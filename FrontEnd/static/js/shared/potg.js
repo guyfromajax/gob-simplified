@@ -69,7 +69,8 @@ function inferTeamFromBoxScoreKey(key, teamCtx) {
 
 function getPlayerImage(player) {
   const id = player.playerId || player._id || player.player_id || '';
-  return player.photo || (id ? `/images/players/${id}.png` : '/images/players/generic_headshot.png');
+  const prefix = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static' : '');
+  return player.photo || (id ? `${prefix}/images/players/${id}.png` : `${prefix}/images/players/generic_headshot.png`);
 }
 
 function buildCandidates(gameData, scoreOverride = null) {

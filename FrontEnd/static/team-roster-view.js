@@ -800,7 +800,7 @@ function createCardFront(player) {
   // Player image
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `/images/players/${player._id}.png`;
+  img.src = player.photo || `${staticPrefix}/images/players/${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
     img.style.display = 'none';

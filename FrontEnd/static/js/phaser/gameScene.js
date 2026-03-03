@@ -641,11 +641,12 @@ export function createGameScene(Phaser) {
         
         if (!tooltip) return;
         
-        // Set player image
-        const playerPhoto = player.photo || `/images/players/${playerId}.png`;
+        // Set player image (use static prefix for localhost)
+        const base = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') ? '/static' : '');
+        const playerPhoto = player.photo || `${base}/images/players/${playerId}.png`;
         image.src = playerPhoto;
         image.onerror = () => {
-          image.src = '/images/players/generic_headshot.png'; // Fallback image
+          image.src = `${base}/images/players/generic_headshot.png`;
         };
         
         // Get current player stats (including current energy)

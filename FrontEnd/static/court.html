@@ -4371,7 +4371,7 @@
       
       // Set intended shooter headshot
       if (data.intendedShooterId) {
-        const photoUrl = `/images/players/${data.intendedShooterId}.png`;
+        const photoUrl = API_CONFIG.buildStaticPath(`/images/players/${data.intendedShooterId}.png`);
         headshotEl.src = photoUrl;
         headshotEl.style.display = 'block';
         
@@ -4532,7 +4532,7 @@
         }
       } else {
         // Away team has ball - show on away side (left)
-        awayHeadshot.src = ballHandlerSprite.photo || `/images/players/${ballHandlerId}.png`;
+        awayHeadshot.src = ballHandlerSprite.photo || API_CONFIG.buildStaticPath(`/images/players/${ballHandlerId}.png`);
         awayHeadshot.className = 'active-player-headshot has-ball';
         awayRole.textContent = '🏀';
         awayRole.className = 'player-role-icon ball';
@@ -4541,7 +4541,7 @@
         
         // Show defender on home side (right) if available
         if (defenderSprite) {
-          homeHeadshot.src = defenderSprite.photo || `/images/players/${defenderId}.png`;
+          homeHeadshot.src = defenderSprite.photo || API_CONFIG.buildStaticPath(`/images/players/${defenderId}.png`);
           homeHeadshot.className = 'active-player-headshot defender';
           homeRole.textContent = 'D';
           homeRole.className = 'player-role-icon defense';

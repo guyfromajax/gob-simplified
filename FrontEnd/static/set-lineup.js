@@ -885,11 +885,13 @@ function updateSlotDisplay(slot) {
       rightWidth = `${fillPercent}%`;
     }
     
+    const imgBase = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/' : '/images/players/');
+    const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
-        <img class="player-image" src="/images/players/${playerId}.png" 
-             onerror="this.src='/images/players/generic_headshot.png'" alt="${player.name}">
+        <img class="player-image" src="${imgBase}${playerId}.png" 
+             onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
       <div class="player-name">${player.name}</div>
       <div class="player-rating">${rating}</div>
@@ -1830,10 +1832,11 @@ function createCardFront(player) {
     headshotContainer.style.transform = 'scale(1)';
   });
   
-  // Player image
+  // Player image (use static prefix for localhost)
+  const playerImgBase = staticPrefix + '/images/players/';
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `/images/players/${player._id}.png`;
+  img.src = player.photo || `${playerImgBase}${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
     // Fallback to white background if image fails

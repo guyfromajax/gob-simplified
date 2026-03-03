@@ -89,11 +89,11 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
   let potg = null;
   let potgImageUrl = '';
+  const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
+    ? window.API_CONFIG.getStaticPath()
+    : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static' : '');
   try {
-    const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
-      ? window.API_CONFIG.getStaticPath()
-      : '';
-    const { calculatePlayerOfTheGame } = await import(`${staticBase}/js/shared/potg.js`);
+    const { calculatePlayerOfTheGame } = await import((staticBase || '') + '/js/shared/potg.js');
     let potgGameData = gameData || null;
     if (!potgGameData && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
       const resp = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
@@ -154,9 +154,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
             <div class="potg-image-row">
               <img
                 class="potg-image"
-                src="${potgImageUrl || '/images/players/generic_headshot.png'}"
+                src="${potgImageUrl || (staticBase + '/images/players/generic_headshot.png')}"
                 alt="${potg.name}"
-                onerror="this.onerror=null;this.src='/images/players/generic_headshot.png';"
+                onerror="this.onerror=null;this.src='${staticBase}/images/players/generic_headshot.png';"
               />
             </div>
             <div class="potg-meta-row potg-player-name" style="color: ${potg.teamColor || '#1a1a2e'};">${potg.name}</div>

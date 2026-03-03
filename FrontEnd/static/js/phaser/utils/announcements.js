@@ -9,6 +9,14 @@ import gameStore from '../../state/gameStore.js';
 
 let currentAnnouncement = null;
 
+/** Build player image URL with static prefix for current environment (localhost vs production). */
+function getPlayerImageUrl(photo, playerId) {
+  const base = (typeof window !== 'undefined' && window.API_CONFIG?.buildStaticPath)
+    ? window.API_CONFIG.buildStaticPath('/images/players/')
+    : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/');
+  return photo || (playerId ? `${base}${playerId}.png` : '');
+}
+
 /** Resolve team secondary color from scene (home/away by team_id). Returns hex string or fallback. */
 export function getSecondaryColorForTeam(scene, teamId) {
   if (!scene?.simData || teamId == null) return '#333333';
@@ -163,7 +171,7 @@ function createHeadshotElement(playerData, scale = 1.0) {
   container.style.backgroundPosition = 'center';
 
   const img = document.createElement('img');
-  img.src = playerData.photo || `/images/players/${playerData.playerId}.png`;
+  img.src = getPlayerImageUrl(playerData.photo, playerData.playerId);
   img.alt = 'Player';
   img.style.width = '100%';
   img.style.height = '100%';
@@ -257,7 +265,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     headshotContainer.style.backgroundPosition = 'center';
 
     const img = document.createElement('img');
-    img.src = playerData.photo || `/images/players/${playerData.playerId}.png`;
+    img.src = getPlayerImageUrl(playerData.photo, playerData.playerId);
     img.alt = 'Player';
     img.style.width = '100%';
     img.style.height = '100%';
