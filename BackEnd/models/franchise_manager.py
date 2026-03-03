@@ -99,7 +99,9 @@ class FranchiseManager:
         self.db = db
         self.teams = self.load_teams()
         self.week = 1
-        self.schedule_manager = ScheduleManager(self.teams)
+        # Schedule uses Conference 1 only (8 teams) for round-robin; full team list still used for FTD etc.
+        conference_1_teams = [t for t in self.teams if t.get("conference") == 1]
+        self.schedule_manager = ScheduleManager(conference_1_teams)
         self.recruit_manager = RecruitManager(self.db)
         self.schedule = []
         self.franchise_id = None
