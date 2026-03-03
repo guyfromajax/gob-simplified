@@ -1,4 +1,4 @@
-id	school	mascot	team_id	primary_color	secondary_color	conference	region	prestige
+id	team	mascot	team_id	primary_color	secondary_color	conference	region	prestige
 1	Bentley-Truman	Sterling Knights	BENTLEY_TRUMAN	#4066b2	#ffffff	1	A	630
 2	Ocean City	Admirals	OCEAN_CITY	#2a2168	#f2d045	1	A	536
 3	Lancaster	Johnnies	LANCASTER	#d24a1b	#000000	1	A	537

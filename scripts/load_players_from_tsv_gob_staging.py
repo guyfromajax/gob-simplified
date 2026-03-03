@@ -1,7 +1,8 @@
 """
 Load players from teams/all_players_with_team_names.txt into gob-staging universal players collection.
 Uses last column as team name; ignores player_type. Backfills team player_ids.
-Run from repo root: python3 scripts/load_players_from_tsv_gob_staging.py
+If run after repopulating teams, pass --replace to clear existing players first (avoids duplicates).
+Run from repo root: python3 scripts/load_players_from_tsv_gob_staging.py [--replace]
 """
 import os
 import sys
@@ -66,8 +67,16 @@ def main():
         print(f"❌ File not found: {TSV_PATH}")
         sys.exit(1)
 
+    replace = "--replace" in sys.argv
     players_coll = client[DB_NAME]["players"]
     teams_coll = client[DB_NAME]["teams"]
+
+    if replace:
+        deleted = players_coll.delete_many({}).deleted_count
+        print(f"[{DB_NAME}] Cleared {deleted} existing player(s).")
+        # Reset team player_ids so backfill doesn't append to stale refs
+        teams_coll.update_many({}, {"$set": {"player_ids": []}})
+        print(f"[{DB_NAME}] Reset all team player_ids to [].")
 
     with open(TSV_PATH) as f:
         lines = [ln.rstrip("\n\r") for ln in f.readlines()]
