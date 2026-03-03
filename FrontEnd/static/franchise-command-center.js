@@ -93,34 +93,85 @@ function populateTop(data) {
   document.getElementById('stat-rank').textContent = `Nat'l Rank: ${data.rank || '--'}`;
 }
 
-function renderStandings(data) {
+let standingsDataCache = null;
+
+function buildTeamLink(t) {
+  const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+  const teamLink = document.createElement('a');
+  teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
+  teamLink.textContent = t.name;
+  teamLink.style.color = '#4a90e2';
+  teamLink.style.textDecoration = 'none';
+  teamLink.style.cursor = 'pointer';
+  teamLink.addEventListener('mouseenter', () => { teamLink.style.textDecoration = 'underline'; });
+  teamLink.addEventListener('mouseleave', () => { teamLink.style.textDecoration = 'none'; });
+  return teamLink;
+}
+
+function renderStandings(data, selectedRegion) {
   if (!data) return;
-  const tbody = document.getElementById('standings-body');
-  tbody.innerHTML = '';
-  (data.standings || []).forEach(t => {
-    teamIdNameMap[t.team_id] = t.name;
-    const tr = document.createElement('tr');
-    
-    // Make team name clickable
-    const teamNameTd = document.createElement('td');
-    const teamLink = document.createElement('a');
-    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-    teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
-    teamLink.textContent = t.name;
-    teamLink.style.color = '#4a90e2';
-    teamLink.style.textDecoration = 'none';
-    teamLink.style.cursor = 'pointer';
-    teamLink.addEventListener('mouseenter', () => {
-      teamLink.style.textDecoration = 'underline';
+  const list = data.standings || [];
+  list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
+
+  selectedRegion = selectedRegion || 'A';
+  const container = document.getElementById('standings-by-region');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
+  const byConference = {};
+  byRegion.forEach(t => {
+    const c = t.conference != null ? t.conference : 0;
+    if (!byConference[c]) byConference[c] = [];
+    byConference[c].push(t);
+  });
+  const confNumbers = Object.keys(byConference).map(Number).sort((a, b) => a - b);
+
+  confNumbers.forEach(confNum => {
+    const teams = byConference[confNum];
+    teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
+
+    const heading = document.createElement('h4');
+    heading.className = 'standings-conference-heading';
+    heading.textContent = `Conference ${selectedRegion}${confNum}`;
+    container.appendChild(heading);
+
+    const scrollWrap = document.createElement('div');
+    scrollWrap.className = 'scroll-x';
+    const table = document.createElement('table');
+    table.className = 'leaders-table standings-conference-table';
+    table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
+    const tbody = table.querySelector('tbody');
+    teams.forEach(t => {
+      const tr = document.createElement('tr');
+      const teamTd = document.createElement('td');
+      teamTd.appendChild(buildTeamLink(t));
+      tr.appendChild(teamTd);
+      tr.appendChild(document.createElement('td')).textContent = t.W;
+      tr.appendChild(document.createElement('td')).textContent = t.L;
+      tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
+      tr.appendChild(document.createElement('td')).textContent = t.PF;
+      tr.appendChild(document.createElement('td')).textContent = t.PA;
+      tr.appendChild(document.createElement('td')).textContent = t.next || '';
+      tbody.appendChild(tr);
     });
-    teamLink.addEventListener('mouseleave', () => {
-      teamLink.style.textDecoration = 'none';
+    scrollWrap.appendChild(table);
+    container.appendChild(scrollWrap);
+  });
+
+  document.querySelectorAll('.standings-region-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
+  });
+}
+
+function bindStandingsRegionButtons() {
+  document.querySelectorAll('.standings-region-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const region = btn.getAttribute('data-region');
+      if (standingsDataCache) renderStandings(standingsDataCache, region);
     });
-    teamNameTd.appendChild(teamLink);
-    
-    tr.appendChild(teamNameTd);
-    tr.innerHTML += `<td>${t.W}</td><td>${t.L}</td><td>${t.pct.toFixed(3)}</td><td>${t.PF}</td><td>${t.PA}</td><td>${t.next}</td>`;
-    tbody.appendChild(tr);
   });
 }
 
@@ -134,7 +185,15 @@ function renderRankings(rankings, showAll) {
   const toShow = showAll ? rankings : rankings.slice(0, 25);
   toShow.forEach((r) => {
     const li = document.createElement('li');
-    li.textContent = `${r.natl_rank}. ${r.team_name}`;
+    li.appendChild(document.createTextNode(`${r.natl_rank}. `));
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = r.team_name;
+    if (r.conference === 1) {
+      nameSpan.className = 'rankings-team conference-1';
+      nameSpan.style.color = r.primary_color || '#000';
+      nameSpan.style.fontWeight = 'bold';
+    }
+    li.appendChild(nameSpan);
     listEl.appendChild(li);
   });
 }
@@ -1058,7 +1117,9 @@ async function init() {
   const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`);
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
-  renderStandings(standingsData);
+  standingsDataCache = standingsData;
+  renderStandings(standingsData, 'A');
+  bindStandingsRegionButtons();
   
     const scheduleStartTime = performance.now();
     const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);

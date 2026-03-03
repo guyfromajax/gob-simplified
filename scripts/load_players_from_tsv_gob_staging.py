@@ -1,8 +1,12 @@
 """
 Load players from teams/all_players_with_team_names.txt into gob-staging universal players collection.
 Uses last column as team name; ignores player_type. Backfills team player_ids.
-If run after repopulating teams, pass --replace to clear existing players first (avoids duplicates).
-Run from repo root: python3 scripts/load_players_from_tsv_gob_staging.py [--replace]
+
+DESTRUCTIVE: --replace deletes ALL players in gob-staging.players and resets ALL
+team player_ids to []. You must also pass --yes to confirm.
+  python3 scripts/load_players_from_tsv_gob_staging.py              # append from TSV (no delete)
+  python3 scripts/load_players_from_tsv_gob_staging.py --replace --yes   # wipe + reload (requires --yes)
+Run from repo root.
 """
 import os
 import sys
@@ -37,17 +41,17 @@ DB_NAME = "gob-staging"
 TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
 GENERIC_HEADSHOT = "/static/images/players/generic_headshot.png"
 
-# Column indices (skip player_type at 4 for DB)
+# Column indices (no player_type column)
 IDX = {
     "first_name": 0,
     "last_name": 1,
     "year": 2,
     "jersey": 3,
-    "height": 5,
-    "weight": 6,
-    "SC": 7, "SH": 8, "ID": 9, "OD": 10, "PS": 11, "BH": 12,
-    "RB": 13, "ST": 14, "AG": 15, "ND": 16, "IQ": 17, "FT": 18,
-    "team": 19,
+    "height": 4,
+    "weight": 5,
+    "SC": 6, "SH": 7, "ID": 8, "OD": 9, "PS": 10, "BH": 11,
+    "RB": 12, "ST": 13, "AG": 14, "ND": 15, "IQ": 16, "FT": 17,
+    "team": 18,
 }
 ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
 
@@ -68,10 +72,17 @@ def main():
         sys.exit(1)
 
     replace = "--replace" in sys.argv
+    confirm_yes = "--yes" in sys.argv
     players_coll = client[DB_NAME]["players"]
     teams_coll = client[DB_NAME]["teams"]
 
     if replace:
+        if not confirm_yes:
+            print("❌ --replace will DELETE ALL players in gob-staging and reset all team player_ids.")
+            print("   Add --yes to confirm: python3 scripts/load_players_from_tsv_gob_staging.py --replace --yes")
+            sys.exit(1)
+        current = players_coll.count_documents({})
+        print(f"⚠️  DESTRUCTIVE: Deleting all {current} player(s) from {DB_NAME}.players and resetting all team player_ids.")
         deleted = players_coll.delete_many({}).deleted_count
         print(f"[{DB_NAME}] Cleared {deleted} existing player(s).")
         # Reset team player_ids so backfill doesn't append to stale refs

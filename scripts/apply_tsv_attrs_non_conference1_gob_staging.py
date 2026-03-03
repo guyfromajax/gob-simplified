@@ -1,7 +1,8 @@
 """
-Read teams/all_players_with_team_names.txt and update gob-staging universal
-players collection: set attributes (SC..FT), anchor_* for those 12, and
-recomputed position_ratings. Matches players by first_name, last_name, team.
+Update non-Conference 1 player documents in gob-staging.players with attribute
+values from teams/all_players_with_team_names.txt (the 12 attributes only:
+SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, plus anchor_* and position_ratings).
+Conference 1 players are skipped. Matches by first_name, last_name, team.
 """
 import os
 import sys
@@ -34,7 +35,11 @@ from pymongo import UpdateOne
 DB_NAME = "gob-staging"
 TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
 
-# Column indices (no player_type column)
+CONFERENCE_1 = {
+    "Bentley-Truman", "Morristown", "Four Corners", "South Lancaster",
+    "Lancaster", "Xavien", "Little York", "Ocean City",
+}
+
 IDX = {
     "first_name": 0, "last_name": 1, "year": 2, "jersey": 3,
     "height": 4, "weight": 5,
@@ -69,6 +74,7 @@ def main():
         print("❌ No data rows.")
         sys.exit(1)
 
+    skipped_conf1 = 0
     ops = []
     for line in lines[1:]:
         if not line.strip():
@@ -76,9 +82,12 @@ def main():
         row = line.split("\t")
         if len(row) <= IDX["team"]:
             continue
+        team = row[IDX["team"]].strip()
+        if team in CONFERENCE_1:
+            skipped_conf1 += 1
+            continue
         first = row[IDX["first_name"]].strip()
         last = row[IDX["last_name"]].strip()
-        team = row[IDX["team"]].strip()
         if not first or not last or not team:
             continue
         attrs = {k: _int(row[IDX[k]], 0) for k in ATTR_KEYS}
@@ -101,7 +110,8 @@ def main():
         updated = result.modified_count
     else:
         updated = 0
-    print(f"[{DB_NAME}] Updated {updated} players (12 attrs + anchor_* + position_ratings). {len(ops)} rows from TSV.")
+    print(f"[{DB_NAME}] Updated {updated} non-Conference 1 players (12 attrs + anchor_* + position_ratings).")
+    print(f"  Skipped {skipped_conf1} Conference 1 rows. {len(ops)} update ops sent.")
 
 
 if __name__ == "__main__":

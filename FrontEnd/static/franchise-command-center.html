@@ -75,14 +75,17 @@
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
-        <div class="scroll-x">
-          <table class="leaders-table" id="standings-table">
-            <thead>
-              <tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr>
-            </thead>
-            <tbody id="standings-body"></tbody>
-          </table>
+        <div class="standings-region-toggle-wrap">
+          <button type="button" class="standings-region-btn active" data-region="A">Region A</button>
+          <button type="button" class="standings-region-btn" data-region="B">Region B</button>
+          <button type="button" class="standings-region-btn" data-region="C">Region C</button>
+          <button type="button" class="standings-region-btn" data-region="D">Region D</button>
+          <button type="button" class="standings-region-btn" data-region="E">Region E</button>
+          <button type="button" class="standings-region-btn" data-region="F">Region F</button>
+          <button type="button" class="standings-region-btn" data-region="G">Region G</button>
+          <button type="button" class="standings-region-btn" data-region="H">Region H</button>
         </div>
+        <div id="standings-by-region" class="standings-by-region"></div>
       </div>
       <div id="roster-tab" class="tab-content">
         <div class="scroll-x">

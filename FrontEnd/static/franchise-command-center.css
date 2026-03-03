@@ -239,3 +239,62 @@
   border-bottom: 1px solid #eee;
   font-family: 'Inter', sans-serif;
 }
+
+.rankings-list li .rankings-team.conference-1 {
+  font-weight: bold;
+}
+
+/* Standings tab: region toggles and conference sections */
+.standings-region-toggle-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.standings-region-btn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.standings-region-btn:hover {
+  background: #f0f7ff;
+}
+.standings-region-btn.active {
+  background: #4065af;
+  color: #fff;
+}
+.standings-by-region {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.standings-conference-heading {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #333;
+}
+.standings-conference-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.standings-conference-table th,
+.standings-conference-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+.standings-conference-table th {
+  font-weight: 600;
+  color: #555;
+}
+#standings-tab .scroll-x {
+  overflow-x: auto;
+  margin-bottom: 8px;
+}

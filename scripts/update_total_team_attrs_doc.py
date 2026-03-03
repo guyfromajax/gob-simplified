@@ -85,22 +85,36 @@ def main() -> int:
             p = doc.get("prestige")
             team_prestige[name] = int(p) if p is not None else 0
 
-    # Sort by total desc, then build table rows
-    sorted_teams = sorted(
+    # Section 1: Rank by total team attributes (prestige on the right)
+    sorted_by_attrs = sorted(
         team_totals.items(),
         key=lambda x: (-x[1], x[0]),
     )
-
     lines = [
         "| Rank | Team | Total team attributes | Prestige |",
         "|------|------|----------------------|----------|",
     ]
-    for rank, (team_name, total) in enumerate(sorted_teams, start=1):
+    for rank, (team_name, total) in enumerate(sorted_by_attrs, start=1):
         prestige = team_prestige.get(team_name, 0)
         lines.append(f"| {rank} | {team_name} | {total} | {prestige} |")
 
+    # Section 2: Rank by prestige (total team attributes on the right)
+    sorted_by_prestige = sorted(
+        team_totals.keys(),
+        key=lambda name: (-team_prestige.get(name, 0), name),
+    )
+    lines.append("")
+    lines.append("## Ranked by Prestige")
+    lines.append("")
+    lines.append("| Rank | Team | Prestige | Total team attributes |")
+    lines.append("|------|------|----------|----------------------|")
+    for rank, team_name in enumerate(sorted_by_prestige, start=1):
+        prestige = team_prestige.get(team_name, 0)
+        total = team_totals.get(team_name, 0)
+        lines.append(f"| {rank} | {team_name} | {prestige} | {total} |")
+
     DOC_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"✅ Updated {DOC_PATH} with {len(sorted_teams)} teams (from {DB_NAME})")
+    print(f"✅ Updated {DOC_PATH} with {len(sorted_by_attrs)} teams (from {DB_NAME})")
     return 0
 
 

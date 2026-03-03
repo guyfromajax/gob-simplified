@@ -1829,12 +1829,17 @@ def command_center_data(
                 ))
                 if ftd_rank_docs:
                     team_ids = [d["team_id"] for d in ftd_rank_docs if d.get("team_id") is not None]
-                    teams_names = {str(t["_id"]): t.get("name", "?") for t in db.teams.find(
+                    teams_docs = {str(t["_id"]): t for t in db.teams.find(
                         {"_id": {"$in": team_ids}},
-                        {"name": 1}
+                        {"name": 1, "primary_color": 1, "conference": 1}
                     )}
                     rankings = [
-                        {"natl_rank": d.get("natl_rank", 128), "team_name": teams_names.get(str(d["team_id"]), "?")}
+                        {
+                            "natl_rank": d.get("natl_rank", 128),
+                            "team_name": teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
+                            "primary_color": teams_docs.get(str(d["team_id"]), {}).get("primary_color") or "#000000",
+                            "conference": teams_docs.get(str(d["team_id"]), {}).get("conference"),
+                        }
                         for d in ftd_rank_docs
                     ]
                     rankings.sort(key=lambda x: x["natl_rank"])
@@ -1966,7 +1971,10 @@ def standings(franchise_id: str, profile: bool = False):
         team_list = _ftd_team_list_for_franchise(franchise_id)
         standings_data = calculate_franchise_standings(franchise_results, team_list)
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
-        teams = list(db.teams.find({"_id": {"$in": team_ids_list}}, {"name": 1, "_id": 1}))
+        teams = list(db.teams.find(
+            {"_id": {"$in": team_ids_list}},
+            {"name": 1, "_id": 1, "region": 1, "conference": 1}
+        ))
         output = []
         for t in teams:
             team_id_str = str(t["_id"])
@@ -1981,6 +1989,8 @@ def standings(franchise_id: str, profile: bool = False):
             output.append({
                 "team_id": team_id_str,
                 "name": t.get("name", ""),
+                "region": t.get("region") or "",
+                "conference": t.get("conference"),
                 "W": wins,
                 "L": losses,
                 "pct": pct,
