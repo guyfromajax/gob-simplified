@@ -649,15 +649,16 @@ class ScheduleManager:
             region_weeks.append(week)
         out = out[: self.CONFERENCE_WEEKS] + region_weeks
 
-        # Weeks 23–26: out-of-region (4 region-pair slots per week)
-        # Pairings: (A,B),(C,D),(E,F),(G,H); (A,C),(B,D),(E,G),(F,H); (A,D),(B,C),(E,H),(F,G); (A,E),(B,F),(C,G),(D,H)
+        # Weeks 23–26: out-of-region. Each team gets 2 home and 2 away OOR games.
+        # Rotate which 8 teams in each region are home each week: week w uses indices
+        # (w*4+j)%16 for j in 0..7 as home, (w*4+8+j)%16 as away.
         pairings = [
             [("A", "B"), ("C", "D"), ("E", "F"), ("G", "H")],
             [("A", "C"), ("B", "D"), ("E", "G"), ("F", "H")],
             [("A", "D"), ("B", "C"), ("E", "H"), ("F", "G")],
             [("A", "E"), ("B", "F"), ("C", "G"), ("D", "H")],
         ]
-        for pairing_list in pairings:
+        for week_idx, pairing_list in enumerate(pairings):
             week = []
             for r1, r2 in pairing_list:
                 ids1 = self._by_region.get(r1, [])
@@ -666,13 +667,17 @@ class ScheduleManager:
                     raise ValueError(
                         "Region %s or %s has wrong size." % (r1, r2)
                     )
-                # 16 games: 8 with r1 home, 8 with r2 home
+                w = week_idx
+                # 8 games: r1 home (r1 indices (w*4+j)%16), r2 away (same slot pattern)
                 for i in range(8):
-                    week.append((ids2[i], ids1[i]))
-                for i in range(8, 16):
-                    week.append((ids1[i], ids2[i]))
+                    week.append((ids2[(w * 4 + i) % 16], ids1[(w * 4 + i) % 16]))
+                # 8 games: r1 away, r2 home
+                for i in range(8):
+                    week.append((ids1[(w * 4 + 8 + i) % 16], ids2[(w * 4 + i) % 16]))
             out.append(week)
 
+        # Randomize week order: same 14 conf + 8 region + 4 OOR blocks, shuffled each new season
+        random.shuffle(out)
         return out
 
 class RecruitManager:
