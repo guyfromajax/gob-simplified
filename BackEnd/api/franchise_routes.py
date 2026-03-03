@@ -18,7 +18,6 @@ from BackEnd.db import (
     franchise_team_data_collection,
     franchise_players_data_collection,
     franchise_recruits_data_collection,
-    normalize_player_id_for_query,
 )
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
@@ -3213,15 +3212,15 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         
         # Get year from core player data
         player_query_start = time.time()
-        query_id = normalize_player_id_for_query(pid_str)
-        core_player = db.players.find_one({"_id": query_id}, {"year": 1})
+        core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
         player_query_time = (time.time() - player_query_start) * 1000
         if player_query_time > 100:  # Only log slow queries (>100ms)
             # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: players.find_one(_id={pid_str}): {player_query_time:.2f}ms")
             pass
         if not core_player:
             try:
-                core_player = db.players.find_one({"_id": query_id}, {"year": 1})
+                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
             except:
                 pass
         
@@ -3362,11 +3361,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     for player in players_for_training:
         pid = player["_id"]
         # Get player's height (from core collection or franchise meta)
-        query_id = normalize_player_id_for_query(pid)
-        core_player = db.players.find_one({"_id": query_id}, {"height": 1})
+        # Try as string first (UUID), fall back to ObjectId if that fails
+        core_player = db.players.find_one({"_id": pid}, {"height": 1})
         if not core_player:
             try:
-                core_player = db.players.find_one({"_id": query_id}, {"height": 1})
+                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                core_player = db.players.find_one({"_id": pid}, {"height": 1})
             except:
                 pass
         height = core_player.get("height") if core_player else None
@@ -3504,11 +3504,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
 
                 # Match user-team training path: include class year so year-based
                 # decay and max adjustments are applied correctly for CPU teams.
-                query_id = normalize_player_id_for_query(pid_str)
-                computer_core_player = db.players.find_one({"_id": query_id}, {"year": 1})
+                computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
                 if not computer_core_player:
                     try:
-                        computer_core_player = db.players.find_one({"_id": query_id}, {"year": 1})
+                        # Player IDs are UUID strings; keep direct lookup.
+                        computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
                     except Exception:
                         computer_core_player = None
                 
@@ -3575,12 +3575,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
             # Recalculate position ratings for each computer player after training
             for player in updated_computer_players:
                 pid = player["_id"]
-                query_id = normalize_player_id_for_query(pid)
-                core_player = db.players.find_one({"_id": query_id}, {"height": 1})
+                core_player = db.players.find_one({"_id": pid}, {"height": 1})
                 if not core_player:
                     try:
-                        core_player = db.players.find_one({"_id": query_id}, {"height": 1})
-                    except Exception:
+                        # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                        core_player = db.players.find_one({"_id": pid}, {"height": 1})
+                    except:
                         pass
                 height = core_player.get("height") if core_player else None
                 
@@ -3934,8 +3934,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 if not has_all_attrs:
                     # Merge with core collection for backward compatibility
                     from BackEnd.db import players_collection
-                    query_id = normalize_player_id_for_query(pid_str)
-                    core_player = players_collection.find_one({"_id": query_id}, {"attributes": 1})
+                    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                    core_player = players_collection.find_one({"_id": pid_str}, {"attributes": 1})
                     if core_player:
                         core_attributes = core_player.get("attributes", {})
                         attrs = {**core_attributes, **attrs}  # Tournament attributes override core

@@ -2,7 +2,6 @@ import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from pymongo.errors import PyMongoError
-from bson import ObjectId
 
 # ✅ LOCAL DEV: Load .env.local if it exists (dev), otherwise use .env (Railway)
 # This allows local dev to use different MongoDB (local or Atlas) without affecting Railway
@@ -230,21 +229,3 @@ def ensure_users_username_index():
         )
     except Exception as e:
         print(f"⚠️ [DB] ensure_users_username_index: {e}", file=sys.stderr, flush=True)
-
-
-def normalize_player_id_for_query(pid):
-    """
-    Convert player id to ObjectId for DB query when it's a 24-char hex string.
-    Players collection uses ObjectId _id; callers often pass string from URL/JSON.
-    Returns ObjectId(pid) when valid, else pid unchanged.
-    """
-    if pid is None:
-        return pid
-    if isinstance(pid, ObjectId):
-        return pid
-    if isinstance(pid, str) and len(pid) == 24 and all(c in "0123456789abcdefABCDEF" for c in pid):
-        try:
-            return ObjectId(pid)
-        except Exception:
-            return pid
-    return pid

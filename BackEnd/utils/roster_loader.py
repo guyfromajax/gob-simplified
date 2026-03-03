@@ -17,8 +17,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
     import time
     import logging
     logger = logging.getLogger(__name__)
-    from bson import ObjectId  # ✅ FIX: Import at function level so it's available throughout
-    
+
     total_start = time.time()
     try:
         # Find the team document by name
@@ -52,14 +51,8 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
                     franchise_players = {d["player_id"]: d for d in fpd_docs}
-                    # ✅ PERFORMANCE: One batch find for universal player bios instead of find_one per player
-                    oids = []
-                    for pid in team_player_ids:
-                        try:
-                            oids.append(ObjectId(pid) if isinstance(pid, str) else pid)
-                        except Exception:
-                            oids.append(pid)
-                    base_docs = list(players_collection.find({"_id": {"$in": oids}}))
+                    # Query players by string id so both gob (string _id) and gob-staging after migration work.
+                    base_docs = list(players_collection.find({"_id": {"$in": pid_list}}))
                     base_by_id = {str(d["_id"]): dict(d) for d in base_docs}
 
                     players = []

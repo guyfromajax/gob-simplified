@@ -166,6 +166,8 @@ When a steal leads to a fast break:
 - Displayed for: Steals, turnovers, fouls, AND-1 situations
 - Fallback: Announcement still displays even if player data is missing (matches AND-1 pattern for consistency)
 
+**How we access player images:** Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, headshot `img.src` is `playerData.photo || \`/images/players/${playerData.playerId}.png\``. No static path prefix in this file; `/images/players/` is assumed correct for the environment. Player ids are strings in both gob and gob-staging (see `scripts/migrate_gob_staging_players_to_string_id.py`).
+
 ### Key Files
 
 **Frontend:**
