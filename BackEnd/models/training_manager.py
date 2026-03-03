@@ -2,7 +2,12 @@ from enum import Enum
 from typing import List, Dict
 import random
 from pymongo.collection import Collection
-from BackEnd.db import players_collection, teams_collection, training_log_collection  # adjust if needed
+from BackEnd.db import (
+    players_collection,
+    teams_collection,
+    training_log_collection,
+    normalize_player_id_for_query,
+)
 from datetime import datetime
 
 
@@ -31,7 +36,8 @@ class TrainingManager:
         if not self.team_doc:
             raise ValueError(f"❌ No team found with name {self.team_name}")
 
-        valid_ids = self.team_doc.get("player_ids", [])
+        raw_ids = self.team_doc.get("player_ids", [])
+        valid_ids = [normalize_player_id_for_query(pid) for pid in raw_ids]
         self.players = list(players_collection.find({"_id": {"$in": valid_ids}}))
 
         if not self.players:
@@ -268,7 +274,8 @@ def save_training_results(
     # --- Player Updates ---
     for player_id, updates in player_updates.items():
         update_fields = {f"attributes.{k}": v for k, v in updates.items()}
-        players_collection.update_one({"_id": player_id}, {"$set": update_fields})
+        query_id = normalize_player_id_for_query(player_id)
+        players_collection.update_one({"_id": query_id}, {"$set": update_fields})
 
     # --- Team Updates ---
     TEAM_FIELDS = [

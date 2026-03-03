@@ -12,6 +12,7 @@ from BackEnd.db import (
     games_collection,
     teams_collection,
     franchise_players_data_collection,
+    normalize_player_id_for_query,
 )
 from BackEnd.utils.roster_loader import load_roster
 
@@ -298,8 +299,9 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     tournament_inc_doc[f"players.{str(query_pid)}.season.GP"] = 1
                     
                     # Get player metadata from players_collection (for name, team, etc.)
+                    player_query_id = normalize_player_id_for_query(query_pid)
                     player_doc = players_collection.find_one(
-                        {"_id": query_pid},
+                        {"_id": player_query_id},
                         {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1},
                     )
                     if not player_doc:
@@ -765,8 +767,9 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
         ) + 1
 
         # ✅ SS&S: Set meta in players object if not already present
+        player_query_id = normalize_player_id_for_query(pid)
         meta = players_collection.find_one(
-            {"_id": pid}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
+            {"_id": player_query_id}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
         )
         if meta:
             # Only set meta if it doesn't already exist (preserve existing meta)
@@ -1453,9 +1456,9 @@ def finalize_game(
             if pid_str not in existing_players:
                 # Get player metadata from players_collection
                 try:
-                    # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
+                    player_query_id = normalize_player_id_for_query(pid_str)
                     player_doc = players_collection.find_one(
-                        {"_id": pid_str},
+                        {"_id": player_query_id},
                         {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
                     )
                     if player_doc:
@@ -2001,8 +2004,9 @@ def finalize_game(
         for pid_str in processed_player_ids:
             if pid_str not in existing_fpd_ids:
                 try:
+                    player_query_id = normalize_player_id_for_query(pid_str)
                     player_doc = players_collection.find_one(
-                        {"_id": pid_str},
+                        {"_id": player_query_id},
                         {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
                     )
                     if player_doc:

@@ -39,6 +39,7 @@ try:
         tournaments_collection,
         franchises_collection,
         franchise_players_data_collection,
+        normalize_player_id_for_query,
     )
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -5275,13 +5276,7 @@ try:
     ):
         try:
             print(f"🔍 Looking up player with ID: {player_id}")
-            # Players collection uses ObjectId for _id; URL passes string — try ObjectId first
-            query_id = player_id
-            if len(player_id) == 24 and all(c in "0123456789abcdefABCDEF" for c in player_id):
-                try:
-                    query_id = ObjectId(player_id)
-                except Exception:
-                    pass
+            query_id = normalize_player_id_for_query(player_id)
             player = players_collection.find_one({"_id": query_id})
             if not player:
                 print(f"❌ Player not found with _id: {player_id}")
