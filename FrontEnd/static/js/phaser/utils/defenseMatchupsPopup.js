@@ -179,6 +179,7 @@ function formatPlayerName(fullName) {
 function createPlayerRow(player, teamType, position, currentMatchups, guardingUserPos = null) {
     const staticPrefix = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') ? '/static' : '');
     const headshotSrc = player.headshot_url ? (staticPrefix + player.headshot_url) : '';
+    const genericHeadshotSrc = staticPrefix + '/images/players/generic_headshot.png';
     const isUserTeam = teamType === 'user';
     const borderColor = isUserTeam 
         ? POSITION_COLORS[position] 
@@ -235,7 +236,7 @@ function createPlayerRow(player, teamType, position, currentMatchups, guardingUs
             <div class="position-square" style="background-color: ${positionSquareColor};">
                 ${position}
             </div>
-            <img class="player-headshot" src="${headshotSrc}" alt="${player.name}" onerror="this.style.display='none';">
+            <img class="player-headshot" src="${headshotSrc}" alt="${player.name}" onerror="this.onerror=null;this.src='${genericHeadshotSrc}';">
             <div class="player-info">
                 <div class="player-name">${formatPlayerName(player.name)}</div>
                 <div class="player-height-weight">${player.height || '--'} · ${player.weight || '--'} lbs</div>

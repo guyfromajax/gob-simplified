@@ -1185,8 +1185,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           img.src = playerPhoto;
           img.alt = event.playerName;
           img.className = 'sim-quarter-player-image';
+          const genericUrl = `${isLocalhost ? '/static' : ''}/images/players/generic_headshot.png`;
           img.onerror = () => {
-            img.style.display = 'none';
+            img.src = genericUrl;
           };
           entry.appendChild(img);
         }

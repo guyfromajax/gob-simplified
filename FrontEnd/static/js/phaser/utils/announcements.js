@@ -9,12 +9,13 @@ import gameStore from '../../state/gameStore.js';
 
 let currentAnnouncement = null;
 
-/** Build player image URL with static prefix for current environment (localhost vs production). */
+/** Build player image URL with static prefix for current environment (localhost vs production). Use generic_headshot when playerId is falsy. */
 function getPlayerImageUrl(photo, playerId) {
   const base = (typeof window !== 'undefined' && window.API_CONFIG?.buildStaticPath)
     ? window.API_CONFIG.buildStaticPath('/images/players/')
     : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/');
-  return photo || (playerId ? `${base}${playerId}.png` : '');
+  const filename = playerId ? `${playerId}.png` : 'generic_headshot.png';
+  return photo || `${base}${filename}`;
 }
 
 /** Resolve team secondary color from scene (home/away by team_id). Returns hex string or fallback. */
@@ -177,7 +178,7 @@ function createHeadshotElement(playerData, scale = 1.0) {
   img.style.height = '100%';
   img.style.objectFit = 'cover';
   img.onerror = () => {
-    img.style.display = 'none';
+    img.src = getPlayerImageUrl(null, null);
   };
   container.appendChild(img);
 
@@ -271,7 +272,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     img.style.height = '100%';
     img.style.objectFit = 'cover';
     img.onerror = () => {
-      img.style.display = 'none';
+      img.src = getPlayerImageUrl(null, null);
     };
     headshotContainer.appendChild(img);
 

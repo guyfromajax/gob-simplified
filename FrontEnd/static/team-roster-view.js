@@ -803,7 +803,7 @@ function createCardFront(player) {
   img.src = player.photo || `${staticPrefix}/images/players/${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
-    img.style.display = 'none';
+    img.src = `${staticPrefix}/images/players/generic_headshot.png`;
   };
   headshotContainer.appendChild(img);
   

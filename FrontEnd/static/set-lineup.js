@@ -1839,8 +1839,7 @@ function createCardFront(player) {
   img.src = player.photo || `${playerImgBase}${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
-    // Fallback to white background if image fails
-    img.style.display = 'none';
+    img.src = staticPrefix + '/images/players/generic_headshot.png';
   };
   headshotContainer.appendChild(img);
   

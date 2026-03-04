@@ -952,23 +952,21 @@ function renderTeamTraits(data, scope) {
   // Sort by default (total descending)
   sortTeamTraitsTable(teamTraitsSortColumn, teamTraitsSortDirection);
   
-  // Setup sortable headers
+  // Setup sortable headers (clone + replace to avoid duplicate listeners when switching scope)
   const headers = document.querySelectorAll('#team-traits-table thead th.sortable');
   headers.forEach(header => {
-    header.style.cursor = 'pointer';
-    header.style.userSelect = 'none';
-    
-    header.addEventListener('click', () => {
-      const attr = header.dataset.attr;
-      
-      // Toggle sort direction if clicking the same column
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const attr = newHeader.dataset.attr;
       if (teamTraitsSortColumn === attr) {
         teamTraitsSortDirection = teamTraitsSortDirection === 'desc' ? 'asc' : 'desc';
       } else {
         teamTraitsSortColumn = attr;
         teamTraitsSortDirection = 'desc';
       }
-      
       sortTeamTraitsTable(attr, teamTraitsSortDirection);
     });
   });
