@@ -335,6 +335,9 @@
   gap: 8px;
   margin-bottom: 16px;
 }
+.schedule-conference-toggle-wrap.schedule-toggles-hidden {
+  display: none;
+}
 .schedule-conference-row {
   display: flex;
   flex-wrap: wrap;

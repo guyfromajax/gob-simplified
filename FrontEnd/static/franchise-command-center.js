@@ -28,6 +28,8 @@ let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let scheduleDataCache = null;       // { schedule, team_id, team_conferences }
 let selectedScheduleConference = 1;  // 1–16; set from userConference on load
+// Set to true to restore 16 conference toggles; false = only show user's conference schedule (no toggles)
+const USE_SCHEDULE_CONFERENCE_TOGGLES = false;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -763,6 +765,12 @@ function getScheduleConferenceLabel(c) {
 function renderScheduleConferenceToggles() {
   const wrap = document.getElementById('schedule-conference-toggle-wrap');
   if (!wrap) return;
+  if (!USE_SCHEDULE_CONFERENCE_TOGGLES) {
+    wrap.innerHTML = '';
+    wrap.classList.add('schedule-toggles-hidden');
+    return;
+  }
+  wrap.classList.remove('schedule-toggles-hidden');
   wrap.innerHTML = '';
   const row1 = document.createElement('div');
   row1.className = 'schedule-conference-row';

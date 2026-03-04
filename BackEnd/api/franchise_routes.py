@@ -3470,6 +3470,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     # ✅ Run training for all computer teams (in unison with user team training)
     # Each computer team gets random allocations and random coaching focus
     # Each team gets separate randomizations for pre-training decay and training
+
+    # TEMPORARY: set to False to restore training for all 128 teams (easy revert)
+    TEMPORARY_CONF1_TRAINING_ONLY = True
     
     # ✅ FTD: Get all FTD documents for this franchise (computer teams)
     all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
@@ -3485,6 +3488,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
             computer_team_doc = db.teams.find_one({"_id": ObjectId(computer_team_id)})
             if not computer_team_doc:
                 logger.warning(f"⚠️ [COMPUTER TRAINING] Team document not found for team_id: {computer_team_id}")
+                continue
+
+            # TEMPORARY: skip computer training for non-Conference 1 teams (revert: remove this block)
+            if TEMPORARY_CONF1_TRAINING_ONLY and computer_team_doc.get("conference") != 1:
                 continue
             
             computer_team_name = computer_team_doc.get("name", "")
