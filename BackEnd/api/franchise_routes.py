@@ -33,7 +33,7 @@ from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
-from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
+from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
     calculate_fb_opp_modifier_change,
@@ -3467,187 +3467,104 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
             {"$set": ftd_update}
         )
 
-    # ✅ Run training for all computer teams (in unison with user team training)
-    # Each computer team gets random allocations and random coaching focus
-    # Each team gets separate randomizations for pre-training decay and training
-
-    # TEMPORARY: set to False to restore training for all 128 teams (easy revert)
-    TEMPORARY_CONF1_TRAINING_ONLY = True
-    
-    # ✅ FTD: Get all FTD documents for this franchise (computer teams)
+    # ✅ Distant training: all non-user teams use template-based training (Distant_Team_Training_System.md)
     all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
-    ftd_by_team_id = {str(doc["team_id"]): doc for doc in all_ftd_docs}
-    
-    for computer_team_id in ftd_by_team_id.keys():
-        # Skip user's team (already processed above)
-        if str(computer_team_id) == str(team_id):
-            continue
-        
-        try:
-            # Get team document to get team name and player_ids
-            computer_team_doc = db.teams.find_one({"_id": ObjectId(computer_team_id)})
-            if not computer_team_doc:
-                logger.warning(f"⚠️ [COMPUTER TRAINING] Team document not found for team_id: {computer_team_id}")
+    training_type = "tc" if is_first_training else "regular"
+    distant_templates = list(db["distant_training"].find({"training_type": training_type}))
+    if not distant_templates:
+        logger.warning(f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams")
+    else:
+        for ftd_doc in all_ftd_docs:
+            computer_team_oid = ftd_doc.get("team_id")
+            if computer_team_oid is None:
                 continue
-
-            # TEMPORARY: skip computer training for non-Conference 1 teams (revert: remove this block)
-            if TEMPORARY_CONF1_TRAINING_ONLY and computer_team_doc.get("conference") != 1:
+            computer_team_id_str = str(computer_team_oid)
+            if computer_team_id_str == str(team_id):
                 continue
-            
-            computer_team_name = computer_team_doc.get("name", "")
-            computer_team_player_ids = computer_team_doc.get("player_ids", [])
-            
-            if not computer_team_player_ids:
-                logger.warning(f"⚠️ [COMPUTER TRAINING] No player_ids found for team_id: {computer_team_id}")
-                continue
-            
-            # Build player list with franchise-specific attributes
-            computer_players_for_training = []
-            for pid in computer_team_player_ids:
-                pid_str = str(pid)
-                computer_franchise_player_data = franchise_players.get(pid_str, {})
-                if not computer_franchise_player_data:
-                    continue
-
-                # Match user-team training path: include class year so year-based
-                # decay and max adjustments are applied correctly for CPU teams.
-                computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
-                if not computer_core_player:
-                    try:
-                        # Player IDs are UUID strings; keep direct lookup.
-                        computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
-                    except Exception:
-                        computer_core_player = None
-                
-                # Build player dict for training
-                player = {
-                    "_id": pid_str,
-                    "first_name": computer_franchise_player_data.get("meta", {}).get("first_name", ""),
-                    "last_name": computer_franchise_player_data.get("meta", {}).get("last_name", ""),
-                    "team": computer_team_name or computer_team_id,
-                    "attributes": computer_franchise_player_data.get("attributes", {}),
-                    "position_ratings": computer_franchise_player_data.get("position_ratings", {}),
-                    "year": computer_core_player.get("year") if computer_core_player else None,
-                }
-                computer_players_for_training.append(player)
-            
-            if not computer_players_for_training:
-                logger.warning(f"⚠️ [COMPUTER TRAINING] No players found for training for team_id: {computer_team_id}")
-                continue
-            
-            # ✅ FTD: Get team data from FTD
-            computer_ftd_doc = ftd_by_team_id.get(str(computer_team_id), {})
-            computer_team_stats = computer_ftd_doc.get("team_attributes", {}).copy()
-            
-            # Get plays, game plan settings, and playbook settings from FTD
-            computer_plays_data = computer_ftd_doc.get("plays", {})
-            computer_strategy_settings = computer_ftd_doc.get("strategy_settings", {})
-            computer_playbook_settings = computer_ftd_doc.get("playbook_settings", {})
-            computer_scouting_data = computer_ftd_doc.get("scouting_data", {})
-            
-            # Initialize plays_data if empty
-            if not computer_plays_data:
-                from BackEnd.api.gameplan_routes import populate_team_plays
-                computer_plays_data = populate_team_plays(mode="franchise")
-            
-            # Initialize scouting_data if empty or missing defense structure
-            if not computer_scouting_data or "defense" not in computer_scouting_data:
-                from BackEnd.models.team_manager import TeamManager
-                temp_team = TeamManager(name=computer_team_name or computer_team_id, mode="franchise")
-                computer_scouting_data = temp_team.scouting_data
-            
-            # Generate random training allocations and coaching focus
-            computer_allocations = generate_random_training_allocations(expected_points)
-            computer_coaching_focus = generate_random_coaching_focus()
-            
-            # Execute training for computer team (includes pre-training conditions and effectiveness decay)
-            # Each team gets separate randomizations (handled by execute_training internally)
-            # Skip pre-training depreciation for first training (training camp) - before any games are played
-            updated_computer_players, updated_computer_team, updated_computer_plays, updated_computer_scouting_data, _ = execute_training(
-                computer_players_for_training,
-                computer_team_stats,
-                computer_allocations,
-                computer_coaching_focus,
-                plays_data=computer_plays_data,
-                strategy_settings=computer_strategy_settings,
-                playbook_settings=computer_playbook_settings,
-                scouting_data=computer_scouting_data,
-                playbook_training_mode="all-plays-even",  # Use even distribution for computer teams
-                skip_pre_training_depreciation=is_first_training  # Skip depreciation for first training (training camp)
-            )
-            
-            # ✅ FTD: Build computer team FTD update
-            computer_ftd_update = {}
-            
-            # Recalculate position ratings for each computer player after training
-            for player in updated_computer_players:
-                pid = player["_id"]
-                core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                if not core_player:
-                    try:
-                        # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
-                        core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                    except:
-                        pass
-                height = core_player.get("height") if core_player else None
-                
-                player_for_ratings = {
-                    "attributes": player.get("attributes", {}),
-                    "height": height,
-                    "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
-                }
-                
-                new_ratings = compute_position_ratings(player_for_ratings)
-                franchise_players_data_collection.update_one(
-                    {"franchise_id": str(req.franchise_id), "player_id": pid},
-                    {"$set": {"position_ratings": new_ratings}},
-                )
-
-            # ✅ FPD: Update computer team players' attributes in franchise_players_data
-            for player in updated_computer_players:
-                pid = player["_id"]
-                attrs = player.get("attributes", {})
-                fpd_set = {}
-                for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
-                    anchor_key = f"anchor_{attr}"
-                    if anchor_key in attrs:
-                        fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
-                        fpd_set[f"attributes.{attr}"] = attrs[attr]
-                if "NG" in attrs:
-                    fpd_set["attributes.NG"] = attrs["NG"]
-                if fpd_set:
-                    franchise_players_data_collection.update_one(
-                        {"franchise_id": str(req.franchise_id), "player_id": pid},
-                        {"$set": fpd_set},
+            try:
+                template = random.choice(distant_templates)
+                team_values = template.get("team_values", {})
+                players_template = template.get("players", {})
+                current_team_attrs = ftd_doc.get("team_attributes", {})
+                ftd_update = {}
+                for attr_name, delta in team_values.items():
+                    if attr_name not in TEAM_ATTR_CLAMPS:
+                        continue
+                    current = current_team_attrs.get(attr_name, 0)
+                    if isinstance(current, (int, float)) and isinstance(delta, (int, float)):
+                        lower, upper = TEAM_ATTR_CLAMPS[attr_name]
+                        delta_val = float(delta) if attr_name == "rebound_modifier" else int(delta)
+                        new_val = current + delta_val
+                        if upper is not None:
+                            new_val = max(lower, min(upper, new_val))
+                        else:
+                            new_val = max(lower, new_val)
+                        if attr_name == "rebound_modifier":
+                            new_val = round(new_val, 2)
+                        else:
+                            new_val = int(round(new_val))
+                        ftd_update[f"team_attributes.{attr_name}"] = new_val
+                if ftd_update:
+                    franchise_team_data_collection.update_one(
+                        {"franchise_id": franchise_id, "team_id": computer_team_oid},
+                        {"$set": ftd_update},
                     )
+                player_order = ftd_doc.get("players")
+                if not player_order:
+                    team_doc = db.teams.find_one({"_id": computer_team_oid}, {"player_ids": 1})
+                    player_order = [str(pid) for pid in (team_doc.get("player_ids") or [])] if team_doc else []
+                else:
+                    player_order = [str(pid) for pid in player_order]
+                for i in range(min(12, len(player_order))):
+                    pid = player_order[i]
+                    player_key = f"player_{i}"
+                    if player_key not in players_template:
+                        continue
+                    fpd = franchise_players.get(pid)
+                    if not fpd:
+                        continue
+                    deltas = players_template[player_key]
+                    current_attrs = fpd.get("attributes", {})
+                    fpd_set = {}
+                    for attr_name, delta in deltas.items():
+                        if not isinstance(delta, (int, float)):
+                            continue
+                        current = current_attrs.get(attr_name, 0) or current_attrs.get(f"anchor_{attr_name}", 0)
+                        try:
+                            cur = int(current) if isinstance(current, (int, float)) else 0
+                        except (TypeError, ValueError):
+                            cur = 0
+                        new_val = cur + int(delta)
+                        new_val = max(PLAYER_ATTR_CLAMP[0], new_val)
+                        fpd_set[f"attributes.{attr_name}"] = new_val
+                        fpd_set[f"attributes.anchor_{attr_name}"] = new_val
+                    if fpd_set:
+                        franchise_players_data_collection.update_one(
+                            {"franchise_id": str(franchise_id), "player_id": pid},
+                            {"$set": fpd_set},
+                        )
+                    core_player = db.players.find_one({"_id": pid}, {"height": 1})
+                    height = core_player.get("height") if core_player else None
+                    updated_attrs = dict(current_attrs)
+                    for k, v in fpd_set.items():
+                        if k.startswith("attributes."):
+                            updated_attrs[k.replace("attributes.", "")] = v
+                    meta = fpd.get("meta", {})
+                    player_for_ratings = {
+                        "attributes": updated_attrs,
+                        "height": height,
+                        "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}",
+                    }
+                    new_ratings = compute_position_ratings(player_for_ratings)
+                    franchise_players_data_collection.update_one(
+                        {"franchise_id": str(franchise_id), "player_id": pid},
+                        {"$set": {"position_ratings": new_ratings}},
+                    )
+                logger.info(f"✅ [DISTANT TRAINING] Applied template for team_id={computer_team_id_str}")
+            except Exception as e:
+                logger.error(f"❌ [DISTANT TRAINING] Error for team_id={computer_team_id_str}: {e}", exc_info=True)
+                continue
 
-            # Update computer team stats (team_attributes) in FTD
-            for field, value in updated_computer_team.items():
-                # Skip non-numeric fields
-                if isinstance(value, dict):
-                    continue
-                computer_ftd_update[f"team_attributes.{field}"] = value
-            
-            # Update computer team plays and scouting data in FTD
-            if updated_computer_plays:
-                computer_ftd_update["plays"] = updated_computer_plays
-            
-            if updated_computer_scouting_data:
-                computer_ftd_update["scouting_data"] = updated_computer_scouting_data
-            
-            # ✅ FTD: Write computer team updates to FTD collection
-            if computer_ftd_update:
-                franchise_team_data_collection.update_one(
-                    {"franchise_id": franchise_id, "team_id": ObjectId(computer_team_id)},
-                    {"$set": computer_ftd_update}
-                )
-            
-            logger.info(f"✅ [COMPUTER TRAINING] Completed training for computer team: {computer_team_name} ({computer_team_id})")
-        
-        except Exception as e:
-            logger.error(f"❌ [COMPUTER TRAINING] Error training computer team {computer_team_id}: {str(e)}")
-            continue
-    
     # Save to franchise document (includes both user team and computer teams)
     db_update_start = time.time()
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})

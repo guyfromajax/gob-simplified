@@ -29,7 +29,7 @@
 8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for training camp: week 1 before first games)
 9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
-11. **Attribute Clamping**: All values clamped to valid ranges (player: min 1, team: defined ranges)
+11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
 12. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
 13. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
 
@@ -169,7 +169,7 @@ The training execution system applies pre-training conditions, allocates trainin
 
 4. **Attribute Clamping**
    - Player attributes: Minimum 1, no maximum
-   - Team attributes: Clamped to defined ranges (see `TEAM_ATTR_CLAMPS` in code)
+   - Team attributes: Clamped to defined ranges (see **Attribute_Clamp_System.md** for full list; implemented as `TEAM_ATTR_CLAMPS` in `training_execution_v2.py`)
 
 5. **Training Report Generation**
    - Calculates changes from original baselines

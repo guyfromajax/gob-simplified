@@ -1,7 +1,8 @@
 
-# 🧠 GOB Agents Reference (`agents.md`)
+# 🧠 Geeked-Out Basketball (GOB) Agents Reference (`agents.md`)
+We are developing a game called Geeked-Out Basketball (GOB for short). Simply put, this is Football Manager for basketball. It's a deep-tactical basketball simulation game that is more about coaching and strategy than about action, animation, or button-mashing.
 
-MACRO OBJECTIVE: We need to build a game engine that is simple, stable, and scalable (SS&S). Use the SS&S lens in every projet you undertake, every file you build, and evey solution you develop. That is the most important component to building this game engine.
+MACRO OBJECTIVE: We're building a game engine that is simple, stable, and scalable (SS&S). Use the SS&S lens in every project you undertake, every file you build, and every solution you develop. That is the most important component to building this game engine.
 
 This file documents key game engine agents, roles, and architectural logic used by the Geeked Out Basketball simulation engine. It exists to help Codex, collaborators, and future developers reason about the system consistently.
 
@@ -13,7 +14,7 @@ This file documents key game engine agents, roles, and architectural logic used 
 A single possession in the game. Each turn contains multiple `steps`.
 
 ### `Step`
-A single animation update within a turn. Typically ~5–8 steps per turn.
+A single animation update within a turn. Typically ~3–8 steps per turn.
 
 ---
 
@@ -114,15 +115,5 @@ Assigns `ballSprite` position to the player with `hasBallAtStep[stepIndex] === t
 - Assigned visually on each step via `setPosition(x, y)`
 - Lives outside the player containers
 
-### Team Logos
-Stored in `/FrontEnd/static/images/team_logos/`  
-Format: `.jpg` or `.webp`  
-Naming convention: `bentley_truman.jpg`, `morristown.jpg`, etc.
-
 ---
 
-## 🔧 In-Progress Logic
-
-- Defensive player AI logic (incomplete)
-- Foul, turnover, and free throw animation support
-- Dynamic `event_type` resolution from `determine_event_type()`

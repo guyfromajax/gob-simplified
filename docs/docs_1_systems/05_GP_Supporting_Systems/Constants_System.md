@@ -68,12 +68,12 @@ Levels 1–5 map to aggression indices 0–4.
 
 ## Team Attribute Ranges
 
-Used for TEAM_ATTR_CLAMPS (e.g. training, team init). Min/max clamp for generated or overridden team attributes.
+Used for TEAM_ATTR_CLAMPS (e.g. training, team init). Min/max clamp for generated or overridden team attributes. Full player and team clamp reference: **docs/docs_1_systems/06_GMO_Supporting_Systems/Attribute_Clamp_System.md**.
 
 | Key | Current value | Notes |
 |-----|---------------|--------|
-| `shot_threshold_min` | 0 | |
-| `shot_threshold_max` | 200 | |
+| `shot_threshold_min` | 10 | |
+| `shot_threshold_max` | 210 | |
 | `rebound_modifier_min` | 0.0 | |
 | `rebound_modifier_max` | 0.4 | |
 

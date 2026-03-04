@@ -68,10 +68,12 @@ Source: `BackEnd/utils/config_overrides.py` (DEFAULTS) and `BackEnd/constants/__
 
 ## Team Attribute Ranges
 
+Clamp ranges for team attributes. Full player and team clamp reference: **docs/docs_1_systems/06_GMO_Supporting_Systems/Attribute_Clamp_System.md**.
+
 | Key | Original value | Notes |
 |-----|----------------|--------|
-| shot_threshold_min | -10 | Min for team shot_threshold (TEAM_ATTR_CLAMPS, init, balancing). |
-| shot_threshold_max | 190 | Max for team shot_threshold. |
+| shot_threshold_min | 10 | Min for team shot_threshold (TEAM_ATTR_CLAMPS, init, balancing). |
+| shot_threshold_max | 210 | Max for team shot_threshold. |
 | rebound_modifier_min | 0.0 | Min for team rebound_modifier. |
 | rebound_modifier_max | 0.4 | Max for team rebound_modifier. |
 
