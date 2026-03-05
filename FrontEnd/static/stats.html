@@ -245,7 +245,7 @@
   }
 
   function getLeadersLimit() {
-    return scope === 'national' ? 20 : 10;
+    return 10;
   }
 
   function render() {
@@ -269,7 +269,7 @@
     const names = { PTS: 'Points', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks' };
     const limit = getLeadersLimit();
     categories.forEach(cat => {
-      const list = (filteredLeaders[cat] || []).slice(0, 20);
+      const list = (filteredLeaders[cat] || []).slice(0, 10);
       if (list.length === 0) return;
       const card = document.createElement('div');
       card.className = 'leader-card';
