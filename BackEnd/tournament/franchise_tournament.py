@@ -493,3 +493,54 @@ def get_region_champions(franchise_doc: Dict[str, Any]) -> Dict[str, str]:
         if final and final[0].get("winner"):
             champs[r] = str(final[0]["winner"])
     return champs
+
+
+def get_eliminated_team_ids(franchise_doc: Dict[str, Any]) -> set:
+    """
+    Return set of team ID strings that have been eliminated from tournament play
+    (lost a game in conference, region, or national bracket). Used to skip
+    training for eliminated computer teams during EOS weeks (Franchise_Tournament_System.md).
+    """
+    eliminated = set()
+    # Placeholders in brackets (e.g. region R1_0/R1_1) are not team IDs
+    def is_team_id(s):
+        if s is None or not isinstance(s, str):
+            return False
+        if s.startswith("R1_") or len(s) != 24:
+            return False
+        try:
+            ObjectId(s)
+            return True
+        except Exception:
+            return False
+
+    def add_loser(m):
+        winner = m.get("winner")
+        if not winner or not is_team_id(winner):
+            return
+        home = m.get("home_team")
+        away = m.get("away_team")
+        loser = str(away) if str(winner) == str(home) else str(home)
+        if is_team_id(loser):
+            eliminated.add(loser)
+
+    for c in range(1, 17):
+        ct = (franchise_doc.get("conference_tournaments") or {}).get(str(c), {})
+        bracket = ct.get("bracket", {})
+        for rnd in ("round1", "round2", "final"):
+            for m in bracket.get(rnd, []):
+                add_loser(m)
+
+    for r in REGION_LETTERS:
+        rt = (franchise_doc.get("region_tournaments") or {}).get(r, {})
+        for rnd in ("round1", "final"):
+            for m in rt.get(rnd, []):
+                add_loser(m)
+
+    national = franchise_doc.get("national_tournament") or {}
+    bracket = national.get("bracket", {})
+    for rnd in ("round1", "round2", "final"):
+        for m in bracket.get(rnd, []):
+            add_loser(m)
+
+    return eliminated

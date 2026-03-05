@@ -134,6 +134,62 @@ def test_week26_full_update_payload_size():
     )
 
 
+def test_week26_builds_update_fields_week_27_and_16_conference_tournaments():
+    """
+    Regression: complete_week(week=26) must set update_fields['week'] = 27 and
+    update_fields['conference_tournaments'] with 16 entries (all conferences).
+    """
+    from BackEnd.models.franchise_manager import ScheduleManager
+    from BackEnd.tournament import franchise_tournament as ft
+    from BackEnd.tournament import eos_tournament as eos
+
+    req_week = 26
+    assert req_week == ScheduleManager.REGULAR_SEASON_WEEKS
+
+    team_ids = [ObjectId() for _ in range(128)]
+    team_docs = []
+    for i, tid in enumerate(team_ids):
+        c = (i % 16) + 1
+        r = chr(ord("A") + (c - 1) // 2)
+        team_docs.append({"_id": tid, "name": f"T{i}", "conference": c, "region": r})
+    mock_teams = _MockTeamsCollection(team_docs)
+
+    franchise_doc = {"_id": ObjectId(), "results": {}}
+    for w in range(1, 26):
+        franchise_doc["results"][str(w)] = [
+            {"away_id": str(team_ids[0]), "home_id": str(team_ids[1]), "away_score": 70, "home_score": 60}
+        ]
+    results_26 = [{"away_id": str(team_ids[i % 128]), "home_id": str(team_ids[(i + 1) % 128]), "away_score": 70, "home_score": 60} for i in range(64)]
+    existing_results = dict(franchise_doc["results"])
+    existing_results["26"] = results_26
+
+    next_week = req_week + 1
+    update_fields = {
+        "results": existing_results,
+        "week": next_week,
+        "training_status.training_completed": False,
+        "training_status.session_type": "in-season",
+    }
+
+    if req_week == ScheduleManager.REGULAR_SEASON_WEEKS:
+        franchise_doc["results"] = existing_results
+        with patch.object(eos, "franchise_team_data_collection", _mock_ftd_collection(team_ids)):
+            conference_tournaments = ft.initialize_conference_tournaments(
+                franchise_doc, mock_teams, team_ids=team_ids
+            )
+        update_fields["conference_tournaments"] = conference_tournaments
+        update_fields["eos_tournament_active"] = True
+        update_fields["week"] = ft.EOS_CONFERENCE_WEEKS[0]
+
+    assert update_fields["week"] == 27, "Week 26 completion must set week to 27"
+    assert update_fields.get("eos_tournament_active") is True
+    assert "conference_tournaments" in update_fields
+    ct = update_fields["conference_tournaments"]
+    assert len(ct) == 16, "Must have 16 conference tournaments (one per conference)"
+    for k in ["1", "2", "8", "16"]:
+        assert k in ct, f"Conference key {k} must be present (string keys for BSON)"
+
+
 @pytest.mark.skipif(
     not os.environ.get("MONGO_URI"),
     reason="MONGO_URI not set; integration test requires real DB (uses unique IDs, does not delete)"

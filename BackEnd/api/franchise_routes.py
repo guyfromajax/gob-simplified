@@ -1631,6 +1631,37 @@ def complete_week(req: CompleteWeekRequest):
             })
             continue
 
+        # EOS conference tournament: non-user conference games use distant sim (per Franchise_Tournament_System.md)
+        if (
+            req.week in ft.EOS_CONFERENCE_WEEKS
+            and week_games_meta
+            and idx < len(week_games_meta)
+        ):
+            g = week_games_meta[idx]
+            if (
+                g.get("phase") == "conference"
+                and user_conference is not None
+                and g.get("conference") != user_conference
+            ):
+                home_ftd = ftd_by_team_id.get(str(home_id), {})
+                away_ftd = ftd_by_team_id.get(str(away_id), {})
+                home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
+                away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+                home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+                results.append({
+                    "away_id": str(away_id),
+                    "home_id": str(home_id),
+                    "away_score": away_score,
+                    "home_score": home_score,
+                })
+                _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=None)
+                winner_id = home_id if home_score > away_score else away_id
+                ft.save_conference_game_result(
+                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                    "", str(winner_id), {"home": home_score, "away": away_score},
+                )
+                continue
+
         # Distant sim: regular season only; neither team in user's conference → lightweight sim (no game doc, no EOG)
         away_conf = team_id_to_conference.get(str(away_id))
         home_conf = team_id_to_conference.get(str(home_id))
@@ -1994,6 +2025,33 @@ def command_center_data(
             response["conference_tournaments"] = franchise_doc.get("conference_tournaments")
             response["region_tournaments"] = franchise_doc.get("region_tournaments")
             response["national_tournament"] = national_tournament
+            # Derive single eos_tournament (old shape) for FCC bracket display: pick current phase by week
+            week_val = week if week is not None else 1
+            if week_val in ft.EOS_CONFERENCE_WEEKS:
+                user_conf = team_doc.get("conference") if team_doc else None
+                ct = (franchise_doc.get("conference_tournaments") or {}).get(str(user_conf), {}) if user_conf is not None else {}
+                response["eos_tournament"] = ct if ct else None
+            elif week_val in ft.EOS_REGION_WEEKS:
+                user_region = (team_doc.get("region") or "").upper() if team_doc else ""
+                if isinstance(user_region, str) and len(user_region) == 1:
+                    rt = (franchise_doc.get("region_tournaments") or {}).get(user_region, {})
+                    if rt:
+                        final_list = rt.get("final", [])
+                        champ = final_list[0].get("winner") if final_list and final_list[0].get("winner") else None
+                        response["eos_tournament"] = {
+                            "bracket": {"round1": rt.get("round1", []), "round2": [], "final": final_list},
+                            "seeds": {},
+                            "current_round": rt.get("current_round", 1),
+                            "champion": champ,
+                        }
+                    else:
+                        response["eos_tournament"] = None
+                else:
+                    response["eos_tournament"] = None
+            elif week_val in ft.EOS_NATIONAL_WEEKS:
+                response["eos_tournament"] = national_tournament if national_tournament else None
+            else:
+                response["eos_tournament"] = None
             # Championship summary when national tournament is complete (week 34 done)
             if national_tournament.get("champion"):
                 bracket = national_tournament.get("bracket", {})
@@ -2067,7 +2125,17 @@ def standings(franchise_id: str, profile: bool = False, scope: Optional[str] = N
     def _build():
         franchise_doc = db.franchises.find_one(
             {"_id": ObjectId(franchise_id)},
-            {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
+            {
+                "schedule": 1,
+                "week": 1,
+                "eos_tournament": 1,
+                "eos_tournament_active": 1,
+                "conference_tournaments": 1,
+                "region_tournaments": 1,
+                "national_tournament": 1,
+                "results": 1,
+                "_id": 1,
+            }
         )
         found = franchise_doc is not None
         logger.info("standings franchise_id=%s found=%s", franchise_id, found)
@@ -2195,6 +2263,9 @@ def season_schedule(franchise_id: str):
             "results": 1,
             "eos_tournament": 1,
             "eos_tournament_active": 1,
+            "conference_tournaments": 1,
+            "region_tournaments": 1,
+            "national_tournament": 1,
             "user_team_id": 1,
             "user_team_object_id": 1,
             "_id": 1
