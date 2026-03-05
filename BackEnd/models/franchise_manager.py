@@ -1,5 +1,6 @@
 import random
 import time
+from collections import Counter
 from datetime import datetime
 from itertools import combinations, permutations
 from pathlib import Path
@@ -572,6 +573,26 @@ def _double_round_robin_8(team_ids):
     return schedule
 
 
+def _validate_schedule_one_game_per_team_per_week(schedule, expected_teams=128):
+    """Ensure every week has each of expected_teams playing exactly one game. O(weeks * games)."""
+    for week_idx, week_games in enumerate(schedule):
+        counts = Counter()
+        for away_id, home_id in week_games:
+            counts[str(away_id)] += 1
+            counts[str(home_id)] += 1
+        if len(counts) != expected_teams:
+            raise ValueError(
+                "Schedule validation failed: week %d has %d distinct teams (expected %d)."
+                % (week_idx + 1, len(counts), expected_teams)
+            )
+        if any(c != 1 for c in counts.values()):
+            bad = [tid for tid, c in counts.items() if c != 1]
+            raise ValueError(
+                "Schedule validation failed: week %d has teams playing != 1 game: %s."
+                % (week_idx + 1, bad[:5])
+            )
+
+
 class ScheduleManager:
     """
     Phase 1 franchise schedule: 26 weeks for 128 teams.
@@ -672,13 +693,14 @@ class ScheduleManager:
                 # 8 games: r1 home (r1 indices (w*4+j)%16), r2 away (same slot pattern)
                 for i in range(8):
                     week.append((ids2[(w * 4 + i) % 16], ids1[(w * 4 + i) % 16]))
-                # 8 games: r1 away, r2 home
+                # 8 games: r1 away, r2 home (use other 8 from r2 as home: (w*4+8+i)%16)
                 for i in range(8):
-                    week.append((ids1[(w * 4 + 8 + i) % 16], ids2[(w * 4 + i) % 16]))
+                    week.append((ids1[(w * 4 + 8 + i) % 16], ids2[(w * 4 + 8 + i) % 16]))
             out.append(week)
 
         # Randomize week order: same 14 conf + 8 region + 4 OOR blocks, shuffled each new season
         random.shuffle(out)
+        _validate_schedule_one_game_per_team_per_week(out)
         return out
 
 class RecruitManager:
