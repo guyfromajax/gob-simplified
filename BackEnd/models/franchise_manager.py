@@ -324,11 +324,12 @@ class FranchiseManager:
         _perf["team_total_attrs_agg"] = (time.time() - _t0) * 1000
 
         # Build (team_object_id, team_name, total_player_attrs, prestige_ftd); prestige = universal + rand(-30, 30), clamp >= 0
+        # total_player_attrs: use universal team doc if present, else computed from players (see Mode_Init_System.md)
         rows = []
         for team in self.teams:
             team_object_id = team["_id"]
             team_name = team.get("name") or ""
-            total_attrs = team_name_to_total_attrs.get(team_name, 0)
+            total_attrs = team.get("total_player_attrs") if team.get("total_player_attrs") is not None else team_name_to_total_attrs.get(team_name, 0)
             base_prestige = int(team.get("prestige") or 0)
             prestige_ftd = max(0, base_prestige + random.randint(-30, 30))
             rows.append((team_object_id, team_name, total_attrs, prestige_ftd))
