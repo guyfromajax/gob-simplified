@@ -3637,8 +3637,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         )
 
     # ✅ Distant training: all non-user teams use template-based training (Distant_Team_Training_System.md)
+    # During EOS weeks, skip training for teams eliminated from tournament (Franchise_Tournament_System.md)
     all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
     training_type = "tc" if is_first_training else "regular"
+    eliminated_team_ids = set()
+    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
+        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
     distant_templates = list(db["distant_training"].find({"training_type": training_type}))
     if not distant_templates:
         logger.warning(f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams")
@@ -3649,6 +3653,8 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                 continue
             computer_team_id_str = str(computer_team_oid)
             if computer_team_id_str == str(team_id):
+                continue
+            if computer_team_id_str in eliminated_team_ids:
                 continue
             try:
                 template = random.choice(distant_templates)

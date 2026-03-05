@@ -44,3 +44,14 @@ Region tournament round 1 matchups will be
 -Conference Tournament: display conference tournament bracket
 -Region Tournament: Region tournament bracket at top, push conference tournemanent bracke to the bottom of the page with a clear horizontal line separating it from the Region Tournament section
 -National Tournament: National Tournamen bracket at top, Region tournament inthe vertcial center, and counference tournament at teh bottom, all with clear horizontal lines separating thme from each other.
+
+
+**Simming Computer Games**
+-Conference Tournaments:
+    - User Conference Games, sim all non-user games with the turn-by-turn engine
+    - Non-user Conference Games, sim all with the Distant Game Sim engine
+-Region and National Tournaments
+    -sim all non-user games with the turn-by-turn engine
+
+**Tournament Training**
+- Once teams are eliminated, they no longer run training for the remaining weeks. When the user runs training during EOS, computer teams that have lost in any conference/region/national bracket are skipped; only teams still active in tournament play receive template-based (distant) training. Implemented via `get_eliminated_team_ids()` in `franchise_tournament.py` and a skip in the computer-training loop in `run_franchise_training`.
