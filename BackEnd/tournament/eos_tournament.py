@@ -30,7 +30,7 @@ def calculate_standings(
     team_ids must be provided from franchise_team_data (FTD); franchise_teams is no longer used.
 
     Returns:
-        List of team standings sorted by: Wins (desc), PF-PA delta (desc), natl_rank (asc; lower = higher)
+        List of team standings sorted by: Wins (desc), natl_rank (asc; lower = higher). No differential.
     """
     if team_ids is None:
         raise ValueError(
@@ -80,8 +80,8 @@ def calculate_standings(
             "natl_rank": natl_rank,
         })
 
-    # Primary: wins desc. Secondary: differential desc. Tiebreaker: natl_rank asc (lower = higher)
-    standings.sort(key=lambda x: (-x["wins"], -x["differential"], x["natl_rank"]))
+    # Tiebreaker: W desc, then natl_rank asc (lower = higher). No differential.
+    standings.sort(key=lambda x: (-x["wins"], x["natl_rank"]))
     return standings
 
 
