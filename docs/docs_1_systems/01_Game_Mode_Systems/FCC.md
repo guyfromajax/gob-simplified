@@ -1,6 +1,6 @@
 # Franchise Command Center (FCC)
 
-Franchise-mode hub: team info, standings, schedule, stats, traits, recruits, tournament bracket, and national rankings. Data is scoped by **franchise_id** and the user’s **team_id** (ObjectId).
+Franchise-mode hub: team info, standings, roster, team report, recruits, tournament bracket, and links to standalone resource pages (standings, stats, schedule, team traits, rankings). Data is scoped by **franchise_id** and the user’s **team_id** (ObjectId).
 
 ---
 
@@ -25,7 +25,6 @@ Franchise-mode hub: team info, standings, schedule, stats, traits, recruits, tou
 | **Standings** | Slim view: user's conference (top) and sister conference (bottom) only. Link to **Resources → Standings** for full 16 conferences. Data: `scope=user_region&team_id=...`. |
 | **Roster** | Roster table + player stats. |
 | **Team** | Team Report (attributes), Playbook Summary. |
-| **Schedule** | User's conference schedule only (no toggles on FCC). |
 | **Recruits** | Recruit list. |
 | **Tournament** | EOS bracket (weeks 15–17); shared with TCC layout. |
 | **Resources** | Standings, Stats, Schedule, Team Traits, Rankings (standalone pages). Blue buttons; **Back To Locker Room** (orange) on each page. |
@@ -39,16 +38,10 @@ Franchise-mode hub: team info, standings, schedule, stats, traits, recruits, tou
 
 ---
 
-- **On FCC:** User's conference schedule only (no conference toggles). Only games involving the user's conference teams are shown.
-- **Full schedule:** The standalone **schedule.html** (via Resources) has 16 conference toggles and lands on the user's conference.
-- **Data:** `/franchise/schedule` returns `schedule`, `team_id`, and `team_conferences` (team_id → conference 1–16).
-
----
-
 ## Resources tab and standalone pages
 
 - **Resources tab (on FCC):** Five buttons (blue fill, white bold): Standings, Stats, Schedule, Team Traits, Rankings. Each opens a standalone page with franchise_id and team_id in the URL.
-- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html. Each has **Back To Locker Room** (orange fill) to return to FCC. Stats/Team Traits: Conference | Region | National toggles. Rankings: Top 25 / All 128. Schedule: 16 conference toggles. Standings: region toggles A–H.
+- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC); schedule.html has 16 conference toggles and lands on the user's conference. Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
 - **Legacy (moved off FCC):** Stats tab content is on stats.html; Team Traits on team-traits.html; Rankings on rankings.html. Scope toggles (Conference | Region | National) and full schedule/standings toggles are on the standalone pages only.
 
 ---

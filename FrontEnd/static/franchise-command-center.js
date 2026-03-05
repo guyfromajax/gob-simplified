@@ -26,10 +26,6 @@ let teamColorCache = null; // Cache for team primary colors
 let leadersDataCache = null;
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
-let scheduleDataCache = null;       // { schedule, team_id, team_conferences }
-let selectedScheduleConference = 1;  // 1–16; set from userConference on load
-// Set to true to restore 16 conference toggles; false = only show user's conference schedule (no toggles)
-const USE_SCHEDULE_CONFERENCE_TOGGLES = false;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -820,180 +816,7 @@ function sortRosterTable(columnName, direction) {
   }
 }
 
-/** Conference 1–16 -> label e.g. "Conf A1", "Conf A2", "Conf B3", … "Conf H16" */
-function getScheduleConferenceLabel(c) {
-  if (c == null || c < 1 || c > 16) return `Conf ${c}`;
-  const regionLetter = String.fromCharCode(65 + Math.floor((c - 1) / 2));
-  return `Conf ${regionLetter}${c}`;
-}
-
-function renderScheduleConferenceToggles() {
-  const wrap = document.getElementById('schedule-conference-toggle-wrap');
-  if (!wrap) return;
-  if (!USE_SCHEDULE_CONFERENCE_TOGGLES) {
-    wrap.innerHTML = '';
-    wrap.classList.add('schedule-toggles-hidden');
-    return;
-  }
-  wrap.classList.remove('schedule-toggles-hidden');
-  wrap.innerHTML = '';
-  const row1 = document.createElement('div');
-  row1.className = 'schedule-conference-row';
-  const row2 = document.createElement('div');
-  row2.className = 'schedule-conference-row';
-  for (let c = 1; c <= 16; c++) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'schedule-conference-btn';
-    if (c === selectedScheduleConference) btn.classList.add('active');
-    btn.dataset.conference = String(c);
-    btn.textContent = getScheduleConferenceLabel(c);
-    (c <= 8 ? row1 : row2).appendChild(btn);
-  }
-  wrap.appendChild(row1);
-  wrap.appendChild(row2);
-  wrap.querySelectorAll('.schedule-conference-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      selectedScheduleConference = parseInt(btn.dataset.conference, 10);
-      wrap.querySelectorAll('.schedule-conference-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (scheduleDataCache) renderSchedule(scheduleDataCache, selectedScheduleConference);
-    });
-  });
-}
-
-function renderSchedule(data, conferenceFilter) {
-  if (!data) return;
-  const container = document.getElementById('schedule-container');
-  if (!container) return;
-  container.innerHTML = '';
-  const teamId = data.team_id;
-  const teamConferences = data.team_conferences || {};
-  let schedule = data.schedule || [];
-  if (conferenceFilter != null && conferenceFilter >= 1 && conferenceFilter <= 16 && Object.keys(teamConferences).length) {
-    schedule = schedule.map((weekGames) =>
-      (weekGames || []).filter(
-        (g) =>
-          teamConferences[g.away_team_id] === conferenceFilter || teamConferences[g.home_team_id] === conferenceFilter
-      )
-    );
-  }
-  schedule.forEach((weekGames, idx) => {
-    if (!weekGames || weekGames.length === 0) return; // Skip empty weeks
-    
-    const weekDiv = document.createElement('div');
-    weekDiv.className = 'schedule-week';
-    const h4 = document.createElement('h4');
-    
-    // ✅ EOS TOURNAMENT: Check if this is a tournament game
-    const isTournamentWeek = weekGames[0]?.is_tournament || false;
-    const roundName = weekGames[0]?.round || '';
-    
-    if (isTournamentWeek && roundName) {
-      h4.textContent = `Week ${idx + 1} - ${roundName}`;
-      weekDiv.classList.add('tournament-week');
-    } else {
-      h4.textContent = `Week ${idx + 1}`;
-    }
-    weekDiv.appendChild(h4);
-      weekGames.forEach(g => {
-      const gameDiv = document.createElement('div');
-      gameDiv.className = 'schedule-game';
-      const away = teamIdNameMap[g.away_team_id] || g.away_team_id;
-      const home = teamIdNameMap[g.home_team_id] || g.home_team_id;
-      
-      // Create clickable team links
-      const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-      const createTeamLink = (teamName, teamId) => {
-        const link = document.createElement('a');
-        link.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId || teamName)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
-        link.textContent = teamName;
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.cursor = 'pointer';
-        link.addEventListener('mouseenter', () => {
-          link.style.textDecoration = 'underline';
-        });
-        link.addEventListener('mouseleave', () => {
-          link.style.textDecoration = 'none';
-        });
-        return link;
-      };
-      
-      if (g.status === 'complete') {
-        const awayLink = createTeamLink(away, g.away_team_id);
-        const homeLink = createTeamLink(home, g.home_team_id);
-        const awayText = document.createTextNode(` (${g.away_score})`);
-        const homeText = document.createTextNode(` (${g.home_score})`);
-        const atText = document.createTextNode(' at ');
-        
-        const awayContainer = document.createElement('span');
-        if (g.away_score > g.home_score) {
-          awayContainer.style.fontWeight = 'bold';
-        }
-        awayContainer.appendChild(awayLink);
-        awayContainer.appendChild(awayText);
-        
-        const homeContainer = document.createElement('span');
-        if (g.home_score > g.away_score) {
-          homeContainer.style.fontWeight = 'bold';
-        }
-        homeContainer.appendChild(homeLink);
-        homeContainer.appendChild(homeText);
-        
-        gameDiv.appendChild(awayContainer);
-        gameDiv.appendChild(atText);
-        gameDiv.appendChild(homeContainer);
-      } else {
-        const awayLink = createTeamLink(away, g.away_team_id);
-        const homeLink = createTeamLink(home, g.home_team_id);
-        const atText = document.createTextNode(' at ');
-        
-        gameDiv.appendChild(awayLink);
-        gameDiv.appendChild(atText);
-        gameDiv.appendChild(homeLink);
-      }
-      
-      // ✅ SS&S: Add box score link for all completed games
-      if (g.status === 'complete' && g.game_id) {
-        const boxScoreLink = document.createElement('a');
-        const boxScoreParams = new URLSearchParams();
-        boxScoreParams.set('mode', 'franchise');
-        boxScoreParams.set('franchise_id', franchiseId);
-        boxScoreParams.set('game_id', g.game_id);
-        // ✅ Add team names for roster loading
-        if (home) boxScoreParams.set('home', home);
-        if (away) boxScoreParams.set('away', away);
-        boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
-        boxScoreLink.textContent = ' [Box Score]';
-        boxScoreLink.className = 'box-score-link';
-        boxScoreLink.style.color = '#4a90e2';
-        boxScoreLink.style.textDecoration = 'none';
-        boxScoreLink.style.marginLeft = '8px';
-        boxScoreLink.style.fontSize = 'calc(1em - 2px)';
-        gameDiv.appendChild(boxScoreLink);
-      }
-      
-      // Add training report link if this is user's team's game and training report exists
-      if (g.is_user_team && g.has_training_report) {
-        const link = document.createElement('a');
-        // ✅ SS&S: Use ObjectId for consistent navigation
-        const teamIdParam = userTeamId || teamId;
-        link.href = `/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamIdParam}&week=${g.week}`;
-        link.textContent = ' [Training Report]';
-        link.className = 'training-report-link';
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.marginLeft = '8px';
-        link.style.fontSize = 'calc(1em - 2px)';
-        gameDiv.appendChild(link);
-      }
-      
-      weekDiv.appendChild(gameDiv);
-    });
-    container.appendChild(weekDiv);
-  });
-}
+// Schedule tab removed; full schedule is on schedule.html (Resources).
 
 // Store team traits data for sorting
 let teamTraitsDataForSorting = [];
@@ -1292,15 +1115,6 @@ async function init() {
   standingsDataCache = standingsData;
   renderStandings(standingsData, 'A');
   bindResourcesLinks();
-    
-    const scheduleStartTime = performance.now();
-    const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
-    const scheduleEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/schedule: ${(scheduleEndTime - scheduleStartTime).toFixed(2)}ms`);
-    scheduleDataCache = scheduleData;
-    selectedScheduleConference = (userConference != null && userConference >= 1 && userConference <= 16) ? userConference : 1;
-    renderScheduleConferenceToggles();
-    renderSchedule(scheduleDataCache, selectedScheduleConference);
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
