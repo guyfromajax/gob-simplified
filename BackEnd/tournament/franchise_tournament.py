@@ -83,8 +83,8 @@ def initialize_conference_tournaments(
     franchise_doc: Dict[str, Any],
     teams_collection,
     team_ids: List[Any],
-) -> Dict[int, Dict[str, Any]]:
-    """Build 16 conference brackets. Seeds from conference standings (W, natl_rank)."""
+) -> Dict[str, Dict[str, Any]]:
+    """Build 16 conference brackets. Seeds from conference standings (W, natl_rank). Keys are str for BSON."""
     team_to_conference, _ = get_team_conference_region(teams_collection, team_ids)
     out = {}
     for c in range(1, 17):
@@ -98,7 +98,8 @@ def initialize_conference_tournaments(
         seed_order = [s["team_id"] for s in conf_standings]
         bracket = bracket_engine.generate_bracket(seed_order)
         seeds = {s["team_id"]: i + 1 for i, s in enumerate(conf_standings)}
-        out[c] = {
+        # BSON requires string keys; use str(c) so franchise doc serializes to MongoDB.
+        out[str(c)] = {
             "bracket": bracket,
             "current_round": 1,
             "seeds": seeds,
