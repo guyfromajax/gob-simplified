@@ -6,14 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Stats</title>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/resource-pages.css">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/stats.css">
 </head>
 <body class="stats-page">
+  <header class="stats-topbar">
+    <a id="back-btn" class="stats-topbar-back" href="#">← Back to Locker Room</a>
+    <h1 class="stats-topbar-title">GOB <span class="dot">·</span> Season Hub</h1>
+  </header>
   <div class="resource-page-container">
-    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
-    <h1>Team Stats</h1>
+    <div class="section-label">Team Overview</div>
     <div class="stats-scope-toggle-wrap">
       <button type="button" class="stats-scope-btn active" data-scope="conference">Conference</button>
       <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
@@ -22,44 +24,52 @@
     <div class="stats-table-wrap">
       <table class="stats-table">
         <thead>
-          <tr>
-            <th class="sortable" data-stat="team">Team <span class="sort-arrow"></span></th>
+          <tr class="group-row">
+            <th colspan="5"></th>
+            <th colspan="3">Shooting</th>
+            <th colspan="3">3-Point</th>
+            <th colspan="3">Free Throws</th>
+            <th colspan="3">Rebounding</th>
+            <th colspan="5">Other</th>
+            <th colspan="4">Defense</th>
+          </tr>
+          <tr class="col-row">
+            <th class="sortable col-group-start" data-stat="team">Team <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="W">W <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="L">L <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="PF">PF <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="PA">PA <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="FGM">FGM <span class="sort-arrow"></span></th>
+            <th class="sortable col-group-start" data-stat="FGM">FGM <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="FGA">FGA <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="FG%">FG% <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="3PTM">3PTM <span class="sort-arrow"></span></th>
+            <th class="sortable col-group-start" data-stat="3PTM">3PTM <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="3PTA">3PTA <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="3PT%">3PT% <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="FTM">FTM <span class="sort-arrow"></span></th>
+            <th class="sortable col-group-start" data-stat="FTM">FTM <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="FTA">FTA <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="FT%">FT% <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="DREB">DREB <span class="sort-arrow"></span></th>
+            <th class="sortable col-group-start" data-stat="DREB">DREB <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="OREB">OREB <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="TREB">TREB <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="AST">AST <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="STL">STL <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="BLK">BLK <span class="sort-arrow"></span></th>
+            <th class="sortable col-group-start" data-stat="AST">AST <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="F">F <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="TO">TO <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="DEF_A">DEFA <span class="sort-arrow"></span></th>
-            <th class="sortable" data-stat="DEF%">DEF% <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="SCR_A">SCRA <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="SCR%">SCR% <span class="sort-arrow"></span></th>
+            <th class="sortable col-group-start" data-stat="STL">STL <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="BLK">BLK <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="DEF_A">DEFA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="DEF%">DEF% <span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="teamstats-body"></tbody>
       </table>
     </div>
-    <h2 style="margin-top: 2rem; font-family: 'Barlow Condensed', sans-serif;">Individual Leaders</h2>
+    <div class="section-label">Individual Leaders</div>
     <div id="leaders-container"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
-  <script src="/js/shared/teamStatsTable.js"></script>
   <script>
 (function() {
   const params = new URLSearchParams(window.location.search);
@@ -76,9 +86,16 @@
     return res.json();
   }
 
-  let userConference = null, userRegion = null, userTeamName = null;
+  let userConference = null, userRegion = null;
   let scope = 'conference';
   let leadersData = null, teamStatsData = null;
+  let defaultOrderTeams = null;
+  let sortColumn = null;
+  let sortDirection = null;
+
+  const COLUMN_ORDER = ['team','W','L','PF','PA','FGM','FGA','FG%','3PTM','3PTA','3PT%','FTM','FTA','FT%','DREB','OREB','TREB','AST','F','TO','SCR_A','SCR%','STL','BLK','DEF_A','DEF%'];
+  const COL_GROUP_START_INDEX = { 0:1, 5:1, 8:1, 11:1, 14:1, 17:1, 22:1 };
+  const STAT_MAP = { 'team':'team', 'W':'W', 'L':'L', 'PF':'PF', 'PA':'PA', 'FGM':'FGM', 'FGA':'FGA', 'FG%':'FG%', '3PTM':'3PTM', '3PTA':'3PTA', '3PT%':'3PT%', 'FTM':'FTM', 'FTA':'FTA', 'FT%':'FT%', 'DREB':'DREB', 'OREB':'OREB', 'TREB':'TREB', 'AST':'AST', 'F':'F', 'TO':'TO', 'SCR_A':'SCR_A', 'SCR%':'SCR%', 'STL':'STL', 'BLK':'BLK', 'DEF_A':'DEF_A', 'DEF%':'DEF%' };
 
   function filterTeamsByScope(teams, sc) {
     if (!teams || sc === 'national') return teams || [];
@@ -109,12 +126,89 @@
     return out;
   }
 
-  let defaultOrderTeams = null;
-  let sortColumn = null;
-  let sortDirection = null;
+  function renderTeamStatsBody(teams) {
+    const tbody = document.getElementById('teamstats-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const totals = { W:0, L:0, PF:0, PA:0, FGM:0, FGA:0, '3PTM':0, '3PTA':0, FTM:0, FTA:0, DREB:0, OREB:0, TREB:0, AST:0, STL:0, BLK:0, F:0, TO:0, DEF_A:0, DEF_S:0, SCR_A:0, SCR_S:0 };
+    teams.forEach(t => {
+      const s = t.stats || {};
+      const tr = document.createElement('tr');
+      let html = '';
+      COLUMN_ORDER.forEach((key, i) => {
+        const groupStart = COL_GROUP_START_INDEX[i] ? ' col-group-start' : '';
+        if (key === 'team') {
+          html += '<td class="col-group-start">' + (t.team || '') + '</td>';
+          return;
+        }
+        const cls = (key === 'W' ? 'col-w' : key === 'L' ? 'col-l' : '') + groupStart;
+        let val;
+        if (key === 'FG%') val = s.FGA > 0 ? ((s.FGM||0)/s.FGA*100).toFixed(1)+'%' : '0.0%';
+        else if (key === '3PT%') val = s['3PTA'] > 0 ? ((s['3PTM']||0)/s['3PTA']*100).toFixed(1)+'%' : '0.0%';
+        else if (key === 'FT%') val = s.FTA > 0 ? ((s.FTM||0)/s.FTA*100).toFixed(1)+'%' : '0.0%';
+        else if (key === 'DEF%') val = s.DEF_A > 0 ? ((s.DEF_S||0)/s.DEF_A*100).toFixed(1)+'%' : '0.0%';
+        else if (key === 'SCR%') val = s.SCR_A > 0 ? ((s.SCR_S||0)/s.SCR_A*100).toFixed(1)+'%' : '0.0%';
+        else val = s[key] ?? 0;
+        if (key === 'W') totals.W += (s.W||0);
+        else if (key === 'L') totals.L += (s.L||0);
+        else if (key === 'PF') totals.PF += (s.PF||0);
+        else if (key === 'PA') totals.PA += (s.PA||0);
+        else if (key === 'FGM') totals.FGM += (s.FGM||0);
+        else if (key === 'FGA') totals.FGA += (s.FGA||0);
+        else if (key === '3PTM') totals['3PTM'] += (s['3PTM']||0);
+        else if (key === '3PTA') totals['3PTA'] += (s['3PTA']||0);
+        else if (key === 'FTM') totals.FTM += (s.FTM||0);
+        else if (key === 'FTA') totals.FTA += (s.FTA||0);
+        else if (key === 'DREB') totals.DREB += (s.DREB||0);
+        else if (key === 'OREB') totals.OREB += (s.OREB||0);
+        else if (key === 'TREB') totals.TREB += (s.TREB||0);
+        else if (key === 'AST') totals.AST += (s.AST||0);
+        else if (key === 'STL') totals.STL += (s.STL||0);
+        else if (key === 'BLK') totals.BLK += (s.BLK||0);
+        else if (key === 'F') totals.F += (s.F||0);
+        else if (key === 'TO') totals.TO += (s.TO||0);
+        else if (key === 'DEF_A') totals.DEF_A += (s.DEF_A||0);
+        else if (key === 'SCR_A') totals.SCR_A += (s.SCR_A||0);
+        if (key === 'DEF%') totals.DEF_S += (s.DEF_S||0);
+        if (key === 'SCR%') totals.SCR_S += (s.SCR_S||0);
+        html += '<td class="' + cls + '">' + val + '</td>';
+      });
+      tr.innerHTML = html;
+      tbody.appendChild(tr);
+    });
+    const totTr = document.createElement('tr');
+    totTr.className = 'totals-row';
+    let totHtml = '<td class="col-group-start">TOTALS</td><td class="col-w">' + totals.W + '</td><td class="col-l">' + totals.L + '</td><td>' + totals.PF + '</td><td>' + totals.PA + '</td>';
+    totHtml += '<td class="col-group-start">' + totals.FGM + '</td><td>' + totals.FGA + '</td><td>' + (totals.FGA > 0 ? (totals.FGM/totals.FGA*100).toFixed(1)+'%' : '0.0%') + '</td>';
+    totHtml += '<td class="col-group-start">' + totals['3PTM'] + '</td><td>' + totals['3PTA'] + '</td><td>' + (totals['3PTA'] > 0 ? (totals['3PTM']/totals['3PTA']*100).toFixed(1)+'%' : '0.0%') + '</td>';
+    totHtml += '<td class="col-group-start">' + totals.FTM + '</td><td>' + totals.FTA + '</td><td>' + (totals.FTA > 0 ? (totals.FTM/totals.FTA*100).toFixed(1)+'%' : '0.0%') + '</td>';
+    totHtml += '<td class="col-group-start">' + totals.DREB + '</td><td>' + totals.OREB + '</td><td>' + totals.TREB + '</td>';
+    totHtml += '<td class="col-group-start">' + totals.AST + '</td><td>' + totals.F + '</td><td>' + totals.TO + '</td><td>' + totals.SCR_A + '</td><td>' + (totals.SCR_A > 0 ? (totals.SCR_S/totals.SCR_A*100).toFixed(1)+'%' : '0.0%') + '</td>';
+    totHtml += '<td class="col-group-start">' + totals.STL + '</td><td>' + totals.BLK + '</td><td>' + totals.DEF_A + '</td><td>' + (totals.DEF_A > 0 ? (totals.DEF_S/totals.DEF_A*100).toFixed(1)+'%' : '0.0%') + '</td>';
+    totTr.innerHTML = totHtml;
+    tbody.appendChild(totTr);
+  }
+
+  function sortTeams(teams, statKey, direction) {
+    const key = STAT_MAP[statKey] || statKey;
+    const copy = teams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    copy.sort((a, b) => {
+      const s1 = a.stats || {}, s2 = b.stats || {};
+      let v1, v2;
+      if (key === 'team') { v1 = a.team||''; v2 = b.team||''; return direction === 'asc' ? v1.localeCompare(v2) : v2.localeCompare(v1); }
+      if (key === 'FG%') { v1 = s1.FGA>0 ? (s1.FGM||0)/s1.FGA : 0; v2 = s2.FGA>0 ? (s2.FGM||0)/s2.FGA : 0; }
+      else if (key === '3PT%') { v1 = s1['3PTA']>0 ? (s1['3PTM']||0)/s1['3PTA'] : 0; v2 = s2['3PTA']>0 ? (s2['3PTM']||0)/s2['3PTA'] : 0; }
+      else if (key === 'FT%') { v1 = s1.FTA>0 ? (s1.FTM||0)/s1.FTA : 0; v2 = s2.FTA>0 ? (s2.FTM||0)/s2.FTA : 0; }
+      else if (key === 'DEF%') { v1 = s1.DEF_A>0 ? (s1.DEF_S||0)/s1.DEF_A : 0; v2 = s2.DEF_A>0 ? (s2.DEF_S||0)/s2.DEF_A : 0; }
+      else if (key === 'SCR%') { v1 = s1.SCR_A>0 ? (s1.SCR_S||0)/s1.SCR_A : 0; v2 = s2.SCR_A>0 ? (s2.SCR_S||0)/s2.SCR_A : 0; }
+      else { v1 = s1[key]||0; v2 = s2[key]||0; }
+      return direction === 'asc' ? v1 - v2 : v2 - v1;
+    });
+    return copy;
+  }
 
   function updateSortHeaders() {
-    document.querySelectorAll('.stats-table thead th.sortable').forEach(th => {
+    document.querySelectorAll('.stats-table thead tr.col-row th.sortable').forEach(th => {
       const stat = th.getAttribute('data-stat');
       const arrow = th.querySelector('.sort-arrow');
       th.classList.remove('active');
@@ -126,48 +220,6 @@
     });
   }
 
-  function render() {
-    if (!teamStatsData) return;
-    const allTeams = (teamStatsData.teams || []).map(t => ({ ...t }));
-    const filtered = filterTeamsByScope(allTeams, scope);
-    defaultOrderTeams = filtered.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
-    const dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
-    if (sortColumn && sortDirection) {
-      TeamStatsTable.sortTeamStats(sortColumn, dataToRender, 'teamstats-body', sortDirection);
-    } else {
-      if (window.TeamStatsTable) TeamStatsTable.renderTeamStatsTable(dataToRender, 'teamstats-body');
-    }
-    updateSortHeaders();
-    bindSortHeaders();
-
-    if (leadersData) {
-      const container = document.getElementById('leaders-container');
-      if (!container) return;
-      container.innerHTML = '';
-      const filteredLeaders = filterLeadersByScope(leadersData, scope);
-      const categories = ['PTS', '3PTM', 'REB', 'AST', 'STL', 'BLK'];
-      const names = { PTS: 'Points', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks' };
-      categories.forEach(cat => {
-        const list = (filteredLeaders[cat] || []).slice(0, 6);
-        if (list.length === 0) return;
-        const card = document.createElement('div');
-        card.className = 'leader-card';
-        card.innerHTML = '<h3>' + (names[cat] || cat) + '</h3>';
-        const table = document.createElement('table');
-        table.innerHTML = '<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>Value</th></tr></thead><tbody></tbody>';
-        const tbody = table.querySelector('tbody');
-        list.forEach((p, idx) => {
-          const tr = document.createElement('tr');
-          tr.className = 'leader-row' + (idx === 0 ? ' rank-1' : '');
-          tr.innerHTML = '<td>' + (idx + 1) + '</td><td>' + (p.name || '') + '</td><td>' + (p.team || '') + '</td><td>' + (p.value ?? '') + '</td>';
-          tbody.appendChild(tr);
-        });
-        card.appendChild(table);
-        container.appendChild(card);
-      });
-    }
-  }
-
   function bindSortHeaders() {
     const wrap = document.querySelector('.stats-table-wrap');
     if (!wrap || wrap.dataset.sortBound) return;
@@ -177,19 +229,61 @@
       if (!th) return;
       const stat = th.getAttribute('data-stat');
       if (sortColumn === stat) {
-        if (sortDirection === 'desc') { sortDirection = 'asc'; }
+        if (sortDirection === 'desc') sortDirection = 'asc';
         else if (sortDirection === 'asc') { sortColumn = null; sortDirection = null; }
       } else {
         sortColumn = stat;
         sortDirection = 'desc';
       }
-      const copy = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+      let dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
       if (sortColumn && sortDirection) {
-        TeamStatsTable.sortTeamStats(sortColumn, copy, 'teamstats-body', sortDirection);
-      } else {
-        TeamStatsTable.renderTeamStatsTable(defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } })), 'teamstats-body');
+        dataToRender = sortTeams(dataToRender, sortColumn, sortDirection);
       }
+      renderTeamStatsBody(dataToRender);
       updateSortHeaders();
+    });
+  }
+
+  function getLeadersLimit() {
+    return scope === 'national' ? 20 : 10;
+  }
+
+  function render() {
+    if (!teamStatsData) return;
+    const allTeams = (teamStatsData.teams || []).map(t => ({ ...t }));
+    const filtered = filterTeamsByScope(allTeams, scope);
+    defaultOrderTeams = filtered.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    let dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    if (sortColumn && sortDirection) {
+      dataToRender = sortTeams(dataToRender, sortColumn, sortDirection);
+    }
+    renderTeamStatsBody(dataToRender);
+    updateSortHeaders();
+    bindSortHeaders();
+
+    const container = document.getElementById('leaders-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const filteredLeaders = filterLeadersByScope(leadersData || {}, scope);
+    const categories = ['PTS', '3PTM', 'REB', 'AST', 'STL', 'BLK'];
+    const names = { PTS: 'Points', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks' };
+    const limit = getLeadersLimit();
+    categories.forEach(cat => {
+      const list = (filteredLeaders[cat] || []).slice(0, 20);
+      if (list.length === 0) return;
+      const card = document.createElement('div');
+      card.className = 'leader-card';
+      card.innerHTML = '<div class="leader-card-header">' + (names[cat] || cat) + '</div>';
+      const listEl = document.createElement('div');
+      listEl.className = 'leader-card-list';
+      list.forEach((p, idx) => {
+        const row = document.createElement('div');
+        row.className = 'leader-row' + (idx === 0 ? ' rank-1' : '') + (idx >= limit ? ' beyond-limit' : '');
+        row.innerHTML = '<span class="leader-rank">' + (idx + 1) + '</span><div class="leader-name-team"><span class="name">' + (p.name || '') + '</span><span class="team">' + (p.team || '') + '</span></div><span class="leader-value">' + (p.value ?? '') + '</span>';
+        listEl.appendChild(row);
+      });
+      card.appendChild(listEl);
+      container.appendChild(card);
     });
   }
 
@@ -204,7 +298,6 @@
   ]).then(([cc, leaders, teamStats]) => {
     userConference = cc.user_conference;
     userRegion = cc.user_region || '';
-    userTeamName = cc.team;
     leadersData = leaders;
     teamStatsData = teamStats;
     render();
