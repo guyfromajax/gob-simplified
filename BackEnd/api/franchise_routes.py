@@ -6,9 +6,10 @@ from pydantic import BaseModel
 from pathlib import Path
 from bson import ObjectId
 import logging
+import math
 import random
 import re
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 from datetime import datetime
 from BackEnd.main import run_simulation
 
@@ -899,6 +900,69 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
         "team2_score": team2_score,
     }
 
+
+def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
+    """
+    Lightweight sim for distant (non-user-conference) games.
+    Uses win probability roll, margin from dominance buckets, and clamped final scores.
+    Returns (home_score, away_score).
+    See docs/docs_1_systems/06_GMO_Supporting_Systems/Distant_Game_Sim_System.md
+    """
+    combined_total = home_combined + away_combined
+    if combined_total <= 0:
+        combined_total = 1
+    roll = random.randint(1, combined_total)
+    home_won = roll <= home_combined
+    threshold = home_combined
+
+    # Dominance: 0.0 = nail-biter, 1.0 = blowout
+    if home_won:
+        dominance = (threshold - roll) / threshold if threshold > 0 else 0.0
+    else:
+        denom = combined_total - threshold
+        dominance = (roll - threshold) / denom if denom > 0 else 0.0
+    dominance = max(0.0, min(1.0, dominance))
+
+    # Map dominance to margin bucket (D1 distribution)
+    if dominance < 0.18:
+        margin = random.randint(1, 3)
+    elif dominance < 0.45:
+        margin = random.randint(4, 9)
+    elif dominance < 0.77:
+        margin = random.randint(10, 19)
+    else:
+        margin = random.randint(20, 40)
+
+    # Rating gap modifier
+    gap = abs(home_combined - away_combined) / combined_total
+    if gap > 0.35:
+        margin = int(margin * 1.50)
+    elif gap > 0.20:
+        margin = int(margin * 1.25)
+
+    # Final scores: total_points from normal(138, 15) clamped [78, 220]
+    total_points = int(round(max(78, min(220, random.gauss(138, 15)))))
+    winning_score = math.ceil((total_points + margin) / 2)
+    losing_score = winning_score - margin
+
+    # Clamp losing floor
+    if losing_score < 39:
+        losing_score = 39
+        winning_score = losing_score + margin
+    # Clamp winning ceiling
+    if winning_score > 121:
+        winning_score = 121
+        losing_score = winning_score - margin
+    # If both clamps conflict, margin gives way
+    if losing_score < 39:
+        losing_score = 39
+        margin = winning_score - losing_score
+
+    if home_won:
+        return (winning_score, losing_score)
+    return (losing_score, winning_score)
+
+
 @router.options("/franchise/select-team")
 async def select_team_options():
     """
@@ -1520,6 +1584,23 @@ def complete_week(req: CompleteWeekRequest):
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
 
+    # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "prestige": 1, "total_player_attrs": 1},
+    ))
+    ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+    team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
+    _u_name, user_team_oid_str = get_user_team_from_franchise(franchise_doc)
+    if user_team_oid_str and ObjectId.is_valid(user_team_oid_str):
+        team_ids_for_conf.append(ObjectId(user_team_oid_str))
+    team_conference_docs = list(db.teams.find(
+        {"_id": {"$in": team_ids_for_conf}},
+        {"_id": 1, "conference": 1},
+    ))
+    team_id_to_conference = {str(d["_id"]): d.get("conference") for d in team_conference_docs}
+    user_conference = team_id_to_conference.get(str(user_team_oid_str)) if user_team_oid_str else None
+
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
             continue
@@ -1537,6 +1618,29 @@ def complete_week(req: CompleteWeekRequest):
                 "home_id": str(existing["team2_id"]),
                 "away_score": existing["team1_score"],
                 "home_score": existing["team2_score"],
+            })
+            continue
+
+        # Distant sim: regular season only; neither team in user's conference → lightweight sim (no game doc, no EOG)
+        away_conf = team_id_to_conference.get(str(away_id))
+        home_conf = team_id_to_conference.get(str(home_id))
+        is_distant = (
+            eos_current_round is None
+            and user_conference is not None
+            and away_conf != user_conference
+            and home_conf != user_conference
+        )
+        if is_distant:
+            home_ftd = ftd_by_team_id.get(str(home_id), {})
+            away_ftd = ftd_by_team_id.get(str(away_id), {})
+            home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
+            away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            results.append({
+                "away_id": str(away_id),
+                "home_id": str(home_id),
+                "away_score": away_score,
+                "home_score": home_score,
             })
             continue
 
