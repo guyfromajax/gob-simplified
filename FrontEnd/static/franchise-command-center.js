@@ -1295,7 +1295,7 @@ function updatePlayButton(data) {
     playNowBtn.textContent = 'Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
-    playNowBtn.textContent = 'Sim Rest Of Tournament';
+    playNowBtn.textContent = 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else if (trainingDisabledForEos || eliminated) {
     playNowBtn.textContent = 'Next Season';
