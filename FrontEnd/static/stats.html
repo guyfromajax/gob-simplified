@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Stats</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/stats.css">
 </head>
-<body>
+<body class="stats-page">
   <div class="resource-page-container">
     <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
     <h1>Team Stats</h1>
@@ -19,41 +19,42 @@
       <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
       <button type="button" class="stats-scope-btn" data-scope="national">National</button>
     </div>
-    <div style="margin-top: 20px; width: 100%; overflow-x: auto;">
+    <div class="stats-table-wrap">
       <table class="stats-table">
         <thead>
           <tr>
-            <th class="sortable" data-stat="team">Team</th>
-            <th class="sortable" data-stat="W">W</th>
-            <th class="sortable" data-stat="L">L</th>
-            <th class="sortable" data-stat="PF">PF</th>
-            <th class="sortable" data-stat="PA">PA</th>
-            <th class="sortable" data-stat="FGM">FGM</th>
-            <th class="sortable" data-stat="FGA">FGA</th>
-            <th class="sortable" data-stat="FG%">FG%</th>
-            <th class="sortable" data-stat="3PTM">3PTM</th>
-            <th class="sortable" data-stat="TPA">3PTA</th>
-            <th class="sortable" data-stat="3PT%">3PT%</th>
-            <th class="sortable" data-stat="FTM">FTM</th>
-            <th class="sortable" data-stat="FTA">FTA</th>
-            <th class="sortable" data-stat="FT%">FT%</th>
-            <th class="sortable" data-stat="DREB">DREB</th>
-            <th class="sortable" data-stat="OREB">OREB</th>
-            <th class="sortable" data-stat="TREB">TREB</th>
-            <th class="sortable" data-stat="AST">AST</th>
-            <th class="sortable" data-stat="STL">STL</th>
-            <th class="sortable" data-stat="BLK">BLK</th>
-            <th class="sortable" data-stat="F">F</th>
-            <th class="sortable" data-stat="TO">TO</th>
-            <th class="sortable" data-stat="DEF_A">DEFA</th>
-            <th class="sortable" data-stat="DEF%">DEF%</th>
-            <th class="sortable" data-stat="SCR_A">SCRA</th>
-            <th class="sortable" data-stat="SCR%">SCR%</th>
+            <th class="sortable" data-stat="team">Team <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="W">W <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="L">L <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="PF">PF <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="PA">PA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="FGM">FGM <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="FGA">FGA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="FG%">FG% <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="3PTM">3PTM <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="3PTA">3PTA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="3PT%">3PT% <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="FTM">FTM <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="FTA">FTA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="FT%">FT% <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="DREB">DREB <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="OREB">OREB <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="TREB">TREB <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="AST">AST <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="STL">STL <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="BLK">BLK <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="F">F <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="TO">TO <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="DEF_A">DEFA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="DEF%">DEF% <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="SCR_A">SCRA <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="SCR%">SCR% <span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="teamstats-body"></tbody>
       </table>
     </div>
+    <h2 style="margin-top: 2rem; font-family: 'Barlow Condensed', sans-serif;">Individual Leaders</h2>
     <div id="leaders-container"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
@@ -108,36 +109,88 @@
     return out;
   }
 
+  let defaultOrderTeams = null;
+  let sortColumn = null;
+  let sortDirection = null;
+
+  function updateSortHeaders() {
+    document.querySelectorAll('.stats-table thead th.sortable').forEach(th => {
+      const stat = th.getAttribute('data-stat');
+      const arrow = th.querySelector('.sort-arrow');
+      th.classList.remove('active');
+      if (arrow) arrow.textContent = '';
+      if (stat === sortColumn && sortDirection) {
+        th.classList.add('active');
+        if (arrow) arrow.textContent = sortDirection === 'desc' ? '↓' : '↑';
+      }
+    });
+  }
+
   function render() {
     if (!teamStatsData) return;
     const allTeams = (teamStatsData.teams || []).map(t => ({ ...t }));
     const filtered = filterTeamsByScope(allTeams, scope);
-    if (window.TeamStatsTable) TeamStatsTable.renderTeamStatsTable(filtered, 'teamstats-body');
+    defaultOrderTeams = filtered.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    const dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    if (sortColumn && sortDirection) {
+      TeamStatsTable.sortTeamStats(sortColumn, dataToRender, 'teamstats-body', sortDirection);
+    } else {
+      if (window.TeamStatsTable) TeamStatsTable.renderTeamStatsTable(dataToRender, 'teamstats-body');
+    }
+    updateSortHeaders();
+    bindSortHeaders();
+
     if (leadersData) {
       const container = document.getElementById('leaders-container');
       if (!container) return;
       container.innerHTML = '';
       const filteredLeaders = filterLeadersByScope(leadersData, scope);
-      const categories = ['PTS', '3PTM', 'TPM', 'REB', 'AST', 'BLK', 'STL'].filter(c => filteredLeaders[c]);
-      const names = { PTS: 'Points', TPM: '3PT Made', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', BLK: 'Blocks', STL: 'Steals' };
+      const categories = ['PTS', '3PTM', 'REB', 'AST', 'STL', 'BLK'];
+      const names = { PTS: 'Points', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks' };
       categories.forEach(cat => {
-        const section = document.createElement('div');
-        section.innerHTML = '<h3>' + (names[cat] || cat) + '</h3>';
-        const div = document.createElement('div');
-        div.className = 'scroll-x';
+        const list = (filteredLeaders[cat] || []).slice(0, 6);
+        if (list.length === 0) return;
+        const card = document.createElement('div');
+        card.className = 'leader-card';
+        card.innerHTML = '<h3>' + (names[cat] || cat) + '</h3>';
         const table = document.createElement('table');
-        table.className = 'leaders-table';
         table.innerHTML = '<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>Value</th></tr></thead><tbody></tbody>';
-        (filteredLeaders[cat] || []).forEach((p, idx) => {
+        const tbody = table.querySelector('tbody');
+        list.forEach((p, idx) => {
           const tr = document.createElement('tr');
+          tr.className = 'leader-row' + (idx === 0 ? ' rank-1' : '');
           tr.innerHTML = '<td>' + (idx + 1) + '</td><td>' + (p.name || '') + '</td><td>' + (p.team || '') + '</td><td>' + (p.value ?? '') + '</td>';
-          table.querySelector('tbody').appendChild(tr);
+          tbody.appendChild(tr);
         });
-        div.appendChild(table);
-        section.appendChild(div);
-        container.appendChild(section);
+        card.appendChild(table);
+        container.appendChild(card);
       });
     }
+  }
+
+  function bindSortHeaders() {
+    const wrap = document.querySelector('.stats-table-wrap');
+    if (!wrap || wrap.dataset.sortBound) return;
+    wrap.dataset.sortBound = '1';
+    wrap.addEventListener('click', (e) => {
+      const th = e.target.closest('th.sortable');
+      if (!th) return;
+      const stat = th.getAttribute('data-stat');
+      if (sortColumn === stat) {
+        if (sortDirection === 'desc') { sortDirection = 'asc'; }
+        else if (sortDirection === 'asc') { sortColumn = null; sortDirection = null; }
+      } else {
+        sortColumn = stat;
+        sortDirection = 'desc';
+      }
+      const copy = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+      if (sortColumn && sortDirection) {
+        TeamStatsTable.sortTeamStats(sortColumn, copy, 'teamstats-body', sortDirection);
+      } else {
+        TeamStatsTable.renderTeamStatsTable(defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } })), 'teamstats-body');
+      }
+      updateSortHeaders();
+    });
   }
 
   if (!franchiseId) {
