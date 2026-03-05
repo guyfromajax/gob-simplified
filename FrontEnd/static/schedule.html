@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Schedule</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+</head>
+<body>
+  <div class="resource-page-container">
+    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
+    <h1>Season Schedule</h1>
+    <div id="schedule-conference-toggle-wrap" class="schedule-conference-toggle-wrap"></div>
+    <div id="schedule-container" class="schedule-container"></div>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const franchiseId = params.get('franchise_id');
+  const teamId = params.get('team_id');
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn && franchiseId && teamId) {
+    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+  }
+
+  const teamIdNameMap = {};
+  let scheduleData = null;
+  let selectedConference = 1;
+
+  function getScheduleConferenceLabel(c) {
+    if (c == null || c < 1 || c > 16) return 'Conf ' + c;
+    const letter = String.fromCharCode(65 + Math.floor((c - 1) / 2));
+    return 'Conf ' + letter + c;
+  }
+
+  async function fetchJSON(url) {
+    const res = await fetch(url, { headers: window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {} });
+    if (!res.ok) throw new Error('Request failed');
+    return res.json();
+  }
+
+  function renderSchedule(data, conferenceFilter) {
+    const container = document.getElementById('schedule-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const teamConferences = data.team_conferences || {};
+    let schedule = data.schedule || [];
+    if (conferenceFilter != null && conferenceFilter >= 1 && conferenceFilter <= 16 && Object.keys(teamConferences).length) {
+      schedule = schedule.map(weekGames => (weekGames || []).filter(g =>
+        teamConferences[g.away_team_id] === conferenceFilter || teamConferences[g.home_team_id] === conferenceFilter
+      ));
+    }
+    const returnUrl = encodeURIComponent(window.location.href);
+    schedule.forEach((weekGames, idx) => {
+      if (!weekGames || weekGames.length === 0) return;
+      const weekDiv = document.createElement('div');
+      weekDiv.className = 'schedule-week';
+      const h4 = document.createElement('h4');
+      const isTournament = weekGames[0] && weekGames[0].is_tournament;
+      const roundName = weekGames[0] && weekGames[0].round || '';
+      h4.textContent = isTournament && roundName ? 'Week ' + (idx + 1) + ' - ' + roundName : 'Week ' + (idx + 1);
+      weekDiv.appendChild(h4);
+      weekGames.forEach(g => {
+        const gameDiv = document.createElement('div');
+        gameDiv.className = 'schedule-game';
+        const away = teamIdNameMap[g.away_team_id] || g.away_team_id;
+        const home = teamIdNameMap[g.home_team_id] || g.home_team_id;
+        const link = (name, id) => {
+          const a = document.createElement('a');
+          a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(id || name)}&team_name=${encodeURIComponent(name)}&return_url=${returnUrl}`;
+          a.textContent = name;
+          a.style.color = '#4a90e2';
+          a.style.textDecoration = 'none';
+          return a;
+        };
+        if (g.status === 'complete') {
+          const awaySpan = document.createElement('span');
+          awaySpan.appendChild(link(away, g.away_team_id));
+          awaySpan.appendChild(document.createTextNode(' (' + (g.away_score ?? '') + ')'));
+          if (g.away_score > g.home_score) awaySpan.style.fontWeight = 'bold';
+          const homeSpan = document.createElement('span');
+          homeSpan.appendChild(link(home, g.home_team_id));
+          homeSpan.appendChild(document.createTextNode(' (' + (g.home_score ?? '') + ')'));
+          if (g.home_score > g.away_score) homeSpan.style.fontWeight = 'bold';
+          gameDiv.appendChild(awaySpan);
+          gameDiv.appendChild(document.createTextNode(' at '));
+          gameDiv.appendChild(homeSpan);
+        } else {
+          gameDiv.appendChild(link(away, g.away_team_id));
+          gameDiv.appendChild(document.createTextNode(' at '));
+          gameDiv.appendChild(link(home, g.home_team_id));
+        }
+        weekDiv.appendChild(gameDiv);
+      });
+      container.appendChild(weekDiv);
+    });
+  }
+
+  function renderToggles() {
+    const wrap = document.getElementById('schedule-conference-toggle-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    const row1 = document.createElement('div');
+    row1.className = 'schedule-conference-row';
+    const row2 = document.createElement('div');
+    row2.className = 'schedule-conference-row';
+    for (let c = 1; c <= 16; c++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'schedule-conference-btn';
+      if (c === selectedConference) btn.classList.add('active');
+      btn.dataset.conference = String(c);
+      btn.textContent = getScheduleConferenceLabel(c);
+      (c <= 8 ? row1 : row2).appendChild(btn);
+    }
+    wrap.appendChild(row1);
+    wrap.appendChild(row2);
+    wrap.querySelectorAll('.schedule-conference-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedConference = parseInt(btn.dataset.conference, 10);
+        wrap.querySelectorAll('.schedule-conference-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (scheduleData) renderSchedule(scheduleData, selectedConference);
+      });
+    });
+  }
+
+  if (!franchiseId) {
+    document.getElementById('schedule-container').innerHTML = '<p>Missing franchise_id in URL.</p>';
+    return;
+  }
+  Promise.all([
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
+    fetchJSON(API_CONFIG.buildUrl('/franchise/standings') + '?franchise_id=' + encodeURIComponent(franchiseId)),
+    fetchJSON(API_CONFIG.buildUrl('/franchise/schedule') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(([cc, standings, schedule]) => {
+    const uc = cc.user_conference;
+    if (uc != null && uc >= 1 && uc <= 16) selectedConference = uc;
+    (standings.standings || []).forEach(t => { teamIdNameMap[t.team_id] = t.name; });
+    scheduleData = schedule;
+    renderToggles();
+    renderSchedule(scheduleData, selectedConference);
+  }).catch(err => {
+    document.getElementById('schedule-container').innerHTML = '<p>Failed to load schedule.</p>';
+    console.error(err);
+  });
+})();
+  </script>
+</body>
+</html>

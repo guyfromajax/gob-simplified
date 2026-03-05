@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Standings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+</head>
+<body>
+  <div class="resource-page-container">
+    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
+    <h1>Conference Standings</h1>
+    <div class="standings-region-toggle-wrap">
+      <button type="button" class="standings-region-btn active" data-region="A">Region A</button>
+      <button type="button" class="standings-region-btn" data-region="B">Region B</button>
+      <button type="button" class="standings-region-btn" data-region="C">Region C</button>
+      <button type="button" class="standings-region-btn" data-region="D">Region D</button>
+      <button type="button" class="standings-region-btn" data-region="E">Region E</button>
+      <button type="button" class="standings-region-btn" data-region="F">Region F</button>
+      <button type="button" class="standings-region-btn" data-region="G">Region G</button>
+      <button type="button" class="standings-region-btn" data-region="H">Region H</button>
+    </div>
+    <div id="standings-by-region" class="standings-by-region"></div>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const franchiseId = params.get('franchise_id');
+  const teamId = params.get('team_id');
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn && franchiseId && teamId) {
+    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+  }
+
+  async function fetchJSON(url) {
+    const res = await fetch(url, { headers: window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {} });
+    if (!res.ok) throw new Error('Request failed');
+    return res.json();
+  }
+
+  function buildTeamLink(t) {
+    const a = document.createElement('a');
+    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_url=${encodeURIComponent(window.location.href)}`;
+    a.textContent = t.name;
+    a.style.color = '#4a90e2';
+    a.style.textDecoration = 'none';
+    return a;
+  }
+
+  function render(list, selectedRegion) {
+    const container = document.getElementById('standings-by-region');
+    if (!container) return;
+    container.innerHTML = '';
+    selectedRegion = selectedRegion || 'A';
+    const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
+    const byConference = {};
+    byRegion.forEach(t => {
+      const c = t.conference != null ? t.conference : 0;
+      if (!byConference[c]) byConference[c] = [];
+      byConference[c].push(t);
+    });
+    const confNumbers = Object.keys(byConference).map(Number).sort((a, b) => a - b);
+    confNumbers.forEach(confNum => {
+      const teams = byConference[confNum];
+      teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
+      const heading = document.createElement('h4');
+      heading.className = 'standings-conference-heading';
+      heading.textContent = 'Conference ' + selectedRegion + confNum;
+      container.appendChild(heading);
+      const scrollWrap = document.createElement('div');
+      scrollWrap.className = 'scroll-x';
+      const table = document.createElement('table');
+      table.className = 'leaders-table standings-conference-table';
+      table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
+      const tbody = table.querySelector('tbody');
+      teams.forEach(t => {
+        const tr = document.createElement('tr');
+        const teamTd = document.createElement('td');
+        teamTd.appendChild(buildTeamLink(t));
+        tr.appendChild(teamTd);
+        tr.appendChild(document.createElement('td')).textContent = t.W;
+        tr.appendChild(document.createElement('td')).textContent = t.L;
+        tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
+        tr.appendChild(document.createElement('td')).textContent = t.PF;
+        tr.appendChild(document.createElement('td')).textContent = t.PA;
+        tr.appendChild(document.createElement('td')).textContent = t.next || '';
+        tbody.appendChild(tr);
+      });
+      scrollWrap.appendChild(table);
+      container.appendChild(scrollWrap);
+    });
+    document.querySelectorAll('.standings-region-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
+    });
+  }
+
+  if (!franchiseId) {
+    document.getElementById('standings-by-region').innerHTML = '<p>Missing franchise_id in URL.</p>';
+    return;
+  }
+  const regionFromConference = (c) => (c >= 1 && c <= 16) ? String.fromCharCode(65 + Math.floor((c - 1) / 2)) : 'A';
+  Promise.all([
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
+    fetchJSON(API_CONFIG.buildUrl('/franchise/standings') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(([cc, data]) => {
+    const list = data.standings || [];
+    const defaultRegion = regionFromConference(cc.user_conference);
+    render(list, defaultRegion);
+    document.querySelectorAll('.standings-region-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-region') === defaultRegion);
+      btn.addEventListener('click', () => {
+        render(list, btn.getAttribute('data-region'));
+        document.querySelectorAll('.standings-region-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-region') === btn.getAttribute('data-region')));
+      });
+    });
+  })
+    .catch(err => {
+      document.getElementById('standings-by-region').innerHTML = '<p>Failed to load standings.</p>';
+      console.error(err);
+    });
+})();
+  </script>
+</body>
+</html>

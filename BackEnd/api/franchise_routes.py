@@ -2028,9 +2028,16 @@ def _ftd_team_list_for_franchise(franchise_id) -> dict:
     return {str(d["team_id"]): {} for d in docs}
 
 
+def _sister_conference(conference: int) -> int:
+    """Same region, other conference. Conferences 1-2 = region A, 3-4 = B, ... 15-16 = H."""
+    if not isinstance(conference, int) or conference < 1 or conference > 16:
+        return conference
+    return conference + 1 if conference % 2 == 1 else conference - 1
+
+
 @router.get("/franchise/standings")
-def standings(franchise_id: str, profile: bool = False):
-    """Add ?profile=1 to get profile_summary in the response."""
+def standings(franchise_id: str, profile: bool = False, scope: Optional[str] = None, team_id: Optional[str] = None):
+    """Add ?profile=1 for profile_summary. scope=user_region&team_id=... returns only user + sister conference."""
     import time
     def _build():
         franchise_doc = db.franchises.find_one(
@@ -2076,6 +2083,13 @@ def standings(franchise_id: str, profile: bool = False):
         franchise_results = franchise_doc.get("results", {})
         team_list = _ftd_team_list_for_franchise(franchise_id)
         standings_data = calculate_franchise_standings(franchise_results, team_list)
+        # Load natl_rank from FTD for tiebreaker (lower natl_rank = higher in standings)
+        fid = ObjectId(franchise_id)
+        ftd_rank_docs = list(franchise_team_data_collection.find(
+            {"franchise_id": fid},
+            {"team_id": 1, "natl_rank": 1},
+        ))
+        natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
         teams = list(db.teams.find(
             {"_id": {"$in": team_ids_list}},
@@ -2092,6 +2106,7 @@ def standings(franchise_id: str, profile: bool = False):
             pf = team_standings.get("PF", 0)
             pa = team_standings.get("PA", 0)
             differential = pf - pa
+            natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
             output.append({
                 "team_id": team_id_str,
                 "name": t.get("name", ""),
@@ -2103,11 +2118,32 @@ def standings(franchise_id: str, profile: bool = False):
                 "PF": pf,
                 "PA": pa,
                 "differential": differential,
+                "natl_rank": natl_rank,
                 "next": matchup_map.get(team_id_str, "")
             })
-        output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
+        # Primary: wins desc. Tiebreaker: natl_rank asc (lower = higher in standings)
+        output.sort(key=lambda x: (-x["W"], x["natl_rank"]))
+
+        # Optional: return only user + sister conference (lighter payload for FCC Standings tab)
+        result = {"standings": output}
+        if scope == "user_region" and team_id:
+            try:
+                tid = ObjectId(team_id) if ObjectId.is_valid(team_id) else None
+                if tid:
+                    user_team_doc = db.teams.find_one({"_id": tid}, {"conference": 1})
+                    user_conf = user_team_doc.get("conference") if user_team_doc else None
+                    if user_conf is not None and isinstance(user_conf, int):
+                        sister = _sister_conference(user_conf)
+                        allowed = {user_conf, sister}
+                        output_filtered = [x for x in output if x.get("conference") in allowed]
+                        result["standings"] = output_filtered
+                        result["user_conference"] = user_conf
+                        result["sister_conference"] = sister
+            except Exception as e:
+                logger.warning("standings scope=user_region failed: %s", e)
+
         logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
-        return {"standings": output}
+        return result
     if profile:
         from BackEnd.utils.profiling import run_profiled
         _out = [None]

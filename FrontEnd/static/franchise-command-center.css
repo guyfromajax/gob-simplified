@@ -361,3 +361,51 @@
   background: #4065af;
   color: #fff;
 }
+
+/* Standings tab: note linking to Resources */
+.standings-fcc-note {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #555;
+}
+.standings-fcc-note a {
+  color: #4065af;
+  text-decoration: none;
+}
+.standings-fcc-note a:hover {
+  text-decoration: underline;
+}
+
+/* Resources tab: 3-column grid, buttons like Game Plan (blue fill, white bold) */
+.resources-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 480px;
+  margin-top: 20px;
+}
+.resources-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 20px;
+  background: #4065af;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  box-sizing: border-box;
+}
+.resources-btn:hover {
+  background: #345a94;
+  color: #fff;
+  transform: translateY(-1px);
+}

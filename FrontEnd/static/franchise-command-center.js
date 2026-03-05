@@ -124,11 +124,51 @@ function renderStandings(data, selectedRegion) {
   const list = data.standings || [];
   list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
 
-  selectedRegion = selectedRegion || 'A';
   const container = document.getElementById('standings-by-region');
   if (!container) return;
   container.innerHTML = '';
 
+  // FCC slim view: two blocks (user conference, sister conference) when API returned user_conference/sister_conference
+  const userConf = data.user_conference;
+  const sisterConf = data.sister_conference;
+  if (userConf != null && sisterConf != null && list.length > 0) {
+    const regionLabels = { 1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2', 7: 'D1', 8: 'D2', 9: 'E1', 10: 'E2', 11: 'F1', 12: 'F2', 13: 'G1', 14: 'G2', 15: 'H1', 16: 'H2' };
+    [userConf, sisterConf].forEach((confNum, idx) => {
+      const teams = list.filter(t => t.conference === confNum);
+      if (teams.length === 0) return;
+      const label = idx === 0 ? 'Your conference' : 'Sister conference';
+      const subLabel = regionLabels[confNum] ? ` (Conf ${regionLabels[confNum]})` : '';
+      const heading = document.createElement('h4');
+      heading.className = 'standings-conference-heading';
+      heading.textContent = label + subLabel;
+      container.appendChild(heading);
+      const scrollWrap = document.createElement('div');
+      scrollWrap.className = 'scroll-x';
+      const table = document.createElement('table');
+      table.className = 'leaders-table standings-conference-table';
+      table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
+      const tbody = table.querySelector('tbody');
+      teams.forEach(t => {
+        const tr = document.createElement('tr');
+        const teamTd = document.createElement('td');
+        teamTd.appendChild(buildTeamLink(t));
+        tr.appendChild(teamTd);
+        tr.appendChild(document.createElement('td')).textContent = t.W;
+        tr.appendChild(document.createElement('td')).textContent = t.L;
+        tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
+        tr.appendChild(document.createElement('td')).textContent = t.PF;
+        tr.appendChild(document.createElement('td')).textContent = t.PA;
+        tr.appendChild(document.createElement('td')).textContent = t.next || '';
+        tbody.appendChild(tr);
+      });
+      scrollWrap.appendChild(table);
+      container.appendChild(scrollWrap);
+    });
+    return;
+  }
+
+  // Fallback: full standings by region (e.g. from standalone standings page)
+  selectedRegion = selectedRegion || 'A';
   const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
   const byConference = {};
   byRegion.forEach(t => {
@@ -171,7 +211,7 @@ function renderStandings(data, selectedRegion) {
   });
 
   document.querySelectorAll('.standings-region-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
+    if (btn) btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
   });
 }
 
@@ -184,6 +224,31 @@ function bindStandingsRegionButtons() {
       if (standingsDataCache) renderStandings(standingsDataCache, region);
     });
   });
+}
+
+function buildResourceUrl(page, extraParams) {
+  if (!franchiseId || !userTeamId) return '#';
+  const params = new URLSearchParams();
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  if (extraParams) Object.keys(extraParams).forEach(k => params.set(k, extraParams[k]));
+  return `/${page}?${params.toString()}`;
+}
+
+function bindResourcesLinks() {
+  const q = () => (franchiseId && userTeamId ? `?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}` : '');
+  const standingsLink = document.getElementById('standings-resources-link');
+  if (standingsLink) standingsLink.href = `/standings.html${q()}`;
+  const rStandings = document.getElementById('resources-standings');
+  if (rStandings) rStandings.href = `/standings.html${q()}`;
+  const rStats = document.getElementById('resources-stats');
+  if (rStats) rStats.href = `/stats.html${q()}`;
+  const rSchedule = document.getElementById('resources-schedule');
+  if (rSchedule) rSchedule.href = `/schedule.html${q()}`;
+  const rTraits = document.getElementById('resources-team-traits');
+  if (rTraits) rTraits.href = `/team-traits.html${q()}`;
+  const rRankings = document.getElementById('resources-rankings');
+  if (rRankings) rRankings.href = `/rankings.html${q()}`;
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -1182,26 +1247,7 @@ async function init() {
   
   populateTop(topData);
   
-  // Rankings tab: store list and render Top 25 by default
-  rankingsFullList = topData.rankings || [];
-  renderRankings(rankingsFullList, false);
-  const btnTop25 = document.getElementById('rankings-toggle-top25');
-  const btnAll128 = document.getElementById('rankings-toggle-all');
-  if (btnTop25 && btnAll128 && !btnTop25.dataset.bound) {
-    btnTop25.dataset.bound = '1';
-    btnTop25.addEventListener('click', () => {
-      renderRankings(rankingsFullList, false);
-      btnTop25.classList.add('active');
-      btnAll128.classList.remove('active');
-    });
-    btnAll128.addEventListener('click', () => {
-      renderRankings(rankingsFullList, true);
-      btnAll128.classList.add('active');
-      btnTop25.classList.remove('active');
-    });
-  }
-  
-  // Store user team name and scope keys for leaderboard / Stats / Traits
+  // Store user team name and scope keys (used by roster/team if needed)
   if (topData && topData.team) {
     userTeamNameForLeaders = topData.team;
   }
@@ -1237,13 +1283,16 @@ async function init() {
     }
   }
   const standingsStartTime = performance.now();
-  const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`);
+  const standingsUrl = userTeamId
+    ? `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&scope=user_region&team_id=${encodeURIComponent(userTeamId)}&profile=1`
+    : `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`;
+  const standingsData = await fetchJSON(standingsUrl);
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   standingsDataCache = standingsData;
   renderStandings(standingsData, 'A');
-  bindStandingsRegionButtons();
-  
+  bindResourcesLinks();
+    
     const scheduleStartTime = performance.now();
     const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
     const scheduleEndTime = performance.now();
@@ -1252,13 +1301,6 @@ async function init() {
     selectedScheduleConference = (userConference != null && userConference >= 1 && userConference <= 16) ? userConference : 1;
     renderScheduleConferenceToggles();
     renderSchedule(scheduleDataCache, selectedScheduleConference);
-    
-    const leadersStartTime = performance.now();
-    const leadersData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`);
-    const leadersEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/leaders: ${(leadersEndTime - leadersStartTime).toFixed(2)}ms`);
-    leadersDataCache = leadersData;
-    renderLeaders(leadersData, statsScope);
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
@@ -1276,27 +1318,13 @@ async function init() {
     // 🛠️ END DEV MODE FEATURE
     // ============================================================================
     
-    const teamStatsStartTime = performance.now();
-    const teamStatsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
-    const teamStatsEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/team-stats: ${(teamStatsEndTime - teamStatsStartTime).toFixed(2)}ms`);
-    teamStatsDataCache = teamStatsData;
-    renderTeamStats(teamStatsData, statsScope);
-    
     const recruitsStartTime = performance.now();
     const recruitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`);
     const recruitsEndTime = performance.now();
     console.log(`⏱️ [PERF] /franchise/recruits: ${(recruitsEndTime - recruitsStartTime).toFixed(2)}ms`);
     renderRecruits(recruitsData);
     
-    const teamTraitsStartTime = performance.now();
-    const teamTraitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-traits')}?franchise_id=${franchiseId}`);
-    const teamTraitsEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/team-traits: ${(teamTraitsEndTime - teamTraitsStartTime).toFixed(2)}ms`);
-    teamTraitsDataCache = teamTraitsData;
-    renderTeamTraits(teamTraitsData, traitsScope);
-    bindStatsAndTraitsScopeButtons();
-    // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
+    // ✅ Stats, Team Traits, Rankings moved to standalone pages (Resources tab)
     
     // Initialize tooltips for table headers
     if (typeof initAttributeTooltips !== 'undefined') {

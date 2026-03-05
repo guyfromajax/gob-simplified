@@ -66,25 +66,14 @@
         <button data-tab="standings-tab" class="active">Standings</button>
         <button data-tab="roster-tab">Roster</button>
         <button data-tab="team-tab">Team</button>
-        <button data-tab="stats-tab">Stats</button>
         <button data-tab="schedule-tab">Schedule</button>
-        <button data-tab="team-traits-tab">Team Traits</button>
         <button data-tab="recruits-tab">Recruits</button>
         <button data-tab="tournament-tab">Tournament</button>
-        <button data-tab="rankings-tab">Rankings</button>
+        <button data-tab="resources-tab">Resources</button>
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
-        <div class="standings-region-toggle-wrap">
-          <button type="button" class="standings-region-btn active" data-region="A">Region A</button>
-          <button type="button" class="standings-region-btn" data-region="B">Region B</button>
-          <button type="button" class="standings-region-btn" data-region="C">Region C</button>
-          <button type="button" class="standings-region-btn" data-region="D">Region D</button>
-          <button type="button" class="standings-region-btn" data-region="E">Region E</button>
-          <button type="button" class="standings-region-btn" data-region="F">Region F</button>
-          <button type="button" class="standings-region-btn" data-region="G">Region G</button>
-          <button type="button" class="standings-region-btn" data-region="H">Region H</button>
-        </div>
+        <p class="standings-fcc-note">Your conference and sister conference (same region). For all 16 conferences, use <a href="#" id="standings-resources-link">Resources → Standings</a>.</p>
         <div id="standings-by-region" class="standings-by-region"></div>
       </div>
       <div id="roster-tab" class="tab-content">
@@ -162,50 +151,6 @@
           </section>
         </div>
       </div>
-      <div id="stats-tab" class="tab-content">
-        <div class="stats-scope-toggle-wrap">
-          <button type="button" class="stats-scope-btn active" data-scope="conference">Conference</button>
-          <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
-          <button type="button" class="stats-scope-btn" data-scope="national">National</button>
-        </div>
-        <div style="margin-top: 20px; width: 100%; overflow-x: auto;">
-          <h3>Team Stats</h3>
-          <table class="stats-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-stat="team">Team</th>
-                <th class="sortable" data-stat="W">W</th>
-                <th class="sortable" data-stat="L">L</th>
-                <th class="sortable" data-stat="PF">PF</th>
-                <th class="sortable" data-stat="PA">PA</th>
-                <th class="sortable" data-stat="FGM">FGM</th>
-                <th class="sortable" data-stat="FGA">FGA</th>
-                <th class="sortable" data-stat="FG%">FG%</th>
-                <th class="sortable" data-stat="3PTM">3PTM</th>
-                <th class="sortable" data-stat="TPA">3PTA</th>
-                <th class="sortable" data-stat="3PT%">3PT%</th>
-                <th class="sortable" data-stat="FTM">FTM</th>
-                <th class="sortable" data-stat="FTA">FTA</th>
-                <th class="sortable" data-stat="FT%">FT%</th>
-                <th class="sortable" data-stat="DREB">DREB</th>
-                <th class="sortable" data-stat="OREB">OREB</th>
-                <th class="sortable" data-stat="TREB">TREB</th>
-                <th class="sortable" data-stat="AST">AST</th>
-                <th class="sortable" data-stat="STL">STL</th>
-                <th class="sortable" data-stat="BLK">BLK</th>
-                <th class="sortable" data-stat="F">F</th>
-                <th class="sortable" data-stat="TO">TO</th>
-                <th class="sortable" data-stat="DEF_A">DEFA</th>
-                <th class="sortable" data-stat="DEF%">DEF%</th>
-                <th class="sortable" data-stat="SCR_A">SCRA</th>
-                <th class="sortable" data-stat="SCR%">SCR%</th>
-              </tr>
-            </thead>
-            <tbody id="teamstats-body"></tbody>
-          </table>
-        </div>
-        <div id="leaders-container"></div>
-      </div>
       <div id="recruits-tab" class="tab-content">
         <div class="scroll-x">
           <table class="roster-table">
@@ -223,64 +168,21 @@
         </div>
         <div id="schedule-container" class="schedule-container"></div>
       </div>
-      <div id="team-traits-tab" class="tab-content">
-        <div class="traits-scope-toggle-wrap">
-          <button type="button" class="traits-scope-btn active" data-scope="conference">Conference</button>
-          <button type="button" class="traits-scope-btn" data-scope="region">Region</button>
-          <button type="button" class="traits-scope-btn" data-scope="national">National</button>
-        </div>
-        <h3>Team Attribute Totals</h3>
-        <div class="scroll-x">
-          <table class="roster-table" id="team-traits-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-attr="team">Team</th>
-                <th class="sortable" data-attr="SC">SC</th>
-                <th class="sortable" data-attr="SH">SH</th>
-                <th class="sortable" data-attr="ID">ID</th>
-                <th class="sortable" data-attr="OD">OD</th>
-                <th class="sortable" data-attr="PS">PS</th>
-                <th class="sortable" data-attr="BH">BH</th>
-                <th class="sortable" data-attr="RB">RB</th>
-                <th class="sortable" data-attr="AG">AG</th>
-                <th class="sortable" data-attr="ST">ST</th>
-                <th class="sortable" data-attr="ND">ND</th>
-                <th class="sortable" data-attr="IQ">IQ</th>
-                <th class="sortable" data-attr="FT">FT</th>
-                <th class="sortable" data-attr="total">Total</th>
-              </tr>
-            </thead>
-            <tbody id="team-traits-body"></tbody>
-          </table>
-        </div>
-        <div style="margin-top: 40px;">
-          <h3>Top 10 (excluding FT)</h3>
-          <div id="team-traits-top10"></div>
-        </div>
-      </div>
-      <div id="recruits-tab" class="tab-content">
-        <div class="scroll-x">
-          <table class="roster-table">
-            <thead>
-              <tr><th>Name</th><th>Archetype</th><th>HT</th><th>WT</th><th>POS</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th><th>RT</th></tr>
-            </thead>
-            <tbody id="recruits-body"></tbody>
-          </table>
-        </div>
-      </div>
       <div id="tournament-tab" class="tab-content">
         <h3>End-of-Season Tournament</h3>
         <div style="width: 100%; overflow-x: auto;">
           <div id="tournament-bracket-container" class="bracket"></div>
         </div>
       </div>
-      <div id="rankings-tab" class="tab-content">
-        <h3>National Rankings</h3>
-        <div class="rankings-toggle-wrap">
-          <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
-          <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
+      <div id="resources-tab" class="tab-content">
+        <h3>Resources</h3>
+        <div class="resources-grid">
+          <a id="resources-standings" class="resources-btn" href="#">Standings</a>
+          <a id="resources-stats" class="resources-btn" href="#">Stats</a>
+          <a id="resources-schedule" class="resources-btn" href="#">Schedule</a>
+          <a id="resources-team-traits" class="resources-btn" href="#">Team Traits</a>
+          <a id="resources-rankings" class="resources-btn" href="#">Rankings</a>
         </div>
-        <ul id="rankings-list" class="rankings-list"></ul>
       </div>
     </div>
   </div>

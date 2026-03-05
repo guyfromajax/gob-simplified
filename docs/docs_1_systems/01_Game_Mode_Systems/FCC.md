@@ -22,58 +22,34 @@ Franchise-mode hub: team info, standings, schedule, stats, traits, recruits, tou
 
 | Tab | Content |
 |-----|--------|
-| **Standings** | Region toggles (A–H); per region, conferences with tables: Team, W, L, %, PF, PA, Next. Team names link to roster view. |
-| **Schedule** | 16 conference toggles (Conf A1 … Conf H16, 2 rows of 8). Default: user’s conference. Only games for that conference’s teams. |
-| **Stats** | Scope toggles (Conference / Region / National); Team Stats table + stat leaders (PTS, 3PTM, REB, AST, BLK, STL). |
-| **Team Traits** | Scope toggles (Conference / Region / National); team attribute totals table + Top 10 (excluding FT). |
+| **Standings** | Slim view: user's conference (top) and sister conference (bottom) only. Link to **Resources → Standings** for full 16 conferences. Data: `scope=user_region&team_id=...`. |
+| **Roster** | Roster table + player stats. |
+| **Team** | Team Report (attributes), Playbook Summary. |
+| **Schedule** | User's conference schedule only (no toggles on FCC). |
 | **Recruits** | Recruit list. |
 | **Tournament** | EOS bracket (weeks 15–17); shared with TCC layout. |
-| **Rankings** | National rank 1–128; toggle Top 25 / All 128. Conference 1 teams in primary color, bold. |
+| **Resources** | Standings, Stats, Schedule, Team Traits, Rankings (standalone pages). Blue buttons; **Back To Locker Room** (orange) on each page. |
 
 ---
 
 ## Standings tab
 
-- **8 region toggles:** Region A through Region H. One active at a time.
-- **Per region:** Conferences in that region are listed in order (e.g. Region A: Conference A1, Conference A2; Region H: Conference H15, Conference H16). Each conference has a table: **Team | W | L | % | PF | PA | Next**. Teams sorted by wins then point differential. Team name links to `/team-roster-view.html` (franchise, same team_id, return to standings).
-- **Data:** `/franchise/standings`. Response includes `region` and `conference` per team for grouping.
+- **Slim view (FCC):** Two blocks only — **Your conference** (top) and **Sister conference** (same region, bottom). No region toggles on the FCC. Team names link to roster view. A note links to **Resources → Standings** for the full 16-conference view.
+- **Data:** `/franchise/standings?franchise_id=...&scope=user_region&team_id=...` returns only teams in the user's and sister conference; response includes `user_conference`, `sister_conference`, and `standings` (filtered). Sorted by wins then natl_rank (asc). Full standings (all conferences) are on the standalone **standings.html** page (region toggles A–H).
 
 ---
 
-## Schedule tab
-
-- **16 conference toggles:** Conf A1, Conf A2, … Conf H16 (2 rows of 8). No region or national toggles.
-- **On load:** User’s conference is detected from command-center data (`user_conference`); that conference’s toggle is active and only games involving teams in that conference are shown.
-- **Filter:** For the selected conference, each week shows only games where the away or home team is in that conference (conference games, region games, and OOR games that involve that conference).
-- **Data:** `/franchise/schedule` returns `schedule`, `team_id`, and `team_conferences` (team_id → conference 1–16). Frontend caches schedule and re-renders from cache when the conference toggle changes.
+- **On FCC:** User's conference schedule only (no conference toggles). Only games involving the user's conference teams are shown.
+- **Full schedule:** The standalone **schedule.html** (via Resources) has 16 conference toggles and lands on the user's conference.
+- **Data:** `/franchise/schedule` returns `schedule`, `team_id`, and `team_conferences` (team_id → conference 1–16).
 
 ---
 
-## Stats tab
+## Resources tab and standalone pages
 
-- **Scope toggles:** Conference | Region | National. Default: Conference.
-  - **Conference:** 8 teams (and their players) in the user’s conference.
-  - **Region:** 16 teams (and their players) in the user’s region.
-  - **National:** All 128 teams and players.
-- **Content:** (1) Team Stats table (W, L, PF, PA, FGM/FGA, 3PT, FT, REB, AST, STL, BLK, etc.). (2) Leaders sections (Points, 3PT Made, Rebounds, Assists, Blocks, Steals); user-team players highlighted in primary color and bold.
-- **Data:** `/franchise/command-center/data` (user_conference, user_region), `/franchise/leaders`, `/franchise/team-stats`. Leaders and team-stats responses include `conference` and `region` per team/entry; frontend filters by scope.
-
----
-
-## Team Traits tab
-
-- **Scope toggles:** Conference | Region | National. Same behavior as Stats (user’s conference = 8 teams, user’s region = 16, national = 128). Default: Conference.
-- **Content:** Team attribute totals table (SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, Total); team names in primary color, bold. Below: “Top 10 (excluding FT)” list.
-- **Data:** `/franchise/team-traits`. Response includes `conference` and `region` per team; frontend filters by selected scope.
-
----
-
-## Rankings tab
-
-- **Display:** “{natl_rank}. {team_name}” (e.g. “7. Bentley-Truman”). No prestige in list.
-- **Toggle:** Top 25 (default) | All 128.
-- **Conference 1 teams:** Rendered in primary color and bold. Conference/primary_color come from command-center rankings payload (per team).
-- **Data:** `/franchise/command-center/data` includes `rankings` (array of `natl_rank`, `team_name`, `primary_color`, `conference`), plus user’s `rank` and `prestige` for the top bar.
+- **Resources tab (on FCC):** Five buttons (blue fill, white bold): Standings, Stats, Schedule, Team Traits, Rankings. Each opens a standalone page with franchise_id and team_id in the URL.
+- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html. Each has **Back To Locker Room** (orange fill) to return to FCC. Stats/Team Traits: Conference | Region | National toggles. Rankings: Top 25 / All 128. Schedule: 16 conference toggles. Standings: region toggles A–H.
+- **Legacy (moved off FCC):** Stats tab content is on stats.html; Team Traits on team-traits.html; Rankings on rankings.html. Scope toggles (Conference | Region | National) and full schedule/standings toggles are on the standalone pages only.
 
 ---
 

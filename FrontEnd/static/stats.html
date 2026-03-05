@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+</head>
+<body>
+  <div class="resource-page-container">
+    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
+    <h1>Team Stats</h1>
+    <div class="stats-scope-toggle-wrap">
+      <button type="button" class="stats-scope-btn active" data-scope="conference">Conference</button>
+      <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
+      <button type="button" class="stats-scope-btn" data-scope="national">National</button>
+    </div>
+    <div style="margin-top: 20px; width: 100%; overflow-x: auto;">
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-stat="team">Team</th>
+            <th class="sortable" data-stat="W">W</th>
+            <th class="sortable" data-stat="L">L</th>
+            <th class="sortable" data-stat="PF">PF</th>
+            <th class="sortable" data-stat="PA">PA</th>
+            <th class="sortable" data-stat="FGM">FGM</th>
+            <th class="sortable" data-stat="FGA">FGA</th>
+            <th class="sortable" data-stat="FG%">FG%</th>
+            <th class="sortable" data-stat="3PTM">3PTM</th>
+            <th class="sortable" data-stat="TPA">3PTA</th>
+            <th class="sortable" data-stat="3PT%">3PT%</th>
+            <th class="sortable" data-stat="FTM">FTM</th>
+            <th class="sortable" data-stat="FTA">FTA</th>
+            <th class="sortable" data-stat="FT%">FT%</th>
+            <th class="sortable" data-stat="DREB">DREB</th>
+            <th class="sortable" data-stat="OREB">OREB</th>
+            <th class="sortable" data-stat="TREB">TREB</th>
+            <th class="sortable" data-stat="AST">AST</th>
+            <th class="sortable" data-stat="STL">STL</th>
+            <th class="sortable" data-stat="BLK">BLK</th>
+            <th class="sortable" data-stat="F">F</th>
+            <th class="sortable" data-stat="TO">TO</th>
+            <th class="sortable" data-stat="DEF_A">DEFA</th>
+            <th class="sortable" data-stat="DEF%">DEF%</th>
+            <th class="sortable" data-stat="SCR_A">SCRA</th>
+            <th class="sortable" data-stat="SCR%">SCR%</th>
+          </tr>
+        </thead>
+        <tbody id="teamstats-body"></tbody>
+      </table>
+    </div>
+    <div id="leaders-container"></div>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/teamStatsTable.js"></script>
+  <script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const franchiseId = params.get('franchise_id');
+  const teamId = params.get('team_id');
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn && franchiseId && teamId) {
+    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+  }
+
+  async function fetchJSON(url) {
+    const res = await fetch(url, { headers: window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {} });
+    if (!res.ok) throw new Error('Request failed');
+    return res.json();
+  }
+
+  let userConference = null, userRegion = null, userTeamName = null;
+  let scope = 'conference';
+  let leadersData = null, teamStatsData = null;
+
+  function filterTeamsByScope(teams, sc) {
+    if (!teams || sc === 'national') return teams || [];
+    const confMatch = sc === 'conference' && userConference != null;
+    const regionMatch = sc === 'region' && userRegion != null;
+    const rn = (v) => (v || '').toString().toUpperCase();
+    return teams.filter((t) => {
+      if (confMatch) return t.conference === userConference;
+      if (regionMatch) return rn(t.region) === rn(userRegion);
+      return true;
+    });
+  }
+
+  function filterLeadersByScope(data, sc) {
+    if (!data || sc === 'national') return data;
+    const out = {};
+    const confMatch = sc === 'conference' && userConference != null;
+    const regionMatch = sc === 'region' && userRegion != null;
+    const rn = (v) => (v || '').toString().toUpperCase();
+    Object.keys(data).forEach(cat => {
+      const list = data[cat] || [];
+      out[cat] = list.filter((p) => {
+        if (confMatch) return p.conference === userConference;
+        if (regionMatch) return rn(p.region) === rn(userRegion);
+        return true;
+      });
+    });
+    return out;
+  }
+
+  function render() {
+    if (!teamStatsData) return;
+    const allTeams = (teamStatsData.teams || []).map(t => ({ ...t }));
+    const filtered = filterTeamsByScope(allTeams, scope);
+    if (window.TeamStatsTable) TeamStatsTable.renderTeamStatsTable(filtered, 'teamstats-body');
+    if (leadersData) {
+      const container = document.getElementById('leaders-container');
+      if (!container) return;
+      container.innerHTML = '';
+      const filteredLeaders = filterLeadersByScope(leadersData, scope);
+      const categories = ['PTS', '3PTM', 'TPM', 'REB', 'AST', 'BLK', 'STL'].filter(c => filteredLeaders[c]);
+      const names = { PTS: 'Points', TPM: '3PT Made', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', BLK: 'Blocks', STL: 'Steals' };
+      categories.forEach(cat => {
+        const section = document.createElement('div');
+        section.innerHTML = '<h3>' + (names[cat] || cat) + '</h3>';
+        const div = document.createElement('div');
+        div.className = 'scroll-x';
+        const table = document.createElement('table');
+        table.className = 'leaders-table';
+        table.innerHTML = '<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>Value</th></tr></thead><tbody></tbody>';
+        (filteredLeaders[cat] || []).forEach((p, idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + (idx + 1) + '</td><td>' + (p.name || '') + '</td><td>' + (p.team || '') + '</td><td>' + (p.value ?? '') + '</td>';
+          table.querySelector('tbody').appendChild(tr);
+        });
+        div.appendChild(table);
+        section.appendChild(div);
+        container.appendChild(section);
+      });
+    }
+  }
+
+  if (!franchiseId) {
+    document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Missing franchise_id in URL.</td></tr>';
+    return;
+  }
+  Promise.all([
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
+    fetchJSON(API_CONFIG.buildUrl('/franchise/leaders') + '?franchise_id=' + encodeURIComponent(franchiseId)),
+    fetchJSON(API_CONFIG.buildUrl('/franchise/team-stats') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(([cc, leaders, teamStats]) => {
+    userConference = cc.user_conference;
+    userRegion = cc.user_region || '';
+    userTeamName = cc.team;
+    leadersData = leaders;
+    teamStatsData = teamStats;
+    render();
+    document.querySelectorAll('.stats-scope-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        scope = btn.getAttribute('data-scope') || 'conference';
+        document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === scope));
+        render();
+      });
+    });
+  }).catch(err => {
+    document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Failed to load stats.</td></tr>';
+    console.error(err);
+  });
+})();
+  </script>
+</body>
+</html>
