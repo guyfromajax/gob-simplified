@@ -2088,7 +2088,14 @@ def command_center_data(
         response["training_disabled_for_eos"] = training_disabled_for_eos
         user_eliminated = training_disabled_for_eos
         tournament_complete = bool(national_tournament.get("champion")) if national_tournament else False
-        offer_sim_rest = user_eliminated and eos_tournament_active and not tournament_complete
+        # User has bye: in EOS, no game this week, but not eliminated → show "Sim Next Round" so they sim the round then train for next week
+        user_has_bye = False
+        if eos_tournament_active and week in ft.EOS_WEEKS and franchise_doc and team_id:
+            week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+            found = ft.find_user_game_in_eos_week(week_games_meta, str(team_id))
+            eliminated_ids = ft.get_eliminated_team_ids(franchise_doc)
+            user_has_bye = not found and str(team_id) not in eliminated_ids
+        offer_sim_rest = (user_eliminated or user_has_bye) and eos_tournament_active and not tournament_complete
         response["user_eliminated"] = user_eliminated
         response["offer_sim_rest"] = offer_sim_rest
         return response
@@ -4211,6 +4218,9 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     existing_results = franchise_doc.get("results", {})
     existing_results[str(week)] = results
     update_fields = {"results": existing_results}
+    # After advancing the round, cue user to run training for the new week (e.g. bye in week 30 → sim → week 31 → "Run Training")
+    update_fields["training_status.training_completed"] = False
+    update_fields["training_status.session_type"] = "in-season"
 
     if week in ft.EOS_CONFERENCE_WEEKS:
         for c in range(1, 17):
