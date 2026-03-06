@@ -328,10 +328,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const homeLogoEl = document.getElementById('home-logo');
   const awayLogoEl = document.getElementById('away-logo');
   if (homeLogoEl && homeTeam) {
-    homeLogoEl.src = `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
+    homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
   }
   if (awayLogoEl && awayTeam) {
-    awayLogoEl.src = `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+    awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
   }
   
   // Hide pre-game container

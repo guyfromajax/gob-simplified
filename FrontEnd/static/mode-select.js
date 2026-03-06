@@ -33,6 +33,7 @@ const TEAM_LOGO_CODE = {
 };
 
 function getSquareLogoPath(teamName) {
+  if (typeof getTeamAssetPath === 'function') return getTeamAssetPath(teamName, 'logo_square');
   const code = TEAM_LOGO_CODE[teamName];
   return code ? `/images/square-logos/${code}_square.png` : null;
 }

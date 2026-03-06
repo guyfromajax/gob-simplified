@@ -7,10 +7,10 @@
   'use strict';
 
   function defaultGetLogo(teamName) {
-    if (typeof formatTeamName === 'function') {
-      return '/images/homepage-logos/' + formatTeamName(teamName || '') + '.png';
+    if (typeof getTeamAssetPath === 'function') {
+      return getTeamAssetPath(teamName || '', 'banner_primary');
     }
-    return '/images/homepage-logos/default.png';
+    return '/images/teams/general/general_banner_primary.jpg';
   }
 
   function defaultIsUserTeam() {

@@ -772,7 +772,7 @@ function createCardFront(player) {
   const teamNameNormalized = (teamName || '').toLowerCase().replace(/\s+/g, '-');
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const staticPrefix = isLocalhost ? '/static' : '';
-  headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  headshotContainer.style.backgroundImage = `url(${(typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'background') : staticPrefix + '/images/team-backgrounds/' + teamNameNormalized + '-background.png')})`;
   headshotContainer.style.backgroundSize = 'cover';
   headshotContainer.style.backgroundPosition = 'center';
   

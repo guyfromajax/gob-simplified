@@ -296,7 +296,7 @@
 
       <div class="right-column">
         <div class="court-visualization">
-          <img id="court-image" src="/images/courts/bentley_truman.jpg" alt="Basketball Court">
+          <img id="court-image" src="/images/teams/general/general_court.jpg" alt="Basketball Court">
           <div id="player-icons-container"></div>
           <div id="ball-icon" class="ball-icon" style="display: none;"></div>
         </div>
@@ -481,7 +481,7 @@
         document.getElementById('submit-section').style.display = 'block';
 
         // Set default court image (Bentley Truman)
-        document.getElementById('court-image').src = '/static/images/courts/bentley_truman.jpg';
+        document.getElementById('court-image').src = '/images/teams/general/general_court.jpg';
         
         // Start animation
         startAnimation();
@@ -494,7 +494,7 @@
     // Load team info (default to Bentley Truman for plays builder)
     async function loadTeamInfo() {
       // Use Bentley Truman court image as default
-      document.getElementById('court-image').src = '/static/images/courts/bentley_truman.jpg';
+      document.getElementById('court-image').src = '/images/teams/general/general_court.jpg';
     }
 
     // Render court visualization

@@ -343,6 +343,7 @@
   </div>
 
   <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
   <script>
     const ATTRIBUTE_GROUPS = {
       OFFENSE: ['SC', 'SH'],
@@ -594,11 +595,13 @@
     }
 
     function getTeamBackground(teamName, staticPrefix = '') {
+      if (typeof getTeamAssetPath === 'function') return staticPrefix + getTeamAssetPath(teamName, 'background');
       const normalized = teamName.toLowerCase().replace(/\s+/g, '-');
       return `${staticPrefix}/images/team-backgrounds/${normalized}-background.png`;
     }
 
     function getTeamLogo(teamName, staticPrefix = '') {
+      if (typeof getTeamAssetPath === 'function') return staticPrefix + getTeamAssetPath(teamName, 'logo_square');
       const logoMap = {
         'Bentley-Truman': `${staticPrefix}/images/homepage-logos/Bentley-Truman.png`,
         'Four Corners': `${staticPrefix}/images/homepage-logos/Four Corners.png`,

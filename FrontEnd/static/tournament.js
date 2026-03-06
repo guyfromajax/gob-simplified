@@ -100,8 +100,7 @@ const teamIdNameMap = {};
 console.log("✅ tournament.js loaded");
 
 function getLogo(teamName) {
-  const formatted = formatTeamName(teamName);
-  return `/images/homepage-logos/${formatted}.png`;
+  return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'banner_primary') : `/images/homepage-logos/${formatTeamName(teamName || '')}.png`;
 }
 
 
@@ -1032,7 +1031,7 @@ function populateTop(data) {
   // Update team logo
   if (data.team) {
     const formattedTeam = formatTeamName(data.team);
-    const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
+    const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'logo_square') : `/images/homepage-logos/${formattedTeam}.png`;
     const logoEl = document.getElementById('user-team-logo');
     if (logoEl) {
       logoEl.src = logoSrc;
@@ -1128,10 +1127,9 @@ function updateTeamChemistry() {
 }
 
 function initTopAssets(teamName) {
-  const formattedName = formatTeamName(teamName || userTeamId || "");
   const logoEl = document.getElementById("user-team-logo");
   if (logoEl) {
-    logoEl.src = `/images/homepage-logos/${formattedName}.png`;
+    logoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName || userTeamId || "", 'logo_square') : `/images/homepage-logos/${formatTeamName(teamName || userTeamId || "")}.png`;
   }
   const abbr = teamMap[formattedName] || "";
   const sammyEl = document.getElementById("coach-sammy");

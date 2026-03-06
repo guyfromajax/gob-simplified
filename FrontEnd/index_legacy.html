@@ -76,7 +76,7 @@
   
       const simData = await res.json();
       const homeTeamId = simData.home_team_id.toLowerCase(); // e.g., "four_corners"
-      document.getElementById("court").src = `/static/images/courts/${homeTeamId}.jpg`;
+      document.getElementById("court").src = `/static/images/teams/${homeTeamId}/${homeTeamId}_court.jpg`;
   
       // Setup animation from first turn (you can expand this later)
       const animationQueue = simData.turns[0]?.animations || [];

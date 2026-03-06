@@ -258,7 +258,7 @@
       <div class="right-column">
         <div class="court-container">
           <div class="court-visualization" id="court-visualization">
-            <img id="court-image" src="/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
+            <img id="court-image" src="/images/teams/general/general_court.jpg" alt="Basketball Court" class="court-image">
             <div id="player-icons-container" class="player-icons-container"></div>
           </div>
           <button id="pause-resume-btn" class="pause-resume-btn" onclick="togglePauseResume()">
@@ -369,16 +369,13 @@
     function setCourtImage(teamName) {
       const courtImage = document.getElementById('court-image');
       if (courtImage && teamName) {
-        const normalizedName = normalizeTeamName(teamName);
-        // Use environment-aware path
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const staticPrefix = isLocalhost ? '/static' : '';
-        courtImage.src = `${staticPrefix}/images/courts/${normalizedName}.jpg`;
+        courtImage.src = typeof getTeamAssetPath === 'function' ? staticPrefix + getTeamAssetPath(teamName, 'court') : `${staticPrefix}/images/courts/${normalizeTeamName(teamName)}.jpg`;
         courtImage.alt = `${teamName} Basketball Court`;
-        // Fallback to default if image doesn't exist
         courtImage.onerror = function() {
-          this.src = `${staticPrefix}/images/courts/bentley_truman.jpg`;
-          this.onerror = null; // Prevent infinite loop
+          this.src = typeof getTeamAssetPath === 'function' ? staticPrefix + getTeamAssetPath(null, 'court') : `${staticPrefix}/images/courts/bentley_truman.jpg`;
+          this.onerror = null;
         };
       }
     }
@@ -1034,6 +1031,7 @@
     });
   </script>
   <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
 </body>
 </html>

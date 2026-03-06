@@ -55,7 +55,7 @@ const teamIdNameMap = {};
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
-  const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
+  const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'logo_square') : `/images/homepage-logos/${formattedTeam}.png`;
   document.getElementById('team-logo').src = logoSrc;
   console.log('Team logo URL:', logoSrc);
 
@@ -2079,7 +2079,7 @@ async function renderTournamentBracket() {
     renderBracketShared(container, eosTournament.bracket || {}, teamIdToNameMap, {
       seeds: eosTournament.seeds || {},
       getLogo: function (name) {
-        return '/images/homepage-logos/' + (typeof formatTeamName === 'function' ? formatTeamName(name) : (name || '')) + '.png';
+        return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
       },
       isUserTeam: function (id) {
         return userTeamId != null && (String(id) === String(userTeamId));

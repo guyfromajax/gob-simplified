@@ -45,7 +45,7 @@ function createLogoButtons() {
     btn.className = 'logo-btn';
     btn.title = 'click or drag to add';
     const img = document.createElement('img');
-    img.src = `./images/homepage-logos/${name}.png`;
+    img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'logo_square') : `./images/homepage-logos/${name}.png`;
     img.alt = name;
     img.draggable = true;
     img.addEventListener('dragstart', e => {
@@ -79,16 +79,11 @@ function addToFirstAvailable(team) {
 function setLogo(box, team) {
   box.innerHTML = '';
   const img = document.createElement('img');
-  const code = teamCodeMap[team];
-  if (code) {
-    img.src = `./images/square-logos/${code}_square.png`;
-    img.onerror = () => {
-      img.onerror = null;
-      img.src = `./images/homepage-logos/${team}.png`;
-    };
-  } else {
-    img.src = `./images/homepage-logos/${team}.png`;
-  }
+  img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'logo_square') : `./images/homepage-logos/${team}.png`;
+  img.onerror = function() {
+    img.onerror = null;
+    img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(null, 'logo_square') : './images/teams/general/general_logo_square.png';
+  };
   img.alt = team;
   box.appendChild(img);
   box.dataset.team = team;

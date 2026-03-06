@@ -247,7 +247,7 @@ function setHeader() {
   
   const logo = document.getElementById('team-logo');
   if (logo && teamName) {
-    logo.src = `/images/homepage-logos/${teamName}.png`;
+    logo.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'logo_square') : `/images/homepage-logos/${teamName}.png`;
     logo.alt = `${teamName} logo`;
     logo.hidden = false;
     logo.onerror = () => { logo.hidden = true; };
