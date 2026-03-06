@@ -48,12 +48,20 @@
   -->
   <div class="mode-container">
     <div class="mode-card">
-      <h2>Scrimmage</h2>
+      <div class="mode-card-icon">
+        <img src="/images/modes/scrimmage.png" alt="" role="presentation" />
+      </div>
+      <h2 class="mode-card-title">Scrimmage</h2>
+      <p class="mode-card-descriptor">Quick one-off game</p>
       <button id="scrimmage-btn" class="play-button">PLAY NOW</button>
     </div>
     <div class="mode-card mode-card-tournament">
-      <h2>Tournament</h2>
-      <!-- Current instance: team name (bold, primary colors) + round to play next (First Round / Semis / Championship / Complete) -->
+      <div class="mode-card-icon">
+        <img src="/images/modes/tournament.png" alt="" role="presentation" />
+      </div>
+      <h2 class="mode-card-title">Tournament</h2>
+      <p class="mode-card-descriptor">Run a full bracket</p>
+      <!-- Current instance: team name (bold, primary colors) + round to play next -->
       <div id="tournament-instance" class="mode-instance" style="display: none;" data-instance-accent="">
         <div class="instance-copy">
           <div id="tournament-instance-team" class="instance-team-name"></div>
@@ -68,8 +76,12 @@
       </div>
     </div>
     <div class="mode-card mode-card-franchise">
-      <h2>Franchise</h2>
-      <!-- Current instance: team name (bold, primary colors) + week/phase (Week N, First Round/Semis/Championship, or Offseason) -->
+      <div class="mode-card-icon">
+        <img src="/images/modes/franchise.png" alt="" role="presentation" />
+      </div>
+      <h2 class="mode-card-title">Franchise</h2>
+      <p class="mode-card-descriptor">Manage your program</p>
+      <!-- Current instance: team name (bold, primary colors) + week/phase -->
       <div id="franchise-instance" class="mode-instance" style="display: none;" data-instance-accent="">
         <div class="instance-copy">
           <div id="franchise-instance-team" class="instance-team-name"></div>
