@@ -1,12 +1,12 @@
 id	team	mascot	team_id	primary_color	secondary_color	conference	region	prestige
 1	Bentley-Truman	Sterling Knights	BENTLEY_TRUMAN	#4066b2	#ffffff	1	A	630
-2	Ocean City	Admirals	OCEAN_CITY	#2a2168	#f2d045	1	A	536
+2	Ocean City	Admirals	OCEAN_CITY	#2a2168	#00a89d	1	A	536
 3	Lancaster	Johnnies	LANCASTER	#d24a1b	#000000	1	A	537
-4	Four Corners	Harvest	FOUR_CORNERS	#c0976a	#3b3b3b	1	A	504
+4	Four Corners	Harvest	FOUR_CORNERS	#c0976a	#00954b	1	A	504
 5	Morristown	Pirates	MORRISTOWN	#ec1d28	#cccccc	1	A	516
-6	Xavien	Elm Trees	XAVIEN	#016837	#ffffff	1	A	413
-7	Little York	Minutemen	LITTLE_YORK	#65308e	#f2d045	1	A	525
-8	South Lancaster	Bulldogs	SOUTH_LANCASTER	#7c2b24	#f1c40f	1	A	465
+6	Xavien	Elm Trees	XAVIEN	#016837	#999999	1	A	413
+7	Little York	Minutemen	LITTLE_YORK	#65308e	#f6af38	1	A	525
+8	South Lancaster	Bulldogs	SOUTH_LANCASTER	#7c2b24	#e39649	1	A	465
 9	Crickstown	Caribou	CRICKSTOWN	#6a1f2b	#f3e6d0	2	A	490
 10	Cagers World	Mustangs	CAGERS_WORLD	#5a3a1b	#c5c5c5	2	A	444
 11	Nickel Beach	Sea Turtles	NICKEL_BEACH	#008b8f	#2a2a2a	2	A	567

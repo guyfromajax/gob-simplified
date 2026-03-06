@@ -2,7 +2,7 @@
 {
     "name": "Bentley-Truman",
     "primary_color": "#4066b2",
-    "secondary_color": "#9b9b9b",
+    "secondary_color": "#ffffff",
     "strategy_settings": {
       "offense": 2,
       "inside": 2,

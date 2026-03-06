@@ -1,7 +1,7 @@
 {
     "name": "Morristown",
     "primary_color": "#ec1d28",
-    "secondary_color": "#ccc",
+    "secondary_color": "#cccccc",
     "strategy_settings": {
       "offense": 2,
       "inside": 2,

@@ -2,7 +2,7 @@
 {
     "name": "Lancaster",
     "primary_color": "#d24a1b",
-    "secondary_color": "#ccc",
+    "secondary_color": "#000000",
     "strategy_settings": {
       "offense": 2,
       "inside": 2,
