@@ -16,7 +16,7 @@ id	team	mascot	team_id	primary_color	secondary_color	conference	region	prestige
 15	IDA	Academy	IDA	#f2f2f2	#1f4fb2	2	A	574
 16	Durham	Generals	DURHAM	#1c2a44	#c8a951	2	A	626
 17	Montpeiler	Maples	MONTPEILER	#264653	#e76f51	3	B	465
-18	Queen's Guard	Sentinels	QUEEN_S_GUARD	#111111	#d4af37	3	B	524
+18	Queen's Guard	Sentinels	queens_guard	#111111	#d4af37	3	B	524
 19	Independence	Spartans	INDEPENDENCE	#3b3b3b	#c0976a	3	B	442
 20	Concord	Rams	CONCORD	#ec1d28	#cccccc	3	B	469
 21	Garden Elites	Legion	GARDEN_ELITES	#0b1f3a	#a9c6e8	3	B	532
@@ -80,7 +80,7 @@ id	team	mascot	team_id	primary_color	secondary_color	conference	region	prestige
 79	Tower Academy	Royals	TOWER_ACADEMY	#1f4fb2	#f2f2f2	10	E	536
 80	Two Rivers	Pointers	TWO_RIVERS	#4066b2	#ffffff	10	E	459
 81	Norman	Tornados	NORMAN	#005f73	#e9d8a6	11	F	585
-82	River's Edge	Catfish	RIVER_S_EDGE	#1c2a44	#c8a951	11	F	583
+82	River's Edge	Catfish	rivers_edge	#1c2a44	#c8a951	11	F	583
 83	Amarillo Tech	Armadillos	AMARILLO_TECH	#6a1f2b	#f3e6d0	11	F	545
 84	Pan Handle Limited	Steeds	PAN_HANDLE_LIMITED	#3b3b3b	#c0976a	11	F	471
 85	Ada	Falcons	ADA	#264653	#e76f51	11	F	508
@@ -95,7 +95,7 @@ id	team	mascot	team_id	primary_color	secondary_color	conference	region	prestige
 94	Chambless Global	Raiders	CHAMBLESS_GLOBAL	#65308e	#f2d045	12	F	628
 95	Austin West	Defenders	AUSTIN_WEST	#ff6f61	#1c1c1e	12	F	516
 96	Bayou District	Airboats	BAYOU_DISTRICT	#0b1f3a	#a9c6e8	12	F	582
-97	Pike's Prep	Climbers	PIKE_S_PREP	#006847	#c0c0c0	13	G	545
+97	Pike's Prep	Climbers	pikes_prep	#006847	#c0c0c0	13	G	545
 98	Desert Regional	Mesas	DESERT_REGIONAL	#f4c300	#111111	13	G	518
 99	East Rockies	Mountain Lions	EAST_ROCKIES	#2a2168	#f2d045	13	G	451
 100	Circus Circus	Ringmasters	CIRCUS_CIRCUS	#ff6f61	#1c1c1e	13	G	496
@@ -109,7 +109,7 @@ id	team	mascot	team_id	primary_color	secondary_color	conference	region	prestige
 108	Seattle AAA	Sound	SEATTLE_AAA	#006847	#c0c0c0	14	G	500
 109	Vancouver	Bears	VANCOUVER	#d24a1b	#000000	14	G	495
 110	Cardinal Conor	Monarchs	CARDINAL_CONOR	#3b3b3b	#c0976a	14	G	485
-111	Couer d'Alene	Grizzlies	COUER_D_ALENE	#f4c300	#111111	14	G	525
+111	Couer d'Alene	Grizzlies	couer_d_alene	#f4c300	#111111	14	G	525
 112	Boise	Mountaineers	BOISE	#ff6f61	#1c1c1e	14	G	524
 113	Valley High	Orcas	VALLEY_HIGH	#ec1d28	#cccccc	15	H	456
 114	San Jose	Kings	SAN_JOSE	#264653	#e76f51	15	H	546
