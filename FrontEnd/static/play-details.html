@@ -371,10 +371,10 @@
       if (courtImage && teamName) {
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const staticPrefix = isLocalhost ? '/static' : '';
-        courtImage.src = typeof getTeamAssetPath === 'function' ? staticPrefix + getTeamAssetPath(teamName, 'court') : `${staticPrefix}/images/courts/${normalizeTeamName(teamName)}.jpg`;
+        courtImage.src = typeof getTeamAssetPath === 'function' ? staticPrefix + getTeamAssetPath(teamName, 'court') : staticPrefix + '/images/teams/general/general_court.jpg';
         courtImage.alt = `${teamName} Basketball Court`;
         courtImage.onerror = function() {
-          this.src = typeof getTeamAssetPath === 'function' ? staticPrefix + getTeamAssetPath(null, 'court') : `${staticPrefix}/images/courts/bentley_truman.jpg`;
+          this.src = typeof getTeamAssetPath === 'function' ? staticPrefix + getTeamAssetPath(null, 'court') : staticPrefix + '/images/teams/general/general_court.jpg';
           this.onerror = null;
         };
       }

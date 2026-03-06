@@ -156,7 +156,7 @@ export function createGameScene(Phaser) {
       if (this.animate) {
         this.load.image("ball", "/images/ball.png");
         const { home } = gameStore.getTeams();
-        const courtPath = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(home, 'court') : `/images/courts/${(home || '').toLowerCase().replace(/[\s\-]/g, '_')}.jpg`;
+        const courtPath = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(home, 'court') : '/images/teams/general/general_court.jpg';
         this.load.image("court-bg", courtPath);
       }
 
@@ -496,8 +496,8 @@ export function createGameScene(Phaser) {
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
-      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
-      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
 
       const homeScoreEl = document.getElementById('home-score');
       const awayScoreEl = document.getElementById('away-score');

@@ -596,23 +596,12 @@
 
     function getTeamBackground(teamName, staticPrefix = '') {
       if (typeof getTeamAssetPath === 'function') return staticPrefix + getTeamAssetPath(teamName, 'background');
-      const normalized = teamName.toLowerCase().replace(/\s+/g, '-');
-      return `${staticPrefix}/images/team-backgrounds/${normalized}-background.png`;
+      return staticPrefix + '/images/teams/general/general_background.png';
     }
 
     function getTeamLogo(teamName, staticPrefix = '') {
       if (typeof getTeamAssetPath === 'function') return staticPrefix + getTeamAssetPath(teamName, 'logo_square');
-      const logoMap = {
-        'Bentley-Truman': `${staticPrefix}/images/homepage-logos/Bentley-Truman.png`,
-        'Four Corners': `${staticPrefix}/images/homepage-logos/Four Corners.png`,
-        'Lancaster': `${staticPrefix}/images/homepage-logos/Lancaster.png`,
-        'Little York': `${staticPrefix}/images/homepage-logos/Little York.png`,
-        'Morristown': `${staticPrefix}/images/homepage-logos/Morristown.png`,
-        'Ocean City': `${staticPrefix}/images/homepage-logos/Ocean City.png`,
-        'South Lancaster': `${staticPrefix}/images/homepage-logos/South Lancaster.png`,
-        'Xavien': `${staticPrefix}/images/homepage-logos/Xavien.png`
-      };
-      return logoMap[teamName] || '';
+      return staticPrefix + '/images/teams/general/general_logo_square.png';
     }
 
     function goBack() {

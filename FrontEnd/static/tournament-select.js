@@ -22,7 +22,7 @@ function createButtons() {
   teams.forEach(team => {
     const btn = document.createElement("button");
     btn.className = "team-button";
-    btn.innerHTML = `<img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'logo_square') : './images/homepage-logos/' + team + '.png'}" alt="${team} logo"><span>${team}</span>`;
+    btn.innerHTML = `<img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'logo_square') : '/images/teams/general/general_logo_square.png'}" alt="${team} logo"><span>${team}</span>`;
     btn.addEventListener("click", () => {
       playSound("click-beep.wav");
       selectTeam(team);

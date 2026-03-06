@@ -39,7 +39,7 @@
 
 ### Missing Team Background Images (404s)
 - **Issue**: 404 errors for team background images (e.g., `south_lancaster-background.png`, `little_york-background.png`)
-- **Location**: `FrontEnd/static/images/team-backgrounds/`
+- **Location**: `FrontEnd/static/images/teams/{team_slug}/` ({team_slug}_background.png per image_naming_update.md)
 - **Impact**: Low - missing assets, doesn't affect functionality
 - **Action**: Add missing team background images or update references
 - **Priority**: Low (cosmetic only)
