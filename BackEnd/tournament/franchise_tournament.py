@@ -233,7 +233,7 @@ def get_eos_week_games(
         conf_tournaments = franchise_doc.get("conference_tournaments", {})
         for c in range(1, 17):
             ct = conf_tournaments.get(str(c), conf_tournaments.get(c)) or {}
-            if ct.get("current_round") != round_num:
+            if not include_completed and ct.get("current_round") != round_num:
                 continue
             bracket = ct.get("bracket", {})
             rn = bracket_engine.get_round_name(round_num)
@@ -315,7 +315,7 @@ def get_eos_week_games(
     elif week in EOS_NATIONAL_WEEKS:
         round_num = week - 31  # 32->1, 33->2, 34->3
         national = franchise_doc.get("national_tournament", {})
-        if national.get("current_round") != round_num:
+        if not include_completed and national.get("current_round") != round_num:
             return games
         bracket = national.get("bracket", {})
         rn = bracket_engine.get_round_name(round_num)
