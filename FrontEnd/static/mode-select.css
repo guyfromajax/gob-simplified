@@ -226,42 +226,55 @@ body {
   margin: 0 auto;
 }
 
+/* Neutral container: shared surface so logo art carries identity */
 .team-button {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #fff;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
   cursor: pointer;
-  padding: 6px 8px;
+  padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-start;
   transition: box-shadow 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .team-button:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* Logo: fixed height so size/aspect stay exact; no scaling/cropping */
-.team-button img {
-  flex: 0 0 auto;
+/* Logo stage: fixed height, neutral surface, logos aligned across grid */
+.team-button-logo-stage {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Logo: dimensions unchanged; centered in stage */
+.team-button-logo-stage img {
   width: 100%;
   height: 100px;
   object-fit: contain;
   display: block;
 }
 
+/* Tagline: secondary descriptor, soft color */
 .team-tagline {
-  margin-top: 4px;
-  font-size: 10px;
-  line-height: 1.2;
-  letter-spacing: 0.04em;
+  margin-top: 6px;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1.25;
+  letter-spacing: 0.03em;
   text-align: center;
   font-family: 'Bebas Neue', sans-serif;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 500;
+  color: #374151;
   overflow-wrap: anywhere;
-  opacity: 0.92;
 }
 
 @media (max-width: 600px) {
@@ -269,13 +282,17 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .team-button img {
+  .team-button-logo-stage {
+    height: 88px;
+  }
+
+  .team-button-logo-stage img {
     height: 88px;
   }
 
   .team-tagline {
-    font-size: 9px;
-    margin-top: 3px;
+    font-size: 10px;
+    margin-top: 4px;
   }
 }
 
