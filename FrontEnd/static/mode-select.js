@@ -33,9 +33,8 @@ const TEAM_LOGO_CODE = {
 };
 
 function getSquareLogoPath(teamName) {
-  if (typeof getTeamAssetPath === 'function') return getTeamAssetPath(teamName, 'logo_square');
-  const code = TEAM_LOGO_CODE[teamName];
-  return '/images/teams/general/general_logo_square.png';
+  if (typeof getTeamAssetPath === 'function') return getTeamAssetPath(teamName, 'banner_primary');
+  return '/images/teams/general/general_banner_primary.jpg';
 }
 
 function tournamentRoundLabel(roundNum, completed) {

@@ -45,7 +45,7 @@ function createLogoButtons() {
     btn.className = 'logo-btn';
     btn.title = 'click or drag to add';
     const img = document.createElement('img');
-    img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'logo_square') : '/images/teams/general/general_logo_square.png';
+    img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
     img.alt = name;
     img.draggable = true;
     img.addEventListener('dragstart', e => {
@@ -79,10 +79,10 @@ function addToFirstAvailable(team) {
 function setLogo(box, team) {
   box.innerHTML = '';
   const img = document.createElement('img');
-  img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'logo_square') : '/images/teams/general/general_logo_square.png';
+  img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   img.onerror = function() {
     img.onerror = null;
-    img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(null, 'logo_square') : './images/teams/general/general_logo_square.png';
+    img.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(null, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   };
   img.alt = team;
   box.appendChild(img);
