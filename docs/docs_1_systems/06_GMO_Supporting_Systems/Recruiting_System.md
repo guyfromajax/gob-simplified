@@ -46,6 +46,26 @@
     - delete that franchise's prior season FRD recruits
     - generate the new season's 200 FRD recruits
 
+**Recruiting API**
+- `GET /franchise/recruiting-data`
+    - returns:
+        - the user's team / team_id
+        - current franchise week
+        - current saved FTD `Recruits` order
+        - all FRD recruits for that franchise
+        - team id -> team name map for rendering `Lean`
+- `POST /franchise/recruiting-orders`
+    - accepts:
+        - `franchise_id`
+        - ordered array of recruit ids
+    - validation rules:
+        - allowed only during weeks `20-34`
+        - maximum 10 recruit ids
+        - duplicate recruit ids are rejected
+        - recruit ids must belong to that franchise's FRD pool
+    - save behavior:
+        - writes compressed keys only (`"1"` through `"N"`) into FTD `Recruits`
+
 **FCC Update**
 - Remove the Recruits tab from the FCC
 - Add a `Recruits` button to the Resources tab that links to the `recruiting.html` screen
@@ -68,7 +88,12 @@
 1. Display all 200 recruits.
     - Default sort on page load is descending order of each recruit's top RT value, from highest value to lowest.
 2. Use the same display that we use for the current Recruits tab in the FCC that we're sunsetting in this task.
-    - Add the following columns:
+    - The recruit list keeps the legacy `HT` and `WT` columns.
+    - Columns displayed are:
+        - `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `SC`, `SH`, `ID`, `OD`, `PS`, `BH`, `RB`, `AG`, `ST`, `ND`, `IQ`, `FT`, `RT`, `Current Lean`
+    - Recruiting attributes display using the same bucketed format as the prior FCC recruits table.
+        - Example: values `0-9` display as `0`, values `10-19` display as `1`, values `20-29` display as `2`, and so on.
+    - Relative to the legacy table:
         - after `Name` and before `Archetype`, add `Home Region` and display the recruit's home region string (`A` through `H`)
         - after `RT`, add `Current Lean`
     - `Current Lean` display rules:
@@ -88,6 +113,7 @@
     - For `Current Lean`, sort according to key `"1"` value only.
 4. Starting week 20, display a green fill button in the top right with the copy `Recruiting Orders`.
     - When the user presses that button it takes them to the `recruiting-orders.html` screen.
+    - In the current implementation, this button is hidden before week 20.
 
 
 **Recruiting-Orders.html Screen**
@@ -100,6 +126,7 @@
     - If the user previously saved recruiting orders, preload those recruits into the grid and highlight those recruits in the lower recruits table immediately.
     - Give the grid drag-and-drop functionality, same as our lineup screen, so the user can swap assigned rows for recruits by using drag and drop.
         - Play `Click tiny` on this action.
+        - Current implementation supports swapping between occupied rows; order is always compressed so filled rows remain contiguous from priority `1` through priority `N`.
     - Adjust column behavior:
         - provide up / down toggle buttons that move recruits up or down when pressed
         - if a recruit occupies the row the moving recruit goes to, those two recruits swap rows
@@ -119,6 +146,7 @@
     - if the recruit is already in the Top Grid:
         - remove that recruit from the Top Grid
         - remove the highlight from that recruit's row in the lower table
+        - play `x-back`
 4. If the grid is full and the user adds a new recruit, give the user a popup that says `All 10 rows are occupied. You must remove a recruit`.
 5. If the user attempts to leave the page and there is at least one recruit in the Top Grid that was not previously saved, give the following popup:
     - `You have unsaved recruiting orders. Are you sure you want to leave?`
@@ -131,3 +159,6 @@
 7. When a user presses `Submit Orders`, they are taken back to the FCC.
 8. When the user presses `Back`, take them to the screen they came from, either FCC or `recruiting.html`.
     - Use URL query-param source tracking as the single source of truth for this behavior.
+    - Current query-param values are:
+        - `from=fcc`
+        - `from=recruiting`
