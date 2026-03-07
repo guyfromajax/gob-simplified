@@ -68,6 +68,56 @@ body {
   width: 100%;
 }
 
+.orders-grid-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.orders-grid-table th:nth-child(1),
+.orders-grid-table td:nth-child(1) {
+  width: 6%;
+}
+
+.orders-grid-table th:nth-child(2),
+.orders-grid-table td:nth-child(2) {
+  width: 20%;
+}
+
+.orders-grid-table th:nth-child(3),
+.orders-grid-table td:nth-child(3) {
+  width: 8%;
+}
+
+.orders-grid-table th:nth-child(4),
+.orders-grid-table td:nth-child(4) {
+  width: 16%;
+}
+
+.orders-grid-table th:nth-child(5),
+.orders-grid-table td:nth-child(5) {
+  width: 6%;
+}
+
+.orders-grid-table th:nth-child(6),
+.orders-grid-table td:nth-child(6) {
+  width: 6%;
+}
+
+.orders-grid-table th:nth-child(7),
+.orders-grid-table td:nth-child(7) {
+  width: 18%;
+}
+
+.orders-grid-table th:nth-child(8),
+.orders-grid-table td:nth-child(8) {
+  width: 10%;
+}
+
+.orders-grid-table th:nth-child(9),
+.orders-grid-table td:nth-child(9) {
+  width: 10%;
+}
+
 .recruiting-table thead th[data-sort-key] {
   cursor: pointer;
   user-select: none;
@@ -94,6 +144,13 @@ body {
 .orders-grid-table td {
   text-align: center;
   vertical-align: middle;
+}
+
+.orders-grid-table th:nth-child(3),
+.orders-grid-table td:nth-child(3),
+.recruiting-table th:nth-child(2),
+.recruiting-table td:nth-child(2) {
+  text-align: center;
 }
 
 .orders-grid-table tr[data-filled="true"] {
