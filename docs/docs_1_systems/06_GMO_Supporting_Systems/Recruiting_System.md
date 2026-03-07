@@ -4,7 +4,7 @@
 - Phase 1 includes:
     - generating 200 recruits for a franchise
     - displaying recruits on standalone recruiting pages
-    - allowing the user to rank up to 10 recruits
+    - allowing the user to rank up to 20 recruits
     - saving those ranked FRD string ids into the user's FTD `Recruits` field
 - Phase 2 adds:
     - one weekly recruit visit assignment per team during weeks `20-26`
@@ -23,9 +23,9 @@
 
 **Franchise Init / New Season Init**
 0. Add a new `Recruits` field to each FTD doc.
-    - This will be a dict with potential keys `"1"` through `"10"`.
+    - This will be a dict with potential keys `"1"` through `"20"`.
     - Values hold FRD string ids.
-    - On init, keys `"1"` through `"10"` should exist and each value should be `None`.
+    - On init, keys `"1"` through `"20"` should exist and each value should be `None`.
 1. Add two new fields to each new doc in the FRD collection.
     - Existing FRD docs do not need to be retrofitted because existing franchise instances will be deleted before implementation.
     - `Home Region`
@@ -48,7 +48,7 @@
             - all key `"3"` values == `None`
 2. Upon new franchise init and the start of each new season within a franchise instance, create 200 new recruits per our recruit generation logic.
 3. At the start of each new season within a franchise instance:
-    - reset every team's FTD `Recruits` field back to keys `"1"` through `"10"` with `None` values
+    - reset every team's FTD `Recruits` field back to keys `"1"` through `"20"` with `None` values
     - delete that franchise's prior season FRD recruits
     - generate the new season's 200 FRD recruits
 
@@ -69,7 +69,7 @@
         - ordered array of recruit ids
     - validation rules:
         - allowed only during weeks `20-26`
-        - maximum 10 recruit ids
+        - maximum 20 recruit ids
         - duplicate recruit ids are rejected
         - recruit ids must belong to that franchise's FRD pool
         - the user can only submit once per week
@@ -90,7 +90,7 @@
     - week 22: all team / recruit visit pairings
 - Results persist to the FCC.
 - At the start of each new recruiting week, every team begins with no assigned visit for that new week.
-- Team `FTD.Recruits` top-10 bids persist week to week unless explicitly changed by the user or regenerated for CPU teams.
+- Team `FTD.Recruits` top-20 bids persist week to week unless explicitly changed by the user or regenerated for CPU teams.
 
 **FCC Update**
 - Remove the Recruits tab from the FCC
@@ -172,7 +172,7 @@
     - Adjust column behavior:
         - provide up / down toggle buttons that move recruits up or down when pressed
         - if a recruit occupies the row the moving recruit goes to, those two recruits swap rows
-        - there is no up button for row 1 and no down button for row 10
+        - there is no up button for row 1 and no down button for row 20
     - Remove column behavior:
         - display active red `x` buttons when there is a recruit in the row
         - if there is no recruit in the row it will be a grey fill button with no functionality on press
@@ -189,14 +189,14 @@
         - remove that recruit from the Top Grid
         - remove the highlight from that recruit's row in the lower table
         - play `x-back`
-4. If the grid is full and the user adds a new recruit, give the user a popup that says `All 10 rows are occupied. You must remove a recruit`.
+4. If the grid is full and the user adds a new recruit, give the user a popup that says `All 20 rows are occupied. You must remove a recruit`.
 5. If the user attempts to leave the page and there is at least one recruit in the Top Grid that was not previously saved, give the following popup:
     - `You have unsaved recruiting orders. Are you sure you want to leave?`
     - include an orange `Back To Recruiting` button and a blue `Leave` button
 6. When a user presses `Submit Orders`, save the recruit string ids to the `Recruits` field in the FTD doc for the user's team.
     - Assign each recruit to the key that matches the row it occupies in the Top Grid.
     - Persist only occupied keys.
-        - Example: if rows 1-8 are occupied and rows 9-10 are empty, persist keys `"1"` through `"8"` only.
+        - Example: if rows 1-18 are occupied and rows 19-20 are empty, persist keys `"1"` through `"18"` only.
     - If a user removes recruits before saving, compress the saved ranking so there are no gaps.
     - The user can only submit once per week. There are no redo's for that week.
 7. When a user presses `Submit Orders`, they are taken back to the FCC.
@@ -226,20 +226,21 @@
     - rank all recruits within each region according to their RT value, highest RT = 1, second highest RT = 2, etc
         - ties are broken randomly
         - `n = total number of recruits in the region`
-    - each team ends with exactly 10 ranked recruits
-    - choose 9-10 recruits from the team's current region plus 0-1 recruits outside the region
-        - current implementation uses a fixed 50% chance of taking 1 out-of-region recruit and a 50% chance of taking 0
-    - if a recruit from outside the region is chosen:
-        - choose the outside region at random
-        - exclude the team's own region from that draw
-        - choose one of the recruits ranked `1-3` in that region at random
-    - for the 9-10 recruits within the team's region:
-        - choose 5 of the top 10 rated players at random
-            - if there are fewer than 10 recruits in the region, choose from however many exist
-            - if there are fewer than 5 recruits in the region, choose as many as exist
-        - choose the remaining 4-5 at random from the remaining in-region recruits
+    - each team ends with up to 20 ranked recruits
+    - choose 15-20 recruits from the team's current region plus 0-5 recruits outside the region
+    - first choose `random.randint(0,5)` to determine how many players from outside the region will be chosen
+    - for recruits from outside the region:
+        - choose outside regions at random
+        - exclude the team's own region from those draws
+        - the same outside region can be chosen multiple times
+        - choose one of the recruits ranked `1-15` in that region at random
+    - for the remaining in-region recruits:
+        - choose 10 of the top 16 rated players at random
+            - if there are fewer than 16 recruits in the region, choose from however many exist
+            - if there are fewer than 10 recruits in that top bucket, choose as many as exist
+        - choose the remaining 5-10 at random from the remaining in-region recruits
             - exclude recruits already chosen in the previous step
-            - the remaining pool can include the top-10 recruits who were not selected in the first step
+            - the remaining pool can include the top-16 recruits who were not selected in the first step
 
 **Weekly Region Recruiting Resolution**
 - Run each week's recruiting for weeks `20-26` after the user submits.

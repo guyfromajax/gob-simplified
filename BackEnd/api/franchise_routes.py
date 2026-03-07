@@ -799,6 +799,9 @@ class SaveRecruitingOrdersRequest(BaseModel):
     recruit_ids: list[str]
 
 
+MAX_RECRUITING_ORDER_SLOTS = 20
+
+
 def _normalize_team_id(team_id: str):
     try:
         return ObjectId(team_id)
@@ -2923,22 +2926,28 @@ def _generate_cpu_recruiting_orders(
             continue
 
         selected_ids: list[str] = []
-        choose_out_region = random.random() < 0.5
-        if choose_out_region:
-            outside_regions = [region for region in all_regions if region != team_region]
-            if outside_regions:
-                outside_region = random.choice(outside_regions)
-                outside_pool = recruits_by_region.get(outside_region, [])[:3]
-                if outside_pool:
-                    selected_ids.append(random.choice(outside_pool)["recruit_id"])
+        out_of_region_count = random.randint(0, 5)
+        outside_regions = [region for region in all_regions if region != team_region]
+        for _ in range(out_of_region_count):
+            if not outside_regions:
+                break
+            outside_region = random.choice(outside_regions)
+            outside_pool = recruits_by_region.get(outside_region, [])[:15]
+            available_outside_pool = [
+                recruit["recruit_id"]
+                for recruit in outside_pool
+                if recruit["recruit_id"] not in selected_ids
+            ]
+            if available_outside_pool:
+                selected_ids.append(random.choice(available_outside_pool))
 
-        desired_in_region = 10 - len(selected_ids)
-        top_ten_pool = in_region_recruits[: min(10, len(in_region_recruits))]
-        top_pick_count = min(5, len(top_ten_pool), desired_in_region)
+        desired_in_region = MAX_RECRUITING_ORDER_SLOTS - len(selected_ids)
+        top_sixteen_pool = in_region_recruits[: min(16, len(in_region_recruits))]
+        top_pick_count = min(10, len(top_sixteen_pool), desired_in_region)
         if top_pick_count > 0:
-            selected_ids.extend([recruit["recruit_id"] for recruit in random.sample(top_ten_pool, top_pick_count)])
+            selected_ids.extend([recruit["recruit_id"] for recruit in random.sample(top_sixteen_pool, top_pick_count)])
 
-        remaining_needed = 10 - len(selected_ids)
+        remaining_needed = desired_in_region - top_pick_count
         remaining_pool = [
             recruit["recruit_id"]
             for recruit in in_region_recruits
@@ -2947,7 +2956,7 @@ def _generate_cpu_recruiting_orders(
         if remaining_needed > 0 and remaining_pool:
             selected_ids.extend(random.sample(remaining_pool, min(remaining_needed, len(remaining_pool))))
 
-        cpu_orders[team_id] = _normalize_recruiting_orders(selected_ids[:10])
+        cpu_orders[team_id] = _normalize_recruiting_orders(selected_ids[:MAX_RECRUITING_ORDER_SLOTS])
 
     return cpu_orders
 
@@ -3221,8 +3230,8 @@ def save_recruiting_orders(
         raise HTTPException(status_code=400, detail="Recruiting orders have already been submitted for this week")
 
     recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
-    if len(recruit_ids) > 10:
-        raise HTTPException(status_code=400, detail="A maximum of 10 recruits can be ranked")
+    if len(recruit_ids) > MAX_RECRUITING_ORDER_SLOTS:
+        raise HTTPException(status_code=400, detail=f"A maximum of {MAX_RECRUITING_ORDER_SLOTS} recruits can be ranked")
     if len(set(recruit_ids)) != len(recruit_ids):
         raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
 

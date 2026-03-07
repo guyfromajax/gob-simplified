@@ -2,6 +2,7 @@
   'use strict';
 
   var Recruiting = window.RecruitingCommon;
+  var MAX_RECRUITING_ORDER_SLOTS = 20;
   var context = Recruiting.getQueryContext();
   var sortState = { key: 'rt', direction: 'desc' };
   var recruits = [];
@@ -43,7 +44,7 @@
 
   function buildAdjustButtons(index, filled) {
     var upDisabled = !filled || index === 0;
-    var downDisabled = !filled || index === 9;
+    var downDisabled = !filled || index === MAX_RECRUITING_ORDER_SLOTS - 1;
     return [
       '<div class="recruiting-adjust">',
       '<button class="recruiting-adjust-btn" type="button" data-action="up" data-index="' + index + '"' + (upDisabled ? ' disabled' : '') + '>↑</button>',
@@ -56,7 +57,7 @@
     var tbody = document.getElementById('orders-grid-body');
     tbody.innerHTML = '';
 
-    for (var i = 0; i < 10; i += 1) {
+    for (var i = 0; i < MAX_RECRUITING_ORDER_SLOTS; i += 1) {
       var recruitId = currentOrder[i] || null;
       var recruit = recruitId ? recruitMap[recruitId] : null;
       var tr = document.createElement('tr');
@@ -90,7 +91,7 @@
 
   function moveRecruit(index, direction) {
     var targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex > 9 || !currentOrder[index]) return;
+    if (targetIndex < 0 || targetIndex >= MAX_RECRUITING_ORDER_SLOTS || !currentOrder[index]) return;
     var currentId = currentOrder[index];
     var targetId = currentOrder[targetIndex] || null;
     currentOrder[targetIndex] = currentId;
@@ -137,10 +138,10 @@
       removeRecruitAt(existingIndex);
       return;
     }
-    if (currentOrder.length >= 10) {
+    if (currentOrder.length >= MAX_RECRUITING_ORDER_SLOTS) {
       showModal({
-        title: 'All 10 Rows Are Occupied',
-        message: 'All 10 rows are occupied. You must remove a recruit',
+        title: 'All 20 Rows Are Occupied',
+        message: 'All 20 rows are occupied. You must remove a recruit',
         actions: [{ label: 'Close', variant: 'secondary' }]
       });
       return;

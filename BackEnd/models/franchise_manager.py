@@ -417,7 +417,7 @@ class FranchiseManager:
                 "franchise_id": self.franchise_id,
                 "team_id": team_object_id,
                 "players": players,
-                "Recruits": {str(i): None for i in range(1, 11)},
+                "Recruits": {str(i): None for i in range(1, 21)},
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
                 "playbook_settings": playbook_settings.copy(),
