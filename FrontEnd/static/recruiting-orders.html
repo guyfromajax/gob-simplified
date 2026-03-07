@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Recruiting Orders</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/recruiting.css">
+</head>
+<body>
+  <div class="resource-page-container recruiting-page">
+    <div class="recruiting-header">
+      <button id="back-btn" class="recruiting-back-btn" type="button">Back</button>
+      <div class="recruiting-actions">
+        <button id="submit-btn" class="recruiting-btn is-dead" type="button" disabled>Submit Orders</button>
+      </div>
+    </div>
+
+    <div class="recruiting-section">
+      <h1>Recruiting Orders</h1>
+      <p class="recruiting-help">Rank up to 10 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
+      <div class="scroll-x">
+        <table class="roster-table orders-grid-table" id="orders-grid-table">
+          <thead>
+            <tr>
+              <th>Priority</th>
+              <th>Recruit</th>
+              <th>Home Region</th>
+              <th>Archetype</th>
+              <th>Pos</th>
+              <th>RT</th>
+              <th>Current Lean</th>
+              <th>Adjust</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody id="orders-grid-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="recruiting-section">
+      <h2>All Recruits</h2>
+      <div class="scroll-x">
+        <table id="recruits-table" class="roster-table recruiting-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th data-sort-key="homeRegion">Home Region</th>
+              <th data-sort-key="archetype">Archetype</th>
+              <th data-sort-key="height">HT</th>
+              <th data-sort-key="weight">WT</th>
+              <th data-sort-key="pos">POS</th>
+              <th data-sort-key="SC">SC</th>
+              <th data-sort-key="SH">SH</th>
+              <th data-sort-key="ID">ID</th>
+              <th data-sort-key="OD">OD</th>
+              <th data-sort-key="PS">PS</th>
+              <th data-sort-key="BH">BH</th>
+              <th data-sort-key="RB">RB</th>
+              <th data-sort-key="AG">AG</th>
+              <th data-sort-key="ST">ST</th>
+              <th data-sort-key="ND">ND</th>
+              <th data-sort-key="IQ">IQ</th>
+              <th data-sort-key="FT">FT</th>
+              <th data-sort-key="rt">RT</th>
+              <th data-sort-key="lean">Current Lean</th>
+            </tr>
+          </thead>
+          <tbody id="recruits-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="recruiting-modal-backdrop" class="recruiting-modal-backdrop" aria-hidden="true">
+    <div class="recruiting-modal" role="dialog" aria-modal="true" aria-labelledby="recruiting-modal-title">
+      <h3 id="recruiting-modal-title">Recruiting</h3>
+      <p id="recruiting-modal-message"></p>
+      <div id="recruiting-modal-actions" class="recruiting-modal-actions"></div>
+    </div>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/attributeTooltips.js"></script>
+  <script src="/recruiting-common.js"></script>
+  <script src="/recruiting-orders.js"></script>
+</body>
+</html>

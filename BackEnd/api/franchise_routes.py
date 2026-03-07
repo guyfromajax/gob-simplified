@@ -2864,6 +2864,93 @@ def recruits(franchise_id: str = Query(...)):
     return {"recruits": rec_docs}
 
 
+def _normalize_recruiting_orders(recruit_ids: list[str]) -> dict[str, str]:
+    return {str(index): recruit_id for index, recruit_id in enumerate(recruit_ids, start=1)}
+
+
+@router.get("/franchise/recruiting-data")
+def get_recruiting_data(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    fid = franchise_doc["_id"]
+
+    team_name, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
+        {"Recruits": 1},
+    )
+    saved_orders = ftd_doc.get("Recruits", {}) if ftd_doc else {}
+
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_id)},
+            {"_id": 0, "franchise_id": 0},
+        )
+    )
+    team_name_map = {
+        str(team["_id"]): team.get("name", str(team["_id"]))
+        for team in db.teams.find({}, {"name": 1})
+    }
+
+    return {
+        "team": team_name,
+        "team_id": user_team_id,
+        "week": franchise_doc.get("week", 1),
+        "saved_orders": saved_orders,
+        "recruits": recruits,
+        "team_name_map": team_name_map,
+    }
+
+
+@router.post("/franchise/recruiting-orders")
+def save_recruiting_orders(
+    req: SaveRecruitingOrdersRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    fid = franchise_doc["_id"]
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week < 20 or week > 34:
+        raise HTTPException(status_code=400, detail="Recruiting orders can only be saved during weeks 20-34")
+
+    recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
+    if len(recruit_ids) > 10:
+        raise HTTPException(status_code=400, detail="A maximum of 10 recruits can be ranked")
+    if len(set(recruit_ids)) != len(recruit_ids):
+        raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
+
+    valid_recruit_ids = set(
+        franchise_recruits_data_collection.distinct(
+            "recruit_id",
+            {"franchise_id": str(req.franchise_id)},
+        )
+    )
+    if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
+        raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+
+    orders_payload = _normalize_recruiting_orders(recruit_ids)
+    franchise_team_data_collection.update_one(
+        {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
+        {
+            "$set": {
+                "Recruits": orders_payload,
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+
+    return {"status": "success", "saved_orders": orders_payload}
+
+
 @router.get("/franchise/debug-names")
 def debug_names():
     """Debug endpoint to check if franchise names are loading correctly."""
@@ -4139,6 +4226,11 @@ class FinishSeasonRequest(BaseModel):
     franchise_id: str
 
 
+class SaveRecruitingOrdersRequest(BaseModel):
+    franchise_id: str
+    recruit_ids: list[str]
+
+
 @router.post("/franchise/sim-rest-of-tournament")
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
@@ -4356,6 +4448,7 @@ def finish_season(req: FinishSeasonRequest):
     # Initialize new season (same logic as initial season initialization)
     from BackEnd.models.franchise_manager import FranchiseManager
     fm = FranchiseManager(db)
+    fm.franchise_id = franchise_id
     
     # Get user team info
     user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)

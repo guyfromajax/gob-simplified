@@ -106,6 +106,35 @@ class FranchiseManager:
         self.schedule = []
         self.franchise_id = None
 
+    def _build_region_team_map(self) -> dict[str, list[str]]:
+        region_map: dict[str, list[str]] = {r: [] for r in "ABCDEFGH"}
+        for team in self.teams:
+            region = str(team.get("region") or "").upper()
+            if len(region) == 1 and region in region_map:
+                region_map[region].append(str(team["_id"]))
+        return region_map
+
+    def _build_recruit_lean(self, home_region: str, region_team_ids: dict[str, list[str]]) -> dict[str, str | None]:
+        lean = {"1": None, "2": None, "3": None}
+        team_ids = list(region_team_ids.get(home_region, []))
+        if not team_ids:
+            lean["1"] = "open"
+            return lean
+
+        if random.random() < 0.75:
+            lean["1"] = "open"
+            return lean
+
+        first_team_id = random.choice(team_ids)
+        lean["1"] = first_team_id
+
+        if random.random() < 0.20:
+            remaining = [team_id for team_id in team_ids if team_id != first_team_id]
+            if remaining:
+                lean["2"] = random.choice(remaining)
+
+        return lean
+
     def load_teams(self):
         return list(self.db.teams.find())
 
@@ -219,7 +248,7 @@ class FranchiseManager:
 
         _t0 = time.time()
         # Generate initial recruits for the franchise
-        recruits = self.recruit_manager.generate_recruits_list()
+        recruits = self.recruit_manager.generate_recruits_list(count=200)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
@@ -269,6 +298,10 @@ class FranchiseManager:
         ensure_fpd_index()
         ensure_frd_index()
 
+        # New season flow rewrites FPD/FRD for the current franchise.
+        franchise_players_data_collection.delete_many({"franchise_id": str(self.franchise_id)})
+        franchise_recruits_data_collection.delete_many({"franchise_id": str(self.franchise_id)})
+
         # ✅ FPD: Batch insert (one round-trip instead of N)
         fpd_docs = [
             {
@@ -287,6 +320,8 @@ class FranchiseManager:
             franchise_players_data_collection.insert_many(fpd_docs)
         _perf["fpd_insert_many"] = (time.time() - _t0) * 1000
 
+        region_team_ids = self._build_region_team_map()
+
         # ✅ FRD: Batch insert (one round-trip instead of N)
         frd_docs = [
             {
@@ -299,9 +334,12 @@ class FranchiseManager:
                 "weight": recruit["weight"],
                 "archetype": recruit["archetype"],
                 "year": recruit["year"],
+                "Home Region": home_region,
+                "Lean": self._build_recruit_lean(home_region, region_team_ids),
                 "created_at": recruit["created_at"],
             }
             for recruit in recruits
+            for home_region in [random.choice(list(region_team_ids.keys()))]
         ]
         _t0 = time.time()
         if frd_docs:
@@ -378,6 +416,7 @@ class FranchiseManager:
                 "franchise_id": self.franchise_id,
                 "team_id": team_object_id,
                 "players": players,
+                "Recruits": {str(i): None for i in range(1, 11)},
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
                 "playbook_settings": playbook_settings.copy(),
@@ -878,4 +917,3 @@ class RecruitManager:
             return random.randint(195, 231)
         else:  # > 80
             return random.randint(209, 260)
-

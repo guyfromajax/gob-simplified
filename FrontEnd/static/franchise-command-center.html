@@ -57,7 +57,10 @@
           <button id="playbooks-franchise" class="secondary-btn">Playbooks</button>
           <button id="scouting-report-btn" class="secondary-btn" style="display: none;">Scouting Report</button>
         </div>
-        <button id="play-now" class="hero-btn">Run Training</button>
+        <div class="hero-buttons-group">
+          <button id="play-now" class="hero-btn">Run Training</button>
+          <button id="fcc-recruiting-btn" class="recruiting-access-btn is-dead" type="button" disabled>Recruiting Begins Week 20</button>
+        </div>
       </div>
     </div>
 
@@ -66,7 +69,6 @@
         <button data-tab="standings-tab" class="active">Standings</button>
         <button data-tab="roster-tab">Roster</button>
         <button data-tab="team-tab">Team</button>
-        <button data-tab="recruits-tab">Recruits</button>
         <button data-tab="tournament-tab">Tournament</button>
         <button data-tab="resources-tab">Resources</button>
       </div>
@@ -150,16 +152,6 @@
           </section>
         </div>
       </div>
-      <div id="recruits-tab" class="tab-content">
-        <div class="scroll-x">
-          <table class="roster-table">
-            <thead>
-              <tr><th>Name</th><th>Archetype</th><th>HT</th><th>WT</th><th>POS</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th><th>RT</th></tr>
-            </thead>
-            <tbody id="recruits-body"></tbody>
-          </table>
-        </div>
-      </div>
       <div id="tournament-tab" class="tab-content">
         <h3>End-of-Season Tournament</h3>
         <div style="width: 100%; overflow-x: auto;">
@@ -174,6 +166,7 @@
           <a id="resources-schedule" class="resources-btn" href="#">Schedule</a>
           <a id="resources-team-traits" class="resources-btn" href="#">Team Traits</a>
           <a id="resources-rankings" class="resources-btn" href="#">Rankings</a>
+          <a id="resources-recruits" class="resources-btn" href="#">Recruits</a>
         </div>
       </div>
     </div>

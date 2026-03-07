@@ -245,6 +245,8 @@ function bindResourcesLinks() {
   if (rTraits) rTraits.href = `/team-traits.html${q()}`;
   const rRankings = document.getElementById('resources-rankings');
   if (rRankings) rRankings.href = `/rankings.html${q()}`;
+  const rRecruits = document.getElementById('resources-recruits');
+  if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -1085,6 +1087,7 @@ async function init() {
   // Update button based on training status
   updatePlayButton(topData);
   updateScoutingButton(topData);
+  updateRecruitingButton(topData);
   maybeShowChampionshipCompleteModal(topData);
   
   if (topData && (topData.team_id || topData.team) && userTeamId) {
@@ -1132,20 +1135,12 @@ async function init() {
     // 🛠️ END DEV MODE FEATURE
     // ============================================================================
     
-    const recruitsStartTime = performance.now();
-    const recruitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`);
-    const recruitsEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/recruits: ${(recruitsEndTime - recruitsStartTime).toFixed(2)}ms`);
-    renderRecruits(recruitsData);
-    
     // ✅ Stats, Team Traits, Rankings moved to standalone pages (Resources tab)
     
     // Initialize tooltips for table headers
     if (typeof initAttributeTooltips !== 'undefined') {
       const rosterTable = document.querySelector('#roster-tab .roster-table');
-      const recruitsTable = document.querySelector('#recruits-tab .roster-table');
       if (rosterTable) initAttributeTooltips(rosterTable, ['th']);
-      if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
     }
     
     // Load team data for Team tab
@@ -1310,6 +1305,27 @@ function updatePlayButton(data) {
       playNowBtn.textContent = 'Play Now';
       playNowBtn.dataset.mode = 'play';
     }
+  }
+}
+
+function updateRecruitingButton(data) {
+  const recruitingBtn = document.getElementById('fcc-recruiting-btn');
+  if (!recruitingBtn) return;
+  const week = Number(data?.week || 1);
+  const active = week >= 20 && week <= 34;
+  recruitingBtn.textContent = active ? 'Recruiting' : 'Recruiting Begins Week 20';
+  recruitingBtn.disabled = !active;
+  recruitingBtn.classList.toggle('is-dead', !active);
+  recruitingBtn.onclick = null;
+  if (active) {
+    recruitingBtn.onclick = () => {
+      if (!franchiseId || !userTeamId) return;
+      const params = new URLSearchParams();
+      params.set('franchise_id', franchiseId);
+      params.set('team_id', userTeamId);
+      params.set('from', 'fcc');
+      window.location.href = `/recruiting-orders.html?${params.toString()}`;
+    };
   }
 }
 

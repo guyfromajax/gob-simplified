@@ -34,6 +34,13 @@
   gap: 12px; /* Gap between secondary buttons group and hero button */
 }
 
+#franchise-container .hero-buttons-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
 /* Secondary buttons group (Set Game Plan, Playbooks, Scouting Report) */
 #franchise-container .secondary-buttons-group {
   display: flex;
@@ -127,6 +134,31 @@
 #franchise-container .hero-btn:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(255, 122, 0, 0.3);
+}
+
+#franchise-container .recruiting-access-btn {
+  min-height: 40px;
+  border: none;
+  border-radius: 4px;
+  background: #2f8f46;
+  color: #c9ced7;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#franchise-container .recruiting-access-btn:hover:not(.is-dead) {
+  background: #358f58;
+  transform: translateY(-1px);
+}
+
+#franchise-container .recruiting-access-btn.is-dead,
+#franchise-container .recruiting-access-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
