@@ -794,6 +794,11 @@ class CompleteWeekRequest(BaseModel):
     game_document: dict | None = None  # Optional: complete game document from simulate-quarter (eliminates race condition)
 
 
+class SaveRecruitingOrdersRequest(BaseModel):
+    franchise_id: str
+    recruit_ids: list[str]
+
+
 def _normalize_team_id(team_id: str):
     try:
         return ObjectId(team_id)
@@ -4224,11 +4229,6 @@ class SimChampionshipRequest(BaseModel):
 
 class FinishSeasonRequest(BaseModel):
     franchise_id: str
-
-
-class SaveRecruitingOrdersRequest(BaseModel):
-    franchise_id: str
-    recruit_ids: list[str]
 
 
 @router.post("/franchise/sim-rest-of-tournament")
