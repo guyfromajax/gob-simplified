@@ -2914,6 +2914,11 @@ def _generate_cpu_recruiting_orders(
 ) -> dict[str, dict[str, str]]:
     cpu_orders: dict[str, dict[str, str]] = {}
     all_regions = [region for region, recruits in recruits_by_region.items() if recruits]
+    recruit_docs_by_id = {
+        recruit["recruit_id"]: recruit
+        for recruits in recruits_by_region.values()
+        for recruit in recruits
+    }
 
     for team_id, team_doc in team_docs_by_id.items():
         if team_id == user_team_id:
@@ -2956,7 +2961,15 @@ def _generate_cpu_recruiting_orders(
         if remaining_needed > 0 and remaining_pool:
             selected_ids.extend(random.sample(remaining_pool, min(remaining_needed, len(remaining_pool))))
 
-        cpu_orders[team_id] = _normalize_recruiting_orders(selected_ids[:MAX_RECRUITING_ORDER_SLOTS])
+        sorted_selected_ids = [
+            recruit["recruit_id"]
+            for recruit in _sort_recruits_by_rt([
+                recruit_docs_by_id[recruit_id]
+                for recruit_id in selected_ids[:MAX_RECRUITING_ORDER_SLOTS]
+                if recruit_id in recruit_docs_by_id
+            ])
+        ]
+        cpu_orders[team_id] = _normalize_recruiting_orders(sorted_selected_ids)
 
     return cpu_orders
 
@@ -2966,6 +2979,27 @@ def _highest_remaining_team_target(team_order: list[str], assigned_recruit_ids: 
         if recruit_id not in assigned_recruit_ids:
             return recruit_id
     return None
+
+
+def _team_prestige_draw_entries(team_doc: dict | None) -> int:
+    prestige = int((team_doc or {}).get("prestige") or 0)
+    return max(1, prestige // 10)
+
+
+def _select_team_by_prestige_draw(team_ids: list[str], team_docs_by_id: dict[str, dict]) -> str:
+    weighted_ranges: list[tuple[int, int, str]] = []
+    current_start = 1
+    for team_id in team_ids:
+        entries = _team_prestige_draw_entries(team_docs_by_id.get(team_id))
+        current_end = current_start + entries - 1
+        weighted_ranges.append((current_start, current_end, team_id))
+        current_start = current_end + 1
+
+    draw = random.randint(1, weighted_ranges[-1][1])
+    for range_start, range_end, team_id in weighted_ranges:
+        if range_start <= draw <= range_end:
+            return team_id
+    return weighted_ranges[-1][2]
 
 
 def _resolve_weekly_recruiting_visits(
@@ -3036,7 +3070,7 @@ def _resolve_weekly_recruiting_visits(
                 if not eligible_team_ids:
                     break
 
-                selected_team_id = random.choice(eligible_team_ids)
+                selected_team_id = _select_team_by_prestige_draw(eligible_team_ids, team_docs_by_id)
                 top_remaining_recruit_id = _highest_remaining_team_target(
                     team_orders.get(selected_team_id, []),
                     assigned_recruit_ids,
@@ -3262,13 +3296,17 @@ def save_recruiting_orders(
 
     ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
     team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
-    team_docs_by_id = {
-        str(team["_id"]): team
-        for team in db.teams.find(
-            {"_id": {"$in": team_ids}},
-            {"name": 1, "conference": 1, "region": 1},
-        )
-    }
+    ftd_by_team_id = {str(doc["team_id"]): doc for doc in ftd_docs if doc.get("team_id") is not None}
+    team_docs_by_id = {}
+    for team in db.teams.find(
+        {"_id": {"$in": team_ids}},
+        {"name": 1, "conference": 1, "region": 1},
+    ):
+        team_id = str(team["_id"])
+        team_docs_by_id[team_id] = {
+            **team,
+            "prestige": (ftd_by_team_id.get(team_id) or {}).get("prestige", 0),
+        }
     recruits = list(
         franchise_recruits_data_collection.find(
             {"franchise_id": str(req.franchise_id)},

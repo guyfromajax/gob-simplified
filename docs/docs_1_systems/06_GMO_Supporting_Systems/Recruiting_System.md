@@ -241,6 +241,8 @@
         - choose the remaining 5-10 at random from the remaining in-region recruits
             - exclude recruits already chosen in the previous step
             - the remaining pool can include the top-16 recruits who were not selected in the first step
+    - once the CPU team's recruit pool has been selected, rank that final board from highest RT to lowest RT before saving it into `FTD.Recruits`
+        - ties are broken randomly
 
 **Weekly Region Recruiting Resolution**
 - Run each week's recruiting for weeks `20-26` after the user submits.
@@ -257,7 +259,13 @@
         - if any of those teams are on the recruit's `Lean` list, remove any teams that are not on the recruit's `Lean` list
         - if lean filtering produces no overlap, ignore lean filtering and continue with the original eligible team set
         - if the recruit's lean is `open`, apply no lean filtering
-        - randomly choose one of the remaining teams and assign that recruit for that week's visit
+        - if more than one team remains tied at that point, resolve the winner with a prestige-weighted random draw
+            - take the first two digits of each tied team's prestige value
+                - Example: `745 -> 74`, `609 -> 60`, `450 -> 45`, `311 -> 31`
+            - those values become the number of entries that team gets in the random draw
+            - sum all tied-team entries, then draw `random.randint(1, total_entries)`
+            - whichever team's numeric range contains that draw wins the visit
+        - if only one team remains eligible, that team gets the visit
         - remove that team and that recruit from all calculations moving forward for that week
             - a team can receive at most one visit in a week
             - a recruit can receive at most one visit in a week
