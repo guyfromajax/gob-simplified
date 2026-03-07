@@ -55,7 +55,7 @@ const teamIdNameMap = {};
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
-  const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'logo_square') : '/images/teams/general/general_logo_square.png';
+  const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
   console.log('Team logo URL:', logoSrc);
 

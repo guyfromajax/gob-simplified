@@ -1031,7 +1031,7 @@ function populateTop(data) {
   // Update team logo
   if (data.team) {
     const formattedTeam = formatTeamName(data.team);
-    const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'logo_square') : '/images/teams/general/general_logo_square.png';
+    const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
     const logoEl = document.getElementById('user-team-logo');
     if (logoEl) {
       logoEl.src = logoSrc;
@@ -1129,7 +1129,7 @@ function updateTeamChemistry() {
 function initTopAssets(teamName) {
   const logoEl = document.getElementById("user-team-logo");
   if (logoEl) {
-    logoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName || userTeamId || "", 'logo_square') : '/images/teams/general/general_logo_square.png';
+    logoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName || userTeamId || "", 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
   const abbr = teamMap[formattedName] || "";
   const sammyEl = document.getElementById("coach-sammy");
