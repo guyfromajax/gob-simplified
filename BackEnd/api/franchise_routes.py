@@ -1763,6 +1763,7 @@ def complete_week(req: CompleteWeekRequest):
 
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
+    _apply_complete_week_recruiting_lean_updates(franchise_doc, req.week, results)
     
     # Reset training status for next week
     next_week = req.week + 1
@@ -3002,6 +3003,176 @@ def _select_team_by_prestige_draw(team_ids: list[str], team_docs_by_id: dict[str
     return weighted_ranges[-1][2]
 
 
+def _team_outcomes_by_week_results(results: list[dict]) -> dict[str, str]:
+    outcomes: dict[str, str] = {}
+    for result in results:
+        away_id = str(result.get("away_id"))
+        home_id = str(result.get("home_id"))
+        away_score = int(result.get("away_score", 0) or 0)
+        home_score = int(result.get("home_score", 0) or 0)
+        if away_score > home_score:
+            outcomes[away_id] = "win"
+            outcomes[home_id] = "loss"
+        elif home_score > away_score:
+            outcomes[home_id] = "win"
+            outcomes[away_id] = "loss"
+    return outcomes
+
+
+def _normalize_recruit_lean_doc(lean_doc: dict | None) -> dict[str, str | None]:
+    lean = {"1": None, "2": None, "3": None}
+    for key in ("1", "2", "3"):
+        value = (lean_doc or {}).get(key)
+        lean[key] = value if value not in ("",) else None
+    return lean
+
+
+def _lean_has_open_slot(lean_doc: dict[str, str | None]) -> bool:
+    return lean_doc.get("1") in (None, "open") or lean_doc.get("2") is None or lean_doc.get("3") is None
+
+
+def _insert_team_into_highest_open_lean_slot(lean_doc: dict[str, str | None], team_id: str) -> dict[str, str | None]:
+    updated = _normalize_recruit_lean_doc(lean_doc)
+    if updated.get("1") in (None, "open"):
+        updated["1"] = team_id
+        updated["2"] = None if updated.get("2") == "open" else updated.get("2")
+        updated["3"] = None if updated.get("3") == "open" else updated.get("3")
+        return updated
+    if updated.get("2") is None:
+        updated["2"] = team_id
+        return updated
+    if updated.get("3") is None:
+        updated["3"] = team_id
+    return updated
+
+
+def _update_recruit_lean_after_visit(
+    lean_doc: dict | None,
+    team_id: str,
+    in_region: bool,
+    won_game: bool,
+) -> dict[str, str | None]:
+    updated = _normalize_recruit_lean_doc(lean_doc)
+    existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
+
+    if existing_rank == "1":
+        if updated.get("3") is not None:
+            updated["3"] = None
+        elif updated.get("2") is not None:
+            updated["2"] = None
+        return updated
+    if existing_rank == "2":
+        updated["2"], updated["1"] = updated.get("1"), updated.get("2")
+        return updated
+    if existing_rank == "3":
+        updated["3"], updated["2"] = updated.get("2"), updated.get("3")
+        return updated
+
+    has_open_slot = _lean_has_open_slot(updated)
+    if in_region:
+        chance = 0.95 if won_game and has_open_slot else 0.75 if won_game else 0.75 if has_open_slot else 0.40
+    else:
+        chance = 0.80 if won_game and has_open_slot else 0.60 if won_game else 0.50 if has_open_slot else 0.30
+
+    if random.random() > chance:
+        return updated
+
+    if has_open_slot:
+        return _insert_team_into_highest_open_lean_slot(updated, team_id)
+
+    updated["3"] = team_id
+    return updated
+
+
+def _apply_complete_week_recruiting_lean_updates(
+    franchise_doc: dict,
+    week: int,
+    results: list[dict],
+) -> None:
+    if week < 20 or week > 26:
+        return
+
+    applied = (franchise_doc.get("recruiting_lean_updates_applied") or {}).get(str(week))
+    if applied:
+        logger.info("Skipping recruiting lean updates for franchise=%s week=%s; already applied", franchise_doc.get("_id"), week)
+        return
+
+    fid = franchise_doc["_id"]
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "recruit_visit": 1},
+    ))
+    if not ftd_docs:
+        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        return
+
+    visited_recruit_ids: set[str] = set()
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    team_docs_by_id = {
+        str(team["_id"]): team
+        for team in db.teams.find({"_id": {"$in": team_ids}}, {"region": 1})
+    }
+    recruit_visit_pairs: list[tuple[str, str]] = []
+    for ftd_doc in ftd_docs:
+        team_id = str(ftd_doc.get("team_id"))
+        recruit_id = ftd_doc.get("recruit_visit")
+        if not team_id or not recruit_id:
+            continue
+        if recruit_id in visited_recruit_ids:
+            logger.warning(
+                "Duplicate recruit_visit detected for franchise=%s week=%s recruit_id=%s; keeping first occurrence",
+                fid,
+                week,
+                recruit_id,
+            )
+            continue
+        visited_recruit_ids.add(recruit_id)
+        recruit_visit_pairs.append((team_id, recruit_id))
+
+    if not recruit_visit_pairs:
+        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        return
+
+    recruit_ids = [recruit_id for _, recruit_id in recruit_visit_pairs]
+    recruit_docs_by_id = {
+        recruit["recruit_id"]: recruit
+        for recruit in franchise_recruits_data_collection.find(
+            {"franchise_id": str(fid), "recruit_id": {"$in": recruit_ids}},
+            {"recruit_id": 1, "Home Region": 1, "Lean": 1},
+        )
+    }
+    team_outcomes = _team_outcomes_by_week_results(results)
+
+    bulk_updates = []
+    for team_id, recruit_id in recruit_visit_pairs:
+        recruit_doc = recruit_docs_by_id.get(recruit_id)
+        team_doc = team_docs_by_id.get(team_id)
+        if not recruit_doc or not team_doc:
+            continue
+        updated_lean = _update_recruit_lean_after_visit(
+            recruit_doc.get("Lean"),
+            team_id,
+            str(team_doc.get("region") or "").upper() == str(recruit_doc.get("Home Region") or "").upper(),
+            team_outcomes.get(team_id) == "win",
+        )
+        bulk_updates.append({
+            "filter": {"franchise_id": str(fid), "recruit_id": recruit_id},
+            "update": {"$set": {"Lean": updated_lean}},
+        })
+
+    for op in bulk_updates:
+        franchise_recruits_data_collection.update_one(op["filter"], op["update"])
+
+    franchise_team_data_collection.update_many(
+        {"franchise_id": fid},
+        {"$set": {"recruit_visit": None, "updated_at": datetime.utcnow()}},
+    )
+    db.franchises.update_one(
+        {"_id": fid},
+        {"$set": {f"recruiting_lean_updates_applied.{week}": True}},
+    )
+
+
 def _resolve_weekly_recruiting_visits(
     team_docs_by_id: dict[str, dict],
     team_orders: dict[str, list[str]],
@@ -3341,6 +3512,17 @@ def save_recruiting_orders(
             }
         },
     )
+    for ftd_doc in all_ftd_docs:
+        team_id = str(ftd_doc["team_id"])
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ftd_doc["team_id"]},
+            {
+                "$set": {
+                    "recruit_visit": assignments.get(team_id),
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
 
     return {"status": "success", "saved_orders": orders_payload, "results_week": week}
 
@@ -4859,6 +5041,7 @@ def finish_season(req: FinishSeasonRequest):
             "region_tournaments": {},
             "national_tournament": {},
             "recruiting_results": {},
+            "recruiting_lean_updates_applied": {},
             "training_status.training_completed": False,
             "training_status.session_type": "preseason"
         }}

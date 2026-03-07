@@ -139,6 +139,10 @@ Ranges will be determined by each team's seed
   3. `Player.randomize_game_attributes()` is called for each player
   4. Team attributes are initialized in the **franchise_team_data (FTD)** structure with Franchise-specific ranges
   5. Each team's FTD doc includes **`total_player_attrs`**: the sum of that team's player core attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT). Used for national ranking. When the universal **teams** collection has a `total_player_attrs` field for a team, franchise init uses that value; otherwise it is computed from the universal **players** collection (sum by team name) during init.
+  6. Each team's FTD doc includes recruiting support fields:
+     - `Recruits`: keys `"1"` through `"20"` initialized to `None`
+     - `recruit_visit`: initialized to `None`
+  7. On each new franchise season, those recruiting support fields are reset before the new season begins.
 
 ### Playbook Settings Initialization
 
@@ -203,4 +207,3 @@ At the start of any new season in Franchise mode we will build team schedules fo
 
 Rules
 - All teams must have 13 home game and 13 away games in the regular season
-

@@ -257,6 +257,7 @@ class FranchiseManager:
             "players": {},  # FPD holds player data; empty here for legacy safety
             "recruits": [],  # FRD holds recruit data; empty here for legacy safety
             "recruiting_results": {},
+            "recruiting_lean_updates_applied": {},
             "applied_games": [],
             "training_status": training_status,
             # Add missing document-level fields (matches Tournament pattern)
@@ -418,6 +419,7 @@ class FranchiseManager:
                 "team_id": team_object_id,
                 "players": players,
                 "Recruits": {str(i): None for i in range(1, 21)},
+                "recruit_visit": None,
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
                 "playbook_settings": playbook_settings.copy(),

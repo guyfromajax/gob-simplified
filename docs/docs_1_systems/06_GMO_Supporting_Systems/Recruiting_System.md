@@ -26,6 +26,12 @@
     - This will be a dict with potential keys `"1"` through `"20"`.
     - Values hold FRD string ids.
     - On init, keys `"1"` through `"20"` should exist and each value should be `None`.
+0a. Add a new `recruit_visit` field to each FTD doc.
+    - This stores the current week's assigned recruit visit for that team.
+    - Value is either:
+        - a recruit id string, or
+        - `None`
+    - On init and through weeks `1-19`, this value should be `None`.
 1. Add two new fields to each new doc in the FRD collection.
     - Existing FRD docs do not need to be retrofitted because existing franchise instances will be deleted before implementation.
     - `Home Region`
@@ -49,6 +55,7 @@
 2. Upon new franchise init and the start of each new season within a franchise instance, create 200 new recruits per our recruit generation logic.
 3. At the start of each new season within a franchise instance:
     - reset every team's FTD `Recruits` field back to keys `"1"` through `"20"` with `None` values
+    - reset every team's FTD `recruit_visit` field back to `None`
     - delete that franchise's prior season FRD recruits
     - generate the new season's 200 FRD recruits
 
@@ -78,6 +85,9 @@
         - generates fresh computer-team `FTD.Recruits` orders for that week
         - runs weekly recruiting visit resolution for all 128 teams
         - persists that week's final team/recruit visit pairings
+        - writes `FTD.recruit_visit` for all 128 teams
+            - assigned teams get the recruit id string
+            - teams with no visit get `None`
 
 **Recruiting Results Persistence**
 - Persist recruiting visit results by week at the franchise level.
@@ -298,8 +308,64 @@
     - `from=fcc`
     - `from=recruiting`
 
+**Complete Week Recruiting Logic**
+- Run this logic immediately after all franchise games for the week have been simulated/finalized.
+    - Best-practice implementation is a dedicated recruiting helper that is called from `complete_week`.
+    - The helper should run only once per franchise / week and should use a franchise-level idempotency marker.
+- This logic applies only during weeks `20-26`.
+- Use `FTD.recruit_visit` as the team-level source of truth for that week's visit assignment.
+    - Teams with `recruit_visit == None` do nothing.
+    - If duplicate bad data causes the same recruit to appear in more than one `FTD.recruit_visit` for the same week:
+        - use the first occurrence encountered
+        - log a warning
+- Determine each visiting team's win/loss result from that team's actual completed franchise game for that week.
+- Update FRD `Lean` only. No other recruiting outcomes are processed here.
+- `open` handling:
+    - `Lean["1"] == "open"` behaves the same as an open slot for insertion logic
+    - once any real team is inserted onto the recruit's lean list, remove `open`
+- If the visiting team is in-region for the recruit:
+    - if the team is not already on the recruit's lean list:
+        - determine percent chance:
+            - if there is a null/open value on the recruit's lean list:
+                - `95%` if team wins
+                - `75%` if team loses
+            - if there is not a null/open value on the recruit's lean list:
+                - `75%` if team wins
+                - `40%` if team loses
+        - if added and there is a null/open slot:
+            - the team occupies the highest rated opening on the lean list
+            - slot `1` if open/null, else slot `2` if null, else slot `3` if null
+        - if added and there is not a null/open slot:
+            - the team replaces the current `#3` team
+            - `#1` and `#2` are never displaced in this situation
+    - if the team is already on the recruit's lean list:
+        - if the team is currently ranked `#1`, it remains `#1`
+            - if there are other teams on the recruit's lean list, drop the lowest rated occupied slot
+            - clear only one slot to `None`
+        - if the team is ranked `#2` or `#3`, it moves up one ranking by swapping with the team directly in front of it
+        - these existing-team movements are deterministic; there is no probability roll
+- If the visiting team is out-of-region for the recruit:
+    - if the team is not already on the recruit's lean list:
+        - determine percent chance:
+            - if there is a null/open value on the recruit's lean list:
+                - `80%` if team wins
+                - `50%` if team loses
+            - if there is not a null/open value on the recruit's lean list:
+                - `60%` if team wins
+                - `30%` if team loses
+        - if added and there is a null/open slot:
+            - the team occupies the highest rated opening on the lean list
+            - slot `1` if open/null, else slot `2` if null, else slot `3` if null
+        - if added and there is not a null/open slot:
+            - the team replaces the current `#3` team
+            - `#1` and `#2` are never displaced in this situation
+    - if the team is already on the recruit's lean list:
+        - if the team is currently ranked `#1`, it remains `#1`
+            - if there are other teams on the recruit's lean list, drop the lowest rated occupied slot
+            - clear only one slot to `None`
+        - if the team is ranked `#2` or `#3`, it moves up one ranking by swapping with the team directly in front of it
+        - these existing-team movements are deterministic; there is no probability roll
+
 **Still Out Of Scope**
-- This phase does not determine recruit lean updates.
-    - Lean updates will happen during complete week.
 - This phase does not determine final recruit choice / commitment.
     - Final recruiting season logic will run between the National Championship and the End of Season system.
