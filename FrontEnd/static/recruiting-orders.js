@@ -273,6 +273,11 @@
 
     Recruiting.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-data') + '?franchise_id=' + encodeURIComponent(context.franchiseId))
       .then(function (data) {
+        var week = Number(data.week || 1);
+        if (Number(data.current_results_week || 0) === week) {
+          navigateAway(Recruiting.buildRecruitingUrl('recruiting-results.html', context, { week: String(week) }));
+          return;
+        }
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});
         recruitMap = {};
         recruits.forEach(function (recruit) {

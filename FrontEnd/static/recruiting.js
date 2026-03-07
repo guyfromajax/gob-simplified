@@ -17,14 +17,23 @@
     var btn = document.getElementById('orders-btn');
     if (!btn) return;
     var week = Number(data.week || 1);
-    if (week < 20) {
+    var resultsWeek = Number(data.current_results_week || 0);
+    if (week < 20 || week > 26) {
       btn.style.display = 'none';
       return;
     }
     btn.style.display = 'inline-flex';
-    btn.addEventListener('click', function () {
-      window.location.href = Recruiting.buildRecruitingUrl('recruiting-orders.html', context, { from: 'recruiting' });
-    });
+    if (resultsWeek === week) {
+      btn.textContent = 'Week ' + week + ' Recruiting Visits';
+      btn.addEventListener('click', function () {
+        window.location.href = Recruiting.buildRecruitingUrl('recruiting-results.html', context, { from: 'recruiting', week: String(week) });
+      });
+    } else {
+      btn.textContent = 'Recruiting Orders';
+      btn.addEventListener('click', function () {
+        window.location.href = Recruiting.buildRecruitingUrl('recruiting-orders.html', context, { from: 'recruiting' });
+      });
+    }
   }
 
   function init() {

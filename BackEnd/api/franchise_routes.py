@@ -2021,6 +2021,9 @@ def command_center_data(
         response["training_completed"] = training_completed
         response["session_type"] = session_type
         response["week"] = week if week is not None else 1
+        recruiting_results = franchise_doc.get("recruiting_results", {}) if franchise_doc else {}
+        current_results_week = week if week is not None and str(week) in (recruiting_results or {}) else None
+        response["current_recruiting_results_week"] = current_results_week
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
@@ -2869,6 +2872,286 @@ def recruits(franchise_id: str = Query(...)):
     return {"recruits": rec_docs}
 
 
+def _recruit_rt(recruit_doc: dict) -> int:
+    ratings = recruit_doc.get("position_ratings") or {}
+    values = [int(v or 0) for v in ratings.values() if isinstance(v, (int, float))]
+    return max(values) if values else 0
+
+
+def _best_position(position_ratings: dict) -> dict:
+    best_pos = "--"
+    best_rating = None
+    for pos, rating in (position_ratings or {}).items():
+        if not isinstance(rating, (int, float)):
+            continue
+        if best_rating is None or rating > best_rating:
+            best_pos = pos
+            best_rating = int(rating)
+    return {"pos": best_pos, "rating": best_rating}
+
+
+def _team_order_list(order_doc: dict | None) -> list[str]:
+    return [
+        order_doc[key]
+        for key in sorted((order_doc or {}).keys(), key=lambda item: int(item))
+        if order_doc.get(key)
+    ]
+
+
+def _sort_recruits_by_rt(recruit_docs: list[dict]) -> list[dict]:
+    rows = list(recruit_docs)
+    rows.sort(key=lambda recruit: (-_recruit_rt(recruit), random.random()))
+    return rows
+
+
+def _generate_cpu_recruiting_orders(
+    team_docs_by_id: dict[str, dict],
+    user_team_id: str,
+    recruits_by_region: dict[str, list[dict]],
+) -> dict[str, dict[str, str]]:
+    cpu_orders: dict[str, dict[str, str]] = {}
+    all_regions = [region for region, recruits in recruits_by_region.items() if recruits]
+
+    for team_id, team_doc in team_docs_by_id.items():
+        if team_id == user_team_id:
+            continue
+
+        team_region = str(team_doc.get("region") or "").upper()
+        in_region_recruits = list(recruits_by_region.get(team_region, []))
+        if not in_region_recruits:
+            cpu_orders[team_id] = {}
+            continue
+
+        selected_ids: list[str] = []
+        choose_out_region = random.random() < 0.5
+        if choose_out_region:
+            outside_regions = [region for region in all_regions if region != team_region]
+            if outside_regions:
+                outside_region = random.choice(outside_regions)
+                outside_pool = recruits_by_region.get(outside_region, [])[:3]
+                if outside_pool:
+                    selected_ids.append(random.choice(outside_pool)["recruit_id"])
+
+        desired_in_region = 10 - len(selected_ids)
+        top_ten_pool = in_region_recruits[: min(10, len(in_region_recruits))]
+        top_pick_count = min(5, len(top_ten_pool), desired_in_region)
+        if top_pick_count > 0:
+            selected_ids.extend([recruit["recruit_id"] for recruit in random.sample(top_ten_pool, top_pick_count)])
+
+        remaining_needed = 10 - len(selected_ids)
+        remaining_pool = [
+            recruit["recruit_id"]
+            for recruit in in_region_recruits
+            if recruit["recruit_id"] not in selected_ids
+        ]
+        if remaining_needed > 0 and remaining_pool:
+            selected_ids.extend(random.sample(remaining_pool, min(remaining_needed, len(remaining_pool))))
+
+        cpu_orders[team_id] = _normalize_recruiting_orders(selected_ids[:10])
+
+    return cpu_orders
+
+
+def _highest_remaining_team_target(team_order: list[str], assigned_recruit_ids: set[str]) -> str | None:
+    for recruit_id in team_order:
+        if recruit_id not in assigned_recruit_ids:
+            return recruit_id
+    return None
+
+
+def _resolve_weekly_recruiting_visits(
+    team_docs_by_id: dict[str, dict],
+    team_orders: dict[str, list[str]],
+    recruit_docs_by_id: dict[str, dict],
+) -> dict[str, str]:
+    team_rank_lookup = {
+        team_id: {recruit_id: index + 1 for index, recruit_id in enumerate(order)}
+        for team_id, order in team_orders.items()
+    }
+    available_team_ids = set(team_docs_by_id.keys())
+    assigned_recruit_ids: set[str] = set()
+    assignments: dict[str, str] = {}
+    shuffled_regions = list("ABCDEFGH")
+    random.shuffle(shuffled_regions)
+
+    for region in shuffled_regions:
+        region_team_ids = [
+            team_id
+            for team_id, team_doc in team_docs_by_id.items()
+            if str(team_doc.get("region") or "").upper() == region and team_id in available_team_ids
+        ]
+        if not region_team_ids:
+            continue
+
+        region_bid_recruit_ids = set()
+        for team_id in region_team_ids:
+            for recruit_id in team_orders.get(team_id, []):
+                if recruit_id not in assigned_recruit_ids:
+                    region_bid_recruit_ids.add(recruit_id)
+
+        sorted_region_recruits = _sort_recruits_by_rt([
+            recruit_docs_by_id[recruit_id]
+            for recruit_id in region_bid_recruit_ids
+            if recruit_id in recruit_docs_by_id
+        ])
+
+        for recruit_doc in sorted_region_recruits:
+            recruit_id = recruit_doc["recruit_id"]
+            if recruit_id in assigned_recruit_ids:
+                continue
+
+            while True:
+                candidate_team_ids = [
+                    team_id
+                    for team_id in region_team_ids
+                    if team_id in available_team_ids and recruit_id in team_rank_lookup.get(team_id, {})
+                ]
+                if not candidate_team_ids:
+                    break
+
+                best_rank = min(team_rank_lookup[team_id][recruit_id] for team_id in candidate_team_ids)
+                eligible_team_ids = [
+                    team_id
+                    for team_id in candidate_team_ids
+                    if team_rank_lookup[team_id][recruit_id] == best_rank
+                ]
+
+                lean_doc = recruit_doc.get("Lean") or {}
+                if lean_doc.get("1") != "open":
+                    lean_team_ids = {team_id for team_id in lean_doc.values() if team_id}
+                    if lean_team_ids:
+                        overlap = [team_id for team_id in eligible_team_ids if team_id in lean_team_ids]
+                        if overlap:
+                            eligible_team_ids = overlap
+
+                if not eligible_team_ids:
+                    break
+
+                selected_team_id = random.choice(eligible_team_ids)
+                top_remaining_recruit_id = _highest_remaining_team_target(
+                    team_orders.get(selected_team_id, []),
+                    assigned_recruit_ids,
+                )
+                if not top_remaining_recruit_id:
+                    available_team_ids.discard(selected_team_id)
+                    break
+
+                if top_remaining_recruit_id != recruit_id:
+                    assignments[selected_team_id] = top_remaining_recruit_id
+                    assigned_recruit_ids.add(top_remaining_recruit_id)
+                    available_team_ids.discard(selected_team_id)
+                    continue
+
+                assignments[selected_team_id] = recruit_id
+                assigned_recruit_ids.add(recruit_id)
+                available_team_ids.discard(selected_team_id)
+                break
+
+    return assignments
+
+
+def _region_display_order(user_region: str | None) -> list[str]:
+    ordered = list("ABCDEFGH")
+    user_region = str(user_region or "").upper()
+    if user_region in ordered:
+        ordered.remove(user_region)
+        ordered.insert(0, user_region)
+    return ordered
+
+
+def _build_recruiting_results_payload(franchise_doc: dict, week: int) -> dict:
+    fid = franchise_doc["_id"]
+    week_key = str(week)
+    recruiting_results = franchise_doc.get("recruiting_results", {}) or {}
+    week_results = recruiting_results.get(week_key)
+    if week_results is None:
+        raise HTTPException(status_code=404, detail="Recruiting results not found for this week")
+
+    user_team_name, user_team_id = get_user_team_from_franchise(franchise_doc)
+    user_region = ""
+    if user_team_id:
+        try:
+            team_doc = db.teams.find_one({"_id": ObjectId(user_team_id)}, {"region": 1})
+            user_region = str(team_doc.get("region") or "").upper() if team_doc else ""
+        except Exception:
+            user_region = ""
+
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1}))
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    teams_by_id = {
+        str(team["_id"]): team
+        for team in db.teams.find(
+            {"_id": {"$in": team_ids}},
+            {"name": 1, "conference": 1, "region": 1},
+        )
+    }
+    recruit_ids = [recruit_id for recruit_id in week_results.values() if recruit_id]
+    recruit_docs_by_id = {
+        recruit["recruit_id"]: recruit
+        for recruit in franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": recruit_ids}},
+            {"_id": 0, "franchise_id": 0},
+        )
+    }
+
+    regions_payload = []
+    for region in _region_display_order(user_region):
+        region_teams = [
+            {
+                "team_id": team_id,
+                "team_name": team_doc.get("name", team_id),
+                "conference": team_doc.get("conference"),
+                "region": str(team_doc.get("region") or "").upper(),
+            }
+            for team_id, team_doc in teams_by_id.items()
+            if str(team_doc.get("region") or "").upper() == region
+        ]
+        if not region_teams:
+            continue
+
+        conferences_payload = []
+        for conference in sorted({team["conference"] for team in region_teams if team.get("conference") is not None}):
+            conference_teams = [team for team in region_teams if team.get("conference") == conference]
+            conference_teams.sort(key=lambda team: team["team_name"])
+            team_rows = []
+            for team in conference_teams:
+                recruit_id = week_results.get(team["team_id"])
+                recruit_doc = recruit_docs_by_id.get(recruit_id) if recruit_id else None
+                recruit_payload = None
+                if recruit_doc:
+                    best_pos = _best_position(recruit_doc.get("position_ratings") or {})
+                    recruit_payload = {
+                        "recruit_id": recruit_doc["recruit_id"],
+                        "name": recruit_doc.get("name", "--"),
+                        "home_region": recruit_doc.get("Home Region", "--"),
+                        "archetype": recruit_doc.get("archetype", "--"),
+                        "height": recruit_doc.get("height"),
+                        "weight": recruit_doc.get("weight"),
+                        "pos": best_pos.get("pos", "--"),
+                        "rt": best_pos.get("rating"),
+                    }
+                team_rows.append({
+                    "team_id": team["team_id"],
+                    "team_name": team["team_name"],
+                    "visit": recruit_payload,
+                })
+            conferences_payload.append({
+                "conference": conference,
+                "teams": team_rows,
+            })
+        regions_payload.append({
+            "region": region,
+            "conferences": conferences_payload,
+        })
+
+    return {
+        "week": week,
+        "user_team": user_team_name,
+        "user_team_id": user_team_id,
+        "regions": regions_payload,
+    }
+
+
 def _normalize_recruiting_orders(recruit_ids: list[str]) -> dict[str, str]:
     return {str(index): recruit_id for index, recruit_id in enumerate(recruit_ids, start=1)}
 
@@ -2906,10 +3189,22 @@ def get_recruiting_data(
         "team": team_name,
         "team_id": user_team_id,
         "week": franchise_doc.get("week", 1),
+        "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,
         "saved_orders": saved_orders,
         "recruits": recruits,
         "team_name_map": team_name_map,
     }
+
+
+@router.get("/franchise/recruiting-results")
+def get_recruiting_results(
+    franchise_id: str,
+    week: int | None = None,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    requested_week = week if week is not None else int(franchise_doc.get("week", 1) or 1)
+    return _build_recruiting_results_payload(franchise_doc, requested_week)
 
 
 @router.post("/franchise/recruiting-orders")
@@ -2920,8 +3215,10 @@ def save_recruiting_orders(
     franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     fid = franchise_doc["_id"]
     week = int(franchise_doc.get("week", 1) or 1)
-    if week < 20 or week > 34:
-        raise HTTPException(status_code=400, detail="Recruiting orders can only be saved during weeks 20-34")
+    if week < 20 or week > 26:
+        raise HTTPException(status_code=400, detail="Recruiting orders can only be saved during weeks 20-26")
+    if str(week) in (franchise_doc.get("recruiting_results", {}) or {}):
+        raise HTTPException(status_code=400, detail="Recruiting orders have already been submitted for this week")
 
     recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
     if len(recruit_ids) > 10:
@@ -2943,8 +3240,9 @@ def save_recruiting_orders(
         raise HTTPException(status_code=404, detail="User team not selected")
 
     orders_payload = _normalize_recruiting_orders(recruit_ids)
+    user_team_id_str = str(user_team_id)
     franchise_team_data_collection.update_one(
-        {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
+        {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
         {
             "$set": {
                 "Recruits": orders_payload,
@@ -2953,7 +3251,51 @@ def save_recruiting_orders(
         },
     )
 
-    return {"status": "success", "saved_orders": orders_payload}
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    team_docs_by_id = {
+        str(team["_id"]): team
+        for team in db.teams.find(
+            {"_id": {"$in": team_ids}},
+            {"name": 1, "conference": 1, "region": 1},
+        )
+    }
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(req.franchise_id)},
+            {"_id": 0, "franchise_id": 0},
+        )
+    )
+    recruit_docs_by_id = {recruit["recruit_id"]: recruit for recruit in recruits}
+    recruits_by_region = {}
+    for region in "ABCDEFGH":
+        region_recruits = [recruit for recruit in recruits if str(recruit.get("Home Region") or "").upper() == region]
+        recruits_by_region[region] = _sort_recruits_by_rt(region_recruits)
+
+    cpu_orders = _generate_cpu_recruiting_orders(team_docs_by_id, user_team_id_str, recruits_by_region)
+    for team_id, cpu_order in cpu_orders.items():
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ObjectId(team_id)},
+            {"$set": {"Recruits": cpu_order, "updated_at": datetime.utcnow()}},
+        )
+
+    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
+    team_orders = {
+        str(doc["team_id"]): _team_order_list(doc.get("Recruits"))
+        for doc in all_ftd_docs
+    }
+    assignments = _resolve_weekly_recruiting_visits(team_docs_by_id, team_orders, recruit_docs_by_id)
+
+    db.franchises.update_one(
+        {"_id": fid},
+        {
+            "$set": {
+                f"recruiting_results.{week}": assignments,
+            }
+        },
+    )
+
+    return {"status": "success", "saved_orders": orders_payload, "results_week": week}
 
 
 @router.get("/franchise/debug-names")
@@ -4469,6 +4811,7 @@ def finish_season(req: FinishSeasonRequest):
             "conference_tournaments": {},
             "region_tournaments": {},
             "national_tournament": {},
+            "recruiting_results": {},
             "training_status.training_completed": False,
             "training_status.session_type": "preseason"
         }}

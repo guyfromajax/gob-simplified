@@ -240,6 +240,25 @@ body {
   color: #1f2937;
 }
 
+.recruiting-results-region {
+  margin-top: 22px;
+}
+
+.recruiting-results-region h2,
+.recruiting-results-region h3 {
+  margin-bottom: 10px;
+}
+
+.recruiting-results-table {
+  margin-bottom: 16px;
+}
+
+.recruiting-no-visit {
+  text-align: left;
+  color: #6b7280;
+  font-style: italic;
+}
+
 .recruiting-modal-actions {
   display: flex;
   justify-content: flex-end;

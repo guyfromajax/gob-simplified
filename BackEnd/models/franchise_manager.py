@@ -256,6 +256,7 @@ class FranchiseManager:
         extra_state = {
             "players": {},  # FPD holds player data; empty here for legacy safety
             "recruits": [],  # FRD holds recruit data; empty here for legacy safety
+            "recruiting_results": {},
             "applied_games": [],
             "training_status": training_status,
             # Add missing document-level fields (matches Tournament pattern)

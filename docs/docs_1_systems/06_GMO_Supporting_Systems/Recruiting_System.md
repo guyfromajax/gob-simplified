@@ -1,19 +1,25 @@
 
 **Scope**
-- This doc covers recruiting phase 1 only.
+- This doc currently covers recruiting phases 1 and 2.
 - Phase 1 includes:
     - generating 200 recruits for a franchise
     - displaying recruits on standalone recruiting pages
     - allowing the user to rank up to 10 recruits
     - saving those ranked FRD string ids into the user's FTD `Recruits` field
+- Phase 2 adds:
+    - one weekly recruit visit assignment per team during weeks `20-26`
+    - computer-team recruiting order generation each week
+    - one-submit-per-week recruiting lockout for the user
+    - persistence of weekly team/recruit visit results
+    - `recruiting-results.html`
+    - post-submit button state changes on FCC and `recruiting.html`
 - Out of scope for this task:
     - recruit commitments / signings
-    - weekly recruiting simulation / resolution
     - lean changes over time
-    - recruiting outcomes tied to week advancement
     - tournament performance affecting recruiting
     - signed recruits being added to rosters
     - offseason roster turnover tied to recruiting
+    - weeks `27-34` recruiting logic
 
 **Franchise Init / New Season Init**
 0. Add a new `Recruits` field to each FTD doc.
@@ -51,20 +57,40 @@
     - returns:
         - the user's team / team_id
         - current franchise week
+        - `current_results_week` if the current week's recruiting visits have already been processed
         - current saved FTD `Recruits` order
         - all FRD recruits for that franchise
         - team id -> team name map for rendering `Lean`
+- `GET /franchise/recruiting-results`
+    - returns the persisted recruiting visit results for the requested week
 - `POST /franchise/recruiting-orders`
     - accepts:
         - `franchise_id`
         - ordered array of recruit ids
     - validation rules:
-        - allowed only during weeks `20-34`
+        - allowed only during weeks `20-26`
         - maximum 10 recruit ids
         - duplicate recruit ids are rejected
         - recruit ids must belong to that franchise's FRD pool
+        - the user can only submit once per week
     - save behavior:
         - writes compressed keys only (`"1"` through `"N"`) into FTD `Recruits`
+        - generates fresh computer-team `FTD.Recruits` orders for that week
+        - runs weekly recruiting visit resolution for all 128 teams
+        - persists that week's final team/recruit visit pairings
+
+**Recruiting Results Persistence**
+- Persist recruiting visit results by week at the franchise level.
+- Store only the final pairing output for each week:
+    - team
+    - recruit
+- Example shape at a high level:
+    - week 20: all team / recruit visit pairings
+    - week 21: all team / recruit visit pairings
+    - week 22: all team / recruit visit pairings
+- Results persist to the FCC.
+- At the start of each new recruiting week, every team begins with no assigned visit for that new week.
+- Team `FTD.Recruits` top-10 bids persist week to week unless explicitly changed by the user or regenerated for CPU teams.
 
 **FCC Update**
 - Remove the Recruits tab from the FCC
@@ -72,16 +98,25 @@
 
 **FCC Recruiting Button**
 - Place a Recruiting button in the upper right of the FCC, below the Run Training / Play Next Game button.
-    - Give it a green fill with bold silver copy.
+    - Give it a green fill with bold white copy.
     - Weeks 1-19:
         - this is a dead button
         - pressing it has no effect
         - give it the reduced opacity / overlay treatment that we use for dead buttons elsewhere in the experience
         - button copy reads `Recruiting Begins Week 20`
-    - Weeks 20-34:
-        - button becomes active
-        - remove the dead-button overlay / reduced opacity
-        - pressing it takes the user to the `recruiting-orders.html` page
+    - Weeks 20-26:
+        - if the current week's recruiting has not been processed yet:
+            - button becomes active
+            - remove the dead-button overlay / reduced opacity
+            - button copy reads `Recruiting`
+            - pressing it takes the user to the `recruiting-orders.html` page
+        - if the current week's recruiting has already been processed:
+            - button becomes active
+            - button copy reads `Week ## Recruiting Visits`
+            - pressing it takes the user to `recruiting-results.html`
+    - Weeks 27-34:
+        - current implementation shows the button as dead with copy `Recruiting Returns Later`
+        - weeks 27-34 logic will be implemented in a later phase
 
 
 **Recruiting.html Screen**
@@ -112,12 +147,19 @@
     - Third click returns to highest-to-lowest, and so on.
     - For `Current Lean`, sort according to key `"1"` value only.
 4. Starting week 20, display a green fill button in the top right with the copy `Recruiting Orders`.
-    - When the user presses that button it takes them to the `recruiting-orders.html` screen.
-    - In the current implementation, this button is hidden before week 20.
+    - button copy is white
+    - if the current week's recruiting has not been processed yet:
+        - button copy reads `Recruiting Orders`
+        - when the user presses that button it takes them to the `recruiting-orders.html` screen
+    - if the current week's recruiting has already been processed:
+        - button copy reads `Week ## Recruiting Visits`
+        - when the user presses that button it takes them to `recruiting-results.html`
+    - in the current implementation, this button is hidden before week 20 and after week 26
 
 
 **Recruiting-Orders.html Screen**
 0. Top right: `Submit Orders` button, green fill with bold silver copy when active.
+    - button copy is white
     - The button starts dead and becomes active when there is at least one recruit in the Top Grid.
     - Top left: orange back button.
 1. Top Grid with the following columns from left to right:
@@ -156,9 +198,99 @@
     - Persist only occupied keys.
         - Example: if rows 1-8 are occupied and rows 9-10 are empty, persist keys `"1"` through `"8"` only.
     - If a user removes recruits before saving, compress the saved ranking so there are no gaps.
+    - The user can only submit once per week. There are no redo's for that week.
 7. When a user presses `Submit Orders`, they are taken back to the FCC.
 8. When the user presses `Back`, take them to the screen they came from, either FCC or `recruiting.html`.
     - Use URL query-param source tracking as the single source of truth for this behavior.
     - Current query-param values are:
         - `from=fcc`
         - `from=recruiting`
+
+**Recruiting Logic**
+- When the user presses `Submit Orders` during weeks `20-26`:
+    - save the user's `FTD.Recruits`
+    - generate fresh computer-team recruiting orders for the other 127 teams for that week
+    - run that week's recruiting logic and process results
+    - persist that week's recruiting visit results at the franchise level
+    - populate `recruiting-results.html`
+    - change the copy on the Recruiting button on the FCC and `recruiting.html` screens to read `Week ## Recruiting Visits`
+    - when pressed, that button takes the user to `recruiting-results.html`
+- This visit logic applies only to weeks `20-26`.
+- Weeks `27-34` recruiting logic will be defined in a later phase.
+
+**Computer Team Recruiting Orders**
+- Headline:
+    - For weeks `20-26`, each team wins one recruit visit, and each recruit can only visit one team each week.
+    - Assuming all 128 teams submit recruiting orders, there will be 128 recruiting visits each week for weeks `20-26`.
+- For each CPU team, build that team's `FTD.Recruits` fresh each week with the following logic:
+    - rank all recruits within each region according to their RT value, highest RT = 1, second highest RT = 2, etc
+        - ties are broken randomly
+        - `n = total number of recruits in the region`
+    - each team ends with exactly 10 ranked recruits
+    - choose 9-10 recruits from the team's current region plus 0-1 recruits outside the region
+        - current implementation uses a fixed 50% chance of taking 1 out-of-region recruit and a 50% chance of taking 0
+    - if a recruit from outside the region is chosen:
+        - choose the outside region at random
+        - exclude the team's own region from that draw
+        - choose one of the recruits ranked `1-3` in that region at random
+    - for the 9-10 recruits within the team's region:
+        - choose 5 of the top 10 rated players at random
+            - if there are fewer than 10 recruits in the region, choose from however many exist
+            - if there are fewer than 5 recruits in the region, choose as many as exist
+        - choose the remaining 4-5 at random from the remaining in-region recruits
+            - exclude recruits already chosen in the previous step
+            - the remaining pool can include the top-10 recruits who were not selected in the first step
+
+**Weekly Region Recruiting Resolution**
+- Run each week's recruiting for weeks `20-26` after the user submits.
+- Shuffle the order of the regions and run recruiting in whatever order we land on.
+- For each region pass:
+    - include all 16 teams in that region in the calculations
+    - once a team receives a visit assignment, remove that team from all future calculations for that week, including other regions
+    - get all recruits who received at least one bid from a team in that region and sort them by RT, highest to lowest
+        - ties are broken randomly
+        - being present in any team's `FTD.Recruits` = receiving a recruiting bid
+    - start with the first recruit on the sorted list
+        - narrow the eligible team list to the team or teams who gave that recruit the highest rating
+            - the rating is the key position in each team's `FTD.Recruits` associated with that recruit's id
+        - if any of those teams are on the recruit's `Lean` list, remove any teams that are not on the recruit's `Lean` list
+        - if lean filtering produces no overlap, ignore lean filtering and continue with the original eligible team set
+        - if the recruit's lean is `open`, apply no lean filtering
+        - randomly choose one of the remaining teams and assign that recruit for that week's visit
+        - remove that team and that recruit from all calculations moving forward for that week
+            - a team can receive at most one visit in a week
+            - a recruit can receive at most one visit in a week
+            - user team has no priority over CPU teams
+        - edge case:
+            - if a team gets a recruit assignment and that recruit is not the highest remaining recruit on that team's list, assign the highest remaining available recruit on that team's list to that team for that week
+            - remove that reassigned recruit from all future calculations for that week
+            - keep rerunning the original recruit's logic until he is either assigned within that region pass or there are no eligible teams from that region remaining
+            - if a team runs out of available recruits on its list during this process, that team gets no visit for that week
+    - note:
+        - once a recruit is assigned, he is removed from all future region calculations for that week
+        - this is relevant for in-region recruits who receive bids from out-of-region teams, and out-of-region recruits who receive bids from in-region teams
+        - this is why the random region shuffle at the beginning is consequential
+
+**Recruiting-Results.html Screen**
+- After each week's recruiting has run, populate `recruiting-results.html` as follows:
+    - change Recruiting button copy on FCC and `recruiting.html` to read `Week ## Recruiting Visits`
+    - page header: `Week ## Recruiting Visits`
+    - show all regions, leading with the user's region, then resume `A-H` order after that
+        - Example if user region is `D`: `D, A, B, C, E, F, G, H`
+    - within each region:
+        - list teams conference by conference
+        - within each conference, order teams alphabetically by team name
+        - display one row per team
+        - if a team received a visit, display:
+            - `{Team Name}: Recruit Name  Home Region  Archetype  HT  WT  Pos  RT`
+        - if a team did not receive a visit, display `no visit`
+- Back button takes the user back to the screen they came from, FCC or `recruiting.html`
+- Use the same query-param source tracking approach as the rest of recruiting:
+    - `from=fcc`
+    - `from=recruiting`
+
+**Still Out Of Scope**
+- This phase does not determine recruit lean updates.
+    - Lean updates will happen during complete week.
+- This phase does not determine final recruit choice / commitment.
+    - Final recruiting season logic will run between the National Championship and the End of Season system.

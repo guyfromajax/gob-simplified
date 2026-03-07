@@ -1312,19 +1312,30 @@ function updateRecruitingButton(data) {
   const recruitingBtn = document.getElementById('fcc-recruiting-btn');
   if (!recruitingBtn) return;
   const week = Number(data?.week || 1);
-  const active = week >= 20 && week <= 34;
-  recruitingBtn.textContent = active ? 'Recruiting' : 'Recruiting Begins Week 20';
+  const resultsWeek = Number(data?.current_recruiting_results_week || 0);
+  let active = false;
+  let text = 'Recruiting Begins Week 20';
+  let href = null;
+
+  if (week >= 20 && week <= 26 && resultsWeek === week) {
+    active = true;
+    text = `Week ${week} Recruiting Visits`;
+    href = `/recruiting-results.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc&week=${encodeURIComponent(String(week))}`;
+  } else if (week >= 20 && week <= 26) {
+    active = true;
+    text = 'Recruiting';
+    href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+  } else if (week > 26) {
+    text = 'Recruiting Returns Later';
+  }
+
+  recruitingBtn.textContent = text;
   recruitingBtn.disabled = !active;
   recruitingBtn.classList.toggle('is-dead', !active);
   recruitingBtn.onclick = null;
-  if (active) {
+  if (active && href) {
     recruitingBtn.onclick = () => {
-      if (!franchiseId || !userTeamId) return;
-      const params = new URLSearchParams();
-      params.set('franchise_id', franchiseId);
-      params.set('team_id', userTeamId);
-      params.set('from', 'fcc');
-      window.location.href = `/recruiting-orders.html?${params.toString()}`;
+      window.location.href = href;
     };
   }
 }
