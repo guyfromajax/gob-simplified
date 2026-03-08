@@ -3261,6 +3261,24 @@ def _resolve_weekly_recruiting_visits(
                 available_team_ids.discard(selected_team_id)
                 break
 
+        fallback_team_ids = [
+            team_id
+            for team_id in region_team_ids
+            if team_id in available_team_ids
+        ]
+        if fallback_team_ids:
+            fallback_recruits = _sort_recruits_by_rt([
+                recruit
+                for recruit in recruit_docs_by_id.values()
+                if str(recruit.get("Home Region") or "").upper() == region
+                and recruit.get("recruit_id") not in assigned_recruit_ids
+            ])
+            for team_id, recruit_doc in zip(fallback_team_ids, fallback_recruits):
+                recruit_id = recruit_doc["recruit_id"]
+                assignments[team_id] = recruit_id
+                assigned_recruit_ids.add(recruit_id)
+                available_team_ids.discard(team_id)
+
     return assignments
 
 

@@ -284,11 +284,15 @@
             - if a team gets a recruit assignment and that recruit is not the highest remaining recruit on that team's list, assign the highest remaining available recruit on that team's list to that team for that week
             - remove that reassigned recruit from all future calculations for that week
             - keep rerunning the original recruit's logic until he is either assigned within that region pass or there are no eligible teams from that region remaining
-            - if a team runs out of available recruits on its list during this process, that team gets no visit for that week
+            - if a team runs out of available recruits on its list during this process, that team can still receive an end-of-week fallback visit from the safety net below
     - note:
         - once a recruit is assigned, he is removed from all future region calculations for that week
         - this is relevant for in-region recruits who receive bids from out-of-region teams, and out-of-region recruits who receive bids from in-region teams
         - this is why the random region shuffle at the beginning is consequential
+    - safety net at the end of each week's visit assignment:
+        - if a team still has `no visit` after the main assignment logic, assign that team the highest-rated recruit who still has `no visit` in that team's region
+        - this fallback happens after the normal region-assignment logic has completed
+        - fallback recruits are still one-per-team and one-team-per-recruit
 
 **Recruiting-Results.html Screen**
 - After each week's recruiting has run, populate `recruiting-results.html` as follows:
