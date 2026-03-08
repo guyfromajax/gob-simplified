@@ -3072,12 +3072,7 @@ def _insert_team_into_highest_open_lean_slot(lean_doc: dict[str, str | None], te
     return updated
 
 
-def _update_recruit_lean_after_visit(
-    lean_doc: dict | None,
-    team_id: str,
-    in_region: bool,
-    won_game: bool,
-) -> dict[str, str | None]:
+def _apply_recruit_lean_addition(lean_doc: dict | None, team_id: str) -> dict[str, str | None]:
     updated = _normalize_recruit_lean_doc(lean_doc)
     existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
 
@@ -3094,6 +3089,23 @@ def _update_recruit_lean_after_visit(
         updated["3"], updated["2"] = updated.get("2"), updated.get("3")
         return updated
 
+    if _lean_has_open_slot(updated):
+        return _insert_team_into_highest_open_lean_slot(updated, team_id)
+
+    updated["3"] = team_id
+    return updated
+
+
+def _update_recruit_lean_after_visit(
+    lean_doc: dict | None,
+    team_id: str,
+    in_region: bool,
+    won_game: bool,
+) -> dict[str, str | None]:
+    updated = _normalize_recruit_lean_doc(lean_doc)
+    existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
+    if existing_rank:
+        return _apply_recruit_lean_addition(updated, team_id)
     has_open_slot = _lean_has_open_slot(updated)
     if in_region:
         chance = 0.95 if won_game and has_open_slot else 0.75 if won_game else 0.75 if has_open_slot else 0.40
@@ -3103,11 +3115,113 @@ def _update_recruit_lean_after_visit(
     if random.random() > chance:
         return updated
 
-    if has_open_slot:
-        return _insert_team_into_highest_open_lean_slot(updated, team_id)
+    return _apply_recruit_lean_addition(updated, team_id)
 
-    updated["3"] = team_id
-    return updated
+
+def _non_visit_recruiting_roll_chances_for_week(week: int) -> tuple[float, float] | None:
+    if 1 <= week <= 10:
+        return (0.15, 0.05)
+    if 11 <= week <= 15:
+        return (0.40, 0.10)
+    if 16 <= week <= 19:
+        return (0.60, 0.20)
+    if 27 <= week <= 34:
+        return (0.80, 0.50)
+    return None
+
+
+def _winning_team_ids_for_recruiting_week(franchise_doc: dict, week: int, results: list[dict]) -> set[str]:
+    winners = {team_id for team_id, outcome in _team_outcomes_by_week_results(results).items() if outcome == "win"}
+    if week == 30 and franchise_doc.get("eos_tournament_active"):
+        week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+        scheduled_team_ids = {str(g["away_id"]) for g in week_games_meta} | {str(g["home_id"]) for g in week_games_meta}
+        eliminated_ids = ft.get_eliminated_team_ids(franchise_doc)
+        all_team_ids = {
+            str(doc["team_id"])
+            for doc in franchise_team_data_collection.find({"franchise_id": franchise_doc["_id"]}, {"team_id": 1})
+            if doc.get("team_id") is not None
+        }
+        bye_team_ids = {team_id for team_id in all_team_ids if team_id not in scheduled_team_ids and team_id not in eliminated_ids}
+        winners.update(bye_team_ids)
+    return winners
+
+
+def _apply_non_visit_recruiting_lean_updates(
+    franchise_doc: dict,
+    week: int,
+    results: list[dict],
+) -> None:
+    chances = _non_visit_recruiting_roll_chances_for_week(week)
+    if chances is None:
+        return
+
+    fid = franchise_doc["_id"]
+    winning_team_ids = _winning_team_ids_for_recruiting_week(franchise_doc, week, results)
+    if not winning_team_ids:
+        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        return
+
+    team_docs_by_id = {
+        str(team["_id"]): team
+        for team in db.teams.find(
+            {"_id": {"$in": [ObjectId(team_id) for team_id in winning_team_ids if ObjectId.is_valid(team_id)]}},
+            {"region": 1},
+        )
+    }
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(fid)},
+            {"recruit_id": 1, "Home Region": 1, "Lean": 1, "position_ratings": 1},
+        )
+    )
+    recruit_docs_by_id = {recruit["recruit_id"]: dict(recruit) for recruit in recruits if recruit.get("recruit_id")}
+    recruits_by_region: dict[str, list[dict]] = {region: [] for region in "ABCDEFGH"}
+    for recruit in recruit_docs_by_id.values():
+        region = str(recruit.get("Home Region") or "").upper()
+        if region in recruits_by_region:
+            recruits_by_region[region].append(recruit)
+    for region in recruits_by_region:
+        recruits_by_region[region] = _sort_recruits_by_rt(recruits_by_region[region])
+
+    low_rt_chance, high_rt_chance = chances
+    for team_id in winning_team_ids:
+        team_doc = team_docs_by_id.get(team_id)
+        if not team_doc:
+            continue
+        region = str(team_doc.get("region") or "").upper()
+        region_recruits = recruits_by_region.get(region, [])
+        if not region_recruits:
+            continue
+
+        selected_this_team: set[str] = set()
+        if random.random() <= low_rt_chance:
+            low_candidates = [recruit for recruit in region_recruits if _recruit_rt(recruit) < 30]
+            if low_candidates:
+                chosen = random.choice(low_candidates)
+                updated_lean = _apply_recruit_lean_addition(chosen.get("Lean"), team_id)
+                franchise_recruits_data_collection.update_one(
+                    {"franchise_id": str(fid), "recruit_id": chosen["recruit_id"]},
+                    {"$set": {"Lean": updated_lean}},
+                )
+                recruit_docs_by_id[chosen["recruit_id"]]["Lean"] = updated_lean
+                selected_this_team.add(chosen["recruit_id"])
+
+        if random.random() <= high_rt_chance:
+            high_candidates = [
+                recruit
+                for recruit in region_recruits
+                if _recruit_rt(recruit) >= 30 and recruit["recruit_id"] not in selected_this_team
+            ]
+            if high_candidates:
+                chosen = random.choice(high_candidates)
+                updated_lean = _apply_recruit_lean_addition(chosen.get("Lean"), team_id)
+                franchise_recruits_data_collection.update_one(
+                    {"franchise_id": str(fid), "recruit_id": chosen["recruit_id"]},
+                    {"$set": {"Lean": updated_lean}},
+                )
+                recruit_docs_by_id[chosen["recruit_id"]]["Lean"] = updated_lean
+
+    db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
 
 
 def _apply_complete_week_recruiting_lean_updates(
@@ -3115,12 +3229,15 @@ def _apply_complete_week_recruiting_lean_updates(
     week: int,
     results: list[dict],
 ) -> None:
-    if week < 20 or week > 26:
-        return
-
     applied = (franchise_doc.get("recruiting_lean_updates_applied") or {}).get(str(week))
     if applied:
         logger.info("Skipping recruiting lean updates for franchise=%s week=%s; already applied", franchise_doc.get("_id"), week)
+        return
+
+    if (1 <= week <= 19) or (27 <= week <= 34):
+        _apply_non_visit_recruiting_lean_updates(franchise_doc, week, results)
+        return
+    if week < 20 or week > 26:
         return
 
     fid = franchise_doc["_id"]

@@ -316,7 +316,43 @@
 - Run this logic immediately after all franchise games for the week have been simulated/finalized.
     - Best-practice implementation is a dedicated recruiting helper that is called from `complete_week`.
     - The helper should run only once per franchise / week and should use a franchise-level idempotency marker.
-- This logic applies only during weeks `20-26`.
+- This logic applies across all weeks, but the recruiting rules differ by week band.
+- Use a franchise-level idempotency marker so these recruiting lean updates run only once per franchise / week.
+- `open` handling:
+    - `Lean["1"] == "open"` behaves the same as an open slot for insertion logic
+    - once any real team is inserted onto the recruit's lean list, remove `open`
+
+## Weeks 1-10
+- Same logic applies to the user team and all computer teams.
+- If the team wins its game that week:
+    - `15%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
+    - `5%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
+- If a roll hits:
+    - choose one recruit in the team's region meeting that RT criteria at random
+    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
+    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
+
+## Weeks 11-15
+- Same logic applies to the user team and all computer teams.
+- If the team wins its game that week:
+    - `40%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
+    - `10%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
+- If a roll hits:
+    - choose one recruit in the team's region meeting that RT criteria at random
+    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
+    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
+
+## Weeks 16-19
+- Same logic applies to the user team and all computer teams.
+- If the team wins its game that week:
+    - `60%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
+    - `20%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
+- If a roll hits:
+    - choose one recruit in the team's region meeting that RT criteria at random
+    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
+    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
+
+## Weeks 20-26
 - Use `FTD.recruit_visit` as the team-level source of truth for that week's visit assignment.
     - Teams with `recruit_visit == None` do nothing.
     - If duplicate bad data causes the same recruit to appear in more than one `FTD.recruit_visit` for the same week:
@@ -369,6 +405,33 @@
             - clear only one slot to `None`
         - if the team is ranked `#2` or `#3`, it moves up one ranking by swapping with the team directly in front of it
         - these existing-team movements are deterministic; there is no probability roll
+
+## Weeks 27-34
+- Same logic applies to the user team and all computer teams.
+- If the team wins its game that week:
+    - `80%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
+    - `50%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
+- Special week-30 bye handling:
+    - if a team is on bye in week `30`, treat that week like a win for that team for recruiting-roll purposes
+    - infer bye teams from EOS state by identifying teams that are not eliminated and are not present in the week-30 EOS game list
+- If a roll hits:
+    - choose one recruit in the team's region meeting that RT criteria at random
+    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
+    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
+
+## Weeks 1-19 and 27-34 Lean-List Addition Logic
+- If a recruit adds a team to the recruit's lean list during that week:
+    - if that team is already on the lean list:
+        - the team advances one spot by replacing the team ahead of it
+            - `2` moves to `1` and `1` becomes `2`
+            - `3` moves to `2` and `2` becomes `3`
+        - if the team is already `1` on the list:
+            - drop the lowest rated occupied team on the recruit's lean list
+            - if there are no other teams on the recruit's lean list, no effect
+    - if that team is not already on the lean list:
+        - the team occupies the highest rated opening
+            - slot `1` if open/null, else slot `2` if null, else slot `3` if null
+        - if all three ratings are occupied, the team replaces the `#3` team
 
 **Still Out Of Scope**
 - This phase does not determine final recruit choice / commitment.
