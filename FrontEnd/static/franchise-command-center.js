@@ -26,9 +26,11 @@ let teamColorCache = null; // Cache for team primary colors
 let leadersDataCache = null;
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
+let leanRecruitsDataCache = [];
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
+const recruitSortState = { key: 'rt', direction: 'desc' };
 
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
@@ -269,6 +271,39 @@ function bindStatsAndTraitsScopeButtons() {
       if (teamTraitsDataCache) renderTeamTraits(teamTraitsDataCache, traitsScope);
     });
   });
+}
+
+function renderFccRecruits() {
+  const tbody = document.getElementById('fcc-recruits-body');
+  const table = document.getElementById('fcc-recruits-table');
+  if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
+  if (!leanRecruitsDataCache.length) {
+    tbody.innerHTML = '<tr><td colspan="20">No recruits currently have your team on their lean list.</td></tr>';
+    return;
+  }
+  RecruitingCommon.renderRecruitTableRows(
+    tbody,
+    RecruitingCommon.sortRecruits(leanRecruitsDataCache, recruitSortState),
+    {}
+  );
+}
+
+function initFccRecruits(topData) {
+  if (typeof RecruitingCommon === 'undefined') return;
+  leanRecruitsDataCache = RecruitingCommon.normalizeRecruits(
+    topData?.lean_recruits || [],
+    topData?.team_name_map || {}
+  );
+  RecruitingCommon.bindSortableHeaders(
+    document.getElementById('fcc-recruits-table'),
+    recruitSortState,
+    renderFccRecruits
+  );
+  renderFccRecruits();
+  if (typeof initAttributeTooltips !== 'undefined') {
+    const recruitsTable = document.getElementById('fcc-recruits-table');
+    if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
+  }
 }
 
 let rankingsFullList = [];
@@ -1071,6 +1106,7 @@ async function init() {
   }
   
   populateTop(topData);
+  initFccRecruits(topData);
   
   // Store user team name and scope keys (used by roster/team if needed)
   if (topData && topData.team) {

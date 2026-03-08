@@ -2028,6 +2028,32 @@ def command_center_data(
         recruiting_results = franchise_doc.get("recruiting_results", {}) if franchise_doc else {}
         current_results_week = week if week is not None and str(week) in (recruiting_results or {}) else None
         response["current_recruiting_results_week"] = current_results_week
+        if franchise_id and franchise_doc and team_id:
+            try:
+                response["lean_recruits"] = list(
+                    franchise_recruits_data_collection.find(
+                        {
+                            "franchise_id": str(fid),
+                            "$or": [
+                                {"Lean.1": team_id},
+                                {"Lean.2": team_id},
+                                {"Lean.3": team_id},
+                            ],
+                        },
+                        {"_id": 0, "franchise_id": 0},
+                    )
+                )
+                response["team_name_map"] = {
+                    str(team["_id"]): team.get("name", str(team["_id"]))
+                    for team in db.teams.find({}, {"name": 1})
+                }
+            except Exception as e:
+                logger.debug("fcc lean recruits: %s", e)
+                response["lean_recruits"] = []
+                response["team_name_map"] = {}
+        else:
+            response["lean_recruits"] = []
+            response["team_name_map"] = {}
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}

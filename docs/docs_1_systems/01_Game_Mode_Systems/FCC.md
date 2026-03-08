@@ -1,6 +1,6 @@
 # Franchise Command Center (FCC)
 
-Franchise-mode hub: team info, standings, roster, team report, recruits, tournament bracket, and links to standalone resource pages (standings, stats, schedule, team traits, rankings). Data is scoped by **franchise_id** and the user’s **team_id** (ObjectId).
+Franchise-mode hub: team info, standings, roster, team report, recruits, tournament bracket, and links to standalone resource pages (standings, stats, schedule, team traits, rankings, recruiting). Data is scoped by **franchise_id** and the user’s **team_id** (ObjectId).
 
 ---
 
@@ -9,6 +9,10 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 - **Franchise-level:** All tab data uses `franchise_id` (e.g. `/franchise/standings`, `/franchise/leaders`, `/franchise/team-stats`, `/franchise/team-traits`).
 - **User’s team:** Use **`team_id`** (ObjectId string), not team name. Resolved from URL param `team_id` or from `/franchise/command-center/data` (`team_id`, `team`).
 - **Command center response** also includes **`user_conference`** and **`user_region`** (from the user’s team document) for Stats and Team Traits scope toggles. Conference/region are dynamic (no assumption the user is in Conference 1).
+- **Command center response** also includes:
+  - `current_recruiting_results_week` for the FCC Recruiting button state
+  - `lean_recruits` for the FCC Recruits tab
+  - `team_name_map` so recruit lean team IDs render as team names
 
 | Use | Endpoint / param |
 |-----|-------------------|
@@ -25,9 +29,9 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 | **Standings** | Slim view: user's conference (top) and sister conference (bottom) only. Link to **Resources → Standings** for full 16 conferences. Data: `scope=user_region&team_id=...`. |
 | **Roster** | Roster table + player stats. |
 | **Team** | Team Report (attributes), Playbook Summary. |
-| **Recruits** | Recruit list. |
-| **Tournament** | EOS bracket (weeks 15–17); shared with TCC layout. |
-| **Resources** | Standings, Stats, Schedule, Team Traits, Rankings (standalone pages). Blue buttons; **Back To Locker Room** (orange) on each page. |
+| **Recruits** | FCC-only recruit list showing only recruits who currently have the user's team on their lean list. Same columns as recruiting.html. Default sort RT descending. All header columns except Name sortable. |
+| **Tournament** | EOS bracket (weeks 27–34); shared with TCC layout. |
+| **Resources** | Standings, Stats, Schedule, Team Traits, Rankings, Recruits (standalone pages). Blue buttons; **Back To Locker Room** (orange) on each page. |
 
 ---
 
@@ -38,17 +42,36 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 
 ---
 
+## Recruits tab
+
+- **Scope:** Only recruits whose `Lean.1`, `Lean.2`, or `Lean.3` currently matches the user's `team_id`.
+- **Columns:** `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `SC`, `SH`, `ID`, `OD`, `PS`, `BH`, `RB`, `AG`, `ST`, `ND`, `IQ`, `FT`, `RT`, `Current Lean`.
+- **Sort behavior:** Default sort is `RT` descending. All header columns except `Name` are sortable. Repeated clicks toggle `desc -> asc -> desc`.
+- **Current Lean rendering:** Uses the same lean-display rules as the recruiting standalone pages, with team IDs translated to team names via `team_name_map`.
+
+---
+
 ## Resources tab and standalone pages
 
-- **Resources tab (on FCC):** Five buttons (blue fill, white bold): Standings, Stats, Schedule, Team Traits, Rankings. Each opens a standalone page with franchise_id and team_id in the URL.
-- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC); schedule.html has 16 conference toggles and lands on the user's conference. Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
+- **Resources tab (on FCC):** Six buttons (blue fill, white bold): Standings, Stats, Schedule, Team Traits, Rankings, Recruits. Each opens a standalone page with `franchise_id` and `team_id` in the URL.
+- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html, recruiting.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC); schedule.html has 16 conference toggles and lands on the user's conference. Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
 - **Legacy (moved off FCC):** Stats tab content is on stats.html; Team Traits on team-traits.html; Rankings on rankings.html. Scope toggles (Conference | Region | National) and full schedule/standings toggles are on the standalone pages only.
+
+---
+
+## Recruiting button
+
+- **Placement:** Upper-right hero area under `Run Training / Play Now`.
+- **Weeks 1-19:** Dead button with copy `Recruiting Begins Week 20`.
+- **Weeks 20-26, before current-week recruiting is processed:** Active button with copy `Recruiting`; opens `recruiting-orders.html`.
+- **Weeks 20-26, after current-week recruiting is processed:** Active button with copy `Week ## Recruiting Visits`; opens `recruiting-results.html`.
+- **Weeks 27-34:** Dead button with copy `Recruiting Returns Later`.
 
 ---
 
 ## Tournament tab (EOS bracket)
 
-- **When:** Weeks 15–17 after EOS tournament is initialized. Bracket rendered in **Tournament** tab.
+- **When:** Weeks 27–34 after EOS tournament is initialized. Bracket rendered in **Tournament** tab.
 - **Layout:** Same as TCC Bracket tab. Shared renderer: `renderBracketShared()` in `bracket.js` (5-column grid, matchups, logos, seeds, scores). Container uses class `bracket`; `tournament.css` and `franchise-command-center.css` apply.
 - **Data:** Team names from `/franchise/team-stats` (build `teamIdToNameMap`). Options use `eos_tournament.seeds`, `getLogo`, and `isUserTeam(id)` for user-team highlighting.
 
