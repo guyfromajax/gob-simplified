@@ -255,7 +255,7 @@
     - rows are contiguous and auto-compress after remove / reorder
     - there is no max row count
     - columns are:
-        - `Priority`, `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `SC`, `SH`, `ID`, `OD`, `PS`, `BH`, `RB`, `AG`, `ST`, `ND`, `IQ`, `FT`, `RT`, `Current Lean`, `Scholarship`, `Playing Time`, `Adjust`, `Remove`
+        - `Priority`, `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `RT`, `Current Lean`, `Scholarship`, `Playing Time`, `Adjust`, `Remove`
     - `Scholarship` and `Playing Time` default to unchecked on auto-fill and on any add / re-add action
     - keep the up/down buttons and red remove button to the right of those checkbox columns
     - drag and drop uses insert-and-push behavior
