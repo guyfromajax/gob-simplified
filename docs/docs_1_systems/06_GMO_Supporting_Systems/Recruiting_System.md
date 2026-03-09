@@ -148,6 +148,10 @@
     - Weeks 27-34:
         - current implementation shows the button as dead with copy `Recruiting Returns Later`
         - weeks 27-34 logic will be implemented in a later phase
+    - Weeks 35-36:
+        - button becomes active
+        - button copy reads `Recruiting`
+        - pressing it takes the user to the Week 35-36 `recruiting-orders.html` flow
 
 
 **Recruiting.html Screen**

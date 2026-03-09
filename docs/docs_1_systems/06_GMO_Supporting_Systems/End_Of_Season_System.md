@@ -6,6 +6,7 @@
 -delete all game documents that are linked to the season that just finished
 -archive season data (I need to define, table this for now)
 -archive graduating players (I need to define, table this for now)
+-When EOS national week `34` completes, franchise week advances to `35`.
 
 ##Age Players##
 -Seniors graduate (represent with "graduate" on the front end)
@@ -16,6 +17,7 @@
 
 #FCC Update##
 -Add an "Awards" button to the Resources tab in the FCC. Make this a dead button until week 25, then it becomes live and clicks to awards.html.
+-Do not expose `Next Season` as the primary FCC CTA during weeks `35-36`; reserve that for after the offseason flow.
 
 ##Awards Page Conent##
 - after week 34 completes

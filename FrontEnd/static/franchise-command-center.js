@@ -249,6 +249,8 @@ function bindResourcesLinks() {
   if (rRankings) rRankings.href = `/rankings.html${q()}`;
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
+  const rAwards = document.getElementById('resources-awards');
+  if (rAwards) rAwards.href = '/awards.html';
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -1124,6 +1126,7 @@ async function init() {
   updatePlayButton(topData);
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
+  updateAwardsButton(topData);
   maybeShowChampionshipCompleteModal(topData);
   
   if (topData && (topData.team_id || topData.team) && userTeamId) {
@@ -1322,7 +1325,7 @@ function updatePlayButton(data) {
   const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
   const tournamentComplete = eosTournament?.completed || false;
   
-  if (tournamentComplete && week >= 34) {
+  if (tournamentComplete && week >= 37) {
     playNowBtn.textContent = 'Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
@@ -1376,6 +1379,21 @@ function updateRecruitingButton(data) {
   if (active && href) {
     recruitingBtn.onclick = () => {
       window.location.href = href;
+    };
+  }
+}
+
+function updateAwardsButton(data) {
+  const awardsBtn = document.getElementById('resources-awards');
+  if (!awardsBtn) return;
+  const week = Number(data?.week || 1);
+  const active = week >= 25;
+  awardsBtn.classList.toggle('is-dead', !active);
+  awardsBtn.setAttribute('aria-disabled', active ? 'false' : 'true');
+  awardsBtn.onclick = null;
+  if (!active) {
+    awardsBtn.onclick = function (e) {
+      e.preventDefault();
     };
   }
 }

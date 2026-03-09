@@ -6,6 +6,10 @@
 
 Franchise Mode supports multi-season career mode where team and player data persists across games and seasons. Team attributes and player attributes can be modified through training and persist throughout the franchise. The Franchise Command Center provides a comprehensive interface for managing franchise progression, viewing schedules, standings, and running training sessions.
 
+Post-championship offseason flow:
+- After EOS national week `34` completes, franchise mode advances to week `35`.
+- Weeks `35-36` are reserved for offseason Awards / recruiting-order flow before `Next Season` becomes the primary CTA.
+
 **Location:** `FrontEnd/static/franchise-command-center.html`, `FrontEnd/static/franchise-command-center.js`  
 **Status:** ✅ Fully implemented with Schedule tab, training integration, and franchise management
 

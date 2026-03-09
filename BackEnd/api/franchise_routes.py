@@ -5054,7 +5054,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
         if week == ft.EOS_NATIONAL_WEEKS[-1]:
             update_fields["eos_tournament_active"] = False
-            update_fields["week"] = week
+            update_fields["week"] = 35
         else:
             update_fields["week"] = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
 
@@ -5116,7 +5116,7 @@ def sim_championship(req: SimChampionshipRequest):
         national_tournament = franchise_doc.get("national_tournament", {})
         db.franchises.update_one(
             {"_id": franchise_id},
-            {"$set": {"national_tournament": national_tournament, "eos_tournament_active": False}}
+            {"$set": {"national_tournament": national_tournament, "eos_tournament_active": False, "week": 35}}
         )
         logger.info("✅ [EOS] National championship complete! Winner: %s", winner_id)
         return {
