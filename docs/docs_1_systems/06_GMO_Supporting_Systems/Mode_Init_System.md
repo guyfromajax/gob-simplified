@@ -140,6 +140,8 @@ Ranges will be determined by each team's seed
   4. Team attributes are initialized in the **franchise_team_data (FTD)** structure with Franchise-specific ranges
   5. Each team's FTD doc includes **`total_player_attrs`**: the sum of that team's player core attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT). Used for national ranking. When the universal **teams** collection has a `total_player_attrs` field for a team, franchise init uses that value; otherwise it is computed from the universal **players** collection (sum by team name) during init.
   6. Each team's FTD doc includes recruiting support fields:
+     - `scholarship_players`: array of the team's 12 initial player id strings
+     - `playing_time_promise_players`: initialized to `[]`
      - `Recruits`: keys `"1"` through `"20"` initialized to `None`
      - `recruit_visit`: initialized to `None`
   7. On each new franchise season, those recruiting support fields are reset before the new season begins.

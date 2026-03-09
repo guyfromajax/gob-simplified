@@ -29,7 +29,7 @@
         - 2nd Team = players ranked 6-10
         - 3rd Team = random choice of five players among the players ranked 11-20
 
-**Week 36: Run Recruiting**
+**Week 35: Run Recruiting**
 -see Week 36 section of Recruiting_System.md doc for direction
 -This is a separate recruiting-orders flow from weeks 20-26.
 -Expose the Week 36 recruiting-orders screen during weeks `35-36` only.

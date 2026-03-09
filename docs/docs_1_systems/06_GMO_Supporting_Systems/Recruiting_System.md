@@ -45,6 +45,13 @@
         - `scholarship`: boolean
         - `playing_time`: boolean
     - On init and on each new season, this value should be `{}`.
+0c. Add two new roster / promise support fields to each FTD doc.
+    - `scholarship_players`
+        - store as an array of player id strings
+        - on new franchise init and on each new season, populate with that team's 12 existing roster player ids
+    - `playing_time_promise_players`
+        - store as an array of player id strings
+        - on new franchise init and on each new season, initialize to `[]`
 1. Add two new fields to each new doc in the FRD collection.
     - Existing FRD docs do not need to be retrofitted because existing franchise instances will be deleted before implementation.
     - `Home Region`
@@ -67,6 +74,8 @@
             - all key `"3"` values == `None`
 2. Upon new franchise init and the start of each new season within a franchise instance, create 200 new recruits per our recruit generation logic.
 3. At the start of each new season within a franchise instance:
+    - reset every team's FTD `scholarship_players` field to the team's 12 existing roster player ids
+    - reset every team's FTD `playing_time_promise_players` field back to `[]`
     - reset every team's FTD `Recruits` field back to keys `"1"` through `"20"` with `None` values
     - reset every team's FTD `recruiting_orders_week_36` field back to `{}`
     - reset every team's FTD `recruit_visit` field back to `None`

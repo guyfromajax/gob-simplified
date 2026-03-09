@@ -418,6 +418,8 @@ class FranchiseManager:
                 "franchise_id": self.franchise_id,
                 "team_id": team_object_id,
                 "players": players,
+                "scholarship_players": players[:12],
+                "playing_time_promise_players": [],
                 "Recruits": {str(i): None for i in range(1, 21)},
                 "recruiting_orders_week_36": {},
                 "recruit_visit": None,

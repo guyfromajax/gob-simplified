@@ -53,7 +53,7 @@ Post-championship offseason flow:
 
 **Tabs (in order):**
 1. **Standings** - Conference standings table showing wins, losses, win percentage, points for/against, and next opponent
-2. **Roster** - Team roster (player attributes) and player statistics for the current season
+2. **Roster** - Team roster (player attributes) and player statistics for the current season. Each team has 15 players and 12 scholarships. They have an active roster of 12 players, and 3 players on their traning squad. Franchise-team data stores `scholarship_players` as the 12 current scholarship player id strings and `playing_time_promise_players` as the future recruiting-promise array.
 3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
 4. **Stats** - Franchise leaderboards for key statistics across all teams, plus team-level statistics
 5. **Schedule** - Season schedule view with weekly matchups and training report links
