@@ -178,6 +178,8 @@
     if (!tbody) return;
     var selectedIds = options && options.selectedIds ? options.selectedIds : new Set();
     var onRowClick = options && options.onRowClick;
+    var onActionClick = options && options.onActionClick;
+    var getActionLabel = options && options.getActionLabel;
     tbody.innerHTML = '';
 
     recruits.forEach(function (recruit) {
@@ -205,8 +207,15 @@
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
         '<td>' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
-        '<td>' + (recruit.leanDisplay || '--') + '</td>'
+        '<td>' + (recruit.leanDisplay || '--') + '</td>',
+        onActionClick ? '<td><button class="recruiting-row-action-btn" type="button">' + (getActionLabel ? getActionLabel(recruit, selectedIds.has(recruit.recruitId)) : '+') + '</button></td>' : ''
       ].join('');
+      if (onActionClick) {
+        tr.querySelector('.recruiting-row-action-btn').addEventListener('click', function (e) {
+          e.stopPropagation();
+          onActionClick(recruit);
+        });
+      }
       if (onRowClick) {
         tr.addEventListener('click', function () {
           onRowClick(recruit);

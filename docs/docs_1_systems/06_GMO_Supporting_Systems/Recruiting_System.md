@@ -13,8 +13,13 @@
     - persistence of weekly team/recruit visit results
     - `recruiting-results.html`
     - post-submit button state changes on FCC and `recruiting.html`
+- Phase 3 adds:
+    - a separate Week 35-36 recruiting-orders flow for offseason commitment setup
+    - persistent week-36 order storage on `FTD.recruiting_orders_week_36`
+    - saved `scholarship` and `playing_time` promises per ordered recruit
 - Out of scope for this task:
     - recruit commitments / signings
+    - week-36 commitment resolution logic
     - lean changes over time
     - tournament performance affecting recruiting
     - signed recruits being added to rosters
@@ -32,6 +37,14 @@
         - a recruit id string, or
         - `None`
     - On init and through weeks `1-19`, this value should be `None`.
+0b. Add a new `recruiting_orders_week_36` field to each FTD doc.
+    - This stores the user's offseason recruiting board for weeks `35-36`.
+    - Store as a dict keyed by row position (`"1"`, `"2"`, `"3"`, etc).
+    - Each value is a dict with:
+        - `id`: recruit id string
+        - `scholarship`: boolean
+        - `playing_time`: boolean
+    - On init and on each new season, this value should be `{}`.
 1. Add two new fields to each new doc in the FRD collection.
     - Existing FRD docs do not need to be retrofitted because existing franchise instances will be deleted before implementation.
     - `Home Region`
@@ -55,6 +68,7 @@
 2. Upon new franchise init and the start of each new season within a franchise instance, create 200 new recruits per our recruit generation logic.
 3. At the start of each new season within a franchise instance:
     - reset every team's FTD `Recruits` field back to keys `"1"` through `"20"` with `None` values
+    - reset every team's FTD `recruiting_orders_week_36` field back to `{}`
     - reset every team's FTD `recruit_visit` field back to `None`
     - delete that franchise's prior season FRD recruits
     - generate the new season's 200 FRD recruits
@@ -66,6 +80,8 @@
         - current franchise week
         - `current_results_week` if the current week's recruiting visits have already been processed
         - current saved FTD `Recruits` order
+        - current saved FTD `recruiting_orders_week_36`
+        - `available_roster_spots` for Week 35-36 rendering
         - all FRD recruits for that franchise
         - team id -> team name map for rendering `Lean`
 - `GET /franchise/recruiting-results`
@@ -73,21 +89,26 @@
 - `POST /franchise/recruiting-orders`
     - accepts:
         - `franchise_id`
-        - ordered array of recruit ids
+        - ordered array of recruit ids during weeks `20-26`
+        - ordered array of `{id, scholarship, playing_time}` entries during weeks `35-36`
     - validation rules:
-        - allowed only during weeks `20-26`
-        - maximum 20 recruit ids
+        - allowed only during weeks `20-26` or `35-36`
+        - weeks `20-26`: maximum 20 recruit ids
+        - weeks `35-36`: no max row count
         - duplicate recruit ids are rejected
         - recruit ids must belong to that franchise's FRD pool
-        - the user can only submit once per week
+        - the user can only submit once per week during weeks `20-26`
     - save behavior:
-        - writes compressed keys only (`"1"` through `"N"`) into FTD `Recruits`
+        - weeks `20-26`: writes compressed keys only (`"1"` through `"N"`) into FTD `Recruits`
         - generates fresh computer-team `FTD.Recruits` orders for that week
         - runs weekly recruiting visit resolution for all 128 teams
         - persists that week's final team/recruit visit pairings
         - writes `FTD.recruit_visit` for all 128 teams
             - assigned teams get the recruit id string
             - teams with no visit get `None`
+        - weeks `35-36`: writes compressed keys only (`"1"` through `"N"`) into FTD `recruiting_orders_week_36`
+            - each saved row stores `id`, `scholarship`, and `playing_time`
+            - users may revisit and re-save this board until commitment logic is run in a later phase
 
 **Recruiting Results Persistence**
 - Persist recruiting visit results by week at the franchise level.
@@ -168,6 +189,7 @@
 
 
 **Recruiting-Orders.html Screen**
+## Weeks 20-26
 0. Top right: `Submit Orders` button, green fill with bold silver copy when active.
     - button copy is white
     - The button starts dead and becomes active when there is at least one recruit in the Top Grid.
@@ -215,6 +237,37 @@
     - Current query-param values are:
         - `from=fcc`
         - `from=recruiting`
+
+## Weeks 35-36
+0. Use the same `recruiting-orders.html` page, but a separate Week 35-36 board and persistence path.
+    - expose this screen during weeks `35-36` only
+    - weeks `20-26` behavior remains unchanged
+1. Top right: `Submit Orders` button.
+    - button is active when there is at least one recruit in the Top Grid
+    - users may revisit and re-save during weeks `35-36`
+2. Top Grid:
+    - preload saved `FTD.recruiting_orders_week_36` if it exists
+    - otherwise auto-populate with all recruits who currently have the user's team in any lean slot (`Lean.1`, `Lean.2`, or `Lean.3`), sorted by RT descending
+    - rows are contiguous and auto-compress after remove / reorder
+    - there is no max row count
+    - columns are:
+        - `Priority`, `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `SC`, `SH`, `ID`, `OD`, `PS`, `BH`, `RB`, `AG`, `ST`, `ND`, `IQ`, `FT`, `RT`, `Current Lean`, `Scholarship`, `Playing Time`, `Adjust`, `Remove`
+    - `Scholarship` and `Playing Time` default to unchecked on auto-fill and on any add / re-add action
+    - keep the up/down buttons and red remove button to the right of those checkbox columns
+    - drag and drop uses insert-and-push behavior
+3. Display text below the Top Grid header:
+    - `Available Roster Spots {X}`
+    - `X = 15 - returning_non_graduating_player_count`
+4. Lower recruit list:
+    - show all recruits
+    - add `+` buttons on the far right
+    - row click and `+` button both add/remove recruits
+    - recruits currently present in the Top Grid have a green row fill in the lower list
+5. Save behavior:
+    - save into `FTD.recruiting_orders_week_36`
+    - keys are row positions stored as strings
+    - values are `{id, scholarship, playing_time}`
+6. Back behavior and unsaved-changes modal match the existing recruiting-orders page behavior.
 
 **Recruiting Logic**
 - When the user presses `Submit Orders` during weeks `20-26`:
@@ -316,41 +369,10 @@
 - Run this logic immediately after all franchise games for the week have been simulated/finalized.
     - Best-practice implementation is a dedicated recruiting helper that is called from `complete_week`.
     - The helper should run only once per franchise / week and should use a franchise-level idempotency marker.
-- This logic applies across all weeks, but the recruiting rules differ by week band.
-- Use a franchise-level idempotency marker so these recruiting lean updates run only once per franchise / week.
+- This logic applies only during weeks `20-26`.
 - `open` handling:
     - `Lean["1"] == "open"` behaves the same as an open slot for insertion logic
     - once any real team is inserted onto the recruit's lean list, remove `open`
-
-## Weeks 1-10
-- Same logic applies to the user team and all computer teams.
-- If the team wins its game that week:
-    - `15%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
-    - `5%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
-- If a roll hits:
-    - choose one recruit in the team's region meeting that RT criteria at random
-    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
-    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
-
-## Weeks 11-15
-- Same logic applies to the user team and all computer teams.
-- If the team wins its game that week:
-    - `40%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
-    - `10%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
-- If a roll hits:
-    - choose one recruit in the team's region meeting that RT criteria at random
-    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
-    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
-
-## Weeks 16-19
-- Same logic applies to the user team and all computer teams.
-- If the team wins its game that week:
-    - `60%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
-    - `20%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
-- If a roll hits:
-    - choose one recruit in the team's region meeting that RT criteria at random
-    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
-    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
 
 ## Weeks 20-26
 - Use `FTD.recruit_visit` as the team-level source of truth for that week's visit assignment.
@@ -405,33 +427,6 @@
             - clear only one slot to `None`
         - if the team is ranked `#2` or `#3`, it moves up one ranking by swapping with the team directly in front of it
         - these existing-team movements are deterministic; there is no probability roll
-
-## Weeks 27-34
-- Same logic applies to the user team and all computer teams.
-- If the team wins its game that week:
-    - `80%` chance that one recruit with `RT < 30` in that team's region adds the team to the recruit's lean list
-    - `50%` chance that one recruit with `RT >= 30` in that team's region adds the team to the recruit's lean list
-- Special week-30 bye handling:
-    - if a team is on bye in week `30`, treat that week like a win for that team for recruiting-roll purposes
-    - infer bye teams from EOS state by identifying teams that are not eliminated and are not present in the week-30 EOS game list
-- If a roll hits:
-    - choose one recruit in the team's region meeting that RT criteria at random
-    - a team can gain at most one `< 30 RT` recruit and at most one `>= 30 RT` recruit in the same week
-    - if both rolls hit, exclude the first selected recruit from the second draw for that team / week
-
-## Weeks 1-19 and 27-34 Lean-List Addition Logic
-- If a recruit adds a team to the recruit's lean list during that week:
-    - if that team is already on the lean list:
-        - the team advances one spot by replacing the team ahead of it
-            - `2` moves to `1` and `1` becomes `2`
-            - `3` moves to `2` and `2` becomes `3`
-        - if the team is already `1` on the list:
-            - drop the lowest rated occupied team on the recruit's lean list
-            - if there are no other teams on the recruit's lean list, no effect
-    - if that team is not already on the lean list:
-        - the team occupies the highest rated opening
-            - slot `1` if open/null, else slot `2` if null, else slot `3` if null
-        - if all three ratings are occupied, the team replaces the `#3` team
 
 **Still Out Of Scope**
 - This phase does not determine final recruit choice / commitment.

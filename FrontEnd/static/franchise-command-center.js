@@ -1361,6 +1361,10 @@ function updateRecruitingButton(data) {
     active = true;
     text = 'Recruiting';
     href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+  } else if (week >= 35 && week <= 36) {
+    active = true;
+    text = 'Recruiting';
+    href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
   } else if (week > 26) {
     text = 'Recruiting Returns Later';
   }

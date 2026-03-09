@@ -796,7 +796,8 @@ class CompleteWeekRequest(BaseModel):
 
 class SaveRecruitingOrdersRequest(BaseModel):
     franchise_id: str
-    recruit_ids: list[str]
+    recruit_ids: list[str] | None = None
+    order_entries: list[dict[str, Any]] | None = None
 
 
 MAX_RECRUITING_ORDER_SLOTS = 20
@@ -1835,7 +1836,7 @@ def complete_week(req: CompleteWeekRequest):
             update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
             if req.week == ft.EOS_NATIONAL_WEEKS[-1]:
                 update_fields["eos_tournament_active"] = False
-                next_week = req.week
+                next_week = 35
             else:
                 next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(req.week) + 1]
             update_fields["week"] = next_week
@@ -3072,10 +3073,14 @@ def _insert_team_into_highest_open_lean_slot(lean_doc: dict[str, str | None], te
     return updated
 
 
-def _apply_recruit_lean_addition(lean_doc: dict | None, team_id: str) -> dict[str, str | None]:
+def _update_recruit_lean_after_visit(
+    lean_doc: dict | None,
+    team_id: str,
+    in_region: bool,
+    won_game: bool,
+) -> dict[str, str | None]:
     updated = _normalize_recruit_lean_doc(lean_doc)
     existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
-
     if existing_rank == "1":
         if updated.get("3") is not None:
             updated["3"] = None
@@ -3088,24 +3093,6 @@ def _apply_recruit_lean_addition(lean_doc: dict | None, team_id: str) -> dict[st
     if existing_rank == "3":
         updated["3"], updated["2"] = updated.get("2"), updated.get("3")
         return updated
-
-    if _lean_has_open_slot(updated):
-        return _insert_team_into_highest_open_lean_slot(updated, team_id)
-
-    updated["3"] = team_id
-    return updated
-
-
-def _update_recruit_lean_after_visit(
-    lean_doc: dict | None,
-    team_id: str,
-    in_region: bool,
-    won_game: bool,
-) -> dict[str, str | None]:
-    updated = _normalize_recruit_lean_doc(lean_doc)
-    existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
-    if existing_rank:
-        return _apply_recruit_lean_addition(updated, team_id)
     has_open_slot = _lean_has_open_slot(updated)
     if in_region:
         chance = 0.95 if won_game and has_open_slot else 0.75 if won_game else 0.75 if has_open_slot else 0.40
@@ -3115,113 +3102,11 @@ def _update_recruit_lean_after_visit(
     if random.random() > chance:
         return updated
 
-    return _apply_recruit_lean_addition(updated, team_id)
+    if has_open_slot:
+        return _insert_team_into_highest_open_lean_slot(updated, team_id)
 
-
-def _non_visit_recruiting_roll_chances_for_week(week: int) -> tuple[float, float] | None:
-    if 1 <= week <= 10:
-        return (0.15, 0.05)
-    if 11 <= week <= 15:
-        return (0.40, 0.10)
-    if 16 <= week <= 19:
-        return (0.60, 0.20)
-    if 27 <= week <= 34:
-        return (0.80, 0.50)
-    return None
-
-
-def _winning_team_ids_for_recruiting_week(franchise_doc: dict, week: int, results: list[dict]) -> set[str]:
-    winners = {team_id for team_id, outcome in _team_outcomes_by_week_results(results).items() if outcome == "win"}
-    if week == 30 and franchise_doc.get("eos_tournament_active"):
-        week_games_meta = ft.get_eos_week_games(franchise_doc, week)
-        scheduled_team_ids = {str(g["away_id"]) for g in week_games_meta} | {str(g["home_id"]) for g in week_games_meta}
-        eliminated_ids = ft.get_eliminated_team_ids(franchise_doc)
-        all_team_ids = {
-            str(doc["team_id"])
-            for doc in franchise_team_data_collection.find({"franchise_id": franchise_doc["_id"]}, {"team_id": 1})
-            if doc.get("team_id") is not None
-        }
-        bye_team_ids = {team_id for team_id in all_team_ids if team_id not in scheduled_team_ids and team_id not in eliminated_ids}
-        winners.update(bye_team_ids)
-    return winners
-
-
-def _apply_non_visit_recruiting_lean_updates(
-    franchise_doc: dict,
-    week: int,
-    results: list[dict],
-) -> None:
-    chances = _non_visit_recruiting_roll_chances_for_week(week)
-    if chances is None:
-        return
-
-    fid = franchise_doc["_id"]
-    winning_team_ids = _winning_team_ids_for_recruiting_week(franchise_doc, week, results)
-    if not winning_team_ids:
-        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
-        return
-
-    team_docs_by_id = {
-        str(team["_id"]): team
-        for team in db.teams.find(
-            {"_id": {"$in": [ObjectId(team_id) for team_id in winning_team_ids if ObjectId.is_valid(team_id)]}},
-            {"region": 1},
-        )
-    }
-    recruits = list(
-        franchise_recruits_data_collection.find(
-            {"franchise_id": str(fid)},
-            {"recruit_id": 1, "Home Region": 1, "Lean": 1, "position_ratings": 1},
-        )
-    )
-    recruit_docs_by_id = {recruit["recruit_id"]: dict(recruit) for recruit in recruits if recruit.get("recruit_id")}
-    recruits_by_region: dict[str, list[dict]] = {region: [] for region in "ABCDEFGH"}
-    for recruit in recruit_docs_by_id.values():
-        region = str(recruit.get("Home Region") or "").upper()
-        if region in recruits_by_region:
-            recruits_by_region[region].append(recruit)
-    for region in recruits_by_region:
-        recruits_by_region[region] = _sort_recruits_by_rt(recruits_by_region[region])
-
-    low_rt_chance, high_rt_chance = chances
-    for team_id in winning_team_ids:
-        team_doc = team_docs_by_id.get(team_id)
-        if not team_doc:
-            continue
-        region = str(team_doc.get("region") or "").upper()
-        region_recruits = recruits_by_region.get(region, [])
-        if not region_recruits:
-            continue
-
-        selected_this_team: set[str] = set()
-        if random.random() <= low_rt_chance:
-            low_candidates = [recruit for recruit in region_recruits if _recruit_rt(recruit) < 30]
-            if low_candidates:
-                chosen = random.choice(low_candidates)
-                updated_lean = _apply_recruit_lean_addition(chosen.get("Lean"), team_id)
-                franchise_recruits_data_collection.update_one(
-                    {"franchise_id": str(fid), "recruit_id": chosen["recruit_id"]},
-                    {"$set": {"Lean": updated_lean}},
-                )
-                recruit_docs_by_id[chosen["recruit_id"]]["Lean"] = updated_lean
-                selected_this_team.add(chosen["recruit_id"])
-
-        if random.random() <= high_rt_chance:
-            high_candidates = [
-                recruit
-                for recruit in region_recruits
-                if _recruit_rt(recruit) >= 30 and recruit["recruit_id"] not in selected_this_team
-            ]
-            if high_candidates:
-                chosen = random.choice(high_candidates)
-                updated_lean = _apply_recruit_lean_addition(chosen.get("Lean"), team_id)
-                franchise_recruits_data_collection.update_one(
-                    {"franchise_id": str(fid), "recruit_id": chosen["recruit_id"]},
-                    {"$set": {"Lean": updated_lean}},
-                )
-                recruit_docs_by_id[chosen["recruit_id"]]["Lean"] = updated_lean
-
-    db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+    updated["3"] = team_id
+    return updated
 
 
 def _apply_complete_week_recruiting_lean_updates(
@@ -3232,10 +3117,6 @@ def _apply_complete_week_recruiting_lean_updates(
     applied = (franchise_doc.get("recruiting_lean_updates_applied") or {}).get(str(week))
     if applied:
         logger.info("Skipping recruiting lean updates for franchise=%s week=%s; already applied", franchise_doc.get("_id"), week)
-        return
-
-    if (1 <= week <= 19) or (27 <= week <= 34):
-        _apply_non_visit_recruiting_lean_updates(franchise_doc, week, results)
         return
     if week < 20 or week > 26:
         return
@@ -3531,6 +3412,64 @@ def _normalize_recruiting_orders(recruit_ids: list[str]) -> dict[str, str]:
     return {str(index): recruit_id for index, recruit_id in enumerate(recruit_ids, start=1)}
 
 
+def _normalize_week_36_recruiting_orders(order_entries: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(order_entries, start=1):
+        recruit_id = str((entry or {}).get("id") or "").strip()
+        if not recruit_id:
+            continue
+        normalized[str(index)] = {
+            "id": recruit_id,
+            "scholarship": bool((entry or {}).get("scholarship", False)),
+            "playing_time": bool((entry or {}).get("playing_time", False)),
+        }
+    return normalized
+
+
+def _week_36_order_entries(saved_orders: Any) -> list[dict[str, Any]]:
+    if not isinstance(saved_orders, dict):
+        return []
+    entries: list[dict[str, Any]] = []
+    for key in sorted(saved_orders.keys(), key=lambda value: int(value) if str(value).isdigit() else 10**9):
+        entry = saved_orders.get(key)
+        if not isinstance(entry, dict):
+            continue
+        recruit_id = str(entry.get("id") or "").strip()
+        if not recruit_id:
+            continue
+        entries.append(
+            {
+                "id": recruit_id,
+                "scholarship": bool(entry.get("scholarship", False)),
+                "playing_time": bool(entry.get("playing_time", False)),
+            }
+        )
+    return entries
+
+
+def _calculate_available_roster_spots(fid: ObjectId, user_team_id: str) -> int:
+    try:
+        team_object_id = ObjectId(user_team_id)
+    except Exception:
+        return 0
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"players": 1},
+    ) or {}
+    roster_player_ids = [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+    if not roster_player_ids:
+        return 15
+
+    non_graduating_count = db.players.count_documents(
+        {
+            "_id": {"$in": roster_player_ids},
+            "year": {"$nin": ["Senior", "senior", "Graduate", "graduate"]},
+        }
+    )
+    return max(0, 15 - int(non_graduating_count))
+
+
 @router.get("/franchise/recruiting-data")
 def get_recruiting_data(
     franchise_id: str,
@@ -3545,9 +3484,10 @@ def get_recruiting_data(
 
     ftd_doc = franchise_team_data_collection.find_one(
         {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
-        {"Recruits": 1},
+        {"Recruits": 1, "recruiting_orders_week_36": 1},
     )
     saved_orders = ftd_doc.get("Recruits", {}) if ftd_doc else {}
+    saved_week_36_orders = ftd_doc.get("recruiting_orders_week_36", {}) if ftd_doc else {}
 
     recruits = list(
         franchise_recruits_data_collection.find(
@@ -3566,6 +3506,9 @@ def get_recruiting_data(
         "week": franchise_doc.get("week", 1),
         "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,
         "saved_orders": saved_orders,
+        "saved_orders_week_36": saved_week_36_orders,
+        "saved_order_entries_week_36": _week_36_order_entries(saved_week_36_orders),
+        "available_roster_spots": _calculate_available_roster_spots(fid, user_team_id),
         "recruits": recruits,
         "team_name_map": team_name_map,
     }
@@ -3590,8 +3533,52 @@ def save_recruiting_orders(
     franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     fid = franchise_doc["_id"]
     week = int(franchise_doc.get("week", 1) or 1)
-    if week < 20 or week > 26:
-        raise HTTPException(status_code=400, detail="Recruiting orders can only be saved during weeks 20-26")
+    is_visit_window = 20 <= week <= 26
+    is_week_36_window = 35 <= week <= 36
+    if not is_visit_window and not is_week_36_window:
+        raise HTTPException(status_code=400, detail="Recruiting orders can only be saved during weeks 20-26 or 35-36")
+
+    valid_recruit_ids = set(
+        franchise_recruits_data_collection.distinct(
+            "recruit_id",
+            {"franchise_id": str(req.franchise_id)},
+        )
+    )
+
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+
+    user_team_id_str = str(user_team_id)
+
+    if is_week_36_window:
+        order_entries = [
+            {
+                "id": str((entry or {}).get("id") or "").strip(),
+                "scholarship": bool((entry or {}).get("scholarship", False)),
+                "playing_time": bool((entry or {}).get("playing_time", False)),
+            }
+            for entry in (req.order_entries or [])
+        ]
+        order_entries = [entry for entry in order_entries if entry["id"]]
+        recruit_ids = [entry["id"] for entry in order_entries]
+        if len(set(recruit_ids)) != len(recruit_ids):
+            raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
+        if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
+            raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+
+        orders_payload = _normalize_week_36_recruiting_orders(order_entries)
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
+            {
+                "$set": {
+                    "recruiting_orders_week_36": orders_payload,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+        return {"status": "success", "saved_orders_week_36": orders_payload, "results_week": None}
+
     if str(week) in (franchise_doc.get("recruiting_results", {}) or {}):
         raise HTTPException(status_code=400, detail="Recruiting orders have already been submitted for this week")
 
@@ -3600,22 +3587,10 @@ def save_recruiting_orders(
         raise HTTPException(status_code=400, detail=f"A maximum of {MAX_RECRUITING_ORDER_SLOTS} recruits can be ranked")
     if len(set(recruit_ids)) != len(recruit_ids):
         raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
-
-    valid_recruit_ids = set(
-        franchise_recruits_data_collection.distinct(
-            "recruit_id",
-            {"franchise_id": str(req.franchise_id)},
-        )
-    )
     if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
         raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
 
-    _, user_team_id = get_user_team_from_franchise(franchise_doc)
-    if not user_team_id:
-        raise HTTPException(status_code=404, detail="User team not selected")
-
     orders_payload = _normalize_recruiting_orders(recruit_ids)
-    user_team_id_str = str(user_team_id)
     franchise_team_data_collection.update_one(
         {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
         {

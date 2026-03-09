@@ -18,7 +18,7 @@
     if (!btn) return;
     var week = Number(data.week || 1);
     var resultsWeek = Number(data.current_results_week || 0);
-    if (week < 20 || week > 26) {
+    if (!((week >= 20 && week <= 26) || (week >= 35 && week <= 36))) {
       btn.style.display = 'none';
       return;
     }

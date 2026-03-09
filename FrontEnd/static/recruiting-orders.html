@@ -22,22 +22,11 @@
 
     <div class="recruiting-section">
       <h1>Recruiting Orders</h1>
-      <p class="recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
+      <p id="orders-help" class="recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
+      <p id="orders-status" class="recruiting-status-text"></p>
       <div class="scroll-x">
         <table class="roster-table orders-grid-table" id="orders-grid-table">
-          <thead>
-            <tr>
-              <th>Priority</th>
-              <th>Recruit</th>
-              <th>Home Region</th>
-              <th>Archetype</th>
-              <th>Pos</th>
-              <th>RT</th>
-              <th>Current Lean</th>
-              <th>Adjust</th>
-              <th>Remove</th>
-            </tr>
-          </thead>
+          <thead id="orders-grid-head"></thead>
           <tbody id="orders-grid-body"></tbody>
         </table>
       </div>
@@ -69,6 +58,7 @@
               <th data-sort-key="FT">FT</th>
               <th data-sort-key="rt">RT</th>
               <th data-sort-key="lean">Current Lean</th>
+              <th>Add</th>
             </tr>
           </thead>
           <tbody id="recruits-body"></tbody>

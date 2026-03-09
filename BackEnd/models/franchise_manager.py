@@ -419,6 +419,7 @@ class FranchiseManager:
                 "team_id": team_object_id,
                 "players": players,
                 "Recruits": {str(i): None for i in range(1, 21)},
+                "recruiting_orders_week_36": {},
                 "recruit_visit": None,
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
