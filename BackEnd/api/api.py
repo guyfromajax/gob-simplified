@@ -39,6 +39,7 @@ try:
         tournaments_collection,
         franchises_collection,
         franchise_players_data_collection,
+        franchise_team_data_collection,
     )
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -4913,6 +4914,19 @@ try:
     
         process_start = time.time()
         players = []
+        pt_promise_ids = set()
+        franchise_week = None
+        if franchise_id:
+            try:
+                franchise_doc = franchises_collection.find_one({"_id": ObjectId(franchise_id)}, {"week": 1})
+                franchise_week = franchise_doc.get("week") if franchise_doc else None
+                ftd_doc = franchise_team_data_collection.find_one(
+                    {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
+                    {"playing_time_promise_players": 1},
+                ) or {}
+                pt_promise_ids = {str(pid) for pid in (ftd_doc.get("playing_time_promise_players") or []) if pid}
+            except Exception:
+                pt_promise_ids = set()
         for p in player_objects:
             player_id_str = str(p.get("_id"))
             player_name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
@@ -4947,6 +4961,8 @@ try:
                 "jersey": p.get("jersey", 0),
                 "position_ratings": position_ratings,
                 "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
+                "has_playing_time_promise": player_id_str in pt_promise_ids,
+                "is_graduating": bool(franchise_week == 36 and str(p.get("year") or "").strip().lower() in {"senior", "graduate"}),
             })
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)

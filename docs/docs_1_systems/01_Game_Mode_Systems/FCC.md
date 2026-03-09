@@ -54,7 +54,7 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 ## Resources tab and standalone pages
 
 - **Resources tab (on FCC):** Seven buttons (blue fill, white bold): Standings, Stats, Schedule, Team Traits, Rankings, Recruits, Awards. Each opens a standalone page with `franchise_id` and `team_id` in the URL.
-- **Awards button state:** Dead through week `24`; active starting week `25`.
+- **Awards button state:** Dead through week `34`; active starting week `35`.
 - **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html, recruiting.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC); schedule.html has 16 conference toggles and lands on the user's conference. Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
 - **Legacy (moved off FCC):** Stats tab content is on stats.html; Team Traits on team-traits.html; Rankings on rankings.html. Scope toggles (Conference | Region | National) and full schedule/standings toggles are on the standalone pages only.
 
@@ -67,8 +67,9 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 - **Weeks 20-26, before current-week recruiting is processed:** Active button with copy `Recruiting`; opens `recruiting-orders.html`.
 - **Weeks 20-26, after current-week recruiting is processed:** Active button with copy `Week ## Recruiting Visits`; opens `recruiting-results.html`.
 - **Weeks 27-34:** Dead button with copy `Recruiting Returns Later`.
-- **Weeks 35-36:** Active button with copy `Recruiting`; opens `recruiting-orders.html`.
-- **Post-championship state:** After EOS national week `34` completes, franchise mode advances to week `35` before `Next Season` becomes available.
+- **Week 35:** Primary CTA copy `Recruiting`; opens `recruiting-orders.html`. Show bold green copy below it: `Recruiting Is Live`.
+- **Week 36:** Primary CTA copy `Go To Next Season`; recruiting orders are closed.
+- **Post-championship state:** After EOS national week `34` completes, franchise mode advances to week `35`.
 
 ---
 

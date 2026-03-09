@@ -1,41 +1,64 @@
+## Week 35 Awards And Recruiting
 
-**Week 35 Awards & Player Aging**
-##Update Stats##
--upldate all player and team career level stats
--reset all player and team season level stats to 0
--delete all game documents that are linked to the season that just finished
--archive season data (I need to define, table this for now)
--archive graduating players (I need to define, table this for now)
--When EOS national week `34` completes, franchise week advances to `35`.
+When EOS national week `34` completes, franchise mode advances to week `35`.
 
-##Age Players##
--Seniors graduate (represent with "graduate" on the front end)
--Juniors become Seniors
--Sophomores become Juniors
--Freshmen become Sophomores
--Recruits become Freshmen
+### Week 35 Awards
 
-#FCC Update##
--Add an "Awards" button to the Resources tab in the FCC. Make this a dead button until week 25, then it becomes live and clicks to awards.html.
--Do not expose `Next Season` as the primary FCC CTA during weeks `35-36`; reserve that for after the offseason flow.
+- `Awards` in FCC Resources becomes live at week `35`
+- awards are computed once immediately when week `35` begins
+- awards persist on the franchise doc in `awards`
+- `awards.html` displays 3 All-American teams
 
-##Awards Page Conent##
-- after week 34 completes
-    - determine the All-American teams
-        - use each player's season stats
-        - use the same logic we use to determine player of the game after each game, with one adjustment 
-            - in order for a player's DEF% to be calculated, he must have at least 130 DEFA or greater on the season
-        - 1st Team = top five players
-        - 2nd Team = players ranked 6-10
-        - 3rd Team = random choice of five players among the players ranked 11-20
+### All-American Logic
 
-**Week 35: Run Recruiting**
--see Week 36 section of Recruiting_System.md doc for direction
--This is a separate recruiting-orders flow from weeks 20-26.
--Expose the Week 36 recruiting-orders screen during weeks `35-36` only.
--Week 36 recruiting orders persist on the user's FTD doc in `recruiting_orders_week_36`.
--On first load, if `recruiting_orders_week_36` is empty, auto-populate the top grid with all recruits who have the user's team in any lean slot, sorted by RT descending.
--On revisit, preload the saved `recruiting_orders_week_36` values instead of re-running auto-fill.
--Display `Available Roster Spots {X}` where `X = 15 - returning_non_graduating_player_count`.
--Graduating seniors still free future roster spots for this display, but they remain on the visible roster for now.
--Commitments / signings / roster mutation from Week 36 recruiting will be implemented in the next recruiting phase.
+- use player season stats, not game stats
+- use the same scoring logic as Player Of The Game with one change:
+  - a player only gets DEF% bonus scoring if `DEFA >= 130`
+- 1st Team = top 5 scorers
+- 2nd Team = players ranked 6-10
+- 3rd Team = uniform random selection of 5 players from ranks 11-20
+- selection happens once per season and does not reroll on revisit
+
+### FCC Week 35 State
+
+- top-right CTA copy = `Recruiting`
+- CTA click opens `recruiting-orders.html`
+- below the CTA, show bold green copy `Recruiting Is Live`
+- the old green recruiting-access button is not used for week `35`
+- Resources -> Recruits still opens `recruiting.html`
+
+### Week 35 Recruiting
+
+- week `35` is the actual commitment / signing phase
+- `Save Orders` saves the user board and generates CPU week-35 boards if those CPU boards are still empty
+- CPU week-35 orders only generate once per team
+- `Run Recruiting` behaves as save-first-then-run
+- when `Run Recruiting` finishes:
+  - recruiting assignments resolve
+  - walk-ons are generated where needed
+  - week advances from `35` to `36`
+  - user is redirected to `recruiting.html`
+
+## Week 36 Wrap-Up State
+
+- recruiting is closed
+- FCC top-right CTA copy = `Go To Next Season`
+- CTA uses a confirmation modal
+- Resources -> Recruits opens `recruiting.html`, now acting as the signed-results page
+- roster pages still show graduating seniors during week `36`
+  - append bold green `(GR)` next to their names
+
+## Go To Next Season
+
+When the user confirms `Go To Next Season`:
+
+- current-season game docs for the franchise are deleted
+- seniors are removed from the franchise instance
+- signed recruits and walk-ons are carried into the next season
+- career stats persist
+- season stats reset
+- a new franchise-season schedule is generated
+- old FRD docs are deleted
+- 200 new recruits are generated for the next season
+
+For the detailed franchise-instance rollover process, see `Season_Init_System.md`.

@@ -7,6 +7,7 @@ from BackEnd.db import (
     teams_collection,
     franchises_collection,
     franchise_players_data_collection,
+    franchise_team_data_collection,
 )
 from pymongo.errors import PyMongoError
 from bson import ObjectId
@@ -35,7 +36,12 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
         if franchise_id:
             logger.warning(f"🔍 [ROSTER LOADER DEBUG] franchise_id={franchise_id}, team_name={team_name}")
             try:
-                team_player_ids = team_doc.get("player_ids", [])
+                team_object_id = team_doc.get("_id")
+                ftd_doc = franchise_team_data_collection.find_one(
+                    {"franchise_id": ObjectId(franchise_id), "team_id": team_object_id},
+                    {"players": 1},
+                ) or {}
+                team_player_ids = ftd_doc.get("players") or team_doc.get("player_ids", [])
                 if not team_player_ids or not isinstance(team_player_ids, (list, tuple)):
                     if not team_player_ids:
                         logger.error(f"❌ [ROSTER LOADER] team_player_ids is empty! team_doc keys: {list(team_doc.keys())}")
@@ -74,10 +80,25 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             if not isinstance(franchise_attrs, dict):
                                 logger.error(f"❌ [ROSTER LOADER] franchise_attrs is not a dict! Type: {type(franchise_attrs)}, Value: {franchise_attrs}")
                                 continue
+                            meta = franchise_player_data.get("meta", {})
                             base_player["attributes"] = franchise_attrs
                             franchise_position_ratings = franchise_player_data.get("position_ratings", {})
                             if franchise_position_ratings:
                                 base_player["position_ratings"] = franchise_position_ratings
+                            if meta.get("height") is not None:
+                                base_player["height"] = meta.get("height")
+                            if meta.get("weight") is not None:
+                                base_player["weight"] = meta.get("weight")
+                            if meta.get("jersey") is not None:
+                                base_player["jersey"] = meta.get("jersey")
+                            if meta.get("year"):
+                                base_player["year"] = meta.get("year")
+                            if meta.get("first_name"):
+                                base_player["first_name"] = meta.get("first_name")
+                            if meta.get("last_name"):
+                                base_player["last_name"] = meta.get("last_name")
+                            if meta.get("team"):
+                                base_player["team"] = meta.get("team")
                             players.append(base_player)
                         except Exception as e:
                             logger.error(f"❌ [ROSTER LOADER] Exception processing player {pid} (idx {idx}): {type(e).__name__}: {str(e)}")

@@ -196,7 +196,7 @@ class FranchiseManager:
         _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1}
         )
         for p in players:
             from BackEnd.models.player import Player
@@ -206,6 +206,10 @@ class FranchiseManager:
                 "first_name": p.get("first_name", ""),
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
+                "height": p.get("height"),
+                "weight": p.get("weight"),
+                "year": p.get("year"),
+                "jersey": p.get("jersey"),
             }
             tid = p.get("team_id")
             if tid is not None:
@@ -419,9 +423,10 @@ class FranchiseManager:
                 "team_id": team_object_id,
                 "players": players,
                 "scholarship_players": players[:12],
+                "training_squad_players": players[12:15],
                 "playing_time_promise_players": [],
                 "Recruits": {str(i): None for i in range(1, 21)},
-                "recruiting_orders_week_36": {},
+                "recruiting_orders_week_35": {},
                 "recruit_visit": None,
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,

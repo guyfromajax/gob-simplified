@@ -191,7 +191,9 @@ async function loadRoster() {
         position_ratings: posRatings, // Store full position ratings for player view
         highestRT: highestRT !== -Infinity ? highestRT : null,
         highestPos: highestPos || (p.position || '--'),
-        photo: p.photo || null
+        photo: p.photo || null,
+        hasPlayingTimePromise: !!p.has_playing_time_promise,
+        isGraduating: !!p.is_graduating
       };
     });
     
@@ -373,6 +375,20 @@ function renderRoster() {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.hasPlayingTimePromise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.isGraduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     const addCell = (content) => {
@@ -446,6 +462,20 @@ function renderStats() {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.hasPlayingTimePromise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.isGraduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     const addCell = (content) => {

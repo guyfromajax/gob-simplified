@@ -4,13 +4,17 @@ from BackEnd.api import franchise_routes
 
 
 class _FakeCollection:
-    def __init__(self, find_one_result=None, distinct_result=None):
+    def __init__(self, find_one_result=None, distinct_result=None, find_result=None):
         self.find_one_result = find_one_result
         self.distinct_result = distinct_result or []
+        self.find_result = find_result or []
         self.update_calls = []
 
     def find_one(self, *_args, **_kwargs):
         return self.find_one_result
+
+    def find(self, *_args, **_kwargs):
+        return self.find_result
 
     def distinct(self, *_args, **_kwargs):
         return self.distinct_result
@@ -56,7 +60,7 @@ def test_calculate_available_roster_spots_uses_returning_non_graduates(monkeypat
 
 
 def test_week36_order_helpers_preserve_shape():
-    payload = franchise_routes._normalize_week_36_recruiting_orders(
+    payload = franchise_routes._normalize_week_35_recruiting_orders(
         [
             {"id": "r2", "scholarship": True, "playing_time": False},
             {"id": "r1", "scholarship": False, "playing_time": True},
@@ -67,16 +71,15 @@ def test_week36_order_helpers_preserve_shape():
         "1": {"id": "r2", "scholarship": True, "playing_time": False},
         "2": {"id": "r1", "scholarship": False, "playing_time": True},
     }
-    assert franchise_routes._week_36_order_entries(payload) == [
+    assert franchise_routes._week_35_order_entries(payload) == [
         {"id": "r2", "scholarship": True, "playing_time": False},
         {"id": "r1", "scholarship": False, "playing_time": True},
     ]
 
-
-def test_save_recruiting_orders_week36_updates_separate_ftd_field(monkeypatch):
+def test_save_recruiting_orders_week35_updates_separate_ftd_field(monkeypatch):
     franchise_id = str(ObjectId())
     team_id = str(ObjectId())
-    fake_ftd = _FakeCollection()
+    fake_ftd = _FakeCollection(find_result=[{"team_id": ObjectId(team_id)}])
     fake_frd = _FakeCollection(distinct_result=["r1", "r2"])
 
     monkeypatch.setattr(
@@ -92,13 +95,14 @@ def test_save_recruiting_orders_week36_updates_separate_ftd_field(monkeypatch):
     )
     monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", fake_ftd)
     monkeypatch.setattr(franchise_routes, "franchise_recruits_data_collection", fake_frd)
+    monkeypatch.setattr(franchise_routes, "db", _FakeDb(0, [{"_id": ObjectId(team_id), "name": "Morristown", "region": "A"}]))
 
     response = franchise_routes.save_recruiting_orders(
         franchise_routes.SaveRecruitingOrdersRequest(
             franchise_id=franchise_id,
             order_entries=[
                 {"id": "r2", "scholarship": True, "playing_time": True},
-                {"id": "r1", "scholarship": False, "playing_time": True},
+                {"id": "r1", "scholarship": False, "playing_time": False},
             ],
         ),
         user={"user_id": "test-user-123"},
@@ -107,13 +111,12 @@ def test_save_recruiting_orders_week36_updates_separate_ftd_field(monkeypatch):
     assert response["status"] == "success"
     assert fake_ftd.update_calls
     update_doc = fake_ftd.update_calls[0][0][1]["$set"]
-    assert update_doc["recruiting_orders_week_36"] == {
+    assert update_doc["recruiting_orders_week_35"] == {
         "1": {"id": "r2", "scholarship": True, "playing_time": True},
-        "2": {"id": "r1", "scholarship": False, "playing_time": True},
+        "2": {"id": "r1", "scholarship": False, "playing_time": False},
     }
 
-
-def test_get_recruiting_data_includes_week36_saved_orders_and_spots(monkeypatch):
+def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch):
     franchise_id = str(ObjectId())
     team_id = str(ObjectId())
     monkeypatch.setattr(
@@ -133,7 +136,7 @@ def test_get_recruiting_data_includes_week36_saved_orders_and_spots(monkeypatch)
         _FakeCollection(
             find_one_result={
                 "Recruits": {"1": "legacy"},
-                "recruiting_orders_week_36": {
+                "recruiting_orders_week_35": {
                     "1": {"id": "r1", "scholarship": True, "playing_time": False}
                 },
             }
@@ -171,9 +174,9 @@ def test_get_recruiting_data_includes_week36_saved_orders_and_spots(monkeypatch)
 
     assert payload["week"] == 35
     assert payload["available_roster_spots"] == 13
-    assert payload["saved_orders_week_36"] == {
+    assert payload["saved_orders_week_35"] == {
         "1": {"id": "r1", "scholarship": True, "playing_time": False}
     }
-    assert payload["saved_order_entries_week_36"] == [
+    assert payload["saved_order_entries_week_35"] == [
         {"id": "r1", "scholarship": True, "playing_time": False}
     ]

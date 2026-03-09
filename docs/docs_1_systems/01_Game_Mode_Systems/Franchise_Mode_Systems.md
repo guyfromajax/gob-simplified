@@ -6,9 +6,13 @@
 
 Franchise Mode supports multi-season career mode where team and player data persists across games and seasons. Team attributes and player attributes can be modified through training and persist throughout the franchise. The Franchise Command Center provides a comprehensive interface for managing franchise progression, viewing schedules, standings, and running training sessions.
 
+Continuing seasons inside a franchise instance are rebuilt from franchise-instance state only. Universal `players` / `teams` data is only used when creating a brand new franchise instance.
+
 Post-championship offseason flow:
 - After EOS national week `34` completes, franchise mode advances to week `35`.
-- Weeks `35-36` are reserved for offseason Awards / recruiting-order flow before `Next Season` becomes the primary CTA.
+- Week `35` is Awards + live recruiting/signings.
+- Week `36` is the signed-results / wrap-up state.
+- `Go To Next Season` becomes the primary CTA in week `36`.
 
 **Location:** `FrontEnd/static/franchise-command-center.html`, `FrontEnd/static/franchise-command-center.js`  
 **Status:** ✅ Fully implemented with Schedule tab, training integration, and franchise management
@@ -53,7 +57,7 @@ Post-championship offseason flow:
 
 **Tabs (in order):**
 1. **Standings** - Conference standings table showing wins, losses, win percentage, points for/against, and next opponent
-2. **Roster** - Team roster (player attributes) and player statistics for the current season. Each team has 15 players and 12 scholarships. They have an active roster of 12 players, and 3 players on their traning squad. Franchise-team data stores `scholarship_players` as the 12 current scholarship player id strings and `playing_time_promise_players` as the future recruiting-promise array.
+2. **Roster** - Team roster (player attributes) and player statistics for the current season. Each team has 15 players and 12 scholarships. They have an active roster of 12 players, and up to 3 players on their training squad. Franchise-team data stores `scholarship_players`, `training_squad_players`, and `playing_time_promise_players`.
 3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
 4. **Stats** - Franchise leaderboards for key statistics across all teams, plus team-level statistics
 5. **Schedule** - Season schedule view with weekly matchups and training report links

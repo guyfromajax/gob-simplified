@@ -250,7 +250,7 @@ function bindResourcesLinks() {
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');
-  if (rAwards) rAwards.href = '/awards.html';
+  if (rAwards) rAwards.href = `/awards.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -666,6 +666,20 @@ function renderTeam(data) {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.has_playing_time_promise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.is_graduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     // Add other columns directly as DOM elements
@@ -1286,9 +1300,9 @@ function showNewSeasonConfirmModal() {
   overlay.className = 'fcc-modal-overlay';
   overlay.innerHTML = `
     <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="New Season">
-      <h3 class="fcc-modal-title">Start New Season?</h3>
-      <p class="fcc-modal-copy">All current season data will be deleted.</p>
-      <p class="fcc-modal-copy">This action cannot be undone.</p>
+      <h3 class="fcc-modal-title">Go To Next Season?</h3>
+      <p class="fcc-modal-copy">This will create the next season for this franchise instance.</p>
+      <p class="fcc-modal-copy">Your current season cannot be reopened after you proceed.</p>
       <div class="fcc-modal-actions">
         <button class="fcc-modal-btn fcc-modal-btn-secondary" id="fcc-new-season-cancel">Cancel</button>
         <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-new-season-proceed">Proceed</button>
@@ -1325,14 +1339,20 @@ function updatePlayButton(data) {
   const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
   const tournamentComplete = eosTournament?.completed || false;
   
-  if (tournamentComplete && week >= 37) {
-    playNowBtn.textContent = 'Next Season';
+  if (week === 35) {
+    playNowBtn.textContent = 'Recruiting';
+    playNowBtn.dataset.mode = 'week35-recruiting';
+  } else if (week === 36) {
+    playNowBtn.textContent = 'Go To Next Season';
+    playNowBtn.dataset.mode = 'new-season';
+  } else if (tournamentComplete && week >= 37) {
+    playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
     playNowBtn.textContent = 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else if (trainingDisabledForEos || eliminated) {
-    playNowBtn.textContent = 'Next Season';
+    playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else {
     const trainingCompleted = data.training_completed || false;
@@ -1349,6 +1369,7 @@ function updatePlayButton(data) {
 
 function updateRecruitingButton(data) {
   const recruitingBtn = document.getElementById('fcc-recruiting-btn');
+  const liveCopy = document.getElementById('fcc-recruiting-live-copy');
   if (!recruitingBtn) return;
   const week = Number(data?.week || 1);
   const resultsWeek = Number(data?.current_recruiting_results_week || 0);
@@ -1364,14 +1385,18 @@ function updateRecruitingButton(data) {
     active = true;
     text = 'Recruiting';
     href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
-  } else if (week >= 35 && week <= 36) {
-    active = true;
+  } else if (week === 35) {
+    active = false;
     text = 'Recruiting';
-    href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+  } else if (week === 36) {
+    active = false;
+    text = 'Recruiting Closed';
   } else if (week > 26) {
     text = 'Recruiting Returns Later';
   }
 
+  if (liveCopy) liveCopy.style.display = week === 35 ? 'block' : 'none';
+  recruitingBtn.style.display = week === 35 ? 'none' : 'inline-flex';
   recruitingBtn.textContent = text;
   recruitingBtn.disabled = !active;
   recruitingBtn.classList.toggle('is-dead', !active);
@@ -1387,7 +1412,7 @@ function updateAwardsButton(data) {
   const awardsBtn = document.getElementById('resources-awards');
   if (!awardsBtn) return;
   const week = Number(data?.week || 1);
-  const active = week >= 25;
+  const active = week >= 35;
   awardsBtn.classList.toggle('is-dead', !active);
   awardsBtn.setAttribute('aria-disabled', active ? 'false' : 'true');
   awardsBtn.onclick = null;
@@ -1421,6 +1446,11 @@ playNowBtn.addEventListener('click', async () => {
     const sessionType = topData?.session_type || 'in-season';
     const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
     window.location.href = `/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
+    return;
+  }
+
+  if (mode === 'week35-recruiting') {
+    window.location.href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
     return;
   }
   

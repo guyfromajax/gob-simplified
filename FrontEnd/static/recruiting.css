@@ -38,6 +38,10 @@ body {
   padding: 11px 18px;
 }
 
+.recruiting-btn.recruiting-btn-orange {
+  background: #dd7a19;
+}
+
 .recruiting-btn.is-dead,
 .recruiting-btn:disabled {
   opacity: 0.45;

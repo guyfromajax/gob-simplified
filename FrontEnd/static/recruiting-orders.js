@@ -3,8 +3,6 @@
 
   var Recruiting = window.RecruitingCommon;
   var MAX_RECRUITING_ORDER_SLOTS = 20;
-  var WEEK_36_START = 35;
-  var WEEK_36_END = 36;
   var context = Recruiting.getQueryContext();
   var sortState = { key: 'rt', direction: 'desc' };
   var recruits = [];
@@ -16,8 +14,8 @@
   var availableRosterSpots = 0;
   var mode = 'visits';
 
-  function isWeek36Mode() {
-    return mode === 'week36';
+  function isWeek35Mode() {
+    return mode === 'week35';
   }
 
   function cloneEntry(entry) {
@@ -55,24 +53,56 @@
     return !entriesEqual(currentEntries, savedEntries);
   }
 
-  function updateSubmitButton() {
-    var btn = document.getElementById('submit-btn');
-    var active = currentEntries.length > 0;
-    btn.disabled = !active;
-    btn.classList.toggle('is-dead', !active);
+  function updateActionButtons() {
+    var saveBtn = document.getElementById('save-btn');
+    var runBtn = document.getElementById('run-btn');
+    var hasCurrent = currentEntries.length > 0;
+    var hasSaved = savedEntries.length > 0;
+    saveBtn.textContent = isWeek35Mode() ? 'Save Orders' : 'Submit Orders';
+    saveBtn.disabled = !hasCurrent;
+    saveBtn.classList.toggle('is-dead', !hasCurrent);
+    runBtn.style.display = isWeek35Mode() ? 'inline-flex' : 'none';
+    if (isWeek35Mode()) {
+      runBtn.disabled = !(hasCurrent || hasSaved);
+      runBtn.classList.toggle('is-dead', !(hasCurrent || hasSaved));
+    }
   }
 
   function getSelectedIds() {
     return new Set(currentEntries.map(function (entry) { return entry.id; }));
   }
 
+  function showModal(config) {
+    var backdrop = document.getElementById('recruiting-modal-backdrop');
+    var title = document.getElementById('recruiting-modal-title');
+    var message = document.getElementById('recruiting-modal-message');
+    var actions = document.getElementById('recruiting-modal-actions');
+    title.textContent = config.title || 'Recruiting';
+    message.textContent = config.message || '';
+    actions.innerHTML = '';
+    (config.actions || []).forEach(function (action) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'recruiting-modal-btn ' + (action.variant || 'secondary');
+      btn.textContent = action.label;
+      btn.addEventListener('click', function () {
+        backdrop.classList.remove('open');
+        backdrop.setAttribute('aria-hidden', 'true');
+        if (action.onClick) action.onClick();
+      });
+      actions.appendChild(btn);
+    });
+    backdrop.classList.add('open');
+    backdrop.setAttribute('aria-hidden', 'false');
+  }
+
   function setOrdersScreenCopy() {
     var help = document.getElementById('orders-help');
     var status = document.getElementById('orders-status');
     var table = document.getElementById('orders-grid-table');
-    if (table) table.classList.toggle('orders-grid-table-week36', isWeek36Mode());
-    if (isWeek36Mode()) {
-      help.textContent = 'Drag to reorder the board, use the + column or row click to add and remove recruits, and save scholarship / playing time promises for later commitment logic.';
+    if (table) table.classList.toggle('orders-grid-table-week36', isWeek35Mode());
+    if (isWeek35Mode()) {
+      help.textContent = 'Drag to reorder the board, use the + column or row click to add and remove recruits, and save scholarship / playing time promises for commitment logic.';
       status.textContent = 'Available Roster Spots ' + availableRosterSpots;
     } else {
       help.textContent = 'Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.';
@@ -102,7 +132,7 @@
   function buildTopGridHead() {
     var head = document.getElementById('orders-grid-head');
     if (!head) return;
-    if (isWeek36Mode()) {
+    if (isWeek35Mode()) {
       head.innerHTML = [
         '<tr>',
         '<th>Priority</th>',
@@ -139,7 +169,7 @@
   }
 
   function buildAdjustButtons(index, filled) {
-    var maxIndex = isWeek36Mode() ? currentEntries.length - 1 : MAX_RECRUITING_ORDER_SLOTS - 1;
+    var maxIndex = isWeek35Mode() ? currentEntries.length - 1 : MAX_RECRUITING_ORDER_SLOTS - 1;
     var upDisabled = !filled || index === 0;
     var downDisabled = !filled || index >= maxIndex;
     return [
@@ -150,7 +180,9 @@
     ].join('');
   }
 
-  function buildWeek36Row(index, recruit) {
+  function buildWeek35Row(index, recruit) {
+    var entry = currentEntries[index] || {};
+    var scholarshipChecked = recruit && !!entry.scholarship;
     return [
       '<td class="priority-cell">' + (index + 1) + '</td>',
       '<td>' + (recruit ? recruit.name : '<span class="recruiting-top-grid-empty">--</span>') + '</td>',
@@ -161,8 +193,8 @@
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
       '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? (recruit.leanDisplay || '--') : '--') + '</td>',
-      '<td><input class="recruiting-checkbox" type="checkbox" data-action="scholarship" data-index="' + index + '"' + (recruit && currentEntries[index].scholarship ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
-      '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && currentEntries[index].playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
+      '<td><input class="recruiting-checkbox" type="checkbox" data-action="scholarship" data-index="' + index + '"' + (scholarshipChecked ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
+      '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + ((recruit && scholarshipChecked) ? '' : ' disabled') + '></td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
     ].join('');
@@ -184,7 +216,7 @@
 
   function renderTopGrid() {
     var tbody = document.getElementById('orders-grid-body');
-    var rowCount = isWeek36Mode() ? Math.max(currentEntries.length, 1) : MAX_RECRUITING_ORDER_SLOTS;
+    var rowCount = isWeek35Mode() ? Math.max(currentEntries.length, 1) : MAX_RECRUITING_ORDER_SLOTS;
     tbody.innerHTML = '';
 
     for (var i = 0; i < rowCount; i += 1) {
@@ -194,17 +226,25 @@
       tr.dataset.index = String(i);
       tr.dataset.filled = recruit ? 'true' : 'false';
       tr.draggable = !!recruit;
-      tr.innerHTML = isWeek36Mode() ? buildWeek36Row(i, recruit) : buildVisitRow(i, recruit);
+      tr.innerHTML = isWeek35Mode() ? buildWeek35Row(i, recruit) : buildVisitRow(i, recruit);
       tbody.appendChild(tr);
     }
 
     bindTopGridInteractions();
-    updateSubmitButton();
+    updateActionButtons();
   }
 
   function rerender() {
     renderTopGrid();
     renderRecruitList();
+  }
+
+  function defaultEntryForRecruit(recruitId) {
+    return {
+      id: recruitId,
+      scholarship: false,
+      playing_time: false
+    };
   }
 
   function moveRecruit(index, direction) {
@@ -224,38 +264,6 @@
     rerender();
   }
 
-  function showModal(config) {
-    var backdrop = document.getElementById('recruiting-modal-backdrop');
-    var title = document.getElementById('recruiting-modal-title');
-    var message = document.getElementById('recruiting-modal-message');
-    var actions = document.getElementById('recruiting-modal-actions');
-    title.textContent = config.title || 'Recruiting';
-    message.textContent = config.message || '';
-    actions.innerHTML = '';
-    (config.actions || []).forEach(function (action) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'recruiting-modal-btn ' + (action.variant || 'secondary');
-      btn.textContent = action.label;
-      btn.addEventListener('click', function () {
-        backdrop.classList.remove('open');
-        backdrop.setAttribute('aria-hidden', 'true');
-        if (action.onClick) action.onClick();
-      });
-      actions.appendChild(btn);
-    });
-    backdrop.classList.add('open');
-    backdrop.setAttribute('aria-hidden', 'false');
-  }
-
-  function defaultEntryForRecruit(recruitId) {
-    return {
-      id: recruitId,
-      scholarship: false,
-      playing_time: false
-    };
-  }
-
   function toggleRecruitSelection(recruitId) {
     var existingIndex = currentEntries.findIndex(function (entry) {
       return entry.id === recruitId;
@@ -264,7 +272,7 @@
       removeRecruitAt(existingIndex);
       return;
     }
-    if (!isWeek36Mode() && currentEntries.length >= MAX_RECRUITING_ORDER_SLOTS) {
+    if (!isWeek35Mode() && currentEntries.length >= MAX_RECRUITING_ORDER_SLOTS) {
       showModal({
         title: 'All 20 Rows Are Occupied',
         message: 'All 20 rows are occupied. You must remove a recruit',
@@ -281,8 +289,10 @@
     if (fromIndex < 0 || fromIndex >= currentEntries.length || !currentEntries[fromIndex]) return;
     var entry = currentEntries.splice(fromIndex, 1)[0];
     var insertAt = Math.max(0, Math.min(toIndex, currentEntries.length));
-    if (fromIndex < toIndex) insertAt = Math.max(0, insertAt);
     currentEntries.splice(insertAt, 0, entry);
+    if (!isWeek35Mode() && currentEntries.length > MAX_RECRUITING_ORDER_SLOTS) {
+      currentEntries = currentEntries.slice(0, MAX_RECRUITING_ORDER_SLOTS);
+    }
   }
 
   function bindTopGridInteractions() {
@@ -296,8 +306,17 @@
         var action = control.dataset.action;
         var index = Number(control.dataset.index);
         if (Number.isNaN(index) || !currentEntries[index]) return;
-        if (action === 'scholarship') currentEntries[index].scholarship = control.checked;
-        if (action === 'playing_time') currentEntries[index].playing_time = control.checked;
+        if (action === 'scholarship') {
+          currentEntries[index].scholarship = control.checked;
+          if (!control.checked) {
+            currentEntries[index].playing_time = false;
+          }
+          rerender();
+          return;
+        }
+        if (action === 'playing_time') {
+          currentEntries[index].playing_time = control.checked && !!currentEntries[index].scholarship;
+        }
       });
       if (control.tagName === 'BUTTON') {
         control.addEventListener('click', function () {
@@ -355,14 +374,9 @@
     });
   }
 
-  function submitOrders() {
-    if (!currentEntries.length) return;
-    var btn = document.getElementById('submit-btn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
-
+  function buildSavePayload() {
     var payload = { franchise_id: context.franchiseId };
-    if (isWeek36Mode()) {
+    if (isWeek35Mode()) {
       payload.order_entries = currentEntries.map(function (entry) {
         return {
           id: entry.id,
@@ -373,25 +387,96 @@
     } else {
       payload.recruit_ids = currentEntries.map(function (entry) { return entry.id; });
     }
+    return payload;
+  }
 
-    Recruiting.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
+  function saveOrders(onSuccess) {
+    var saveBtn = document.getElementById('save-btn');
+    if (!currentEntries.length) return Promise.resolve(null);
+    saveBtn.disabled = true;
+    saveBtn.textContent = isWeek35Mode() ? 'Saving...' : 'Submitting...';
+
+    return Recruiting.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(function () {
+      body: JSON.stringify(buildSavePayload())
+    }).then(function (response) {
       savedEntries = cloneEntries(currentEntries);
-      navigateAway(Recruiting.buildFccUrl(context));
+      updateActionButtons();
+      saveBtn.textContent = isWeek35Mode() ? 'Save Orders' : 'Submit Orders';
+      if (onSuccess) onSuccess(response);
+      return response;
     }).catch(function (err) {
       console.error(err);
-      btn.disabled = false;
-      btn.textContent = 'Submit Orders';
-      updateSubmitButton();
+      saveBtn.textContent = isWeek35Mode() ? 'Save Orders' : 'Submit Orders';
+      updateActionButtons();
+      throw err;
+    });
+  }
+
+  function handleSaveClick() {
+    saveOrders(function () {
+      if (isWeek35Mode()) {
+        showModal({
+          title: 'Orders Saved',
+          message: 'Recruiting orders are saved. You can now run recruiting.',
+          actions: [{ label: 'Close', variant: 'secondary' }]
+        });
+      } else {
+        navigateAway(Recruiting.buildFccUrl(context));
+      }
+    }).catch(function () {
       showModal({
         title: 'Save Failed',
         message: 'Unable to save recruiting orders.',
         actions: [{ label: 'Close', variant: 'secondary' }]
       });
     });
+  }
+
+  function handleRunClick() {
+    if (!savedEntries.length && !currentEntries.length) {
+      showModal({
+        title: 'Save Orders First',
+        message: 'You must save recruiting orders before you can run recruiting.',
+        actions: [{ label: 'Close', variant: 'secondary' }]
+      });
+      return;
+    }
+
+    var proceed = function () {
+      var runBtn = document.getElementById('run-btn');
+      runBtn.disabled = true;
+      runBtn.textContent = 'Running...';
+      Recruiting.fetchJSON(API_CONFIG.buildUrl('/franchise/run-week-35-recruiting'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ franchise_id: context.franchiseId })
+      }).then(function () {
+        navigateAway(Recruiting.buildRecruitingUrl('recruiting.html', context, { from: 'fcc' }));
+      }).catch(function (err) {
+        console.error(err);
+        runBtn.textContent = 'Run Recruiting';
+        updateActionButtons();
+        showModal({
+          title: 'Run Failed',
+          message: 'Unable to run recruiting.',
+          actions: [{ label: 'Close', variant: 'secondary' }]
+        });
+      });
+    };
+
+    if (hasUnsavedChanges()) {
+      saveOrders(proceed).catch(function () {
+        showModal({
+          title: 'Save Failed',
+          message: 'Unable to save recruiting orders before running recruiting.',
+          actions: [{ label: 'Close', variant: 'secondary' }]
+        });
+      });
+      return;
+    }
+    proceed();
   }
 
   function initNavigationGuards() {
@@ -415,7 +500,7 @@
     });
   }
 
-  function getWeek36AutofillEntries(userTeamId) {
+  function getWeek35AutofillEntries(userTeamId) {
     return Recruiting.sortRecruits(
       recruits.filter(function (recruit) {
         var lean = recruit.lean || {};
@@ -435,7 +520,7 @@
     });
   }
 
-  function getSavedWeek36Entries(savedOrderEntries) {
+  function getSavedWeek35Entries(savedOrderEntries) {
     return (savedOrderEntries || []).map(function (entry) {
       return {
         id: entry.id,
@@ -453,18 +538,23 @@
       return;
     }
 
-    document.getElementById('submit-btn').addEventListener('click', submitOrders);
+    document.getElementById('save-btn').addEventListener('click', handleSaveClick);
+    document.getElementById('run-btn').addEventListener('click', handleRunClick);
     initNavigationGuards();
 
     Recruiting.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-data') + '?franchise_id=' + encodeURIComponent(context.franchiseId))
       .then(function (data) {
         activeWeek = Number(data.week || 1);
+        if (activeWeek === 36) {
+          navigateAway(Recruiting.buildRecruitingUrl('recruiting.html', context, { from: 'fcc' }));
+          return;
+        }
         if (Number(data.current_results_week || 0) === activeWeek && activeWeek >= 20 && activeWeek <= 26) {
           navigateAway(Recruiting.buildRecruitingUrl('recruiting-results.html', context, { week: String(activeWeek) }));
           return;
         }
 
-        mode = activeWeek >= WEEK_36_START && activeWeek <= WEEK_36_END ? 'week36' : 'visits';
+        mode = activeWeek === 35 ? 'week35' : 'visits';
         availableRosterSpots = Number(data.available_roster_spots || 0);
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});
         recruitMap = {};
@@ -475,10 +565,10 @@
         buildTopGridHead();
         setOrdersScreenCopy();
 
-        if (isWeek36Mode()) {
-          currentEntries = getSavedWeek36Entries(data.saved_order_entries_week_36);
+        if (isWeek35Mode()) {
+          currentEntries = getSavedWeek35Entries(data.saved_order_entries_week_35);
           if (!currentEntries.length) {
-            currentEntries = getWeek36AutofillEntries(data.team_id);
+            currentEntries = getWeek35AutofillEntries(data.team_id);
           }
         } else {
           currentEntries = getSavedVisitEntries(data.saved_orders);
