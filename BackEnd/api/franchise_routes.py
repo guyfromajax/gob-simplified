@@ -5411,14 +5411,15 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(doc_id)}))
             franchise_players = {d["player_id"]: d for d in fpd_docs}
 
-            # ✅ SS&S: Load team_doc from teams collection to get player_ids (canonical list)
-            # This is more efficient and reliable than iterating all players and matching by team_id
-            team_doc = db.teams.find_one({"_id": ObjectId(authoritative_team_id)})
-            if not team_doc:
-                raise HTTPException(status_code=404, detail=f"Team not found: {authoritative_team_id}")
-            
-            team_player_ids = team_doc.get("player_ids", [])
-            logger.info(f"🔍 [TRAINING REPORT] Using team_doc.player_ids: {len(team_player_ids)} players")
+            team_player_ids = (ftd_doc or {}).get("players") or []
+            if not team_player_ids:
+                team_doc = db.teams.find_one({"_id": ObjectId(authoritative_team_id)})
+                if not team_doc:
+                    raise HTTPException(status_code=404, detail=f"Team not found: {authoritative_team_id}")
+                team_player_ids = team_doc.get("player_ids", [])
+                logger.info(f"🔍 [TRAINING REPORT] Fallback to team_doc.player_ids: {len(team_player_ids)} players")
+            else:
+                logger.info(f"🔍 [TRAINING REPORT] Using FTD.players: {len(team_player_ids)} players")
             logger.info(f"🔍 [TRAINING REPORT] Total franchise players: {len(franchise_players)}")
             
             for pid in team_player_ids:

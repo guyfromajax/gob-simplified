@@ -108,7 +108,7 @@
     if (table) table.classList.toggle('orders-grid-table-week36', isWeek35Mode());
     if (isWeek35Mode()) {
       if (title) title.textContent = 'Recruiting Focus List';
-      help.textContent = 'Drag to reorder the board, use the + column or row click to add and remove recruits, assign recruiting points, and save scholarship / playing time promises for commitment logic.';
+      help.textContent = '';
       status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Available Scholarships: ' + availableScholarships + ', Points Remaining: ' + getWeek35PointsRemaining();
     } else {
       if (title) title.textContent = 'Recruiting Orders';

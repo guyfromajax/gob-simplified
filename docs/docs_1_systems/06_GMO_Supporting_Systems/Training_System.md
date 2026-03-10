@@ -518,7 +518,8 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 2. **Training Report Display:**
    - Frontend loads training report data from `/franchise/training-report` endpoint
    - Backend resolves team_id (handles both name and ID formats)
-   - Backend retrieves players from `franchise.players` collection (filtered by `meta.team_id`)
+   - Backend retrieves players from franchise-instance `FPD`
+   - Franchise player membership comes from `FTD.players` (not universal `teams.player_ids`)
    - Backend retrieves training report from `franchise_teams.{team_id}.training_reports.{week}`
    - Frontend renders players table and team attributes with visualizations
 
@@ -563,7 +564,7 @@ In Franchise mode, when the user submits training for their team, all computer t
 - **Process**:
   1. Iterate through all teams in `franchise_teams` (skipping user's team)
   2. For each computer team:
-     - Fetch team document and player_ids
+     - Fetch franchise team data and use `FTD.players`
      - Build player list with franchise-specific attributes from `franchise_players`
      - Get team stats, plays, playcall settings, strategy settings, playbook settings, and scouting data
      - Initialize `plays_data` and `scouting_data` if empty
@@ -579,6 +580,10 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Team attributes: `franchise_teams.{team_id}.{attribute_name}`
 - Plays data: `franchise_teams.{team_id}.plays` (if initialized)
 - Scouting data: `franchise_teams.{team_id}.scouting_data` (if initialized)
+
+**Franchise Roster Source Of Truth:**
+- Training execution and the training report page both use `FTD.players` as the franchise roster membership list
+- This is required so signed recruits and walk-ons appear in training camp / in-season training reports even though they do not exist in the universal `players` collection or universal `teams.player_ids`
 
 **Note:** Player attributes saved by training are automatically loaded during game initialization. See `Franchise_Mode_Systems.md` section "3.5. Player Attribute Loading During Game Initialization" for complete details on how trained attributes are loaded into gameplay.
 
@@ -626,4 +631,3 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Training history tracking and archiving
 - Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training
-
