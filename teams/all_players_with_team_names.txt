@@ -1468,14 +1468,14 @@ Jonathan	Fabrizio	freshman	99	78	221	38	5	16	5	15	4	30	24	9	15	22	15	Ocean City
 Felix	Steele	junior	21	71	188	78	55	39	85	55	57	25	44	81	100	44	70	South Lancaster
 Eli	Minutes	senior	7	72	185	28	8	39	32	27	13	58	45	10	27	24	52	Xavien
 Warren	Davis	senior	42	79	265	34	4	72	11	29	8	52	80	9	13	34	41	Four Corners
-Sonny	Carrozza	senior	29	70	190	10	5	33	75	14	35	11	22	51	13	70	18	South Lancaster
+Sonny	Carrozza	junior	29	70	190	10	5	33	75	14	35	11	22	51	13	70	18	South Lancaster
 Kenneth	O'Callahan	senior	7	68	162	7	10	11	6	41	45	9	11	20	31	54	105	South Lancaster
 Brian	Jeffries	sophomore	1	69	171	22	43	21	42	68	43	15	20	52	28	25	83	Xavien
 Paul	Pavelka	junior	17	72	176	35	35	24	46	46	31	33	17	19	89	87	70	Four Corners
-Terry	Axelford	senior	43	76	228	45	11	68	19	44	6	62	61	21	63	60	28	South Lancaster
+Terry	Axelford	junior	43	76	228	45	11	68	19	44	6	62	61	21	63	60	28	South Lancaster
 Scott	Swensen	senior	24	74	204	73	52	70	75	55	47	68	70	71	58	44	82	Xavien
 Kevin	Nelson	sophomore	33	70	174	65	88	26	45	71	38	32	35	71	100	45	94	Morristown
-JR	Crawford	senior	34	70	180	29	64	11	29	34	23	50	31	18	61	20	75	South Lancaster
+JR	Crawford	sophomore	34	70	180	29	64	11	29	34	23	50	31	18	61	20	75	South Lancaster
 Steven	Martinez	junior	36	69	168	8	27	17	44	36	29	17	14	82	49	8	69	Xavien
 Omar	Nola	junior	17	76	207	47	18	64	29	48	21	44	70	55	64	37	81	Bentley-Truman
 Jeffrey	Jackson	senior	34	76	227	91	69	92	70	61	55	88	82	71	92	64	90	Four Corners
@@ -1487,7 +1487,7 @@ Norris	Khan	sophomore	23	74	186	53	48	55	84	58	47	58	52	75	85	63	91	Lancaster
 Wallace	Farrabee	sophomore	33	75	217	48	14	73	15	37	15	79	70	27	39	62	27	Little York
 Mose	Hawkins	senior	43	67	158	39	11	25	91	60	92	15	36	70	95	77	61	Morristown
 Von	Sanborn	sophomore	25	70	168	19	23	33	66	52	67	19	24	72	95	49	57	Bentley-Truman
-Jerry	O'Neal	junior	3	68	159	52	17	11	23	45	37	9	14	55	42	45	24	Little York
+Jerry	O'Neal	junior	3	68	159	32	17	11	13	35	22	9	14	29	42	45	24	Little York
 Damon	Martin	junior	22	73	213	29	9	49	12	25	5	43	90	14	6	28	19	Lancaster
 Ferdinand	Steele	junior	12	70	179	46	27	39	76	65	65	26	25	76	86	64	75	South Lancaster
 Neel	Baldwin	senior	1	78	228	50	26	72	7	56	5	87	65	12	35	85	25	South Lancaster
@@ -1495,7 +1495,7 @@ Peter	Gregory	junior	1	72	198	86	67	62	65	61	64	46	55	84	30	65	84	Morristown
 Xenon	Fletcher	senior	0	72	175	37	80	45	87	95	89	25	32	80	89	92	89	Bentley-Truman
 Quinn	Aldrete	junior	44	76	230	55	15	45	16	21	6	59	94	18	20	5	34	Ocean City
 Craig	James	senior	16	72	180	35	22	21	25	55	29	43	27	18	59	45	35	Ocean City
-Booker	Preston	senior	7	71	182	17	15	9	11	30	44	14	5	12	26	24	75	Ocean City
+Booker	Preston	freshman	7	71	182	17	15	9	11	30	44	14	5	12	26	24	75	Ocean City
 Teddy	Spielman	junior	5	72	190	9	15	23	29	11	27	18	50	61	13	59	18	Little York
 Marlin	McDonough	senior	18	73	200	25	31	54	20	23	10	71	42	9	60	41	34	Xavien
 Clint	Workman	sophomore	20	73	185	33	17	44	62	17	30	40	45	86	61	73	10	Bentley-Truman
@@ -1505,11 +1505,11 @@ CJ	Castleman	senior	44	76	218	62	24	94	21	44	12	88	79	26	81	59	34	Bentley-Truman
 Leonard	Tibbits	junior	12	70	179	26	41	28	54	28	10	12	20	46	63	41	74	Four Corners
 Prince	Baez	sophomore	8	73	173	18	15	19	35	17	15	23	21	50	31	32	51	Four Corners
 Jeremy	Johnson	senior	41	74	203	9	13	30	11	20	3	23	24	13	31	22	11	Lancaster
-Ellis	Clemons	freshman	4	70	177	12	35	10	28	8	12	9	8	35	14	13	29	Lancaster
+Ellis	Clemons	freshman	4	70	177	22	45	10	18	8	12	9	8	35	14	13	39	Lancaster
 Emery	Landraneau	senior	88	80	244	62	26	75	14	62	8	68	89	11	37	70	95	Little York
 Manual	Roose	senior	9	73	188	22	6	25	10	17	5	26	13	12	26	54	23	Little York
 Trent	Athens	senior	7	75	202	76	105	36	72	54	62	34	45	71	91	75	107	Bentley-Truman
-Siran	Stanhope	sophomore	5	73	182	18	6	38	29	12	7	42	34	29	19	11	21	South Lancaster
+Siran	Stanhope	freshman	5	73	182	18	6	38	29	12	7	42	34	29	19	11	21	South Lancaster
 Roberto	You	senior	53	74	209	51	21	91	25	44	12	83	69	27	77	39	25	Four Corners
 Alex	Thomas	sophomore	5	70	170	26	33	9	41	48	51	10	8	31	23	45	78	Morristown
 Phillip	Ali	senior	21	74	201	40	26	23	32	5	34	19	46	58	56	13	73	Morristown
@@ -1521,15 +1521,15 @@ Charles	Black	junior	10	73	188	74	57	67	73	67	41	50	76	65	75	28	80	Four Corners
 Jesse	Jamison	junior	40	76	228	49	6	60	21	18	17	51	69	27	43	45	29	Morristown
 Benny	Pena	senior	14	72	182	19	11	47	95	46	48	33	35	70	54	86	14	Lancaster
 AC	Buford	junior	1	75	199	41	78	72	35	88	38	63	36	24	63	75	92	Little York
-Porter	DeGroot	senior	9	75	209	29	12	77	59	60	42	69	51	15	29	94	22	Morristown
-Delmont	Braggs	freshman	11	73	171	26	30	13	21	31	21	15	13	28	24	15	42	Bentley-Truman
+Porter	DeGroot	junior	9	75	209	29	12	77	59	60	42	69	51	15	29	94	22	Morristown
+Delmont	Braggs	freshman	11	73	171	26	30	13	51	31	21	15	13	42	50	15	42	Bentley-Truman
 Malcolm	Bleeker	senior	31	72	180	31	19	17	27	14	31	28	33	65	65	73	9	Four Corners
-Lucky	Forte	freshman	4	66	150	2	15	5	20	49	45	5	4	37	26	29	28	Xavien
+Lucky	Forte	freshman	4	66	150	2	25	5	20	49	62	5	4	37	26	35	28	Xavien
 Dan	Olson	freshman	3	66	149	6	30	10	28	23	22	10	5	31	14	18	34	Four Corners
 Monroe	Quinto	junior	52	76	213	20	74	33	12	62	17	37	51	13	25	26	84	Ocean City
 Granville	D'Amore	sophomore	40	75	177	11	58	12	25	36	11	59	10	13	12	70	74	Ocean City
 Wilbert	Struthers	senior	31	75	221	96	91	99	87	81	58	84	68	94	73	60	75	Lancaster
-Antoine	Ellington	freshman	10	75	210	39	5	38	2	15	8	36	24	15	20	28	8	Xavien
+Antoine	Ellington	freshman	10	75	210	52	5	38	2	15	8	50	24	15	55	28	8	Xavien
 Mario	Braxton	freshman	50	78	239	24	10	28	7	11	6	46	41	13	14	37	24	Xavien
 Freddie	Anderson	senior	13	74	201	25	25	54	21	64	23	68	55	25	95	26	75	Bentley-Truman
 Cedric	Buckles	junior	43	76	232	39	22	91	12	20	8	88	83	29	53	65	25	Lancaster
