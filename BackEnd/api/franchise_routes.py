@@ -5497,7 +5497,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": doc_id_obj, "team_id": team_object_id},
-                {"training_reports": 1, "team_attributes": 1}
+                {"training_reports": 1, "team_attributes": 1, "players": 1}
             )
             
             if ftd_doc:

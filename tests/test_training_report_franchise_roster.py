@@ -10,6 +10,27 @@ def test_franchise_training_report_uses_ftd_players_for_player_list(monkeypatch)
     team_id = str(ObjectId())
     recruit_player_id = "franchise-only-freshman"
 
+    def _fake_ftd_find_one(_filter, projection=None):
+        full_doc = {
+            "players": [recruit_player_id],
+            "training_reports": {
+                "1": {
+                    "player_logs": {},
+                    "team_log": {},
+                    "coaching_focus": {},
+                    "training_notes": [],
+                    "plays_data": {},
+                    "scouting_data": {},
+                    "plays_effectiveness_changes": {},
+                    "defenses_effectiveness_changes": {},
+                }
+            },
+            "team_attributes": {},
+        }
+        if not projection:
+            return full_doc
+        return {key: value for key, value in full_doc.items() if projection.get(key)}
+
     monkeypatch.setattr(
         franchise_routes,
         "get_user_team_from_franchise",
@@ -18,24 +39,7 @@ def test_franchise_training_report_uses_ftd_players_for_player_list(monkeypatch)
     monkeypatch.setattr(
         franchise_routes,
         "franchise_team_data_collection",
-        SimpleNamespace(
-            find_one=lambda *args, **kwargs: {
-                "players": [recruit_player_id],
-                "training_reports": {
-                    "1": {
-                        "player_logs": {},
-                        "team_log": {},
-                        "coaching_focus": {},
-                        "training_notes": [],
-                        "plays_data": {},
-                        "scouting_data": {},
-                        "plays_effectiveness_changes": {},
-                        "defenses_effectiveness_changes": {},
-                    }
-                },
-                "team_attributes": {},
-            }
-        ),
+        SimpleNamespace(find_one=_fake_ftd_find_one),
     )
     monkeypatch.setattr(
         franchise_routes,
