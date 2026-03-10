@@ -59,6 +59,11 @@ function populateTop(data) {
   const formattedTeam = formatTeamName(data.team);
   const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
+  const seasonLabelEl = document.getElementById('fcc-season-label');
+  if (seasonLabelEl) {
+    const seasonNumber = Number(data.current_season || 1);
+    seasonLabelEl.textContent = `Season ${seasonNumber}`;
+  }
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -1528,7 +1533,7 @@ playNowBtn.addEventListener('click', async () => {
     return;
   }
   
-  // End-of-season alpha flow: delete current season data and start fresh
+  // End-of-season franchise rollover: keep the same franchise instance and build the next season from franchise data
   if (mode === 'new-season') {
     const modal = showNewSeasonConfirmModal();
     modal.querySelector('#fcc-new-season-cancel')?.addEventListener('click', () => {
@@ -1539,13 +1544,13 @@ playNowBtn.addEventListener('click', async () => {
       playNowBtn.disabled = true;
       playNowBtn.textContent = 'Starting...';
       try {
-        const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
+        const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
           method: 'POST',
-          headers: API_CONFIG.getAuthHeaders(),
+          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ franchise_id: franchiseId }),
         });
-        if (!res.ok) throw new Error('Delete current franchise failed');
-        clearFranchiseLocalStorage();
-        window.location.href = '/franchise-select-team.html';
+        if (!res.ok) throw new Error('Finish season failed');
+        window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
       } catch (err) {
         console.error(err);
         alert('Unable to start new season');

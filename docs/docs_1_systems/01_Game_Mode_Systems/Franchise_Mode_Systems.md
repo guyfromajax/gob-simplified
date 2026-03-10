@@ -13,6 +13,7 @@ Post-championship offseason flow:
 - Week `35` is Awards + live recruiting/signings.
 - Week `36` is the signed-results / wrap-up state.
 - `Go To Next Season` becomes the primary CTA in week `36`.
+- `Go To Next Season` runs an in-place season rollover for the existing franchise instance and returns the user directly to FCC for the same franchise.
 
 **Location:** `FrontEnd/static/franchise-command-center.html`, `FrontEnd/static/franchise-command-center.js`  
 **Status:** ✅ Fully implemented with Schedule tab, training integration, and franchise management
@@ -99,6 +100,7 @@ Post-championship offseason flow:
 - **Set Game Plan** - Navigate to Game Plan screen with franchise context
 - **Playbooks** - Navigate to Playbooks page with franchise context
 - **Run Training / Play Now** - Dynamic button that changes based on training status
+- **Season Label** - Under the team logo, display `Season XX` to the right of **Exit Franchise**, sourced from `franchise.current_season`
 
 **Schedule Tab:**
 - Displays full season schedule organized by week

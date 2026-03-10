@@ -92,3 +92,11 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 ## Exit Franchise button
 
 - Replaces old “Coach/Username” under team logo. Label: **Exit Franchise**. On click, navigates to `/mode-select.html`.
+- To the right of **Exit Franchise**, show `Season XX`, where `XX` is the franchise document's `current_season` value.
+
+## Go To Next Season
+
+- **Week 36 CTA:** Primary hero button copy is `Go To Next Season`.
+- **Confirmation:** Uses the existing FCC confirmation modal before proceeding.
+- **Behavior:** Calls the franchise-only next-season init flow and returns the user directly to FCC for the same `franchise_id`.
+- **Important:** This is not a delete-and-reselect flow. The user does not go back to team select, and the franchise instance persists with aged returning players, signed recruits, walk-ons, and preserved career stats.

@@ -2000,6 +2000,7 @@ def command_center_data(
         eos_tournament_active = franchise_doc.get("eos_tournament_active", False) if franchise_doc else False
         week = franchise_doc.get("week", 1) if franchise_doc else None
         response = build_command_center_base(team_name, team_id, team_doc)
+        response["current_season"] = franchise_doc.get("current_season", 1) if franchise_doc else 1
         response["intangibles"] = team_doc.get("intangibles", "-")
         response["prestige"] = team_doc.get("prestige", "-")
         response["rank"] = team_doc.get("rank", "-")
