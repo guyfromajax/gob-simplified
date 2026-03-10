@@ -57,6 +57,31 @@
     return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
   }
 
+  function getBestPosition(positionRatings) {
+    var bestPos = '--';
+    var bestRating = null;
+    Object.entries(positionRatings || {}).forEach(function (entry) {
+      var pos = entry[0];
+      var rating = entry[1];
+      if (typeof rating === 'number' && (bestRating === null || rating > bestRating)) {
+        bestPos = pos;
+        bestRating = rating;
+      }
+    });
+    return {
+      pos: bestPos,
+      rating: bestRating
+    };
+  }
+
+  function formatHeight(heightInches) {
+    var total = Number(heightInches || 0);
+    if (!total) return '--';
+    var feet = Math.floor(total / 12);
+    var inches = total % 12;
+    return feet + "'" + inches + '"';
+  }
+
   function updateStatus() {
     var status = document.getElementById('cut-status');
     var selectedCount = selectedIds.size;
@@ -219,7 +244,22 @@
       var topData = results[0] || {};
       var roster = results[1] || {};
       cutCount = Number(topData.cut_count || 0);
-      players = (roster.players || []).slice().sort(function (a, b) {
+      players = (roster.players || []).map(function (player) {
+        var positionRatings = player.position_ratings || {};
+        var best = getBestPosition(positionRatings);
+        return {
+          _id: player._id,
+          name: player.name || [player.first_name || '', player.last_name || ''].join(' ').trim(),
+          pos: best.pos,
+          highestRT: best.rating,
+          year: player.year || '--',
+          height: formatHeight(player.height),
+          weight: player.weight || '--',
+          attributes: player.attributes || {},
+          hasPlayingTimePromise: !!player.has_playing_time_promise,
+          isGraduating: !!player.is_graduating
+        };
+      }).sort(function (a, b) {
         return Number(b.highestRT || -1) - Number(a.highestRT || -1);
       });
       renderTable();
