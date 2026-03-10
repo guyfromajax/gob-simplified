@@ -27,6 +27,7 @@ let leadersDataCache = null;
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
+let signedRecruitsDataCache = [];
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -283,7 +284,53 @@ function bindStatsAndTraitsScopeButtons() {
 function renderFccRecruits() {
   const tbody = document.getElementById('fcc-recruits-body');
   const table = document.getElementById('fcc-recruits-table');
+  const heading = document.querySelector('#recruits-tab h3');
+  const lastCol = document.getElementById('fcc-recruits-last-col');
   if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
+
+  const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
+  if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
+  if (lastCol) {
+    lastCol.textContent = 'Current Lean';
+    lastCol.dataset.sortKey = 'lean';
+    lastCol.style.display = useSignedRecruits ? 'none' : '';
+  }
+
+  if (useSignedRecruits) {
+    if (!signedRecruitsDataCache.length) {
+      tbody.innerHTML = '<tr><td colspan="19">No recruits or walk-ons joined your team.</td></tr>';
+      return;
+    }
+    const rows = RecruitingCommon.sortRecruits(signedRecruitsDataCache, recruitSortState);
+    tbody.innerHTML = '';
+    rows.forEach(function (recruit) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = [
+        '<td>' + recruit.name + '</td>',
+        '<td>' + recruit.homeRegion + '</td>',
+        '<td>' + recruit.archetype + '</td>',
+        '<td>' + recruit.height + '</td>',
+        '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
+        '<td>' + recruit.pos + '</td>',
+        '<td>' + recruit.attrs.SC + '</td>',
+        '<td>' + recruit.attrs.SH + '</td>',
+        '<td>' + recruit.attrs.ID + '</td>',
+        '<td>' + recruit.attrs.OD + '</td>',
+        '<td>' + recruit.attrs.PS + '</td>',
+        '<td>' + recruit.attrs.BH + '</td>',
+        '<td>' + recruit.attrs.RB + '</td>',
+        '<td>' + recruit.attrs.AG + '</td>',
+        '<td>' + recruit.attrs.ST + '</td>',
+        '<td>' + recruit.attrs.ND + '</td>',
+        '<td>' + recruit.attrs.IQ + '</td>',
+        '<td>' + recruit.attrs.FT + '</td>',
+        '<td>' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
+      ].join('');
+      tbody.appendChild(tr);
+    });
+    return;
+  }
+
   if (!leanRecruitsDataCache.length) {
     tbody.innerHTML = '<tr><td colspan="20">No recruits currently have your team on their lean list.</td></tr>';
     return;
@@ -297,10 +344,42 @@ function renderFccRecruits() {
 
 function initFccRecruits(topData) {
   if (typeof RecruitingCommon === 'undefined') return;
+  document.body.dataset.fccWeek = String(Number(topData?.week || 1));
   leanRecruitsDataCache = RecruitingCommon.normalizeRecruits(
     topData?.lean_recruits || [],
     topData?.team_name_map || {}
   );
+  signedRecruitsDataCache = (topData?.week_35_user_recruits || []).map((player) => {
+    const attrs = player.attributes || {};
+    return {
+      recruitId: player.recruit_id || player.player_id,
+      name: player.walk_on ? player.name + ' (walk on)' : player.name,
+      homeRegion: player.home_region || '--',
+      archetype: player.archetype || '--',
+      height: typeof formatHeight === 'function' ? formatHeight(player.height) : '--',
+      heightRaw: Number(player.height) || 0,
+      weight: player.weight != null ? Number(player.weight) : null,
+      pos: player.pos || '--',
+      rt: player.rt != null ? Number(player.rt) : null,
+      leanDisplay: '',
+      leanSortValue: '',
+      attrs: {
+        SC: Math.floor((Number(attrs.SC) || 0) / 10),
+        SH: Math.floor((Number(attrs.SH) || 0) / 10),
+        ID: Math.floor((Number(attrs.ID) || 0) / 10),
+        OD: Math.floor((Number(attrs.OD) || 0) / 10),
+        PS: Math.floor((Number(attrs.PS) || 0) / 10),
+        BH: Math.floor((Number(attrs.BH) || 0) / 10),
+        RB: Math.floor((Number(attrs.RB) || 0) / 10),
+        AG: Math.floor((Number(attrs.AG) || 0) / 10),
+        ST: Math.floor((Number(attrs.ST) || 0) / 10),
+        ND: Math.floor((Number(attrs.ND) || 0) / 10),
+        IQ: Math.floor((Number(attrs.IQ) || 0) / 10),
+        FT: Math.floor((Number(attrs.FT) || 0) / 10)
+      },
+      raw: player
+    };
+  });
   RecruitingCommon.bindSortableHeaders(
     document.getElementById('fcc-recruits-table'),
     recruitSortState,

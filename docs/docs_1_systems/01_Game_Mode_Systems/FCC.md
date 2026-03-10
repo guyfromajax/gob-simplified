@@ -12,6 +12,7 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 - **Command center response** also includes:
   - `current_recruiting_results_week` for the FCC Recruiting button state
   - `lean_recruits` for the FCC Recruits tab
+  - `week_35_user_recruits` for the FCC Recruits tab after week `35` recruiting runs
   - `team_name_map` so recruit lean team IDs render as team names
 
 | Use | Endpoint / param |
@@ -29,7 +30,7 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 | **Standings** | Slim view: user's conference (top) and sister conference (bottom) only. Link to **Resources → Standings** for full 16 conferences. Data: `scope=user_region&team_id=...`. |
 | **Roster** | Roster table + player stats. |
 | **Team** | Team Report (attributes), Playbook Summary. |
-| **Recruits** | FCC-only recruit list showing only recruits who currently have the user's team on their lean list. Same columns as recruiting.html. Default sort RT descending. All header columns except Name sortable. |
+| **Recruits** | Phase-based recruit list. Before week `36`, show recruits currently leaning toward the user's team. Starting week `36`, show the user team's signed recruits and walk-ons. Default sort RT descending. All columns are sortable. |
 | **Tournament** | EOS bracket (weeks 27–34); shared with TCC layout. |
 | **Resources** | Standings, Stats, Schedule, Team Traits, Rankings, Recruits (standalone pages). Blue buttons; **Back To Locker Room** (orange) on each page. |
 
@@ -44,9 +45,12 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 
 ## Recruits tab
 
-- **Scope:** Only recruits whose `Lean.1`, `Lean.2`, or `Lean.3` currently matches the user's `team_id`.
-- **Columns:** `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `SC`, `SH`, `ID`, `OD`, `PS`, `BH`, `RB`, `AG`, `ST`, `ND`, `IQ`, `FT`, `RT`, `Current Lean`.
-- **Sort behavior:** Default sort is `RT` descending. All header columns except `Name` are sortable. Repeated clicks toggle `desc -> asc -> desc`.
+- **Weeks 1-35 (pre-results):** Only recruits whose `Lean.1`, `Lean.2`, or `Lean.3` currently matches the user's `team_id`.
+- **Week 36 onward:** Show signed recruits and walk-ons for the user's team from `week_35_recruiting_results`.
+- **Columns before week 36:** `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `SC`, `SH`, `ID`, `OD`, `PS`, `BH`, `RB`, `AG`, `ST`, `ND`, `IQ`, `FT`, `RT`, `Current Lean`.
+- **Columns starting week 36:** Same as the standalone recruiting results page, but omit `Signed`.
+- **Walk-ons:** Display `(walk on)` next to the player name.
+- **Sort behavior:** Default sort is `RT` descending. All header columns are sortable. Repeated clicks toggle `desc -> asc -> desc`.
 - **Current Lean rendering:** Uses the same lean-display rules as the recruiting standalone pages, with team IDs translated to team names via `team_name_map`.
 
 ---

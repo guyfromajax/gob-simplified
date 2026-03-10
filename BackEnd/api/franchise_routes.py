@@ -2184,13 +2184,21 @@ def command_center_data(
                     str(team["_id"]): team.get("name", str(team["_id"]))
                     for team in db.teams.find({}, {"name": 1})
                 }
+                week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+                response["week_35_user_recruits"] = [
+                    player
+                    for player in (week_35_results.get("signed_players") or [])
+                    if str(player.get("team_id") or "") == str(team_id)
+                ]
             except Exception as e:
                 logger.debug("fcc lean recruits: %s", e)
                 response["lean_recruits"] = []
                 response["team_name_map"] = {}
+                response["week_35_user_recruits"] = []
         else:
             response["lean_recruits"] = []
             response["team_name_map"] = {}
+            response["week_35_user_recruits"] = []
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}

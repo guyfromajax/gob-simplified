@@ -9,6 +9,42 @@
   var walkOns = [];
   var week = 1;
 
+  function compareValues(a, b, direction) {
+    if (typeof a === 'number' && typeof b === 'number') {
+      return direction === 'asc' ? a - b : b - a;
+    }
+    var aStr = (a == null ? '' : String(a)).toLowerCase();
+    var bStr = (b == null ? '' : String(b)).toLowerCase();
+    if (aStr === bStr) return 0;
+    if (direction === 'asc') return aStr < bStr ? -1 : 1;
+    return aStr > bStr ? -1 : 1;
+  }
+
+  function getWeek36SortValue(row, key) {
+    if (Recruiting.ATTR_KEYS.indexOf(key) !== -1) return row.attrs[key];
+    switch (key) {
+      case 'name': return row.name;
+      case 'homeRegion': return row.homeRegion;
+      case 'archetype': return row.archetype;
+      case 'height': return row.heightRaw;
+      case 'weight': return row.weight != null ? row.weight : -1;
+      case 'pos': return row.pos;
+      case 'rt': return row.rt != null ? row.rt : -1;
+      case 'signed': return row.signedDisplay === '--' ? '' : row.signedDisplay;
+      default: return row[key];
+    }
+  }
+
+  function sortWeek36Rows(rows) {
+    var key = sortState && sortState.key ? sortState.key : 'rt';
+    var direction = sortState && sortState.direction ? sortState.direction : 'desc';
+    return rows.slice().sort(function (a, b) {
+      var primary = compareValues(getWeek36SortValue(a, key), getWeek36SortValue(b, key), direction);
+      if (primary !== 0) return primary;
+      return compareValues(a.rt != null ? a.rt : -1, b.rt != null ? b.rt : -1, 'desc');
+    });
+  }
+
   function renderStandardRows() {
     Recruiting.renderRecruitTableRows(
       document.getElementById('recruiting-body'),
@@ -18,7 +54,7 @@
 
   function renderWeek36Rows() {
     var tbody = document.getElementById('recruiting-body');
-    var rows = Recruiting.sortRecruits(recruits, sortState).map(function (recruit) {
+    var rows = recruits.map(function (recruit) {
       var signedInfo = signedMap[recruit.recruitId];
       return {
         name: recruit.name,
@@ -29,9 +65,11 @@
         pos: recruit.pos,
         attrs: recruit.attrs,
         rt: recruit.rt,
+        heightRaw: recruit.heightRaw,
         signedDisplay: signedInfo ? signedInfo.team_name + (signedInfo.walk_on ? ' (walk on)' : '') : '--'
       };
     }).concat(walkOns);
+    rows = sortWeek36Rows(rows);
 
     tbody.innerHTML = '';
     rows.forEach(function (row) {
@@ -109,11 +147,13 @@
       title.textContent = 'Recruiting Results';
       help.textContent = 'All recruits are shown below. Signed recruits display their chosen team.';
       lastCol.textContent = 'Signed';
+      lastCol.dataset.sortKey = 'signed';
       return;
     }
     title.textContent = 'Recruiting';
     help.textContent = 'Recruits are sorted by top RT by default. Click any sortable header to reorder the table.';
     lastCol.textContent = 'Current Lean';
+    lastCol.dataset.sortKey = 'lean';
   }
 
   function normalizeWalkOns(results) {
@@ -125,6 +165,7 @@
         homeRegion: '--',
         archetype: 'Walk On',
         height: window.formatHeight ? formatHeight(player.height) : '--',
+        heightRaw: Number(player.height) || 0,
         weight: player.weight,
         pos: player.pos || '--',
         attrs: (function () {
