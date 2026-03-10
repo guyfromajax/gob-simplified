@@ -297,10 +297,16 @@ function renderFccRecruits() {
   const table = document.getElementById('fcc-recruits-table');
   const heading = document.querySelector('#recruits-tab h3');
   const lastCol = document.getElementById('fcc-recruits-last-col');
+  const fullListCopy = document.getElementById('fcc-recruits-link-copy');
+  const fullListLink = document.getElementById('fcc-recruits-full-link');
   if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
 
   const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
   if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
+  if (fullListCopy) fullListCopy.style.display = useSignedRecruits ? 'none' : 'block';
+  if (fullListLink) {
+    fullListLink.href = `/recruiting.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+  }
   if (lastCol) {
     lastCol.textContent = 'Current Lean';
     lastCol.dataset.sortKey = 'lean';
