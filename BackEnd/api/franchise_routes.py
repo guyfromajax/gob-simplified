@@ -982,6 +982,125 @@ def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, 
     return (losing_score, winning_score)
 
 
+def _build_user_eos_sim_scope(
+    franchise_doc: dict[str, Any],
+    user_team_id_str: Optional[str],
+) -> dict[str, Any]:
+    """Snapshot the user's EOS sim scope at the start of a week."""
+    scope = {
+        "active": False,
+        "conference": None,
+        "region": None,
+        "region_conferences": tuple(),
+    }
+    if not user_team_id_str:
+        return scope
+
+    eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
+    scope["active"] = user_team_id_str not in eliminated_team_ids
+
+    team_doc = None
+    if ObjectId.is_valid(user_team_id_str):
+        team_doc = db.teams.find_one(
+            {"_id": ObjectId(user_team_id_str)},
+            {"conference": 1, "region": 1},
+        )
+    conference = team_doc.get("conference") if team_doc else None
+    region = team_doc.get("region") if team_doc else None
+    if region is None and conference is not None:
+        region = ft._conference_to_region(conference)
+
+    scope["conference"] = conference
+    scope["region"] = region
+    scope["region_conferences"] = (
+        ft._region_to_conferences(region) if region else tuple()
+    )
+    return scope
+
+
+def _should_use_tbt_for_eos_game(
+    week: int,
+    game_meta: dict[str, Any],
+    user_scope: dict[str, Any],
+) -> bool:
+    """Return True when an EOS matchup should use turn-by-turn sim."""
+    if not user_scope.get("active"):
+        return False
+
+    if week in ft.EOS_CONFERENCE_WEEKS:
+        conference = game_meta.get("conference")
+        if week in (27, 28):
+            return conference == user_scope.get("conference")
+        if week == 29:
+            return conference in set(user_scope.get("region_conferences") or ())
+        return False
+
+    if week in ft.EOS_REGION_WEEKS:
+        return (
+            game_meta.get("phase") == "region"
+            and game_meta.get("region") == user_scope.get("region")
+        )
+
+    if week in ft.EOS_NATIONAL_WEEKS:
+        return True
+
+    return False
+
+
+def _get_user_eos_phase_status(
+    franchise_doc: dict[str, Any],
+    user_team_id_str: Optional[str],
+    week: int,
+) -> dict[str, Any]:
+    """Derive user EOS status from the current phase bracket instead of a sticky flag."""
+    status = {
+        "phase": None,
+        "active_this_week": False,
+        "has_game_this_week": False,
+        "has_bye_this_week": False,
+        "eliminated_from_current_phase": False,
+    }
+    if not franchise_doc or not user_team_id_str or week not in ft.EOS_WEEKS:
+        return status
+
+    scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+    found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
+    if found:
+        status["has_game_this_week"] = True
+        status["active_this_week"] = True
+
+    if week in ft.EOS_CONFERENCE_WEEKS:
+        status["phase"] = "conference"
+        status["eliminated_from_current_phase"] = not status["has_game_this_week"]
+        return status
+
+    if week in ft.EOS_REGION_WEEKS:
+        status["phase"] = "region"
+        user_region = scope.get("region")
+        rt = (franchise_doc.get("region_tournaments") or {}).get(user_region or "", {})
+        final_list = rt.get("final", []) or []
+        final_matchup = final_list[0] if final_list else {}
+        final_has_user = (
+            str(final_matchup.get("away_team")) == user_team_id_str
+            or str(final_matchup.get("home_team")) == user_team_id_str
+        )
+        final_unplayed = not final_matchup.get("winner")
+        if week == ft.EOS_REGION_WEEKS[0] and not status["has_game_this_week"] and final_has_user and final_unplayed:
+            status["has_bye_this_week"] = True
+            status["active_this_week"] = True
+        elif not status["has_game_this_week"]:
+            status["eliminated_from_current_phase"] = True
+        return status
+
+    if week in ft.EOS_NATIONAL_WEEKS:
+        status["phase"] = "national"
+        status["eliminated_from_current_phase"] = not status["has_game_this_week"]
+        return status
+
+    return status
+
+
 @router.options("/franchise/select-team")
 async def select_team_options():
     """
@@ -1352,6 +1471,8 @@ def complete_week(req: CompleteWeekRequest):
     )
     eos_current_round = None
     week_games_meta = None
+    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
     if req.week in ft.EOS_WEEKS and eos_active:
         week_games_meta = ft.get_eos_week_games(franchise_doc, req.week)
         week_games = [(g["away_id"], g["home_id"]) for g in week_games_meta]
@@ -1380,7 +1501,6 @@ def complete_week(req: CompleteWeekRequest):
 
     # ✅ EOS (weeks 27–34): save user's game result to the correct bracket (conference/region/national)
     if week_games_meta and user_game_id:
-        _u, user_team_id_str = get_user_team_from_franchise(franchise_doc)
         found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
         if found:
             _, g = found
@@ -1624,15 +1744,14 @@ def complete_week(req: CompleteWeekRequest):
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
     team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
-    _u_name, user_team_oid_str = get_user_team_from_franchise(franchise_doc)
-    if user_team_oid_str and ObjectId.is_valid(user_team_oid_str):
-        team_ids_for_conf.append(ObjectId(user_team_oid_str))
+    if user_team_id_str and ObjectId.is_valid(user_team_id_str):
+        team_ids_for_conf.append(ObjectId(user_team_id_str))
     team_conference_docs = list(db.teams.find(
         {"_id": {"$in": team_ids_for_conf}},
         {"_id": 1, "conference": 1},
     ))
     team_id_to_conference = {str(d["_id"]): d.get("conference") for d in team_conference_docs}
-    user_conference = team_id_to_conference.get(str(user_team_oid_str)) if user_team_oid_str else None
+    user_conference = team_id_to_conference.get(str(user_team_id_str)) if user_team_id_str else None
 
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
@@ -1654,18 +1773,9 @@ def complete_week(req: CompleteWeekRequest):
             })
             continue
 
-        # EOS conference tournament: non-user conference games use distant sim (per Franchise_Tournament_System.md)
-        if (
-            req.week in ft.EOS_CONFERENCE_WEEKS
-            and week_games_meta
-            and idx < len(week_games_meta)
-        ):
+        if week_games_meta and idx < len(week_games_meta):
             g = week_games_meta[idx]
-            if (
-                g.get("phase") == "conference"
-                and user_conference is not None
-                and g.get("conference") != user_conference
-            ):
+            if not _should_use_tbt_for_eos_game(req.week, g, user_eos_sim_scope):
                 home_ftd = ftd_by_team_id.get(str(home_id), {})
                 away_ftd = ftd_by_team_id.get(str(away_id), {})
                 home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
@@ -1679,10 +1789,21 @@ def complete_week(req: CompleteWeekRequest):
                 })
                 _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=None)
                 winner_id = home_id if home_score > away_score else away_id
-                ft.save_conference_game_result(
-                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                    "", str(winner_id), {"home": home_score, "away": away_score},
-                )
+                if g["phase"] == "conference":
+                    ft.save_conference_game_result(
+                        franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                        "", str(winner_id), {"home": home_score, "away": away_score},
+                    )
+                elif g["phase"] == "region":
+                    ft.save_region_game_result(
+                        franchise_doc, g["region"], g["round"], g["matchup_index"],
+                        "", str(winner_id), {"home": home_score, "away": away_score},
+                    )
+                elif g["phase"] == "national":
+                    ft.save_national_game_result(
+                        franchise_doc, g["round"], g["matchup_index"],
+                        "", str(winner_id), {"home": home_score, "away": away_score},
+                    )
                 continue
 
         # Distant sim: regular season only; neither team in user's conference → lightweight sim (no game doc, no EOG)
@@ -1854,16 +1975,6 @@ def complete_week(req: CompleteWeekRequest):
             else:
                 next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(req.week) + 1]
             update_fields["week"] = next_week
-        _u, user_team_oid = get_user_team_from_franchise(franchise_doc)
-        if user_team_oid and week_games_meta:
-            found = ft.find_user_game_in_eos_week(week_games_meta, str(user_team_oid))
-            if found and user_game_id:
-                winner_id = team1_id if user.team1_score > user.team2_score else team2_id
-                user_lost = str(winner_id) != str(user_team_oid)
-                if user_lost:
-                    update_fields["training_status.training_disabled_for_eos"] = True
-                    logger.info("✅ [EOS] User eliminated; training disabled for remaining EOS weeks")
-
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": update_fields},
@@ -2148,17 +2259,18 @@ def command_center_data(
                     "winner_team_id": winner_id,
                     "winner_team_name": id_to_name.get(str(winner_id), winner_id),
                 }
-        training_disabled_for_eos = bool(franchise_doc.get("training_status", {}).get("training_disabled_for_eos", False)) if franchise_id and franchise_doc else False
+        eos_status = (
+            _get_user_eos_phase_status(franchise_doc, str(team_id), week)
+            if franchise_id and franchise_doc and team_id and eos_tournament_active and week in ft.EOS_WEEKS
+            else {}
+        )
+        training_disabled_for_eos = bool(
+            eos_status.get("eliminated_from_current_phase", False)
+        ) if eos_status else False
         response["training_disabled_for_eos"] = training_disabled_for_eos
         user_eliminated = training_disabled_for_eos
         tournament_complete = bool(national_tournament.get("champion")) if national_tournament else False
-        # User has bye: in EOS, no game this week, but not eliminated → show "Sim Next Round" so they sim the round then train for next week
-        user_has_bye = False
-        if eos_tournament_active and week in ft.EOS_WEEKS and franchise_doc and team_id:
-            week_games_meta = ft.get_eos_week_games(franchise_doc, week)
-            found = ft.find_user_game_in_eos_week(week_games_meta, str(team_id))
-            eliminated_ids = ft.get_eliminated_team_ids(franchise_doc)
-            user_has_bye = not found and str(team_id) not in eliminated_ids
+        user_has_bye = bool(eos_status.get("has_bye_this_week", False)) if eos_status else False
         offer_sim_rest = (user_eliminated or user_has_bye) and eos_tournament_active and not tournament_complete
         response["user_eliminated"] = user_eliminated
         response["offer_sim_rest"] = offer_sim_rest
@@ -4853,12 +4965,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     week = franchise_doc.get("week", 1)
     results = franchise_doc.get("results", {})
     
-    if training_status.get("training_disabled_for_eos", False) and week > ScheduleManager.REGULAR_SEASON_WEEKS:
-        raise HTTPException(
-            status_code=400,
-            detail="Training is disabled for remaining EOS weeks after elimination.",
-        )
-    
     # Check if it's first training (training camp) - week 1 and no results yet
     is_first_training = (week == 1 and not results.get("1"))
     expected_points = 30 if is_first_training else 24
@@ -4902,6 +5008,19 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_id or not user_team_object_id:
         raise HTTPException(status_code=404, detail="User team not found in franchise document")
+
+    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
+        eos_status = _get_user_eos_phase_status(franchise_doc, str(user_team_object_id), week)
+        if eos_status.get("eliminated_from_current_phase"):
+            raise HTTPException(
+                status_code=400,
+                detail="Training is disabled for the current EOS phase after elimination.",
+            )
+        if eos_status.get("has_bye_this_week"):
+            raise HTTPException(
+                status_code=400,
+                detail="Training is not available during an EOS bye week.",
+            )
     
     # Use franchise document's user_team_object_id as authoritative team_id
     team_id = user_team_object_id
@@ -5690,6 +5809,14 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     if not week_games_meta:
         raise HTTPException(status_code=400, detail="No games in current EOS round (e.g. week 30 with all double-winners)")
 
+    _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "prestige": 1, "total_player_attrs": 1},
+    ))
+    ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+
     results = []
     for g in week_games_meta:
         away_id = g["away_id"]
@@ -5698,6 +5825,38 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
         away_name = away_doc.get("name", "")
+        if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
+            home_ftd = ftd_by_team_id.get(str(home_id), {})
+            away_ftd = ftd_by_team_id.get(str(away_id), {})
+            home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
+            away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            winner_id = home_id if home_score > away_score else away_id
+            score = {"home": home_score, "away": away_score}
+            if g["phase"] == "conference":
+                ft.save_conference_game_result(
+                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                    "", str(winner_id), score,
+                )
+            elif g["phase"] == "region":
+                ft.save_region_game_result(
+                    franchise_doc, g["region"], g["round"], g["matchup_index"],
+                    "", str(winner_id), score,
+                )
+            elif g["phase"] == "national":
+                ft.save_national_game_result(
+                    franchise_doc, g["round"], g["matchup_index"],
+                    "", str(winner_id), score,
+                )
+            results.append({
+                "away_id": str(away_id),
+                "home_id": str(home_id),
+                "away_score": away_score,
+                "home_score": home_score,
+            })
+            logger.info("✅ [EOS] Distant-simmed %s: %s vs %s", g["phase"], away_id, home_id)
+            continue
+
         if not home_name or not away_name:
             logger.error("❌ [EOS] Missing team names for sim round")
             continue

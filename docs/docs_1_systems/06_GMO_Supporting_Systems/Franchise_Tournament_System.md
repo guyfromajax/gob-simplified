@@ -47,11 +47,28 @@ Region tournament round 1 matchups will be
 
 
 **Simming Computer Games**
--Conference Tournaments:
-    - User Conference Games, sim all non-user games with the turn-by-turn engine
-    - Non-user Conference Games, sim all with the Distant Game Sim engine
--Region and National Tournaments
-    -sim all non-user games with the turn-by-turn engine
+- If the user team was eliminated in the prior EOS week, all games in the current EOS week use the Distant Game Sim engine.
+- If the user team is still active:
+    - Weeks 27-28:
+        - games in the user's conference use the turn-by-turn engine
+        - all other conference games use the Distant Game Sim engine
+    - Week 29:
+        - games in the user's region pair of conferences use the turn-by-turn engine
+        - all other conference finals use the Distant Game Sim engine
+    - Weeks 30-31:
+        - games in the user's region bracket use the turn-by-turn engine
+        - all other region games use the Distant Game Sim engine
+    - Weeks 32-34:
+        - all national tournament games use the turn-by-turn engine
+- This sim-routing policy applies in both `complete_week` and `/franchise/sim-rest-of-tournament`.
 
 **Tournament Training**
 - Once teams are eliminated, they no longer run training for the remaining weeks. When the user runs training during EOS, computer teams that have lost in any conference/region/national bracket are skipped; only teams still active in tournament play receive template-based (distant) training. Implemented via `get_eliminated_team_ids()` in `franchise_tournament.py` and a skip in the computer-training loop in `run_franchise_training`.
+- User EOS eligibility is derived from the current phase bracket, not from a sticky elimination flag. This matters because a user team can lose in the conference tournament and still re-enter as a region qualifier via the regular-season `#1` slot.
+- User training / FCC button state therefore uses current-week bracket status:
+    - `has_game_this_week`
+    - `has_bye_this_week`
+    - `eliminated_from_current_phase`
+- Example:
+    - user loses in conference week 28 -> week 29 shows `Sim Next Round`
+    - if that same team qualifies into the region tournament, week 30 derives them as active again from the region bracket and they can resume the normal EOS flow
