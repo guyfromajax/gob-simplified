@@ -34,6 +34,7 @@ from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
 from BackEnd.models.player import Player
+from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
     calculate_fb_opp_modifier_change,
