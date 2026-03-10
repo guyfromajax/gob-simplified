@@ -12,7 +12,9 @@
   var allowLeave = false;
   var activeWeek = 1;
   var availableRosterSpots = 0;
+  var availableScholarships = 0;
   var mode = 'visits';
+  var WEEK_35_POINTS_BUDGET = 20;
 
   function isWeek35Mode() {
     return mode === 'week35';
@@ -21,6 +23,7 @@
   function cloneEntry(entry) {
     return {
       id: entry.id,
+      points: Number(entry.points || 0),
       scholarship: !!entry.scholarship,
       playing_time: !!entry.playing_time
     };
@@ -36,6 +39,7 @@
       var left = a[i] || {};
       var right = b[i] || {};
       if (left.id !== right.id) return false;
+      if (Number(left.points || 0) !== Number(right.points || 0)) return false;
       if (!!left.scholarship !== !!right.scholarship) return false;
       if (!!left.playing_time !== !!right.playing_time) return false;
     }
@@ -97,17 +101,30 @@
   }
 
   function setOrdersScreenCopy() {
+    var title = document.getElementById('orders-title');
     var help = document.getElementById('orders-help');
     var status = document.getElementById('orders-status');
     var table = document.getElementById('orders-grid-table');
     if (table) table.classList.toggle('orders-grid-table-week36', isWeek35Mode());
     if (isWeek35Mode()) {
-      help.textContent = 'Drag to reorder the board, use the + column or row click to add and remove recruits, and save scholarship / playing time promises for commitment logic.';
-      status.textContent = 'Available Roster Spots ' + availableRosterSpots;
+      if (title) title.textContent = 'Recruiting Focus List';
+      help.textContent = 'Drag to reorder the board, use the + column or row click to add and remove recruits, assign recruiting points, and save scholarship / playing time promises for commitment logic.';
+      status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Available Scholarships: ' + availableScholarships + ', Points Remaining: ' + getWeek35PointsRemaining();
     } else {
+      if (title) title.textContent = 'Recruiting Orders';
       help.textContent = 'Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.';
       status.textContent = '';
     }
+  }
+
+  function getWeek35AssignedPoints() {
+    return currentEntries.reduce(function (total, entry) {
+      return total + Number((entry || {}).points || 0);
+    }, 0);
+  }
+
+  function getWeek35PointsRemaining() {
+    return Math.max(0, WEEK_35_POINTS_BUDGET - getWeek35AssignedPoints());
   }
 
   function renderRecruitList() {
@@ -144,6 +161,7 @@
         '<th>POS</th>',
         '<th>RT</th>',
         '<th>Current Lean</th>',
+        '<th>Points</th>',
         '<th>Scholarship</th>',
         '<th>Playing Time</th>',
         '<th>Adjust</th>',
@@ -183,6 +201,7 @@
   function buildWeek35Row(index, recruit) {
     var entry = currentEntries[index] || {};
     var scholarshipChecked = recruit && !!entry.scholarship;
+    var pointsValue = recruit ? Number(entry.points || 0) : 0;
     return [
       '<td class="priority-cell">' + (index + 1) + '</td>',
       '<td>' + (recruit ? recruit.name : '<span class="recruiting-top-grid-empty">--</span>') + '</td>',
@@ -193,6 +212,7 @@
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
       '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? (recruit.leanDisplay || '--') : '--') + '</td>',
+      '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="scholarship" data-index="' + index + '"' + (scholarshipChecked ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + ((recruit && scholarshipChecked) ? '' : ' disabled') + '></td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
@@ -216,7 +236,7 @@
 
   function renderTopGrid() {
     var tbody = document.getElementById('orders-grid-body');
-    var rowCount = isWeek35Mode() ? Math.max(currentEntries.length, 1) : MAX_RECRUITING_ORDER_SLOTS;
+    var rowCount = MAX_RECRUITING_ORDER_SLOTS;
     tbody.innerHTML = '';
 
     for (var i = 0; i < rowCount; i += 1) {
@@ -235,6 +255,7 @@
   }
 
   function rerender() {
+    setOrdersScreenCopy();
     renderTopGrid();
     renderRecruitList();
   }
@@ -242,6 +263,7 @@
   function defaultEntryForRecruit(recruitId) {
     return {
       id: recruitId,
+      points: 0,
       scholarship: false,
       playing_time: false
     };
@@ -272,7 +294,7 @@
       removeRecruitAt(existingIndex);
       return;
     }
-    if (!isWeek35Mode() && currentEntries.length >= MAX_RECRUITING_ORDER_SLOTS) {
+    if (currentEntries.length >= MAX_RECRUITING_ORDER_SLOTS) {
       showModal({
         title: 'All 20 Rows Are Occupied',
         message: 'All 20 rows are occupied. You must remove a recruit',
@@ -298,14 +320,57 @@
   function bindTopGridInteractions() {
     var tbody = document.getElementById('orders-grid-body');
     tbody.querySelectorAll('button[data-action], input[data-action]').forEach(function (control) {
+      if (control.dataset.action === 'points') {
+        control.addEventListener('keydown', function (e) {
+          var allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+          if (allowedKeys.indexOf(e.key) !== -1) return;
+          if (!/^\d$/.test(e.key)) {
+            e.preventDefault();
+            return;
+          }
+          var index = Number(control.dataset.index);
+          if (Number.isNaN(index) || !currentEntries[index]) {
+            e.preventDefault();
+            return;
+          }
+          var currentValue = String(control.value || '');
+          var selectionStart = control.selectionStart != null ? control.selectionStart : currentValue.length;
+          var selectionEnd = control.selectionEnd != null ? control.selectionEnd : currentValue.length;
+          var nextValue = currentValue.slice(0, selectionStart) + e.key + currentValue.slice(selectionEnd);
+          var parsed = Number(nextValue || 0);
+          var totalWithoutCurrent = getWeek35AssignedPoints() - Number(currentEntries[index].points || 0);
+          if (parsed + totalWithoutCurrent > WEEK_35_POINTS_BUDGET) {
+            e.preventDefault();
+          }
+        });
+      }
       control.addEventListener('click', function (e) {
         e.stopPropagation();
+      });
+      control.addEventListener('input', function () {
+        if (control.tagName !== 'INPUT') return;
+        var action = control.dataset.action;
+        var index = Number(control.dataset.index);
+        if (Number.isNaN(index) || !currentEntries[index]) return;
+        if (action !== 'points') return;
+        var normalized = String(control.value || '').replace(/[^\d]/g, '');
+        var parsed = Number(normalized || 0);
+        var totalWithoutCurrent = getWeek35AssignedPoints() - Number(currentEntries[index].points || 0);
+        if (parsed + totalWithoutCurrent > WEEK_35_POINTS_BUDGET) {
+          parsed = Math.max(0, WEEK_35_POINTS_BUDGET - totalWithoutCurrent);
+        }
+        currentEntries[index].points = parsed;
+        control.value = String(parsed);
+        setOrdersScreenCopy();
       });
       control.addEventListener('change', function () {
         if (control.tagName !== 'INPUT') return;
         var action = control.dataset.action;
         var index = Number(control.dataset.index);
         if (Number.isNaN(index) || !currentEntries[index]) return;
+        if (action === 'points') {
+          return;
+        }
         if (action === 'scholarship') {
           currentEntries[index].scholarship = control.checked;
           if (!control.checked) {
@@ -380,6 +445,7 @@
       payload.order_entries = currentEntries.map(function (entry) {
         return {
           id: entry.id,
+          points: Number(entry.points || 0),
           scholarship: !!entry.scholarship,
           playing_time: !!entry.playing_time
         };
@@ -507,7 +573,7 @@
         return lean['1'] === userTeamId || lean['2'] === userTeamId || lean['3'] === userTeamId;
       }),
       { key: 'rt', direction: 'desc' }
-    ).map(function (recruit) {
+    ).slice(0, MAX_RECRUITING_ORDER_SLOTS).map(function (recruit) {
       return defaultEntryForRecruit(recruit.recruitId);
     });
   }
@@ -524,6 +590,7 @@
     return (savedOrderEntries || []).map(function (entry) {
       return {
         id: entry.id,
+        points: Number(entry.points || 0),
         scholarship: !!entry.scholarship,
         playing_time: !!entry.playing_time
       };
@@ -556,6 +623,7 @@
 
         mode = activeWeek === 35 ? 'week35' : 'visits';
         availableRosterSpots = Number(data.available_roster_spots || 0);
+        availableScholarships = Number(data.available_scholarships || 0);
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});
         recruitMap = {};
         recruits.forEach(function (recruit) {

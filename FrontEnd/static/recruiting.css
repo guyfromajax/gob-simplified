@@ -94,22 +94,22 @@ body {
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(1),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(1) {
-  width: 6%;
+  width: 5%;
 }
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(2),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(2) {
-  width: 15%;
+  width: 12%;
 }
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(3),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(3) {
-  width: 9%;
+  width: 8%;
 }
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(4),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(4) {
-  width: 12%;
+  width: 10%;
 }
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(5),
@@ -118,7 +118,7 @@ body {
 .orders-grid-table.orders-grid-table-week36 td:nth-child(6),
 .orders-grid-table.orders-grid-table-week36 th:nth-child(7),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(7) {
-  width: 6%;
+  width: 5%;
 }
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(8),
@@ -128,7 +128,7 @@ body {
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(9),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(9) {
-  width: 15%;
+  width: 12%;
 }
 
 .orders-grid-table.orders-grid-table-week36 th:nth-child(10),
@@ -140,6 +140,11 @@ body {
 .orders-grid-table.orders-grid-table-week36 th:nth-child(13),
 .orders-grid-table.orders-grid-table-week36 td:nth-child(13) {
   width: 5%;
+}
+
+.orders-grid-table.orders-grid-table-week36 th:nth-child(14),
+.orders-grid-table.orders-grid-table-week36 td:nth-child(14) {
+  width: 4%;
 }
 
 .orders-grid-table th:nth-child(1),
@@ -295,6 +300,21 @@ body {
   width: 18px;
   height: 18px;
   cursor: pointer;
+}
+
+.recruiting-points-input {
+  width: 56px;
+  padding: 4px 6px;
+  border: 1px solid #c9d0db;
+  border-radius: 4px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+}
+
+.recruiting-points-input:disabled {
+  background: #eef2f7;
+  color: #8a94a6;
 }
 
 .orders-grid-table.orders-grid-table-week36 .recruiting-adjust {

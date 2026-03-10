@@ -30,6 +30,9 @@ When EOS national week `34` completes, franchise mode advances to week `35`.
 ### Week 35 Recruiting
 
 - week `35` is the actual commitment / signing phase
+- recruiting-orders page header copy = `Recruiting Focus List`
+- week `35` boards use a 20-point recruiting budget
+  - `Points Remaining` updates live as the user edits point inputs
 - `Save Orders` saves the user board and generates CPU week-35 boards if those CPU boards are still empty
 - CPU week-35 orders only generate once per team
 - `Run Recruiting` behaves as save-first-then-run

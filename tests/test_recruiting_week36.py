@@ -62,18 +62,18 @@ def test_calculate_available_roster_spots_uses_returning_non_graduates(monkeypat
 def test_week36_order_helpers_preserve_shape():
     payload = franchise_routes._normalize_week_35_recruiting_orders(
         [
-            {"id": "r2", "scholarship": True, "playing_time": False},
-            {"id": "r1", "scholarship": False, "playing_time": True},
+            {"id": "r2", "points": 3, "scholarship": True, "playing_time": False},
+            {"id": "r1", "points": 0, "scholarship": False, "playing_time": True},
         ]
     )
 
     assert payload == {
-        "1": {"id": "r2", "scholarship": True, "playing_time": False},
-        "2": {"id": "r1", "scholarship": False, "playing_time": True},
+        "1": {"id": "r2", "points": 3, "scholarship": True, "playing_time": False},
+        "2": {"id": "r1", "points": 0, "scholarship": False, "playing_time": True},
     }
     assert franchise_routes._week_35_order_entries(payload) == [
-        {"id": "r2", "scholarship": True, "playing_time": False},
-        {"id": "r1", "scholarship": False, "playing_time": True},
+        {"id": "r2", "points": 3, "scholarship": True, "playing_time": False},
+        {"id": "r1", "points": 0, "scholarship": False, "playing_time": True},
     ]
 
 def test_save_recruiting_orders_week35_updates_separate_ftd_field(monkeypatch):
@@ -101,8 +101,8 @@ def test_save_recruiting_orders_week35_updates_separate_ftd_field(monkeypatch):
         franchise_routes.SaveRecruitingOrdersRequest(
             franchise_id=franchise_id,
             order_entries=[
-                {"id": "r2", "scholarship": True, "playing_time": True},
-                {"id": "r1", "scholarship": False, "playing_time": False},
+                {"id": "r2", "points": 12, "scholarship": True, "playing_time": True},
+                {"id": "r1", "points": 8, "scholarship": False, "playing_time": False},
             ],
         ),
         user={"user_id": "test-user-123"},
@@ -112,8 +112,8 @@ def test_save_recruiting_orders_week35_updates_separate_ftd_field(monkeypatch):
     assert fake_ftd.update_calls
     update_doc = fake_ftd.update_calls[0][0][1]["$set"]
     assert update_doc["recruiting_orders_week_35"] == {
-        "1": {"id": "r2", "scholarship": True, "playing_time": True},
-        "2": {"id": "r1", "scholarship": False, "playing_time": False},
+        "1": {"id": "r2", "points": 12, "scholarship": True, "playing_time": True},
+        "2": {"id": "r1", "points": 8, "scholarship": False, "playing_time": False},
     }
 
 def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch):
@@ -137,7 +137,7 @@ def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch)
             find_one_result={
                 "Recruits": {"1": "legacy"},
                 "recruiting_orders_week_35": {
-                    "1": {"id": "r1", "scholarship": True, "playing_time": False}
+                    "1": {"id": "r1", "points": 4, "scholarship": True, "playing_time": False}
                 },
             }
         ),
@@ -169,14 +169,63 @@ def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch)
         ),
     )
     monkeypatch.setattr(franchise_routes, "_calculate_available_roster_spots", lambda _fid, _team_id: 13)
+    monkeypatch.setattr(franchise_routes, "_calculate_available_scholarships", lambda _fid, _team_id: 4)
 
     payload = franchise_routes.get_recruiting_data(franchise_id, user={"user_id": "test-user-123"})
 
     assert payload["week"] == 35
     assert payload["available_roster_spots"] == 13
+    assert payload["available_scholarships"] == 4
     assert payload["saved_orders_week_35"] == {
-        "1": {"id": "r1", "scholarship": True, "playing_time": False}
+        "1": {"id": "r1", "points": 4, "scholarship": True, "playing_time": False}
     }
     assert payload["saved_order_entries_week_35"] == [
-        {"id": "r1", "scholarship": True, "playing_time": False}
+        {"id": "r1", "points": 4, "scholarship": True, "playing_time": False}
     ]
+
+
+def test_week35_team_score_applies_subtotal_then_lean_multiplier():
+    score = franchise_routes._week_35_team_score(
+        "team-1",
+        {"points": 10, "scholarship": True, "playing_time": True},
+        {"1": "team-1", "2": "team-2", "3": None},
+        scholarship_offer_count=3,
+        pt_offer_count=2,
+    )
+
+    assert score == 95
+
+
+def test_save_recruiting_orders_week35_rejects_points_over_budget(monkeypatch):
+    franchise_id = str(ObjectId())
+    team_id = str(ObjectId())
+
+    monkeypatch.setattr(
+        franchise_routes,
+        "verify_franchise_owned_by_user",
+        lambda _franchise_id, _user_id: {
+            "_id": ObjectId(franchise_id),
+            "week": 35,
+            "user_team_id": "Morristown",
+            "user_team_object_id": team_id,
+            "recruiting_results": {},
+        },
+    )
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", _FakeCollection(find_result=[{"team_id": ObjectId(team_id)}]))
+    monkeypatch.setattr(franchise_routes, "franchise_recruits_data_collection", _FakeCollection(distinct_result=["r1", "r2"]))
+
+    try:
+        franchise_routes.save_recruiting_orders(
+            franchise_routes.SaveRecruitingOrdersRequest(
+                franchise_id=franchise_id,
+                order_entries=[
+                    {"id": "r1", "points": 12, "scholarship": True, "playing_time": False},
+                    {"id": "r2", "points": 9, "scholarship": False, "playing_time": False},
+                ],
+            ),
+            user={"user_id": "test-user-123"},
+        )
+        assert False, "Expected HTTPException for over-budget recruiting points"
+    except franchise_routes.HTTPException as exc:
+        assert exc.status_code == 400
+        assert "20 total recruiting points" in exc.detail

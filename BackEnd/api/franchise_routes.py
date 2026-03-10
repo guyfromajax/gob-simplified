@@ -52,6 +52,7 @@ STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 AWARDS_FIELD = "awards"
+WEEK_35_RECRUITING_POINTS_BUDGET = 20
 
 
 def _game_doc_richness_score(game_doc: dict) -> int:
@@ -3442,8 +3443,13 @@ def _normalize_week_35_recruiting_orders(order_entries: list[dict[str, Any]]) ->
         recruit_id = str((entry or {}).get("id") or "").strip()
         if not recruit_id:
             continue
+        try:
+            points = int((entry or {}).get("points", 0) or 0)
+        except Exception:
+            points = 0
         normalized[str(index)] = {
             "id": recruit_id,
+            "points": max(0, points),
             "scholarship": bool((entry or {}).get("scholarship", False)),
             "playing_time": bool((entry or {}).get("playing_time", False)),
         }
@@ -3464,6 +3470,7 @@ def _week_35_order_entries(saved_orders: Any) -> list[dict[str, Any]]:
         entries.append(
             {
                 "id": recruit_id,
+                "points": _safe_int(entry.get("points", 0) or 0, 0),
                 "scholarship": bool(entry.get("scholarship", False)),
                 "playing_time": bool(entry.get("playing_time", False)),
             }
@@ -3483,6 +3490,13 @@ def _zero_stats_block() -> dict[str, Any]:
     zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
     zero_stats["Outlet_Score_List"] = []
     return zero_stats
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
 
 
 def _best_position(position_ratings: dict[str, Any]) -> dict[str, Any]:
@@ -3566,6 +3580,36 @@ def _calculate_available_roster_spots(fid: ObjectId, user_team_id: str) -> int:
         if not _is_graduating_year(_player_year_from_fpd_or_core(player_id, fpd_docs.get(player_id))):
             non_graduating_count += 1
     return max(0, 15 - int(non_graduating_count))
+
+
+def _calculate_available_scholarships(fid: ObjectId, user_team_id: str) -> int:
+    try:
+        team_object_id = ObjectId(user_team_id)
+    except Exception:
+        return 0
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"scholarship_players": 1},
+    ) or {}
+    scholarship_player_ids = [str(player_id) for player_id in (ftd_doc.get("scholarship_players") or []) if player_id]
+    if not scholarship_player_ids:
+        return 12
+
+    fpd_docs = _load_fpd_map(fid, scholarship_player_ids)
+    if not fpd_docs:
+        non_graduating_count = db.players.count_documents(
+            {
+                "_id": {"$in": scholarship_player_ids},
+                "year": {"$nin": ["Senior", "senior", "Graduate", "graduate"]},
+            }
+        )
+        return max(0, 12 - int(non_graduating_count))
+    non_graduating_count = 0
+    for player_id in scholarship_player_ids:
+        if not _is_graduating_year(_player_year_from_fpd_or_core(player_id, fpd_docs.get(player_id))):
+            non_graduating_count += 1
+    return max(0, 12 - int(non_graduating_count))
 
 
 def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
@@ -3684,25 +3728,119 @@ def _build_cpu_week_35_orders(
             in_region_rest.append(recruit)
 
     lean_matches.sort(key=lambda recruit: (_best_position(recruit.get("position_ratings") or {}).get("rating") or -1), reverse=True)
-    in_region_rest.sort(key=lambda recruit: (_best_position(recruit.get("position_ratings") or {}).get("rating") or -1), reverse=True)
-    ordered = lean_matches + in_region_rest
+    selected_ids = {recruit.get("recruit_id") for recruit in lean_matches if recruit.get("recruit_id")}
+    remaining_slots = max(0, MAX_RECRUITING_ORDER_SLOTS - len(lean_matches))
+    high_pool = []
+    low_pool = []
+    for recruit in in_region_rest:
+        recruit_id = recruit.get("recruit_id")
+        if not recruit_id or recruit_id in selected_ids:
+            continue
+        rt = _best_position(recruit.get("position_ratings") or {}).get("rating") or 0
+        if rt >= 25:
+            high_pool.append(recruit)
+        else:
+            low_pool.append(recruit)
 
-    removable_indexes = [
-        index for index, recruit in enumerate(ordered)
-        if not any((recruit.get("Lean") or {}).get(slot) == team_id for slot in ("1", "2", "3"))
-    ]
-    removals = min(7, len(removable_indexes))
-    for remove_index in sorted(random.sample(removable_indexes, removals), reverse=True):
-        ordered.pop(remove_index)
+    high_slots = remaining_slots // 2
+    low_slots = remaining_slots - high_slots
+    selected_high = random.sample(high_pool, min(high_slots, len(high_pool))) if high_pool else []
+    selected_low = random.sample(low_pool, min(low_slots, len(low_pool))) if low_pool else []
+
+    remaining_after_split = remaining_slots - len(selected_high) - len(selected_low)
+    if remaining_after_split > 0:
+        extra_high_pool = [recruit for recruit in high_pool if recruit not in selected_high]
+        extra_low_pool = [recruit for recruit in low_pool if recruit not in selected_low]
+        rollover_pool = extra_high_pool + extra_low_pool
+        if rollover_pool:
+            extras = random.sample(rollover_pool, min(remaining_after_split, len(rollover_pool)))
+            for recruit in extras:
+                rt = _best_position(recruit.get("position_ratings") or {}).get("rating") or 0
+                if rt >= 25:
+                    selected_high.append(recruit)
+                else:
+                    selected_low.append(recruit)
+
+    ordered = lean_matches + selected_high + selected_low
 
     entries = []
-    for recruit in ordered:
-        rt = _best_position(recruit.get("position_ratings") or {}).get("rating") or 0
+    for recruit in ordered[:MAX_RECRUITING_ORDER_SLOTS]:
         entries.append({
             "id": recruit.get("recruit_id"),
-            "scholarship": rt > 24,
+            "points": 0,
+            "scholarship": any((recruit.get("Lean") or {}).get(slot) == team_id for slot in ("1", "2", "3")) or ((_best_position(recruit.get("position_ratings") or {}).get("rating") or 0) >= 25 and recruit in selected_high),
             "playing_time": False,
         })
+
+    def add_points_to_entry(recruit_id: str | None, points: int) -> int:
+        if not recruit_id or points <= 0:
+            return 0
+        for entry in entries:
+            if entry.get("id") == recruit_id:
+                entry["points"] = int(entry.get("points", 0) or 0) + points
+                return points
+        return 0
+
+    points_remaining = WEEK_35_RECRUITING_POINTS_BUDGET
+    if selected_low:
+        assigned = add_points_to_entry(selected_low[0].get("recruit_id"), 1)
+        points_remaining -= assigned
+    if selected_high and points_remaining > 0:
+        assigned = add_points_to_entry(
+            random.choice(selected_high).get("recruit_id"),
+            min(points_remaining, random.randint(1, 3)),
+        )
+        points_remaining -= assigned
+
+    lean_entries = [entry for entry in entries if any(((next((recruit for recruit in lean_matches if recruit.get("recruit_id") == entry.get("id")), {}) or {}).get("Lean") or {}).get(slot) == team_id for slot in ("1", "2", "3"))]
+    if not lean_entries and points_remaining > 0:
+        regional_fallback = sorted(
+            [recruit for recruit in in_region_rest if recruit.get("recruit_id") in {entry.get("id") for entry in entries}],
+            key=lambda recruit: (_best_position(recruit.get("position_ratings") or {}).get("rating") or -1),
+            reverse=True,
+        )[:5]
+        fallback_ids = [recruit.get("recruit_id") for recruit in regional_fallback if recruit.get("recruit_id")]
+        if fallback_ids:
+            base = points_remaining // len(fallback_ids)
+            remainder = points_remaining % len(fallback_ids)
+            for index, recruit_id in enumerate(fallback_ids):
+                add_points_to_entry(recruit_id, base + (1 if index < remainder else 0))
+            points_remaining = 0
+    elif lean_entries and points_remaining > 0:
+        lean_entries.sort(
+            key=lambda entry: (
+                _best_position((next((recruit for recruit in lean_matches if recruit.get("recruit_id") == entry.get("id")), {}) or {}).get("position_ratings") or {}).get("rating") or -1
+            ),
+            reverse=True,
+        )
+        if points_remaining < len(lean_entries):
+            for entry in random.sample(lean_entries, points_remaining):
+                entry["points"] = int(entry.get("points", 0) or 0) + 1
+            points_remaining = 0
+        elif len(lean_entries) == 1:
+            lean_entries[0]["points"] += points_remaining
+            points_remaining = 0
+        elif len(lean_entries) in {2, 3}:
+            lead_points = math.floor(points_remaining * 0.8)
+            remainder = points_remaining - lead_points
+            lean_entries[0]["points"] += lead_points
+            base = remainder // (len(lean_entries) - 1)
+            extra = remainder % (len(lean_entries) - 1)
+            for index, entry in enumerate(lean_entries[1:]):
+                entry["points"] += base + (1 if index < extra else 0)
+            points_remaining = 0
+        else:
+            lead_pool = lean_entries[:3]
+            chosen = random.choice(lead_pool)
+            lead_points = math.floor(points_remaining * 0.6)
+            remainder = points_remaining - lead_points
+            chosen["points"] += lead_points
+            others = lean_entries
+            base = remainder // len(others)
+            extra = remainder % len(others)
+            for index, entry in enumerate(others):
+                entry["points"] += base + (1 if index < extra else 0)
+            points_remaining = 0
     return _normalize_week_35_recruiting_orders(entries)
 
 
@@ -3823,27 +3961,48 @@ def _choose_week_35_team_slots(chance_map: dict[str, int]) -> list[tuple[str, in
     if not chance_map:
         return []
     ordered = sorted(chance_map.items(), key=lambda item: (-item[1], item[0]))
-    selected: list[tuple[str, int]] = []
-    selected_ids: set[str] = set()
-    remaining_slots = 4
+    grouped: dict[int, list[tuple[str, int]]] = defaultdict(list)
     for team_id, value in ordered:
+        grouped[int(value)].append((team_id, value))
+    selected: list[tuple[str, int]] = []
+    for value in sorted(grouped.keys(), reverse=True):
+        group = grouped[value]
+        remaining_slots = 4 - len(selected)
         if remaining_slots <= 0:
             break
-        higher_count = sum(1 for _tid, _value in ordered if _value > value)
-        if higher_count + 1 <= 4:
-            selected.append((team_id, value))
-            selected_ids.add(team_id)
-            remaining_slots -= 1
-        else:
-            break
-    if remaining_slots <= 0:
-        return selected[:4]
-    remaining = [(team_id, value) for team_id, value in ordered if team_id not in selected_ids]
-    if remaining:
-        chosen = random.sample(remaining, min(remaining_slots, len(remaining)))
-        selected.extend(chosen)
+        if len(group) <= remaining_slots:
+            selected.extend(group)
+            continue
+        selected.extend(random.sample(group, remaining_slots))
+        break
     selected.sort(key=lambda item: (-item[1], item[0]))
     return selected[:4]
+
+
+def _week_35_team_score(
+    team_id: str,
+    entry: dict[str, Any],
+    lean: dict[str, Any],
+    scholarship_offer_count: int,
+    pt_offer_count: int,
+) -> int:
+    assigned_points = int(entry.get("points", 0) or 0)
+    subtotal = 1 + assigned_points
+    if entry.get("scholarship"):
+        subtotal += 5 if scholarship_offer_count == 1 else 1
+    if entry.get("playing_time") and entry.get("scholarship"):
+        if 1 <= pt_offer_count <= 2:
+            subtotal += 7
+        elif pt_offer_count > 2:
+            subtotal += 4
+    multiplier = 1
+    if lean.get("1") == team_id:
+        multiplier = 5
+    elif lean.get("2") == team_id:
+        multiplier = 3
+    elif lean.get("3") == team_id:
+        multiplier = 2
+    return subtotal * multiplier
 
 
 def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
@@ -3869,6 +4028,7 @@ def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
         scholarship_offers: list[str] = []
         pt_offers: list[str] = []
         lean = recruit.get("Lean") or {}
+        entries_by_team: dict[str, dict[str, Any]] = {}
         for ftd_doc in ftd_docs:
             team_id = str(ftd_doc.get("team_id"))
             team_state = capacity.get(team_id, {})
@@ -3878,34 +4038,26 @@ def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
             entry = next((value for value in orders.values() if isinstance(value, dict) and value.get("id") == recruit_id), None)
             if not entry:
                 continue
-            chances = 0
-            if lean.get("1") == team_id:
-                chances += 7
-            elif lean.get("2") == team_id:
-                chances += 3
-            elif lean.get("3") == team_id:
-                chances += 1
+            entries_by_team[team_id] = entry
             if entry.get("scholarship") and team_state.get("scholarship_count", 0) < 12:
                 scholarship_offers.append(team_id)
             if entry.get("playing_time") and entry.get("scholarship") and team_state.get("scholarship_count", 0) < 12:
                 pt_offers.append(team_id)
-            chance_map[team_id] = chances
+            chance_map[team_id] = 0
 
         if not chance_map:
             continue
 
-        if len(scholarship_offers) == 1:
-            chance_map[scholarship_offers[0]] = chance_map.get(scholarship_offers[0], 0) + 5
-        elif len(scholarship_offers) > 1:
-            for team_id in scholarship_offers:
-                chance_map[team_id] = chance_map.get(team_id, 0) + 1
-
-        if 1 <= len(pt_offers) <= 2:
-            for team_id in pt_offers:
-                chance_map[team_id] = chance_map.get(team_id, 0) + 7
-        elif len(pt_offers) > 2:
-            for team_id in pt_offers:
-                chance_map[team_id] = chance_map.get(team_id, 0) + 5
+        scholarship_offer_count = len(scholarship_offers)
+        pt_offer_count = len(pt_offers)
+        for team_id, entry in entries_by_team.items():
+            chance_map[team_id] = _week_35_team_score(
+                team_id,
+                entry,
+                lean,
+                scholarship_offer_count,
+                pt_offer_count,
+            )
 
         eligible_chances = {team_id: value for team_id, value in chance_map.items() if value > 0}
         if not eligible_chances:
@@ -4005,6 +4157,7 @@ def get_recruiting_data(
         "saved_orders_week_35": saved_week_35_orders,
         "saved_order_entries_week_35": _week_35_order_entries(saved_week_35_orders),
         "available_roster_spots": _calculate_available_roster_spots(fid, user_team_id),
+        "available_scholarships": _calculate_available_scholarships(fid, user_team_id),
         "recruits": recruits,
         "team_name_map": team_name_map,
         "week_35_recruiting_results": week_35_results,
@@ -4066,20 +4219,27 @@ def save_recruiting_orders(
         order_entries = [
             {
                 "id": str((entry or {}).get("id") or "").strip(),
+                "points": _safe_int((entry or {}).get("points", 0) or 0, 0),
                 "scholarship": bool((entry or {}).get("scholarship", False)),
                 "playing_time": bool((entry or {}).get("playing_time", False)),
             }
             for entry in (req.order_entries or [])
         ]
         order_entries = [entry for entry in order_entries if entry["id"]]
+        if len(order_entries) > MAX_RECRUITING_ORDER_SLOTS:
+            raise HTTPException(status_code=400, detail=f"A maximum of {MAX_RECRUITING_ORDER_SLOTS} recruits can be ranked")
         for entry in order_entries:
             if entry["playing_time"] and not entry["scholarship"]:
                 raise HTTPException(status_code=400, detail="Playing time promises require a scholarship offer")
+            if entry["points"] < 0:
+                raise HTTPException(status_code=400, detail="Recruiting points cannot be negative")
         recruit_ids = [entry["id"] for entry in order_entries]
         if len(set(recruit_ids)) != len(recruit_ids):
             raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
         if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
             raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+        if sum(int(entry.get("points", 0) or 0) for entry in order_entries) > WEEK_35_RECRUITING_POINTS_BUDGET:
+            raise HTTPException(status_code=400, detail="Recruiting orders cannot exceed 20 total recruiting points")
 
         orders_payload = _normalize_week_35_recruiting_orders(order_entries)
         franchise_team_data_collection.update_one(
