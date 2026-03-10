@@ -30,7 +30,7 @@
 
 
 **Recruiting.html Screen**
-1. Display all 200 recruits, in descending order of their top RT value, from highest value to lowest
+1. Display all 300 recruits, in descending order of their top RT value, from highest value to lowest
 2. Use the same display that we use for the current Recruits tab in teh FCC that we're sunsetting in this task. Add the following columns:
     - After "Name" and before "Archetype" add "Home Region" and dispaly the recruit's home region
     - After "RT" add "Current Lean" and display all values associated with that recruit, separated by commas, in order of key 1, key 2, key 3. Do not display the key. If the recruit's key 1 value us "open", display open.

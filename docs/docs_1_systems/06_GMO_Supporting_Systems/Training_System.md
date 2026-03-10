@@ -234,6 +234,12 @@ The training execution system applies pre-training conditions, allocates trainin
 - 4 points: `+= random.randint(3, 5)`
 - 5 points: `+= random.randint(3, 6)`
 
+**High Attribute Gain Reduction**
+- If a player's starting value for a trained attribute at the beginning of the training session is `> 100`, any positive gain to that attribute is reduced by `50%`, using rounded integer value.
+- Example: if a player starts training with `SH = 102` and rolls a gain of `+5`, the applied gain becomes `+3`.
+- This check uses the player's value at the start of training, not the running updated value during the session.
+- If a player starts training at `99` and gains `+6`, the full `+6` applies even if the player finishes above `100`.
+
 **Year-Based Adjustments:**
 Leave minimums as is, only change maximums
 - **Freshman**: 0 to min, 5 to max (e.g., 1 point: `random.randint(0, 6)`)

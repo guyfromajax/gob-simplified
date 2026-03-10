@@ -6394,7 +6394,7 @@ def finish_season(req: FinishSeasonRequest):
     fm = FranchiseManager(db)
     fm.franchise_id = franchise_id
     schedule = fm.schedule_manager.generate_schedule()
-    recruits = fm.recruit_manager.generate_recruits_list(count=200)
+    recruits = fm.recruit_manager.generate_recruits_list(count=300)
     region_team_ids = fm._build_region_team_map()
 
     franchise_recruits_data_collection.delete_many({"franchise_id": str(franchise_id)})

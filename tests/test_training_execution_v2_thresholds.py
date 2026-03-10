@@ -38,8 +38,8 @@ def test_player_attr_range_point_0_includes_year_max_adjustment(monkeypatch):
     player = _make_player(year="senior")
     training._apply_player_training_points(player, "SC", 0)
 
-    # Base 0-point range (-2,-1) with senior max adjustment +2 -> (-2,1)
-    assert calls == [(-2, 1)]
+    # Base 0-point range (-2,-1) with senior max adjustment +1 -> (-2,0)
+    assert calls == [(-2, 0)]
 
 
 def test_player_attr_range_point_5_sophomore(monkeypatch):
@@ -53,12 +53,12 @@ def test_player_attr_range_point_5_sophomore(monkeypatch):
     player = _make_player(year="sophomore")
     training._apply_player_training_points(player, "SC", 5)
 
-    # Base 5-point range (3,6) with sophomore max adjustment +4 -> (3,10)
-    assert calls == [(3, 10)]
+    # Base 5-point range (3,6) with sophomore max adjustment +3 -> (3,9)
+    assert calls == [(3, 9)]
 
 
 def test_pre_training_decay_ranges_by_year():
-    assert training._pre_training_decay_range_for_year("freshman") == (-5, -1)
+    assert training._pre_training_decay_range_for_year("freshman") == (-5, -2)
     assert training._pre_training_decay_range_for_year("sophomore") == (-4, -1)
     assert training._pre_training_decay_range_for_year("junior") == (-3, 0)
     assert training._pre_training_decay_range_for_year("senior") == (-2, 0)
@@ -66,7 +66,7 @@ def test_pre_training_decay_ranges_by_year():
 
 def test_pre_training_conditions_use_freshman_decay_range(monkeypatch):
     def fake_randint(a, b):
-        assert (a, b) == (-5, -1)
+        assert (a, b) == (-5, -2)
         return -5
 
     monkeypatch.setattr(training.random, "randint", fake_randint)
@@ -153,3 +153,23 @@ def test_team_attr_standard_ranges_match_documentation(monkeypatch):
     training._apply_team_training_points(team, "discipline", 5)
 
     assert calls == [(-2, 0), (1, 2), (2, 3), (2, 5), (2, 6), (2, 7)]
+
+
+def test_training_gain_is_halved_when_player_starts_above_100(monkeypatch):
+    monkeypatch.setattr(training.random, "randint", lambda a, b: 5)
+
+    player = _make_player(year="junior", anchor_val=102)
+    training._apply_player_training_points(player, "SC", 4, starting_baseline=102)
+
+    assert player["attributes"]["anchor_SC"] == 105
+    assert player["attributes"]["SC"] == 105
+
+
+def test_training_gain_is_not_reduced_when_player_starts_at_99(monkeypatch):
+    monkeypatch.setattr(training.random, "randint", lambda a, b: 6)
+
+    player = _make_player(year="junior", anchor_val=99)
+    training._apply_player_training_points(player, "SC", 4, starting_baseline=99)
+
+    assert player["attributes"]["anchor_SC"] == 105
+    assert player["attributes"]["SC"] == 105

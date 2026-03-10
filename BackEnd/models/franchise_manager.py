@@ -252,7 +252,7 @@ class FranchiseManager:
 
         _t0 = time.time()
         # Generate initial recruits for the franchise
-        recruits = self.recruit_manager.generate_recruits_list(count=200)
+        recruits = self.recruit_manager.generate_recruits_list(count=300)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean

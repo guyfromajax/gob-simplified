@@ -8,6 +8,7 @@ This module implements the new training execution system with:
 - Training report generation
 """
 
+import math
 import random
 import logging
 from typing import List, Dict, Tuple, Optional
@@ -352,7 +353,13 @@ def apply_training_points(
                         multiplier = 0.5 if attr == "CH" and category in ["conditioning", "film_study"] else 1.0
                         for player in players:
                             _apply_player_training_points(
-                                player, attr, points, archetype, sub_option, multiplier
+                                player,
+                                attr,
+                                points,
+                                archetype,
+                                sub_option,
+                                multiplier,
+                                player_baselines.get(player["_id"], {}).get(attr),
                             )
                 
                 # Track team attribute contributions from multipliers
@@ -370,7 +377,13 @@ def apply_training_points(
                     multiplier = 0.5 if attr == "CH" and category in ["conditioning", "film_study"] else 1.0
                     for player in players:
                         _apply_player_training_points(
-                            player, attr, allocation_data, archetype, sub_option, multiplier
+                            player,
+                            attr,
+                            allocation_data,
+                            archetype,
+                            sub_option,
+                            multiplier,
+                            player_baselines.get(player["_id"], {}).get(attr),
                         )
             
             # Track team attribute contributions from multipliers (single-value categories)
@@ -577,7 +590,8 @@ def _apply_player_training_points(
     points: int,
     archetype: Optional[str] = None,
     sub_option: Optional[str] = None,
-    multiplier: float = 1.0
+    multiplier: float = 1.0,
+    starting_baseline: Optional[int] = None,
 ):
     """
     Apply training points to a single player attribute.
@@ -627,6 +641,10 @@ def _apply_player_training_points(
     
     # Apply multiplier (for CH in conditioning/film_study)
     increase = int(increase * multiplier)
+
+    # If the player started training above 100 in this attribute, positive gains are halved.
+    if (starting_baseline or 0) > 100 and increase > 0:
+        increase = int(math.floor((increase * 0.5) + 0.5))
     
     # Check if this attribute should be amplified based on focus
     should_amplify = False
