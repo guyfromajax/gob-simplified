@@ -75,8 +75,17 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                                 continue
                             base_player = base_by_id.get(pid_str)
                             if not base_player:
-                                logger.error(f"❌ [ROSTER LOADER] Player {pid_str} not found in universal collection")
-                                continue
+                                meta = franchise_player_data.get("meta", {})
+                                base_player = {
+                                    "_id": pid_str,
+                                    "first_name": meta.get("first_name", ""),
+                                    "last_name": meta.get("last_name", ""),
+                                    "team": meta.get("team", team_name),
+                                    "height": meta.get("height"),
+                                    "weight": meta.get("weight"),
+                                    "jersey": meta.get("jersey"),
+                                    "year": meta.get("year"),
+                                }
                             if not isinstance(franchise_attrs, dict):
                                 logger.error(f"❌ [ROSTER LOADER] franchise_attrs is not a dict! Type: {type(franchise_attrs)}, Value: {franchise_attrs}")
                                 continue

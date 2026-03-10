@@ -53,6 +53,8 @@ When EOS national week `34` completes, franchise mode advances to week `35`.
 When the user confirms `Go To Next Season`:
 
 - current-season game docs for the franchise are deleted
+- franchise standings/results are reset
+  - `franchise.results` is cleared, so W / L / PF / PA all return to zero for the new season
 - seniors are removed from the franchise instance
 - signed recruits and walk-ons are carried into the next season
 - career stats persist
@@ -60,5 +62,7 @@ When the user confirms `Go To Next Season`:
 - a new franchise-season schedule is generated
 - old FRD docs are deleted
 - 200 new recruits are generated for the next season
+- roster rendering for the next season is franchise-instance driven
+  - signed recruits and walk-ons do not need universal `players` docs to appear on roster pages
 
 For the detailed franchise-instance rollover process, see `Season_Init_System.md`.

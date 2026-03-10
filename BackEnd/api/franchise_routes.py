@@ -5899,6 +5899,7 @@ def finish_season(req: FinishSeasonRequest):
         {"$set": {
             "current_season": next_season,
             "week": 1,
+            "results": {},
             "schedule": schedule,
             "eos_tournament_active": False,
             "conference_tournaments": {},
