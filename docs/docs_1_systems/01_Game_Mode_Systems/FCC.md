@@ -94,6 +94,16 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 
 ---
 
+## Post-Training Camp Cuts
+
+- **When:** After week 1 training camp only, if user roster size is greater than 12.
+- **Modal:** On return to FCC from training report, present:
+  - `You need to cut X players`
+- **CTA:** Main upper-right CTA becomes `Cut Players` until roster is legal.
+- **Flow:** `Cut Players` routes to `cut-players.html`. Once cuts are submitted and roster reaches 12, FCC returns to normal `Play Next Game` cadence.
+
+---
+
 ## Exit Franchise button
 
 - Replaces old “Coach/Username” under team logo. Label: **Exit Franchise**. On click, navigates to `/mode-select.html`.

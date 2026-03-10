@@ -1,0 +1,25 @@
+.cut-players-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.cut-player-name-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cut-player-name-link:hover {
+  text-decoration: underline;
+}
+
+.cut-player-checkbox-cell {
+  text-align: center;
+}
+
+.cut-player-checkbox {
+  cursor: pointer;
+  height: 18px;
+  width: 18px;
+}

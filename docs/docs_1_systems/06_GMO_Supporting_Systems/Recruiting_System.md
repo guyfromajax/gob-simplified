@@ -178,13 +178,12 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
   - if the user has no saved orders and presses `Run Recruiting`, block and warn
   - page header copy = `Recruiting Focus List`
   - sub-head copy under the header:
-    - `Available Roster Spots: X, Available Scholarships: Y, Points Remaining: Z`
+    - `Available Roster Spots: X, Points Remaining: Z`
     - `X = 15 - returning_non_graduating_player_count`
-    - `Y = 12 - returning_non_graduating_scholarship_player_count`
     - `Z = 20 - currently assigned recruiting points`
     - `Points Remaining` updates in real time as the user edits point inputs, including unsaved edits
   - top grid columns:
-    - `Priority`, `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `RT`, `Current Lean`, `Points`, `Scholarship`, `Playing Time`, `Adjust`, `Remove`
+    - `Priority`, `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `RT`, `Current Lean`, `Points`, `Playing Time`, `Adjust`, `Remove`
   - top grid preloads from saved `recruiting_orders_week_35`
   - if that field is empty, auto-fill with all recruits who currently have the user team in any lean slot, sorted RT descending
   - point inputs default to `0`
@@ -192,7 +191,7 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
   - teams have a 20-point total budget in week `35`
   - point inputs only accept integers and block keystrokes that would push the board above 20 total points
   - checkboxes default empty on preload and on fresh add
-  - `Playing Time` cannot be checked unless `Scholarship` is checked
+  - `Playing Time` can be checked independently; scholarship is dormant and always saved as `false`
   - drag/drop uses insert-and-push behavior
   - row click and `+` both add/remove recruits
   - top grid is capped at 20 rows
@@ -208,15 +207,12 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 -computer teaam recruiting orders:
     - computer teams build out their ranking list in the following order:
         -Lean List Players: all players who have tthe computer team on their lean list.
-            - all lean-list players receive scholarship offers, regardless of RT
         -Then the computer adds remaining players from their region to their list according to this logic:
             - Remaining slots = 20 - Lean List Players
             - 50% of remaining slots go to players with RT >= 25
                 - choose these at random
-                - all receive scholarship offer
             - 50% of remaining slots go to players with RT <= 24
                 - choose these at random
-                - none receive scholarship offer
             - if one RT pool cannot fill its share, roll the unused slots over to the other pool
             - no playing time promises
         - Points assignments
@@ -225,7 +221,7 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
             - if one of those groups has no qualifying player on the board, skip that step
             - assign all remaining points to players on the lean list. if only one player is on the lean list, he gets all of the points. If 2-3 players are on the lean list, give the highest RT 80% of remaining points and distrubute the remaining evenly. Otherewise assign 60% of teh points to oen of the 3 highest RT players on the lean list and distribure the rest evenly among the players on the lean list. If there are not enough points to give every player at least one, distribute points to random players on the lean list until you run out of points and the remaining players will receive 0.
             - if there are no lean-list players on the board, fallback to the top 5 RT in-region players on the board and split the remaining points evenly among them
-        - out-of-region players who are on that CPU team's lean list can receive scholarship offers and points assignments
+        - out-of-region players who are on that CPU team's lean list can receive points assignments
 
 -run recruiting assignments
 
@@ -235,15 +231,12 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
         - teams allocate points to each recruit based on the following criteria:
             - on the player's lean list receive multipliers:
                 -1 = 5x, 2 = 3x, 3 = 2x 
-            - scholarship offer
-                - if only one team makes a scholarship offer = 5 points
-                - or if > 1 team makes a scholarship offer = 1 point for each team making a scholarship offer
             - playing time offer
                 - if only one or two teams makes a playing time offer = 7 points per team
                 - if > 2 teams make a playing time offer = 4 points per team
             - teams receive one point for having the player on their Top Grid list
             - teams receive points for the number of points they assign in their recruiting orders
-            - subtotal = top-grid point + assigned recruiting points + scholarship points + playing-time points
+            - subtotal = top-grid point + assigned recruiting points + playing-time points
             - the lean-list multiplier applies to that subtotal
             - teams not on the player's lean list use a 1x multiplier
 
@@ -252,21 +245,19 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
         - total value is the total number of points of chosen teams. Example:
             - for player A the following:
                 - lean list: 1. Team 1, 2. Team 2, 3. null
-                - scholarship offers: 12 (including Teams 1-12)
                 - playing time offers: Team 1 and Team 7
                 - points per team:
-                    - Team 1 (assigned 10 of their points in recruiting orders): 19 points x 5 multiplier = 95
-                    - Team 7 (assigned 2 of their points in recruiting orders): 11 points x 1 = 11
-                    - Team 2 (assigned 5 of their points in recruiting orders): 7 points x 3 multiplier = 21
-                    - Team 9 (assigned 5 of their points in recruiting orders): 7 points x 1 = 7
-                    - total points = 134
-                - value = random.randint(1,134)
+                    - Team 1 (assigned 10 of their points in recruiting orders): 18 points x 5 multiplier = 90
+                    - Team 7 (assigned 2 of their points in recruiting orders): 10 points x 1 = 10
+                    - Team 2 (assigned 5 of their points in recruiting orders): 6 points x 3 multiplier = 18
+                    - Team 9 (assigned 5 of their points in recruiting orders): 6 points x 1 = 6
+                    - total points = 124
+                - value = random.randint(1,124)
                     - Win ranges:
-                        - Team 1: 1-95, Team 7: 96-106, Team 2: 107-127, Team 9: 128-134
+                        - Team 1: 1-90, Team 7: 91-100, Team 2: 101-118, Team 9: 119-124
 
 
     - team eligibility for recruits
-        - once a team has reached 12 scholarships assigned, they are removed from all remining players for whom they've offered a scholarship
         - once a team has reached a roster of 15 players, they are removed from all remaining players
     - when run recruiting completes:
         - advance franchise week from `35` to `36`
@@ -299,4 +290,3 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
   - walk-on -> signed team name + ` (walk on)`
   - unsigned recruit -> `--`
 - `Run Recruiting` is the catalyst that advances week `35` -> `36`
-

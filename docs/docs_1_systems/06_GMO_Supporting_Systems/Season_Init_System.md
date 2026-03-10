@@ -45,11 +45,10 @@ For each franchise team:
    - add signed recruits who accepted scholarship offers
    - hard cap = 12
    - if the cap is somehow exceeded, remove scholarship from the lowest-RT freshman scholarship player
-5. Build active roster / training squad state:
-   - active group = scholarship players first
-   - if active group is below 12, add highest-RT non-scholarship players until it reaches 12
-   - remaining players go to `training_squad_players`
-   - `training_squad_players` may contain 0-3 player ids
+5. Build roster state:
+   - keep the full 12-15 player roster together
+   - sort the carried roster for storage/display
+   - `training_squad_players` remains stored but is reset to `[]` and is currently dormant
 
 ## Team Fields Reset
 
@@ -61,7 +60,7 @@ Each FTD doc is reset for the new season:
 - `training_reports` -> `{}`
 - `playing_time_promise_players` -> signed freshmen who accepted a PT promise
 - `scholarship_players` -> current scholarship player ids
-- `training_squad_players` -> current training-squad player ids
+- `training_squad_players` -> `[]` (field retained, functionality dormant)
 
 ## Franchise Fields Reset
 

@@ -12,7 +12,6 @@
   var allowLeave = false;
   var activeWeek = 1;
   var availableRosterSpots = 0;
-  var availableScholarships = 0;
   var mode = 'visits';
   var WEEK_35_POINTS_BUDGET = 20;
 
@@ -40,7 +39,6 @@
       var right = b[i] || {};
       if (left.id !== right.id) return false;
       if (Number(left.points || 0) !== Number(right.points || 0)) return false;
-      if (!!left.scholarship !== !!right.scholarship) return false;
       if (!!left.playing_time !== !!right.playing_time) return false;
     }
     return true;
@@ -109,7 +107,7 @@
     if (isWeek35Mode()) {
       if (title) title.textContent = 'Recruiting Focus List';
       help.textContent = '';
-      status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Available Scholarships: ' + availableScholarships + ', Points Remaining: ' + getWeek35PointsRemaining();
+      status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Points Remaining: ' + getWeek35PointsRemaining();
     } else {
       if (title) title.textContent = 'Recruiting Orders';
       help.textContent = 'Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.';
@@ -162,7 +160,6 @@
         '<th>RT</th>',
         '<th>Current Lean</th>',
         '<th>Points</th>',
-        '<th>Scholarship</th>',
         '<th>Playing Time</th>',
         '<th>Adjust</th>',
         '<th>Remove</th>',
@@ -200,7 +197,6 @@
 
   function buildWeek35Row(index, recruit) {
     var entry = currentEntries[index] || {};
-    var scholarshipChecked = recruit && !!entry.scholarship;
     var pointsValue = recruit ? Number(entry.points || 0) : 0;
     return [
       '<td class="priority-cell">' + (index + 1) + '</td>',
@@ -213,8 +209,7 @@
       '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? (recruit.leanDisplay || '--') : '--') + '</td>',
       '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
-      '<td><input class="recruiting-checkbox" type="checkbox" data-action="scholarship" data-index="' + index + '"' + (scholarshipChecked ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
-      '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + ((recruit && scholarshipChecked) ? '' : ' disabled') + '></td>',
+      '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
     ].join('');
@@ -371,16 +366,8 @@
         if (action === 'points') {
           return;
         }
-        if (action === 'scholarship') {
-          currentEntries[index].scholarship = control.checked;
-          if (!control.checked) {
-            currentEntries[index].playing_time = false;
-          }
-          rerender();
-          return;
-        }
         if (action === 'playing_time') {
-          currentEntries[index].playing_time = control.checked && !!currentEntries[index].scholarship;
+          currentEntries[index].playing_time = control.checked;
         }
       });
       if (control.tagName === 'BUTTON') {
@@ -446,7 +433,7 @@
         return {
           id: entry.id,
           points: Number(entry.points || 0),
-          scholarship: !!entry.scholarship,
+          scholarship: false,
           playing_time: !!entry.playing_time
         };
       });
@@ -591,7 +578,7 @@
       return {
         id: entry.id,
         points: Number(entry.points || 0),
-        scholarship: !!entry.scholarship,
+        scholarship: false,
         playing_time: !!entry.playing_time
       };
     }).filter(function (entry) {
@@ -623,7 +610,6 @@
 
         mode = activeWeek === 35 ? 'week35' : 'visits';
         availableRosterSpots = Number(data.available_roster_spots || 0);
-        availableScholarships = Number(data.available_scholarships || 0);
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});
         recruitMap = {};
         recruits.forEach(function (recruit) {

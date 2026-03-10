@@ -147,6 +147,7 @@ Ranges will be determined by each team's seed
      - `recruiting_orders_week_35`: initialized to `{}`
      - `recruit_visit`: initialized to `None`
  7. On each new franchise season, those recruiting support fields are reset before the new season begins.
+    - `scholarship_players` and `training_squad_players` are retained in the schema for future use, but are currently dormant in roster-assignment UI/logic.
   8. Brand new franchise init still loads from universal collections. Continuing franchise seasons do not; see `Season_Init_System.md`.
 
 ### Playbook Settings Initialization

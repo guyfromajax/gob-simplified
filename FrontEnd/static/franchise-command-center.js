@@ -1237,6 +1237,9 @@ async function init() {
   updateRecruitingButton(topData);
   updateAwardsButton(topData);
   maybeShowChampionshipCompleteModal(topData);
+  if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
+    showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+  }
   
   if (topData && (topData.team_id || topData.team) && userTeamId) {
     console.log('Loading franchise roster for team_id:', userTeamId, 'franchiseId:', franchiseId);
@@ -1408,6 +1411,24 @@ function showNewSeasonConfirmModal() {
   return overlay;
 }
 
+function showCutPlayersRequiredModal(cutCount) {
+  const overlay = document.createElement('div');
+  overlay.className = 'fcc-modal-overlay';
+  overlay.innerHTML = `
+    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="Cut Players Required">
+      <h3 class="fcc-modal-title">Cut Players Required</h3>
+      <p class="fcc-modal-copy">You need to cut ${cutCount} player${cutCount === 1 ? '' : 's'}.</p>
+      <div class="fcc-modal-actions">
+        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-cut-required-close">Close</button>
+      </div>
+    </div>
+  `;
+  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', () => {
+    overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
 function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
   if (!data) return;
@@ -1433,8 +1454,12 @@ function updatePlayButton(data) {
   const eliminated = userEliminated != null ? userEliminated : userTeamEliminated;
   const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
   const tournamentComplete = eosTournament?.completed || false;
+  const cutRequired = !!data.cut_required;
   
-  if (week === 35) {
+  if (cutRequired) {
+    playNowBtn.textContent = 'Cut Players';
+    playNowBtn.dataset.mode = 'cut-players';
+  } else if (week === 35) {
     playNowBtn.textContent = 'Recruiting';
     playNowBtn.dataset.mode = 'week35-recruiting';
   } else if (week === 36) {
@@ -1456,7 +1481,7 @@ function updatePlayButton(data) {
       playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
       playNowBtn.dataset.mode = 'training';
     } else {
-      playNowBtn.textContent = 'Play Now';
+      playNowBtn.textContent = 'Play Next Game';
       playNowBtn.dataset.mode = 'play';
     }
   }
@@ -1546,6 +1571,11 @@ playNowBtn.addEventListener('click', async () => {
 
   if (mode === 'week35-recruiting') {
     window.location.href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+    return;
+  }
+
+  if (mode === 'cut-players') {
+    window.location.href = `/cut-players.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
     return;
   }
   

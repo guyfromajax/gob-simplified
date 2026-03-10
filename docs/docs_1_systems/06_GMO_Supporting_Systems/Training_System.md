@@ -32,6 +32,29 @@
 11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
 12. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
 13. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
+14. **Post-Training Camp Cuts**: After week 1 training camp only, any team above 12 players must reduce to a legal 12-player roster before gameplay resumes.
+
+### Post-Training Camp Cut Flow
+
+- **Trigger:** Only after franchise week 1 training camp is completed.
+- **User Team:**
+  - If user roster size is greater than 12 when the user returns to FCC from the training report, FCC shows a modal:
+    - `You need to cut X players`
+  - Main FCC CTA becomes `Cut Players`
+  - User is routed to `cut-players.html`
+  - `cut-players.html` shows the full roster table plus a `Players To Cut` checkbox column
+  - `Submit Cuts` is active only when exactly `roster_size - 12` players are checked
+  - Confirmation modal copy:
+    - `You are going to cut {player name}, {player name}, and {player name}. This cannot be undone. Are you sure you want to proceed with the cuts?`
+  - Success modal copy:
+    - `{player name}, {player name}, and {player name} have been cut.`
+  - After successful cuts, user returns to FCC and normal weekly cadence resumes
+- **CPU Teams:**
+  - After week 1 training camp, any CPU team above 12 players automatically cuts down to 12
+  - Cut rule:
+    - lowest RT first
+    - RT tie -> older year first (`Senior`, `Junior`, `Sophomore`, `Freshman`)
+    - remaining tie -> random
 
 **Long Form Documentation**
 
