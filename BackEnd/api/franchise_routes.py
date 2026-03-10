@@ -2762,12 +2762,20 @@ def team_stats(franchise_id: str):
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
     team_ids_for_meta = [ObjectId(t["team_id"]) for t in output if t.get("team_id")]
     if team_ids_for_meta:
-        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1}))
-        id_to_meta = {str(d["_id"]): {"conference": d.get("conference"), "region": d.get("region", "")} for d in team_meta_docs}
+        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1, "mascot": 1}))
+        id_to_meta = {
+            str(d["_id"]): {
+                "conference": d.get("conference"),
+                "region": d.get("region", ""),
+                "mascot": d.get("mascot", ""),
+            }
+            for d in team_meta_docs
+        }
         for t in output:
             meta = id_to_meta.get(t.get("team_id", ""), {})
             t["conference"] = meta.get("conference")
             t["region"] = meta.get("region", "")
+            t["mascot"] = meta.get("mascot", "")
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")

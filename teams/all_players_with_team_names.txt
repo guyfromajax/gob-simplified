@@ -1487,7 +1487,7 @@ Norris	Khan	sophomore	23	74	186	53	48	55	84	58	47	58	52	75	85	63	91	Lancaster
 Wallace	Farrabee	sophomore	33	75	217	48	14	73	15	37	15	79	70	27	39	62	27	Little York
 Mose	Hawkins	senior	43	67	158	39	11	25	91	60	92	15	36	70	95	77	61	Morristown
 Von	Sanborn	sophomore	25	70	168	19	23	33	66	52	67	19	24	72	95	49	57	Bentley-Truman
-Jerry	O'Neal	junior	3	68	159	32	17	11	13	35	22	9	14	29	42	45	24	Little York
+Jerry	O'Neal	freshman	3	68	159	32	17	11	13	35	22	9	14	29	42	45	24	Little York
 Damon	Martin	junior	22	73	213	29	9	49	12	25	5	43	90	14	6	28	19	Lancaster
 Ferdinand	Steele	junior	12	70	179	46	27	39	76	65	65	26	25	76	86	64	75	South Lancaster
 Neel	Baldwin	senior	1	78	228	50	26	72	7	56	5	87	65	12	35	85	25	South Lancaster

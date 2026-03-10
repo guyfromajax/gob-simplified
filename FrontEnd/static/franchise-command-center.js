@@ -54,6 +54,17 @@ const teamMap = {
 };
 
 const teamIdNameMap = {};
+const teamIdMetaMap = {};
+
+function formatConferenceTooltipLabel(conference) {
+  const numericConference = Number(conference);
+  if (!Number.isInteger(numericConference) || numericConference < 1 || numericConference > 16) {
+    return String(conference || '');
+  }
+  const regionLetter = String.fromCharCode(65 + Math.floor((numericConference - 1) / 2));
+  const conferenceNumber = ((numericConference - 1) % 2) + 1;
+  return `${conferenceNumber}${regionLetter}`;
+}
 
 function populateTop(data) {
   if (!data) return;
@@ -2268,6 +2279,11 @@ async function renderTournamentBracket() {
     teams.forEach(function (t) {
       if (t.team_id != null && t.team != null) {
         teamIdToNameMap[String(t.team_id)] = t.team;
+        teamIdMetaMap[String(t.team_id)] = {
+          team: t.team,
+          mascot: t.mascot || '',
+          conference: t.conference,
+        };
       }
     });
   } catch (e) {
@@ -2282,6 +2298,14 @@ async function renderTournamentBracket() {
       },
       isUserTeam: function (id) {
         return userTeamId != null && (String(id) === String(userTeamId));
+      },
+      getTooltip: function (id, name) {
+        const meta = teamIdMetaMap[String(id)] || {};
+        const teamName = meta.team || name || '';
+        const mascot = meta.mascot || '';
+        const conferenceLabel = formatConferenceTooltipLabel(meta.conference);
+        if (!teamName || !mascot || !conferenceLabel) return '';
+        return `${teamName} ${mascot}, conference ${conferenceLabel}`;
       },
     });
   } else {

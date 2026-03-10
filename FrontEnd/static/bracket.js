@@ -22,17 +22,19 @@
    * @param {HTMLElement} container - Element to clear and append bracket to (e.g. #bracket or #tournament-bracket-container)
    * @param {{ round1: Array, round2: Array, final: Array }} bracketData - Bracket matchups per round
    * @param {Object.<string, string>} teamIdToNameMap - Map team_id (string) -> team name (string)
-   * @param {Object} [options] - Optional: results, seeds, getLogo, isUserTeam
+   * @param {Object} [options] - Optional: results, seeds, getLogo, isUserTeam, getTooltip
    * @param {Array} [options.results] - TCC-style results [{ round, match_index, score, winner }]; if omitted, use matchup.score/winner
    * @param {Object.<string, number>} [options.seeds] - teamId -> seed (1-8); if omitted, derive from round1 order (1v8, 4v5, 2v7, 3v6)
    * @param {function(string): string} [options.getLogo] - teamName -> logo src
-   * @param {function(string): boolean} [options.isUserTeam] - teamId or teamName -> boolean
+   * @param {function(string, string): boolean} [options.isUserTeam] - teamId or teamName -> boolean
+   * @param {function(string, string): string} [options.getTooltip] - (teamId, teamName) -> tooltip text
    */
   function renderBracketShared(container, bracketData, teamIdToNameMap, options) {
     if (!container) return;
     options = options || {};
     var getLogo = options.getLogo || defaultGetLogo;
     var isUserTeam = options.isUserTeam || defaultIsUserTeam;
+    var getTooltip = typeof options.getTooltip === 'function' ? options.getTooltip : null;
     var results = options.results || [];
     var seedsOption = options.seeds || null;
 
@@ -77,6 +79,11 @@
       img.src = getLogo(teamNameVal);
       img.classList.add('team-logo', 'bracket-logo');
       if (isUserTeam(teamId) || isUserTeam(teamNameVal)) img.classList.add('user-team');
+      var tooltipText = getTooltip ? getTooltip(teamId, teamNameVal) : '';
+      if (tooltipText) {
+        img.title = tooltipText;
+        img.setAttribute('aria-label', tooltipText);
+      }
       var scoreSpan = document.createElement('span');
       scoreSpan.className = 'score';
       scoreSpan.textContent = score !== undefined && score !== null ? score : '';
