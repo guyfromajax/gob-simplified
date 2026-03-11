@@ -458,3 +458,19 @@
   color: #fff;
   transform: translateY(-1px);
 }
+
+.resources-btn.is-dead,
+.resources-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: auto;
+  box-shadow: none;
+  filter: grayscale(0.2);
+}
+
+.resources-btn.is-dead:hover,
+.resources-btn[aria-disabled="true"]:hover {
+  background: #4065af;
+  color: #fff;
+  transform: none;
+}

@@ -394,8 +394,9 @@ After training is submitted, users are automatically redirected to the training 
 **Player Report Section:**
 - Header: "Player Report"
 - Toggle between "Attributes" and "Training Changes" views
+- **Player Order:** Players are displayed by highest `RT` value, descending. If two players share the same highest `RT`, their existing roster/report order is the tiebreaker.
 - **Attributes View:** Shows current attribute values after training
-  - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM
+  - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, RT
   - **Note:** MO (Momentum) is excluded from Training Report display
   - **Attribute Formatting:**
     - **SC through FT (first 12):** Displayed as integer values
@@ -411,18 +412,20 @@ After training is submitted, users are automatically redirected to the training 
       - Red fill on left side for negative momentum
       - Yellow center line at 50%
       - No integer value displayed on top of pill
+    - **RT:** Static highest position-rating value for the player
   - **Tooltip Feature:** Hovering over any attribute value displays the training change for that attribute
     - Green tooltip for positive changes (e.g., "+5")
     - Red tooltip for negative changes (e.g., "-3")
     - Black tooltip for zero changes
     - Tooltip appears above the attribute value
   - **Training Changes View:** Shows net changes from training
-  - **Attribute Order:** Same exact order as Attributes view (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM)
+  - **Attribute Order:** Same exact order as Attributes view (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, RT)
   - **Note:** MO (Momentum) is excluded from Training Report display
   - Only displays attributes that have changes (maintains order)
   - Positive changes: Green text with `+` prefix
   - Negative changes: Red text with `-` prefix
   - Zero changes: Black text
+  - **RT Column:** Static highest position-rating value; does not toggle to a delta/change view
   - **Aggregated Total Row:** Bottom row displays "Total" in the first column and sums all attribute changes across all players
     - Styled with gold background highlight and bold text
     - Provides quick overview of total training impact

@@ -74,7 +74,8 @@ function populateTop(data) {
   const seasonLabelEl = document.getElementById('fcc-season-label');
   if (seasonLabelEl) {
     const seasonNumber = Number(data.current_season || 1);
-    seasonLabelEl.textContent = `Season ${seasonNumber}`;
+    const weekNumber = Number(data.week || 1);
+    seasonLabelEl.textContent = `Season ${seasonNumber} / Week ${weekNumber}`;
   }
   console.log('Team logo URL:', logoSrc);
 
