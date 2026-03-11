@@ -59,8 +59,17 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 
 - **Resources tab (on FCC):** Seven buttons (blue fill, white bold): Standings, Stats, Schedule, Team Traits, Rankings, Recruits, Awards. Each opens a standalone page with `franchise_id` and `team_id` in the URL.
 - **Awards button state:** Dead through week `34`; active starting week `35`.
-- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html, recruiting.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC); schedule.html has 16 conference toggles and lands on the user's conference. Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
+- **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html, recruiting.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC). Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
 - **Legacy (moved off FCC):** Stats tab content is on stats.html; Team Traits on team-traits.html; Rankings on rankings.html. Scope toggles (Conference | Region | National) and full schedule/standings toggles are on the standalone pages only.
+
+### Schedule
+
+- **Conference toggles:** `schedule.html` shows 16 conference toggles and lands on the user's conference by default.
+- **Lazy load behavior:** On initial page load, only the user's conference schedule is fetched from `/franchise/schedule`.
+- **On-demand fetches:** When the user clicks another conference toggle, `schedule.html` fetches only that conference's schedule from `/franchise/schedule?conference={n}`.
+- **Session cache:** Conference schedule payloads are cached for the current browser session in memory and `sessionStorage`, keyed by franchise id, season, week, and conference.
+- **Invalidation:** Changing franchise week or current season changes the cache key, so stale prior-week schedules are not reused.
+- **Payload shaping:** The schedule endpoint returns the selected conference's schedule plus the team-name map needed to render roster links, so `schedule.html` no longer fetches standings data just to build team labels.
 
 ---
 

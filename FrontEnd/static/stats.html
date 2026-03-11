@@ -69,6 +69,7 @@
     <div id="leaders-container"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
   <script src="/common.js"></script>
   <script>
 (function() {
@@ -89,6 +90,7 @@
   let userConference = null, userRegion = null;
   let scope = 'conference';
   let leadersData = null, teamStatsData = null;
+  let resourceCache = null;
   let defaultOrderTeams = null;
   let sortColumn = null;
   let sortDirection = null;
@@ -96,35 +98,6 @@
   const COLUMN_ORDER = ['team','W','L','PF','PA','FGM','FGA','FG%','3PTM','3PTA','3PT%','FTM','FTA','FT%','DREB','OREB','TREB','AST','F','TO','SCR_A','SCR%','STL','BLK','DEF_A','DEF%'];
   const COL_GROUP_START_INDEX = { 0:1, 5:1, 8:1, 11:1, 14:1, 17:1, 22:1 };
   const STAT_MAP = { 'team':'team', 'W':'W', 'L':'L', 'PF':'PF', 'PA':'PA', 'FGM':'FGM', 'FGA':'FGA', 'FG%':'FG%', '3PTM':'3PTM', '3PTA':'3PTA', '3PT%':'3PT%', 'FTM':'FTM', 'FTA':'FTA', 'FT%':'FT%', 'DREB':'DREB', 'OREB':'OREB', 'TREB':'TREB', 'AST':'AST', 'F':'F', 'TO':'TO', 'SCR_A':'SCR_A', 'SCR%':'SCR%', 'STL':'STL', 'BLK':'BLK', 'DEF_A':'DEF_A', 'DEF%':'DEF%' };
-
-  function filterTeamsByScope(teams, sc) {
-    if (!teams || sc === 'national') return teams || [];
-    const confMatch = sc === 'conference' && userConference != null;
-    const regionMatch = sc === 'region' && userRegion != null;
-    const rn = (v) => (v || '').toString().toUpperCase();
-    return teams.filter((t) => {
-      if (confMatch) return t.conference === userConference;
-      if (regionMatch) return rn(t.region) === rn(userRegion);
-      return true;
-    });
-  }
-
-  function filterLeadersByScope(data, sc) {
-    if (!data || sc === 'national') return data;
-    const out = {};
-    const confMatch = sc === 'conference' && userConference != null;
-    const regionMatch = sc === 'region' && userRegion != null;
-    const rn = (v) => (v || '').toString().toUpperCase();
-    Object.keys(data).forEach(cat => {
-      const list = data[cat] || [];
-      out[cat] = list.filter((p) => {
-        if (confMatch) return p.conference === userConference;
-        if (regionMatch) return rn(p.region) === rn(userRegion);
-        return true;
-      });
-    });
-    return out;
-  }
 
   function renderTeamStatsBody(teams) {
     const tbody = document.getElementById('teamstats-body');
@@ -250,8 +223,7 @@
 
   function render() {
     if (!teamStatsData) return;
-    const allTeams = (teamStatsData.teams || []).map(t => ({ ...t }));
-    const filtered = filterTeamsByScope(allTeams, scope);
+    const filtered = (teamStatsData.teams || []).map(t => ({ ...t }));
     defaultOrderTeams = filtered.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
     let dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
     if (sortColumn && sortDirection) {
@@ -264,7 +236,7 @@
     const container = document.getElementById('leaders-container');
     if (!container) return;
     container.innerHTML = '';
-    const filteredLeaders = filterLeadersByScope(leadersData || {}, scope);
+    const filteredLeaders = leadersData || {};
     const categories = ['PTS', '3PTM', 'REB', 'AST', 'STL', 'BLK'];
     const names = { PTS: 'Points', '3PTM': '3PT Made', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks' };
     const limit = getLeadersLimit();
@@ -287,24 +259,47 @@
     });
   }
 
+  async function loadScope(targetScope) {
+    const cached = resourceCache && resourceCache.get(targetScope);
+    if (cached) return cached;
+    const [leaders, teamStats] = await Promise.all([
+      fetchJSON(
+        API_CONFIG.buildUrl('/franchise/leaders')
+        + '?franchise_id=' + encodeURIComponent(franchiseId)
+        + '&scope=season&view_scope=' + encodeURIComponent(targetScope)
+      ),
+      fetchJSON(
+        API_CONFIG.buildUrl('/franchise/team-stats')
+        + '?franchise_id=' + encodeURIComponent(franchiseId)
+        + '&scope=' + encodeURIComponent(targetScope)
+      )
+    ]);
+    const payload = { leaders, teamStats };
+    return resourceCache ? resourceCache.set(targetScope, payload) : payload;
+  }
+
   if (!franchiseId) {
     document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Missing franchise_id in URL.</td></tr>';
     return;
   }
   Promise.all([
-    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    fetchJSON(API_CONFIG.buildUrl('/franchise/leaders') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    fetchJSON(API_CONFIG.buildUrl('/franchise/team-stats') + '?franchise_id=' + encodeURIComponent(franchiseId))
-  ]).then(([cc, leaders, teamStats]) => {
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(async ([cc]) => {
     userConference = cc.user_conference;
     userRegion = cc.user_region || '';
-    leadersData = leaders;
-    teamStatsData = teamStats;
+    resourceCache = window.ResourceCache.createResourceCache('stats', franchiseId, cc.current_season, cc.week);
+    const payload = await loadScope(scope);
+    leadersData = payload.leaders;
+    teamStatsData = payload.teamStats;
     render();
     document.querySelectorAll('.stats-scope-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         scope = btn.getAttribute('data-scope') || 'conference';
         document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === scope));
+        document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Loading stats...</td></tr>';
+        const nextPayload = await loadScope(scope);
+        leadersData = nextPayload.leaders;
+        teamStatsData = nextPayload.teamStats;
         render();
       });
     });

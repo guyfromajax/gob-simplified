@@ -27,6 +27,7 @@
     <div id="standings-by-region" class="standings-by-region"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
   <script src="/common.js"></script>
   <script>
 (function() {
@@ -37,6 +38,8 @@
   if (backBtn && franchiseId && teamId) {
     backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
   }
+
+  let resourceCache = null;
 
   async function fetchJSON(url) {
     const res = await fetch(url, { headers: window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {} });
@@ -100,6 +103,17 @@
     });
   }
 
+  async function loadRegion(region) {
+    const cached = resourceCache && resourceCache.get(region);
+    if (cached) return cached;
+    const payload = await fetchJSON(
+      API_CONFIG.buildUrl('/franchise/standings')
+      + '?franchise_id=' + encodeURIComponent(franchiseId)
+      + '&region=' + encodeURIComponent(region)
+    );
+    return resourceCache ? resourceCache.set(region, payload) : payload;
+  }
+
   if (!franchiseId) {
     document.getElementById('standings-by-region').innerHTML = '<p>Missing franchise_id in URL.</p>';
     return;
@@ -107,16 +121,19 @@
   const regionFromConference = (c) => (c >= 1 && c <= 16) ? String.fromCharCode(65 + Math.floor((c - 1) / 2)) : 'A';
   Promise.all([
     fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    fetchJSON(API_CONFIG.buildUrl('/franchise/standings') + '?franchise_id=' + encodeURIComponent(franchiseId))
-  ]).then(([cc, data]) => {
-    const list = data.standings || [];
+  ]).then(async ([cc]) => {
+    resourceCache = window.ResourceCache.createResourceCache('standings', franchiseId, cc.current_season, cc.week);
     const defaultRegion = regionFromConference(cc.user_conference);
-    render(list, defaultRegion);
+    const data = await loadRegion(defaultRegion);
+    render(data.standings || [], defaultRegion);
     document.querySelectorAll('.standings-region-btn').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-region') === defaultRegion);
-      btn.addEventListener('click', () => {
-        render(list, btn.getAttribute('data-region'));
-        document.querySelectorAll('.standings-region-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-region') === btn.getAttribute('data-region')));
+      btn.addEventListener('click', async () => {
+        const region = btn.getAttribute('data-region');
+        document.getElementById('standings-by-region').innerHTML = '<p>Loading standings...</p>';
+        const regionData = await loadRegion(region);
+        render(regionData.standings || [], region);
+        document.querySelectorAll('.standings-region-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-region') === region));
       });
     });
   })

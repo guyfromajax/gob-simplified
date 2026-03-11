@@ -18,6 +18,7 @@
     <div id="schedule-container" class="schedule-container"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
   <script src="/common.js"></script>
   <script>
 (function() {
@@ -30,9 +31,11 @@
   }
 
   const teamIdNameMap = {};
-  let scheduleData = null;
   let selectedConference = 1;
   let userConference = null;
+  let currentSeason = null;
+  let currentWeek = null;
+  let resourceCache = null;
 
   function getScheduleConferenceLabel(c) {
     if (c == null || c < 1 || c > 16) return 'Conf ' + c;
@@ -46,19 +49,28 @@
     return res.json();
   }
 
-  function renderSchedule(data, conferenceFilter) {
+  async function loadConferenceSchedule(conference) {
+    const cached = resourceCache && resourceCache.get(String(conference));
+    if (cached) {
+      Object.assign(teamIdNameMap, cached.team_name_map || {});
+      return cached;
+    }
+    const payload = await fetchJSON(
+      API_CONFIG.buildUrl('/franchise/schedule')
+      + '?franchise_id=' + encodeURIComponent(franchiseId)
+      + '&conference=' + encodeURIComponent(conference)
+    );
+    Object.assign(teamIdNameMap, payload.team_name_map || {});
+    return resourceCache ? resourceCache.set(String(conference), payload) : payload;
+  }
+
+  function renderSchedule(data) {
     const container = document.getElementById('schedule-container');
     if (!container) return;
     container.innerHTML = '';
-    const teamConferences = data.team_conferences || {};
-    let schedule = data.schedule || [];
-    if (conferenceFilter != null && conferenceFilter >= 1 && conferenceFilter <= 16 && Object.keys(teamConferences).length) {
-      schedule = schedule.map(weekGames => (weekGames || []).filter(g =>
-        teamConferences[g.away_team_id] === conferenceFilter || teamConferences[g.home_team_id] === conferenceFilter
-      ));
-    }
+    const schedule = data.schedule || [];
     const returnUrl = encodeURIComponent(window.location.href);
-    const isUserConference = (userConference != null && conferenceFilter === userConference);
+    const isUserConference = (userConference != null && selectedConference === userConference);
     schedule.forEach((weekGames, idx) => {
       if (!weekGames || weekGames.length === 0) return;
       const weekDiv = document.createElement('div');
@@ -112,6 +124,9 @@
       });
       container.appendChild(weekDiv);
     });
+    if (!container.children.length) {
+      container.innerHTML = '<p>No games found for this conference.</p>';
+    }
   }
 
   function renderToggles() {
@@ -134,11 +149,19 @@
     wrap.appendChild(row1);
     wrap.appendChild(row2);
     wrap.querySelectorAll('.schedule-conference-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         selectedConference = parseInt(btn.dataset.conference, 10);
         wrap.querySelectorAll('.schedule-conference-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        if (scheduleData) renderSchedule(scheduleData, selectedConference);
+        const container = document.getElementById('schedule-container');
+        if (container) container.innerHTML = '<p>Loading schedule...</p>';
+        try {
+          const scheduleData = await loadConferenceSchedule(selectedConference);
+          renderSchedule(scheduleData);
+        } catch (err) {
+          if (container) container.innerHTML = '<p>Failed to load schedule.</p>';
+          console.error(err);
+        }
       });
     });
   }
@@ -148,19 +171,19 @@
     return;
   }
   Promise.all([
-    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    fetchJSON(API_CONFIG.buildUrl('/franchise/standings') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    fetchJSON(API_CONFIG.buildUrl('/franchise/schedule') + '?franchise_id=' + encodeURIComponent(franchiseId))
-  ]).then(([cc, standings, schedule]) => {
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(async ([cc]) => {
     const uc = cc.user_conference;
+    currentSeason = cc.current_season;
+    currentWeek = cc.week;
+    resourceCache = window.ResourceCache.createResourceCache('schedule', franchiseId, currentSeason, currentWeek);
     if (uc != null && uc >= 1 && uc <= 16) {
       selectedConference = uc;
       userConference = uc;
     }
-    (standings.standings || []).forEach(t => { teamIdNameMap[t.team_id] = t.name; });
-    scheduleData = schedule;
     renderToggles();
-    renderSchedule(scheduleData, selectedConference);
+    const scheduleData = await loadConferenceSchedule(selectedConference);
+    renderSchedule(scheduleData);
   }).catch(err => {
     document.getElementById('schedule-container').innerHTML = '<p>Failed to load schedule.</p>';
     console.error(err);

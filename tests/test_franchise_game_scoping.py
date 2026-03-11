@@ -165,3 +165,52 @@ def test_schedule_endpoint_does_not_leak_cross_franchise_game_docs(monkeypatch):
     game = res.json()["schedule"][0][0]
     assert game["status"] == "scheduled"
     assert game["game_id"] is None
+
+
+def test_schedule_endpoint_filters_to_requested_conference(monkeypatch):
+    client = TestClient(app)
+    franchise_id = ObjectId()
+    away_id = ObjectId()
+    home_id = ObjectId()
+    other_away_id = ObjectId()
+    other_home_id = ObjectId()
+
+    franchises = MagicMock()
+    franchises.find_one.return_value = {
+        "_id": franchise_id,
+        "schedule": [[(away_id, home_id), (other_away_id, other_home_id)]],
+        "results": {},
+        "user_team_id": "Away Team",
+        "user_team_object_id": str(away_id),
+    }
+
+    teams = MagicMock()
+    teams.find.return_value = [
+        {"_id": away_id, "conference": 1, "name": "Alpha"},
+        {"_id": home_id, "conference": 1, "name": "Beta"},
+        {"_id": other_away_id, "conference": 2, "name": "Gamma"},
+        {"_id": other_home_id, "conference": 2, "name": "Delta"},
+    ]
+
+    fake_db = SimpleNamespace(franchises=franchises, games=MagicMock(), teams=teams)
+    fake_db.games.find_one.return_value = None
+    monkeypatch.setattr(franchise_routes, "db", fake_db)
+    monkeypatch.setattr(
+        franchise_routes,
+        "franchise_team_data_collection",
+        SimpleNamespace(find_one=lambda *args, **kwargs: None),
+    )
+
+    res = client.get(f"/franchise/schedule?franchise_id={franchise_id}&conference=1")
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["conference"] == 1
+    assert len(payload["schedule"]) == 1
+    assert len(payload["schedule"][0]) == 1
+    game = payload["schedule"][0][0]
+    assert game["away_team_id"] == str(away_id)
+    assert game["home_team_id"] == str(home_id)
+    assert payload["team_name_map"] == {
+        str(away_id): "Alpha",
+        str(home_id): "Beta",
+    }

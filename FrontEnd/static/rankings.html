@@ -21,6 +21,7 @@
     <ul id="rankings-list" class="rankings-list"></ul>
   </div>
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
   <script src="/common.js"></script>
   <script>
 (function() {
@@ -34,6 +35,7 @@
 
   let showAll = false;
   let rankings = [];
+  let resourceCache = null;
 
   async function fetchJSON(url) {
     const res = await fetch(url, { headers: window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {} });
@@ -61,12 +63,21 @@
     });
   }
 
+  async function loadRankings() {
+    const cached = resourceCache && resourceCache.get('national');
+    if (cached) return cached;
+    const payload = await fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId));
+    return resourceCache ? resourceCache.set('national', payload) : payload;
+  }
+
   if (!franchiseId) {
     document.getElementById('rankings-list').innerHTML = '<li>Missing franchise_id in URL.</li>';
     return;
   }
   fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId))
     .then(data => {
+      resourceCache = window.ResourceCache.createResourceCache('rankings', franchiseId, data.current_season, data.week);
+      resourceCache.set('national', data);
       rankings = data.rankings || [];
       render();
       document.getElementById('rankings-toggle-top25').addEventListener('click', () => {

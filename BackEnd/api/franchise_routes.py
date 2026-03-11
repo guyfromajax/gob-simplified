@@ -2319,7 +2319,13 @@ def _sister_conference(conference: int) -> int:
 
 
 @router.get("/franchise/standings")
-def standings(franchise_id: str, profile: bool = False, scope: Optional[str] = None, team_id: Optional[str] = None):
+def standings(
+    franchise_id: str,
+    profile: bool = False,
+    scope: Optional[str] = None,
+    team_id: Optional[str] = None,
+    region: Optional[str] = None,
+):
     """Add ?profile=1 for profile_summary. scope=user_region&team_id=... returns only user + sister conference."""
     import time
     def _build():
@@ -2434,6 +2440,13 @@ def standings(franchise_id: str, profile: bool = False, scope: Optional[str] = N
             except Exception as e:
                 logger.warning("standings scope=user_region failed: %s", e)
 
+        if region:
+            region_normalized = str(region).strip().upper()
+            result["standings"] = [
+                item for item in (result.get("standings") or [])
+                if str(item.get("region") or "").upper() == region_normalized
+            ]
+
         logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
         return result
     if profile:
@@ -2449,7 +2462,7 @@ def standings(franchise_id: str, profile: bool = False, scope: Optional[str] = N
 
 
 @router.get("/franchise/schedule")
-def season_schedule(franchise_id: str):
+def season_schedule(franchise_id: str, conference: Optional[int] = None):
     import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/schedule START - franchise_id={franchise_id}")
@@ -2513,6 +2526,7 @@ def season_schedule(franchise_id: str):
 
     weeks = []
     results_by_week = franchise_doc.get("results", {})
+    included_team_ids = set()
     for idx, games in enumerate(schedule, start=1):
         week_games = []
         week_results = {
@@ -2566,6 +2580,8 @@ def season_schedule(franchise_id: str):
                 "is_user_team": str(away_id) == team_id or str(home_id) == team_id,
                 "game_id": game_id  # ✅ SS&S: Include game_id for box score links
             })
+            included_team_ids.add(str(away_id))
+            included_team_ids.add(str(home_id))
         weeks.append(week_games)
 
     # ✅ EOS: Add tournament games (weeks 27–34) from conference / region / national
@@ -2607,13 +2623,42 @@ def season_schedule(franchise_id: str):
                     "is_tournament": True,
                     "round": round_labels.get(eos_week, ""),
                 })
+                included_team_ids.add(away_str)
+                included_team_ids.add(home_str)
             weeks.append(week_games)
 
-    
-    # FCC Schedule tab: team_id -> conference (1–16) for filtering by conference
-    team_conferences = {str(t["_id"]): t.get("conference") for t in db.teams.find({}, {"_id": 1, "conference": 1})}
+    team_docs = list(db.teams.find({}, {"_id": 1, "conference": 1, "name": 1, "mascot": 1}))
+    team_conferences = {str(t["_id"]): t.get("conference") for t in team_docs}
+    if conference is not None:
+        if not isinstance(conference, int) or conference < 1 or conference > 16:
+            raise HTTPException(status_code=422, detail="conference must be an integer from 1 to 16")
+        filtered_weeks = []
+        included_team_ids = set()
+        for week_games in weeks:
+            filtered_week_games = [
+                game for game in (week_games or [])
+                if team_conferences.get(game.get("away_team_id")) == conference
+                or team_conferences.get(game.get("home_team_id")) == conference
+            ]
+            for game in filtered_week_games:
+                included_team_ids.add(game.get("away_team_id"))
+                included_team_ids.add(game.get("home_team_id"))
+            filtered_weeks.append(filtered_week_games)
+        weeks = filtered_weeks
+
+    team_name_map = {
+        str(team_doc["_id"]): team_doc.get("name")
+        for team_doc in team_docs
+        if str(team_doc["_id"]) in included_team_ids
+    }
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
-    return {"schedule": weeks, "team_id": team_id, "team_conferences": team_conferences}
+    return {
+        "schedule": weeks,
+        "team_id": team_id,
+        "team_conferences": team_conferences,
+        "team_name_map": team_name_map,
+        "conference": conference,
+    }
 
 
 def get_leaders(
@@ -2680,16 +2725,51 @@ def leaders(
     franchise_id: str,
     scope: str = "season",
     limit: int = 10,
+    view_scope: str = "national",
 ):
     import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
     
     categories = ["PTS", "AST", "3PTM", "REB", "BLK", "STL"]  # ✅ SS&S: Use standardized field name "3PTM" instead of "TPM"
+    allowed_team_ids: Optional[set[str]] = None
+    allowed_team_names: Optional[set[str]] = None
+    if view_scope in {"conference", "region"}:
+        franchise_doc = db.franchises.find_one(
+            {"_id": ObjectId(franchise_id)},
+            {"user_team_object_id": 1, "user_team_id": 1},
+        )
+        user_team_id = None
+        if franchise_doc:
+            _, user_team_id = get_user_team_from_franchise(franchise_doc)
+        if user_team_id and ObjectId.is_valid(user_team_id):
+            user_team_doc = db.teams.find_one({"_id": ObjectId(user_team_id)}, {"conference": 1, "region": 1})
+            if user_team_doc:
+                query = {}
+                if view_scope == "conference":
+                    query["conference"] = user_team_doc.get("conference")
+                else:
+                    query["region"] = user_team_doc.get("region", "")
+                team_docs = list(db.teams.find(query, {"_id": 1, "name": 1}))
+                allowed_team_ids = {str(team["_id"]) for team in team_docs}
+                allowed_team_names = {team.get("name", "") for team in team_docs if team.get("name")}
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
         cat_start = time.time()
-        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=limit)
+        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=256)
+        if allowed_team_ids is not None or allowed_team_names is not None:
+            filtered_top = []
+            for player in top:
+                player_team = player.get("team")
+                player_team_id = str(player_team) if player_team is not None else ""
+                if allowed_team_ids and player_team_id in allowed_team_ids:
+                    filtered_top.append(player)
+                    continue
+                if allowed_team_names and player_team in allowed_team_names:
+                    filtered_top.append(player)
+            top = filtered_top[:limit]
+        else:
+            top = top[:limit]
         cat_time = time.time() - cat_start
         result[cat] = [
             {
@@ -2722,7 +2802,7 @@ def leaders(
 
 
 @router.get("/franchise/team-stats")
-def team_stats(franchise_id: str):
+def team_stats(franchise_id: str, scope: str = "national"):
     """Get team stats by aggregating player stats from franchise document.
     
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific stats),
@@ -2738,7 +2818,7 @@ def team_stats(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1, "user_team_id": 1, "user_team_object_id": 1})
     db_query_time = time.time() - db_query_start
     # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
@@ -2747,6 +2827,23 @@ def team_stats(franchise_id: str):
     players = {d["player_id"]: d for d in fpd_docs}
     franchise_results = franchise_doc.get("results", {})
     team_list = _ftd_team_list_for_franchise(fid)
+    if scope in {"conference", "region"}:
+        user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        if user_team_object_id and ObjectId.is_valid(user_team_object_id):
+            user_team_doc = db.teams.find_one({"_id": ObjectId(user_team_object_id)}, {"conference": 1, "region": 1})
+            if user_team_doc:
+                filtered_team_list = {}
+                for team_id_str, team_name in team_list.items():
+                    if not ObjectId.is_valid(team_id_str):
+                        continue
+                    team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"conference": 1, "region": 1})
+                    if not team_doc:
+                        continue
+                    if scope == "conference" and team_doc.get("conference") == user_team_doc.get("conference"):
+                        filtered_team_list[team_id_str] = team_name
+                    if scope == "region" and team_doc.get("region", "") == user_team_doc.get("region", ""):
+                        filtered_team_list[team_id_str] = team_name
+                team_list = filtered_team_list
     # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
     ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1}))
     franchise_team_rosters = {}
@@ -2792,7 +2889,7 @@ def team_stats(franchise_id: str):
 
 
 @router.get("/franchise/team-traits")
-def team_traits(franchise_id: str):
+def team_traits(franchise_id: str, scope: str = "national"):
     """Get team attribute totals for all teams in franchise.
     
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific attributes),
@@ -2816,6 +2913,11 @@ def team_traits(franchise_id: str):
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
     players = {d["player_id"]: d for d in fpd_docs}
     team_list = _ftd_team_list_for_franchise(fid)
+    user_team_scope = None
+    if scope in {"conference", "region"}:
+        user_team_id, user_team_object_id = get_user_team_from_franchise(db.franchises.find_one({"_id": fid}, {"user_team_id": 1, "user_team_object_id": 1}))
+        if user_team_object_id and ObjectId.is_valid(user_team_object_id):
+            user_team_scope = db.teams.find_one({"_id": ObjectId(user_team_object_id)}, {"conference": 1, "region": 1})
     
     # logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(team_list)} teams")
     
@@ -2827,6 +2929,10 @@ def team_traits(franchise_id: str):
         try:
             team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1, "conference": 1, "region": 1})
             if team_doc:
+                if user_team_scope and scope == "conference" and team_doc.get("conference") != user_team_scope.get("conference"):
+                    continue
+                if user_team_scope and scope == "region" and team_doc.get("region", "") != user_team_scope.get("region", ""):
+                    continue
                 team_name = team_doc.get("name", team_id_str)
                 team_names[team_id_str] = team_name
                 team_totals[team_id_str] = {

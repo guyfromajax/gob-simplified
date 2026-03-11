@@ -48,6 +48,7 @@
     </div>
   </div>
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
   <script src="/common.js"></script>
   <script>
 (function() {
@@ -68,25 +69,14 @@
   let userConference = null, userRegion = null;
   let scope = 'conference';
   let traitsData = null;
+  let resourceCache = null;
 
   const ATTRS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
   const ATTRS_NO_FT = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ'];
 
-  function filterTeams(teams, sc) {
-    if (!teams || sc === 'national') return teams || [];
-    const confMatch = sc === 'conference' && userConference != null;
-    const regionMatch = sc === 'region' && userRegion != null;
-    const rn = (v) => (v || '').toString().toUpperCase();
-    return teams.filter((t) => {
-      if (confMatch) return t.conference === userConference;
-      if (regionMatch) return rn(t.region) === rn(userRegion);
-      return true;
-    });
-  }
-
   function render() {
     if (!traitsData || !traitsData.teams) return;
-    const filtered = filterTeams(JSON.parse(JSON.stringify(traitsData.teams)), scope);
+    const filtered = JSON.parse(JSON.stringify(traitsData.teams));
     filtered.forEach(team => {
       const attrs = team.attributes || {};
       team.total = ATTRS.reduce((sum, attr) => sum + (attrs[attr] || 0), 0);
@@ -138,22 +128,35 @@
     }
   }
 
+  async function loadScope(targetScope) {
+    const cached = resourceCache && resourceCache.get(targetScope);
+    if (cached) return cached;
+    const payload = await fetchJSON(
+      API_CONFIG.buildUrl('/franchise/team-traits')
+      + '?franchise_id=' + encodeURIComponent(franchiseId)
+      + '&scope=' + encodeURIComponent(targetScope)
+    );
+    return resourceCache ? resourceCache.set(targetScope, payload) : payload;
+  }
+
   if (!franchiseId) {
     document.getElementById('team-traits-body').innerHTML = '<tr><td colspan="14">Missing franchise_id in URL.</td></tr>';
     return;
   }
   Promise.all([
-    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    fetchJSON(API_CONFIG.buildUrl('/franchise/team-traits') + '?franchise_id=' + encodeURIComponent(franchiseId))
-  ]).then(([cc, data]) => {
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(async ([cc]) => {
     userConference = cc.user_conference;
     userRegion = cc.user_region || '';
-    traitsData = data;
+    resourceCache = window.ResourceCache.createResourceCache('team-traits', franchiseId, cc.current_season, cc.week);
+    traitsData = await loadScope(scope);
     render();
     document.querySelectorAll('.traits-scope-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         scope = btn.getAttribute('data-scope') || 'conference';
         document.querySelectorAll('.traits-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === scope));
+        document.getElementById('team-traits-body').innerHTML = '<tr><td colspan="14">Loading team traits...</td></tr>';
+        traitsData = await loadScope(scope);
         render();
       });
     });
