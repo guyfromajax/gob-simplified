@@ -2317,7 +2317,7 @@ async function renderTournamentBracket() {
     tournamentTitle = 'Conference Tournament';
   } else if (week >= 30 && week <= 31) {
     tournamentTitle = 'Region Tournament';
-  } else if (week >= 32 && week <= 34) {
+  } else if (week >= 32 && week <= 36) {
     tournamentTitle = 'National Tournament';
   }
   if (titleEl) titleEl.textContent = tournamentTitle;
@@ -2410,7 +2410,7 @@ async function renderTournamentBracket() {
   } else if (week >= 30 && week <= 31) {
     if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
     if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
-  } else if (week >= 32 && week <= 34) {
+  } else if (week >= 32 && week <= 36) {
     if (nationalTournament) sections.push(createBracketSection('National Tournament', nationalTournament, 'full', 'fcc-tournament-tone-national'));
     if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
     if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));

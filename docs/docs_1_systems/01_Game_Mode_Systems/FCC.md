@@ -101,6 +101,7 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
   - weeks `27-29`: show only the user's Conference Tournament bracket
   - weeks `30-31`: show Region Tournament on top and the user's Conference Tournament below it
   - weeks `32-34`: show National Tournament on top, the user's Region Tournament below it, and the user's Conference Tournament at the bottom
+  - weeks `35-36`: keep the same stacked National + Region + Conference tournament history visible until next season init clears EOS state
   - sections are separated by horizontal divider lines
 - **Section backgrounds:**
   - Conference Tournament: white
