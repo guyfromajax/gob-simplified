@@ -11,6 +11,7 @@ Define the standardized page-load pattern for franchise-mode resource pages so i
 - `stats.html`
 - `team-traits.html`
 - `rankings.html`
+- stateful gameplay transitions such as `set-lineup.html` -> `court.html`
 
 ## Standardized process
 
@@ -87,6 +88,7 @@ Examples:
 - Keep caching browser-session scoped only.
 - Do not use server-side global caches unless profiling later proves they are needed.
 - Keep rendering separate from fetching and separate from caching.
+- For stateful pages, do not hide the page-load overlay until all visible header/UI state has been hydrated from current data.
 
 ## Rationale
 
