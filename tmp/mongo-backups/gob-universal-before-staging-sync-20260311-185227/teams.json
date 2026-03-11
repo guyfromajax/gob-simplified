@@ -1,0 +1,2539 @@
+[
+  {
+    "_id": {
+      "$oid": "68c98b08674d3f9b04546b2e"
+    },
+    "name": "Bentley-Truman",
+    "player_ids": [
+      "8487cb3b-887b-472a-90d9-f46caa572d46",
+      "fa15e712-21f7-4e6f-951d-b5fb3bb45812",
+      "f3f74388-9907-4e71-becd-05992f8ce5b2",
+      "1b15ccb9-17b1-492c-a0c4-e82b3d368079",
+      "8785cbe5-da8f-4c37-9b2e-54bfd8b029bb",
+      "88ab7e7e-c3ef-4f45-ab85-0814891fddb8",
+      "79c6c5c9-43a2-4d8a-b7f9-337231091e64",
+      "f23fae35-ea45-44fe-a698-a06580707783",
+      "8387538a-1a76-451d-9c08-9c812bf65fdc",
+      "1cab89f0-f2b2-4c45-8d31-6e38746c4477",
+      "bd2a1128-80b1-48e9-be21-835031805b49",
+      "d53139da-06cd-4e4b-8ed4-a107fbb58bd5"
+    ],
+    "team_id": "BENTLEY_TRUMAN",
+    "primary_color": "#4066b2",
+    "secondary_color": "#ffffff",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 427,
+            "used": 1166,
+            "vs_attack": {
+              "attempts": 396,
+              "success": 142
+            },
+            "vs_inside": {
+              "attempts": 388,
+              "success": 106
+            },
+            "vs_motion": {
+              "attempts": 577,
+              "success": 179
+            },
+            "vs_motion_attack": {
+              "attempts": 199,
+              "success": 64
+            },
+            "vs_motion_inside": {
+              "attempts": 188,
+              "success": 23
+            },
+            "vs_motion_outside": {
+              "attempts": 190,
+              "success": 92
+            },
+            "vs_outside": {
+              "attempts": 382,
+              "success": 179
+            },
+            "vs_set": {
+              "attempts": 589,
+              "success": 248
+            },
+            "vs_set_attack": {
+              "attempts": 197,
+              "success": 78
+            },
+            "vs_set_inside": {
+              "attempts": 200,
+              "success": 83
+            },
+            "vs_set_outside": {
+              "attempts": 192,
+              "success": 87
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 420,
+            "used": 1181,
+            "vs_attack": {
+              "attempts": 365,
+              "success": 123
+            },
+            "vs_inside": {
+              "attempts": 412,
+              "success": 107
+            },
+            "vs_motion": {
+              "attempts": 634,
+              "success": 169
+            },
+            "vs_motion_attack": {
+              "attempts": 214,
+              "success": 49
+            },
+            "vs_motion_inside": {
+              "attempts": 214,
+              "success": 20
+            },
+            "vs_motion_outside": {
+              "attempts": 206,
+              "success": 100
+            },
+            "vs_outside": {
+              "attempts": 404,
+              "success": 190
+            },
+            "vs_set": {
+              "attempts": 547,
+              "success": 251
+            },
+            "vs_set_attack": {
+              "attempts": 151,
+              "success": 74
+            },
+            "vs_set_inside": {
+              "attempts": 198,
+              "success": 87
+            },
+            "vs_set_outside": {
+              "attempts": 198,
+              "success": 90
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 450,
+            "used": 1181,
+            "vs_attack": {
+              "attempts": 424,
+              "success": 148
+            },
+            "vs_inside": {
+              "attempts": 390,
+              "success": 102
+            },
+            "vs_motion": {
+              "attempts": 608,
+              "success": 184
+            },
+            "vs_motion_attack": {
+              "attempts": 221,
+              "success": 48
+            },
+            "vs_motion_inside": {
+              "attempts": 202,
+              "success": 26
+            },
+            "vs_motion_outside": {
+              "attempts": 185,
+              "success": 110
+            },
+            "vs_outside": {
+              "attempts": 367,
+              "success": 200
+            },
+            "vs_set": {
+              "attempts": 573,
+              "success": 266
+            },
+            "vs_set_attack": {
+              "attempts": 203,
+              "success": 100
+            },
+            "vs_set_inside": {
+              "attempts": 188,
+              "success": 76
+            },
+            "vs_set_outside": {
+              "attempts": 182,
+              "success": 90
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1311,
+            "used": 3820,
+            "vs_attack": {
+              "attempts": 1262,
+              "success": 404
+            },
+            "vs_inside": {
+              "attempts": 1266,
+              "success": 309
+            },
+            "vs_motion": {
+              "attempts": 1949,
+              "success": 538
+            },
+            "vs_motion_attack": {
+              "attempts": 664,
+              "success": 177
+            },
+            "vs_motion_inside": {
+              "attempts": 652,
+              "success": 69
+            },
+            "vs_motion_outside": {
+              "attempts": 631,
+              "success": 292
+            },
+            "vs_outside": {
+              "attempts": 1290,
+              "success": 598
+            },
+            "vs_set": {
+              "attempts": 1871,
+              "success": 773
+            },
+            "vs_set_attack": {
+              "attempts": 598,
+              "success": 227
+            },
+            "vs_set_inside": {
+              "attempts": 614,
+              "success": 240
+            },
+            "vs_set_outside": {
+              "attempts": 659,
+              "success": 306
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": -5,
+    "fb_efficiency": -9,
+    "fb_opp_modifier": -10,
+    "pt_efficiency": -1,
+    "pt_opp_modifier": 7,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "playbook_settings": {
+      "motion": {
+        "4-1 Motion": 100
+      },
+      "set_play_inside": {},
+      "set_play_attack": {},
+      "set_play_outside": {},
+      "zone_defense": {},
+      "slot_assignments": {},
+      "motion_dropdowns": {}
+    },
+    "discipline": -1,
+    "fight": 1,
+    "mascot": "Sterling Knights"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b08674d3f9b04546b2f"
+    },
+    "name": "Four Corners",
+    "player_ids": [
+      "efbe97ca-5e68-4151-97e2-9b2c751a3e82",
+      "c4d4afa3-c08a-47db-92b7-dd882f03000e",
+      "81ae60d5-11da-4775-b0d7-286f9e21c7ed",
+      "5333d083-f227-45cf-b875-0947a413c859",
+      "c6467e5b-fd10-46e3-88a0-9941391cc6b7",
+      "2f7736fc-8bf6-45ea-814f-d32179ad4fc7",
+      "a2aa2719-0f09-47d7-8c99-ad208f20b847",
+      "030d9bd9-125d-4ad5-a49c-12b528d7ae89",
+      "efc6434e-25d0-4f55-9fb8-a3023cbf0371",
+      "042c7d34-fc6b-4647-8f21-e97bbd9249a3",
+      "a490f32e-54e3-44d3-b805-b3e43b524fda",
+      "d56e27a3-92ef-4c0a-a882-6b158131331e"
+    ],
+    "team_id": "FOUR_CORNERS",
+    "primary_color": "#c0976a",
+    "secondary_color": "#00954b",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 456,
+            "used": 1241,
+            "vs_attack": {
+              "attempts": 442,
+              "success": 155
+            },
+            "vs_inside": {
+              "attempts": 452,
+              "success": 109
+            },
+            "vs_motion": {
+              "attempts": 629,
+              "success": 190
+            },
+            "vs_motion_attack": {
+              "attempts": 209,
+              "success": 62
+            },
+            "vs_motion_inside": {
+              "attempts": 222,
+              "success": 18
+            },
+            "vs_motion_outside": {
+              "attempts": 197,
+              "success": 110
+            },
+            "vs_outside": {
+              "attempts": 424,
+              "success": 226
+            },
+            "vs_set": {
+              "attempts": 690,
+              "success": 300
+            },
+            "vs_set_attack": {
+              "attempts": 233,
+              "success": 93
+            },
+            "vs_set_inside": {
+              "attempts": 230,
+              "success": 91
+            },
+            "vs_set_outside": {
+              "attempts": 227,
+              "success": 116
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 474,
+            "used": 1272,
+            "vs_attack": {
+              "attempts": 479,
+              "success": 164
+            },
+            "vs_inside": {
+              "attempts": 439,
+              "success": 126
+            },
+            "vs_motion": {
+              "attempts": 642,
+              "success": 179
+            },
+            "vs_motion_attack": {
+              "attempts": 225,
+              "success": 52
+            },
+            "vs_motion_inside": {
+              "attempts": 207,
+              "success": 16
+            },
+            "vs_motion_outside": {
+              "attempts": 209,
+              "success": 111
+            },
+            "vs_outside": {
+              "attempts": 437,
+              "success": 217
+            },
+            "vs_set": {
+              "attempts": 714,
+              "success": 328
+            },
+            "vs_set_attack": {
+              "attempts": 254,
+              "success": 112
+            },
+            "vs_set_inside": {
+              "attempts": 232,
+              "success": 110
+            },
+            "vs_set_outside": {
+              "attempts": 228,
+              "success": 106
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 474,
+            "used": 1281,
+            "vs_attack": {
+              "attempts": 493,
+              "success": 174
+            },
+            "vs_inside": {
+              "attempts": 440,
+              "success": 131
+            },
+            "vs_motion": {
+              "attempts": 625,
+              "success": 171
+            },
+            "vs_motion_attack": {
+              "attempts": 226,
+              "success": 48
+            },
+            "vs_motion_inside": {
+              "attempts": 206,
+              "success": 21
+            },
+            "vs_motion_outside": {
+              "attempts": 191,
+              "success": 102
+            },
+            "vs_outside": {
+              "attempts": 429,
+              "success": 204
+            },
+            "vs_set": {
+              "attempts": 739,
+              "success": 338
+            },
+            "vs_set_attack": {
+              "attempts": 267,
+              "success": 126
+            },
+            "vs_set_inside": {
+              "attempts": 234,
+              "success": 110
+            },
+            "vs_set_outside": {
+              "attempts": 238,
+              "success": 102
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1281,
+            "used": 3693,
+            "vs_attack": {
+              "attempts": 1262,
+              "success": 407
+            },
+            "vs_inside": {
+              "attempts": 1253,
+              "success": 299
+            },
+            "vs_motion": {
+              "attempts": 1777,
+              "success": 508
+            },
+            "vs_motion_attack": {
+              "attempts": 589,
+              "success": 151
+            },
+            "vs_motion_inside": {
+              "attempts": 609,
+              "success": 69
+            },
+            "vs_motion_outside": {
+              "attempts": 578,
+              "success": 288
+            },
+            "vs_outside": {
+              "attempts": 1238,
+              "success": 599
+            },
+            "vs_set": {
+              "attempts": 1977,
+              "success": 797
+            },
+            "vs_set_attack": {
+              "attempts": 673,
+              "success": 256
+            },
+            "vs_set_inside": {
+              "attempts": 644,
+              "success": 230
+            },
+            "vs_set_outside": {
+              "attempts": 660,
+              "success": 311
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": -4,
+    "fb_efficiency": 1,
+    "fb_opp_modifier": 1,
+    "pt_efficiency": 5,
+    "pt_opp_modifier": -1,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "playbook_settings": {
+      "motion": {
+        "3-2 Motion": 34,
+        "4-1 Motion": 33,
+        "5-0 Motion": 33
+      },
+      "set_play_inside": {
+        "Base Post Play": 50,
+        "C Post Iso": 50
+      },
+      "set_play_attack": {
+        "C High Post Clear Out": 50,
+        "Pick & Roll (Lower Wing)": 50
+      },
+      "set_play_outside": {
+        "C Screen & Three": 50,
+        "Double Screen For SG": 50
+      },
+      "zone_defense": {
+        "2-3 Zone": 33,
+        "3-2 Zone": 33,
+        "1-3-1 Zone": 34
+      },
+      "slot_assignments": {
+        "1": {
+          "section": "set-play-inside",
+          "playId": "set-inside-1"
+        },
+        "2": {
+          "section": "set-play-inside",
+          "playId": "set-inside-2"
+        },
+        "3": {
+          "section": "set-play-attack",
+          "playId": "set-attack-1"
+        },
+        "4": {
+          "section": "set-play-attack",
+          "playId": "set-attack-4"
+        },
+        "5": {
+          "section": "set-play-outside",
+          "playId": "set-outside-1"
+        },
+        "6": {
+          "section": "set-play-outside",
+          "playId": "set-outside-2"
+        }
+      },
+      "motion_dropdowns": {
+        "motion-1": "-",
+        "motion-2": "-",
+        "motion-3": "-",
+        "motion-tba-4": "-",
+        "motion-4": "-",
+        "motion-tba-2": "-",
+        "motion-tba-3": "-",
+        "motion-tba-1": "-"
+      },
+      "man_defense": {
+        "Man Defense": 100
+      },
+      "even_distribution_all": true
+    },
+    "discipline": -9,
+    "fight": -4,
+    "mascot": "Harvest"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b08674d3f9b04546b30"
+    },
+    "name": "Lancaster",
+    "player_ids": [
+      "83608be4-5065-4df6-9276-5e69376c15aa",
+      "da0cf556-b8b9-47d1-91f9-a80595359f4e",
+      "131abe35-8f84-41ce-ba4c-154556289954",
+      "0df15c02-a4d1-437b-b102-45f42b25e50b",
+      "26e15606-2eca-4616-840a-d14b87174395",
+      "b17a21bc-790e-4893-82d5-362dd8ec19a2",
+      "778e8352-eecb-4870-a280-a0eb90222551",
+      "a699d851-8d4e-4987-936d-293b04a7b1f8",
+      "d9449124-4ca6-4437-b192-554be3a5d00a",
+      "560d1d61-4ddb-4ac8-b68b-00181e488c48",
+      "7acb9670-0995-45e3-8ca8-1c7f8a601f92",
+      "7c10c995-0d1a-4c1b-b4eb-7198ad81c9b2"
+    ],
+    "team_id": "LANCASTER",
+    "primary_color": "#d24a1b",
+    "secondary_color": "#000000",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 459,
+            "used": 1234,
+            "vs_attack": {
+              "attempts": 390,
+              "success": 137
+            },
+            "vs_inside": {
+              "attempts": 420,
+              "success": 110
+            },
+            "vs_motion": {
+              "attempts": 619,
+              "success": 175
+            },
+            "vs_motion_attack": {
+              "attempts": 184,
+              "success": 49
+            },
+            "vs_motion_inside": {
+              "attempts": 208,
+              "success": 19
+            },
+            "vs_motion_outside": {
+              "attempts": 227,
+              "success": 107
+            },
+            "vs_outside": {
+              "attempts": 458,
+              "success": 225
+            },
+            "vs_set": {
+              "attempts": 649,
+              "success": 297
+            },
+            "vs_set_attack": {
+              "attempts": 206,
+              "success": 88
+            },
+            "vs_set_inside": {
+              "attempts": 212,
+              "success": 91
+            },
+            "vs_set_outside": {
+              "attempts": 231,
+              "success": 118
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 451,
+            "used": 1190,
+            "vs_attack": {
+              "attempts": 398,
+              "success": 143
+            },
+            "vs_inside": {
+              "attempts": 420,
+              "success": 124
+            },
+            "vs_motion": {
+              "attempts": 591,
+              "success": 149
+            },
+            "vs_motion_attack": {
+              "attempts": 184,
+              "success": 47
+            },
+            "vs_motion_inside": {
+              "attempts": 212,
+              "success": 19
+            },
+            "vs_motion_outside": {
+              "attempts": 195,
+              "success": 83
+            },
+            "vs_outside": {
+              "attempts": 408,
+              "success": 199
+            },
+            "vs_set": {
+              "attempts": 635,
+              "success": 317
+            },
+            "vs_set_attack": {
+              "attempts": 214,
+              "success": 96
+            },
+            "vs_set_inside": {
+              "attempts": 208,
+              "success": 105
+            },
+            "vs_set_outside": {
+              "attempts": 213,
+              "success": 116
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 478,
+            "used": 1207,
+            "vs_attack": {
+              "attempts": 412,
+              "success": 153
+            },
+            "vs_inside": {
+              "attempts": 421,
+              "success": 124
+            },
+            "vs_motion": {
+              "attempts": 614,
+              "success": 161
+            },
+            "vs_motion_attack": {
+              "attempts": 206,
+              "success": 53
+            },
+            "vs_motion_inside": {
+              "attempts": 210,
+              "success": 17
+            },
+            "vs_motion_outside": {
+              "attempts": 198,
+              "success": 91
+            },
+            "vs_outside": {
+              "attempts": 410,
+              "success": 215
+            },
+            "vs_set": {
+              "attempts": 629,
+              "success": 331
+            },
+            "vs_set_attack": {
+              "attempts": 206,
+              "success": 100
+            },
+            "vs_set_inside": {
+              "attempts": 211,
+              "success": 107
+            },
+            "vs_set_outside": {
+              "attempts": 212,
+              "success": 124
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1353,
+            "used": 3732,
+            "vs_attack": {
+              "attempts": 1199,
+              "success": 417
+            },
+            "vs_inside": {
+              "attempts": 1302,
+              "success": 328
+            },
+            "vs_motion": {
+              "attempts": 1890,
+              "success": 530
+            },
+            "vs_motion_attack": {
+              "attempts": 618,
+              "success": 163
+            },
+            "vs_motion_inside": {
+              "attempts": 673,
+              "success": 69
+            },
+            "vs_motion_outside": {
+              "attempts": 599,
+              "success": 298
+            },
+            "vs_outside": {
+              "attempts": 1254,
+              "success": 617
+            },
+            "vs_set": {
+              "attempts": 1865,
+              "success": 832
+            },
+            "vs_set_attack": {
+              "attempts": 581,
+              "success": 254
+            },
+            "vs_set_inside": {
+              "attempts": 629,
+              "success": 259
+            },
+            "vs_set_outside": {
+              "attempts": 655,
+              "success": 319
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": -7,
+    "fb_efficiency": 4,
+    "fb_opp_modifier": -3,
+    "pt_efficiency": 1,
+    "pt_opp_modifier": 4,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "discipline": -5,
+    "fight": -3,
+    "playbook_settings": {
+      "motion": {
+        "3-2 Motion": 34,
+        "4-1 Motion": 33,
+        "5-0 Motion": 33
+      },
+      "set_play_inside": {
+        "Base Post Play": 50,
+        "SG Pass & Cut": 50
+      },
+      "set_play_attack": {
+        "Pick & Roll (Lower Wing)": 50,
+        "SG Pick & Roll": 50
+      },
+      "set_play_outside": {
+        "Double Screen For SG": 50,
+        "SG Wheel Three": 50
+      },
+      "zone_defense": {
+        "2-3 Zone": 60,
+        "3-2 Zone": 30,
+        "1-3-1 Zone": 10
+      },
+      "slot_assignments": {},
+      "motion_dropdowns": {
+        "motion-1": "-",
+        "motion-2": "-",
+        "motion-3": "-",
+        "motion-tba-4": "-",
+        "motion-tba-1": "-",
+        "motion-tba-2": "-",
+        "motion-tba-3": "-"
+      },
+      "man_defense": {
+        "Man Defense": 100
+      }
+    },
+    "mascot": "Johnnies"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b09674d3f9b04546b31"
+    },
+    "name": "Little York",
+    "player_ids": [
+      "670a92ad-fea1-44c9-b8c8-c1a0c46dc7ef",
+      "65f42052-4920-43e4-b39c-0066a20d2cbf",
+      "2a5439f6-4e6d-4f0e-90f5-cb7f56e94ddb",
+      "2b2c829f-d990-4463-9fa7-679126f14f58",
+      "1ac0782e-e1b3-4cb6-9462-b1ff032ed9ed",
+      "31699ab9-3855-44ae-87dc-76a6bca3190e",
+      "d664ffa7-8320-4050-97bb-bc4ff162b5cf",
+      "b97f8a36-2532-4fe9-af35-5f42ab24a737",
+      "29654adb-54cf-4584-85cc-976e8bada5cc",
+      "4c985ddd-4f6e-4be7-8476-8b8be842724e",
+      "1a4c430b-b160-42a5-9de7-759e64726a81",
+      "a3860d21-e625-4b2a-bd76-51c5ff5958af"
+    ],
+    "team_id": "LITTLE_YORK",
+    "primary_color": "#65308e",
+    "secondary_color": "#f6af38",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 434,
+            "used": 1295,
+            "vs_attack": {
+              "attempts": 418,
+              "success": 161
+            },
+            "vs_inside": {
+              "attempts": 450,
+              "success": 105
+            },
+            "vs_motion": {
+              "attempts": 719,
+              "success": 180
+            },
+            "vs_motion_attack": {
+              "attempts": 212,
+              "success": 70
+            },
+            "vs_motion_inside": {
+              "attempts": 237,
+              "success": 24
+            },
+            "vs_motion_outside": {
+              "attempts": 270,
+              "success": 86
+            },
+            "vs_outside": {
+              "attempts": 477,
+              "success": 192
+            },
+            "vs_set": {
+              "attempts": 626,
+              "success": 278
+            },
+            "vs_set_attack": {
+              "attempts": 206,
+              "success": 91
+            },
+            "vs_set_inside": {
+              "attempts": 213,
+              "success": 81
+            },
+            "vs_set_outside": {
+              "attempts": 207,
+              "success": 106
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 413,
+            "used": 1249,
+            "vs_attack": {
+              "attempts": 415,
+              "success": 143
+            },
+            "vs_inside": {
+              "attempts": 419,
+              "success": 106
+            },
+            "vs_motion": {
+              "attempts": 703,
+              "success": 193
+            },
+            "vs_motion_attack": {
+              "attempts": 209,
+              "success": 65
+            },
+            "vs_motion_inside": {
+              "attempts": 233,
+              "success": 30
+            },
+            "vs_motion_outside": {
+              "attempts": 261,
+              "success": 98
+            },
+            "vs_outside": {
+              "attempts": 460,
+              "success": 185
+            },
+            "vs_set": {
+              "attempts": 591,
+              "success": 241
+            },
+            "vs_set_attack": {
+              "attempts": 206,
+              "success": 78
+            },
+            "vs_set_inside": {
+              "attempts": 186,
+              "success": 76
+            },
+            "vs_set_outside": {
+              "attempts": 199,
+              "success": 87
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 438,
+            "used": 1295,
+            "vs_attack": {
+              "attempts": 436,
+              "success": 146
+            },
+            "vs_inside": {
+              "attempts": 447,
+              "success": 106
+            },
+            "vs_motion": {
+              "attempts": 706,
+              "success": 185
+            },
+            "vs_motion_attack": {
+              "attempts": 221,
+              "success": 46
+            },
+            "vs_motion_inside": {
+              "attempts": 235,
+              "success": 25
+            },
+            "vs_motion_outside": {
+              "attempts": 250,
+              "success": 114
+            },
+            "vs_outside": {
+              "attempts": 455,
+              "success": 205
+            },
+            "vs_set": {
+              "attempts": 632,
+              "success": 272
+            },
+            "vs_set_attack": {
+              "attempts": 215,
+              "success": 100
+            },
+            "vs_set_inside": {
+              "attempts": 212,
+              "success": 81
+            },
+            "vs_set_outside": {
+              "attempts": 205,
+              "success": 91
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1356,
+            "used": 3953,
+            "vs_attack": {
+              "attempts": 1281,
+              "success": 448
+            },
+            "vs_inside": {
+              "attempts": 1319,
+              "success": 338
+            },
+            "vs_motion": {
+              "attempts": 2072,
+              "success": 556
+            },
+            "vs_motion_attack": {
+              "attempts": 658,
+              "success": 202
+            },
+            "vs_motion_inside": {
+              "attempts": 684,
+              "success": 68
+            },
+            "vs_motion_outside": {
+              "attempts": 730,
+              "success": 286
+            },
+            "vs_outside": {
+              "attempts": 1380,
+              "success": 581
+            },
+            "vs_set": {
+              "attempts": 1908,
+              "success": 811
+            },
+            "vs_set_attack": {
+              "attempts": 623,
+              "success": 246
+            },
+            "vs_set_inside": {
+              "attempts": 635,
+              "success": 270
+            },
+            "vs_set_outside": {
+              "attempts": 650,
+              "success": 295
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": -7,
+    "fb_efficiency": -1,
+    "fb_opp_modifier": -2,
+    "pt_efficiency": 5,
+    "pt_opp_modifier": -10,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "discipline": 3,
+    "fight": 9,
+    "playbook_settings": {
+      "motion": {
+        "3-2 Motion": 34,
+        "4-1 Motion": 33,
+        "5-0 Motion": 33
+      },
+      "set_play_inside": {
+        "Base Post Play": 50,
+        "SF Back Door": 50
+      },
+      "set_play_attack": {
+        "Pick & Roll (Lower Wing)": 50,
+        "SF Isolation": 50
+      },
+      "set_play_outside": {
+        "Double Screen For SG": 50,
+        "SF Misdirection Three": 50
+      },
+      "zone_defense": {
+        "2-3 Zone": 33,
+        "3-2 Zone": 33,
+        "1-3-1 Zone": 34
+      },
+      "slot_assignments": {
+        "1": {
+          "section": "set-play-outside",
+          "playId": "set-outside-6"
+        },
+        "2": {
+          "section": "set-play-outside",
+          "playId": "set-outside-2"
+        },
+        "3": {
+          "section": "set-play-attack",
+          "playId": "set-attack-5"
+        },
+        "4": {
+          "section": "set-play-attack",
+          "playId": "set-attack-4"
+        },
+        "5": {
+          "section": "set-play-inside",
+          "playId": "set-inside-5"
+        },
+        "6": {
+          "section": "set-play-inside",
+          "playId": "set-inside-1"
+        }
+      },
+      "motion_dropdowns": {
+        "motion-1": "-",
+        "motion-2": "-",
+        "motion-3": "-",
+        "motion-tba-4": "-"
+      },
+      "man_defense": {
+        "Man Defense": 100
+      },
+      "even_distribution_all": true
+    },
+    "mascot": "Minutemen"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b09674d3f9b04546b32"
+    },
+    "name": "Morristown",
+    "player_ids": [
+      "e78e967d-86f8-4f31-b5f3-2729ac5c3ecb",
+      "3a910b40-f05c-4624-9555-aeb13faf56e6",
+      "17694da1-cf52-4934-8755-aaddb23e7cd0",
+      "2e0089ee-a3e6-4c2d-8822-170fbbd335ac",
+      "b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad",
+      "20cdb34e-4f62-47ef-889c-729045d6359b",
+      "c88c3ece-1dc8-4f53-8577-2c9494d2a503",
+      "068c0b8a-c772-4542-a6ec-0cd6f21329ba",
+      "0ebe584c-1baf-41aa-b270-f48549527ecf",
+      "23df2d9a-dabf-4777-96db-d7412b988291",
+      "eaae738e-6170-4191-b6bf-f6cf4a291b30",
+      "4e0e13d8-ae9a-4bc1-a852-86ff10c9292f"
+    ],
+    "team_id": "MORRISTOWN",
+    "primary_color": "#ec1d28",
+    "secondary_color": "#cccccc",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "defensive_efficiency": -2,
+    "fb_efficiency": -7,
+    "fb_opp_modifier": -4,
+    "pt_efficiency": 6,
+    "pt_opp_modifier": -8,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 364,
+            "used": 1011,
+            "vs_attack": {
+              "attempts": 345,
+              "success": 109
+            },
+            "vs_inside": {
+              "attempts": 362,
+              "success": 104
+            },
+            "vs_motion": {
+              "attempts": 506,
+              "success": 134
+            },
+            "vs_motion_attack": {
+              "attempts": 163,
+              "success": 29
+            },
+            "vs_motion_inside": {
+              "attempts": 184,
+              "success": 21
+            },
+            "vs_motion_outside": {
+              "attempts": 159,
+              "success": 84
+            },
+            "vs_outside": {
+              "attempts": 337,
+              "success": 167
+            },
+            "vs_set": {
+              "attempts": 538,
+              "success": 246
+            },
+            "vs_set_attack": {
+              "attempts": 182,
+              "success": 80
+            },
+            "vs_set_inside": {
+              "attempts": 178,
+              "success": 83
+            },
+            "vs_set_outside": {
+              "attempts": 178,
+              "success": 83
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 401,
+            "used": 1085,
+            "vs_attack": {
+              "attempts": 362,
+              "success": 131
+            },
+            "vs_inside": {
+              "attempts": 381,
+              "success": 96
+            },
+            "vs_motion": {
+              "attempts": 564,
+              "success": 177
+            },
+            "vs_motion_attack": {
+              "attempts": 184,
+              "success": 62
+            },
+            "vs_motion_inside": {
+              "attempts": 196,
+              "success": 16
+            },
+            "vs_motion_outside": {
+              "attempts": 184,
+              "success": 99
+            },
+            "vs_outside": {
+              "attempts": 374,
+              "success": 190
+            },
+            "vs_set": {
+              "attempts": 553,
+              "success": 240
+            },
+            "vs_set_attack": {
+              "attempts": 178,
+              "success": 69
+            },
+            "vs_set_inside": {
+              "attempts": 185,
+              "success": 80
+            },
+            "vs_set_outside": {
+              "attempts": 190,
+              "success": 91
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 367,
+            "used": 1068,
+            "vs_attack": {
+              "attempts": 390,
+              "success": 133
+            },
+            "vs_inside": {
+              "attempts": 374,
+              "success": 98
+            },
+            "vs_motion": {
+              "attempts": 537,
+              "success": 129
+            },
+            "vs_motion_attack": {
+              "attempts": 177,
+              "success": 41
+            },
+            "vs_motion_inside": {
+              "attempts": 186,
+              "success": 20
+            },
+            "vs_motion_outside": {
+              "attempts": 174,
+              "success": 68
+            },
+            "vs_outside": {
+              "attempts": 340,
+              "success": 156
+            },
+            "vs_set": {
+              "attempts": 567,
+              "success": 258
+            },
+            "vs_set_attack": {
+              "attempts": 213,
+              "success": 92
+            },
+            "vs_set_inside": {
+              "attempts": 188,
+              "success": 78
+            },
+            "vs_set_outside": {
+              "attempts": 166,
+              "success": 88
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1233,
+            "used": 3394,
+            "vs_attack": {
+              "attempts": 1085,
+              "success": 393
+            },
+            "vs_inside": {
+              "attempts": 1160,
+              "success": 319
+            },
+            "vs_motion": {
+              "attempts": 1656,
+              "success": 480
+            },
+            "vs_motion_attack": {
+              "attempts": 539,
+              "success": 174
+            },
+            "vs_motion_inside": {
+              "attempts": 549,
+              "success": 68
+            },
+            "vs_motion_outside": {
+              "attempts": 566,
+              "success": 238
+            },
+            "vs_outside": {
+              "attempts": 1169,
+              "success": 529
+            },
+            "vs_set": {
+              "attempts": 1760,
+              "success": 761
+            },
+            "vs_set_attack": {
+              "attempts": 546,
+              "success": 219
+            },
+            "vs_set_inside": {
+              "attempts": 611,
+              "success": 251
+            },
+            "vs_set_outside": {
+              "attempts": 603,
+              "success": 291
+            }
+          }
+        }
+      }
+    },
+    "playbook_settings": {
+      "motion": {
+        "4-1 Motion": 100
+      },
+      "set_play_inside": {},
+      "set_play_attack": {},
+      "set_play_outside": {},
+      "zone_defense": {},
+      "slot_assignments": {},
+      "motion_dropdowns": {},
+      "position_filters": {}
+    },
+    "discipline": 5,
+    "fight": 3,
+    "mascot": "Pirates"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b09674d3f9b04546b33"
+    },
+    "name": "Ocean City",
+    "player_ids": [
+      "728177e8-4742-4cb0-97cf-86497685819e",
+      "f196e4a5-2ab1-41cc-8e81-e2a6ea5667cb",
+      "beffda50-d288-4659-a0e8-d95523597635",
+      "1af6348c-f61c-4ada-b490-d6b5f7c99e7d",
+      "2bba8939-29f2-456d-9d6e-715bff328f3c",
+      "7c0baaab-a1fc-474c-ae39-735fa77f223c",
+      "37688b1e-f172-4f52-b57a-4b0c3f4c03e2",
+      "ca3259d3-5a3d-48b6-875b-1c16d591c535",
+      "48313d96-b5dc-4f35-bec0-3ff0356d9f0b",
+      "33971d07-6f6d-459c-b24f-a0f9ce3cd477",
+      "acbbd4d6-d841-4217-9fe6-7a73ce5e1f8b",
+      "db212d09-17de-4c97-a510-d2691a00fce9"
+    ],
+    "team_id": "OCEAN_CITY",
+    "primary_color": "#2a2168",
+    "secondary_color": "#00a89d",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 439,
+            "used": 1267,
+            "vs_attack": {
+              "attempts": 431,
+              "success": 129
+            },
+            "vs_inside": {
+              "attempts": 409,
+              "success": 108
+            },
+            "vs_motion": {
+              "attempts": 620,
+              "success": 173
+            },
+            "vs_motion_attack": {
+              "attempts": 218,
+              "success": 53
+            },
+            "vs_motion_inside": {
+              "attempts": 188,
+              "success": 19
+            },
+            "vs_motion_outside": {
+              "attempts": 214,
+              "success": 101
+            },
+            "vs_outside": {
+              "attempts": 471,
+              "success": 222
+            },
+            "vs_set": {
+              "attempts": 691,
+              "success": 286
+            },
+            "vs_set_attack": {
+              "attempts": 213,
+              "success": 76
+            },
+            "vs_set_inside": {
+              "attempts": 221,
+              "success": 89
+            },
+            "vs_set_outside": {
+              "attempts": 257,
+              "success": 121
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 409,
+            "used": 1306,
+            "vs_attack": {
+              "attempts": 461,
+              "success": 137
+            },
+            "vs_inside": {
+              "attempts": 455,
+              "success": 102
+            },
+            "vs_motion": {
+              "attempts": 697,
+              "success": 177
+            },
+            "vs_motion_attack": {
+              "attempts": 226,
+              "success": 55
+            },
+            "vs_motion_inside": {
+              "attempts": 240,
+              "success": 22
+            },
+            "vs_motion_outside": {
+              "attempts": 231,
+              "success": 100
+            },
+            "vs_outside": {
+              "attempts": 431,
+              "success": 192
+            },
+            "vs_set": {
+              "attempts": 650,
+              "success": 254
+            },
+            "vs_set_attack": {
+              "attempts": 235,
+              "success": 82
+            },
+            "vs_set_inside": {
+              "attempts": 215,
+              "success": 80
+            },
+            "vs_set_outside": {
+              "attempts": 200,
+              "success": 92
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 446,
+            "used": 1317,
+            "vs_attack": {
+              "attempts": 463,
+              "success": 136
+            },
+            "vs_inside": {
+              "attempts": 429,
+              "success": 105
+            },
+            "vs_motion": {
+              "attempts": 657,
+              "success": 162
+            },
+            "vs_motion_attack": {
+              "attempts": 223,
+              "success": 42
+            },
+            "vs_motion_inside": {
+              "attempts": 213,
+              "success": 21
+            },
+            "vs_motion_outside": {
+              "attempts": 221,
+              "success": 99
+            },
+            "vs_outside": {
+              "attempts": 471,
+              "success": 227
+            },
+            "vs_set": {
+              "attempts": 706,
+              "success": 306
+            },
+            "vs_set_attack": {
+              "attempts": 240,
+              "success": 94
+            },
+            "vs_set_inside": {
+              "attempts": 216,
+              "success": 84
+            },
+            "vs_set_outside": {
+              "attempts": 250,
+              "success": 128
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1293,
+            "used": 3969,
+            "vs_attack": {
+              "attempts": 1365,
+              "success": 416
+            },
+            "vs_inside": {
+              "attempts": 1326,
+              "success": 303
+            },
+            "vs_motion": {
+              "attempts": 1908,
+              "success": 505
+            },
+            "vs_motion_attack": {
+              "attempts": 654,
+              "success": 164
+            },
+            "vs_motion_inside": {
+              "attempts": 653,
+              "success": 56
+            },
+            "vs_motion_outside": {
+              "attempts": 601,
+              "success": 285
+            },
+            "vs_outside": {
+              "attempts": 1300,
+              "success": 582
+            },
+            "vs_set": {
+              "attempts": 2083,
+              "success": 796
+            },
+            "vs_set_attack": {
+              "attempts": 711,
+              "success": 252
+            },
+            "vs_set_inside": {
+              "attempts": 673,
+              "success": 247
+            },
+            "vs_set_outside": {
+              "attempts": 699,
+              "success": 297
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": 3,
+    "fb_efficiency": -2,
+    "fb_opp_modifier": -2,
+    "pt_efficiency": 6,
+    "pt_opp_modifier": 3,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "playbook_settings": {
+      "motion": {
+        "3-2 Motion": 25,
+        "4-1 Motion": 25,
+        "5-0 Motion": 25,
+        "PF Post Motion": 25
+      },
+      "set_play_inside": {
+        "Base Post Play": 50,
+        "PF Post Up": 50
+      },
+      "set_play_attack": {
+        "PF High Post Drive": 50,
+        "Pick & Roll (Lower Wing)": 50
+      },
+      "set_play_outside": {
+        "Double Screen For SG": 34,
+        "PF Corner Shot": 33,
+        "PF Quick Jumper": 33
+      },
+      "zone_defense": {
+        "2-3 Zone": 100
+      },
+      "slot_assignments": {
+        "1": {
+          "section": "set-play-outside",
+          "playId": "set-outside-3"
+        },
+        "2": {
+          "section": "set-play-outside",
+          "playId": "set-outside-2"
+        },
+        "3": {
+          "section": "set-play-outside",
+          "playId": "set-outside-1"
+        },
+        "4": {
+          "section": "set-play-attack",
+          "playId": "set-attack-2"
+        },
+        "5": {
+          "section": "set-play-attack",
+          "playId": "set-attack-1"
+        },
+        "6": {
+          "section": "set-play-inside",
+          "playId": "set-inside-1"
+        }
+      },
+      "motion_dropdowns": {
+        "motion-1": "-",
+        "motion-2": "-",
+        "motion-3": "-",
+        "motion-4": "-"
+      },
+      "man_defense": {
+        "Man Defense": 100
+      }
+    },
+    "discipline": -1,
+    "fight": -2,
+    "mascot": "Admirals"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b09674d3f9b04546b34"
+    },
+    "name": "South Lancaster",
+    "player_ids": [
+      "df743fbc-109b-460c-8b00-c0b5c2d324bc",
+      "5ea5f459-710e-489f-9973-c276ac874221",
+      "b7b3a416-ae6c-49bf-a5c5-0559e9be463c",
+      "f369adfc-6cb6-4c9e-8725-dee69f5801aa",
+      "0add5f1e-8da2-486e-8927-ced609e0c6cc",
+      "1b444605-7f6e-495f-af71-4108eadbc89a",
+      "3ace59bd-a5ac-4639-9549-c35d5e1d00c6",
+      "90fd9806-3d58-432d-9a77-57cd478a2e52",
+      "a3e25093-32f8-4933-865d-ff32c813d627",
+      "f4c14001-290b-4e61-a8e8-2d57ab6cab91",
+      "2773f3d4-1b64-4b29-ac1d-37043c17438d",
+      "30b4fb3d-6a8a-4ea8-a62e-aa4c1614bf0a"
+    ],
+    "team_id": "SOUTH_LANCASTER",
+    "primary_color": "#7c2b24",
+    "secondary_color": "#e39649",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 487,
+            "used": 1291,
+            "vs_attack": {
+              "attempts": 455,
+              "success": 158
+            },
+            "vs_inside": {
+              "attempts": 408,
+              "success": 123
+            },
+            "vs_motion": {
+              "attempts": 586,
+              "success": 171
+            },
+            "vs_motion_attack": {
+              "attempts": 214,
+              "success": 55
+            },
+            "vs_motion_inside": {
+              "attempts": 181,
+              "success": 18
+            },
+            "vs_motion_outside": {
+              "attempts": 191,
+              "success": 98
+            },
+            "vs_outside": {
+              "attempts": 428,
+              "success": 206
+            },
+            "vs_set": {
+              "attempts": 705,
+              "success": 316
+            },
+            "vs_set_attack": {
+              "attempts": 241,
+              "success": 103
+            },
+            "vs_set_inside": {
+              "attempts": 227,
+              "success": 105
+            },
+            "vs_set_outside": {
+              "attempts": 237,
+              "success": 108
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 456,
+            "used": 1264,
+            "vs_attack": {
+              "attempts": 432,
+              "success": 148
+            },
+            "vs_inside": {
+              "attempts": 416,
+              "success": 112
+            },
+            "vs_motion": {
+              "attempts": 615,
+              "success": 161
+            },
+            "vs_motion_attack": {
+              "attempts": 216,
+              "success": 56
+            },
+            "vs_motion_inside": {
+              "attempts": 203,
+              "success": 24
+            },
+            "vs_motion_outside": {
+              "attempts": 196,
+              "success": 81
+            },
+            "vs_outside": {
+              "attempts": 416,
+              "success": 196
+            },
+            "vs_set": {
+              "attempts": 649,
+              "success": 295
+            },
+            "vs_set_attack": {
+              "attempts": 216,
+              "success": 92
+            },
+            "vs_set_inside": {
+              "attempts": 213,
+              "success": 88
+            },
+            "vs_set_outside": {
+              "attempts": 220,
+              "success": 115
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 474,
+            "used": 1296,
+            "vs_attack": {
+              "attempts": 436,
+              "success": 145
+            },
+            "vs_inside": {
+              "attempts": 438,
+              "success": 134
+            },
+            "vs_motion": {
+              "attempts": 610,
+              "success": 162
+            },
+            "vs_motion_attack": {
+              "attempts": 206,
+              "success": 56
+            },
+            "vs_motion_inside": {
+              "attempts": 197,
+              "success": 19
+            },
+            "vs_motion_outside": {
+              "attempts": 207,
+              "success": 87
+            },
+            "vs_outside": {
+              "attempts": 422,
+              "success": 195
+            },
+            "vs_set": {
+              "attempts": 686,
+              "success": 312
+            },
+            "vs_set_attack": {
+              "attempts": 230,
+              "success": 89
+            },
+            "vs_set_inside": {
+              "attempts": 241,
+              "success": 115
+            },
+            "vs_set_outside": {
+              "attempts": 215,
+              "success": 108
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1334,
+            "used": 3753,
+            "vs_attack": {
+              "attempts": 1253,
+              "success": 401
+            },
+            "vs_inside": {
+              "attempts": 1316,
+              "success": 361
+            },
+            "vs_motion": {
+              "attempts": 1718,
+              "success": 487
+            },
+            "vs_motion_attack": {
+              "attempts": 585,
+              "success": 141
+            },
+            "vs_motion_inside": {
+              "attempts": 568,
+              "success": 53
+            },
+            "vs_motion_outside": {
+              "attempts": 565,
+              "success": 293
+            },
+            "vs_outside": {
+              "attempts": 1184,
+              "success": 572
+            },
+            "vs_set": {
+              "attempts": 2035,
+              "success": 847
+            },
+            "vs_set_attack": {
+              "attempts": 668,
+              "success": 260
+            },
+            "vs_set_inside": {
+              "attempts": 748,
+              "success": 308
+            },
+            "vs_set_outside": {
+              "attempts": 619,
+              "success": 279
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": -7,
+    "fb_efficiency": 1,
+    "fb_opp_modifier": -3,
+    "pt_efficiency": 6,
+    "pt_opp_modifier": 6,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "discipline": -8,
+    "fight": -3,
+    "playbook_settings": {
+      "motion": {
+        "3-2 Motion": 34,
+        "4-1 Motion": 33,
+        "5-0 Motion": 33
+      },
+      "set_play_inside": {
+        "Base Post Play": 50,
+        "C Post Iso": 50
+      },
+      "set_play_attack": {
+        "C High Post Clear Out": 50,
+        "Pick & Roll (Lower Wing)": 50
+      },
+      "set_play_outside": {
+        "C Screen & Three": 50,
+        "Double Screen For SG": 50
+      },
+      "zone_defense": {
+        "2-3 Zone": 33,
+        "3-2 Zone": 33,
+        "1-3-1 Zone": 34
+      },
+      "slot_assignments": {},
+      "motion_dropdowns": {
+        "motion-tba-1": "-",
+        "motion-tba-2": "-",
+        "motion-tba-3": "-",
+        "motion-tba-4": "-",
+        "motion-1": "-",
+        "motion-2": "-",
+        "motion-3": "-"
+      },
+      "man_defense": {
+        "Man Defense": 100
+      },
+      "even_distribution_all": true
+    },
+    "mascot": "Bulldogs"
+  },
+  {
+    "_id": {
+      "$oid": "68c98b09674d3f9b04546b35"
+    },
+    "name": "Xavien",
+    "player_ids": [
+      "b2a51b35-fec8-4ba0-9155-9a0008b8a224",
+      "cf39c8b7-050d-4707-bdf6-5d3e20c0b777",
+      "eba936b9-f30b-4fe1-b3ee-402cb9be9d6f",
+      "a3269f39-4acb-4708-a3f3-48e56756c35d",
+      "dfc97213-ecf1-418e-b01c-0d5043992c37",
+      "b78c7115-a7ad-4bb1-98a7-822e88d5ecc0",
+      "eefc46cc-42f6-468a-93ff-96286eec18b9",
+      "27f01228-279c-4e5b-b463-99f578dd88c8",
+      "69e37c36-77cd-4d9d-ae97-0ab85d27f5b9",
+      "c5242a24-b0fa-48ce-b148-299103be4221",
+      "c1625529-4539-4e99-aedd-5b54235bfd6a",
+      "24a33578-d7ff-46a2-b48b-2143614122ed"
+    ],
+    "team_id": "XAVIEN",
+    "primary_color": "#016837",
+    "secondary_color": "#999999",
+    "momentum_score": 10,
+    "offensive_efficiency": 5,
+    "rebound_modifier": 1.0,
+    "shot_threshold": 200,
+    "team_chemistry": 15,
+    "PA": 0,
+    "PF": 0,
+    "record": {
+      "W": 0,
+      "L": 0
+    },
+    "stats": {
+      "season": {}
+    },
+    "strategy_settings": {
+      "aggression": 2,
+      "attack": 2,
+      "defense": 2,
+      "fc_press": 2,
+      "hc_trap": 2,
+      "inside": 2,
+      "offense": 2,
+      "outside": 2,
+      "play_calling": 2,
+      "rebounding": 2,
+      "tempo": 2
+    },
+    "scouting_data": {
+      "defense": {
+        "2-3 Zone": {
+          "season_stats": {
+            "success": 459,
+            "used": 1382,
+            "vs_attack": {
+              "attempts": 480,
+              "success": 138
+            },
+            "vs_inside": {
+              "attempts": 487,
+              "success": 111
+            },
+            "vs_motion": {
+              "attempts": 667,
+              "success": 149
+            },
+            "vs_motion_attack": {
+              "attempts": 224,
+              "success": 37
+            },
+            "vs_motion_inside": {
+              "attempts": 230,
+              "success": 16
+            },
+            "vs_motion_outside": {
+              "attempts": 213,
+              "success": 96
+            },
+            "vs_outside": {
+              "attempts": 479,
+              "success": 230
+            },
+            "vs_set": {
+              "attempts": 779,
+              "success": 330
+            },
+            "vs_set_attack": {
+              "attempts": 256,
+              "success": 101
+            },
+            "vs_set_inside": {
+              "attempts": 257,
+              "success": 95
+            },
+            "vs_set_outside": {
+              "attempts": 266,
+              "success": 134
+            }
+          }
+        },
+        "3-2 Zone": {
+          "season_stats": {
+            "success": 484,
+            "used": 1436,
+            "vs_attack": {
+              "attempts": 477,
+              "success": 141
+            },
+            "vs_inside": {
+              "attempts": 508,
+              "success": 119
+            },
+            "vs_motion": {
+              "attempts": 709,
+              "success": 196
+            },
+            "vs_motion_attack": {
+              "attempts": 225,
+              "success": 53
+            },
+            "vs_motion_inside": {
+              "attempts": 228,
+              "success": 23
+            },
+            "vs_motion_outside": {
+              "attempts": 256,
+              "success": 120
+            },
+            "vs_outside": {
+              "attempts": 512,
+              "success": 240
+            },
+            "vs_set": {
+              "attempts": 788,
+              "success": 304
+            },
+            "vs_set_attack": {
+              "attempts": 252,
+              "success": 88
+            },
+            "vs_set_inside": {
+              "attempts": 280,
+              "success": 96
+            },
+            "vs_set_outside": {
+              "attempts": 256,
+              "success": 120
+            }
+          }
+        },
+        "1-3-1 Zone": {
+          "season_stats": {
+            "success": 440,
+            "used": 1282,
+            "vs_attack": {
+              "attempts": 453,
+              "success": 171
+            },
+            "vs_inside": {
+              "attempts": 446,
+              "success": 88
+            },
+            "vs_motion": {
+              "attempts": 682,
+              "success": 165
+            },
+            "vs_motion_attack": {
+              "attempts": 193,
+              "success": 54
+            },
+            "vs_motion_inside": {
+              "attempts": 245,
+              "success": 19
+            },
+            "vs_motion_outside": {
+              "attempts": 244,
+              "success": 92
+            },
+            "vs_outside": {
+              "attempts": 450,
+              "success": 199
+            },
+            "vs_set": {
+              "attempts": 667,
+              "success": 293
+            },
+            "vs_set_attack": {
+              "attempts": 260,
+              "success": 117
+            },
+            "vs_set_inside": {
+              "attempts": 201,
+              "success": 69
+            },
+            "vs_set_outside": {
+              "attempts": 206,
+              "success": 107
+            }
+          }
+        },
+        "Man": {
+          "season_stats": {
+            "success": 1407,
+            "used": 4193,
+            "vs_attack": {
+              "attempts": 1338,
+              "success": 470
+            },
+            "vs_inside": {
+              "attempts": 1472,
+              "success": 362
+            },
+            "vs_motion": {
+              "attempts": 1975,
+              "success": 519
+            },
+            "vs_motion_attack": {
+              "attempts": 601,
+              "success": 172
+            },
+            "vs_motion_inside": {
+              "attempts": 696,
+              "success": 64
+            },
+            "vs_motion_outside": {
+              "attempts": 678,
+              "success": 283
+            },
+            "vs_outside": {
+              "attempts": 1413,
+              "success": 581
+            },
+            "vs_set": {
+              "attempts": 2248,
+              "success": 894
+            },
+            "vs_set_attack": {
+              "attempts": 737,
+              "success": 298
+            },
+            "vs_set_inside": {
+              "attempts": 776,
+              "success": 298
+            },
+            "vs_set_outside": {
+              "attempts": 735,
+              "success": 298
+            }
+          }
+        }
+      }
+    },
+    "defensive_efficiency": -10,
+    "fb_efficiency": 8,
+    "fb_opp_modifier": -2,
+    "pt_efficiency": -10,
+    "pt_opp_modifier": -6,
+    "coaching": {
+      "effectiveness": 0,
+      "training_focus_list": [],
+      "authoritarian": {
+        "score": 0,
+        "momentum": 0
+      },
+      "systems coach": {
+        "score": 0,
+        "momentum": 0
+      },
+      "player maximizer": {
+        "score": 0,
+        "momentum": 0
+      },
+      "culture builder": {
+        "score": 0,
+        "momentum": 0
+      }
+    },
+    "discipline": 10,
+    "fight": 4,
+    "mascot": "Elm Trees"
+  }
+]
