@@ -21,6 +21,7 @@ Define the standardized page-load pattern for franchise-mode resource pages so i
    - `week`
    - default user scope data such as `user_conference` or `user_region`
 3. The page fetches only the default visible slice of data on first render.
+   - While that initial scoped fetch is in flight, the page should show a lightweight loading message for the primary content area.
 4. Additional slices are fetched only when the user clicks a toggle.
 5. Each fetched payload is cached:
    - in memory for the current page life
@@ -48,6 +49,7 @@ Examples:
 ### Schedule
 
 - First load fetches only the user's conference.
+- While the initial conference payload is loading, `schedule.html` shows `Loading schedule...`.
 - Clicking another conference toggle fetches only that conference.
 - The endpoint returns:
   - conference-scoped schedule data
