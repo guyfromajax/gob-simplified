@@ -22,12 +22,13 @@
    * @param {HTMLElement} container - Element to clear and append bracket to (e.g. #bracket or #tournament-bracket-container)
    * @param {{ round1: Array, round2: Array, final: Array }} bracketData - Bracket matchups per round
    * @param {Object.<string, string>} teamIdToNameMap - Map team_id (string) -> team name (string)
-   * @param {Object} [options] - Optional: results, seeds, getLogo, isUserTeam, getTooltip
+   * @param {Object} [options] - Optional: results, seeds, getLogo, isUserTeam, getTooltip, layout
    * @param {Array} [options.results] - TCC-style results [{ round, match_index, score, winner }]; if omitted, use matchup.score/winner
    * @param {Object.<string, number>} [options.seeds] - teamId -> seed (1-8); if omitted, derive from round1 order (1v8, 4v5, 2v7, 3v6)
    * @param {function(string): string} [options.getLogo] - teamName -> logo src
    * @param {function(string, string): boolean} [options.isUserTeam] - teamId or teamName -> boolean
    * @param {function(string, string): string} [options.getTooltip] - (teamId, teamName) -> tooltip text
+   * @param {'full'|'compact4'} [options.layout] - full 8-team bracket or compact 4-team bracket
    */
   function renderBracketShared(container, bracketData, teamIdToNameMap, options) {
     if (!container) return;
@@ -37,6 +38,7 @@
     var getTooltip = typeof options.getTooltip === 'function' ? options.getTooltip : null;
     var results = options.results || [];
     var seedsOption = options.seeds || null;
+    var layout = options.layout || 'full';
 
     var round1 = bracketData.round1 || [];
     var round2 = bracketData.round2 || [];
@@ -134,6 +136,26 @@
       matchup.appendChild(placeholder);
       wrap.appendChild(matchup);
       return wrap;
+    }
+
+    if (layout === 'compact4') {
+      var compactRound1 = document.createElement('div');
+      compactRound1.className = 'round round-1 semifinals';
+      if (round1[0]) compactRound1.appendChild(createMatchup(round1[0], 'left', 1, 0));
+      var compactSpacer = document.createElement('div');
+      compactSpacer.style.height = '40px';
+      compactSpacer.className = 'bracket-spacer';
+      compactRound1.appendChild(compactSpacer);
+      if (round1[1]) compactRound1.appendChild(createMatchup(round1[1], 'left', 1, 1));
+
+      var compactFinal = document.createElement('div');
+      compactFinal.className = 'round round-3 final';
+      if (finalRound[0]) compactFinal.appendChild(createMatchup(finalRound[0], 'center', 3, 0));
+      else compactFinal.appendChild(createPlaceholder('Championship!'));
+
+      container.appendChild(compactRound1);
+      container.appendChild(compactFinal);
+      return;
     }
 
     var leftR1 = document.createElement('div');

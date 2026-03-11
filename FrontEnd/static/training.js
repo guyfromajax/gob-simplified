@@ -490,6 +490,9 @@ submitBtn.addEventListener('click', async function() {
   try {
     this.disabled = true;
     this.textContent = 'Submitting...';
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show('128 Teams Executing Training');
+    }
     
     console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
     console.log('🔍 [TRAINING] Payload:', payload);
@@ -530,6 +533,9 @@ submitBtn.addEventListener('click', async function() {
     
   } catch (error) {
     console.error('Failed to submit training:', error);
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+      window.PageLoadOverlay.hide();
+    }
     showMessageModal(error.message || 'Failed to submit training. Please try again.');
     this.disabled = false;
     this.textContent = 'Submit Training';

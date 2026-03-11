@@ -90,9 +90,15 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 ## Tournament tab (EOS bracket)
 
 - **When:** Weeks 27–34 after EOS tournament is initialized. Bracket rendered in **Tournament** tab.
-- **Layout:** Same as TCC Bracket tab. Shared renderer: `renderBracketShared()` in `bracket.js` (5-column grid, matchups, logos, seeds, scores). Container uses class `bracket`; `tournament.css` and `franchise-command-center.css` apply.
+- **Header by phase:**
+  - weeks `27-29`: `Conference Tournament`
+  - weeks `30-31`: `Region Tournament`
+  - weeks `32-34`: `National Tournament`
+- **Layout:** Shared renderer: `renderBracketShared()` in `bracket.js`.
+  - Conference and National brackets use the full 5-column shared layout.
+  - Region bracket uses a compact 2-round layout with the right-side bracket columns removed.
 - **Data:** Team names from `/franchise/team-stats` (build `teamIdToNameMap`). Options use `eos_tournament.seeds`, `getLogo`, and `isUserTeam(id)` for user-team highlighting.
-- **Tooltip:** On hover over a bracket team logo, show `"{team name} {team mascot}, conference {team conference}"`. Example: `"Bentley-Truman Sterling Knights, conference 1A"`.
+- **Tooltip:** On hover over a bracket team logo in Conference, Region, or National tournament views, show `"{team name} {team mascot}, conference {team conference}"`. Example: `"Bentley-Truman Sterling Knights, conference 1A"`.
 
 ---
 

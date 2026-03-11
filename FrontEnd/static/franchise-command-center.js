@@ -2299,15 +2299,30 @@ function createMetricBar(title, value, maxValue, color, change) {
 // ✅ EOS TOURNAMENT: Render tournament bracket (shared with TCC via bracket.js)
 async function renderTournamentBracket() {
   const container = document.getElementById('tournament-bracket-container');
+  const titleEl = document.getElementById('fcc-tournament-title');
   if (!container) return;
 
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const eosTournament = topData?.eos_tournament;
+  const week = Number(topData?.week || 0);
 
   if (!eosTournament) {
+    if (titleEl) titleEl.textContent = 'End-of-Season Tournament';
     container.innerHTML = '<p>Tournament bracket not available.</p>';
     return;
   }
+
+  let tournamentTitle = 'End-of-Season Tournament';
+  let bracketLayout = 'full';
+  if (week >= 27 && week <= 29) {
+    tournamentTitle = 'Conference Tournament';
+  } else if (week >= 30 && week <= 31) {
+    tournamentTitle = 'Region Tournament';
+    bracketLayout = 'compact4';
+  } else if (week >= 32 && week <= 34) {
+    tournamentTitle = 'National Tournament';
+  }
+  if (titleEl) titleEl.textContent = tournamentTitle;
 
   // SS&S: Get team id→name map from franchise/team-stats (same pattern as TCC)
   let teamIdToNameMap = {};
@@ -2331,6 +2346,7 @@ async function renderTournamentBracket() {
   if (typeof renderBracketShared === 'function') {
     renderBracketShared(container, eosTournament.bracket || {}, teamIdToNameMap, {
       seeds: eosTournament.seeds || {},
+      layout: bracketLayout,
       getLogo: function (name) {
         return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
       },
