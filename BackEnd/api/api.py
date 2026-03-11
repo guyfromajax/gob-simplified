@@ -4975,6 +4975,8 @@ try:
         response_data = {
             "team": team.get("name", match if match else team_identifier),
             "team_name": team.get("name", match if match else team_identifier),
+            "primary_color": team.get("primary_color", "#000000"),
+            "secondary_color": team.get("secondary_color", "#ffffff"),
             "players": players
         }
         
