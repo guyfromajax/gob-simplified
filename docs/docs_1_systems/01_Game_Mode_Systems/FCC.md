@@ -97,6 +97,15 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 - **Layout:** Shared renderer: `renderBracketShared()` in `bracket.js`.
   - Conference and National brackets use the full 5-column shared layout.
   - Region bracket uses a compact 2-round layout with the right-side bracket columns removed.
+- **Stacked history view:**
+  - weeks `27-29`: show only the user's Conference Tournament bracket
+  - weeks `30-31`: show Region Tournament on top and the user's Conference Tournament below it
+  - weeks `32-34`: show National Tournament on top, the user's Region Tournament below it, and the user's Conference Tournament at the bottom
+  - sections are separated by horizontal divider lines
+- **Section backgrounds:**
+  - Conference Tournament: white
+  - Region Tournament: very light gray
+  - National Tournament: slightly darker light gray
 - **Data:** Team names from `/franchise/team-stats` (build `teamIdToNameMap`). Options use `eos_tournament.seeds`, `getLogo`, and `isUserTeam(id)` for user-team highlighting.
 - **Tooltip:** On hover over a bracket team logo in Conference, Region, or National tournament views, show `"{team name} {team mascot}, conference {team conference}"`. Example: `"Bentley-Truman Sterling Knights, conference 1A"`.
 

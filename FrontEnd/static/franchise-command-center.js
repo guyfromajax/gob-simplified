@@ -2313,12 +2313,10 @@ async function renderTournamentBracket() {
   }
 
   let tournamentTitle = 'End-of-Season Tournament';
-  let bracketLayout = 'full';
   if (week >= 27 && week <= 29) {
     tournamentTitle = 'Conference Tournament';
   } else if (week >= 30 && week <= 31) {
     tournamentTitle = 'Region Tournament';
-    bracketLayout = 'compact4';
   } else if (week >= 32 && week <= 34) {
     tournamentTitle = 'National Tournament';
   }
@@ -2343,28 +2341,98 @@ async function renderTournamentBracket() {
     console.warn('[FCC] Could not load team-stats for bracket names:', e);
   }
 
-  if (typeof renderBracketShared === 'function') {
-    renderBracketShared(container, eosTournament.bracket || {}, teamIdToNameMap, {
-      seeds: eosTournament.seeds || {},
-      layout: bracketLayout,
-      getLogo: function (name) {
-        return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  function normalizeRegionBracket(rt) {
+    if (!rt) return null;
+    const finalList = rt.final || [];
+    return {
+      bracket: {
+        round1: rt.round1 || [],
+        round2: [],
+        final: finalList,
       },
-      isUserTeam: function (id) {
-        return userTeamId != null && (String(id) === String(userTeamId));
-      },
-      getTooltip: function (id, name) {
-        const meta = teamIdMetaMap[String(id)] || {};
-        const teamName = meta.team || name || '';
-        const mascot = meta.mascot || '';
-        const conferenceLabel = formatConferenceTooltipLabel(meta.conference);
-        if (!teamName || !mascot || !conferenceLabel) return '';
-        return `${teamName} ${mascot}, conference ${conferenceLabel}`;
-      },
-    });
-  } else {
-    container.innerHTML = '<p>Bracket renderer not loaded.</p>';
+      seeds: {},
+    };
   }
+
+  function createBracketSection(sectionTitle, bracketPayload, layout, toneClass) {
+    if (!bracketPayload || !bracketPayload.bracket) return null;
+
+    const section = document.createElement('section');
+    section.className = `fcc-tournament-section ${toneClass || ''}`.trim();
+
+    const heading = document.createElement('h4');
+    heading.className = 'fcc-tournament-section-title';
+    heading.textContent = sectionTitle;
+    section.appendChild(heading);
+
+    const bracketRoot = document.createElement('div');
+    bracketRoot.className = 'bracket';
+    section.appendChild(bracketRoot);
+
+    if (typeof renderBracketShared === 'function') {
+      renderBracketShared(bracketRoot, bracketPayload.bracket || {}, teamIdToNameMap, {
+        seeds: bracketPayload.seeds || {},
+        layout: layout || 'full',
+        getLogo: function (name) {
+          return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+        },
+        isUserTeam: function (id) {
+          return userTeamId != null && (String(id) === String(userTeamId));
+        },
+        getTooltip: function (id, name) {
+          const meta = teamIdMetaMap[String(id)] || {};
+          const teamName = meta.team || name || '';
+          const mascot = meta.mascot || '';
+          const conferenceLabel = formatConferenceTooltipLabel(meta.conference);
+          if (!teamName || !mascot || !conferenceLabel) return '';
+          return `${teamName} ${mascot}, conference ${conferenceLabel}`;
+        },
+      });
+    } else {
+      bracketRoot.innerHTML = '<p>Bracket renderer not loaded.</p>';
+    }
+
+    return section;
+  }
+
+  container.innerHTML = '';
+
+  const userConference = topData?.user_conference != null ? String(topData.user_conference) : '';
+  const userRegion = String(topData?.user_region || '').toUpperCase();
+  const conferenceTournament = userConference ? (topData?.conference_tournaments || {})[userConference] : null;
+  const regionTournamentRaw = userRegion ? (topData?.region_tournaments || {})[userRegion] : null;
+  const regionTournament = regionTournamentRaw ? normalizeRegionBracket(regionTournamentRaw) : null;
+  const nationalTournament = topData?.national_tournament || null;
+
+  const sections = [];
+  if (week >= 27 && week <= 29 && conferenceTournament) {
+    sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
+  } else if (week >= 30 && week <= 31) {
+    if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
+    if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
+  } else if (week >= 32 && week <= 34) {
+    if (nationalTournament) sections.push(createBracketSection('National Tournament', nationalTournament, 'full', 'fcc-tournament-tone-national'));
+    if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
+    if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
+  } else if (eosTournament) {
+    sections.push(createBracketSection(tournamentTitle, eosTournament, week >= 30 && week <= 31 ? 'compact4' : 'full', 'fcc-tournament-tone-conference'));
+  }
+
+  const renderedSections = sections.filter(Boolean);
+  if (!renderedSections.length) {
+    container.innerHTML = '<p>Tournament bracket not available.</p>';
+    return;
+  }
+
+  renderedSections.forEach(function (section, index) {
+    if (index > 0) {
+      const divider = document.createElement('hr');
+      divider.className = 'fcc-tournament-divider';
+      container.appendChild(divider);
+    }
+    container.appendChild(section);
+  });
+
 }
 
 // Scouting Report functionality

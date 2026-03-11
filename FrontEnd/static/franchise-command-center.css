@@ -179,6 +179,43 @@
   min-height: 500px;
 }
 
+#tournament-bracket-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fcc-tournament-section {
+  padding: 14px 16px 18px;
+  border-radius: 8px;
+}
+
+.fcc-tournament-section-title {
+  margin: 0 0 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.fcc-tournament-tone-conference {
+  background: #ffffff;
+}
+
+.fcc-tournament-tone-region {
+  background: #f5f5f5;
+}
+
+.fcc-tournament-tone-national {
+  background: #ebebeb;
+}
+
+.fcc-tournament-divider {
+  border: 0;
+  border-top: 1px solid #cfd3d8;
+  margin: 14px 0;
+}
+
 /* Reusable FCC modal styling (EOS and confirmation popups) */
 .fcc-modal-overlay,
 .sim-popup {
