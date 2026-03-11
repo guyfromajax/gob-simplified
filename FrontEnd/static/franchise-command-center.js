@@ -1496,38 +1496,39 @@ function updatePlayButton(data) {
 function updateRecruitingButton(data) {
   const recruitingBtn = document.getElementById('fcc-recruiting-btn');
   const liveCopy = document.getElementById('fcc-recruiting-live-copy');
-  if (!recruitingBtn) return;
+  if (!recruitingBtn || !liveCopy) return;
   const week = Number(data?.week || 1);
   const resultsWeek = Number(data?.current_recruiting_results_week || 0);
-  let active = false;
   let text = 'Recruiting Begins Week 20';
   let href = null;
+  let showButton = false;
 
   if (week >= 20 && week <= 26 && resultsWeek === week) {
-    active = true;
+    showButton = true;
     text = `Week ${week} Recruiting Visits`;
     href = `/recruiting-results.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc&week=${encodeURIComponent(String(week))}`;
   } else if (week >= 20 && week <= 26) {
-    active = true;
-    text = 'Recruiting';
-    href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+    text = 'Recruiting Invites Active';
+  } else if (week === 19) {
+    text = 'Recruiting Invites Begin Next Week';
+  } else if (week >= 1 && week <= 18) {
+    text = 'Recruiting Invites Begin Week 20';
   } else if (week === 35) {
-    active = false;
-    text = 'Recruiting';
+    text = 'Recruiting Is Live';
   } else if (week === 36) {
-    active = false;
     text = 'Recruiting Closed';
   } else if (week > 26) {
     text = 'Recruiting Returns Later';
   }
 
-  if (liveCopy) liveCopy.style.display = week === 35 ? 'block' : 'none';
-  recruitingBtn.style.display = week === 35 ? 'none' : 'inline-flex';
+  liveCopy.textContent = text;
+  liveCopy.style.display = showButton ? 'none' : 'block';
+  recruitingBtn.style.display = showButton ? 'inline-flex' : 'none';
   recruitingBtn.textContent = text;
-  recruitingBtn.disabled = !active;
-  recruitingBtn.classList.toggle('is-dead', !active);
+  recruitingBtn.disabled = !showButton;
+  recruitingBtn.classList.toggle('is-dead', !showButton);
   recruitingBtn.onclick = null;
-  if (active && href) {
+  if (showButton && href) {
     recruitingBtn.onclick = () => {
       window.location.href = href;
     };

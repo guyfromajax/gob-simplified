@@ -45,6 +45,14 @@
   }
 
   function resolveBackUrl() {
+    if (context.from === 'training') {
+      var params = new URLSearchParams();
+      if (context.franchiseId) params.set('franchise_id', context.franchiseId);
+      if (context.teamId) params.set('team_id', context.teamId);
+      params.set('mode', 'franchise');
+      params.set('session_type', new URLSearchParams(window.location.search).get('session_type') || 'in-season');
+      return '/training.html?' + params.toString();
+    }
     if (context.from === 'recruiting') {
       return Recruiting.buildRecruitingUrl('recruiting.html', context, { from: 'fcc' });
     }
@@ -60,7 +68,7 @@
     var runBtn = document.getElementById('run-btn');
     var hasCurrent = currentEntries.length > 0;
     var hasSaved = savedEntries.length > 0;
-    saveBtn.textContent = isWeek35Mode() ? 'Save Orders' : 'Submit Orders';
+    saveBtn.textContent = 'Save Orders';
     saveBtn.disabled = !hasCurrent;
     saveBtn.classList.toggle('is-dead', !hasCurrent);
     runBtn.style.display = isWeek35Mode() ? 'inline-flex' : 'none';
@@ -456,12 +464,12 @@
     }).then(function (response) {
       savedEntries = cloneEntries(currentEntries);
       updateActionButtons();
-      saveBtn.textContent = isWeek35Mode() ? 'Save Orders' : 'Submit Orders';
+      saveBtn.textContent = 'Save Orders';
       if (onSuccess) onSuccess(response);
       return response;
     }).catch(function (err) {
       console.error(err);
-      saveBtn.textContent = isWeek35Mode() ? 'Save Orders' : 'Submit Orders';
+      saveBtn.textContent = 'Save Orders';
       updateActionButtons();
       throw err;
     });
@@ -476,7 +484,11 @@
           actions: [{ label: 'Close', variant: 'secondary' }]
         });
       } else {
-        navigateAway(Recruiting.buildFccUrl(context));
+        showModal({
+          title: 'Orders Saved',
+          message: 'Recruiting orders are saved.',
+          actions: [{ label: 'Close', variant: 'secondary' }]
+        });
       }
     }).catch(function () {
       showModal({
@@ -593,7 +605,8 @@
     }
 
     document.getElementById('save-btn').addEventListener('click', handleSaveClick);
-    document.getElementById('run-btn').addEventListener('click', handleRunClick);
+    var runBtn = document.getElementById('run-btn');
+    if (runBtn) runBtn.addEventListener('click', handleRunClick);
     initNavigationGuards();
 
     Recruiting.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-data') + '?franchise_id=' + encodeURIComponent(context.franchiseId))

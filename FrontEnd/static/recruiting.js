@@ -108,37 +108,6 @@
     renderStandardRows();
   }
 
-  function setOrdersButton(data) {
-    var btn = document.getElementById('orders-btn');
-    if (!btn) return;
-    btn.replaceWith(btn.cloneNode(true));
-    btn = document.getElementById('orders-btn');
-    if (week >= 20 && week <= 26) {
-      btn.style.display = 'inline-flex';
-      if (Number(data.current_results_week || 0) === week) {
-        btn.textContent = 'Week ' + week + ' Recruiting Visits';
-        btn.addEventListener('click', function () {
-          window.location.href = Recruiting.buildRecruitingUrl('recruiting-results.html', context, { from: 'recruiting', week: String(week) });
-        });
-      } else {
-        btn.textContent = 'Recruiting Orders';
-        btn.addEventListener('click', function () {
-          window.location.href = Recruiting.buildRecruitingUrl('recruiting-orders.html', context, { from: 'recruiting' });
-        });
-      }
-      return;
-    }
-    if (week !== 35) {
-      btn.style.display = 'none';
-      return;
-    }
-    btn.style.display = 'inline-flex';
-    btn.textContent = 'Recruiting Orders';
-    btn.addEventListener('click', function () {
-      window.location.href = Recruiting.buildRecruitingUrl('recruiting-orders.html', context, { from: 'recruiting' });
-    });
-  }
-
   function setHeaders() {
     var title = document.querySelector('.recruiting-section h1');
     var help = document.querySelector('.recruiting-help');
@@ -214,7 +183,6 @@
           render
         );
         render();
-        setOrdersButton(data);
         if (typeof window.initAttributeTooltips === 'function') {
           window.initAttributeTooltips(document.getElementById('recruiting-table'), ['th']);
         }

@@ -17,22 +17,25 @@
 8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
 9. **Pre-Training Decay**: Plays/defenses with effectiveness > 0 reduced by `random.randint(5, 15)`
 
-**Training System Flow (13 Steps)**
+**Training System Flow (16 Steps)**
 
 1. **Page Load**: Frontend fetches training points from `/franchise/training-points` endpoint (30 for training camp, 24 for regular training)
 2. **User Allocates Points**: User distributes training points (30 or 24) across 20 sliders (player drills, team drills, general)
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
-4. **Submit Training**: Frontend sends POST request to `/franchise/run-training` with training data
-5. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
-6. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
-7. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
-8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for training camp: week 1 before first games)
-9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
-10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
-11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
-12. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
-13. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
-14. **Post-Training Camp Cuts**: After week 1 training camp only, any team above 12 players must reduce to a legal 12-player roster before gameplay resumes.
+4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to `recruiting-orders.html`
+5. **Submit Training**: Frontend sends POST request to `/franchise/run-training` with training data
+6. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
+   - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
+7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
+8. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
+9. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for training camp: week 1 before first games)
+10. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
+11. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
+12. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
+13. **Weeks 20-26 Recruiting Invite Processing**: During recruiting invite season, `Submit Training` also runs that week's recruiting invite processing using the user's saved recruiting orders plus CPU weekly recruiting logic
+14. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
+15. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
+16. **Post-Training Camp Cuts**: After week 1 training camp only, any team above 12 players must reduce to a legal 12-player roster before gameplay resumes.
 
 ### Post-Training Camp Cut Flow
 

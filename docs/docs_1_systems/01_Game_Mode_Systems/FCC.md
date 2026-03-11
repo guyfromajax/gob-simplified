@@ -67,10 +67,11 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 ## Recruiting button
 
 - **Placement:** Upper-right hero area under `Run Training / Play Now`.
-- **Weeks 1-19:** Dead button with copy `Recruiting Begins Week 20`.
-- **Weeks 20-26, before current-week recruiting is processed:** Active button with copy `Recruiting`; opens `recruiting-orders.html`.
+- **Weeks 1-18:** No recruiting button. Show bold green copy `Recruiting Invites Begin Week 20`.
+- **Week 19:** No recruiting button. Show bold green copy `Recruiting Invites Begin Next Week`.
+- **Weeks 20-26, before current-week recruiting is processed:** No recruiting button. Show bold green copy `Recruiting Invites Active`.
 - **Weeks 20-26, after current-week recruiting is processed:** Active button with copy `Week ## Recruiting Visits`; opens `recruiting-results.html`.
-- **Weeks 27-34:** Dead button with copy `Recruiting Returns Later`.
+- **Weeks 27-34:** No recruiting button. Show bold green copy `Recruiting Returns Later`.
 - **Week 35:** Primary CTA copy `Recruiting`; opens `recruiting-orders.html`. Show bold green copy below it: `Recruiting Is Live`. The week-35 page header reads `Recruiting Focus List`.
 - **Week 36:** Primary CTA copy `Go To Next Season`; recruiting orders are closed.
 - **Post-championship state:** After EOS national week `34` completes, franchise mode advances to week `35`.

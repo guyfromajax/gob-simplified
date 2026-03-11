@@ -22,8 +22,10 @@
 
 **FCC Recruiting Button**
 -Place a Recruiting button in the upper right of the FCC, below the Run Training / Play Next Game button -- give it a green fill with bold silver copy. When active, button takes the user to the recruiting.html page.
-    -Weeks 1-19, this is a dead button. Pressing it has no effect and give it a reduced opacity or overlay that we use to indicate dead buttons in teh rest of our experience. Button copy reads "Recruiting Begins Week 20"
-    -Weeks 20-26 -- button becomes active. Remove the overlay / reduced opacity. Pressing it takes the user to the recruiting-orders.html page.
+    -Weeks 1-18, replace the button with green bold copy that reads `Recruiting Invites Begin Week 20`
+    -Week 19, replace the button with green bold copy that reads `Recruiting Invites Begin Next Week`
+    -Weeks 20-26 before that week's training is submitted, replace the button with green bold copy that reads `Recruiting Invites Active`
+    -Weeks 20-26 after that week's training/recruiting processing is complete, show an active button with copy `Week ## Recruiting Visits`. Pressing it takes the user to the recruiting-results.html page.
     -Weeks 27-34 -- button is inactive and recruiting is not live.
     -Week 35 -- the main FCC CTA becomes `Recruiting`, and bold green copy below it reads `Recruiting Is Live`
     -Week 36 -- the main FCC CTA becomes `Go To Next Season`
@@ -38,8 +40,7 @@
         - Exmaple of recruit with only a key 1 value: "Morristown"
         - Example of recruit with key 1 and key 2 values: "Morristown, Bentley-Truaman"
         - Example of recruit with key 1, key 2, and key 3 values: "Morristown, Bentley-Truman, Xavien"
-3. Starting week 20, display a green fill button in teh top right wiht the copy "Recruiting Orders"
-    -when the user presses that button it takes them to the recruiting-orders.html screen
+3. Remove the top-right Recruiting Orders button from this screen.
 4. In week `36`, this screen becomes the signed-results page
     - replace `Current Lean` with `Signed`
     - show all recruits
@@ -59,15 +60,21 @@
     a. when the user clicks a recruit's row, highlight the row with a light green fill and add that player to the Top Grid, the top available row in the Grid (1 is considered the top row, then 2, then 3, and so on). Play Click tiny on this action
 3. If the grid is full and the user adds a new recruit, give teh user a pop up that says "All 10 rows are occupied. You must remove a recruit".
 4. If the user attempts to leave the page and there is at least one recruit in the Top Grid that was not previously saved, give the following pop up "You have unsaved recruiting orders. Are you sure you want to leave?". With an orange "Back To Recruiting" button and a blue "Leave" button.
-5. When the user pressed "Submit Recruting Orders" button, save the recruit string ids to the "Recruits" field in the FTD doc for the user's team. Assiging eaach to the key in the FTD "Recruits" field according to the row in the Top Grid tha tthey occupy.
-6. When a user presses Submit Recruiting Orders, they are taken back to the FCC. When they press Back, they are taken to screen they came from -- FCC or Recruits.html.
+5. Weeks 20-26 use `Save Orders`, not `Submit Orders`.
+    - pressing `Save Orders` saves the recruit string ids to the `Recruits` field in the FTD doc for the user's team, assigning each to the key according to the row they occupy in the Top Grid.
+    - after saving, keep the user on recruiting-orders.html and show a confirmation pop up.
+6. Weeks 20-26 recruiting visits are no longer processed from recruiting-orders.html.
+    - recruiting invite processing now runs when the user presses `Submit Training` on training.html.
+    - once that week's training/recruiting processing is complete, recruiting-orders.html should redirect to recruiting-results.html for that week.
+7. When they press Back, they are taken to the screen they came from -- FCC, Recruits.html, or Training.html.
 
 **Recruiting Logic**
--when the user presses "Submit Recruiting Orders"
-    - run computer team recruiting orders (details below)
-    - run that weeks' recruiting logic and process results (details below)
-    - populate recruiting-results.html screen (details below)
-    - change the copy on the Recruiting button on teh FCC and recruiting.html screens to read "Week ## Recruiting Results" and when pressed, take the user to the recruiting-results.html screen
+-Weeks 20-26:
+    - when the user presses `Save Orders`, only save the user's recruiting orders for that week
+    - when the user presses `Submit Training`, run computer team recruiting orders, run that week's recruiting invite logic, process results, and populate recruiting-results.html
+    - if the user does not change recruiting orders in a later week, the previously saved `FTD.Recruits` settings persist and are used again
+    - special case: week 20, if the user has never saved recruiting orders and presses `Submit Training`, block training and show a modal telling the user they must save recruiting orders first
+    - after processing, change FCC copy to `Week ## Recruiting Visits`
 
 **Computer Team Recruiting Orders**
 HEADLINE: For Week's 20-26, each team wins one recruit visit, and each recruit can only visit one team each week. So assuming all 128 teams submit recruiting order, there will be 128 recruiting visits each week for weeks 20-26

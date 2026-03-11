@@ -3570,6 +3570,89 @@ def _build_recruiting_results_payload(franchise_doc: dict, week: int) -> dict:
     }
 
 
+def _process_weekly_recruiting_invites(franchise_doc: dict[str, Any]) -> dict[str, Any]:
+    fid = franchise_doc["_id"]
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week < 20 or week > 26:
+        raise HTTPException(status_code=400, detail="Weekly recruiting invites are only processed during weeks 20-26")
+    if str(week) in (franchise_doc.get("recruiting_results", {}) or {}):
+        return (franchise_doc.get("recruiting_results", {}) or {}).get(str(week)) or {}
+
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+    user_team_id_str = str(user_team_id)
+
+    if week == 20:
+        user_ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
+            {"Recruits": 1},
+        ) or {}
+        if not _team_order_list(user_ftd.get("Recruits")):
+            raise HTTPException(status_code=400, detail="You must save recruiting orders before running training in week 20")
+
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    ftd_by_team_id = {str(doc["team_id"]): doc for doc in ftd_docs if doc.get("team_id") is not None}
+    team_docs_by_id = {}
+    for team in db.teams.find(
+        {"_id": {"$in": team_ids}},
+        {"name": 1, "conference": 1, "region": 1},
+    ):
+        team_id = str(team["_id"])
+        team_docs_by_id[team_id] = {
+            **team,
+            "prestige": (ftd_by_team_id.get(team_id) or {}).get("prestige", 0),
+        }
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_doc["_id"])},
+            {"_id": 0, "franchise_id": 0},
+        )
+    )
+    recruit_docs_by_id = {recruit["recruit_id"]: recruit for recruit in recruits}
+    recruits_by_region = {}
+    for region in "ABCDEFGH":
+        region_recruits = [recruit for recruit in recruits if str(recruit.get("Home Region") or "").upper() == region]
+        recruits_by_region[region] = _sort_recruits_by_rt(region_recruits)
+
+    cpu_orders = _generate_cpu_recruiting_orders(team_docs_by_id, user_team_id_str, recruits_by_region)
+    for team_id, cpu_order in cpu_orders.items():
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ObjectId(team_id)},
+            {"$set": {"Recruits": cpu_order, "updated_at": datetime.utcnow()}},
+        )
+
+    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
+    team_orders = {
+        str(doc["team_id"]): _team_order_list(doc.get("Recruits"))
+        for doc in all_ftd_docs
+    }
+    assignments = _resolve_weekly_recruiting_visits(team_docs_by_id, team_orders, recruit_docs_by_id)
+
+    db.franchises.update_one(
+        {"_id": fid},
+        {
+            "$set": {
+                f"recruiting_results.{week}": assignments,
+            }
+        },
+    )
+    for ftd_doc in all_ftd_docs:
+        team_id = str(ftd_doc["team_id"])
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ftd_doc["team_id"]},
+            {
+                "$set": {
+                    "recruit_visit": assignments.get(team_id),
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+
+    return assignments
+
+
 def _normalize_recruiting_orders(recruit_ids: list[str]) -> dict[str, str]:
     return {str(index): recruit_id for index, recruit_id in enumerate(recruit_ids, start=1)}
 
@@ -4531,9 +4614,6 @@ def save_recruiting_orders(
             )
         return {"status": "success", "saved_orders_week_35": orders_payload, "results_week": None}
 
-    if str(week) in (franchise_doc.get("recruiting_results", {}) or {}):
-        raise HTTPException(status_code=400, detail="Recruiting orders have already been submitted for this week")
-
     recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
     if len(recruit_ids) > MAX_RECRUITING_ORDER_SLOTS:
         raise HTTPException(status_code=400, detail=f"A maximum of {MAX_RECRUITING_ORDER_SLOTS} recruits can be ranked")
@@ -4552,67 +4632,7 @@ def save_recruiting_orders(
             }
         },
     )
-
-    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
-    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
-    ftd_by_team_id = {str(doc["team_id"]): doc for doc in ftd_docs if doc.get("team_id") is not None}
-    team_docs_by_id = {}
-    for team in db.teams.find(
-        {"_id": {"$in": team_ids}},
-        {"name": 1, "conference": 1, "region": 1},
-    ):
-        team_id = str(team["_id"])
-        team_docs_by_id[team_id] = {
-            **team,
-            "prestige": (ftd_by_team_id.get(team_id) or {}).get("prestige", 0),
-        }
-    recruits = list(
-        franchise_recruits_data_collection.find(
-            {"franchise_id": str(req.franchise_id)},
-            {"_id": 0, "franchise_id": 0},
-        )
-    )
-    recruit_docs_by_id = {recruit["recruit_id"]: recruit for recruit in recruits}
-    recruits_by_region = {}
-    for region in "ABCDEFGH":
-        region_recruits = [recruit for recruit in recruits if str(recruit.get("Home Region") or "").upper() == region]
-        recruits_by_region[region] = _sort_recruits_by_rt(region_recruits)
-
-    cpu_orders = _generate_cpu_recruiting_orders(team_docs_by_id, user_team_id_str, recruits_by_region)
-    for team_id, cpu_order in cpu_orders.items():
-        franchise_team_data_collection.update_one(
-            {"franchise_id": fid, "team_id": ObjectId(team_id)},
-            {"$set": {"Recruits": cpu_order, "updated_at": datetime.utcnow()}},
-        )
-
-    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
-    team_orders = {
-        str(doc["team_id"]): _team_order_list(doc.get("Recruits"))
-        for doc in all_ftd_docs
-    }
-    assignments = _resolve_weekly_recruiting_visits(team_docs_by_id, team_orders, recruit_docs_by_id)
-
-    db.franchises.update_one(
-        {"_id": fid},
-        {
-            "$set": {
-                f"recruiting_results.{week}": assignments,
-            }
-        },
-    )
-    for ftd_doc in all_ftd_docs:
-        team_id = str(ftd_doc["team_id"])
-        franchise_team_data_collection.update_one(
-            {"franchise_id": fid, "team_id": ftd_doc["team_id"]},
-            {
-                "$set": {
-                    "recruit_visit": assignments.get(team_id),
-                    "updated_at": datetime.utcnow(),
-                }
-            },
-        )
-
-    return {"status": "success", "saved_orders": orders_payload, "results_week": week}
+    return {"status": "success", "saved_orders": orders_payload, "results_week": None}
 
 
 @router.post("/franchise/run-week-35-recruiting")
@@ -5136,7 +5156,8 @@ def get_training_points(franchise_id: str):
     
     return {
         "training_points": training_points,
-        "is_first_training": is_first_training
+        "is_first_training": is_first_training,
+        "week": week,
     }
 
 
@@ -5187,6 +5208,22 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     # Check if it's first training (training camp) - week 1 and no results yet
     is_first_training = (week == 1 and not results.get("1"))
     expected_points = 30 if is_first_training else 24
+    recruiting_results = franchise_doc.get("recruiting_results", {}) or {}
+
+    if 20 <= week <= 26 and str(week) not in recruiting_results:
+        _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        if not user_team_object_id:
+            raise HTTPException(status_code=404, detail="User team not found in franchise document")
+        if week == 20:
+            user_ftd = franchise_team_data_collection.find_one(
+                {"franchise_id": franchise_id, "team_id": ObjectId(user_team_object_id)},
+                {"Recruits": 1},
+            ) or {}
+            if not _team_order_list(user_ftd.get("Recruits")):
+                raise HTTPException(
+                    status_code=400,
+                    detail="You must save recruiting orders before running training in week 20",
+                )
     
     # Validate total training points allocated
     training_data = req.training_data
@@ -5471,6 +5508,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         logger.warning(f"⚠️ [TRAINING] updated_scouting_data is None, preserving existing scouting_data")
     if is_first_training:
         ftd_update["training_squad_players"] = []
+
+    if 20 <= week <= 26 and str(week) not in recruiting_results:
+        _process_weekly_recruiting_invites(franchise_doc)
 
     # Mark training as completed and update status (still in franchise doc)
     session_type = training_status.get("session_type", "in-season")
