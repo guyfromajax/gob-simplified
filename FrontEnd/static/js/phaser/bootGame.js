@@ -1808,6 +1808,18 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
       secondary_color: awayRoster.secondary_color,
     },
   });
+
+  // Keep court-level UI (player/team box score headers, borders, pills) synced to real team colors.
+  // This overrides the legacy 8-team vibrant-color fallback used before roster data is available.
+  try {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.style.setProperty('--home-vibrant-color', homeRoster.primary_color || '#ff6200');
+      document.documentElement.style.setProperty('--away-vibrant-color', awayRoster.primary_color || '#ff6200');
+    }
+  } catch (err) {
+    console.warn('⚠️ [bootGame] Failed to apply real team colors to court UI:', err);
+  }
+
   gameStore.setGameId(gameId);
   if (!game) {
     game = new Phaser.Game({
