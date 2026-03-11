@@ -4,11 +4,11 @@ from BackEnd.db import teams_collection
 team_colors = {
     "BENTLEY-TRUMAN": {
         "primary_color": "#4066b2",
-        "secondary_color": "#9b9b9b"
+        "secondary_color": "#ffffff"
     },
     "LANCASTER": {
         "primary_color": "#d24a1b",
-        "secondary_color": "#cccccc"
+        "secondary_color": "#000000"
     },
     "FOUR_CORNERS": {
         "primary_color": "#c0976a",

@@ -39,6 +39,7 @@ try:
         tournaments_collection,
         franchises_collection,
         franchise_players_data_collection,
+        franchise_team_data_collection,
     )
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -551,14 +552,15 @@ try:
                 if doc and team_id:
                     teams_obj = doc.get("teams", {})
                     team_obj = teams_obj.get(team_id, {})
-                    # Extract team_attributes from team_obj
+                    # Game doc stores attributes under team_obj["attributes"] (from summarize_game_state)
+                    source = team_obj.get("attributes", team_obj)
                     attrs = {}
                     for key in ["shot_threshold", "discipline", "fight",
                                "rebound_modifier", "momentum_score", "offensive_efficiency",
                                "team_chemistry", "defensive_efficiency", "fb_efficiency",
                                "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier"]:
-                        if key in team_obj:
-                            attrs[key] = team_obj[key]
+                        if key in source:
+                            attrs[key] = source[key]
             except Exception as e:
                 print(f"⚠️ Error loading team_attributes from game doc: {e}")
         
@@ -4912,6 +4914,19 @@ try:
     
         process_start = time.time()
         players = []
+        pt_promise_ids = set()
+        franchise_week = None
+        if franchise_id:
+            try:
+                franchise_doc = franchises_collection.find_one({"_id": ObjectId(franchise_id)}, {"week": 1})
+                franchise_week = franchise_doc.get("week") if franchise_doc else None
+                ftd_doc = franchise_team_data_collection.find_one(
+                    {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
+                    {"playing_time_promise_players": 1},
+                ) or {}
+                pt_promise_ids = {str(pid) for pid in (ftd_doc.get("playing_time_promise_players") or []) if pid}
+            except Exception:
+                pt_promise_ids = set()
         for p in player_objects:
             player_id_str = str(p.get("_id"))
             player_name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
@@ -4946,6 +4961,8 @@ try:
                 "jersey": p.get("jersey", 0),
                 "position_ratings": position_ratings,
                 "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
+                "has_playing_time_promise": player_id_str in pt_promise_ids,
+                "is_graduating": bool(franchise_week == 36 and str(p.get("year") or "").strip().lower() in {"senior", "graduate"}),
             })
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
@@ -4958,6 +4975,8 @@ try:
         response_data = {
             "team": team.get("name", match if match else team_identifier),
             "team_name": team.get("name", match if match else team_identifier),
+            "primary_color": team.get("primary_color", "#000000"),
+            "secondary_color": team.get("secondary_color", "#ffffff"),
             "players": players
         }
         

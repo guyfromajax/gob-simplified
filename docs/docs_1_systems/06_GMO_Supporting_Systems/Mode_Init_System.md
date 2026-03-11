@@ -137,7 +137,18 @@ Ranges will be determined by each team's seed
   1. Season is initialized
   2. All players from all teams are loaded
   3. `Player.randomize_game_attributes()` is called for each player
-  4. Team attributes are initialized in `franchise_teams` structure with Franchise-specific ranges
+  4. Team attributes are initialized in the **franchise_team_data (FTD)** structure with Franchise-specific ranges
+  5. Each team's FTD doc includes **`total_player_attrs`**: the sum of that team's player core attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT). Used for national ranking. When the universal **teams** collection has a `total_player_attrs` field for a team, franchise init uses that value; otherwise it is computed from the universal **players** collection (sum by team name) during init.
+ 6. Each team's FTD doc includes recruiting support fields:
+     - `scholarship_players`: array of the team's 12 initial player id strings
+     - `training_squad_players`: array of the other 3 initial player id strings
+     - `playing_time_promise_players`: initialized to `[]`
+     - `Recruits`: keys `"1"` through `"20"` initialized to `None`
+     - `recruiting_orders_week_35`: initialized to `{}`
+     - `recruit_visit`: initialized to `None`
+ 7. On each new franchise season, those recruiting support fields are reset before the new season begins.
+    - `scholarship_players` and `training_squad_players` are retained in the schema for future use, but are currently dormant in roster-assignment UI/logic.
+  8. Brand new franchise init still loads from universal collections. Continuing franchise seasons do not; see `Season_Init_System.md`.
 
 ### Playbook Settings Initialization
 
@@ -193,3 +204,12 @@ Ranges will be determined by each team's seed
 - `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-210) - Franchise mode initialization
 - `BackEnd/api/gameplan_routes.py` - `initialize_playbook_settings()` (lines 206-378) - Playbook settings initialization
 
+**Franchise Mode New Season Schedule Logic**
+At the start of any new season in Franchise mode we will build team schedules for all 128 teams with teh following logic:
+-Each team will schedule 26 regular season games
+  - 14 conference games, 2 against each conference opponent, 1 home and 1 away
+  - 8 region games, 1 against each team in the sister conference in their region (4 home and 4 away). Home / away assignments will be randomly chosen for the first season in teh franchise instnace, then will rotate for each subsequent season. So if Morristown from Conference A1 plays at home against Crickstown from Conferecne A2 in season 1, Morristown will play away against Crickstown in season 2, home against Crickstown in season 3, away against Crickstown in season 4, etc.
+  - 4 out-of-region games (2 home and 2 away), the four out-of-region opponents can be any team that is not in their region, radomly chosen. Home away assignments will be randomly chosen.
+
+Rules
+- All teams must have 13 home game and 13 away games in the regular season

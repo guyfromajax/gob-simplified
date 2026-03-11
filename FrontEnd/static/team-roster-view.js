@@ -191,7 +191,9 @@ async function loadRoster() {
         position_ratings: posRatings, // Store full position ratings for player view
         highestRT: highestRT !== -Infinity ? highestRT : null,
         highestPos: highestPos || (p.position || '--'),
-        photo: p.photo || null
+        photo: p.photo || null,
+        hasPlayingTimePromise: !!p.has_playing_time_promise,
+        isGraduating: !!p.is_graduating
       };
     });
     
@@ -373,6 +375,20 @@ function renderRoster() {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.hasPlayingTimePromise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.isGraduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     const addCell = (content) => {
@@ -446,6 +462,20 @@ function renderStats() {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.hasPlayingTimePromise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.isGraduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     const addCell = (content) => {
@@ -772,7 +802,7 @@ function createCardFront(player) {
   const teamNameNormalized = (teamName || '').toLowerCase().replace(/\s+/g, '-');
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const staticPrefix = isLocalhost ? '/static' : '';
-  headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  headshotContainer.style.backgroundImage = `url(${(typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'background') : staticPrefix + '/images/teams/general/general_background.png')})`;
   headshotContainer.style.backgroundSize = 'cover';
   headshotContainer.style.backgroundPosition = 'center';
   
@@ -800,10 +830,10 @@ function createCardFront(player) {
   // Player image
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `/images/players/${player._id}.png`;
+  img.src = player.photo || `${staticPrefix}/images/players/${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
-    img.style.display = 'none';
+    img.src = `${staticPrefix}/images/players/generic_headshot.png`;
   };
   headshotContainer.appendChild(img);
   

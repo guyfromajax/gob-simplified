@@ -28,6 +28,7 @@ def _setup_teams_and_players():
     franchise_team_data_collection.delete_many({})
     db.players.delete_many({})
 
+    # Conference 1 required so schedule generation gets exactly 8 teams for round-robin
     team_ids = [ObjectId() for _ in range(8)]
     teams = [
         {
@@ -36,6 +37,7 @@ def _setup_teams_and_players():
             "record": {"W": 0, "L": 0},
             "PF": 0,
             "PA": 0,
+            "conference": 1,
             "player_ids": [] if i > 0 else ["p1", "p2"],
         }
         for i in range(8)

@@ -1316,131 +1316,135 @@ class ShotManager:
                         shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
                         bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
 
-                # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
-                # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
-                o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
-                d_rebounder_lineup = {pos: def_team.lineup[pos] for pos in defense_rebounders if def_team.lineup.get(pos) is not None}
-                
-                # Step 3: Penalize shooter (20% distance penalty) but don't exclude
-                shooter_id = getattr(shooter, "player_id", None)
-                exclude_player_ids = set()  # Don't exclude shooter anymore
-                penalize_player_ids = {shooter_id} if shooter_id else set()  # Penalize shooter by 20% distance
-                
-                # Step 4: Choose closest player to bounce spot from each team
-                o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
-                d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
-                
-                # Step 5: Handle edge cases (all players released/got back)
-                if o_rebounder is None and d_rebounder is None:
-                    # Fallback: use any defensive player
-                    logging.warning("No eligible rebounders found, using fallback")
-                    d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
-                    if d_rebounder:
+                # For fast-break misses, rebound outcome is fully resolved above in the
+                # FAST_BREAK-specific block. Do not run the shared HCO rebound pipeline,
+                # or we can resolve rebound twice and emit contradictory state.
+                if not is_fast_break:
+                    # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
+                    # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
+                    o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
+                    d_rebounder_lineup = {pos: def_team.lineup[pos] for pos in defense_rebounders if def_team.lineup.get(pos) is not None}
+                    
+                    # Step 3: Penalize shooter (20% distance penalty) but don't exclude
+                    shooter_id = getattr(shooter, "player_id", None)
+                    exclude_player_ids = set()  # Don't exclude shooter anymore
+                    penalize_player_ids = {shooter_id} if shooter_id else set()  # Penalize shooter by 20% distance
+                    
+                    # Step 4: Choose closest player to bounce spot from each team
+                    o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
+                    d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
+                    
+                    # Step 5: Handle edge cases (all players released/got back)
+                    if o_rebounder is None and d_rebounder is None:
+                        # Fallback: use any defensive player
+                        logging.warning("No eligible rebounders found, using fallback")
+                        d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
+                        if d_rebounder:
+                            rebounder = d_rebounder
+                            rebound_team = def_team
+                            stat = "DREB"
+                        else:
+                            raise ValueError("No players available for rebound")
+                    elif o_rebounder is None:
+                        # All offensive players got back - automatic DREB
                         rebounder = d_rebounder
                         rebound_team = def_team
                         stat = "DREB"
+                    elif d_rebounder is None:
+                        # All defensive players released - automatic OREB
+                        rebounder = o_rebounder
+                        rebound_team = off_team
+                        stat = "OREB"
                     else:
-                        raise ValueError("No players available for rebound")
-                elif o_rebounder is None:
-                    # All offensive players got back - automatic DREB
-                    rebounder = d_rebounder
-                    rebound_team = def_team
-                    stat = "DREB"
-                elif d_rebounder is None:
-                    # All defensive players released - automatic OREB
-                    rebounder = o_rebounder
-                    rebound_team = off_team
-                    stat = "OREB"
-                else:
-                    # Step 6: Calculate rebound scores for closest players
-                    o_score = calculate_rebound_score(o_rebounder)
-                    d_score = calculate_rebound_score(d_rebounder)
+                        # Step 6: Calculate rebound scores for closest players
+                        o_score = calculate_rebound_score(o_rebounder)
+                        d_score = calculate_rebound_score(d_rebounder)
+                        
+                        # Step 7: Apply team bias with player advantage modifier
+                        def_prob = 0.7
+                        player_advantage = len(defense_rebounders) - len(offense_rebounders)
+                        def_prob += (player_advantage * 0.05)
+                        
+                        off_mod = off_team.team_attributes["rebound_modifier"]
+                        def_mod = def_team.team_attributes["rebound_modifier"]
+                        bias = def_mod - off_mod
+                        new_prob = min(0.95, max(0.35, def_prob + bias))
+                        
+                        # Step 8: Calculate final weights
+                        total_score = d_score + o_score
+                        d_weight = (d_score / total_score) if total_score > 0 else 0.5
+                        d_weight += (new_prob - 0.5)
+                        d_weight = min(0.95, max(0.05, d_weight))
+                        
+                        # Zone defense penalty
+                        defense_call = game_state.get("defense_call", "Man")
+                        if defense_call == "Zone":
+                            d_weight *= 0.9
+                        
+                        # Step 9: Weighted random selection
+                        rebound_team = def_team if random.random() < d_weight else off_team
+                        rebounder = d_rebounder if rebound_team == def_team else o_rebounder
+                        stat = "DREB" if rebound_team == def_team else "OREB"
                     
-                    # Step 7: Apply team bias with player advantage modifier
-                    def_prob = 0.7
-                    player_advantage = len(defense_rebounders) - len(offense_rebounders)
-                    def_prob += (player_advantage * 0.05)
+                    # Store bounce spot for frontend animation
+                    result["ball_bounce_x"] = bounce_spot["x"]
+                    result["ball_bounce_y"] = bounce_spot["y"]
                     
-                    off_mod = off_team.team_attributes["rebound_modifier"]
-                    def_mod = def_team.team_attributes["rebound_modifier"]
-                    bias = def_mod - off_mod
-                    new_prob = min(0.95, max(0.35, def_prob + bias))
+                    # Record rebound stat and update game state
+                    self.game_state["last_rebound"] = stat
+                    rebounder.record_stat(stat)
+                    # Debug: Log when initial rebound stat is recorded
+                    # ✅ COMMENTED OUT: Initial rebound log (cluttering transition debugging)
+                    # logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
+                    text += f"...{get_name_safe(rebounder)} grabs the rebound."
+                    result["rebounderId"] = getattr(rebounder, "player_id", None)
+                    result["rebound_type"] = stat
                     
-                    # Step 8: Calculate final weights
-                    total_score = d_score + o_score
-                    d_weight = (d_score / total_score) if total_score > 0 else 0.5
-                    d_weight += (new_prob - 0.5)
-                    d_weight = min(0.95, max(0.05, d_weight))
+                    # Add player positioning data for frontend animation (already added at top for MAKE shots)
+                    result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
+                    result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
+                    result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
+                    result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
                     
-                    # Zone defense penalty
-                    defense_call = game_state.get("defense_call", "Man")
-                    if defense_call == "Zone":
-                        d_weight *= 0.9
+                    # ✅ SS&S: Calculate and store get-back player coordinates (backend as source of truth)
+                    offense_getback_coords = {}
+                    for pos in offense_getback_list:
+                        getback_player = off_team.lineup.get(pos)
+                        if getback_player:
+                            coords = self._calculate_getback_coordinates(getback_player, off_team, def_team)
+                            offense_getback_coords[getback_player.player_id] = coords
+                            # Update player.coords so fast break logic uses correct starting position
+                            getback_player.coords = coords.copy()
+                    result["offense_getback_coords"] = offense_getback_coords
                     
-                    # Step 9: Weighted random selection
-                    rebound_team = def_team if random.random() < d_weight else off_team
-                    rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                    stat = "DREB" if rebound_team == def_team else "OREB"
-                
-                # Store bounce spot for frontend animation
-                result["ball_bounce_x"] = bounce_spot["x"]
-                result["ball_bounce_y"] = bounce_spot["y"]
-                
-                # Record rebound stat and update game state
-                self.game_state["last_rebound"] = stat
-                rebounder.record_stat(stat)
-                # Debug: Log when initial rebound stat is recorded
-                # ✅ COMMENTED OUT: Initial rebound log (cluttering transition debugging)
-                # logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
-                text += f"...{get_name_safe(rebounder)} grabs the rebound."
-                result["rebounderId"] = getattr(rebounder, "player_id", None)
-                result["rebound_type"] = stat
-                
-                # Add player positioning data for frontend animation (already added at top for MAKE shots)
-                result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
-                result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
-                result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
-                result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
-                
-                # ✅ SS&S: Calculate and store get-back player coordinates (backend as source of truth)
-                offense_getback_coords = {}
-                for pos in offense_getback_list:
-                    getback_player = off_team.lineup.get(pos)
-                    if getback_player:
-                        coords = self._calculate_getback_coordinates(getback_player, off_team, def_team)
-                        offense_getback_coords[getback_player.player_id] = coords
-                        # Update player.coords so fast break logic uses correct starting position
-                        getback_player.coords = coords.copy()
-                result["offense_getback_coords"] = offense_getback_coords
-                
-                # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
-                defense_release_coords = {}
-                for pos in defense_release_list:
-                    release_player = def_team.lineup.get(pos)
-                    if release_player:
-                        coords = self._calculate_release_coordinates(release_player, off_team, def_team)
-                        defense_release_coords[release_player.player_id] = coords
-                        # Update player.coords so fast break logic uses correct starting position
-                        release_player.coords = coords.copy()
-                result["defense_release_coords"] = defense_release_coords
-                
-                # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
-                # These players should be near the basket they were attacking (where the shot was taken)
-                # off_team was on offense during shot, so they were attacking their target basket
-                # For home team shooting: attacking away basket (x=10)
-                # For away team shooting: attacking home basket (x=90)
-                is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
-                for pos in offense_rebounders:
-                    rebounder_player = off_team.lineup.get(pos)
-                    if rebounder_player:
-                        # Non-get-back players are near the basket after shot attempt
-                        if is_home_team_shooting:
-                            # Home team was shooting, so rebounders near away basket (x=10)
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                        else:
-                            # Away team was shooting, so rebounders near home basket (x=90)
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        rebounder_player.coords = rebounder_coords.copy()
+                    # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+                    defense_release_coords = {}
+                    for pos in defense_release_list:
+                        release_player = def_team.lineup.get(pos)
+                        if release_player:
+                            coords = self._calculate_release_coordinates(release_player, off_team, def_team)
+                            defense_release_coords[release_player.player_id] = coords
+                            # Update player.coords so fast break logic uses correct starting position
+                            release_player.coords = coords.copy()
+                    result["defense_release_coords"] = defense_release_coords
+                    
+                    # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
+                    # These players should be near the basket they were attacking (where the shot was taken)
+                    # off_team was on offense during shot, so they were attacking their target basket
+                    # For home team shooting: attacking away basket (x=10)
+                    # For away team shooting: attacking home basket (x=90)
+                    is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+                    for pos in offense_rebounders:
+                        rebounder_player = off_team.lineup.get(pos)
+                        if rebounder_player:
+                            # Non-get-back players are near the basket after shot attempt
+                            if is_home_team_shooting:
+                                # Home team was shooting, so rebounders near away basket (x=10)
+                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                            else:
+                                # Away team was shooting, so rebounders near home basket (x=90)
+                                rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                            rebounder_player.coords = rebounder_coords.copy()
                 
                 # Debug log to verify offense_getback is populated
                 # print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {
@@ -1484,59 +1488,62 @@ class ShotManager:
                 # result["rebound_type"] = stat
                 # ==================== END OLD REBOUND SYSTEM ====================
                 
-                if stat == "OREB":
-                    possession_flips = False
-                    if self.game_state.get("final_turn"):
-                        result["quarter_ends_after"] = True
-                        result["next_play_type"] = None
-                    else:
-                        # Store OREB info for game_manager to create a separate OREB turn
-                        self.game_state["pending_oreb"] = {
-                            "rebounder": rebounder,
-                            "rebounder_id": getattr(rebounder, "player_id", None),
-                            "from_block": getattr(self, "_block_spot", None) is not None,
-                        }
-                        result["next_play_type"] = "OREB"
-                else:
-                    # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
-                    possession_flips = True
-                    if self.game_state.get("final_turn"):
-                        result["quarter_ends_after"] = True
-                        result["next_play_type"] = None
-                    else:
-                        events.append({
-                            "event_type": "defReb",
-                            "rebounderId": getattr(rebounder, "player_id", None),
-                        })
-                        self.game.turn_manager.logger.log("defReb")
-                        self.game_state["last_rebounder"] = rebounder
-                        # ✅ Situational Logic: Force Foul after DREB — execute immediately, forgo FB/HCO and outlet
-                        from BackEnd.utils import situational_logic as sl
-                        time_remaining_sec = self.game_state.get("time_remaining")
-                        force_foul_after_dreb = (
-                            sl.is_situational_active(getattr(self.game, "quarter", None))
-                            and sl.is_slow_it_down(self.game, time_remaining_sec)
-                            and sl.should_force_foul(self.game, time_remaining_sec)
-                        )
-                        if force_foul_after_dreb:
-                            result["force_foul_after_dreb"] = True
-                            next_play_type = "HCO"
-                            self.game_state["last_release_player"] = None
-                            self.game_state["offensive_state"] = "HCO"
-                            result["next_play_type"] = next_play_type
+                # Fast-break miss paths set rebound transition in the dedicated FB branch above.
+                # Running this shared post-rebound transition block for FB can double-process state.
+                if not is_fast_break:
+                    if stat == "OREB":
+                        possession_flips = False
+                        if self.game_state.get("final_turn"):
+                            result["quarter_ends_after"] = True
+                            result["next_play_type"] = None
                         else:
-                            # NEW FAST BREAK LOGIC:
-                            next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
-                            if defense_release_list:
-                                release_pos = defense_release_list[0]
-                                release_player = def_team.lineup.get(release_pos)
-                                if release_player:
-                                    self.game_state["last_release_player"] = release_player
-                            else:
+                            # Store OREB info for game_manager to create a separate OREB turn
+                            self.game_state["pending_oreb"] = {
+                                "rebounder": rebounder,
+                                "rebounder_id": getattr(rebounder, "player_id", None),
+                                "from_block": getattr(self, "_block_spot", None) is not None,
+                            }
+                            result["next_play_type"] = "OREB"
+                    else:
+                        # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
+                        possession_flips = True
+                        if self.game_state.get("final_turn"):
+                            result["quarter_ends_after"] = True
+                            result["next_play_type"] = None
+                        else:
+                            events.append({
+                                "event_type": "defReb",
+                                "rebounderId": getattr(rebounder, "player_id", None),
+                            })
+                            self.game.turn_manager.logger.log("defReb")
+                            self.game_state["last_rebounder"] = rebounder
+                            # ✅ Situational Logic: Force Foul after DREB — execute immediately, forgo FB/HCO and outlet
+                            from BackEnd.utils import situational_logic as sl
+                            time_remaining_sec = self.game_state.get("time_remaining")
+                            force_foul_after_dreb = (
+                                sl.is_situational_active(getattr(self.game, "quarter", None))
+                                and sl.is_slow_it_down(self.game, time_remaining_sec)
+                                and sl.should_force_foul(self.game, time_remaining_sec)
+                            )
+                            if force_foul_after_dreb:
+                                result["force_foul_after_dreb"] = True
                                 next_play_type = "HCO"
                                 self.game_state["last_release_player"] = None
-                            self.game_state["offensive_state"] = next_play_type
-                            result["next_play_type"] = next_play_type
+                                self.game_state["offensive_state"] = "HCO"
+                                result["next_play_type"] = next_play_type
+                            else:
+                                # NEW FAST BREAK LOGIC:
+                                next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
+                                if defense_release_list:
+                                    release_pos = defense_release_list[0]
+                                    release_player = def_team.lineup.get(release_pos)
+                                    if release_player:
+                                        self.game_state["last_release_player"] = release_player
+                                else:
+                                    next_play_type = "HCO"
+                                    self.game_state["last_release_player"] = None
+                                self.game_state["offensive_state"] = next_play_type
+                                result["next_play_type"] = next_play_type
 
         # ⏱️ Skeleton turns use per-step random (1..5) up to shot resolution step.
         # Fast breaks are CG turns and will be overwritten in resolve_fast_break_logic.

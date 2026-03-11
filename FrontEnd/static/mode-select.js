@@ -33,8 +33,8 @@ const TEAM_LOGO_CODE = {
 };
 
 function getSquareLogoPath(teamName) {
-  const code = TEAM_LOGO_CODE[teamName];
-  return code ? `/images/square-logos/${code}_square.png` : null;
+  if (typeof getTeamAssetPath === 'function') return getTeamAssetPath(teamName, 'banner_primary');
+  return '/images/teams/general/general_banner_primary.jpg';
 }
 
 function tournamentRoundLabel(roundNum, completed) {
@@ -543,17 +543,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
       });
 
+      /* Scout team cards use neutral container (CSS); colorMap still used for Tournament/Franchise instance accents */
       teamButtons.forEach(btn => {
         const team = btn.dataset.team;
-        const taglineEl = btn.querySelector('.team-tagline');
-        const colors = colorMap[team] || {};
-        const bgColor = colors.primary || fallbackColor;
-        const borderColor = colors.secondary || fallbackColor;
-        const taglineColor = colors.primary ? '#fff' : '#000';
-        btn.style.backgroundColor = bgColor;
-        btn.style.borderColor = borderColor;
-        if (taglineEl) taglineEl.style.color = taglineColor;
-        console.log(`Tile ${team} bgColor: ${bgColor} borderColor: ${borderColor}`);
+        if (colorMap[team]) {
+          console.log(`Tile ${team} colors loaded (card uses neutral theme)`);
+        }
       });
 
       // Render Tournament and Franchise instance cards from API data
@@ -624,12 +619,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     })
     .catch(() => {
+      /* Scout team cards use neutral theme from CSS; no fallback needed */
       teamButtons.forEach(btn => {
-        const taglineEl = btn.querySelector('.team-tagline');
-        btn.style.borderColor = fallbackColor;
-        btn.style.backgroundColor = fallbackColor;
-        if (taglineEl) taglineEl.style.color = '#000';
-        console.log(`Tile ${btn.dataset.team} bgColor: ${fallbackColor} (fallback)`);
+        console.log(`Tile ${btn.dataset.team} (teams API failed, neutral theme)`);
       });
     });
 });

@@ -214,8 +214,14 @@ def delete_current_tournament(user: dict = Depends(get_current_user)):
     """
     Delete the current user's tournament (so they can start a new one from mode-select).
     Used when user confirms "New Tournament" in the confirmation modal.
+    Cascade-deletes games linked to those tournaments (same as franchise delete).
     Returns 200 with deleted=True if a tournament was deleted, deleted=False if none existed.
     """
+    # Cascade: delete games linked to this user's tournaments (match franchise behavior)
+    tournament_docs = list(tournaments_collection.find({"user_id": user.get("user_id")}, {"_id": 1}))
+    tournament_ids = [str(doc["_id"]) for doc in tournament_docs]
+    if tournament_ids:
+        games_collection.delete_many({"tournament_id": {"$in": tournament_ids}})
     result = tournaments_collection.delete_many({"user_id": user.get("user_id")})
     deleted = result.deleted_count > 0
     return {"deleted": deleted, "count": result.deleted_count}

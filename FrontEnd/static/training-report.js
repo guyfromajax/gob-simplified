@@ -26,6 +26,7 @@ let currentView = 'changes'; // 'attributes' or 'changes'
 const ATTRIBUTE_ORDER = [
   'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'EM'
 ];
+const STATIC_COLUMNS = ['RT'];
 
 const ATTRIBUTE_NAMES = {
   'SC': 'SC',
@@ -304,11 +305,15 @@ function renderPlayersTable() {
       headerRow.appendChild(createHeaderCell(attr));
     });
   }
+
+  STATIC_COLUMNS.forEach(col => {
+    headerRow.appendChild(createHeaderCell(col));
+  });
   
   thead.appendChild(headerRow);
   
   // Build rows
-  reportData.players.forEach(player => {
+  getSortedPlayersForReport().forEach(player => {
     const row = document.createElement('tr');
     row.appendChild(createCell(player.name));
     
@@ -328,6 +333,8 @@ function renderPlayersTable() {
         row.appendChild(createChangeCell(change));
       });
     }
+
+    row.appendChild(createCell(getPlayerHighestRt(player)));
     
     tbody.appendChild(row);
   });
@@ -350,6 +357,24 @@ function renderPlayersTable() {
     
     tbody.appendChild(totalRow);
   }
+}
+
+function getPlayerHighestRt(player) {
+  const ratings = player && player.position_ratings ? player.position_ratings : {};
+  const values = Object.values(ratings).map(v => Number(v) || 0);
+  if (!values.length) return 0;
+  return Math.max(...values);
+}
+
+function getSortedPlayersForReport() {
+  return (reportData.players || [])
+    .map((player, index) => ({ player, index }))
+    .sort((a, b) => {
+      const rtDiff = getPlayerHighestRt(b.player) - getPlayerHighestRt(a.player);
+      if (rtDiff !== 0) return rtDiff;
+      return a.index - b.index;
+    })
+    .map(entry => entry.player);
 }
 
 function createHeaderCell(text) {

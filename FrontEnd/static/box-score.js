@@ -335,11 +335,91 @@ function renderBoxScore() {
 
   renderHeader();
   renderQuarterScoring();
+  renderPlayerOfTheGameSection();
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
   renderTeamAttributeChangesForTab('home');
   renderTeamAttributeChangesForTab('away');
+}
+
+async function renderPlayerOfTheGameSection() {
+  const section = document.getElementById('potg-section');
+  const playerLine = document.getElementById('potg-player-line');
+  const statsLine = document.getElementById('potg-stats-line');
+  if (!section || !playerLine || !statsLine) return;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPregame = urlParams.get('pregame') === '1';
+  if (isPregame) {
+    section.style.display = 'none';
+    return;
+  }
+
+  const isGameComplete = isGameCompleteForPotg(gameData);
+  if (!isGameComplete) {
+    playerLine.textContent = '';
+    statsLine.textContent = '';
+    playerLine.style.color = '';
+    statsLine.style.color = '';
+    return;
+  }
+
+  try {
+    const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
+      ? window.API_CONFIG.getStaticPath()
+      : '';
+    const { calculatePlayerOfTheGame } = await import(`${staticBase}/js/shared/potg.js`);
+    const gameId = urlParams.get('game_id') || '';
+    const potg = calculatePlayerOfTheGame(gameData, { gameId });
+
+    if (!potg) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    playerLine.textContent = `${potg.name} - ${potg.teamName}`;
+    statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
+    const potgColor = potg.teamColor || '#1a1a2e';
+    playerLine.style.color = potgColor;
+    statsLine.style.color = potgColor;
+  } catch (err) {
+    console.warn('[box-score] Failed to render POTG section:', err);
+    section.style.display = 'none';
+  }
+}
+
+function isGameCompleteForPotg(data) {
+  if (!data || typeof data !== 'object') return false;
+
+  if (data.is_final === true || data.finalized === true || data.game_complete === true) {
+    return true;
+  }
+
+  const status = String(data.status || data.game_status || '').toLowerCase();
+  if (['complete', 'completed', 'final', 'finalized'].includes(status)) {
+    return true;
+  }
+
+  // Conservative fallback for older game docs without explicit completion flags.
+  const quarter = Number(data.quarter || 0);
+  const timeRemaining = Number(data.time_remaining);
+  const clock = String(data.clock || '').trim();
+  const score = data.score || {};
+  const teamsObj = data.teams || {};
+  const homeTeamName = (data.home_team_id && teamsObj[data.home_team_id]?.name) || data.home_team?.name || 'Home Team';
+  const awayTeamName = (data.away_team_id && teamsObj[data.away_team_id]?.name) || data.away_team?.name || 'Away Team';
+  const homeScore = Number(score[homeTeamName] ?? data.home_team?.score ?? 0);
+  const awayScore = Number(score[awayTeamName] ?? data.away_team?.score ?? 0);
+  const hasWinner = homeScore !== awayScore;
+  const clockAtZero = clock === '0:00' || clock === '00:00';
+  const noClockData = !Number.isFinite(timeRemaining) && !clock;
+
+  if (quarter > 4 && hasWinner && (clockAtZero || !Number.isFinite(timeRemaining) || timeRemaining <= 0 || noClockData)) return true;
+  if (quarter === 4 && hasWinner && (clockAtZero || (Number.isFinite(timeRemaining) && timeRemaining <= 0) || noClockData)) return true;
+
+  return false;
 }
 
 // Build zeroed box score data from rosters when viewing pre-game

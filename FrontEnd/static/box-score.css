@@ -104,6 +104,30 @@ h2 {
   background: #fafafa;
 }
 
+#potg-section {
+  background: #ffffff;
+  text-align: center;
+}
+
+#potg-section h2 {
+  text-align: center;
+}
+
+.potg-player-line {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: #1a1a2e;
+  margin-bottom: 10px;
+}
+
+.potg-stats-line {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: #1a1a2e;
+}
+
 #quarter-scoring-table {
   width: 100%;
   border-collapse: collapse;
@@ -569,4 +593,3 @@ h2 {
 .player-name-link:hover {
   color: #004499;
 }
-

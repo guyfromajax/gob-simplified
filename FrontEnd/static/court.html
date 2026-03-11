@@ -10,6 +10,7 @@
   <meta charset="UTF-8" />
   <title>GOB Court</title>
   <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
@@ -1872,6 +1873,22 @@
       background-color: #0056b3;
     }
 
+    /* Dead controls are intentionally non-interactive with an obvious visual mask. */
+    .dead-control {
+      position: relative;
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .dead-control::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.28);
+    }
+
     /* Skip To End is not yet implemented; keep it clearly disabled until post-alpha */
     #skip-btn:disabled {
       opacity: 0.45;
@@ -2501,9 +2518,9 @@
       
       <!-- Game controls (pause/skip) at bottom of court -->
       <div class="game-controls">
-        <button id="game-speed-btn">Game Speed</button>
+        <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
         <button id="pause-btn">Pause</button>
-        <button id="skip-btn" disabled title="Coming in a future update">Skip To End</button>
+        <button id="skip-btn" class="dead-control" disabled title="Coming in a future update">Skip To End</button>
         <button id="timeout-btn">Timeout</button>
       </div>
       
@@ -3121,7 +3138,7 @@
               headshotImg.setAttribute('data-player-id', shooterId);
               headshotImg.onerror = () => {
                 console.warn(`⚠️ [PLAYCALL HEADSHOTS] Headshot failed to load: ${imgPath}, using default`);
-                headshotImg.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+                headshotImg.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
               };
               
               // Add tooltip event listeners (if tooltip functions exist)
@@ -4055,6 +4072,39 @@
     const loadGameStatsModule = await import(`${staticPath}/js/phaser/utils/loadGameStats.js`);
     const { applyVibrantColors } = vibrantColorsModule;
     const { initializeGameStats } = loadGameStatsModule;
+
+    async function hydrateCourtColorsFromRoster(homeTeamName, awayTeamName) {
+      if (!homeTeamName || !awayTeamName) return false;
+
+      const params = new URLSearchParams();
+      const mode = urlParams.get('mode');
+      const franchiseId = urlParams.get('franchise_id');
+      const tournamentId = urlParams.get('tournament_id');
+      if (mode === 'franchise' && franchiseId) params.append('franchise_id', franchiseId);
+      if (mode === 'tournament' && tournamentId) params.append('tournament_id', tournamentId);
+      params.append('profile', '1');
+      const query = params.toString() ? `?${params.toString()}` : '';
+
+      try {
+        const [homeRes, awayRes] = await Promise.all([
+          fetch(API_CONFIG.buildUrl(`/roster/${encodeURIComponent(homeTeamName)}${query}`)),
+          fetch(API_CONFIG.buildUrl(`/roster/${encodeURIComponent(awayTeamName)}${query}`)),
+        ]);
+        if (!homeRes.ok || !awayRes.ok) return false;
+
+        const [homeRoster, awayRoster] = await Promise.all([homeRes.json(), awayRes.json()]);
+        const homeColor = homeRoster?.primary_color;
+        const awayColor = awayRoster?.primary_color;
+        if (!homeColor || !awayColor) return false;
+
+        document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
+        document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
+        return true;
+      } catch (err) {
+        console.warn('⚠️ Failed to hydrate real team colors for pre-game court UI:', err);
+        return false;
+      }
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
@@ -4071,7 +4121,10 @@
     }
     
     if (homeTeam && awayTeam) {
-      applyVibrantColors(homeTeam, awayTeam);
+      const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
+      if (!appliedRealColors) {
+        applyVibrantColors(homeTeam, awayTeam);
+      }
     } else {
       console.warn('⚠️ No teams found in URL, using default vibrant colors');
     }
@@ -4265,7 +4318,7 @@
       
       // Set player image
       image.src = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
-      image.onerror = () => { image.src = API_CONFIG.buildStaticPath('/images/players/default.png'); };
+      image.onerror = () => { image.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png'); };
       
       // Energy (NG)
       const ng = stats.NG ?? stats.ng ?? 1.0;
@@ -4355,13 +4408,13 @@
       
       // Set intended shooter headshot
       if (data.intendedShooterId) {
-        const photoUrl = `/images/players/${data.intendedShooterId}.png`;
+        const photoUrl = API_CONFIG.buildStaticPath(`/images/players/${data.intendedShooterId}.png`);
         headshotEl.src = photoUrl;
         headshotEl.style.display = 'block';
         
         // Fallback to default if image fails to load
         headshotEl.onerror = () => {
-          headshotEl.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+          headshotEl.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
         };
       } else {
         headshotEl.style.display = 'none';
@@ -4433,7 +4486,7 @@
       headshotEl.style.display = 'block';
       
       headshotEl.onerror = () => {
-        headshotEl.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+        headshotEl.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
       };
 
       const mo = data.shooterMO || 5;
@@ -4516,7 +4569,7 @@
         }
       } else {
         // Away team has ball - show on away side (left)
-        awayHeadshot.src = ballHandlerSprite.photo || `/images/players/${ballHandlerId}.png`;
+        awayHeadshot.src = ballHandlerSprite.photo || API_CONFIG.buildStaticPath(`/images/players/${ballHandlerId}.png`);
         awayHeadshot.className = 'active-player-headshot has-ball';
         awayRole.textContent = '🏀';
         awayRole.className = 'player-role-icon ball';
@@ -4525,7 +4578,7 @@
         
         // Show defender on home side (right) if available
         if (defenderSprite) {
-          homeHeadshot.src = defenderSprite.photo || `/images/players/${defenderId}.png`;
+          homeHeadshot.src = defenderSprite.photo || API_CONFIG.buildStaticPath(`/images/players/${defenderId}.png`);
           homeHeadshot.className = 'active-player-headshot defender';
           homeRole.textContent = 'D';
           homeRole.className = 'player-role-icon defense';
@@ -4538,10 +4591,10 @@
 
       // Image error handling
       awayHeadshot.onerror = () => {
-        awayHeadshot.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+        awayHeadshot.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
       };
       homeHeadshot.onerror = () => {
-        homeHeadshot.src = API_CONFIG.buildStaticPath('/images/players/default.png');
+        homeHeadshot.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
       };
 
       // Display audible text in scoreboard if provided

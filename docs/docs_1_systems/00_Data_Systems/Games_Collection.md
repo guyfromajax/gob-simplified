@@ -207,3 +207,11 @@ This document will be expanded with:
 - Data persistence patterns across game modes
 - Document size optimization strategies
 
+## Deleting docs form the games collection in gob and gob-staging
+-Principle: only games that are linked to active Franchise or Tournament instances should be kept, all others should be deleted
+-All Single Game game docs should be deleted once the user returns to the mode-select screen from teh Single Game. Important -- do not delote the doc while the user is in the Box Score for that game.
+-Tournament & Franhise mode -- preserve all games as long as they are linked to an active Franchise or Tournament doc
+
+-Current cleanup
+  -Delete all game docs collection in the gob-staging collection
+  -Delte all game collectnion docs in the gob collection that ARE NOT linked to an active Franchise our Tournament instance

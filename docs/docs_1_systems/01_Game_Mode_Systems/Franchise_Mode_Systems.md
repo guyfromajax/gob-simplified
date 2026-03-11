@@ -6,6 +6,15 @@
 
 Franchise Mode supports multi-season career mode where team and player data persists across games and seasons. Team attributes and player attributes can be modified through training and persist throughout the franchise. The Franchise Command Center provides a comprehensive interface for managing franchise progression, viewing schedules, standings, and running training sessions.
 
+Continuing seasons inside a franchise instance are rebuilt from franchise-instance state only. Universal `players` / `teams` data is only used when creating a brand new franchise instance.
+
+Post-championship offseason flow:
+- After EOS national week `34` completes, franchise mode advances to week `35`.
+- Week `35` is Awards + live recruiting/signings.
+- Week `36` is the signed-results / wrap-up state.
+- `Go To Next Season` becomes the primary CTA in week `36`.
+- `Go To Next Season` runs an in-place season rollover for the existing franchise instance and returns the user directly to FCC for the same franchise.
+
 **Location:** `FrontEnd/static/franchise-command-center.html`, `FrontEnd/static/franchise-command-center.js`  
 **Status:** ✅ Fully implemented with Schedule tab, training integration, and franchise management
 
@@ -49,7 +58,7 @@ Franchise Mode supports multi-season career mode where team and player data pers
 
 **Tabs (in order):**
 1. **Standings** - Conference standings table showing wins, losses, win percentage, points for/against, and next opponent
-2. **Roster** - Team roster (player attributes) and player statistics for the current season
+2. **Roster** - Team roster (player attributes) and player statistics for the current season. Teams can carry **12-15 players** from post-recruiting through the season transition. After week 1 training camp in the next season, any team above 12 must cut down to a legal 12-player roster before gameplay resumes. Franchise-team data still stores `scholarship_players`, `training_squad_players`, and `playing_time_promise_players`, but scholarship and training-squad behavior are currently dormant in the UI and roster-assignment flow.
 3. **Team** - Team Report section (team attributes) and Playbook Summary section (play effectiveness)
 4. **Stats** - Franchise leaderboards for key statistics across all teams, plus team-level statistics
 5. **Schedule** - Season schedule view with weekly matchups and training report links
@@ -91,6 +100,7 @@ Franchise Mode supports multi-season career mode where team and player data pers
 - **Set Game Plan** - Navigate to Game Plan screen with franchise context
 - **Playbooks** - Navigate to Playbooks page with franchise context
 - **Run Training / Play Now** - Dynamic button that changes based on training status
+- **Season Label** - Under the team logo, display `Season XX` to the right of **Exit Franchise**, sourced from `franchise.current_season`
 
 **Schedule Tab:**
 - Displays full season schedule organized by week

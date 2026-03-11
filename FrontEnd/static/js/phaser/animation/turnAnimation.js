@@ -2246,7 +2246,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }
 
-  for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+  // Step loop animates transitions using (prev -> curr), so it must start at 1.
+  // Starting at 0 makes prev undefined and can short-circuit skeleton playback.
+  const stepLoopStartIndex = 1;
+  for (let stepIndex = stepLoopStartIndex; stepIndex < maxSteps; stepIndex++) {
     
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);

@@ -1399,6 +1399,13 @@ def calculate_defender_coords(
             elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
                 def_x = ox - 2 if is_away_offense_calc else ox + 2
                 def_y = oy
+            elif o_spot_used in ["key"]:
+                if ball_spot_used in ["lower wing", "lower midWing"]:
+                    def_x = bx
+                    def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+                else:
+                    def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                    def_y = oy + 0.5 * (abs(by - oy) * y_direction)
             else:
                 def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
                 def_y = oy + 0.5 * (abs(by - oy) * y_direction)
@@ -1436,6 +1443,13 @@ def calculate_defender_coords(
             elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
                 def_x = ox - 2 if is_away_offense_calc else ox + 2
                 def_y = oy
+            elif o_spot_used in ["key"]:
+                if ball_spot_used in ["upper wing", "upper midWing"]:
+                    def_x = bx
+                    def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+                else:
+                    def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                    def_y = oy + 0.5 * (abs(by - oy) * y_direction)
             else:
                 def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
                 def_y = oy + 0.5 * (abs(by - oy) * y_direction)

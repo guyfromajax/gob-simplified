@@ -125,8 +125,9 @@ The stopper system truncates FCP/HCT "base" variant skeletons at strategic point
 **Clock start and inbound pass**
 - **Game and shot clocks** start only after the inbound receiver has the ball (same behavior as BIP→HCO and SIP).
 - The **inbound pass** runs during the BASELINE_INBOUND (BIP) step; the frontend runs the full inbound sequence (positions + pass) for FCP/HCT as well as HCO.
-- The backend **trims** the FCP/HCT skeleton to `steps[1:]` when building the turn. Step 0 (inbound setup + pass) is not animated again; the first animated step is post-receive, so clocks start on that first step.
-- Implemented in: `phase_resolution.py` (trim after `get_fcp_skeleton` / `get_hct_skeleton` for both shot and non-shot paths), `turnAnimation.js` `runInboundSetup()` (inbound pass runs for FCP/HCT; no early return).
+- When the FCP/HCT turn directly follows a BIP, the backend now skips all leading skeleton steps where `SF.location == inbound_left`, then starts at the first step where SF is no longer at `inbound_left`. This prevents double inbound-pass sequences when variants contain additional inbound-left pass steps after step 0.
+- Fallback behavior is preserved: if no dynamic match is found, legacy start index logic still applies so turns continue safely.
+- Implemented in: `phase_resolution.py` (post-skeleton start-index selection in both FCP/HCT shot and non-shot paths), `turnAnimation.js` `runInboundSetup()` (inbound pass runs for FCP/HCT; no early return).
 
 **Long Form Documentation**
 
@@ -413,4 +414,3 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 - **More Nuanced Defender Assignment**: Currently uses position matching. Future: Determine defender based on actual defensive assignments (zone/man coverage)
 - **Enhanced Ball Handler Detection**: Improve detection logic for edge cases where ball handler isn't clear from skeleton
 - **Skeleton Variants**: Add more skeleton variants for different press break scenarios
-

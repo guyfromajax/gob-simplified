@@ -26,7 +26,7 @@
   <div id="alpha-disclaimer" class="alpha-disclaimer">
     <div class="alpha-disclaimer-title">ALPHA RELEASE</div>
     <p class="alpha-disclaimer-text">
-      <strong>March 1 Calibration</strong> Added real time game clock and shot clock. Minimized animation pause between turns. Added Situational Logic to end of quarters and end of game. Increased number of possesions in the game. Reduced frequency of shot clock violations and shooting fouls. Re-calibrated team attributes impact at end of games.
+      <strong>March 11 Update</strong> Added expanded 26-game regular season, conference, region, and national tournaments, full recruiting system, and cleaned up a number of bugs.
     </p>
   </div>
   <div class="mode-wrapper">
@@ -48,12 +48,20 @@
   -->
   <div class="mode-container">
     <div class="mode-card">
-      <h2>Scrimmage</h2>
+      <div class="mode-card-icon">
+        <img src="/images/modes/scrimmage.png" alt="" role="presentation" />
+      </div>
+      <h2 class="mode-card-title">Scrimmage</h2>
+      <p class="mode-card-descriptor">Quick one-off game</p>
       <button id="scrimmage-btn" class="play-button">PLAY NOW</button>
     </div>
     <div class="mode-card mode-card-tournament">
-      <h2>Tournament</h2>
-      <!-- Current instance: team name (bold, primary colors) + round to play next (First Round / Semis / Championship / Complete) -->
+      <div class="mode-card-icon">
+        <img src="/images/modes/tournament.png" alt="" role="presentation" />
+      </div>
+      <h2 class="mode-card-title">Tournament</h2>
+      <p class="mode-card-descriptor">Run a full bracket</p>
+      <!-- Current instance: team name (bold, primary colors) + round to play next -->
       <div id="tournament-instance" class="mode-instance" style="display: none;" data-instance-accent="">
         <div class="instance-copy">
           <div id="tournament-instance-team" class="instance-team-name"></div>
@@ -68,8 +76,12 @@
       </div>
     </div>
     <div class="mode-card mode-card-franchise">
-      <h2>Franchise</h2>
-      <!-- Current instance: team name (bold, primary colors) + week/phase (Week N, First Round/Semis/Championship, or Offseason) -->
+      <div class="mode-card-icon">
+        <img src="/images/modes/franchise.png" alt="" role="presentation" />
+      </div>
+      <h2 class="mode-card-title">Franchise</h2>
+      <p class="mode-card-descriptor">Manage your program</p>
+      <!-- Current instance: team name (bold, primary colors) + week/phase -->
       <div id="franchise-instance" class="mode-instance" style="display: none;" data-instance-accent="">
         <div class="instance-copy">
           <div id="franchise-instance-team" class="instance-team-name"></div>
@@ -87,35 +99,51 @@
   <h2 id="scout-title">SCOUT TEAMS</h2>
   <div id="team-grid">
     <button class="team-button" data-team="Bentley-Truman">
-      <img src="/images/homepage-logos/Bentley-Truman.png" alt="Bentley-Truman logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/bentley_truman/bentley_truman_banner_primary.jpg" alt="Bentley-Truman">
+      </div>
       <div class="team-tagline">Top-Shelf Talent</div>
     </button>
     <button class="team-button" data-team="Lancaster">
-      <img src="/images/homepage-logos/Lancaster.png" alt="Lancaster logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/lancaster/lancaster_banner_primary.jpg" alt="Lancaster">
+      </div>
       <div class="team-tagline">Muscle & Defense</div>
     </button>
     <button class="team-button" data-team="Four Corners">
-      <img src="/images/homepage-logos/Four Corners.png" alt="Four Corners logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/four_corners/four_corners_banner_primary.jpg" alt="Four Corners">
+      </div>
       <div class="team-tagline">Hustle & Attitude</div>
     </button>
     <button class="team-button" data-team="Ocean City">
-      <img src="/images/homepage-logos/Ocean City.png" alt="Ocean City logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/ocean_city/ocean_city_banner_primary.jpg" alt="Ocean City">
+      </div>
       <div class="team-tagline">Sharpshooters Galore</div>
     </button>
     <button class="team-button" data-team="Morristown">
-      <img src="/images/homepage-logos/Morristown.png" alt="Morristown logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/morristown/morristown_banner_primary.jpg" alt="Morristown">
+      </div>
       <div class="team-tagline">Perfectly Balanced</div>
     </button>
     <button class="team-button" data-team="Little York">
-      <img src="/images/homepage-logos/Little York.png" alt="Little York logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/little_york/little_york_banner_primary.jpg" alt="Little York">
+      </div>
       <div class="team-tagline">Wicked Smart</div>
     </button>
     <button class="team-button" data-team="Xavien">
-      <img src="/images/homepage-logos/Xavien.png" alt="Xavien logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/xavien/xavien_banner_primary.jpg" alt="Xavien">
+      </div>
       <div class="team-tagline">Youthful Exuberance</div>
     </button>
     <button class="team-button" data-team="South Lancaster">
-      <img src="/images/homepage-logos/South Lancaster.png" alt="South Lancaster logo">
+      <div class="team-button-logo-stage">
+        <img src="/images/teams/south_lancaster/south_lancaster_banner_primary.jpg" alt="South Lancaster">
+      </div>
       <div class="team-tagline">Us vs The World</div>
     </button>
   </div>
@@ -154,6 +182,7 @@
   </div>
 
   <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
   <script src="./mode-select.js"></script>
 </body>
 </html>

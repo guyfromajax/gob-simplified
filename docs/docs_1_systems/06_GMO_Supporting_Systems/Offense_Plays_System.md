@@ -364,7 +364,7 @@ The Plays Page System provides detailed views for individual plays, allowing use
   - Court animation container
   - Same dimensions and styling as Play Builder v2 animation container
   - Centered horizontally and vertically within its column
-  - Uses same court image: `/static/images/courts/bentley_truman.jpg`
+  - Uses same court image: `/images/teams/{team_slug}/{team_slug}_court.jpg` (see image_naming_update.md)
 
 #### Animation System
 

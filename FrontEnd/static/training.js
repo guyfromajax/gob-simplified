@@ -5,6 +5,7 @@ let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
 const pointsRemainingEl = document.getElementById('points-remaining');
 const submitBtn = document.getElementById('submit-btn');
 const autoTrainBtn = document.getElementById('auto-train-btn');
+const recruitingInvitesBtn = document.getElementById('recruiting-invites-btn');
 const backBtn = document.getElementById('back-btn');
 const allSliders = document.querySelectorAll('.slider');
 const coachingRadios = document.querySelectorAll('input[name="coaching-focus"]');
@@ -13,6 +14,7 @@ const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"
 const autoTrainModal = document.getElementById('auto-train-modal');
 const autoTrainModalMessage = document.getElementById('auto-train-modal-message');
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
+let currentWeek = 1;
 
 // Track previous slider values to prevent over-allocation
 allSliders.forEach(slider => {
@@ -414,6 +416,16 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+function showMessageModal(message, buttonLabel = 'Close') {
+  if (!autoTrainModal || !autoTrainModalMessage || !autoTrainModalClose) {
+    alert(message);
+    return;
+  }
+  autoTrainModalMessage.textContent = message;
+  autoTrainModalClose.textContent = buttonLabel;
+  autoTrainModal.style.display = 'flex';
+}
+
 /**
  * Handle submit button click
  */
@@ -478,6 +490,9 @@ submitBtn.addEventListener('click', async function() {
   try {
     this.disabled = true;
     this.textContent = 'Submitting...';
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show('128 Teams Executing Training');
+    }
     
     console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
     console.log('🔍 [TRAINING] Payload:', payload);
@@ -492,7 +507,12 @@ submitBtn.addEventListener('click', async function() {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let detail = `HTTP error! status: ${response.status}`;
+      try {
+        const err = await response.json();
+        if (err && err.detail) detail = err.detail;
+      } catch (_e) {}
+      throw new Error(detail);
     }
     
     const result = await response.json();
@@ -513,7 +533,10 @@ submitBtn.addEventListener('click', async function() {
     
   } catch (error) {
     console.error('Failed to submit training:', error);
-    alert('Failed to submit training. Please try again.');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+      window.PageLoadOverlay.hide();
+    }
+    showMessageModal(error.message || 'Failed to submit training. Please try again.');
     this.disabled = false;
     this.textContent = 'Submit Training';
   }
@@ -526,6 +549,7 @@ async function initializeTrainingPoints() {
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
+  const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
   
   if (mode === 'franchise' && franchiseId) {
     try {
@@ -533,9 +557,25 @@ async function initializeTrainingPoints() {
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
+        currentWeek = Number(data.week || 1);
         // Update points remaining display
         if (pointsRemainingEl) {
           pointsRemainingEl.textContent = TOTAL_POINTS;
+        }
+        if (recruitingInvitesBtn) {
+          const showRecruitingInvites = currentWeek >= 20 && currentWeek <= 26;
+          recruitingInvitesBtn.style.display = showRecruitingInvites ? 'inline-flex' : 'none';
+          if (showRecruitingInvites) {
+            recruitingInvitesBtn.onclick = function () {
+              playSound('confirm-1.mp3');
+              const params = new URLSearchParams();
+              params.set('franchise_id', franchiseId);
+              if (teamId) params.set('team_id', teamId);
+              params.set('from', 'training');
+              params.set('session_type', urlParams.get('session_type') || 'in-season');
+              window.location.href = `/recruiting-orders.html?${params.toString()}`;
+            };
+          }
         }
         console.log(`🎯 [TRAINING] Training points set to ${TOTAL_POINTS} (first training: ${data.is_first_training})`);
       } else {
@@ -568,4 +608,3 @@ initializeTrainingPoints();
     console.log('🔋 [PAGE LOAD] All sliders:', document.querySelectorAll('.slider[data-category="team-drills"]'));
   }
 })();
-

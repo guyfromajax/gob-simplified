@@ -328,10 +328,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const homeLogoEl = document.getElementById('home-logo');
   const awayLogoEl = document.getElementById('away-logo');
   if (homeLogoEl && homeTeam) {
-    homeLogoEl.src = `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
+    homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
   if (awayLogoEl && awayTeam) {
-    awayLogoEl.src = `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+    awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
   
   // Hide pre-game container
@@ -1185,8 +1185,9 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
           img.src = playerPhoto;
           img.alt = event.playerName;
           img.className = 'sim-quarter-player-image';
+          const genericUrl = `${isLocalhost ? '/static' : ''}/images/players/generic_headshot.png`;
           img.onerror = () => {
-            img.style.display = 'none';
+            img.src = genericUrl;
           };
           entry.appendChild(img);
         }
@@ -1807,6 +1808,18 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
       secondary_color: awayRoster.secondary_color,
     },
   });
+
+  // Keep court-level UI (player/team box score headers, borders, pills) synced to real team colors.
+  // This overrides the legacy 8-team vibrant-color fallback used before roster data is available.
+  try {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.style.setProperty('--home-vibrant-color', homeRoster.primary_color || '#ff6200');
+      document.documentElement.style.setProperty('--away-vibrant-color', awayRoster.primary_color || '#ff6200');
+    }
+  } catch (err) {
+    console.warn('⚠️ [bootGame] Failed to apply real team colors to court UI:', err);
+  }
+
   gameStore.setGameId(gameId);
   if (!game) {
     game = new Phaser.Game({
@@ -2040,7 +2053,8 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
     teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
     finalScore: finalScore,
     homeTeam: homeTeam,
-    awayTeam: awayTeam
+    awayTeam: awayTeam,
+    gameData: finalGameData
   });
 }
 

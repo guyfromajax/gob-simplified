@@ -6,8 +6,9 @@ def setup_db():
     db.games.delete_many({})
     db.teams.delete_many({})
     players_collection.delete_many({})
+    # Conference 1 required so ScheduleManager gets exactly 8 teams for round-robin
     teams = [
-        {"_id": f"T{i}", "name": f"Team{i}", "record": {"W": 0, "L": 0}, "PF": 0, "PA": 0}
+        {"_id": f"T{i}", "name": f"Team{i}", "record": {"W": 0, "L": 0}, "PF": 0, "PA": 0, "conference": 1}
         for i in range(8)
     ]
     db.teams.insert_many(teams)

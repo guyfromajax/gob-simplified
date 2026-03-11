@@ -222,6 +222,37 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     return off_lineup.get("PG", list(off_lineup.values())[0])
 
 
+def _get_fcp_hct_post_inbound_start_index(skeleton, game):
+    """
+    Determine where FCP/HCT should start after an inbound pass.
+
+    Default behavior remains "skip step 0" (legacy behavior). When this turn
+    directly follows BASELINE_INBOUND, dynamically skip all leading steps where
+    SF is still positioned at inbound_left.
+    """
+    steps = (skeleton or {}).get("steps") or []
+    if not steps:
+        return 0
+
+    default_start_index = 1 if len(steps) > 1 else 0
+
+    prev_turn = game.turns[-1] if getattr(game, "turns", None) else {}
+    if prev_turn.get("turn_type") != "BASELINE_INBOUND":
+        return default_start_index
+
+    for i, step in enumerate(steps):
+        pos_actions = step.get("pos_actions") or {}
+        sf_action = pos_actions.get("SF")
+        if not isinstance(sf_action, dict):
+            return i
+
+        sf_location = (sf_action.get("location") or sf_action.get("spot") or "").strip().lower()
+        if sf_location != "inbound_left":
+            return i
+
+    return default_start_index
+
+
 def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_pos, defender, off_team, def_team, game):
     """
     Extract the stealer's (defender's) position from a specific skeleton step.
@@ -5055,9 +5086,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if result_type == "SHOT":
         # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
         skeleton = get_fcp_skeleton("SHOT", game) or {}
-        if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 1:
+        if skeleton and "steps" in skeleton and skeleton.get("steps"):
             skeleton = copy.deepcopy(skeleton)
-            skeleton["steps"] = skeleton["steps"][1:]
+            start_index = _get_fcp_hct_post_inbound_start_index(skeleton, game)
+            skeleton["steps"] = skeleton["steps"][start_index:]
         
         # ✅ Dynamically determine shooter and passer from skeleton
         shooter = None
@@ -5222,9 +5254,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
-    # BIP already ran step 0 (inbound setup + pass). Start FCP animation at step 1.
-    if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 1:
-        skeleton["steps"] = skeleton["steps"][1:]
+    # BIP already runs the inbound pass. Skip all leading inbound-left SF steps.
+    if skeleton and "steps" in skeleton and skeleton.get("steps"):
+        start_index = _get_fcp_hct_post_inbound_start_index(skeleton, game)
+        skeleton["steps"] = skeleton["steps"][start_index:]
     
     # ✅ DEBUG: Log step 0 positions from HCO skeleton
     # if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
@@ -6226,9 +6259,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if result_type == "SHOT":
         # ✅ Get skeleton first (needed to determine shooter and passer dynamically)
         skeleton = get_hct_skeleton("SHOT", game) or {}
-        if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 1:
+        if skeleton and "steps" in skeleton and skeleton.get("steps"):
             skeleton = copy.deepcopy(skeleton)
-            skeleton["steps"] = skeleton["steps"][1:]
+            start_index = _get_fcp_hct_post_inbound_start_index(skeleton, game)
+            skeleton["steps"] = skeleton["steps"][start_index:]
         
         # ✅ Dynamically determine shooter and passer from skeleton
         shooter = None
@@ -6397,9 +6431,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
-    # BIP already ran step 0 (inbound setup + pass). Start HCT animation at step 1.
-    if skeleton and "steps" in skeleton and len(skeleton["steps"]) > 1:
-        skeleton["steps"] = skeleton["steps"][1:]
+    # BIP already runs the inbound pass. Skip all leading inbound-left SF steps.
+    if skeleton and "steps" in skeleton and skeleton.get("steps"):
+        start_index = _get_fcp_hct_post_inbound_start_index(skeleton, game)
+        skeleton["steps"] = skeleton["steps"][start_index:]
     
     # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
     skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)

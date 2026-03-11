@@ -6,9 +6,13 @@ from pydantic import BaseModel
 from pathlib import Path
 from bson import ObjectId
 import logging
+import math
 import random
-from typing import Any, Optional
+import re
+import uuid
+from typing import Any, Optional, Tuple
 from datetime import datetime
+from collections import defaultdict
 from BackEnd.main import run_simulation
 
 from BackEnd.db import (
@@ -21,18 +25,16 @@ from BackEnd.db import (
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
-from BackEnd.models.franchise_manager import FranchiseManager
+from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
 from BackEnd.tournament.bracket_engine import get_round_name
-from BackEnd.tournament.eos_tournament import (
-    advance_tournament_round,
-    initialize_eos_tournament,
-    save_tournament_game_result,
-)
+from BackEnd.tournament import franchise_tournament as ft
 from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
-from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS
+from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
+from BackEnd.models.player import Player
+from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
     calculate_fb_opp_modifier_change,
@@ -40,11 +42,17 @@ from BackEnd.eog_attr_rules import (
 )
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
+from BackEnd.utils.position_ratings import compute_position_ratings
+from BackEnd.models.franchise_manager import load_franchise_names
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
+WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
+AWARDS_FIELD = "awards"
+WEEK_35_RECRUITING_POINTS_BUDGET = 20
 
 
 def _game_doc_richness_score(game_doc: dict) -> int:
@@ -796,6 +804,24 @@ class CompleteWeekRequest(BaseModel):
     game_document: dict | None = None  # Optional: complete game document from simulate-quarter (eliminates race condition)
 
 
+class SaveRecruitingOrdersRequest(BaseModel):
+    franchise_id: str
+    recruit_ids: list[str] | None = None
+    order_entries: list[dict[str, Any]] | None = None
+
+
+class RunWeek35RecruitingRequest(BaseModel):
+    franchise_id: str
+
+
+class CutPlayersRequest(BaseModel):
+    franchise_id: str
+    player_ids: list[str]
+
+
+MAX_RECRUITING_ORDER_SLOTS = 20
+
+
 def _normalize_team_id(team_id: str):
     try:
         return ObjectId(team_id)
@@ -897,6 +923,188 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
         "team1_score": team1_score,
         "team2_score": team2_score,
     }
+
+
+def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
+    """
+    Lightweight sim for distant (non-user-conference) games.
+    Uses win probability roll, margin from dominance buckets, and clamped final scores.
+    Returns (home_score, away_score).
+    See docs/docs_1_systems/06_GMO_Supporting_Systems/Distant_Game_Sim_System.md
+    """
+    combined_total = home_combined + away_combined
+    if combined_total <= 0:
+        combined_total = 1
+    roll = random.randint(1, combined_total)
+    home_won = roll <= home_combined
+    threshold = home_combined
+
+    # Dominance: 0.0 = nail-biter, 1.0 = blowout
+    if home_won:
+        dominance = (threshold - roll) / threshold if threshold > 0 else 0.0
+    else:
+        denom = combined_total - threshold
+        dominance = (roll - threshold) / denom if denom > 0 else 0.0
+    dominance = max(0.0, min(1.0, dominance))
+
+    # Map dominance to margin bucket (D1 distribution)
+    if dominance < 0.18:
+        margin = random.randint(1, 3)
+    elif dominance < 0.45:
+        margin = random.randint(4, 9)
+    elif dominance < 0.77:
+        margin = random.randint(10, 19)
+    else:
+        margin = random.randint(20, 40)
+
+    # Rating gap modifier
+    gap = abs(home_combined - away_combined) / combined_total
+    if gap > 0.35:
+        margin = int(margin * 1.50)
+    elif gap > 0.20:
+        margin = int(margin * 1.25)
+
+    # Final scores: total_points from normal(138, 15) clamped [78, 220]
+    total_points = int(round(max(78, min(220, random.gauss(138, 15)))))
+    winning_score = math.ceil((total_points + margin) / 2)
+    losing_score = winning_score - margin
+
+    # Clamp losing floor
+    if losing_score < 39:
+        losing_score = 39
+        winning_score = losing_score + margin
+    # Clamp winning ceiling
+    if winning_score > 121:
+        winning_score = 121
+        losing_score = winning_score - margin
+    # If both clamps conflict, margin gives way
+    if losing_score < 39:
+        losing_score = 39
+        margin = winning_score - losing_score
+
+    if home_won:
+        return (winning_score, losing_score)
+    return (losing_score, winning_score)
+
+
+def _build_user_eos_sim_scope(
+    franchise_doc: dict[str, Any],
+    user_team_id_str: Optional[str],
+) -> dict[str, Any]:
+    """Snapshot the user's EOS sim scope at the start of a week."""
+    scope = {
+        "active": False,
+        "conference": None,
+        "region": None,
+        "region_conferences": tuple(),
+    }
+    if not user_team_id_str:
+        return scope
+
+    eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
+    scope["active"] = user_team_id_str not in eliminated_team_ids
+
+    team_doc = None
+    if ObjectId.is_valid(user_team_id_str):
+        team_doc = db.teams.find_one(
+            {"_id": ObjectId(user_team_id_str)},
+            {"conference": 1, "region": 1},
+        )
+    conference = team_doc.get("conference") if team_doc else None
+    region = team_doc.get("region") if team_doc else None
+    if region is None and conference is not None:
+        region = ft._conference_to_region(conference)
+
+    scope["conference"] = conference
+    scope["region"] = region
+    scope["region_conferences"] = (
+        ft._region_to_conferences(region) if region else tuple()
+    )
+    return scope
+
+
+def _should_use_tbt_for_eos_game(
+    week: int,
+    game_meta: dict[str, Any],
+    user_scope: dict[str, Any],
+) -> bool:
+    """Return True when an EOS matchup should use turn-by-turn sim."""
+    if not user_scope.get("active"):
+        return False
+
+    if week in ft.EOS_CONFERENCE_WEEKS:
+        conference = game_meta.get("conference")
+        if week in (27, 28):
+            return conference == user_scope.get("conference")
+        if week == 29:
+            return conference in set(user_scope.get("region_conferences") or ())
+        return False
+
+    if week in ft.EOS_REGION_WEEKS:
+        return (
+            game_meta.get("phase") == "region"
+            and game_meta.get("region") == user_scope.get("region")
+        )
+
+    if week in ft.EOS_NATIONAL_WEEKS:
+        return True
+
+    return False
+
+
+def _get_user_eos_phase_status(
+    franchise_doc: dict[str, Any],
+    user_team_id_str: Optional[str],
+    week: int,
+) -> dict[str, Any]:
+    """Derive user EOS status from the current phase bracket instead of a sticky flag."""
+    status = {
+        "phase": None,
+        "active_this_week": False,
+        "has_game_this_week": False,
+        "has_bye_this_week": False,
+        "eliminated_from_current_phase": False,
+    }
+    if not franchise_doc or not user_team_id_str or week not in ft.EOS_WEEKS:
+        return status
+
+    scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+    found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
+    if found:
+        status["has_game_this_week"] = True
+        status["active_this_week"] = True
+
+    if week in ft.EOS_CONFERENCE_WEEKS:
+        status["phase"] = "conference"
+        status["eliminated_from_current_phase"] = not status["has_game_this_week"]
+        return status
+
+    if week in ft.EOS_REGION_WEEKS:
+        status["phase"] = "region"
+        user_region = scope.get("region")
+        rt = (franchise_doc.get("region_tournaments") or {}).get(user_region or "", {})
+        final_list = rt.get("final", []) or []
+        final_matchup = final_list[0] if final_list else {}
+        final_has_user = (
+            str(final_matchup.get("away_team")) == user_team_id_str
+            or str(final_matchup.get("home_team")) == user_team_id_str
+        )
+        final_unplayed = not final_matchup.get("winner")
+        if week == ft.EOS_REGION_WEEKS[0] and not status["has_game_this_week"] and final_has_user and final_unplayed:
+            status["has_bye_this_week"] = True
+            status["active_this_week"] = True
+        elif not status["has_game_this_week"]:
+            status["eliminated_from_current_phase"] = True
+        return status
+
+    if week in ft.EOS_NATIONAL_WEEKS:
+        status["phase"] = "national"
+        status["eliminated_from_current_phase"] = not status["has_game_this_week"]
+        return status
+
+    return status
+
 
 @router.options("/franchise/select-team")
 async def select_team_options():
@@ -1057,35 +1265,22 @@ def play_next_game(
     manager.week = franchise_doc.get("week", 1)
     manager.franchise_id = franchise_doc.get("_id")
 
-    # ✅ EOS TOURNAMENT: Check if tournament is active (weeks 15-17)
+    # ✅ EOS: Conference / Region / National (weeks 27–34)
     eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-    eos_tournament = franchise_doc.get("eos_tournament", {})
-    
+    eos_has_state = bool(
+        franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
+    )
     matchup = None
-    
-    if eos_tournament_active and eos_tournament and manager.week >= 15:
-        # ✅ SS&S: Reuse Tournament mode's bracket lookup pattern
-        # Get current round and round name
-        current_round = eos_tournament.get("current_round", 1)
-        round_name = get_round_name(current_round)
-        bracket = eos_tournament.get("bracket", {})
-        matchups = bracket.get(round_name, [])
-        
-        # Find user's matchup in bracket (reusing Tournament mode pattern)
-        user_matchup = None
-        for matchup_data in matchups:
-            # Matchups use ObjectId strings, compare with user_team_id as string
-            if str(user_team_id) in [matchup_data.get("home_team"), matchup_data.get("away_team")]:
-                user_matchup = matchup_data
-                break
-        
-        if user_matchup:
-            # Get team names from ObjectIds
-            home_id = ObjectId(user_matchup["home_team"])
-            away_id = ObjectId(user_matchup["away_team"])
+
+    if eos_tournament_active and eos_has_state and manager.week in ft.EOS_WEEKS:
+        week_games_meta = ft.get_eos_week_games(franchise_doc, manager.week)
+        found = ft.find_user_game_in_eos_week(week_games_meta, str(user_team_id))
+        if found:
+            _, g = found
+            home_id = g["home_id"]
+            away_id = g["away_id"]
             home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
             away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
-            
             matchup = {
                 "home": home_doc.get("name", "") if home_doc else "",
                 "away": away_doc.get("name", "") if away_doc else "",
@@ -1093,8 +1288,8 @@ def play_next_game(
                 "away_id": str(away_id),
                 "week": manager.week,
             }
-    else:
-        # Regular season (weeks 1-14)
+    if matchup is None and manager.week <= ScheduleManager.REGULAR_SEASON_WEEKS:
+        # Regular season (weeks 1–26)
         if manager.week - 1 < len(manager.schedule):
             for away_id, home_id in manager.schedule[manager.week - 1]:
                 # Compare ObjectIds (schedule uses ObjectIds, user_team_id is now ObjectId)
@@ -1276,28 +1471,29 @@ def complete_week(req: CompleteWeekRequest):
 
     schedule = franchise_doc.get("schedule", [])
     eos_active = bool(
-        franchise_doc.get("eos_tournament_active") and franchise_doc.get("eos_tournament")
+        franchise_doc.get("eos_tournament_active")
+        and (franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament"))
     )
     eos_current_round = None
-    if req.week in (15, 16, 17) and eos_active:
-        eos = franchise_doc.get("eos_tournament", {})
-        eos_current_round = eos.get("current_round", 1)
-        rn = get_round_name(eos_current_round)
-        matchups = eos.get("bracket", {}).get(rn, [])
-        week_games = [
-            (ObjectId(m["away_team"]), ObjectId(m["home_team"]))
-            for m in matchups
-        ]
-    else:
+    week_games_meta = None
+    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    if req.week in ft.EOS_WEEKS and eos_active:
+        week_games_meta = ft.get_eos_week_games(franchise_doc, req.week)
+        week_games = [(g["away_id"], g["home_id"]) for g in week_games_meta]
+        eos_current_round = req.week - 26 if req.week <= 29 else (req.week - 29 if req.week <= 31 else req.week - 31)
+    elif req.week <= ScheduleManager.REGULAR_SEASON_WEEKS:
         if req.week < 1 or req.week > len(schedule):
             raise HTTPException(status_code=400, detail="Invalid week")
         week_games = schedule[req.week - 1]
+    else:
+        raise HTTPException(status_code=400, detail="Invalid week")
     results = []
 
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
-    
+
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
     user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week, franchise_id=req.franchise_id, game_id=user_game_id)
@@ -1307,6 +1503,33 @@ def complete_week(req: CompleteWeekRequest):
         "away_score": user_res["team1_score"],
         "home_score": user_res["team2_score"],
     })
+
+    # ✅ EOS (weeks 27–34): save user's game result to the correct bracket (conference/region/national)
+    if week_games_meta and user_game_id:
+        found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
+        if found:
+            _, g = found
+            winner_id = team1_id if user.team1_score > user.team2_score else team2_id
+            home_id_g = g["home_id"]
+            score = {
+                "home": user.team1_score if str(team1_id) == str(home_id_g) else user.team2_score,
+                "away": user.team2_score if str(team1_id) == str(home_id_g) else user.team1_score,
+            }
+            if g["phase"] == "conference":
+                ft.save_conference_game_result(
+                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                    str(user_game_id), str(winner_id), score,
+                )
+            elif g["phase"] == "region":
+                ft.save_region_game_result(
+                    franchise_doc, g["region"], g["round"], g["matchup_index"],
+                    str(user_game_id), str(winner_id), score,
+                )
+            elif g["phase"] == "national":
+                ft.save_national_game_result(
+                    franchise_doc, g["round"], g["matchup_index"],
+                    str(user_game_id), str(winner_id), score,
+                )
     
     # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
     # ✅ FIX: Use game_document from request if provided (eliminates race condition)
@@ -1519,6 +1742,22 @@ def complete_week(req: CompleteWeekRequest):
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
 
+    # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "prestige": 1, "total_player_attrs": 1},
+    ))
+    ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+    team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
+    if user_team_id_str and ObjectId.is_valid(user_team_id_str):
+        team_ids_for_conf.append(ObjectId(user_team_id_str))
+    team_conference_docs = list(db.teams.find(
+        {"_id": {"$in": team_ids_for_conf}},
+        {"_id": 1, "conference": 1},
+    ))
+    team_id_to_conference = {str(d["_id"]): d.get("conference") for d in team_conference_docs}
+    user_conference = team_id_to_conference.get(str(user_team_id_str)) if user_team_id_str else None
+
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
             continue
@@ -1536,6 +1775,62 @@ def complete_week(req: CompleteWeekRequest):
                 "home_id": str(existing["team2_id"]),
                 "away_score": existing["team1_score"],
                 "home_score": existing["team2_score"],
+            })
+            continue
+
+        if week_games_meta and idx < len(week_games_meta):
+            g = week_games_meta[idx]
+            if not _should_use_tbt_for_eos_game(req.week, g, user_eos_sim_scope):
+                home_ftd = ftd_by_team_id.get(str(home_id), {})
+                away_ftd = ftd_by_team_id.get(str(away_id), {})
+                home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
+                away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+                home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+                results.append({
+                    "away_id": str(away_id),
+                    "home_id": str(home_id),
+                    "away_score": away_score,
+                    "home_score": home_score,
+                })
+                _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=None)
+                winner_id = home_id if home_score > away_score else away_id
+                if g["phase"] == "conference":
+                    ft.save_conference_game_result(
+                        franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                        "", str(winner_id), {"home": home_score, "away": away_score},
+                    )
+                elif g["phase"] == "region":
+                    ft.save_region_game_result(
+                        franchise_doc, g["region"], g["round"], g["matchup_index"],
+                        "", str(winner_id), {"home": home_score, "away": away_score},
+                    )
+                elif g["phase"] == "national":
+                    ft.save_national_game_result(
+                        franchise_doc, g["round"], g["matchup_index"],
+                        "", str(winner_id), {"home": home_score, "away": away_score},
+                    )
+                continue
+
+        # Distant sim: regular season only; neither team in user's conference → lightweight sim (no game doc, no EOG)
+        away_conf = team_id_to_conference.get(str(away_id))
+        home_conf = team_id_to_conference.get(str(home_id))
+        is_distant = (
+            eos_current_round is None
+            and user_conference is not None
+            and away_conf != user_conference
+            and home_conf != user_conference
+        )
+        if is_distant:
+            home_ftd = ftd_by_team_id.get(str(home_id), {})
+            away_ftd = ftd_by_team_id.get(str(away_id), {})
+            home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
+            away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            results.append({
+                "away_id": str(away_id),
+                "home_id": str(home_id),
+                "away_score": away_score,
+                "home_score": home_score,
             })
             continue
 
@@ -1577,16 +1872,25 @@ def complete_week(req: CompleteWeekRequest):
                 winner_score=ws,
                 loser_score=ls,
             )
-            if eos_current_round is not None:
+            if week_games_meta and idx < len(week_games_meta):
+                g = week_games_meta[idx]
                 winner_id = home_id if home_score > away_score else away_id
-                save_tournament_game_result(
-                    franchise_doc,
-                    eos_current_round,
-                    idx,
-                    str(computer_game_id),
-                    str(winner_id),
-                    {"home": home_score, "away": away_score},
-                )
+                score = {"home": home_score, "away": away_score}
+                if g["phase"] == "conference":
+                    ft.save_conference_game_result(
+                        franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                        str(computer_game_id), str(winner_id), score,
+                    )
+                elif g["phase"] == "region":
+                    ft.save_region_game_result(
+                        franchise_doc, g["region"], g["round"], g["matchup_index"],
+                        str(computer_game_id), str(winner_id), score,
+                    )
+                elif g["phase"] == "national":
+                    ft.save_national_game_result(
+                        franchise_doc, g["round"], g["matchup_index"],
+                        str(computer_game_id), str(winner_id), score,
+                    )
         except Exception:
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
@@ -1600,11 +1904,12 @@ def complete_week(req: CompleteWeekRequest):
 
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
+    _apply_complete_week_recruiting_lean_updates(franchise_doc, req.week, results)
     
     # Reset training status for next week
     next_week = req.week + 1
     
-    # ✅ EOS TOURNAMENT: Initialize tournament after week 14 completion
+    # ✅ EOS TOURNAMENT: Initialize tournament after week 26 (regular season) completion
     update_fields = {
         "results": existing_results,
         "week": next_week,
@@ -1612,80 +1917,77 @@ def complete_week(req: CompleteWeekRequest):
         "training_status.session_type": "in-season"
     }
     
-    if req.week == 14:
-        # Week 14 complete - initialize EOS Tournament
-        # ✅ FTD: Get team IDs from franchise_team_data
-        # FTD stores franchise_id as ObjectId (from franchise_manager init); query with ObjectId, not string
+    if req.week == ScheduleManager.REGULAR_SEASON_WEEKS:
+        # Regular season complete - initialize Conference Tournaments (EOS weeks 27–34)
         ftd_docs = list(franchise_team_data_collection.find(
             {"franchise_id": franchise_id},
             {"team_id": 1}
         ))
         eos_team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id")]
-        if len(eos_team_ids) < 8:
+        if len(eos_team_ids) < 128:
             logger.warning(
-                f"⚠️ [EOS TOURNAMENT] Fewer than 8 teams in FTD (got {len(eos_team_ids)}); "
-                "bracket may fail. Proceeding anyway."
+                "⚠️ [EOS] Fewer than 128 teams in FTD (got %s); conference brackets may be incomplete.",
+                len(eos_team_ids),
             )
-        logger.info(f"🎯 [EOS TOURNAMENT] Week 14 complete, initializing tournament (teams from FTD: {len(eos_team_ids)})")
-        # EOS seeds from franchise.results; ensure week 14 is included before init
         franchise_doc["results"] = existing_results
-        tournament_state = initialize_eos_tournament(franchise_doc, db.teams, team_ids=eos_team_ids)
-        update_fields["eos_tournament"] = tournament_state
+        conference_tournaments = ft.initialize_conference_tournaments(
+            franchise_doc, db.teams, team_ids=eos_team_ids
+        )
+        update_fields["conference_tournaments"] = conference_tournaments
         update_fields["eos_tournament_active"] = True
-        logger.info(f"✅ [EOS TOURNAMENT] Tournament initialized, week set to 15")
-    elif req.week in [15, 16, 17]:
-        # Tournament week - save game result and advance round if needed
-        eos_tournament = franchise_doc.get("eos_tournament", {})
-        if eos_tournament:
-            current_round = eos_tournament.get("current_round", 1)
-            bracket = eos_tournament.get("bracket", {})
-            round_name = get_round_name(current_round)
-            matchups = bracket.get(round_name, [])
-            
-            # Find which matchup this game belongs to
-            matchup_index = None
-            for i, matchup in enumerate(matchups):
-                if (str(matchup.get("home_team")) == str(team1_id) and str(matchup.get("away_team")) == str(team2_id)) or \
-                   (str(matchup.get("home_team")) == str(team2_id) and str(matchup.get("away_team")) == str(team1_id)):
-                    matchup_index = i
-                    break
-            
-            if matchup_index is not None and user_game_id:
-                # Determine winner
-                winner_id = team1_id if user.team1_score > user.team2_score else team2_id
-                _u_name, user_team_oid = get_user_team_from_franchise(franchise_doc)
-                user_lost = user_team_oid and str(winner_id) != str(user_team_oid)
-                if user_lost:
-                    update_fields["training_status.training_disabled_for_eos"] = True
-                    logger.info("✅ [EOS TOURNAMENT] User eliminated; training disabled for remaining EOS weeks")
-                
-                # Save tournament game result (mutates franchise_doc["eos_tournament"] in place)
-                save_tournament_game_result(
-                    franchise_doc,
-                    current_round,
-                    matchup_index,
-                    user_game_id,
-                    str(winner_id),
-                    {"home": user.team1_score if str(team1_id) == str(matchup.get("home_team")) else user.team2_score,
-                     "away": user.team2_score if str(team1_id) == str(matchup.get("home_team")) else user.team1_score}
+        update_fields["week"] = ft.EOS_CONFERENCE_WEEKS[0]
+        logger.info("✅ [EOS] Conference tournaments initialized, week set to 27")
+    elif req.week in ft.EOS_WEEKS:
+        # EOS week: advance brackets and set next week (or init region/national)
+        next_week = req.week + 1
+        if req.week in ft.EOS_CONFERENCE_WEEKS:
+            for c in range(1, 17):
+                advanced, champ = ft.advance_conference_bracket(franchise_doc, c)
+            if req.week == ft.EOS_CONFERENCE_WEEKS[-1]:
+                eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
+                    {"franchise_id": franchise_id}, {"team_id": 1}
+                ) if d.get("team_id")]
+                region_tournaments = ft.initialize_region_tournaments(
+                    franchise_doc, db.teams, team_ids=eos_team_ids
                 )
-                
-                # Advance from in-memory state (no reload) so we see the saved result
-                eos_tournament = advance_tournament_round(franchise_doc, db.teams)
-                update_fields["eos_tournament"] = eos_tournament
-                new_round = eos_tournament.get("current_round", current_round)
-                if new_round > current_round:
-                    update_fields["week"] = 14 + new_round
-                else:
-                    update_fields["week"] = req.week
-                logger.info(f"✅ [EOS TOURNAMENT] Saved tournament game result for Round {current_round}, Matchup {matchup_index}")
+                update_fields["region_tournaments"] = region_tournaments
+                next_week = ft.EOS_REGION_WEEKS[0]
+            update_fields["week"] = next_week
+            update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
+        elif req.week in ft.EOS_REGION_WEEKS:
+            if req.week == ft.EOS_REGION_WEEKS[-1]:
+                region_champions = ft.get_region_champions(franchise_doc)
+                ftd_docs = list(franchise_team_data_collection.find(
+                    {"franchise_id": franchise_id}, {"team_id": 1}
+                ))
+                team_ids = [d["team_id"] for d in ftd_docs if d.get("team_id")]
+                national_tournament = ft.initialize_national_tournament(
+                    franchise_doc, db.teams, region_champions,
+                    franchise_doc.get("results", {}), team_ids,
+                )
+                update_fields["national_tournament"] = national_tournament
+                next_week = ft.EOS_NATIONAL_WEEKS[0]
             else:
-                update_fields["week"] = req.week
-    
+                next_week = ft.EOS_REGION_WEEKS[1]
+            update_fields["week"] = next_week
+            update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
+        elif req.week in ft.EOS_NATIONAL_WEEKS:
+            advanced, champion = ft.advance_national_bracket(franchise_doc)
+            update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
+            if req.week == ft.EOS_NATIONAL_WEEKS[-1]:
+                update_fields["eos_tournament_active"] = False
+                next_week = 35
+            else:
+                next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(req.week) + 1]
+            update_fields["week"] = next_week
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": update_fields},
     )
+    if update_fields.get("week") == 35:
+        refreshed = db.franchises.find_one({"_id": franchise_id})
+        if refreshed:
+            _persist_week_35_awards_if_needed(refreshed)
 
     id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
     scoreboard = []
@@ -1775,11 +2077,15 @@ def command_center_data(
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
                         ftd = franchise_team_data_collection.find_one(
                             {"franchise_id": fid, "team_id": ObjectId(team_id)},
-                            {"team_attributes": 1}
+                            {"team_attributes": 1, "prestige": 1, "natl_rank": 1}
                         )
                         if ftd:
                             attrs = ftd.get("team_attributes", {})
                             team_doc["team_chemistry"] = attrs.get("team_chemistry", 0)
+                            if "prestige" in ftd:
+                                team_doc["prestige"] = ftd["prestige"]
+                            if "natl_rank" in ftd:
+                                team_doc["rank"] = ftd["natl_rank"]
                         else:
                             team_doc["team_chemistry"] = 0
                     else:
@@ -1808,34 +2114,147 @@ def command_center_data(
             logger.debug(f"franchise_state collection not available: {e}")
             state = {}
         eos_tournament = franchise_doc.get("eos_tournament") if franchise_doc else None
+        national_tournament = franchise_doc.get("national_tournament", {}) if franchise_doc else {}
         eos_tournament_active = franchise_doc.get("eos_tournament_active", False) if franchise_doc else False
         week = franchise_doc.get("week", 1) if franchise_doc else None
         response = build_command_center_base(team_name, team_id, team_doc)
+        response["current_season"] = franchise_doc.get("current_season", 1) if franchise_doc else 1
         response["intangibles"] = team_doc.get("intangibles", "-")
         response["prestige"] = team_doc.get("prestige", "-")
         response["rank"] = team_doc.get("rank", "-")
+        response["user_conference"] = team_doc.get("conference")
+        response["user_region"] = team_doc.get("region", "")
+        # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
+        if franchise_id and franchise_doc:
+            try:
+                fid = franchise_doc["_id"]
+                ftd_rank_docs = list(franchise_team_data_collection.find(
+                    {"franchise_id": fid},
+                    {"team_id": 1, "natl_rank": 1}
+                ))
+                if ftd_rank_docs:
+                    team_ids = [d["team_id"] for d in ftd_rank_docs if d.get("team_id") is not None]
+                    teams_docs = {str(t["_id"]): t for t in db.teams.find(
+                        {"_id": {"$in": team_ids}},
+                        {"name": 1, "primary_color": 1, "conference": 1}
+                    )}
+                    rankings = [
+                        {
+                            "natl_rank": d.get("natl_rank", 128),
+                            "team_name": teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
+                            "primary_color": teams_docs.get(str(d["team_id"]), {}).get("primary_color") or "#000000",
+                            "conference": teams_docs.get(str(d["team_id"]), {}).get("conference"),
+                        }
+                        for d in ftd_rank_docs
+                    ]
+                    rankings.sort(key=lambda x: x["natl_rank"])
+                    response["rankings"] = rankings
+                else:
+                    response["rankings"] = []
+            except Exception as e:
+                logger.debug("rankings for FCC: %s", e)
+                response["rankings"] = []
+        else:
+            response["rankings"] = []
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed
         response["session_type"] = session_type
         response["week"] = week if week is not None else 1
+        cut_state = _week_1_cut_requirement(franchise_doc, fid if franchise_doc else None, team_id)
+        response["user_roster_count"] = int(cut_state.get("roster_count", 0) or 0)
+        response["cut_count"] = int(cut_state.get("cut_count", 0) or 0)
+        response["cut_required"] = bool(cut_state.get("cut_required", False))
+        response["week_35_recruiting_ran"] = bool(franchise_doc.get("week_35_recruiting_ran", False)) if franchise_doc else False
+        recruiting_results = franchise_doc.get("recruiting_results", {}) if franchise_doc else {}
+        current_results_week = week if week is not None and str(week) in (recruiting_results or {}) else None
+        response["current_recruiting_results_week"] = current_results_week
+        if franchise_doc and week is not None and week >= 35:
+            awards = _persist_week_35_awards_if_needed(franchise_doc)
+            response["awards_ready"] = bool((awards or {}).get("all_american_teams"))
+        else:
+            response["awards_ready"] = False
+        if franchise_id and franchise_doc and team_id:
+            try:
+                response["lean_recruits"] = list(
+                    franchise_recruits_data_collection.find(
+                        {
+                            "franchise_id": str(fid),
+                            "$or": [
+                                {"Lean.1": team_id},
+                                {"Lean.2": team_id},
+                                {"Lean.3": team_id},
+                            ],
+                        },
+                        {"_id": 0, "franchise_id": 0},
+                    )
+                )
+                response["team_name_map"] = {
+                    str(team["_id"]): team.get("name", str(team["_id"]))
+                    for team in db.teams.find({}, {"name": 1})
+                }
+                week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+                response["week_35_user_recruits"] = [
+                    player
+                    for player in (week_35_results.get("signed_players") or [])
+                    if str(player.get("team_id") or "") == str(team_id)
+                ]
+            except Exception as e:
+                logger.debug("fcc lean recruits: %s", e)
+                response["lean_recruits"] = []
+                response["team_name_map"] = {}
+                response["week_35_user_recruits"] = []
+        else:
+            response["lean_recruits"] = []
+            response["team_name_map"] = {}
+            response["week_35_user_recruits"] = []
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
         )
-        if eos_tournament_active and eos_tournament:
-            response["eos_tournament"] = eos_tournament
+        if eos_tournament_active:
             response["eos_tournament_active"] = True
-            # Expose championship summary for FCC end-of-season modal (if tournament complete)
-            if eos_tournament.get("completed"):
-                final_matchup = ((eos_tournament.get("bracket") or {}).get("final") or [{}])[0]
+            response["conference_tournaments"] = franchise_doc.get("conference_tournaments")
+            response["region_tournaments"] = franchise_doc.get("region_tournaments")
+            response["national_tournament"] = national_tournament
+            # Derive single eos_tournament (old shape) for FCC bracket display: pick current phase by week
+            week_val = week if week is not None else 1
+            if week_val in ft.EOS_CONFERENCE_WEEKS:
+                user_conf = team_doc.get("conference") if team_doc else None
+                ct = (franchise_doc.get("conference_tournaments") or {}).get(str(user_conf), {}) if user_conf is not None else {}
+                response["eos_tournament"] = ct if ct else None
+            elif week_val in ft.EOS_REGION_WEEKS:
+                user_region = (team_doc.get("region") or "").upper() if team_doc else ""
+                if isinstance(user_region, str) and len(user_region) == 1:
+                    rt = (franchise_doc.get("region_tournaments") or {}).get(user_region, {})
+                    if rt:
+                        final_list = rt.get("final", [])
+                        champ = final_list[0].get("winner") if final_list and final_list[0].get("winner") else None
+                        response["eos_tournament"] = {
+                            "bracket": {"round1": rt.get("round1", []), "round2": [], "final": final_list},
+                            "seeds": {},
+                            "current_round": rt.get("current_round", 1),
+                            "champion": champ,
+                        }
+                    else:
+                        response["eos_tournament"] = None
+                else:
+                    response["eos_tournament"] = None
+            elif week_val in ft.EOS_NATIONAL_WEEKS:
+                response["eos_tournament"] = national_tournament if national_tournament else None
+            else:
+                response["eos_tournament"] = None
+            # Championship summary when national tournament is complete (week 34 done)
+            if national_tournament.get("champion"):
+                bracket = national_tournament.get("bracket", {})
+                final_list = bracket.get("final", [])
+                final_matchup = final_list[0] if final_list else {}
                 home_team_id = final_matchup.get("home_team")
                 away_team_id = final_matchup.get("away_team")
-                winner_id = final_matchup.get("winner") or eos_tournament.get("champion")
+                winner_id = final_matchup.get("winner") or national_tournament.get("champion")
                 score = final_matchup.get("score") or {}
                 home_score = score.get("home")
                 away_score = score.get("away")
-
                 id_to_name = {}
                 for tid in [home_team_id, away_team_id, winner_id]:
                     if not tid:
@@ -1846,7 +2265,6 @@ def command_center_data(
                             id_to_name[str(tid)] = tdoc.get("name", str(tid))
                     except Exception:
                         id_to_name[str(tid)] = str(tid)
-
                 response["championship_summary"] = {
                     "game_id": final_matchup.get("game_id"),
                     "home_team_id": home_team_id,
@@ -1858,11 +2276,19 @@ def command_center_data(
                     "winner_team_id": winner_id,
                     "winner_team_name": id_to_name.get(str(winner_id), winner_id),
                 }
-        training_disabled_for_eos = bool(franchise_doc.get("training_status", {}).get("training_disabled_for_eos", False)) if franchise_id and franchise_doc else False
+        eos_status = (
+            _get_user_eos_phase_status(franchise_doc, str(team_id), week)
+            if franchise_id and franchise_doc and team_id and eos_tournament_active and week in ft.EOS_WEEKS
+            else {}
+        )
+        training_disabled_for_eos = bool(
+            eos_status.get("eliminated_from_current_phase", False)
+        ) if eos_status else False
         response["training_disabled_for_eos"] = training_disabled_for_eos
         user_eliminated = training_disabled_for_eos
-        tournament_complete = bool(eos_tournament.get("completed", False)) if eos_tournament else False
-        offer_sim_rest = user_eliminated and eos_tournament_active and not tournament_complete
+        tournament_complete = bool(national_tournament.get("champion")) if national_tournament else False
+        user_has_bye = bool(eos_status.get("has_bye_this_week", False)) if eos_status else False
+        offer_sim_rest = (user_eliminated or user_has_bye) and eos_tournament_active and not tournament_complete
         response["user_eliminated"] = user_eliminated
         response["offer_sim_rest"] = offer_sim_rest
         return response
@@ -1885,14 +2311,37 @@ def _ftd_team_list_for_franchise(franchise_id) -> dict:
     return {str(d["team_id"]): {} for d in docs}
 
 
+def _sister_conference(conference: int) -> int:
+    """Same region, other conference. Conferences 1-2 = region A, 3-4 = B, ... 15-16 = H."""
+    if not isinstance(conference, int) or conference < 1 or conference > 16:
+        return conference
+    return conference + 1 if conference % 2 == 1 else conference - 1
+
+
 @router.get("/franchise/standings")
-def standings(franchise_id: str, profile: bool = False):
-    """Add ?profile=1 to get profile_summary in the response."""
+def standings(
+    franchise_id: str,
+    profile: bool = False,
+    scope: Optional[str] = None,
+    team_id: Optional[str] = None,
+    region: Optional[str] = None,
+):
+    """Add ?profile=1 for profile_summary. scope=user_region&team_id=... returns only user + sister conference."""
     import time
     def _build():
         franchise_doc = db.franchises.find_one(
             {"_id": ObjectId(franchise_id)},
-            {"schedule": 1, "week": 1, "eos_tournament": 1, "eos_tournament_active": 1, "results": 1, "_id": 1}
+            {
+                "schedule": 1,
+                "week": 1,
+                "eos_tournament": 1,
+                "eos_tournament_active": 1,
+                "conference_tournaments": 1,
+                "region_tournaments": 1,
+                "national_tournament": 1,
+                "results": 1,
+                "_id": 1,
+            }
         )
         found = franchise_doc is not None
         logger.info("standings franchise_id=%s found=%s", franchise_id, found)
@@ -1903,23 +2352,22 @@ def standings(franchise_id: str, profile: bool = False):
         id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
         matchup_map = {}
         eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-        eos_tournament = franchise_doc.get("eos_tournament", {})
-        if eos_tournament_active and eos_tournament and week >= 15:
-            current_round = eos_tournament.get("current_round", 1)
-            round_name = get_round_name(current_round)
-            bracket = eos_tournament.get("bracket", {})
-            matchups = bracket.get(round_name, [])
-            for matchup_data in matchups:
-                home_id_str = matchup_data.get("home_team")
-                away_id_str = matchup_data.get("away_team")
-                if home_id_str and away_id_str:
+        eos_has_state = bool(
+            franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
+        )
+        if eos_tournament_active and eos_has_state and week in ft.EOS_WEEKS:
+            week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+            for g in week_games_meta:
+                away_id = g.get("away_id")
+                home_id = g.get("home_id")
+                if away_id and home_id:
                     try:
-                        home_id = ObjectId(home_id_str)
-                        away_id = ObjectId(away_id_str)
-                        home_name = id_to_name.get(home_id, "")
-                        away_name = id_to_name.get(away_id, "")
-                        matchup_map[str(away_id)] = f"at {home_name}"
-                        matchup_map[str(home_id)] = f"vs {away_name}"
+                        aid = ObjectId(away_id) if isinstance(away_id, str) else away_id
+                        hid = ObjectId(home_id) if isinstance(home_id, str) else home_id
+                        home_name = id_to_name.get(hid, "")
+                        away_name = id_to_name.get(aid, "")
+                        matchup_map[str(aid)] = f"at {home_name}"
+                        matchup_map[str(hid)] = f"vs {away_name}"
                     except Exception:
                         continue
         else:
@@ -1933,8 +2381,18 @@ def standings(franchise_id: str, profile: bool = False):
         franchise_results = franchise_doc.get("results", {})
         team_list = _ftd_team_list_for_franchise(franchise_id)
         standings_data = calculate_franchise_standings(franchise_results, team_list)
+        # Load natl_rank from FTD for tiebreaker (lower natl_rank = higher in standings)
+        fid = ObjectId(franchise_id)
+        ftd_rank_docs = list(franchise_team_data_collection.find(
+            {"franchise_id": fid},
+            {"team_id": 1, "natl_rank": 1},
+        ))
+        natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
-        teams = list(db.teams.find({"_id": {"$in": team_ids_list}}, {"name": 1, "_id": 1}))
+        teams = list(db.teams.find(
+            {"_id": {"$in": team_ids_list}},
+            {"name": 1, "_id": 1, "region": 1, "conference": 1}
+        ))
         output = []
         for t in teams:
             team_id_str = str(t["_id"])
@@ -1946,20 +2404,51 @@ def standings(franchise_id: str, profile: bool = False):
             pf = team_standings.get("PF", 0)
             pa = team_standings.get("PA", 0)
             differential = pf - pa
+            natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
             output.append({
                 "team_id": team_id_str,
                 "name": t.get("name", ""),
+                "region": t.get("region") or "",
+                "conference": t.get("conference"),
                 "W": wins,
                 "L": losses,
                 "pct": pct,
                 "PF": pf,
                 "PA": pa,
                 "differential": differential,
+                "natl_rank": natl_rank,
                 "next": matchup_map.get(team_id_str, "")
             })
-        output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
+        # Primary: wins desc. Tiebreaker: natl_rank asc (lower = higher in standings)
+        output.sort(key=lambda x: (-x["W"], x["natl_rank"]))
+
+        # Optional: return only user + sister conference (lighter payload for FCC Standings tab)
+        result = {"standings": output}
+        if scope == "user_region" and team_id:
+            try:
+                tid = ObjectId(team_id) if ObjectId.is_valid(team_id) else None
+                if tid:
+                    user_team_doc = db.teams.find_one({"_id": tid}, {"conference": 1})
+                    user_conf = user_team_doc.get("conference") if user_team_doc else None
+                    if user_conf is not None and isinstance(user_conf, int):
+                        sister = _sister_conference(user_conf)
+                        allowed = {user_conf, sister}
+                        output_filtered = [x for x in output if x.get("conference") in allowed]
+                        result["standings"] = output_filtered
+                        result["user_conference"] = user_conf
+                        result["sister_conference"] = sister
+            except Exception as e:
+                logger.warning("standings scope=user_region failed: %s", e)
+
+        if region:
+            region_normalized = str(region).strip().upper()
+            result["standings"] = [
+                item for item in (result.get("standings") or [])
+                if str(item.get("region") or "").upper() == region_normalized
+            ]
+
         logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
-        return {"standings": output}
+        return result
     if profile:
         from BackEnd.utils.profiling import run_profiled
         _out = [None]
@@ -1973,7 +2462,7 @@ def standings(franchise_id: str, profile: bool = False):
 
 
 @router.get("/franchise/schedule")
-def season_schedule(franchise_id: str):
+def season_schedule(franchise_id: str, conference: Optional[int] = None):
     import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/schedule START - franchise_id={franchise_id}")
@@ -1987,6 +2476,9 @@ def season_schedule(franchise_id: str):
             "results": 1,
             "eos_tournament": 1,
             "eos_tournament_active": 1,
+            "conference_tournaments": 1,
+            "region_tournaments": 1,
+            "national_tournament": 1,
             "user_team_id": 1,
             "user_team_object_id": 1,
             "_id": 1
@@ -2034,6 +2526,7 @@ def season_schedule(franchise_id: str):
 
     weeks = []
     results_by_week = franchise_doc.get("results", {})
+    included_team_ids = set()
     for idx, games in enumerate(schedule, start=1):
         week_games = []
         week_results = {
@@ -2087,116 +2580,85 @@ def season_schedule(franchise_id: str):
                 "is_user_team": str(away_id) == team_id or str(home_id) == team_id,
                 "game_id": game_id  # ✅ SS&S: Include game_id for box score links
             })
+            included_team_ids.add(str(away_id))
+            included_team_ids.add(str(home_id))
         weeks.append(week_games)
 
-    # ✅ EOS TOURNAMENT: Add tournament games (weeks 15-17) if tournament is active
-    eos_tournament = franchise_doc.get("eos_tournament")
+    # ✅ EOS: Add tournament games (weeks 27–34) from conference / region / national
     eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-    
-    if eos_tournament_active and eos_tournament:
-        bracket = eos_tournament.get("bracket", {})
-        seeds = eos_tournament.get("seeds", {})
-        
-        # Week 15: Round 1 (Quarterfinals)
-        round1 = bracket.get("round1", [])
-        week15_games = []
-        for matchup in round1:
-            game_doc = None
-            if matchup.get("game_id"):
-                game_doc = db.games.find_one({"_id": ObjectId(matchup["game_id"])})
-            
-            score = matchup.get("score", {})
-            away_score = score.get("away")
-            home_score = score.get("home")
-            status = "complete" if matchup.get("winner") else "scheduled"
-            
-            has_training_report = False
-            if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
-                # Check if training report exists for week 15
-                has_training_report = "15" in training_reports
-            
-            week15_games.append({
-                "week": 15,
-                "away_team_id": str(matchup["away_team"]),
-                "home_team_id": str(matchup["home_team"]),
-                "away_score": away_score,
-                "home_score": home_score,
-                "status": status,
-                "has_training_report": has_training_report,
-                "is_user_team": str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id,
-                "game_id": matchup.get("game_id"),
-                "is_tournament": True,
-                "round": "Quarterfinals"
-            })
-        weeks.append(week15_games)
-        
-        # Week 16: Round 2 (Semifinals)
-        round2 = bracket.get("round2", [])
-        week16_games = []
-        for matchup in round2:
-            game_doc = None
-            if matchup.get("game_id"):
-                game_doc = db.games.find_one({"_id": ObjectId(matchup["game_id"])})
-            
-            score = matchup.get("score", {})
-            away_score = score.get("away")
-            home_score = score.get("home")
-            status = "complete" if matchup.get("winner") else "scheduled"
-            
-            has_training_report = False
-            if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
-                has_training_report = "16" in training_reports
-            
-            week16_games.append({
-                "week": 16,
-                "away_team_id": str(matchup["away_team"]),
-                "home_team_id": str(matchup["home_team"]),
-                "away_score": away_score,
-                "home_score": home_score,
-                "status": status,
-                "has_training_report": has_training_report,
-                "is_user_team": str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id,
-                "game_id": matchup.get("game_id"),
-                "is_tournament": True,
-                "round": "Semifinals"
-            })
-        weeks.append(week16_games)
-        
-        # Week 17: Final (Championship)
-        final = bracket.get("final", [])
-        week17_games = []
-        if final and len(final) > 0:
-            matchup = final[0]
-            game_doc = None
-            if matchup.get("game_id"):
-                game_doc = db.games.find_one({"_id": ObjectId(matchup["game_id"])})
-            
-            score = matchup.get("score", {})
-            away_score = score.get("away")
-            home_score = score.get("home")
-            status = "complete" if matchup.get("winner") else "scheduled"
-            
-            has_training_report = False
-            if team_id and (str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id):
-                has_training_report = "17" in training_reports
-            
-            week17_games.append({
-                "week": 17,
-                "away_team_id": str(matchup["away_team"]),
-                "home_team_id": str(matchup["home_team"]),
-                "away_score": away_score,
-                "home_score": home_score,
-                "status": status,
-                "has_training_report": has_training_report,
-                "is_user_team": str(matchup["away_team"]) == team_id or str(matchup["home_team"]) == team_id,
-                "game_id": matchup.get("game_id"),
-                "is_tournament": True,
-                "round": "Championship"
-            })
-        weeks.append(week17_games)
-    
+    eos_has_state = bool(
+        franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
+    )
+    if eos_tournament_active and eos_has_state:
+        round_labels = {
+            27: "Conference R1", 28: "Conference R2", 29: "Conference Final",
+            30: "Region R1", 31: "Region Final",
+            32: "National QF", 33: "National SF", 34: "National Final",
+        }
+        for eos_week in ft.EOS_WEEKS:
+            week_games_meta = ft.get_eos_week_games(franchise_doc, eos_week, include_completed=True)
+            week_games = []
+            for g in week_games_meta:
+                away_id = g.get("away_id")
+                home_id = g.get("home_id")
+                if not away_id or not home_id:
+                    continue
+                away_str = str(away_id)
+                home_str = str(home_id)
+                score = g.get("score", {})
+                away_score = score.get("away")
+                home_score = score.get("home")
+                status = "complete" if g.get("winner") else "scheduled"
+                has_training_report = bool(team_id and (away_str == team_id or home_str == team_id) and str(eos_week) in training_reports)
+                week_games.append({
+                    "week": eos_week,
+                    "away_team_id": away_str,
+                    "home_team_id": home_str,
+                    "away_score": away_score,
+                    "home_score": home_score,
+                    "status": status,
+                    "has_training_report": has_training_report,
+                    "is_user_team": away_str == team_id or home_str == team_id,
+                    "game_id": g.get("game_id"),
+                    "is_tournament": True,
+                    "round": round_labels.get(eos_week, ""),
+                })
+                included_team_ids.add(away_str)
+                included_team_ids.add(home_str)
+            weeks.append(week_games)
+
+    team_docs = list(db.teams.find({}, {"_id": 1, "conference": 1, "name": 1, "mascot": 1}))
+    team_conferences = {str(t["_id"]): t.get("conference") for t in team_docs}
+    if conference is not None:
+        if not isinstance(conference, int) or conference < 1 or conference > 16:
+            raise HTTPException(status_code=422, detail="conference must be an integer from 1 to 16")
+        filtered_weeks = []
+        included_team_ids = set()
+        for week_games in weeks:
+            filtered_week_games = [
+                game for game in (week_games or [])
+                if team_conferences.get(game.get("away_team_id")) == conference
+                or team_conferences.get(game.get("home_team_id")) == conference
+            ]
+            for game in filtered_week_games:
+                included_team_ids.add(game.get("away_team_id"))
+                included_team_ids.add(game.get("home_team_id"))
+            filtered_weeks.append(filtered_week_games)
+        weeks = filtered_weeks
+
+    team_name_map = {
+        str(team_doc["_id"]): team_doc.get("name")
+        for team_doc in team_docs
+        if str(team_doc["_id"]) in included_team_ids
+    }
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
-    return {"schedule": weeks, "team_id": team_id}
+    return {
+        "schedule": weeks,
+        "team_id": team_id,
+        "team_conferences": team_conferences,
+        "team_name_map": team_name_map,
+        "conference": conference,
+    }
 
 
 def get_leaders(
@@ -2263,18 +2725,52 @@ def leaders(
     franchise_id: str,
     scope: str = "season",
     limit: int = 10,
+    view_scope: str = "national",
 ):
     import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
     
     categories = ["PTS", "AST", "3PTM", "REB", "BLK", "STL"]  # ✅ SS&S: Use standardized field name "3PTM" instead of "TPM"
+    allowed_team_ids: Optional[set[str]] = None
+    allowed_team_names: Optional[set[str]] = None
+    if view_scope in {"conference", "region"}:
+        franchise_doc = db.franchises.find_one(
+            {"_id": ObjectId(franchise_id)},
+            {"user_team_object_id": 1, "user_team_id": 1},
+        )
+        user_team_id = None
+        if franchise_doc:
+            _, user_team_id = get_user_team_from_franchise(franchise_doc)
+        if user_team_id and ObjectId.is_valid(user_team_id):
+            user_team_doc = db.teams.find_one({"_id": ObjectId(user_team_id)}, {"conference": 1, "region": 1})
+            if user_team_doc:
+                query = {}
+                if view_scope == "conference":
+                    query["conference"] = user_team_doc.get("conference")
+                else:
+                    query["region"] = user_team_doc.get("region", "")
+                team_docs = list(db.teams.find(query, {"_id": 1, "name": 1}))
+                allowed_team_ids = {str(team["_id"]) for team in team_docs}
+                allowed_team_names = {team.get("name", "") for team in team_docs if team.get("name")}
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
         cat_start = time.time()
-        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=limit)
+        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=256)
+        if allowed_team_ids is not None or allowed_team_names is not None:
+            filtered_top = []
+            for player in top:
+                player_team = player.get("team")
+                player_team_id = str(player_team) if player_team is not None else ""
+                if allowed_team_ids and player_team_id in allowed_team_ids:
+                    filtered_top.append(player)
+                    continue
+                if allowed_team_names and player_team in allowed_team_names:
+                    filtered_top.append(player)
+            top = filtered_top[:limit]
+        else:
+            top = top[:limit]
         cat_time = time.time() - cat_start
-        # logger.info(f"⏱️ [PERF] /franchise/leaders get_leaders('{cat}'): {cat_time:.3f}s")
         result[cat] = [
             {
                 "player_id": p.get("player_id"),
@@ -2284,6 +2780,21 @@ def leaders(
             }
             for p in top
         ]
+    all_team_names = set()
+    for cat in categories:
+        for entry in result[cat]:
+            tn = entry.get("team")
+            if tn:
+                all_team_names.add(tn)
+    team_meta = {}
+    if all_team_names:
+        for t in db.teams.find({"name": {"$in": list(all_team_names)}}, {"name": 1, "conference": 1, "region": 1}):
+            team_meta[t.get("name", "")] = {"conference": t.get("conference"), "region": t.get("region", "")}
+    for cat in categories:
+        for entry in result[cat]:
+            meta = team_meta.get(entry.get("team") or "", {})
+            entry["conference"] = meta.get("conference")
+            entry["region"] = meta.get("region", "")
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/leaders COMPLETE: {total_time:.3f}s")
@@ -2291,7 +2802,7 @@ def leaders(
 
 
 @router.get("/franchise/team-stats")
-def team_stats(franchise_id: str):
+def team_stats(franchise_id: str, scope: str = "national"):
     """Get team stats by aggregating player stats from franchise document.
     
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific stats),
@@ -2307,7 +2818,7 @@ def team_stats(franchise_id: str):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1})
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1, "user_team_id": 1, "user_team_object_id": 1})
     db_query_time = time.time() - db_query_start
     # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
@@ -2316,6 +2827,23 @@ def team_stats(franchise_id: str):
     players = {d["player_id"]: d for d in fpd_docs}
     franchise_results = franchise_doc.get("results", {})
     team_list = _ftd_team_list_for_franchise(fid)
+    if scope in {"conference", "region"}:
+        user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        if user_team_object_id and ObjectId.is_valid(user_team_object_id):
+            user_team_doc = db.teams.find_one({"_id": ObjectId(user_team_object_id)}, {"conference": 1, "region": 1})
+            if user_team_doc:
+                filtered_team_list = {}
+                for team_id_str, team_name in team_list.items():
+                    if not ObjectId.is_valid(team_id_str):
+                        continue
+                    team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"conference": 1, "region": 1})
+                    if not team_doc:
+                        continue
+                    if scope == "conference" and team_doc.get("conference") == user_team_doc.get("conference"):
+                        filtered_team_list[team_id_str] = team_name
+                    if scope == "region" and team_doc.get("region", "") == user_team_doc.get("region", ""):
+                        filtered_team_list[team_id_str] = team_name
+                team_list = filtered_team_list
     # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
     ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1}))
     franchise_team_rosters = {}
@@ -2338,6 +2866,22 @@ def team_stats(franchise_id: str):
     )
     aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
+    team_ids_for_meta = [ObjectId(t["team_id"]) for t in output if t.get("team_id")]
+    if team_ids_for_meta:
+        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1, "mascot": 1}))
+        id_to_meta = {
+            str(d["_id"]): {
+                "conference": d.get("conference"),
+                "region": d.get("region", ""),
+                "mascot": d.get("mascot", ""),
+            }
+            for d in team_meta_docs
+        }
+        for t in output:
+            meta = id_to_meta.get(t.get("team_id", ""), {})
+            t["conference"] = meta.get("conference")
+            t["region"] = meta.get("region", "")
+            t["mascot"] = meta.get("mascot", "")
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
@@ -2345,7 +2889,7 @@ def team_stats(franchise_id: str):
 
 
 @router.get("/franchise/team-traits")
-def team_traits(franchise_id: str):
+def team_traits(franchise_id: str, scope: str = "national"):
     """Get team attribute totals for all teams in franchise.
     
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific attributes),
@@ -2369,6 +2913,11 @@ def team_traits(franchise_id: str):
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
     players = {d["player_id"]: d for d in fpd_docs}
     team_list = _ftd_team_list_for_franchise(fid)
+    user_team_scope = None
+    if scope in {"conference", "region"}:
+        user_team_id, user_team_object_id = get_user_team_from_franchise(db.franchises.find_one({"_id": fid}, {"user_team_id": 1, "user_team_object_id": 1}))
+        if user_team_object_id and ObjectId.is_valid(user_team_object_id):
+            user_team_scope = db.teams.find_one({"_id": ObjectId(user_team_object_id)}, {"conference": 1, "region": 1})
     
     # logger.info(f"⏱️ [PERF] /franchise/team-traits Found {len(players)} players, {len(team_list)} teams")
     
@@ -2378,13 +2927,19 @@ def team_traits(franchise_id: str):
     
     for team_id_str in team_list.keys():
         try:
-            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1})
+            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1, "conference": 1, "region": 1})
             if team_doc:
+                if user_team_scope and scope == "conference" and team_doc.get("conference") != user_team_scope.get("conference"):
+                    continue
+                if user_team_scope and scope == "region" and team_doc.get("region", "") != user_team_scope.get("region", ""):
+                    continue
                 team_name = team_doc.get("name", team_id_str)
                 team_names[team_id_str] = team_name
                 team_totals[team_id_str] = {
                     "team_name": team_name,
                     "primary_color": team_doc.get("primary_color", "#000000"),
+                    "conference": team_doc.get("conference"),
+                    "region": team_doc.get("region", ""),
                     "attributes": {attr: 0 for attr in attributes}
                 }
         except Exception:
@@ -2445,6 +3000,8 @@ def team_traits(franchise_id: str):
             "team_id": team_id,
             "team_name": data["team_name"],
             "primary_color": data["primary_color"],
+            "conference": data.get("conference"),
+            "region": data.get("region", ""),
             "attributes": data["attributes"]
         })
     
@@ -2612,6 +3169,1613 @@ def recruits(franchise_id: str = Query(...)):
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(rec_docs)} recruits)")
     return {"recruits": rec_docs}
+
+
+def _recruit_rt(recruit_doc: dict) -> int:
+    ratings = recruit_doc.get("position_ratings") or {}
+    values = [int(v or 0) for v in ratings.values() if isinstance(v, (int, float))]
+    return max(values) if values else 0
+
+
+def _best_position(position_ratings: dict) -> dict:
+    best_pos = "--"
+    best_rating = None
+    for pos, rating in (position_ratings or {}).items():
+        if not isinstance(rating, (int, float)):
+            continue
+        if best_rating is None or rating > best_rating:
+            best_pos = pos
+            best_rating = int(rating)
+    return {"pos": best_pos, "rating": best_rating}
+
+
+def _team_order_list(order_doc: dict | None) -> list[str]:
+    return [
+        order_doc[key]
+        for key in sorted((order_doc or {}).keys(), key=lambda item: int(item))
+        if order_doc.get(key)
+    ]
+
+
+def _sort_recruits_by_rt(recruit_docs: list[dict]) -> list[dict]:
+    rows = list(recruit_docs)
+    rows.sort(key=lambda recruit: (-_recruit_rt(recruit), random.random()))
+    return rows
+
+
+def _generate_cpu_recruiting_orders(
+    team_docs_by_id: dict[str, dict],
+    user_team_id: str,
+    recruits_by_region: dict[str, list[dict]],
+) -> dict[str, dict[str, str]]:
+    cpu_orders: dict[str, dict[str, str]] = {}
+    all_regions = [region for region, recruits in recruits_by_region.items() if recruits]
+    recruit_docs_by_id = {
+        recruit["recruit_id"]: recruit
+        for recruits in recruits_by_region.values()
+        for recruit in recruits
+    }
+
+    for team_id, team_doc in team_docs_by_id.items():
+        if team_id == user_team_id:
+            continue
+
+        team_region = str(team_doc.get("region") or "").upper()
+        in_region_recruits = list(recruits_by_region.get(team_region, []))
+        if not in_region_recruits:
+            cpu_orders[team_id] = {}
+            continue
+
+        selected_ids: list[str] = []
+        out_of_region_count = random.randint(0, 5)
+        outside_regions = [region for region in all_regions if region != team_region]
+        for _ in range(out_of_region_count):
+            if not outside_regions:
+                break
+            outside_region = random.choice(outside_regions)
+            outside_pool = recruits_by_region.get(outside_region, [])[:15]
+            available_outside_pool = [
+                recruit["recruit_id"]
+                for recruit in outside_pool
+                if recruit["recruit_id"] not in selected_ids
+            ]
+            if available_outside_pool:
+                selected_ids.append(random.choice(available_outside_pool))
+
+        desired_in_region = MAX_RECRUITING_ORDER_SLOTS - len(selected_ids)
+        top_sixteen_pool = in_region_recruits[: min(16, len(in_region_recruits))]
+        top_pick_count = min(10, len(top_sixteen_pool), desired_in_region)
+        if top_pick_count > 0:
+            selected_ids.extend([recruit["recruit_id"] for recruit in random.sample(top_sixteen_pool, top_pick_count)])
+
+        remaining_needed = desired_in_region - top_pick_count
+        remaining_pool = [
+            recruit["recruit_id"]
+            for recruit in in_region_recruits
+            if recruit["recruit_id"] not in selected_ids
+        ]
+        if remaining_needed > 0 and remaining_pool:
+            selected_ids.extend(random.sample(remaining_pool, min(remaining_needed, len(remaining_pool))))
+
+        sorted_selected_ids = [
+            recruit["recruit_id"]
+            for recruit in _sort_recruits_by_rt([
+                recruit_docs_by_id[recruit_id]
+                for recruit_id in selected_ids[:MAX_RECRUITING_ORDER_SLOTS]
+                if recruit_id in recruit_docs_by_id
+            ])
+        ]
+        cpu_orders[team_id] = _normalize_recruiting_orders(sorted_selected_ids)
+
+    return cpu_orders
+
+
+def _highest_remaining_team_target(team_order: list[str], assigned_recruit_ids: set[str]) -> str | None:
+    for recruit_id in team_order:
+        if recruit_id not in assigned_recruit_ids:
+            return recruit_id
+    return None
+
+
+def _team_prestige_draw_entries(team_doc: dict | None) -> int:
+    prestige = int((team_doc or {}).get("prestige") or 0)
+    return max(1, prestige // 10)
+
+
+def _select_team_by_prestige_draw(team_ids: list[str], team_docs_by_id: dict[str, dict]) -> str:
+    weighted_ranges: list[tuple[int, int, str]] = []
+    current_start = 1
+    for team_id in team_ids:
+        entries = _team_prestige_draw_entries(team_docs_by_id.get(team_id))
+        current_end = current_start + entries - 1
+        weighted_ranges.append((current_start, current_end, team_id))
+        current_start = current_end + 1
+
+    draw = random.randint(1, weighted_ranges[-1][1])
+    for range_start, range_end, team_id in weighted_ranges:
+        if range_start <= draw <= range_end:
+            return team_id
+    return weighted_ranges[-1][2]
+
+
+def _team_outcomes_by_week_results(results: list[dict]) -> dict[str, str]:
+    outcomes: dict[str, str] = {}
+    for result in results:
+        away_id = str(result.get("away_id"))
+        home_id = str(result.get("home_id"))
+        away_score = int(result.get("away_score", 0) or 0)
+        home_score = int(result.get("home_score", 0) or 0)
+        if away_score > home_score:
+            outcomes[away_id] = "win"
+            outcomes[home_id] = "loss"
+        elif home_score > away_score:
+            outcomes[home_id] = "win"
+            outcomes[away_id] = "loss"
+    return outcomes
+
+
+def _normalize_recruit_lean_doc(lean_doc: dict | None) -> dict[str, str | None]:
+    lean = {"1": None, "2": None, "3": None}
+    for key in ("1", "2", "3"):
+        value = (lean_doc or {}).get(key)
+        lean[key] = value if value not in ("",) else None
+    return lean
+
+
+def _lean_has_open_slot(lean_doc: dict[str, str | None]) -> bool:
+    return lean_doc.get("1") in (None, "open") or lean_doc.get("2") is None or lean_doc.get("3") is None
+
+
+def _insert_team_into_highest_open_lean_slot(lean_doc: dict[str, str | None], team_id: str) -> dict[str, str | None]:
+    updated = _normalize_recruit_lean_doc(lean_doc)
+    if updated.get("1") in (None, "open"):
+        updated["1"] = team_id
+        updated["2"] = None if updated.get("2") == "open" else updated.get("2")
+        updated["3"] = None if updated.get("3") == "open" else updated.get("3")
+        return updated
+    if updated.get("2") is None:
+        updated["2"] = team_id
+        return updated
+    if updated.get("3") is None:
+        updated["3"] = team_id
+    return updated
+
+
+def _update_recruit_lean_after_visit(
+    lean_doc: dict | None,
+    team_id: str,
+    in_region: bool,
+    won_game: bool,
+) -> dict[str, str | None]:
+    updated = _normalize_recruit_lean_doc(lean_doc)
+    existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
+    if existing_rank == "1":
+        if updated.get("3") is not None:
+            updated["3"] = None
+        elif updated.get("2") is not None:
+            updated["2"] = None
+        return updated
+    if existing_rank == "2":
+        updated["2"], updated["1"] = updated.get("1"), updated.get("2")
+        return updated
+    if existing_rank == "3":
+        updated["3"], updated["2"] = updated.get("2"), updated.get("3")
+        return updated
+    has_open_slot = _lean_has_open_slot(updated)
+    if in_region:
+        chance = 0.95 if won_game and has_open_slot else 0.75 if won_game else 0.75 if has_open_slot else 0.40
+    else:
+        chance = 0.80 if won_game and has_open_slot else 0.60 if won_game else 0.50 if has_open_slot else 0.30
+
+    if random.random() > chance:
+        return updated
+
+    if has_open_slot:
+        return _insert_team_into_highest_open_lean_slot(updated, team_id)
+
+    updated["3"] = team_id
+    return updated
+
+
+def _apply_complete_week_recruiting_lean_updates(
+    franchise_doc: dict,
+    week: int,
+    results: list[dict],
+) -> None:
+    applied = (franchise_doc.get("recruiting_lean_updates_applied") or {}).get(str(week))
+    if applied:
+        logger.info("Skipping recruiting lean updates for franchise=%s week=%s; already applied", franchise_doc.get("_id"), week)
+        return
+    if week < 20 or week > 26:
+        return
+
+    fid = franchise_doc["_id"]
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "recruit_visit": 1},
+    ))
+    if not ftd_docs:
+        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        return
+
+    visited_recruit_ids: set[str] = set()
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    team_docs_by_id = {
+        str(team["_id"]): team
+        for team in db.teams.find({"_id": {"$in": team_ids}}, {"region": 1})
+    }
+    recruit_visit_pairs: list[tuple[str, str]] = []
+    for ftd_doc in ftd_docs:
+        team_id = str(ftd_doc.get("team_id"))
+        recruit_id = ftd_doc.get("recruit_visit")
+        if not team_id or not recruit_id:
+            continue
+        if recruit_id in visited_recruit_ids:
+            logger.warning(
+                "Duplicate recruit_visit detected for franchise=%s week=%s recruit_id=%s; keeping first occurrence",
+                fid,
+                week,
+                recruit_id,
+            )
+            continue
+        visited_recruit_ids.add(recruit_id)
+        recruit_visit_pairs.append((team_id, recruit_id))
+
+    if not recruit_visit_pairs:
+        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        return
+
+    recruit_ids = [recruit_id for _, recruit_id in recruit_visit_pairs]
+    recruit_docs_by_id = {
+        recruit["recruit_id"]: recruit
+        for recruit in franchise_recruits_data_collection.find(
+            {"franchise_id": str(fid), "recruit_id": {"$in": recruit_ids}},
+            {"recruit_id": 1, "Home Region": 1, "Lean": 1},
+        )
+    }
+    team_outcomes = _team_outcomes_by_week_results(results)
+
+    bulk_updates = []
+    for team_id, recruit_id in recruit_visit_pairs:
+        recruit_doc = recruit_docs_by_id.get(recruit_id)
+        team_doc = team_docs_by_id.get(team_id)
+        if not recruit_doc or not team_doc:
+            continue
+        updated_lean = _update_recruit_lean_after_visit(
+            recruit_doc.get("Lean"),
+            team_id,
+            str(team_doc.get("region") or "").upper() == str(recruit_doc.get("Home Region") or "").upper(),
+            team_outcomes.get(team_id) == "win",
+        )
+        bulk_updates.append({
+            "filter": {"franchise_id": str(fid), "recruit_id": recruit_id},
+            "update": {"$set": {"Lean": updated_lean}},
+        })
+
+    for op in bulk_updates:
+        franchise_recruits_data_collection.update_one(op["filter"], op["update"])
+
+    franchise_team_data_collection.update_many(
+        {"franchise_id": fid},
+        {"$set": {"recruit_visit": None, "updated_at": datetime.utcnow()}},
+    )
+    db.franchises.update_one(
+        {"_id": fid},
+        {"$set": {f"recruiting_lean_updates_applied.{week}": True}},
+    )
+
+
+def _resolve_weekly_recruiting_visits(
+    team_docs_by_id: dict[str, dict],
+    team_orders: dict[str, list[str]],
+    recruit_docs_by_id: dict[str, dict],
+) -> dict[str, str]:
+    team_rank_lookup = {
+        team_id: {recruit_id: index + 1 for index, recruit_id in enumerate(order)}
+        for team_id, order in team_orders.items()
+    }
+    available_team_ids = set(team_docs_by_id.keys())
+    assigned_recruit_ids: set[str] = set()
+    assignments: dict[str, str] = {}
+    shuffled_regions = list("ABCDEFGH")
+    random.shuffle(shuffled_regions)
+
+    for region in shuffled_regions:
+        region_team_ids = [
+            team_id
+            for team_id, team_doc in team_docs_by_id.items()
+            if str(team_doc.get("region") or "").upper() == region and team_id in available_team_ids
+        ]
+        if not region_team_ids:
+            continue
+
+        region_bid_recruit_ids = set()
+        for team_id in region_team_ids:
+            for recruit_id in team_orders.get(team_id, []):
+                if recruit_id not in assigned_recruit_ids:
+                    region_bid_recruit_ids.add(recruit_id)
+
+        sorted_region_recruits = _sort_recruits_by_rt([
+            recruit_docs_by_id[recruit_id]
+            for recruit_id in region_bid_recruit_ids
+            if recruit_id in recruit_docs_by_id
+        ])
+
+        for recruit_doc in sorted_region_recruits:
+            recruit_id = recruit_doc["recruit_id"]
+            if recruit_id in assigned_recruit_ids:
+                continue
+
+            while True:
+                candidate_team_ids = [
+                    team_id
+                    for team_id in region_team_ids
+                    if team_id in available_team_ids and recruit_id in team_rank_lookup.get(team_id, {})
+                ]
+                if not candidate_team_ids:
+                    break
+
+                best_rank = min(team_rank_lookup[team_id][recruit_id] for team_id in candidate_team_ids)
+                eligible_team_ids = [
+                    team_id
+                    for team_id in candidate_team_ids
+                    if team_rank_lookup[team_id][recruit_id] == best_rank
+                ]
+
+                lean_doc = recruit_doc.get("Lean") or {}
+                if lean_doc.get("1") != "open":
+                    lean_team_ids = {team_id for team_id in lean_doc.values() if team_id}
+                    if lean_team_ids:
+                        overlap = [team_id for team_id in eligible_team_ids if team_id in lean_team_ids]
+                        if overlap:
+                            eligible_team_ids = overlap
+
+                if not eligible_team_ids:
+                    break
+
+                selected_team_id = _select_team_by_prestige_draw(eligible_team_ids, team_docs_by_id)
+                top_remaining_recruit_id = _highest_remaining_team_target(
+                    team_orders.get(selected_team_id, []),
+                    assigned_recruit_ids,
+                )
+                if not top_remaining_recruit_id:
+                    available_team_ids.discard(selected_team_id)
+                    break
+
+                if top_remaining_recruit_id != recruit_id:
+                    assignments[selected_team_id] = top_remaining_recruit_id
+                    assigned_recruit_ids.add(top_remaining_recruit_id)
+                    available_team_ids.discard(selected_team_id)
+                    continue
+
+                assignments[selected_team_id] = recruit_id
+                assigned_recruit_ids.add(recruit_id)
+                available_team_ids.discard(selected_team_id)
+                break
+
+        fallback_team_ids = [
+            team_id
+            for team_id in region_team_ids
+            if team_id in available_team_ids
+        ]
+        if fallback_team_ids:
+            fallback_recruits = _sort_recruits_by_rt([
+                recruit
+                for recruit in recruit_docs_by_id.values()
+                if str(recruit.get("Home Region") or "").upper() == region
+                and recruit.get("recruit_id") not in assigned_recruit_ids
+            ])
+            for team_id, recruit_doc in zip(fallback_team_ids, fallback_recruits):
+                recruit_id = recruit_doc["recruit_id"]
+                assignments[team_id] = recruit_id
+                assigned_recruit_ids.add(recruit_id)
+                available_team_ids.discard(team_id)
+
+    return assignments
+
+
+def _region_display_order(user_region: str | None) -> list[str]:
+    ordered = list("ABCDEFGH")
+    user_region = str(user_region or "").upper()
+    if user_region in ordered:
+        ordered.remove(user_region)
+        ordered.insert(0, user_region)
+    return ordered
+
+
+def _build_recruiting_results_payload(franchise_doc: dict, week: int) -> dict:
+    fid = franchise_doc["_id"]
+    week_key = str(week)
+    recruiting_results = franchise_doc.get("recruiting_results", {}) or {}
+    week_results = recruiting_results.get(week_key)
+    if week_results is None:
+        raise HTTPException(status_code=404, detail="Recruiting results not found for this week")
+
+    user_team_name, user_team_id = get_user_team_from_franchise(franchise_doc)
+    user_region = ""
+    if user_team_id:
+        try:
+            team_doc = db.teams.find_one({"_id": ObjectId(user_team_id)}, {"region": 1})
+            user_region = str(team_doc.get("region") or "").upper() if team_doc else ""
+        except Exception:
+            user_region = ""
+
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1}))
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    teams_by_id = {
+        str(team["_id"]): team
+        for team in db.teams.find(
+            {"_id": {"$in": team_ids}},
+            {"name": 1, "conference": 1, "region": 1},
+        )
+    }
+    recruit_ids = [recruit_id for recruit_id in week_results.values() if recruit_id]
+    recruit_docs_by_id = {
+        recruit["recruit_id"]: recruit
+        for recruit in franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": recruit_ids}},
+            {"_id": 0, "franchise_id": 0},
+        )
+    }
+
+    regions_payload = []
+    for region in _region_display_order(user_region):
+        region_teams = [
+            {
+                "team_id": team_id,
+                "team_name": team_doc.get("name", team_id),
+                "conference": team_doc.get("conference"),
+                "region": str(team_doc.get("region") or "").upper(),
+            }
+            for team_id, team_doc in teams_by_id.items()
+            if str(team_doc.get("region") or "").upper() == region
+        ]
+        if not region_teams:
+            continue
+
+        conferences_payload = []
+        for conference in sorted({team["conference"] for team in region_teams if team.get("conference") is not None}):
+            conference_teams = [team for team in region_teams if team.get("conference") == conference]
+            conference_teams.sort(key=lambda team: team["team_name"])
+            team_rows = []
+            for team in conference_teams:
+                recruit_id = week_results.get(team["team_id"])
+                recruit_doc = recruit_docs_by_id.get(recruit_id) if recruit_id else None
+                recruit_payload = None
+                if recruit_doc:
+                    best_pos = _best_position(recruit_doc.get("position_ratings") or {})
+                    recruit_payload = {
+                        "recruit_id": recruit_doc["recruit_id"],
+                        "name": recruit_doc.get("name", "--"),
+                        "home_region": recruit_doc.get("Home Region", "--"),
+                        "archetype": recruit_doc.get("archetype", "--"),
+                        "height": recruit_doc.get("height"),
+                        "weight": recruit_doc.get("weight"),
+                        "pos": best_pos.get("pos", "--"),
+                        "rt": best_pos.get("rating"),
+                    }
+                team_rows.append({
+                    "team_id": team["team_id"],
+                    "team_name": team["team_name"],
+                    "visit": recruit_payload,
+                })
+            conferences_payload.append({
+                "conference": conference,
+                "teams": team_rows,
+            })
+        regions_payload.append({
+            "region": region,
+            "conferences": conferences_payload,
+        })
+
+    return {
+        "week": week,
+        "user_team": user_team_name,
+        "user_team_id": user_team_id,
+        "regions": regions_payload,
+    }
+
+
+def _process_weekly_recruiting_invites(franchise_doc: dict[str, Any]) -> dict[str, Any]:
+    fid = franchise_doc["_id"]
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week < 20 or week > 26:
+        raise HTTPException(status_code=400, detail="Weekly recruiting invites are only processed during weeks 20-26")
+    if str(week) in (franchise_doc.get("recruiting_results", {}) or {}):
+        return (franchise_doc.get("recruiting_results", {}) or {}).get(str(week)) or {}
+
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+    user_team_id_str = str(user_team_id)
+
+    if week == 20:
+        user_ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
+            {"Recruits": 1},
+        ) or {}
+        if not _team_order_list(user_ftd.get("Recruits")):
+            raise HTTPException(status_code=400, detail="You must save recruiting orders before running training in week 20")
+
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
+    ftd_by_team_id = {str(doc["team_id"]): doc for doc in ftd_docs if doc.get("team_id") is not None}
+    team_docs_by_id = {}
+    for team in db.teams.find(
+        {"_id": {"$in": team_ids}},
+        {"name": 1, "conference": 1, "region": 1},
+    ):
+        team_id = str(team["_id"])
+        team_docs_by_id[team_id] = {
+            **team,
+            "prestige": (ftd_by_team_id.get(team_id) or {}).get("prestige", 0),
+        }
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_doc["_id"])},
+            {"_id": 0, "franchise_id": 0},
+        )
+    )
+    recruit_docs_by_id = {recruit["recruit_id"]: recruit for recruit in recruits}
+    recruits_by_region = {}
+    for region in "ABCDEFGH":
+        region_recruits = [recruit for recruit in recruits if str(recruit.get("Home Region") or "").upper() == region]
+        recruits_by_region[region] = _sort_recruits_by_rt(region_recruits)
+
+    cpu_orders = _generate_cpu_recruiting_orders(team_docs_by_id, user_team_id_str, recruits_by_region)
+    for team_id, cpu_order in cpu_orders.items():
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ObjectId(team_id)},
+            {"$set": {"Recruits": cpu_order, "updated_at": datetime.utcnow()}},
+        )
+
+    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "Recruits": 1}))
+    team_orders = {
+        str(doc["team_id"]): _team_order_list(doc.get("Recruits"))
+        for doc in all_ftd_docs
+    }
+    assignments = _resolve_weekly_recruiting_visits(team_docs_by_id, team_orders, recruit_docs_by_id)
+
+    db.franchises.update_one(
+        {"_id": fid},
+        {
+            "$set": {
+                f"recruiting_results.{week}": assignments,
+            }
+        },
+    )
+    for ftd_doc in all_ftd_docs:
+        team_id = str(ftd_doc["team_id"])
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ftd_doc["team_id"]},
+            {
+                "$set": {
+                    "recruit_visit": assignments.get(team_id),
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+
+    return assignments
+
+
+def _normalize_recruiting_orders(recruit_ids: list[str]) -> dict[str, str]:
+    return {str(index): recruit_id for index, recruit_id in enumerate(recruit_ids, start=1)}
+
+
+def _normalize_week_35_recruiting_orders(order_entries: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(order_entries, start=1):
+        recruit_id = str((entry or {}).get("id") or "").strip()
+        if not recruit_id:
+            continue
+        try:
+            points = int((entry or {}).get("points", 0) or 0)
+        except Exception:
+            points = 0
+        normalized[str(index)] = {
+            "id": recruit_id,
+            "points": max(0, points),
+            "scholarship": bool((entry or {}).get("scholarship", False)),
+            "playing_time": bool((entry or {}).get("playing_time", False)),
+        }
+    return normalized
+
+
+def _week_35_order_entries(saved_orders: Any) -> list[dict[str, Any]]:
+    if not isinstance(saved_orders, dict):
+        return []
+    entries: list[dict[str, Any]] = []
+    for key in sorted(saved_orders.keys(), key=lambda value: int(value) if str(value).isdigit() else 10**9):
+        entry = saved_orders.get(key)
+        if not isinstance(entry, dict):
+            continue
+        recruit_id = str(entry.get("id") or "").strip()
+        if not recruit_id:
+            continue
+        entries.append(
+            {
+                "id": recruit_id,
+                "points": _safe_int(entry.get("points", 0) or 0, 0),
+                "scholarship": bool(entry.get("scholarship", False)),
+                "playing_time": bool(entry.get("playing_time", False)),
+            }
+        )
+    return entries
+
+
+def _normalize_week_36_recruiting_orders(order_entries: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return _normalize_week_35_recruiting_orders(order_entries)
+
+
+def _week_36_order_entries(saved_orders: Any) -> list[dict[str, Any]]:
+    return _week_35_order_entries(saved_orders)
+
+
+def _zero_stats_block() -> dict[str, Any]:
+    zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
+    zero_stats["Outlet_Score_List"] = []
+    return zero_stats
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _best_position(position_ratings: dict[str, Any]) -> dict[str, Any]:
+    best_pos = "--"
+    best_rating = None
+    for pos, value in (position_ratings or {}).items():
+        try:
+            rating = int(value)
+        except Exception:
+            continue
+        if best_rating is None or rating > best_rating:
+            best_pos = pos
+            best_rating = rating
+    return {"pos": best_pos, "rating": best_rating}
+
+
+def _format_team_name_map(team_ids: list[ObjectId] | None = None) -> dict[str, str]:
+    query: dict[str, Any] = {}
+    if team_ids:
+        query = {"_id": {"$in": team_ids}}
+    return {
+        str(team["_id"]): team.get("name", str(team["_id"]))
+        for team in db.teams.find(query, {"name": 1})
+    }
+
+
+def _load_fpd_map(franchise_id: str | ObjectId, player_ids: list[str] | None = None) -> dict[str, dict[str, Any]]:
+    franchise_id_str = str(franchise_id)
+    query: dict[str, Any] = {"franchise_id": franchise_id_str}
+    if player_ids is not None:
+        query["player_id"] = {"$in": [str(player_id) for player_id in player_ids]}
+    try:
+        return {
+            doc["player_id"]: doc
+            for doc in franchise_players_data_collection.find(query)
+            if doc.get("player_id")
+        }
+    except Exception:
+        return {}
+
+
+def _player_year_from_fpd_or_core(player_id: str, fpd_doc: dict[str, Any] | None) -> str:
+    meta = (fpd_doc or {}).get("meta", {})
+    year = meta.get("year")
+    if year:
+        return str(year)
+    core_doc = db.players.find_one({"_id": player_id}, {"year": 1}) or {}
+    return str(core_doc.get("year") or "")
+
+
+def _is_graduating_year(year_value: str | None) -> bool:
+    year = str(year_value or "").strip().lower()
+    return year in {"senior", "graduate"}
+
+
+def _calculate_available_roster_spots(fid: ObjectId, user_team_id: str) -> int:
+    try:
+        team_object_id = ObjectId(user_team_id)
+    except Exception:
+        return 0
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"players": 1},
+    ) or {}
+    roster_player_ids = [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+    if not roster_player_ids:
+        return 15
+
+    fpd_docs = _load_fpd_map(fid, roster_player_ids)
+    if not fpd_docs:
+        non_graduating_count = db.players.count_documents(
+            {
+                "_id": {"$in": roster_player_ids},
+                "year": {"$nin": ["Senior", "senior", "Graduate", "graduate"]},
+            }
+        )
+        return max(0, 15 - int(non_graduating_count))
+    non_graduating_count = 0
+    for player_id in roster_player_ids:
+        if not _is_graduating_year(_player_year_from_fpd_or_core(player_id, fpd_docs.get(player_id))):
+            non_graduating_count += 1
+    return max(0, 15 - int(non_graduating_count))
+
+
+def _calculate_available_scholarships(fid: ObjectId, user_team_id: str) -> int:
+    try:
+        team_object_id = ObjectId(user_team_id)
+    except Exception:
+        return 0
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"scholarship_players": 1},
+    ) or {}
+    scholarship_player_ids = [str(player_id) for player_id in (ftd_doc.get("scholarship_players") or []) if player_id]
+    if not scholarship_player_ids:
+        return 12
+
+    fpd_docs = _load_fpd_map(fid, scholarship_player_ids)
+    if not fpd_docs:
+        non_graduating_count = db.players.count_documents(
+            {
+                "_id": {"$in": scholarship_player_ids},
+                "year": {"$nin": ["Senior", "senior", "Graduate", "graduate"]},
+            }
+        )
+        return max(0, 12 - int(non_graduating_count))
+    non_graduating_count = 0
+    for player_id in scholarship_player_ids:
+        if not _is_graduating_year(_player_year_from_fpd_or_core(player_id, fpd_docs.get(player_id))):
+            non_graduating_count += 1
+    return max(0, 12 - int(non_graduating_count))
+
+
+def _cut_year_rank(year_value: str | None) -> int:
+    year = str(year_value or "").strip().lower()
+    order = {
+        "senior": 4,
+        "junior": 3,
+        "sophomore": 2,
+        "freshman": 1,
+    }
+    return order.get(year, 0)
+
+
+def _player_rt_from_doc(player_doc: dict[str, Any] | None) -> int:
+    return int((_best_position((player_doc or {}).get("position_ratings") or {}).get("rating") or 0))
+
+
+def _choose_cut_player_ids(
+    roster_player_ids: list[str],
+    fpd_map: dict[str, dict[str, Any]],
+    cut_count: int,
+) -> list[str]:
+    if cut_count <= 0:
+        return []
+
+    players = [str(player_id) for player_id in roster_player_ids if player_id]
+
+    def sort_key(player_id: str) -> tuple[Any, ...]:
+        player_doc = fpd_map.get(player_id) or {}
+        meta = (player_doc.get("meta") or {})
+        return (
+            _player_rt_from_doc(player_doc),
+            -_cut_year_rank(meta.get("year")),
+            random.random(),
+        )
+
+    ordered = sorted(players, key=sort_key)
+    return ordered[:cut_count]
+
+
+def _week_1_cut_requirement(
+    franchise_doc: dict[str, Any] | None,
+    fid: ObjectId | None,
+    user_team_id: str | None,
+) -> dict[str, int | bool]:
+    if not franchise_doc or not fid or not user_team_id:
+        return {"roster_count": 0, "cut_count": 0, "cut_required": False}
+    week = int(franchise_doc.get("week", 1) or 1)
+    training_status = franchise_doc.get("training_status", {}) or {}
+    if week != 1 or not training_status.get("training_completed", False):
+        return {"roster_count": 0, "cut_count": 0, "cut_required": False}
+    try:
+        team_object_id = ObjectId(user_team_id)
+    except Exception:
+        return {"roster_count": 0, "cut_count": 0, "cut_required": False}
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"players": 1},
+    ) or {}
+    roster_count = len([player_id for player_id in (ftd_doc.get("players") or []) if player_id])
+    cut_count = max(0, roster_count - 12)
+    return {"roster_count": roster_count, "cut_count": cut_count, "cut_required": cut_count > 0}
+
+
+def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str | None = None) -> None:
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "players": 1, "scholarship_players": 1, "training_squad_players": 1, "playing_time_promise_players": 1},
+    ))
+    roster_ids = []
+    for doc in ftd_docs:
+        roster_ids.extend([str(player_id) for player_id in (doc.get("players") or []) if player_id])
+    fpd_map = _load_fpd_map(franchise_id, roster_ids)
+
+    for ftd_doc in ftd_docs:
+        team_id = str(ftd_doc.get("team_id") or "")
+        if not team_id or (excluded_team_id and team_id == str(excluded_team_id)):
+            continue
+        roster_player_ids = [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+        cut_count = max(0, len(roster_player_ids) - 12)
+        if cut_count <= 0:
+            franchise_team_data_collection.update_one(
+                {"franchise_id": franchise_id, "team_id": ftd_doc.get("team_id")},
+                {"$set": {"training_squad_players": [], "updated_at": datetime.utcnow()}},
+            )
+            continue
+
+        cut_ids = set(_choose_cut_player_ids(roster_player_ids, fpd_map, cut_count))
+        remaining_ids = [player_id for player_id in roster_player_ids if player_id not in cut_ids]
+        remaining_scholarships = [
+            str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
+            if str(player_id) in remaining_ids
+        ]
+        remaining_ptp = [
+            str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
+            if str(player_id) in remaining_ids
+        ]
+        total_player_attrs = 0
+        for player_id in remaining_ids:
+            attrs = (fpd_map.get(player_id) or {}).get("attributes") or {}
+            total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
+
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": ftd_doc.get("team_id")},
+            {
+                "$set": {
+                    "players": remaining_ids,
+                    "scholarship_players": remaining_scholarships,
+                    "training_squad_players": [],
+                    "playing_time_promise_players": remaining_ptp,
+                    "total_player_attrs": total_player_attrs,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+        if cut_ids:
+            franchise_players_data_collection.delete_many(
+                {"franchise_id": str(franchise_id), "player_id": {"$in": list(cut_ids)}}
+            )
+
+
+def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
+    pts = int(season_stats.get("PTS", 0) or 0)
+    ast = int(season_stats.get("AST", 0) or 0)
+    reb = int(season_stats.get("REB", 0) or (int(season_stats.get("OREB", 0) or 0) + int(season_stats.get("DREB", 0) or 0)))
+    stl = int(season_stats.get("STL", 0) or 0)
+    blk = int(season_stats.get("BLK", 0) or 0)
+    def_a = int(season_stats.get("DEF_A", 0) or 0)
+    def_s = int(season_stats.get("DEF_S", 0) or 0)
+    def_pct = int(round((def_s / def_a) * 100)) if def_a >= 130 else 0
+
+    score = 2 * (pts + ast + reb + stl + blk)
+    if def_a >= 130:
+        if def_pct > 80:
+            score += 15
+        elif def_pct > 60:
+            score += 10
+        elif def_pct > 40:
+            score += 5
+    return score, def_pct
+
+
+def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]:
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_doc["_id"])}))
+    team_name_map = _format_team_name_map()
+    candidates = []
+    for doc in fpd_docs:
+        meta = doc.get("meta", {})
+        season_stats = doc.get("season", {}) or {}
+        score, def_pct = _season_awards_score(season_stats)
+        team_id = str(meta.get("team_id") or "")
+        candidates.append({
+            "player_id": doc.get("player_id"),
+            "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
+            "team_id": team_id,
+            "team_name": team_name_map.get(team_id, meta.get("team", "")),
+            "year": meta.get("year") or "",
+            "score": score,
+            "stats": {
+                "PTS": int(season_stats.get("PTS", 0) or 0),
+                "REB": int(season_stats.get("REB", 0) or (int(season_stats.get("OREB", 0) or 0) + int(season_stats.get("DREB", 0) or 0))),
+                "AST": int(season_stats.get("AST", 0) or 0),
+                "STL": int(season_stats.get("STL", 0) or 0),
+                "BLK": int(season_stats.get("BLK", 0) or 0),
+                "DEF%": def_pct,
+            },
+        })
+    candidates.sort(key=lambda player: (-player["score"], -player["stats"]["PTS"], player["name"]))
+
+    top_twenty = candidates[:20]
+    third_team_pool = top_twenty[10:20]
+    third_team = random.sample(third_team_pool, min(5, len(third_team_pool))) if third_team_pool else []
+    return {
+        "computed_at": datetime.utcnow(),
+        "all_american_teams": {
+            "first_team": top_twenty[:5],
+            "second_team": top_twenty[5:10],
+            "third_team": third_team,
+        },
+    }
+
+
+def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str, Any]:
+    awards = franchise_doc.get(AWARDS_FIELD) or {}
+    if awards.get("all_american_teams"):
+        return awards
+    awards = _compute_all_american_teams(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {AWARDS_FIELD: awards}},
+    )
+    franchise_doc[AWARDS_FIELD] = awards
+    return awards
+
+
+def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: dict[str, Any], scholarship: bool, playing_time: bool, walk_on: bool = False) -> dict[str, Any]:
+    best_pos = _best_position(recruit_doc.get("position_ratings") or {})
+    return {
+        "player_id": str(uuid.uuid4()),
+        "recruit_id": recruit_doc.get("recruit_id"),
+        "team_id": str(team_doc["_id"]),
+        "team_name": team_doc.get("name", ""),
+        "name": recruit_doc.get("name", "--"),
+        "archetype": "Walk On" if walk_on else recruit_doc.get("archetype", "--"),
+        "home_region": recruit_doc.get("Home Region", "--"),
+        "height": recruit_doc.get("height"),
+        "weight": recruit_doc.get("weight"),
+        "year": "Freshman",
+        "position_ratings": (recruit_doc.get("position_ratings") or {}).copy(),
+        "attributes": (recruit_doc.get("attributes") or {}).copy(),
+        "pos": best_pos.get("pos", "--"),
+        "rt": best_pos.get("rating"),
+        "scholarship": bool(scholarship),
+        "playing_time": bool(playing_time),
+        "walk_on": bool(walk_on),
+        "signed_display": team_doc.get("name", "") + (" (walk on)" if walk_on else ""),
+        "jersey": None,
+    }
+
+
+def _build_cpu_week_35_orders(
+    team_doc: dict[str, Any],
+    recruits: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    team_id = str(team_doc["_id"])
+    region = str(team_doc.get("region") or "").upper()
+    lean_matches = []
+    in_region_rest = []
+    for recruit in recruits:
+        lean = recruit.get("Lean") or {}
+        team_on_lean = any(lean.get(slot) == team_id for slot in ("1", "2", "3"))
+        if team_on_lean:
+            lean_matches.append(recruit)
+        elif str(recruit.get("Home Region") or "").upper() == region:
+            in_region_rest.append(recruit)
+
+    lean_matches.sort(key=lambda recruit: (_best_position(recruit.get("position_ratings") or {}).get("rating") or -1), reverse=True)
+    selected_ids = {recruit.get("recruit_id") for recruit in lean_matches if recruit.get("recruit_id")}
+    remaining_slots = max(0, MAX_RECRUITING_ORDER_SLOTS - len(lean_matches))
+    high_pool = []
+    low_pool = []
+    for recruit in in_region_rest:
+        recruit_id = recruit.get("recruit_id")
+        if not recruit_id or recruit_id in selected_ids:
+            continue
+        rt = _best_position(recruit.get("position_ratings") or {}).get("rating") or 0
+        if rt >= 25:
+            high_pool.append(recruit)
+        else:
+            low_pool.append(recruit)
+
+    high_slots = remaining_slots // 2
+    low_slots = remaining_slots - high_slots
+    selected_high = random.sample(high_pool, min(high_slots, len(high_pool))) if high_pool else []
+    selected_low = random.sample(low_pool, min(low_slots, len(low_pool))) if low_pool else []
+
+    remaining_after_split = remaining_slots - len(selected_high) - len(selected_low)
+    if remaining_after_split > 0:
+        extra_high_pool = [recruit for recruit in high_pool if recruit not in selected_high]
+        extra_low_pool = [recruit for recruit in low_pool if recruit not in selected_low]
+        rollover_pool = extra_high_pool + extra_low_pool
+        if rollover_pool:
+            extras = random.sample(rollover_pool, min(remaining_after_split, len(rollover_pool)))
+            for recruit in extras:
+                rt = _best_position(recruit.get("position_ratings") or {}).get("rating") or 0
+                if rt >= 25:
+                    selected_high.append(recruit)
+                else:
+                    selected_low.append(recruit)
+
+    ordered = lean_matches + selected_high + selected_low
+
+    entries = []
+    for recruit in ordered[:MAX_RECRUITING_ORDER_SLOTS]:
+        entries.append({
+            "id": recruit.get("recruit_id"),
+            "points": 0,
+            "scholarship": False,
+            "playing_time": False,
+        })
+
+    def add_points_to_entry(recruit_id: str | None, points: int) -> int:
+        if not recruit_id or points <= 0:
+            return 0
+        for entry in entries:
+            if entry.get("id") == recruit_id:
+                entry["points"] = int(entry.get("points", 0) or 0) + points
+                return points
+        return 0
+
+    points_remaining = WEEK_35_RECRUITING_POINTS_BUDGET
+    if selected_low:
+        assigned = add_points_to_entry(selected_low[0].get("recruit_id"), 1)
+        points_remaining -= assigned
+    if selected_high and points_remaining > 0:
+        assigned = add_points_to_entry(
+            random.choice(selected_high).get("recruit_id"),
+            min(points_remaining, random.randint(1, 3)),
+        )
+        points_remaining -= assigned
+
+    lean_entries = [entry for entry in entries if any(((next((recruit for recruit in lean_matches if recruit.get("recruit_id") == entry.get("id")), {}) or {}).get("Lean") or {}).get(slot) == team_id for slot in ("1", "2", "3"))]
+    if not lean_entries and points_remaining > 0:
+        regional_fallback = sorted(
+            [recruit for recruit in in_region_rest if recruit.get("recruit_id") in {entry.get("id") for entry in entries}],
+            key=lambda recruit: (_best_position(recruit.get("position_ratings") or {}).get("rating") or -1),
+            reverse=True,
+        )[:5]
+        fallback_ids = [recruit.get("recruit_id") for recruit in regional_fallback if recruit.get("recruit_id")]
+        if fallback_ids:
+            base = points_remaining // len(fallback_ids)
+            remainder = points_remaining % len(fallback_ids)
+            for index, recruit_id in enumerate(fallback_ids):
+                add_points_to_entry(recruit_id, base + (1 if index < remainder else 0))
+            points_remaining = 0
+    elif lean_entries and points_remaining > 0:
+        lean_entries.sort(
+            key=lambda entry: (
+                _best_position((next((recruit for recruit in lean_matches if recruit.get("recruit_id") == entry.get("id")), {}) or {}).get("position_ratings") or {}).get("rating") or -1
+            ),
+            reverse=True,
+        )
+        if points_remaining < len(lean_entries):
+            for entry in random.sample(lean_entries, points_remaining):
+                entry["points"] = int(entry.get("points", 0) or 0) + 1
+            points_remaining = 0
+        elif len(lean_entries) == 1:
+            lean_entries[0]["points"] += points_remaining
+            points_remaining = 0
+        elif len(lean_entries) in {2, 3}:
+            lead_points = math.floor(points_remaining * 0.8)
+            remainder = points_remaining - lead_points
+            lean_entries[0]["points"] += lead_points
+            base = remainder // (len(lean_entries) - 1)
+            extra = remainder % (len(lean_entries) - 1)
+            for index, entry in enumerate(lean_entries[1:]):
+                entry["points"] += base + (1 if index < extra else 0)
+            points_remaining = 0
+        else:
+            lead_pool = lean_entries[:3]
+            chosen = random.choice(lead_pool)
+            lead_points = math.floor(points_remaining * 0.6)
+            remainder = points_remaining - lead_points
+            chosen["points"] += lead_points
+            others = lean_entries
+            base = remainder // len(others)
+            extra = remainder % len(others)
+            for index, entry in enumerate(others):
+                entry["points"] += base + (1 if index < extra else 0)
+            points_remaining = 0
+    return _normalize_week_35_recruiting_orders(entries)
+
+
+def _allowed_jersey_numbers(position: str) -> list[int]:
+    pos = str(position or "").upper()
+    if pos == "PG":
+        return list(range(0, 37))
+    if pos in {"SG", "SF"}:
+        return list(range(0, 46)) + [77]
+    return [number for number in range(0, 56) if number < 20 or number > 29] + [88, 91, 99]
+
+
+def _assign_jerseys_to_signed_players(
+    signed_players: list[dict[str, Any]],
+    franchise_id: str | ObjectId,
+) -> None:
+    team_to_existing_numbers: dict[str, set[int]] = defaultdict(set)
+    franchise_id_obj = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id_obj}, {"team_id": 1, "players": 1}))
+    roster_player_ids = []
+    for ftd_doc in ftd_docs:
+        for player_id in (ftd_doc.get("players") or []):
+            roster_player_ids.append(str(player_id))
+    fpd_map = _load_fpd_map(franchise_id, roster_player_ids)
+    for ftd_doc in ftd_docs:
+        team_id = str(ftd_doc.get("team_id"))
+        for player_id in (ftd_doc.get("players") or []):
+            player_id_str = str(player_id)
+            player_fpd = fpd_map.get(player_id_str)
+            if _is_graduating_year(_player_year_from_fpd_or_core(player_id_str, player_fpd)):
+                continue
+            meta = (player_fpd or {}).get("meta", {})
+            jersey = meta.get("jersey")
+            if jersey is None:
+                core_doc = db.players.find_one({"_id": player_id_str}, {"jersey": 1}) or {}
+                jersey = core_doc.get("jersey")
+            if isinstance(jersey, int):
+                team_to_existing_numbers[team_id].add(jersey)
+
+    for player in signed_players:
+        team_id = str(player.get("team_id") or "")
+        allowed = [number for number in _allowed_jersey_numbers(player.get("pos")) if number not in team_to_existing_numbers[team_id]]
+        if not allowed:
+            allowed = _allowed_jersey_numbers(player.get("pos"))
+        jersey = random.choice(allowed)
+        player["jersey"] = jersey
+        team_to_existing_numbers[team_id].add(jersey)
+
+
+def _generate_walk_on_profile() -> dict[str, Any]:
+    first_names, last_names = load_franchise_names()
+    attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+    attrs = {}
+    over_19 = 0
+    for key in attr_keys:
+        value = random.randint(1, 22)
+        if value > 19 and over_19 >= 3:
+            value = random.randint(1, 19)
+        if value > 19:
+            over_19 += 1
+        attrs[key] = value
+    attrs = Player.randomize_game_attributes(attrs)
+    first_name = random.choice(first_names)
+    last_name = random.choice(last_names).title()
+    name = f"{first_name} {last_name}"
+    height = random.randint(66, 72)
+    weight = random.randint(155, 179)
+    position_ratings = compute_position_ratings({
+        "attributes": attrs,
+        "height": height,
+        "name": name,
+    })
+    return {
+        "recruit_id": None,
+        "name": name,
+        "attributes": attrs,
+        "position_ratings": position_ratings,
+        "height": height,
+        "weight": weight,
+        "archetype": "Walk On",
+        "year": "Freshman",
+        "Home Region": "",
+    }
+
+
+def _current_team_capacity_state(franchise_id: ObjectId) -> dict[str, dict[str, Any]]:
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "players": 1, "scholarship_players": 1},
+    ))
+    roster_player_ids = []
+    for doc in ftd_docs:
+        roster_player_ids.extend([str(player_id) for player_id in (doc.get("players") or []) if player_id])
+    fpd_map = _load_fpd_map(franchise_id, roster_player_ids)
+    state: dict[str, dict[str, Any]] = {}
+    for doc in ftd_docs:
+        team_id = str(doc.get("team_id"))
+        players = [str(player_id) for player_id in (doc.get("players") or []) if player_id]
+        scholarship_players = {str(player_id) for player_id in (doc.get("scholarship_players") or []) if player_id}
+        returning_players = []
+        returning_scholarships = set()
+        for player_id in players:
+            if _is_graduating_year(_player_year_from_fpd_or_core(player_id, fpd_map.get(player_id))):
+                continue
+            returning_players.append(player_id)
+            if player_id in scholarship_players:
+                returning_scholarships.add(player_id)
+        state[team_id] = {
+            "roster_count": len(returning_players),
+            "scholarship_count": len(returning_scholarships),
+            "returning_players": returning_players,
+            "returning_scholarship_players": returning_scholarships,
+        }
+    return state
+
+
+def _choose_week_35_team_slots(chance_map: dict[str, int]) -> list[tuple[str, int]]:
+    if not chance_map:
+        return []
+    ordered = sorted(chance_map.items(), key=lambda item: (-item[1], item[0]))
+    grouped: dict[int, list[tuple[str, int]]] = defaultdict(list)
+    for team_id, value in ordered:
+        grouped[int(value)].append((team_id, value))
+    selected: list[tuple[str, int]] = []
+    for value in sorted(grouped.keys(), reverse=True):
+        group = grouped[value]
+        remaining_slots = 4 - len(selected)
+        if remaining_slots <= 0:
+            break
+        if len(group) <= remaining_slots:
+            selected.extend(group)
+            continue
+        selected.extend(random.sample(group, remaining_slots))
+        break
+    selected.sort(key=lambda item: (-item[1], item[0]))
+    return selected[:4]
+
+
+def _week_35_team_score(
+    team_id: str,
+    entry: dict[str, Any],
+    lean: dict[str, Any],
+    scholarship_offer_count: int,
+    pt_offer_count: int,
+) -> int:
+    assigned_points = int(entry.get("points", 0) or 0)
+    subtotal = 1 + assigned_points
+    if entry.get("playing_time"):
+        if 1 <= pt_offer_count <= 2:
+            subtotal += 7
+        elif pt_offer_count > 2:
+            subtotal += 4
+    multiplier = 1
+    if lean.get("1") == team_id:
+        multiplier = 5
+    elif lean.get("2") == team_id:
+        multiplier = 3
+    elif lean.get("3") == team_id:
+        multiplier = 2
+    return subtotal * multiplier
+
+
+def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
+    franchise_id = franchise_doc["_id"]
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
+    team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id")]
+    team_docs = {
+        str(doc["_id"]): doc
+        for doc in db.teams.find({"_id": {"$in": team_ids}})
+    }
+    recruits = list(franchise_recruits_data_collection.find({"franchise_id": str(franchise_id)}))
+    recruits.sort(key=lambda recruit: (_best_position(recruit.get("position_ratings") or {}).get("rating") or -1), reverse=True)
+    capacity = _current_team_capacity_state(franchise_id)
+
+    signed_players: list[dict[str, Any]] = []
+    signed_by_recruit_id: dict[str, dict[str, Any]] = {}
+
+    for recruit in recruits:
+        recruit_id = recruit.get("recruit_id")
+        if not recruit_id:
+            continue
+        chance_map: dict[str, int] = {}
+        scholarship_offers: list[str] = []
+        pt_offers: list[str] = []
+        lean = recruit.get("Lean") or {}
+        entries_by_team: dict[str, dict[str, Any]] = {}
+        for ftd_doc in ftd_docs:
+            team_id = str(ftd_doc.get("team_id"))
+            team_state = capacity.get(team_id, {})
+            if team_state.get("roster_count", 0) >= 15:
+                continue
+            orders = ftd_doc.get(RECRUITING_ORDERS_WEEK_35_FIELD) or {}
+            entry = next((value for value in orders.values() if isinstance(value, dict) and value.get("id") == recruit_id), None)
+            if not entry:
+                continue
+            entries_by_team[team_id] = entry
+            if entry.get("playing_time"):
+                pt_offers.append(team_id)
+            chance_map[team_id] = 0
+
+        if not chance_map:
+            continue
+
+        scholarship_offer_count = len(scholarship_offers)
+        pt_offer_count = len(pt_offers)
+        for team_id, entry in entries_by_team.items():
+            chance_map[team_id] = _week_35_team_score(
+                team_id,
+                entry,
+                lean,
+                scholarship_offer_count,
+                pt_offer_count,
+            )
+
+        eligible_chances = {team_id: value for team_id, value in chance_map.items() if value > 0}
+        if not eligible_chances:
+            continue
+        finalists = _choose_week_35_team_slots(eligible_chances)
+        total = sum(value for _, value in finalists)
+        if total <= 0:
+            continue
+        draw = random.randint(1, total)
+        running = 0
+        winner_team_id = None
+        for team_id, value in finalists:
+            running += value
+            if draw <= running:
+                winner_team_id = team_id
+                break
+        if not winner_team_id or winner_team_id not in team_docs:
+            continue
+
+        scholarship = False
+        playing_time = winner_team_id in pt_offers
+        signed_entry = _week_35_result_entry_from_recruit(
+            recruit,
+            team_docs[winner_team_id],
+            scholarship=scholarship,
+            playing_time=playing_time,
+            walk_on=False,
+        )
+        signed_players.append(signed_entry)
+        signed_by_recruit_id[recruit_id] = {
+            "team_id": winner_team_id,
+            "team_name": team_docs[winner_team_id].get("name", ""),
+            "walk_on": False,
+        }
+        capacity[winner_team_id]["roster_count"] += 1
+    for team_id, team_doc in team_docs.items():
+        while capacity.get(team_id, {}).get("roster_count", 0) < 15:
+            walk_on = _generate_walk_on_profile()
+            signed_players.append(
+                _week_35_result_entry_from_recruit(
+                    walk_on,
+                    team_doc,
+                    scholarship=False,
+                    playing_time=False,
+                    walk_on=True,
+                )
+            )
+            capacity[team_id]["roster_count"] += 1
+
+    _assign_jerseys_to_signed_players(signed_players, franchise_id)
+    return {
+        "generated_at": datetime.utcnow(),
+        "signed_players": signed_players,
+        "signed_by_recruit_id": signed_by_recruit_id,
+    }
+
+@router.get("/franchise/recruiting-data")
+def get_recruiting_data(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    fid = franchise_doc["_id"]
+
+    team_name, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
+        {"Recruits": 1, RECRUITING_ORDERS_WEEK_35_FIELD: 1},
+    )
+    saved_orders = ftd_doc.get("Recruits", {}) if ftd_doc else {}
+    saved_week_35_orders = ftd_doc.get(RECRUITING_ORDERS_WEEK_35_FIELD, {}) if ftd_doc else {}
+    week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_id)},
+            {"_id": 0, "franchise_id": 0},
+        )
+    )
+    team_name_map = {
+        str(team["_id"]): team.get("name", str(team["_id"]))
+        for team in db.teams.find({}, {"name": 1})
+    }
+
+    return {
+        "team": team_name,
+        "team_id": user_team_id,
+        "week": franchise_doc.get("week", 1),
+        "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,
+        "saved_orders": saved_orders,
+        "saved_orders_week_35": saved_week_35_orders,
+        "saved_order_entries_week_35": _week_35_order_entries(saved_week_35_orders),
+        "available_roster_spots": _calculate_available_roster_spots(fid, user_team_id),
+        "available_scholarships": _calculate_available_scholarships(fid, user_team_id),
+        "recruits": recruits,
+        "team_name_map": team_name_map,
+        "week_35_recruiting_results": week_35_results,
+        "week_35_recruiting_ran": bool(franchise_doc.get("week_35_recruiting_ran", False)),
+    }
+
+
+@router.get("/franchise/recruiting-results")
+def get_recruiting_results(
+    franchise_id: str,
+    week: int | None = None,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    requested_week = week if week is not None else int(franchise_doc.get("week", 1) or 1)
+    return _build_recruiting_results_payload(franchise_doc, requested_week)
+
+
+@router.get("/franchise/awards")
+def get_franchise_awards(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week < 35:
+        raise HTTPException(status_code=400, detail="Awards are not available until week 35")
+    awards = _persist_week_35_awards_if_needed(franchise_doc)
+    return awards
+
+
+@router.post("/franchise/recruiting-orders")
+def save_recruiting_orders(
+    req: SaveRecruitingOrdersRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    fid = franchise_doc["_id"]
+    week = int(franchise_doc.get("week", 1) or 1)
+    is_visit_window = 20 <= week <= 26
+    is_week_35_window = week == 35
+    if not is_visit_window and not is_week_35_window:
+        raise HTTPException(status_code=400, detail="Recruiting orders can only be saved during weeks 20-26 or week 35")
+
+    valid_recruit_ids = set(
+        franchise_recruits_data_collection.distinct(
+            "recruit_id",
+            {"franchise_id": str(req.franchise_id)},
+        )
+    )
+
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+
+    user_team_id_str = str(user_team_id)
+
+    if is_week_35_window:
+        order_entries = [
+            {
+                "id": str((entry or {}).get("id") or "").strip(),
+                "points": _safe_int((entry or {}).get("points", 0) or 0, 0),
+                "scholarship": False,
+                "playing_time": bool((entry or {}).get("playing_time", False)),
+            }
+            for entry in (req.order_entries or [])
+        ]
+        order_entries = [entry for entry in order_entries if entry["id"]]
+        if len(order_entries) > MAX_RECRUITING_ORDER_SLOTS:
+            raise HTTPException(status_code=400, detail=f"A maximum of {MAX_RECRUITING_ORDER_SLOTS} recruits can be ranked")
+        for entry in order_entries:
+            if entry["points"] < 0:
+                raise HTTPException(status_code=400, detail="Recruiting points cannot be negative")
+        recruit_ids = [entry["id"] for entry in order_entries]
+        if len(set(recruit_ids)) != len(recruit_ids):
+            raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
+        if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
+            raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+        if sum(int(entry.get("points", 0) or 0) for entry in order_entries) > WEEK_35_RECRUITING_POINTS_BUDGET:
+            raise HTTPException(status_code=400, detail="Recruiting orders cannot exceed 20 total recruiting points")
+
+        orders_payload = _normalize_week_35_recruiting_orders(order_entries)
+        franchise_team_data_collection.update_one(
+            {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
+            {
+                "$set": {
+                    RECRUITING_ORDERS_WEEK_35_FIELD: orders_payload,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+        team_docs = {
+            str(team["_id"]): team
+            for team in db.teams.find(
+                {"_id": {"$in": [doc["team_id"] for doc in franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1}) if doc.get("team_id")]}},
+                {"name": 1, "region": 1},
+            )
+        }
+        recruits = list(
+            franchise_recruits_data_collection.find(
+                {"franchise_id": str(req.franchise_id)},
+                {"_id": 0, "franchise_id": 0},
+            )
+        )
+        for team_id, team_doc in team_docs.items():
+            if team_id == user_team_id_str:
+                continue
+            existing = franchise_team_data_collection.find_one(
+                {"franchise_id": fid, "team_id": ObjectId(team_id)},
+                {RECRUITING_ORDERS_WEEK_35_FIELD: 1},
+            ) or {}
+            if existing.get(RECRUITING_ORDERS_WEEK_35_FIELD):
+                continue
+            franchise_team_data_collection.update_one(
+                {"franchise_id": fid, "team_id": ObjectId(team_id)},
+                {
+                    "$set": {
+                        RECRUITING_ORDERS_WEEK_35_FIELD: _build_cpu_week_35_orders(team_doc, recruits),
+                        "updated_at": datetime.utcnow(),
+                    }
+                },
+            )
+        return {"status": "success", "saved_orders_week_35": orders_payload, "results_week": None}
+
+    recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
+    if len(recruit_ids) > MAX_RECRUITING_ORDER_SLOTS:
+        raise HTTPException(status_code=400, detail=f"A maximum of {MAX_RECRUITING_ORDER_SLOTS} recruits can be ranked")
+    if len(set(recruit_ids)) != len(recruit_ids):
+        raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
+    if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
+        raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+
+    orders_payload = _normalize_recruiting_orders(recruit_ids)
+    franchise_team_data_collection.update_one(
+        {"franchise_id": fid, "team_id": ObjectId(user_team_id_str)},
+        {
+            "$set": {
+                "Recruits": orders_payload,
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+    return {"status": "success", "saved_orders": orders_payload, "results_week": None}
+
+
+@router.post("/franchise/run-week-35-recruiting")
+def run_week_35_recruiting(
+    req: RunWeek35RecruitingRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    if int(franchise_doc.get("week", 1) or 1) != 35:
+        raise HTTPException(status_code=400, detail="Week 35 recruiting can only run during week 35")
+    if franchise_doc.get("week_35_recruiting_ran"):
+        raise HTTPException(status_code=400, detail="Week 35 recruiting has already run")
+
+    fid = franchise_doc["_id"]
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        raise HTTPException(status_code=404, detail="User team not selected")
+
+    user_ftd = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
+        {RECRUITING_ORDERS_WEEK_35_FIELD: 1},
+    ) or {}
+    if not user_ftd.get(RECRUITING_ORDERS_WEEK_35_FIELD):
+        raise HTTPException(status_code=400, detail="Recruiting orders must be saved before recruiting can run")
+
+    results = _run_week_35_signings(franchise_doc)
+    db.franchises.update_one(
+        {"_id": fid},
+        {
+            "$set": {
+                "week": 36,
+                "week_35_recruiting_ran": True,
+                WEEK_35_RECRUITING_RESULTS_FIELD: results,
+            }
+        },
+    )
+    return {"status": "success", "week": 36, "results": results}
 
 
 @router.get("/franchise/debug-names")
@@ -2854,8 +5018,11 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     if not team_doc:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # ✅ FPD: Get franchise player data from franchise_players_data (not franchise.players)
-    team_player_ids = team_doc.get("player_ids", [])
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_doc["_id"]},
+        {"players": 1},
+    ) or {}
+    team_player_ids = ftd_doc.get("players") or team_doc.get("player_ids", [])
     pid_list = [str(pid) for pid in team_player_ids]
     franchise_query_start = time.time()
     fpd_docs = list(franchise_players_data_collection.find(
@@ -2887,6 +5054,10 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
             "last_name": meta.get("last_name", ""),
             "attributes": (fpd.get("attributes") or {}).copy(),
             "position_ratings": fpd.get("position_ratings") or {},
+            "height": meta.get("height"),
+            "weight": meta.get("weight"),
+            "jersey": meta.get("jersey"),
+            "year": meta.get("year"),
         }
     players = build_roster_players(pids_with_fpd, mode_overrides, core_players_dict, team_name)
     processing_time = time.time() - processing_start
@@ -2895,6 +5066,90 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/roster COMPLETE: {total_time:.3f}s")
     return {"players": players}
+
+
+@router.post("/franchise/cut-players")
+def cut_franchise_players(
+    req: CutPlayersRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    fid = franchise_doc["_id"]
+    user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_name or not user_team_object_id:
+        raise HTTPException(status_code=404, detail="User team not found in franchise")
+
+    cut_state = _week_1_cut_requirement(franchise_doc, fid, user_team_object_id)
+    if not cut_state.get("cut_required"):
+        raise HTTPException(status_code=400, detail="No player cuts are currently required")
+
+    required_cut_count = int(cut_state.get("cut_count", 0) or 0)
+    requested_ids = [str(player_id) for player_id in (req.player_ids or []) if player_id]
+    if len(requested_ids) != required_cut_count or len(set(requested_ids)) != required_cut_count:
+        raise HTTPException(status_code=400, detail=f"You must cut exactly {required_cut_count} players")
+
+    team_object_id = ObjectId(user_team_object_id)
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"players": 1, "scholarship_players": 1, "training_squad_players": 1, "playing_time_promise_players": 1},
+    ) or {}
+    roster_player_ids = [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+    if not set(requested_ids).issubset(set(roster_player_ids)):
+        raise HTTPException(status_code=400, detail="One or more selected players are not on your roster")
+
+    fpd_map = _load_fpd_map(fid, roster_player_ids)
+    cut_names = []
+    for player_id in requested_ids:
+        fpd_doc = fpd_map.get(player_id) or {}
+        meta = (fpd_doc.get("meta") or {})
+        name = " ".join(part for part in [meta.get("first_name", ""), meta.get("last_name", "")] if part).strip() or player_id
+        cut_names.append(name)
+
+    remaining_roster_ids = [player_id for player_id in roster_player_ids if player_id not in set(requested_ids)]
+    if len(remaining_roster_ids) != 12:
+        raise HTTPException(status_code=400, detail="Cuts must leave exactly 12 players on the roster")
+
+    remaining_scholarships = [
+        str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
+        if str(player_id) in remaining_roster_ids
+    ]
+    remaining_training_squad = [
+        str(player_id) for player_id in (ftd_doc.get("training_squad_players") or [])
+        if str(player_id) in remaining_roster_ids
+    ]
+    remaining_ptp = [
+        str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
+        if str(player_id) in remaining_roster_ids
+    ]
+
+    total_player_attrs = 0
+    for player_id in remaining_roster_ids:
+        attrs = (fpd_map.get(player_id) or {}).get("attributes") or {}
+        total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
+
+    franchise_team_data_collection.update_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {
+            "$set": {
+                "players": remaining_roster_ids,
+                "scholarship_players": remaining_scholarships,
+                "training_squad_players": remaining_training_squad,
+                "playing_time_promise_players": remaining_ptp,
+                "total_player_attrs": total_player_attrs,
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+    franchise_players_data_collection.delete_many(
+        {"franchise_id": str(fid), "player_id": {"$in": requested_ids}}
+    )
+
+    return {
+        "status": "success",
+        "cut_count": required_cut_count,
+        "cut_names": cut_names,
+        "remaining_roster_count": len(remaining_roster_ids),
+    }
 
 
 @router.get("/franchise/scouting-report")
@@ -3007,7 +5262,8 @@ def get_training_points(franchise_id: str):
     
     return {
         "training_points": training_points,
-        "is_first_training": is_first_training
+        "is_first_training": is_first_training,
+        "week": week,
     }
 
 
@@ -3055,15 +5311,25 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     week = franchise_doc.get("week", 1)
     results = franchise_doc.get("results", {})
     
-    if training_status.get("training_disabled_for_eos", False) and week >= 15:
-        raise HTTPException(
-            status_code=400,
-            detail="Training is disabled for remaining EOS weeks after elimination.",
-        )
-    
     # Check if it's first training (training camp) - week 1 and no results yet
     is_first_training = (week == 1 and not results.get("1"))
     expected_points = 30 if is_first_training else 24
+    recruiting_results = franchise_doc.get("recruiting_results", {}) or {}
+
+    if 20 <= week <= 26 and str(week) not in recruiting_results:
+        _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        if not user_team_object_id:
+            raise HTTPException(status_code=404, detail="User team not found in franchise document")
+        if week == 20:
+            user_ftd = franchise_team_data_collection.find_one(
+                {"franchise_id": franchise_id, "team_id": ObjectId(user_team_object_id)},
+                {"Recruits": 1},
+            ) or {}
+            if not _team_order_list(user_ftd.get("Recruits")):
+                raise HTTPException(
+                    status_code=400,
+                    detail="You must save recruiting orders before running training in week 20",
+                )
     
     # Validate total training points allocated
     training_data = req.training_data
@@ -3104,6 +5370,19 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_id or not user_team_object_id:
         raise HTTPException(status_code=404, detail="User team not found in franchise document")
+
+    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
+        eos_status = _get_user_eos_phase_status(franchise_doc, str(user_team_object_id), week)
+        if eos_status.get("eliminated_from_current_phase"):
+            raise HTTPException(
+                status_code=400,
+                detail="Training is disabled for the current EOS phase after elimination.",
+            )
+        if eos_status.get("has_bye_this_week"):
+            raise HTTPException(
+                status_code=400,
+                detail="Training is not available during an EOS bye week.",
+            )
     
     # Use franchise document's user_team_object_id as authoritative team_id
     team_id = user_team_object_id
@@ -3113,6 +5392,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     team_doc = db.teams.find_one({"_id": ObjectId(team_id)})
     if not team_doc:
         raise HTTPException(status_code=404, detail=f"Team not found: {team_id}")
+    team_object_id = team_doc["_id"]
     
     # Log if req.team_id was provided but doesn't match (for debugging)
     if req.team_id and req.team_id != team_id:
@@ -3122,11 +5402,17 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(req.franchise_id)}))
     franchise_players = {d["player_id"]: d for d in fpd_docs}
 
-    # Get player_ids from team document (team_doc already validated above)
-    team_player_ids = team_doc.get("player_ids", [])
+    # ✅ FTD: Use franchise roster order instead of universal team.player_ids
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id, "team_id": ObjectId(team_id)}
+    )
+    if not ftd_doc:
+        raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {team_id}")
+
+    team_player_ids = ftd_doc.get("players") or team_doc.get("player_ids", [])
     if not team_player_ids:
         raise HTTPException(status_code=404, detail=f"No player_ids on team for team_id: {team_id}")
-    
+
     # Build player list with franchise-specific attributes
     players_load_start = time.time()
     players_for_training = []
@@ -3136,48 +5422,21 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         if not franchise_player_data:
             continue
         
-        # Get year from core player data
-        player_query_start = time.time()
-        core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
-        player_query_time = (time.time() - player_query_start) * 1000
-        if player_query_time > 100:  # Only log slow queries (>100ms)
-            # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: players.find_one(_id={pid_str}): {player_query_time:.2f}ms")
-            pass
-        if not core_player:
-            try:
-                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
-                core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
-            except:
-                pass
-        
+        meta = franchise_player_data.get("meta", {})
         # Build player dict for training
         player = {
             "_id": pid_str,
-            "first_name": franchise_player_data.get("meta", {}).get("first_name", ""),
-            "last_name": franchise_player_data.get("meta", {}).get("last_name", ""),
+            "first_name": meta.get("first_name", ""),
+            "last_name": meta.get("last_name", ""),
             "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
             "attributes": franchise_player_data.get("attributes", {}),
             "position_ratings": franchise_player_data.get("position_ratings", {}),
-            "year": core_player.get("year") if core_player else None
+            "year": meta.get("year")
         }
         players_for_training.append(player)
 
     if not players_for_training:
         raise HTTPException(status_code=404, detail="No players found for training")
-
-    # ✅ FTD: Load team data from FTD collection instead of franchise doc
-    from BackEnd.db import franchise_team_data_collection
-    try:
-        team_object_id = ObjectId(team_id)
-    except:
-        raise HTTPException(status_code=400, detail=f"Invalid team_id format: {team_id}")
-    
-    ftd_doc = franchise_team_data_collection.find_one(
-        {"franchise_id": franchise_id, "team_id": team_object_id}
-    )
-    
-    if not ftd_doc:
-        raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {team_id}")
     
     # Get team stats (team_attributes) from FTD
     team_stats = ftd_doc.get("team_attributes", {}).copy()
@@ -3286,16 +5545,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     
     for player in players_for_training:
         pid = player["_id"]
-        # Get player's height (from core collection or franchise meta)
-        # Try as string first (UUID), fall back to ObjectId if that fails
-        core_player = db.players.find_one({"_id": pid}, {"height": 1})
-        if not core_player:
-            try:
-                # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
-                core_player = db.players.find_one({"_id": pid}, {"height": 1})
-            except:
-                pass
-        height = core_player.get("height") if core_player else None
+        meta = (franchise_players.get(pid) or {}).get("meta", {})
+        height = meta.get("height")
+        if height is None:
+            core_player = db.players.find_one({"_id": pid}, {"height": 1}) or {}
+            height = core_player.get("height")
         
         # Build player dict for position ratings calculation with updated attributes
         player_for_ratings = {
@@ -3358,6 +5612,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         logger.info(f"✅ [TRAINING] Saving scouting_data to FTD")
     else:
         logger.warning(f"⚠️ [TRAINING] updated_scouting_data is None, preserving existing scouting_data")
+    if is_first_training:
+        ftd_update["training_squad_players"] = []
+
+    if 20 <= week <= 26 and str(week) not in recruiting_results:
+        _process_weekly_recruiting_invites(franchise_doc)
 
     # Mark training as completed and update status (still in franchise doc)
     session_type = training_status.get("session_type", "in-season")
@@ -3393,180 +5652,113 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
             {"$set": ftd_update}
         )
 
-    # ✅ Run training for all computer teams (in unison with user team training)
-    # Each computer team gets random allocations and random coaching focus
-    # Each team gets separate randomizations for pre-training decay and training
-    
-    # ✅ FTD: Get all FTD documents for this franchise (computer teams)
+    # ✅ Distant training: all non-user teams use template-based training (Distant_Team_Training_System.md)
+    # During EOS weeks, skip training for teams eliminated from tournament (Franchise_Tournament_System.md)
     all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
-    ftd_by_team_id = {str(doc["team_id"]): doc for doc in all_ftd_docs}
-    
-    for computer_team_id in ftd_by_team_id.keys():
-        # Skip user's team (already processed above)
-        if str(computer_team_id) == str(team_id):
-            continue
-        
-        try:
-            # Get team document to get team name and player_ids
-            computer_team_doc = db.teams.find_one({"_id": ObjectId(computer_team_id)})
-            if not computer_team_doc:
-                logger.warning(f"⚠️ [COMPUTER TRAINING] Team document not found for team_id: {computer_team_id}")
+    training_type = "tc" if is_first_training else "regular"
+    eliminated_team_ids = set()
+    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
+        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
+    distant_templates = list(db["distant_training"].find({"training_type": training_type}))
+    if not distant_templates:
+        logger.warning(f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams")
+    else:
+        for ftd_doc in all_ftd_docs:
+            computer_team_oid = ftd_doc.get("team_id")
+            if computer_team_oid is None:
                 continue
-            
-            computer_team_name = computer_team_doc.get("name", "")
-            computer_team_player_ids = computer_team_doc.get("player_ids", [])
-            
-            if not computer_team_player_ids:
-                logger.warning(f"⚠️ [COMPUTER TRAINING] No player_ids found for team_id: {computer_team_id}")
+            computer_team_id_str = str(computer_team_oid)
+            if computer_team_id_str == str(team_id):
                 continue
-            
-            # Build player list with franchise-specific attributes
-            computer_players_for_training = []
-            for pid in computer_team_player_ids:
-                pid_str = str(pid)
-                computer_franchise_player_data = franchise_players.get(pid_str, {})
-                if not computer_franchise_player_data:
-                    continue
-
-                # Match user-team training path: include class year so year-based
-                # decay and max adjustments are applied correctly for CPU teams.
-                computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
-                if not computer_core_player:
-                    try:
-                        # Player IDs are UUID strings; keep direct lookup.
-                        computer_core_player = db.players.find_one({"_id": pid_str}, {"year": 1})
-                    except Exception:
-                        computer_core_player = None
-                
-                # Build player dict for training
-                player = {
-                    "_id": pid_str,
-                    "first_name": computer_franchise_player_data.get("meta", {}).get("first_name", ""),
-                    "last_name": computer_franchise_player_data.get("meta", {}).get("last_name", ""),
-                    "team": computer_team_name or computer_team_id,
-                    "attributes": computer_franchise_player_data.get("attributes", {}),
-                    "position_ratings": computer_franchise_player_data.get("position_ratings", {}),
-                    "year": computer_core_player.get("year") if computer_core_player else None,
-                }
-                computer_players_for_training.append(player)
-            
-            if not computer_players_for_training:
-                logger.warning(f"⚠️ [COMPUTER TRAINING] No players found for training for team_id: {computer_team_id}")
+            if computer_team_id_str in eliminated_team_ids:
                 continue
-            
-            # ✅ FTD: Get team data from FTD
-            computer_ftd_doc = ftd_by_team_id.get(str(computer_team_id), {})
-            computer_team_stats = computer_ftd_doc.get("team_attributes", {}).copy()
-            
-            # Get plays, game plan settings, and playbook settings from FTD
-            computer_plays_data = computer_ftd_doc.get("plays", {})
-            computer_strategy_settings = computer_ftd_doc.get("strategy_settings", {})
-            computer_playbook_settings = computer_ftd_doc.get("playbook_settings", {})
-            computer_scouting_data = computer_ftd_doc.get("scouting_data", {})
-            
-            # Initialize plays_data if empty
-            if not computer_plays_data:
-                from BackEnd.api.gameplan_routes import populate_team_plays
-                computer_plays_data = populate_team_plays(mode="franchise")
-            
-            # Initialize scouting_data if empty or missing defense structure
-            if not computer_scouting_data or "defense" not in computer_scouting_data:
-                from BackEnd.models.team_manager import TeamManager
-                temp_team = TeamManager(name=computer_team_name or computer_team_id, mode="franchise")
-                computer_scouting_data = temp_team.scouting_data
-            
-            # Generate random training allocations and coaching focus
-            computer_allocations = generate_random_training_allocations(expected_points)
-            computer_coaching_focus = generate_random_coaching_focus()
-            
-            # Execute training for computer team (includes pre-training conditions and effectiveness decay)
-            # Each team gets separate randomizations (handled by execute_training internally)
-            # Skip pre-training depreciation for first training (training camp) - before any games are played
-            updated_computer_players, updated_computer_team, updated_computer_plays, updated_computer_scouting_data, _ = execute_training(
-                computer_players_for_training,
-                computer_team_stats,
-                computer_allocations,
-                computer_coaching_focus,
-                plays_data=computer_plays_data,
-                strategy_settings=computer_strategy_settings,
-                playbook_settings=computer_playbook_settings,
-                scouting_data=computer_scouting_data,
-                playbook_training_mode="all-plays-even",  # Use even distribution for computer teams
-                skip_pre_training_depreciation=is_first_training  # Skip depreciation for first training (training camp)
-            )
-            
-            # ✅ FTD: Build computer team FTD update
-            computer_ftd_update = {}
-            
-            # Recalculate position ratings for each computer player after training
-            for player in updated_computer_players:
-                pid = player["_id"]
-                core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                if not core_player:
-                    try:
-                        # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
-                        core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                    except:
-                        pass
-                height = core_player.get("height") if core_player else None
-                
-                player_for_ratings = {
-                    "attributes": player.get("attributes", {}),
-                    "height": height,
-                    "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
-                }
-                
-                new_ratings = compute_position_ratings(player_for_ratings)
-                franchise_players_data_collection.update_one(
-                    {"franchise_id": str(req.franchise_id), "player_id": pid},
-                    {"$set": {"position_ratings": new_ratings}},
-                )
-
-            # ✅ FPD: Update computer team players' attributes in franchise_players_data
-            for player in updated_computer_players:
-                pid = player["_id"]
-                attrs = player.get("attributes", {})
-                fpd_set = {}
-                for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO"]:
-                    anchor_key = f"anchor_{attr}"
-                    if anchor_key in attrs:
-                        fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
-                        fpd_set[f"attributes.{attr}"] = attrs[attr]
-                if "NG" in attrs:
-                    fpd_set["attributes.NG"] = attrs["NG"]
-                if fpd_set:
-                    franchise_players_data_collection.update_one(
-                        {"franchise_id": str(req.franchise_id), "player_id": pid},
-                        {"$set": fpd_set},
+            try:
+                template = random.choice(distant_templates)
+                team_values = template.get("team_values", {})
+                players_template = template.get("players", {})
+                current_team_attrs = ftd_doc.get("team_attributes", {})
+                ftd_update = {}
+                for attr_name, delta in team_values.items():
+                    if attr_name not in TEAM_ATTR_CLAMPS:
+                        continue
+                    current = current_team_attrs.get(attr_name, 0)
+                    if isinstance(current, (int, float)) and isinstance(delta, (int, float)):
+                        lower, upper = TEAM_ATTR_CLAMPS[attr_name]
+                        delta_val = float(delta) if attr_name == "rebound_modifier" else int(delta)
+                        new_val = current + delta_val
+                        if upper is not None:
+                            new_val = max(lower, min(upper, new_val))
+                        else:
+                            new_val = max(lower, new_val)
+                        if attr_name == "rebound_modifier":
+                            new_val = round(new_val, 2)
+                        else:
+                            new_val = int(round(new_val))
+                        ftd_update[f"team_attributes.{attr_name}"] = new_val
+                if ftd_update:
+                    franchise_team_data_collection.update_one(
+                        {"franchise_id": franchise_id, "team_id": computer_team_oid},
+                        {"$set": ftd_update},
                     )
+                player_order = ftd_doc.get("players")
+                if not player_order:
+                    team_doc = db.teams.find_one({"_id": computer_team_oid}, {"player_ids": 1})
+                    player_order = [str(pid) for pid in (team_doc.get("player_ids") or [])] if team_doc else []
+                else:
+                    player_order = [str(pid) for pid in player_order]
+                for i in range(min(12, len(player_order))):
+                    pid = player_order[i]
+                    player_key = f"player_{i}"
+                    if player_key not in players_template:
+                        continue
+                    fpd = franchise_players.get(pid)
+                    if not fpd:
+                        continue
+                    deltas = players_template[player_key]
+                    current_attrs = fpd.get("attributes", {})
+                    fpd_set = {}
+                    for attr_name, delta in deltas.items():
+                        if not isinstance(delta, (int, float)):
+                            continue
+                        current = current_attrs.get(attr_name, 0) or current_attrs.get(f"anchor_{attr_name}", 0)
+                        try:
+                            cur = int(current) if isinstance(current, (int, float)) else 0
+                        except (TypeError, ValueError):
+                            cur = 0
+                        new_val = cur + int(delta)
+                        new_val = max(PLAYER_ATTR_CLAMP[0], new_val)
+                        fpd_set[f"attributes.{attr_name}"] = new_val
+                        fpd_set[f"attributes.anchor_{attr_name}"] = new_val
+                    if fpd_set:
+                        franchise_players_data_collection.update_one(
+                            {"franchise_id": str(franchise_id), "player_id": pid},
+                            {"$set": fpd_set},
+                        )
+                    core_player = db.players.find_one({"_id": pid}, {"height": 1})
+                    height = core_player.get("height") if core_player else None
+                    updated_attrs = dict(current_attrs)
+                    for k, v in fpd_set.items():
+                        if k.startswith("attributes."):
+                            updated_attrs[k.replace("attributes.", "")] = v
+                    meta = fpd.get("meta", {})
+                    player_for_ratings = {
+                        "attributes": updated_attrs,
+                        "height": height,
+                        "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}",
+                    }
+                    new_ratings = compute_position_ratings(player_for_ratings)
+                    franchise_players_data_collection.update_one(
+                        {"franchise_id": str(franchise_id), "player_id": pid},
+                        {"$set": {"position_ratings": new_ratings}},
+                    )
+                logger.info(f"✅ [DISTANT TRAINING] Applied template for team_id={computer_team_id_str}")
+            except Exception as e:
+                logger.error(f"❌ [DISTANT TRAINING] Error for team_id={computer_team_id_str}: {e}", exc_info=True)
+                continue
 
-            # Update computer team stats (team_attributes) in FTD
-            for field, value in updated_computer_team.items():
-                # Skip non-numeric fields
-                if isinstance(value, dict):
-                    continue
-                computer_ftd_update[f"team_attributes.{field}"] = value
-            
-            # Update computer team plays and scouting data in FTD
-            if updated_computer_plays:
-                computer_ftd_update["plays"] = updated_computer_plays
-            
-            if updated_computer_scouting_data:
-                computer_ftd_update["scouting_data"] = updated_computer_scouting_data
-            
-            # ✅ FTD: Write computer team updates to FTD collection
-            if computer_ftd_update:
-                franchise_team_data_collection.update_one(
-                    {"franchise_id": franchise_id, "team_id": ObjectId(computer_team_id)},
-                    {"$set": computer_ftd_update}
-                )
-            
-            logger.info(f"✅ [COMPUTER TRAINING] Completed training for computer team: {computer_team_name} ({computer_team_id})")
-        
-        except Exception as e:
-            logger.error(f"❌ [COMPUTER TRAINING] Error training computer team {computer_team_id}: {str(e)}")
-            continue
-    
+    if is_first_training:
+        _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
+
     # Save to franchise document (includes both user team and computer teams)
     db_update_start = time.time()
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
@@ -3675,7 +5867,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": doc_id_obj, "team_id": team_object_id},
-                {"training_reports": 1, "team_attributes": 1}
+                {"training_reports": 1, "team_attributes": 1, "players": 1}
             )
             
             if ftd_doc:
@@ -3708,14 +5900,15 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(doc_id)}))
             franchise_players = {d["player_id"]: d for d in fpd_docs}
 
-            # ✅ SS&S: Load team_doc from teams collection to get player_ids (canonical list)
-            # This is more efficient and reliable than iterating all players and matching by team_id
-            team_doc = db.teams.find_one({"_id": ObjectId(authoritative_team_id)})
-            if not team_doc:
-                raise HTTPException(status_code=404, detail=f"Team not found: {authoritative_team_id}")
-            
-            team_player_ids = team_doc.get("player_ids", [])
-            logger.info(f"🔍 [TRAINING REPORT] Using team_doc.player_ids: {len(team_player_ids)} players")
+            team_player_ids = (ftd_doc or {}).get("players") or []
+            if not team_player_ids:
+                team_doc = db.teams.find_one({"_id": ObjectId(authoritative_team_id)})
+                if not team_doc:
+                    raise HTTPException(status_code=404, detail=f"Team not found: {authoritative_team_id}")
+                team_player_ids = team_doc.get("player_ids", [])
+                logger.info(f"🔍 [TRAINING REPORT] Fallback to team_doc.player_ids: {len(team_player_ids)} players")
+            else:
+                logger.info(f"🔍 [TRAINING REPORT] Using FTD.players: {len(team_player_ids)} players")
             logger.info(f"🔍 [TRAINING REPORT] Total franchise players: {len(franchise_players)}")
             
             for pid in team_player_ids:
@@ -3765,7 +5958,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                     players.append({
                         "id": pid_str,
                         "name": player_name,
-                        "attributes": player_attrs
+                        "attributes": player_attrs,
+                        "position_ratings": player_data.get("position_ratings", {}),
                     })
             
             logger.info(f"🔍 [TRAINING REPORT] Found {len(players)} players for team {team_id_str}")
@@ -3900,7 +6094,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                     players.append({
                         "id": pid_str,
                         "name": player_name,
-                        "attributes": player_attrs
+                        "attributes": player_attrs,
+                        "position_ratings": tournament_player_data.get("position_ratings", {}),
                     })
             
             # Get current team attributes from tournament teams (matches Franchise pattern)
@@ -3961,185 +6156,232 @@ class FinishSeasonRequest(BaseModel):
 
 @router.post("/franchise/sim-rest-of-tournament")
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
-    """Simulate all remaining games in the current tournament round."""
+    """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise_id format")
-    
+
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    eos_tournament = franchise_doc.get("eos_tournament", {})
-    if not eos_tournament:
-        raise HTTPException(status_code=400, detail="EOS Tournament not initialized")
-    
-    current_round = eos_tournament.get("current_round", 1)
-    bracket = eos_tournament.get("bracket", {})
-    round_name = get_round_name(current_round)
-    matchups = bracket.get(round_name, [])
-    
-    # Get current week (15, 16, or 17)
-    week = franchise_doc.get("week", 15)
-    
-    # Simulate all incomplete matchups in current round
-    for i, matchup in enumerate(matchups):
-        if matchup.get("winner"):
-            continue  # Already completed
-        
-        home_id = ObjectId(matchup["home_team"])
-        away_id = ObjectId(matchup["away_team"])
-        
+
+    week = franchise_doc.get("week", ScheduleManager.REGULAR_SEASON_WEEKS + 1)
+    if week not in ft.EOS_WEEKS:
+        raise HTTPException(status_code=400, detail="Not in EOS weeks (27–34)")
+
+    eos_active = bool(
+        franchise_doc.get("eos_tournament_active")
+        and (franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament"))
+    )
+    if not eos_active:
+        raise HTTPException(status_code=400, detail="EOS tournaments not active")
+
+    week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+    if not week_games_meta:
+        raise HTTPException(status_code=400, detail="No games in current EOS round (e.g. week 30 with all double-winners)")
+
+    _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "prestige": 1, "total_player_attrs": 1},
+    ))
+    ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+
+    results = []
+    for g in week_games_meta:
+        away_id = g["away_id"]
+        home_id = g["home_id"]
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
         away_name = away_doc.get("name", "")
-        
-        if not home_name or not away_name:
-            logger.error(f"❌ [EOS TOURNAMENT] Could not find team names for matchup {i}")
+        if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
+            home_ftd = ftd_by_team_id.get(str(home_id), {})
+            away_ftd = ftd_by_team_id.get(str(away_id), {})
+            home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
+            away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            winner_id = home_id if home_score > away_score else away_id
+            score = {"home": home_score, "away": away_score}
+            if g["phase"] == "conference":
+                ft.save_conference_game_result(
+                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                    "", str(winner_id), score,
+                )
+            elif g["phase"] == "region":
+                ft.save_region_game_result(
+                    franchise_doc, g["region"], g["round"], g["matchup_index"],
+                    "", str(winner_id), score,
+                )
+            elif g["phase"] == "national":
+                ft.save_national_game_result(
+                    franchise_doc, g["round"], g["matchup_index"],
+                    "", str(winner_id), score,
+                )
+            results.append({
+                "away_id": str(away_id),
+                "home_id": str(home_id),
+                "away_score": away_score,
+                "home_score": home_score,
+            })
+            logger.info("✅ [EOS] Distant-simmed %s: %s vs %s", g["phase"], away_id, home_id)
             continue
-        
+
+        if not home_name or not away_name:
+            logger.error("❌ [EOS] Missing team names for sim round")
+            continue
         try:
-            # Run simulation
             gm = run_simulation(home_name, away_name)
             home_score = gm.score.get(home_name, 0)
             away_score = gm.score.get(away_name, 0)
             summary = summarize_game_state(gm)
-            
-            # Save game to database
-            from BackEnd.utils.game_id_utils import generate_game_id
             game_id = generate_game_id()
             summary["_id"] = game_id
             summary["franchise_id"] = str(franchise_id)
             summary["week"] = week
             db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-            
-            # Finalize game stats
             stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
-            
-            # Determine winner
             winner_id = home_id if home_score > away_score else away_id
-            
-            # Save result to bracket
-            save_tournament_game_result(
-                franchise_doc,
-                current_round,
-                i,
-                str(game_id),
-                str(winner_id),
-                {"home": home_score, "away": away_score}
-            )
-            
-            # Update franchise document
-            db.franchises.update_one(
-                {"_id": franchise_id},
-                {"$set": {"eos_tournament": eos_tournament}}
-            )
-            
-            logger.info(f"✅ [EOS TOURNAMENT] Simulated Round {current_round}, Matchup {i}: {home_name} vs {away_name}")
-        
+            score = {"home": home_score, "away": away_score}
+            if g["phase"] == "conference":
+                ft.save_conference_game_result(
+                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
+                    str(game_id), str(winner_id), score,
+                )
+            elif g["phase"] == "region":
+                ft.save_region_game_result(
+                    franchise_doc, g["region"], g["round"], g["matchup_index"],
+                    str(game_id), str(winner_id), score,
+                )
+            elif g["phase"] == "national":
+                ft.save_national_game_result(
+                    franchise_doc, g["round"], g["matchup_index"],
+                    str(game_id), str(winner_id), score,
+                )
+            results.append({
+                "away_id": str(away_id),
+                "home_id": str(home_id),
+                "away_score": away_score,
+                "home_score": home_score,
+            })
+            logger.info("✅ [EOS] Simulated %s: %s vs %s", g["phase"], away_name, home_name)
         except Exception as e:
-            logger.error(f"❌ [EOS TOURNAMENT] Error simulating matchup {i}: {e}", exc_info=True)
-            continue
-    
-    # Advance round if all matchups complete
-    franchise_doc = db.franchises.find_one({"_id": franchise_id})
-    eos_tournament = advance_tournament_round(franchise_doc, db.teams)
-    new_round = eos_tournament.get("current_round", current_round)
-    payload = {"eos_tournament": eos_tournament}
-    if new_round > current_round:
-        payload["week"] = 14 + new_round
-    db.franchises.update_one(
-        {"_id": franchise_id},
-        {"$set": payload}
-    )
-    
-    return {"status": "success", "round": current_round}
+            logger.error("❌ [EOS] Error simulating game: %s", e, exc_info=True)
+
+    existing_results = franchise_doc.get("results", {})
+    existing_results[str(week)] = results
+    update_fields = {"results": existing_results}
+    # After advancing the round, cue user to run training for the new week (e.g. bye in week 30 → sim → week 31 → "Run Training")
+    update_fields["training_status.training_completed"] = False
+    update_fields["training_status.session_type"] = "in-season"
+
+    if week in ft.EOS_CONFERENCE_WEEKS:
+        for c in range(1, 17):
+            ft.advance_conference_bracket(franchise_doc, c)
+        update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
+        if week == ft.EOS_CONFERENCE_WEEKS[-1]:
+            eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
+                {"franchise_id": franchise_id}, {"team_id": 1}
+            ) if d.get("team_id")]
+            update_fields["region_tournaments"] = ft.initialize_region_tournaments(
+                franchise_doc, db.teams, team_ids=eos_team_ids
+            )
+            update_fields["week"] = ft.EOS_REGION_WEEKS[0]
+        else:
+            update_fields["week"] = week + 1
+    elif week in ft.EOS_REGION_WEEKS:
+        update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
+        if week == ft.EOS_REGION_WEEKS[-1]:
+            region_champions = ft.get_region_champions(franchise_doc)
+            team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
+                {"franchise_id": franchise_id}, {"team_id": 1}
+            ) if d.get("team_id")]
+            update_fields["national_tournament"] = ft.initialize_national_tournament(
+                franchise_doc, db.teams, region_champions,
+                franchise_doc.get("results", {}), team_ids,
+            )
+            update_fields["week"] = ft.EOS_NATIONAL_WEEKS[0]
+        else:
+            update_fields["week"] = ft.EOS_REGION_WEEKS[1]
+    elif week in ft.EOS_NATIONAL_WEEKS:
+        ft.advance_national_bracket(franchise_doc)
+        update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
+        if week == ft.EOS_NATIONAL_WEEKS[-1]:
+            update_fields["eos_tournament_active"] = False
+            update_fields["week"] = 35
+        else:
+            update_fields["week"] = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
+
+    db.franchises.update_one({"_id": franchise_id}, {"$set": update_fields})
+    if update_fields.get("week") == 35:
+        refreshed = db.franchises.find_one({"_id": franchise_id})
+        if refreshed:
+            _persist_week_35_awards_if_needed(refreshed)
+    return {"status": "success", "week": update_fields.get("week", week)}
 
 
 @router.post("/franchise/sim-championship")
 def sim_championship(req: SimChampionshipRequest):
-    """Simulate the championship game (Final round)."""
+    """Simulate the national championship game (week 34 final)."""
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise_id format")
-    
+
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    eos_tournament = franchise_doc.get("eos_tournament", {})
-    if not eos_tournament:
-        raise HTTPException(status_code=400, detail="EOS Tournament not initialized")
-    
-    bracket = eos_tournament.get("bracket", {})
+
+    national_tournament = franchise_doc.get("national_tournament", {})
+    if not national_tournament:
+        raise HTTPException(status_code=400, detail="National tournament not initialized")
+
+    bracket = national_tournament.get("bracket", {})
     final = bracket.get("final", [])
-    
-    if not final or len(final) == 0:
+    if not final or not final[0]:
         raise HTTPException(status_code=400, detail="Final round not ready")
-    
     if final[0].get("winner"):
         raise HTTPException(status_code=400, detail="Championship already completed")
-    
+
     matchup = final[0]
     home_id = ObjectId(matchup["home_team"])
     away_id = ObjectId(matchup["away_team"])
-    
     home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
     away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
     home_name = home_doc.get("name", "")
     away_name = away_doc.get("name", "")
-    
     if not home_name or not away_name:
         raise HTTPException(status_code=400, detail="Could not find team names")
-    
-    week = 17  # Championship is always week 17
-    
+
+    week = ft.EOS_NATIONAL_WEEKS[-1]
     try:
-        # Run simulation
         gm = run_simulation(home_name, away_name)
         home_score = gm.score.get(home_name, 0)
         away_score = gm.score.get(away_name, 0)
         summary = summarize_game_state(gm)
-        
-        # Save game to database
-        from BackEnd.utils.game_id_utils import generate_game_id
         game_id = generate_game_id()
         summary["_id"] = game_id
         summary["franchise_id"] = str(franchise_id)
         summary["week"] = week
         db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-        
-        # Finalize game stats
         stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
-        
-        # Determine winner
         winner_id = home_id if home_score > away_score else away_id
-        
-        # Save result to bracket
-        save_tournament_game_result(
-            franchise_doc,
-            3,  # Final round
-            0,  # Only one matchup
-            str(game_id),
-            str(winner_id),
-            {"home": home_score, "away": away_score}
+        ft.save_national_game_result(
+            franchise_doc, 3, 0, str(game_id), str(winner_id),
+            {"home": home_score, "away": away_score},
         )
-        
-        # Mark tournament as complete
-        eos_tournament["completed"] = True
-        eos_tournament["champion"] = str(winner_id)
-        
-        # Update franchise document
+        ft.advance_national_bracket(franchise_doc)
+        national_tournament = franchise_doc.get("national_tournament", {})
         db.franchises.update_one(
             {"_id": franchise_id},
-            {"$set": {"eos_tournament": eos_tournament}}
+            {"$set": {"national_tournament": national_tournament, "eos_tournament_active": False, "week": 35}}
         )
-        
-        logger.info(f"✅ [EOS TOURNAMENT] Championship complete! Winner: {str(winner_id)}")
-        
+        refreshed = db.franchises.find_one({"_id": franchise_id})
+        if refreshed:
+            _persist_week_35_awards_if_needed(refreshed)
+        logger.info("✅ [EOS] National championship complete! Winner: %s", winner_id)
         return {
             "status": "success",
             "winner": str(winner_id),
@@ -4150,11 +6392,10 @@ def sim_championship(req: SimChampionshipRequest):
             "home_team_name": home_name,
             "away_team_name": away_name,
             "home_score": home_score,
-            "away_score": away_score
+            "away_score": away_score,
         }
-    
     except Exception as e:
-        logger.error(f"❌ [EOS TOURNAMENT] Error simulating championship: {e}", exc_info=True)
+        logger.error("❌ [EOS] Error simulating championship: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -4173,29 +6414,185 @@ def finish_season(req: FinishSeasonRequest):
     # Get current season
     current_season = franchise_doc.get("current_season", 1)
     next_season = current_season + 1
-    
-    # Initialize new season (same logic as initial season initialization)
+
     from BackEnd.models.franchise_manager import FranchiseManager
+
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
+    fpd_by_id = {doc["player_id"]: doc for doc in fpd_docs if doc.get("player_id")}
+    week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+    signed_players = list(week_35_results.get("signed_players") or [])
+    zero_stats = _zero_stats_block()
+
+    def advance_year(year_value: str | None) -> str:
+        year = str(year_value or "").strip().lower()
+        mapping = {
+            "freshman": "Sophomore",
+            "sophomore": "Junior",
+            "junior": "Senior",
+        }
+        return mapping.get(year, str(year_value or "Freshman").title())
+
+    next_fpd_docs: list[dict[str, Any]] = []
+    returning_players_by_team: dict[str, list[str]] = defaultdict(list)
+    returning_scholarships_by_team: dict[str, set[str]] = defaultdict(set)
+
+    for ftd_doc in ftd_docs:
+        team_id = str(ftd_doc.get("team_id"))
+        scholarship_players = {str(player_id) for player_id in (ftd_doc.get("scholarship_players") or []) if player_id}
+        for player_id in (ftd_doc.get("players") or []):
+            player_id_str = str(player_id)
+            fpd_doc = fpd_by_id.get(player_id_str)
+            if not fpd_doc:
+                continue
+            meta = (fpd_doc.get("meta") or {}).copy()
+            year = _player_year_from_fpd_or_core(player_id_str, fpd_doc)
+            if _is_graduating_year(year):
+                continue
+            meta["year"] = advance_year(year)
+            next_doc = {
+                "franchise_id": str(franchise_id),
+                "player_id": player_id_str,
+                "meta": meta,
+                "season": zero_stats.copy(),
+                "career": (fpd_doc.get("career") or zero_stats.copy()),
+                "attributes": (fpd_doc.get("attributes") or {}).copy(),
+                "position_ratings": (fpd_doc.get("position_ratings") or {}).copy(),
+            }
+            next_fpd_docs.append(next_doc)
+            returning_players_by_team[team_id].append(player_id_str)
+            if player_id_str in scholarship_players:
+                returning_scholarships_by_team[team_id].add(player_id_str)
+
+    signed_players_by_team: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for signed_player in signed_players:
+        team_id = str(signed_player.get("team_id") or "")
+        if not team_id:
+            continue
+        signed_players_by_team[team_id].append(signed_player)
+        name_parts = str(signed_player.get("name") or "").split(" ", 1)
+        first_name = name_parts[0] if name_parts else ""
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        next_fpd_docs.append({
+            "franchise_id": str(franchise_id),
+            "player_id": str(signed_player["player_id"]),
+            "meta": {
+                "first_name": first_name,
+                "last_name": last_name,
+                "team": signed_player.get("team_name", ""),
+                "team_id": team_id,
+                "height": signed_player.get("height"),
+                "weight": signed_player.get("weight"),
+                "year": "Freshman",
+                "jersey": signed_player.get("jersey"),
+                "archetype": signed_player.get("archetype"),
+            },
+            "season": zero_stats.copy(),
+            "career": zero_stats.copy(),
+            "attributes": (signed_player.get("attributes") or {}).copy(),
+            "position_ratings": (signed_player.get("position_ratings") or {}).copy(),
+        })
+
+    next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
+
+    def highest_rt(player_id: str) -> int:
+        return int((_best_position((next_fpd_map.get(player_id) or {}).get("position_ratings") or {}).get("rating") or 0))
+
+    for ftd_doc in ftd_docs:
+        team_id = str(ftd_doc.get("team_id"))
+        roster = list(returning_players_by_team.get(team_id, []))
+        scholarship_players = set(returning_scholarships_by_team.get(team_id, set()))
+        pt_promise_players = []
+        for signed_player in signed_players_by_team.get(team_id, []):
+            player_id = str(signed_player["player_id"])
+            roster.append(player_id)
+            if signed_player.get("scholarship"):
+                scholarship_players.add(player_id)
+            if signed_player.get("playing_time"):
+                pt_promise_players.append(player_id)
+        ordered_roster = sorted(roster, key=highest_rt, reverse=True)
+
+        total_player_attrs = 0
+        for player_id in ordered_roster:
+            attrs = (next_fpd_map.get(player_id) or {}).get("attributes") or {}
+            total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
+
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": ftd_doc["team_id"]},
+            {
+                "$set": {
+                    "players": ordered_roster,
+                    "scholarship_players": sorted(scholarship_players, key=highest_rt, reverse=True),
+                    "training_squad_players": [],
+                    "playing_time_promise_players": pt_promise_players,
+                    "Recruits": {str(i): None for i in range(1, 21)},
+                    RECRUITING_ORDERS_WEEK_35_FIELD: {},
+                    "recruit_visit": None,
+                    "training_reports": {},
+                    "total_player_attrs": total_player_attrs,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+
+    franchise_players_data_collection.delete_many({"franchise_id": str(franchise_id)})
+    if next_fpd_docs:
+        franchise_players_data_collection.insert_many(next_fpd_docs)
+
     fm = FranchiseManager(db)
-    
-    # Get user team info
-    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-    
-    # Initialize new season
-    fm.initialize_season(
-        user_team_id=user_team_id,
-        user_team_object_id=user_team_object_id
-    )
-    
-    # Update franchise document
+    fm.franchise_id = franchise_id
+    schedule = fm.schedule_manager.generate_schedule()
+    recruits = fm.recruit_manager.generate_recruits_list(count=300)
+    region_team_ids = fm._build_region_team_map()
+
+    franchise_recruits_data_collection.delete_many({"franchise_id": str(franchise_id)})
+    frd_docs = [
+        {
+            "franchise_id": str(franchise_id),
+            "recruit_id": str(uuid.uuid4()),
+            "name": recruit["name"],
+            "attributes": recruit["attributes"],
+            "position_ratings": recruit["position_ratings"],
+            "height": recruit["height"],
+            "weight": recruit["weight"],
+            "archetype": recruit["archetype"],
+            "year": recruit["year"],
+            "Home Region": home_region,
+            "Lean": fm._build_recruit_lean(home_region, region_team_ids),
+            "created_at": recruit["created_at"],
+        }
+        for recruit in recruits
+        for home_region in [random.choice(list(region_team_ids.keys()))]
+    ]
+    if frd_docs:
+        franchise_recruits_data_collection.insert_many(frd_docs)
+
+    db.games.delete_many({"franchise_id": str(franchise_id)})
+    awards_reset = {}
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": {
             "current_season": next_season,
             "week": 1,
+            "results": {},
+            "schedule": schedule,
             "eos_tournament_active": False,
+            "conference_tournaments": {},
+            "region_tournaments": {},
+            "national_tournament": {},
+            "recruiting_results": {},
+            "recruiting_lean_updates_applied": {},
+            "week_35_recruiting_ran": False,
+            WEEK_35_RECRUITING_RESULTS_FIELD: {},
+            AWARDS_FIELD: awards_reset,
             "training_status.training_completed": False,
-            "training_status.session_type": "preseason"
+            "training_status.session_type": "preseason",
+            "training_status.training_disabled_for_eos": False,
+            "stats.top_10_points": [],
+            "stats.top_10_rebounds": [],
+            "stats.top_10_assists": [],
+            "stats.top_10_blocks": [],
+            "stats.top_10_steals": [],
         }}
     )
     

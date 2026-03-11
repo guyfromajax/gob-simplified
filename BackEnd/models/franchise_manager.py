@@ -1,5 +1,6 @@
 import random
 import time
+from collections import Counter
 from datetime import datetime
 from itertools import combinations, permutations
 from pathlib import Path
@@ -99,10 +100,40 @@ class FranchiseManager:
         self.db = db
         self.teams = self.load_teams()
         self.week = 1
+        # Phase 1: 26-week schedule for all 128 teams (conference → region → OOR).
         self.schedule_manager = ScheduleManager(self.teams)
         self.recruit_manager = RecruitManager(self.db)
         self.schedule = []
         self.franchise_id = None
+
+    def _build_region_team_map(self) -> dict[str, list[str]]:
+        region_map: dict[str, list[str]] = {r: [] for r in "ABCDEFGH"}
+        for team in self.teams:
+            region = str(team.get("region") or "").upper()
+            if len(region) == 1 and region in region_map:
+                region_map[region].append(str(team["_id"]))
+        return region_map
+
+    def _build_recruit_lean(self, home_region: str, region_team_ids: dict[str, list[str]]) -> dict[str, str | None]:
+        lean = {"1": None, "2": None, "3": None}
+        team_ids = list(region_team_ids.get(home_region, []))
+        if not team_ids:
+            lean["1"] = "open"
+            return lean
+
+        if random.random() < 0.75:
+            lean["1"] = "open"
+            return lean
+
+        first_team_id = random.choice(team_ids)
+        lean["1"] = first_team_id
+
+        if random.random() < 0.20:
+            remaining = [team_id for team_id in team_ids if team_id != first_team_id]
+            if remaining:
+                lean["2"] = random.choice(remaining)
+
+        return lean
 
     def load_teams(self):
         return list(self.db.teams.find())
@@ -134,7 +165,7 @@ class FranchiseManager:
         if start_week_env:
             try:
                 w = int(start_week_env)
-                if 1 <= w <= 14:
+                if 1 <= w <= ScheduleManager.REGULAR_SEASON_WEEKS:
                     self.week = w
                     logger.info("FRANCHISE_START_WEEK=%s: starting franchise at week %s (testing)", start_week_env, self.week)
             except ValueError:
@@ -165,7 +196,7 @@ class FranchiseManager:
         _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1}
         )
         for p in players:
             from BackEnd.models.player import Player
@@ -175,6 +206,10 @@ class FranchiseManager:
                 "first_name": p.get("first_name", ""),
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
+                "height": p.get("height"),
+                "weight": p.get("weight"),
+                "year": p.get("year"),
+                "jersey": p.get("jersey"),
             }
             tid = p.get("team_id")
             if tid is not None:
@@ -217,7 +252,7 @@ class FranchiseManager:
 
         _t0 = time.time()
         # Generate initial recruits for the franchise
-        recruits = self.recruit_manager.generate_recruits_list()
+        recruits = self.recruit_manager.generate_recruits_list(count=300)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
@@ -225,6 +260,8 @@ class FranchiseManager:
         extra_state = {
             "players": {},  # FPD holds player data; empty here for legacy safety
             "recruits": [],  # FRD holds recruit data; empty here for legacy safety
+            "recruiting_results": {},
+            "recruiting_lean_updates_applied": {},
             "applied_games": [],
             "training_status": training_status,
             # Add missing document-level fields (matches Tournament pattern)
@@ -267,6 +304,10 @@ class FranchiseManager:
         ensure_fpd_index()
         ensure_frd_index()
 
+        # New season flow rewrites FPD/FRD for the current franchise.
+        franchise_players_data_collection.delete_many({"franchise_id": str(self.franchise_id)})
+        franchise_recruits_data_collection.delete_many({"franchise_id": str(self.franchise_id)})
+
         # ✅ FPD: Batch insert (one round-trip instead of N)
         fpd_docs = [
             {
@@ -285,6 +326,8 @@ class FranchiseManager:
             franchise_players_data_collection.insert_many(fpd_docs)
         _perf["fpd_insert_many"] = (time.time() - _t0) * 1000
 
+        region_team_ids = self._build_region_team_map()
+
         # ✅ FRD: Batch insert (one round-trip instead of N)
         frd_docs = [
             {
@@ -297,14 +340,51 @@ class FranchiseManager:
                 "weight": recruit["weight"],
                 "archetype": recruit["archetype"],
                 "year": recruit["year"],
+                "Home Region": home_region,
+                "Lean": self._build_recruit_lean(home_region, region_team_ids),
                 "created_at": recruit["created_at"],
             }
             for recruit in recruits
+            for home_region in [random.choice(list(region_team_ids.keys()))]
         ]
         _t0 = time.time()
         if frd_docs:
             franchise_recruits_data_collection.insert_many(frd_docs)
         _perf["frd_insert_many"] = (time.time() - _t0) * 1000
+
+        # National rank: total_player_attrs (from universal players) + randomized prestige; rank 1-128, ties broken randomly
+        CORE_ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+
+        def _player_attr_sum(attrs):
+            if not attrs:
+                return 0
+            return sum(int(attrs.get(k, 0) or 0) for k in CORE_ATTR_KEYS if isinstance(attrs.get(k), (int, float)))
+
+        _t0 = time.time()
+        team_name_to_total_attrs = {}
+        for p in self.db.players.find({}, {"team": 1, "attributes": 1}):
+            tname = (p.get("team") or "").strip()
+            if tname:
+                team_name_to_total_attrs[tname] = team_name_to_total_attrs.get(tname, 0) + _player_attr_sum(p.get("attributes") or {})
+        _perf["team_total_attrs_agg"] = (time.time() - _t0) * 1000
+
+        # Build (team_object_id, team_name, total_player_attrs, prestige_ftd); prestige = universal + rand(-30, 30), clamp >= 0
+        # total_player_attrs: use universal team doc if present, else computed from players (see Mode_Init_System.md)
+        rows = []
+        for team in self.teams:
+            team_object_id = team["_id"]
+            team_name = team.get("name") or ""
+            total_attrs = team.get("total_player_attrs") if team.get("total_player_attrs") is not None else team_name_to_total_attrs.get(team_name, 0)
+            base_prestige = int(team.get("prestige") or 0)
+            prestige_ftd = max(0, base_prestige + random.randint(-30, 30))
+            rows.append((team_object_id, team_name, total_attrs, prestige_ftd))
+
+        # Sort by (total_attrs + prestige_ftd) desc; break ties randomly
+        rows.sort(key=lambda r: (-(r[2] + r[3]), random.random()))
+        team_id_to_rank_data = {}
+        for rank, (team_object_id, _name, total_attrs, prestige_ftd) in enumerate(rows, start=1):
+            team_id_to_rank_data[team_object_id] = {"prestige": prestige_ftd, "total_player_attrs": total_attrs, "natl_rank": rank}
+        _perf["natl_rank_compute"] = (time.time() - _t0) * 1000
 
         _t0 = time.time()
         for team in self.teams:
@@ -333,16 +413,30 @@ class FranchiseManager:
             team_player_ids = team.get("player_ids", [])
             players = [str(pid) for pid in team_player_ids]
 
+            rank_data = team_id_to_rank_data.get(team_object_id, {})
+            prestige_ftd = rank_data.get("prestige", 0)
+            total_player_attrs = rank_data.get("total_player_attrs", 0)
+            natl_rank = rank_data.get("natl_rank", 128)
+
             ftd_doc = {
                 "franchise_id": self.franchise_id,
                 "team_id": team_object_id,
                 "players": players,
+                "scholarship_players": players[:12],
+                "training_squad_players": players[12:15],
+                "playing_time_promise_players": [],
+                "Recruits": {str(i): None for i in range(1, 21)},
+                "recruiting_orders_week_35": {},
+                "recruit_visit": None,
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
                 "playbook_settings": playbook_settings.copy(),
                 "plays": populated_plays.copy(),
                 "scouting_data": scouting_data.copy(),
                 "training_reports": {},
+                "prestige": prestige_ftd,
+                "total_player_attrs": total_player_attrs,
+                "natl_rank": natl_rank,
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
             }
@@ -386,7 +480,7 @@ class FranchiseManager:
             )
 
     def run_week(self):
-        if self.week > 14:
+        if self.week > ScheduleManager.REGULAR_SEASON_WEEKS:
             return "Regular season complete"
         games = self.schedule[self.week - 1]
         for team1_id, team2_id in games:
@@ -506,38 +600,158 @@ class FranchiseManager:
     # /franchise/stats → aggregate from self.db.players (stats.season)
     # /franchise/recruits → use self.db.recruits.find()
 
+def _double_round_robin_8(team_ids):
+    """Generate 14 rounds of 4 games (away_id, home_id) for 8 teams. Double round-robin, 1H/1A per pair."""
+    if len(team_ids) != 8:
+        raise ValueError("_double_round_robin_8 expects exactly 8 team IDs.")
+    teams = list(team_ids)
+    random.shuffle(teams)
+    schedule = []
+    for round_index in range(7):
+        week = []
+        for i in range(4):
+            home = teams[i]
+            away = teams[-i - 1]
+            if round_index % 2 == 0:
+                week.append((away, home))
+            else:
+                week.append((home, away))
+        schedule.append(week)
+        teams = [teams[0]] + [teams[-1]] + teams[1:-1]
+    mirrored = [(home, away) for week in schedule for (away, home) in week]
+    schedule += [mirrored[i : i + 4] for i in range(0, len(mirrored), 4)]
+    return schedule
+
+
+def _validate_schedule_one_game_per_team_per_week(schedule, expected_teams=128):
+    """Ensure every week has each of expected_teams playing exactly one game. O(weeks * games)."""
+    for week_idx, week_games in enumerate(schedule):
+        counts = Counter()
+        for away_id, home_id in week_games:
+            counts[str(away_id)] += 1
+            counts[str(home_id)] += 1
+        if len(counts) != expected_teams:
+            raise ValueError(
+                "Schedule validation failed: week %d has %d distinct teams (expected %d)."
+                % (week_idx + 1, len(counts), expected_teams)
+            )
+        if any(c != 1 for c in counts.values()):
+            bad = [tid for tid, c in counts.items() if c != 1]
+            raise ValueError(
+                "Schedule validation failed: week %d has teams playing != 1 game: %s."
+                % (week_idx + 1, bad[:5])
+            )
+
+
 class ScheduleManager:
+    """
+    Phase 1 franchise schedule: 26 weeks for 128 teams.
+    Weeks 1–14: conference (14 games per team, 64 games/week).
+    Weeks 15–22: region (8 games per team, 64 games/week).
+    Weeks 23–26: out-of-region (4 games per team, 64 games/week).
+    """
+
+    REGULAR_SEASON_WEEKS = 26
+    CONFERENCE_WEEKS = 14
+    REGION_WEEKS = 8
+    OOR_WEEKS = 4
+
     def __init__(self, teams):
-        self.teams = [team["_id"] for team in teams]
+        """
+        Args:
+            teams: List of team docs with _id, conference (1–16), region ("A"–"H").
+        """
+        self.teams = teams
+        self._by_conference = None
+        self._by_region = None
+
+    def _index_teams(self):
+        if self._by_conference is not None:
+            return
+        by_conf = {}
+        by_region = {}
+        for t in self.teams:
+            c = t.get("conference")
+            r = t.get("region")
+            if c is not None:
+                by_conf.setdefault(c, []).append(t["_id"])
+            if r is not None:
+                by_region.setdefault(r, []).append(t["_id"])
+        self._by_conference = by_conf
+        self._by_region = by_region
 
     def generate_schedule(self):
-        if len(self.teams) != 8:
-            raise ValueError("This round-robin generator expects exactly 8 teams.")
-
-        teams = list(self.teams)
-        random.shuffle(teams)  # Randomize starting order
-
-        schedule = []
-
-        for round_index in range(len(teams) - 1):
+        """Return 26 weeks, each a list of (away_id, home_id). 64 games per week."""
+        self._index_teams()
+        if len(self.teams) != 128:
+            raise ValueError(
+                "Franchise schedule expects exactly 128 teams, got %d." % len(self.teams)
+            )
+        out = []
+        # Weeks 1–14: conference block
+        conf_rounds = []
+        for c in range(1, 17):
+            ids = self._by_conference.get(c, [])
+            if len(ids) != 8:
+                raise ValueError(
+                    "Conference %d has %d teams, expected 8." % (c, len(ids))
+                )
+            conf_rounds.append(_double_round_robin_8(ids))
+        for w in range(self.CONFERENCE_WEEKS):
             week = []
-            for i in range(len(teams) // 2):
-                home = teams[i]
-                away = teams[-i - 1]
-                # Alternate home/away each round
-                if round_index % 2 == 0:
-                    week.append((away, home))  # away at home
-                else:
-                    week.append((home, away))  # away at home
-            schedule.append(week)
-            # Rotate the teams (keep the first fixed)
-            teams = [teams[0]] + [teams[-1]] + teams[1:-1]
+            for conf_sched in conf_rounds:
+                week.extend(conf_sched[w])
+            out.append(week)
 
-        # Second half of season: reverse home/away of first 7 weeks
-        mirrored_schedule = [(home, away) for week in schedule for (away, home) in week]
-        schedule += [mirrored_schedule[i:i+4] for i in range(0, len(mirrored_schedule), 4)]
+        # Weeks 15–22: region block (sister-conference matchups). 8 weeks, 64 games/week.
+        region_letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
+        region_weeks = []
+        for round_idx in range(8):
+            week = []
+            for r in region_letters:
+                conf1, conf2 = (ord(r) - ord("A")) * 2 + 1, (ord(r) - ord("A")) * 2 + 2
+                c1_ids = self._by_conference.get(conf1, [])
+                c2_ids = self._by_conference.get(conf2, [])
+                for i in range(8):
+                    j = (i + round_idx) % 8
+                    if i in [(round_idx + k) % 8 for k in range(4)]:
+                        week.append((c2_ids[j], c1_ids[i]))
+                    else:
+                        week.append((c1_ids[i], c2_ids[j]))
+            region_weeks.append(week)
+        out = out[: self.CONFERENCE_WEEKS] + region_weeks
 
-        return schedule
+        # Weeks 23–26: out-of-region. Each team gets 2 home and 2 away OOR games.
+        # Rotate which 8 teams in each region are home each week: week w uses indices
+        # (w*4+j)%16 for j in 0..7 as home, (w*4+8+j)%16 as away.
+        pairings = [
+            [("A", "B"), ("C", "D"), ("E", "F"), ("G", "H")],
+            [("A", "C"), ("B", "D"), ("E", "G"), ("F", "H")],
+            [("A", "D"), ("B", "C"), ("E", "H"), ("F", "G")],
+            [("A", "E"), ("B", "F"), ("C", "G"), ("D", "H")],
+        ]
+        for week_idx, pairing_list in enumerate(pairings):
+            week = []
+            for r1, r2 in pairing_list:
+                ids1 = self._by_region.get(r1, [])
+                ids2 = self._by_region.get(r2, [])
+                if len(ids1) != 16 or len(ids2) != 16:
+                    raise ValueError(
+                        "Region %s or %s has wrong size." % (r1, r2)
+                    )
+                w = week_idx
+                # 8 games: r1 home (r1 indices (w*4+j)%16), r2 away (same slot pattern)
+                for i in range(8):
+                    week.append((ids2[(w * 4 + i) % 16], ids1[(w * 4 + i) % 16]))
+                # 8 games: r1 away, r2 home (use other 8 from r2 as home: (w*4+8+i)%16)
+                for i in range(8):
+                    week.append((ids1[(w * 4 + 8 + i) % 16], ids2[(w * 4 + 8 + i) % 16]))
+            out.append(week)
+
+        # Randomize week order: same 14 conf + 8 region + 4 OOR blocks, shuffled each new season
+        random.shuffle(out)
+        _validate_schedule_one_game_per_team_per_week(out)
+        return out
 
 class RecruitManager:
     """Manage recruit generation using optional external name data."""
@@ -714,4 +928,3 @@ class RecruitManager:
             return random.randint(195, 231)
         else:  # > 80
             return random.randint(209, 260)
-

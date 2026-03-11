@@ -44,6 +44,11 @@ def reset_user_state(
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id required")
 
+    # Cascade: delete games linked to this user's tournaments (same as franchise games)
+    tournament_docs = list(tournaments_collection.find({"user_id": user_id}, {"_id": 1}))
+    tournament_ids = [str(doc["_id"]) for doc in tournament_docs]
+    if tournament_ids:
+        db.games.delete_many({"tournament_id": {"$in": tournament_ids}})
     # Delete tournaments for this user
     tr = tournaments_collection.delete_many({"user_id": user_id})
     tournaments_deleted = tr.deleted_count

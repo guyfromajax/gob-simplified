@@ -3,7 +3,7 @@
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: -10 to 190)
+   - `shot_threshold` - Shot attempt threshold (range: 10 to 210)
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4)
@@ -20,6 +20,8 @@
    - **Franchise**: Most attributes use `random.randint(-1, 1)`, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
 
 3. **Initialization Source**: Universal `teams` collection in MongoDB → Team objects → Fallback to `TeamManager.init_team_attributes()`
+
+4. **Attribute clamp ranges**: See **Attribute_Clamp_System.md** for absolute min/max clamp values for all player and team attributes.
 
 ## System Flow
 
@@ -43,7 +45,7 @@ The Team Attribute Management System handles the initialization, storage, and up
 All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
-- `shot_threshold` - Shot attempt threshold (range: -10 to 190, center at 90 for pill display)
+- `shot_threshold` - Shot attempt threshold (range: 10 to 210, center at 110 for pill display)
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
 - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4, center at 0.2 for pill display)
@@ -66,14 +68,14 @@ All team attributes are stored in team objects across all game modes:
 **Single Game & Tournament Mode:**
 - Attribute range: `random.randint(-10, 10)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(-10, 190)`
+- `shot_threshold`: `random.randint(10, 210)` (clamped to same range; see Attribute_Clamp_System.md)
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
 **Franchise Mode:**
 - Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(-10, 190)`
+- `shot_threshold`: `random.randint(100, 120)` (within clamp range 10–210; see Attribute_Clamp_System.md)
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 

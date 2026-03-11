@@ -17,21 +17,47 @@
 8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
 9. **Pre-Training Decay**: Plays/defenses with effectiveness > 0 reduced by `random.randint(5, 15)`
 
-**Training System Flow (13 Steps)**
+**Training System Flow (16 Steps)**
 
 1. **Page Load**: Frontend fetches training points from `/franchise/training-points` endpoint (30 for training camp, 24 for regular training)
 2. **User Allocates Points**: User distributes training points (30 or 24) across 20 sliders (player drills, team drills, general)
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
-4. **Submit Training**: Frontend sends POST request to `/franchise/run-training` with training data
-5. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
-6. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
-7. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
-8. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for training camp: week 1 before first games)
-9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
-10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
-11. **Attribute Clamping**: All values clamped to valid ranges (player: min 1, team: defined ranges)
-12. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
-13. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
+4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to `recruiting-orders.html`
+5. **Submit Training**: Frontend sends POST request to `/franchise/run-training` with training data
+6. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
+   - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
+7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
+8. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
+9. **Pre-Training Conditions**: Random decreases applied to player/team attributes (excluding EM, MO, NG) (skipped for training camp: week 1 before first games)
+10. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
+11. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
+12. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
+13. **Weeks 20-26 Recruiting Invite Processing**: During recruiting invite season, `Submit Training` also runs that week's recruiting invite processing using the user's saved recruiting orders plus CPU weekly recruiting logic
+14. **User Team Report Generation**: Training report stored, player/team attributes updated, redirect to report page
+15. **Computer Team Training**: All computer teams run training in unison (random allocations, random focus, no reports)
+16. **Post-Training Camp Cuts**: After week 1 training camp only, any team above 12 players must reduce to a legal 12-player roster before gameplay resumes.
+
+### Post-Training Camp Cut Flow
+
+- **Trigger:** Only after franchise week 1 training camp is completed.
+- **User Team:**
+  - If user roster size is greater than 12 when the user returns to FCC from the training report, FCC shows a modal:
+    - `You need to cut X players`
+  - Main FCC CTA becomes `Cut Players`
+  - User is routed to `cut-players.html`
+  - `cut-players.html` shows the full roster table plus a `Players To Cut` checkbox column
+  - `Submit Cuts` is active only when exactly `roster_size - 12` players are checked
+  - Confirmation modal copy:
+    - `You are going to cut {player name}, {player name}, and {player name}. This cannot be undone. Are you sure you want to proceed with the cuts?`
+  - Success modal copy:
+    - `{player name}, {player name}, and {player name} have been cut.`
+  - After successful cuts, user returns to FCC and normal weekly cadence resumes
+- **CPU Teams:**
+  - After week 1 training camp, any CPU team above 12 players automatically cuts down to 12
+  - Cut rule:
+    - lowest RT first
+    - RT tie -> older year first (`Senior`, `Junior`, `Sophomore`, `Freshman`)
+    - remaining tie -> random
 
 **Long Form Documentation**
 
@@ -169,7 +195,7 @@ The training execution system applies pre-training conditions, allocates trainin
 
 4. **Attribute Clamping**
    - Player attributes: Minimum 1, no maximum
-   - Team attributes: Clamped to defined ranges (see `TEAM_ATTR_CLAMPS` in code)
+   - Team attributes: Clamped to defined ranges (see **Attribute_Clamp_System.md** for full list; implemented as `TEAM_ATTR_CLAMPS` in `training_execution_v2.py`)
 
 5. **Training Report Generation**
    - Calculates changes from original baselines
@@ -210,6 +236,12 @@ The training execution system applies pre-training conditions, allocates trainin
 - 3 points: `+= random.randint(2, 4)`
 - 4 points: `+= random.randint(3, 5)`
 - 5 points: `+= random.randint(3, 6)`
+
+**High Attribute Gain Reduction**
+- If a player's starting value for a trained attribute at the beginning of the training session is `> 100`, any positive gain to that attribute is reduced by `50%`, using rounded integer value.
+- Example: if a player starts training with `SH = 102` and rolls a gain of `+5`, the applied gain becomes `+3`.
+- This check uses the player's value at the start of training, not the running updated value during the session.
+- If a player starts training at `99` and gains `+6`, the full `+6` applies even if the player finishes above `100`.
 
 **Year-Based Adjustments:**
 Leave minimums as is, only change maximums
@@ -362,8 +394,9 @@ After training is submitted, users are automatically redirected to the training 
 **Player Report Section:**
 - Header: "Player Report"
 - Toggle between "Attributes" and "Training Changes" views
+- **Player Order:** Players are displayed by highest `RT` value, descending. If two players share the same highest `RT`, their existing roster/report order is the tiebreaker.
 - **Attributes View:** Shows current attribute values after training
-  - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM
+  - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, RT
   - **Note:** MO (Momentum) is excluded from Training Report display
   - **Attribute Formatting:**
     - **SC through FT (first 12):** Displayed as integer values
@@ -379,18 +412,20 @@ After training is submitted, users are automatically redirected to the training 
       - Red fill on left side for negative momentum
       - Yellow center line at 50%
       - No integer value displayed on top of pill
+    - **RT:** Static highest position-rating value for the player
   - **Tooltip Feature:** Hovering over any attribute value displays the training change for that attribute
     - Green tooltip for positive changes (e.g., "+5")
     - Red tooltip for negative changes (e.g., "-3")
     - Black tooltip for zero changes
     - Tooltip appears above the attribute value
   - **Training Changes View:** Shows net changes from training
-  - **Attribute Order:** Same exact order as Attributes view (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM)
+  - **Attribute Order:** Same exact order as Attributes view (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, RT)
   - **Note:** MO (Momentum) is excluded from Training Report display
   - Only displays attributes that have changes (maintains order)
   - Positive changes: Green text with `+` prefix
   - Negative changes: Red text with `-` prefix
   - Zero changes: Black text
+  - **RT Column:** Static highest position-rating value; does not toggle to a delta/change view
   - **Aggregated Total Row:** Bottom row displays "Total" in the first column and sums all attribute changes across all players
     - Styled with gold background highlight and bold text
     - Provides quick overview of total training impact
@@ -518,7 +553,8 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 2. **Training Report Display:**
    - Frontend loads training report data from `/franchise/training-report` endpoint
    - Backend resolves team_id (handles both name and ID formats)
-   - Backend retrieves players from `franchise.players` collection (filtered by `meta.team_id`)
+   - Backend retrieves players from franchise-instance `FPD`
+   - Franchise player membership comes from `FTD.players` (not universal `teams.player_ids`)
    - Backend retrieves training report from `franchise_teams.{team_id}.training_reports.{week}`
    - Frontend renders players table and team attributes with visualizations
 
@@ -563,7 +599,7 @@ In Franchise mode, when the user submits training for their team, all computer t
 - **Process**:
   1. Iterate through all teams in `franchise_teams` (skipping user's team)
   2. For each computer team:
-     - Fetch team document and player_ids
+     - Fetch franchise team data and use `FTD.players`
      - Build player list with franchise-specific attributes from `franchise_players`
      - Get team stats, plays, playcall settings, strategy settings, playbook settings, and scouting data
      - Initialize `plays_data` and `scouting_data` if empty
@@ -579,6 +615,10 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Team attributes: `franchise_teams.{team_id}.{attribute_name}`
 - Plays data: `franchise_teams.{team_id}.plays` (if initialized)
 - Scouting data: `franchise_teams.{team_id}.scouting_data` (if initialized)
+
+**Franchise Roster Source Of Truth:**
+- Training execution and the training report page both use `FTD.players` as the franchise roster membership list
+- This is required so signed recruits and walk-ons appear in training camp / in-season training reports even though they do not exist in the universal `players` collection or universal `teams.player_ids`
 
 **Note:** Player attributes saved by training are automatically loaded during game initialization. See `Franchise_Mode_Systems.md` section "3.5. Player Attribute Loading During Game Initialization" for complete details on how trained attributes are loaded into gameplay.
 
@@ -626,4 +666,3 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Training history tracking and archiving
 - Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training
-

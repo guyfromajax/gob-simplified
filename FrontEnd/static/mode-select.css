@@ -95,38 +95,80 @@ body {
 .mode-container {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 14px;
   flex-wrap: wrap;
   width: 100%;
 }
 
+/* Mode cards: same visual system as team cards — neutral, structured, subtle elevation */
 .mode-card {
-  background: #eee;
-  border: 1px solid #ccc;
-  padding: 20px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 12px 14px 14px;
   flex: 1 1 200px;
-  max-width: 280px;
+  max-width: 260px;
   text-align: center;
-  transition: transform 0.1s, box-shadow 0.1s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .mode-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Icon area: visual anchor, ~40% of card feel */
+.mode-card-icon {
+  width: 100%;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.02);
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.mode-card-icon img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.mode-card-title {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 22px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 2px;
+  letter-spacing: 0.02em;
+}
+
+.mode-card-descriptor {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 0 0 10px;
+  line-height: 1.3;
 }
 
 /* Current instance box (Tournament / Franchise) — team name in bold, team primary colors */
 .mode-instance {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background: #fff;
   border-left: 4px solid var(--instance-accent, #1a237e);
   border-radius: 4px;
-  padding: 12px 14px;
-  margin-bottom: 14px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
   text-align: left;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .instance-copy {
@@ -136,80 +178,79 @@ body {
 
 .instance-logo {
   flex-shrink: 0;
-  height: 40px;
-  width: 40px;
+  height: 36px;
+  width: 36px;
   object-fit: contain;
 }
 
 .instance-team-name {
   font-weight: bold;
-  font-size: 1.05em;
+  font-size: 0.95em;
   color: var(--instance-accent, #1a237e);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .instance-round {
-  font-size: 0.9em;
+  font-size: 0.85em;
   color: #555;
 }
 
 .mode-no-instance {
-  font-size: 0.9em;
-  color: #777;
-  margin-bottom: 14px;
+  font-size: 0.85em;
+  color: #6b7280;
+  margin-bottom: 8px;
   min-height: 1.2em;
 }
 
 .mode-actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+  width: 100%;
 }
 
-/* Play Now — orange (primary CTA when user has an instance) */
+/* Primary actions — hero orange */
+.play-button,
 .play-now-btn {
   background: #ff9800;
   color: #fff;
   border: none;
-  padding: 10px 20px;
-  font-weight: bold;
-  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 6px;
   cursor: pointer;
+  width: 100%;
 }
 
+.play-button:hover,
 .play-now-btn:hover {
   background: #e68900;
 }
 
-/* New Tournament / New Franchise — blue (secondary) */
+.play-button.disabled {
+  background: #9ca3af;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Secondary actions — visually quieter */
 .new-mode-btn {
-  background: #1976d2;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  font-weight: bold;
-  border-radius: 4px;
+  background: transparent;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
   cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .new-mode-btn:hover {
-  background: #1565c0;
-}
-
-.play-button {
-  background: #ff9800;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  font-weight: bold;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.play-button.disabled {
-  background: #777;
-  cursor: default;
-  pointer-events: none;
+  background: #e5e7eb;
+  border-color: #9ca3af;
 }
 
 #scout-title {
@@ -222,42 +263,77 @@ body {
 #team-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
+  gap: 12px;
   margin: 0 auto;
 }
 
+/* Neutral container: shared surface so logo art carries identity */
 .team-button {
-  border: 3px solid #ccc;
-  background: #fff;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
   cursor: pointer;
-  padding: 10px;
+  padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  transition: box-shadow 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.team-button:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Logo stage: fixed height, neutral surface, logos aligned across grid */
+.team-button-logo-stage {
+  height: 100px;
+  display: flex;
   align-items: center;
-  aspect-ratio: 1;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
-.team-button img {
-  flex: 1;
+/* Logo: dimensions unchanged; centered in stage */
+.team-button-logo-stage img {
   width: 100%;
-  height: 100%;
+  height: 100px;
   object-fit: contain;
+  display: block;
 }
 
+/* Tagline: secondary descriptor, soft color */
 .team-tagline {
-  margin-top: 0.25em;
-  font-size: clamp(12px, 3.3vw, 99px);
-  line-height: 0.9;
+  margin-top: 6px;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1.25;
+  letter-spacing: 0.03em;
   text-align: center;
   font-family: 'Bebas Neue', sans-serif;
-  font-weight: 700;
-  color: #fff;
+  font-weight: 500;
+  color: #374151;
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 600px) {
   #team-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .team-button-logo-stage {
+    height: 88px;
+  }
+
+  .team-button-logo-stage img {
+    height: 88px;
+  }
+
+  .team-tagline {
+    font-size: 10px;
+    margin-top: 4px;
   }
 }
 

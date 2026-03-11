@@ -147,8 +147,9 @@
    * @param {string} statKey - Stat key to sort by (from header data-stat attribute)
    * @param {Array} teamsData - Teams data array (will be sorted in place)
    * @param {string} tbodyId - ID of tbody element to render into (default: 'teamstats-body')
+   * @param {string} direction - 'asc' | 'desc' (default 'desc')
    */
-  function sortTeamStats(statKey, teamsData, tbodyId = 'teamstats-body') {
+  function sortTeamStats(statKey, teamsData, tbodyId = 'teamstats-body', direction = 'desc') {
   // Map display stat names to data stat keys
   const statMap = {
     'team': 'team',
@@ -188,10 +189,12 @@
     
     let val1, val2;
     
+    let cmp;
     if (dataKey === 'team') {
       val1 = a.team || '';
       val2 = b.team || '';
-      return val2.localeCompare(val1); // Reverse for descending
+      cmp = val2.localeCompare(val1);
+      return direction === 'asc' ? -cmp : cmp;
     } else if (dataKey === 'FG%') {
       val1 = s1.FGA > 0 ? (s1.FGM || 0) / s1.FGA : 0;
       val2 = s2.FGA > 0 ? (s2.FGM || 0) / s2.FGA : 0;
@@ -212,7 +215,8 @@
       val2 = s2[dataKey] || 0;
     }
     
-    return val2 - val1; // Descending order
+    cmp = val2 - val1;
+    return direction === 'asc' ? -cmp : cmp;
   });
   
     // Re-render with sorted data

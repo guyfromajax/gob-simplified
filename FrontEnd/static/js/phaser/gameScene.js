@@ -156,9 +156,8 @@ export function createGameScene(Phaser) {
       if (this.animate) {
         this.load.image("ball", "/images/ball.png");
         const { home } = gameStore.getTeams();
-        const normalizeTeamName = (name) => name.toLowerCase().replace(/[\s\-]/g, '_');
-        const teamId = normalizeTeamName(home);
-        this.load.image("court-bg", `/images/courts/${teamId}.jpg`);
+        const courtPath = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(home, 'court') : '/images/teams/general/general_court.jpg';
+        this.load.image("court-bg", courtPath);
       }
 
     }
@@ -179,10 +178,15 @@ export function createGameScene(Phaser) {
       const urlParams = new URLSearchParams(window.location.search);
       const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
       const timeoutTraceId = urlParams.get('timeout_trace_id');
-      const fromLineup = urlParams.get('from') === 'set-lineup';
-      const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
-      const isAfterBreak = resumeFromTimeout || fromLineup;
-      this.shouldShowMatchupsPopup = (isQ1Start || isAfterBreak) && this.gameId;
+      // Defense Matchups popup trigger:
+      // - Q1 start (non-timeout)
+      // - Any quarter > 1 entry (quarter breaks)
+      // - Any timeout/foul-out resume (resume_from_timeout=true)
+      // Keep timeout/navigation contracts unchanged; this only controls popup visibility.
+      const isQ1Start = this.quarter === 1 && !resumeFromTimeout;
+      const isQuarterBreakEntry = this.quarter > 1;
+      const isTimeoutOrFoulOutResume = resumeFromTimeout;
+      this.shouldShowMatchupsPopup = (isQ1Start || isQuarterBreakEntry || isTimeoutOrFoulOutResume) && this.gameId;
       
       // Reset pause state BEFORE killing tweens
       this.isPaused = false;
@@ -492,8 +496,8 @@ export function createGameScene(Phaser) {
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
-      if (homeLogoEl) homeLogoEl.src = `/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
-      if (awayLogoEl) awayLogoEl.src = `/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
 
       const homeScoreEl = document.getElementById('home-score');
       const awayScoreEl = document.getElementById('away-score');
@@ -636,11 +640,12 @@ export function createGameScene(Phaser) {
         
         if (!tooltip) return;
         
-        // Set player image
-        const playerPhoto = player.photo || `/images/players/${playerId}.png`;
+        // Set player image (use static prefix for localhost)
+        const base = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') ? '/static' : '');
+        const playerPhoto = player.photo || `${base}/images/players/${playerId}.png`;
         image.src = playerPhoto;
         image.onerror = () => {
-          image.src = '/images/players/default.png'; // Fallback image
+          image.src = `${base}/images/players/generic_headshot.png`;
         };
         
         // Get current player stats (including current energy)
@@ -1595,7 +1600,7 @@ export function createGameScene(Phaser) {
       updateSpeedDropdown(initialSpeed);
       
       // Game Speed button handler
-      if (gameSpeedBtn && speedDropdown) {
+      if (gameSpeedBtn && speedDropdown && !gameSpeedBtn.disabled) {
         gameSpeedBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
@@ -1622,6 +1627,8 @@ export function createGameScene(Phaser) {
             speedDropdown.style.display = 'none';
           });
         });
+      } else if (speedDropdown) {
+        speedDropdown.style.display = 'none';
       }
       
       function updateSpeedDropdown(currentSpeed) {
@@ -1785,13 +1792,8 @@ export function createGameScene(Phaser) {
           if (this.shouldShowMatchupsPopup && this.animate) {
             try {
               const { showDefenseMatchupsPopup, resetDontShowAgainFlag } = await import('./utils/defenseMatchupsPopup.js');
-              // Reset "Don't show again" flag at start of new game (Q1)
-              const urlParams = new URLSearchParams(window.location.search);
-              const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-              const fromLineup = urlParams.get('from') === 'set-lineup';
-              const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !fromLineup;
-              
-              if (isQ1Start) {
+              // Reset only for a truly new game (new game_id at Q1), not URL-shape heuristics.
+              if (isNewGame) {
                 resetDontShowAgainFlag(this.gameId);
               }
               

@@ -26,6 +26,54 @@ export async function fetchGameState(gameId) {
   }
 }
 
+function setScoreboardHeaderDefaults(homeTeam, awayTeam) {
+  const homeLogoEl = document.getElementById('home-logo');
+  const awayLogoEl = document.getElementById('away-logo');
+  const homeTolEl = document.getElementById('home-tol');
+  const awayTolEl = document.getElementById('away-tol');
+  const homeFoulsEl = document.getElementById('home-fouls');
+  const awayFoulsEl = document.getElementById('away-fouls');
+
+  if (homeLogoEl && homeTeam) {
+    homeLogoEl.src = typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath(homeTeam, 'banner_primary')
+      : '/images/teams/general/general_banner_primary.jpg';
+  }
+  if (awayLogoEl && awayTeam) {
+    awayLogoEl.src = typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath(awayTeam, 'banner_primary')
+      : '/images/teams/general/general_banner_primary.jpg';
+  }
+  if (homeTolEl) homeTolEl.textContent = 'TOL: 4';
+  if (awayTolEl) awayTolEl.textContent = 'TOL: 4';
+  if (homeFoulsEl) homeFoulsEl.textContent = 'F: 0';
+  if (awayFoulsEl) awayFoulsEl.textContent = 'F: 0';
+}
+
+export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
+  setScoreboardHeaderDefaults(homeTeam, awayTeam);
+
+  if (!gameData) return;
+
+  const homeTolEl = document.getElementById('home-tol');
+  const awayTolEl = document.getElementById('away-tol');
+  const homeFoulsEl = document.getElementById('home-fouls');
+  const awayFoulsEl = document.getElementById('away-fouls');
+  const teamsObj = gameData.teams || {};
+  const homeTeamObj = gameData.home_team_id && teamsObj[gameData.home_team_id] ? teamsObj[gameData.home_team_id] : null;
+  const awayTeamObj = gameData.away_team_id && teamsObj[gameData.away_team_id] ? teamsObj[gameData.away_team_id] : null;
+
+  const homeFouls = homeTeamObj?.team_fouls ?? gameData.fouls?.home ?? 0;
+  const awayFouls = awayTeamObj?.team_fouls ?? gameData.fouls?.away ?? 0;
+  const homeTimeouts = homeTeamObj?.timeouts ?? gameData.timeouts?.home ?? gameData.home_team_timeouts ?? 4;
+  const awayTimeouts = awayTeamObj?.timeouts ?? gameData.timeouts?.away ?? gameData.away_team_timeouts ?? 4;
+
+  if (homeFoulsEl) homeFoulsEl.textContent = `F: ${homeFouls}`;
+  if (awayFoulsEl) awayFoulsEl.textContent = `F: ${awayFouls}`;
+  if (homeTolEl) homeTolEl.textContent = `TOL: ${homeTimeouts}`;
+  if (awayTolEl) awayTolEl.textContent = `TOL: ${awayTimeouts}`;
+}
+
 /**
  * Update scoreboard with accumulated scores
  * @param {Object} gameData - Game data from backend
@@ -209,13 +257,16 @@ export async function initializeGameStats() {
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');
   
-  if (!gameId || !homeTeam || !awayTeam) return;
+  if (!homeTeam || !awayTeam) return;
+
+  setScoreboardHeaderDefaults(homeTeam, awayTeam);
+  if (!gameId) return;
   
   const gameData = await fetchGameState(gameId);
   if (gameData) {
+    displayAccumulatedHeaderState(gameData, homeTeam, awayTeam);
     displayAccumulatedScores(gameData, homeTeam, awayTeam);
     displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam);
     displayTeamBoxScore(gameData, homeTeam, awayTeam);
   }
 }
-

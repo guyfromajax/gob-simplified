@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Team Traits</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+</head>
+<body>
+  <div class="resource-page-container">
+    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
+    <h1>Team Attribute Totals</h1>
+    <div class="traits-scope-toggle-wrap">
+      <button type="button" class="traits-scope-btn active" data-scope="conference">Conference</button>
+      <button type="button" class="traits-scope-btn" data-scope="region">Region</button>
+      <button type="button" class="traits-scope-btn" data-scope="national">National</button>
+    </div>
+    <div class="scroll-x">
+      <table class="roster-table" id="team-traits-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-attr="team">Team</th>
+            <th class="sortable" data-attr="SC">SC</th>
+            <th class="sortable" data-attr="SH">SH</th>
+            <th class="sortable" data-attr="ID">ID</th>
+            <th class="sortable" data-attr="OD">OD</th>
+            <th class="sortable" data-attr="PS">PS</th>
+            <th class="sortable" data-attr="BH">BH</th>
+            <th class="sortable" data-attr="RB">RB</th>
+            <th class="sortable" data-attr="AG">AG</th>
+            <th class="sortable" data-attr="ST">ST</th>
+            <th class="sortable" data-attr="ND">ND</th>
+            <th class="sortable" data-attr="IQ">IQ</th>
+            <th class="sortable" data-attr="FT">FT</th>
+            <th class="sortable" data-attr="total">Total</th>
+          </tr>
+        </thead>
+        <tbody id="team-traits-body"></tbody>
+      </table>
+    </div>
+    <div style="margin-top: 40px;">
+      <h3>Top 10 (excluding FT)</h3>
+      <div id="team-traits-top10"></div>
+    </div>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
+  <script src="/common.js"></script>
+  <script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const franchiseId = params.get('franchise_id');
+  const teamId = params.get('team_id');
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn && franchiseId && teamId) {
+    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+  }
+
+  async function fetchJSON(url) {
+    const res = await fetch(url, { headers: window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {} });
+    if (!res.ok) throw new Error('Request failed');
+    return res.json();
+  }
+
+  let userConference = null, userRegion = null;
+  let scope = 'conference';
+  let traitsData = null;
+  let resourceCache = null;
+
+  const ATTRS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
+  const ATTRS_NO_FT = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ'];
+
+  function render() {
+    if (!traitsData || !traitsData.teams) return;
+    const filtered = JSON.parse(JSON.stringify(traitsData.teams));
+    filtered.forEach(team => {
+      const attrs = team.attributes || {};
+      team.total = ATTRS.reduce((sum, attr) => sum + (attrs[attr] || 0), 0);
+    });
+    filtered.sort((a, b) => (b.total || 0) - (a.total || 0));
+
+    const tbody = document.getElementById('team-traits-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    filtered.forEach(team => {
+      const tr = document.createElement('tr');
+      const attrs = team.attributes || {};
+      const teamTd = document.createElement('td');
+      teamTd.textContent = team.team_name || '';
+      teamTd.style.color = team.primary_color || '#000';
+      teamTd.style.fontWeight = 'bold';
+      tr.appendChild(teamTd);
+      ATTRS.forEach(attr => {
+        const td = document.createElement('td');
+        td.textContent = attrs[attr] || 0;
+        tr.appendChild(td);
+      });
+      const totalTd = document.createElement('td');
+      totalTd.textContent = team.total || 0;
+      totalTd.style.fontWeight = 'bold';
+      tr.appendChild(totalTd);
+      tbody.appendChild(tr);
+    });
+
+    const top10El = document.getElementById('team-traits-top10');
+    if (top10El) {
+      top10El.innerHTML = '';
+      const allValues = [];
+      filtered.forEach(team => {
+        const attrs = team.attributes || {};
+        ATTRS_NO_FT.forEach(attr => {
+          allValues.push({ team_name: team.team_name, value: attrs[attr] || 0 });
+        });
+      });
+      allValues.sort((a, b) => b.value - a.value);
+      const top10 = allValues.slice(0, 10);
+      const ul = document.createElement('ul');
+      top10.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.textContent = (i + 1) + '. ' + item.team_name + ' - ' + item.value;
+        ul.appendChild(li);
+      });
+      top10El.appendChild(ul);
+    }
+  }
+
+  async function loadScope(targetScope) {
+    const cached = resourceCache && resourceCache.get(targetScope);
+    if (cached) return cached;
+    const payload = await fetchJSON(
+      API_CONFIG.buildUrl('/franchise/team-traits')
+      + '?franchise_id=' + encodeURIComponent(franchiseId)
+      + '&scope=' + encodeURIComponent(targetScope)
+    );
+    return resourceCache ? resourceCache.set(targetScope, payload) : payload;
+  }
+
+  if (!franchiseId) {
+    document.getElementById('team-traits-body').innerHTML = '<tr><td colspan="14">Missing franchise_id in URL.</td></tr>';
+    return;
+  }
+  Promise.all([
+    fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(async ([cc]) => {
+    userConference = cc.user_conference;
+    userRegion = cc.user_region || '';
+    resourceCache = window.ResourceCache.createResourceCache('team-traits', franchiseId, cc.current_season, cc.week);
+    traitsData = await loadScope(scope);
+    render();
+    document.querySelectorAll('.traits-scope-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        scope = btn.getAttribute('data-scope') || 'conference';
+        document.querySelectorAll('.traits-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === scope));
+        document.getElementById('team-traits-body').innerHTML = '<tr><td colspan="14">Loading team traits...</td></tr>';
+        traitsData = await loadScope(scope);
+        render();
+      });
+    });
+  }).catch(err => {
+    document.getElementById('team-traits-body').innerHTML = '<tr><td colspan="14">Failed to load team traits.</td></tr>';
+    console.error(err);
+  });
+})();
+  </script>
+</body>
+</html>

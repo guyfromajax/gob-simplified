@@ -75,10 +75,10 @@ def build_roster_players(
             "team": team_name,
             "attributes": attributes,
             "position_ratings": position_ratings,
-            "height": core.get("height") if core else None,
-            "weight": core.get("weight") if core else None,
-            "jersey": core.get("jersey", 0) if core else None,
-            "year": core.get("year") if core else None,
+            "height": override.get("height", core.get("height") if core else None),
+            "weight": override.get("weight", core.get("weight") if core else None),
+            "jersey": override.get("jersey", core.get("jersey", 0) if core else None),
+            "year": override.get("year", core.get("year") if core else None),
         }
         players.append(player)
     return players

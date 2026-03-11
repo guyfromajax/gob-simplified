@@ -17,7 +17,16 @@
   width: 100%;
   display: flex;
   justify-content: flex-start;
+  align-items: center;
+  gap: 16px;
   font-weight: bold;
+}
+
+#franchise-container .fcc-season-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
 }
 
 @media (max-width: 600px) {
@@ -32,6 +41,13 @@
   align-items: center;
   justify-content: space-between; /* Secondary buttons on left, hero button on right - equal spacing */
   gap: 12px; /* Gap between secondary buttons group and hero button */
+}
+
+#franchise-container .hero-buttons-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Secondary buttons group (Set Game Plan, Playbooks, Scouting Report) */
@@ -116,6 +132,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 70%;
+  min-width: 220px;
 }
 
 #franchise-container .hero-btn:hover {
@@ -129,11 +147,73 @@
   box-shadow: 0 2px 6px rgba(255, 122, 0, 0.3);
 }
 
+#franchise-container .recruiting-access-btn {
+  min-height: 40px;
+  border: none;
+  border-radius: 4px;
+  background: #2f8f46;
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#franchise-container .recruiting-access-btn:hover:not(.is-dead) {
+  background: #358f58;
+  transform: translateY(-1px);
+}
+
+#franchise-container .recruiting-access-btn.is-dead,
+#franchise-container .recruiting-access-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
 #tournament-bracket-container.bracket {
   padding-top: 8px;
   padding-bottom: 16px;
   min-height: 500px;
+}
+
+#tournament-bracket-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fcc-tournament-section {
+  padding: 14px 16px 18px;
+  border-radius: 8px;
+}
+
+.fcc-tournament-section-title {
+  margin: 0 0 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.fcc-tournament-tone-conference {
+  background: #ffffff;
+}
+
+.fcc-tournament-tone-region {
+  background: #f5f5f5;
+}
+
+.fcc-tournament-tone-national {
+  background: #ebebeb;
+}
+
+.fcc-tournament-divider {
+  border: 0;
+  border-top: 1px solid #cfd3d8;
+  margin: 14px 0;
 }
 
 /* Reusable FCC modal styling (EOS and confirmation popups) */
@@ -201,10 +281,238 @@
   color: #fff;
 }
 
+.fcc-recruiting-live-copy {
+  margin-top: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #2f8f46;
+  width: 70%;
+  min-width: 220px;
+  text-align: center;
+}
+
 .fcc-modal-btn-secondary,
 #close-sim-popup,
 #fcc-champ-box-score,
 #fcc-new-season-cancel {
   background: #4065af;
   color: #fff;
+}
+
+/* Rankings tab */
+.rankings-toggle-wrap {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.rankings-toggle {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rankings-toggle.active {
+  background: #4065af;
+  color: #fff;
+}
+.rankings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rankings-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+  font-family: 'Inter', sans-serif;
+}
+
+.rankings-list li .rankings-team.conference-1 {
+  font-weight: bold;
+}
+
+/* Standings tab: region toggles and conference sections */
+.standings-region-toggle-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.standings-region-btn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.standings-region-btn:hover {
+  background: #f0f7ff;
+}
+.standings-region-btn.active {
+  background: #4065af;
+  color: #fff;
+}
+.standings-by-region {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.standings-conference-heading {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #333;
+}
+.standings-conference-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.standings-conference-table th,
+.standings-conference-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+.standings-conference-table th {
+  font-weight: 600;
+  color: #555;
+}
+#standings-tab .scroll-x {
+  overflow-x: auto;
+  margin-bottom: 8px;
+}
+
+/* Stats and Team Traits scope toggles (Conference / Region / National) */
+.stats-scope-toggle-wrap,
+.traits-scope-toggle-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stats-scope-btn,
+.traits-scope-btn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stats-scope-btn:hover,
+.traits-scope-btn:hover {
+  background: #f0f7ff;
+}
+.stats-scope-btn.active,
+.traits-scope-btn.active {
+  background: #4065af;
+  color: #fff;
+}
+
+/* Schedule tab: 16 conference toggles (2 rows of 8) */
+.schedule-conference-toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.schedule-conference-toggle-wrap.schedule-toggles-hidden {
+  display: none;
+}
+.schedule-conference-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.schedule-conference-btn {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #4065af;
+  background: #fff;
+  color: #4065af;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+}
+.schedule-conference-btn:hover {
+  background: #f0f7ff;
+}
+.schedule-conference-btn.active {
+  background: #4065af;
+  color: #fff;
+}
+
+/* Standings tab: note linking to Resources */
+.standings-fcc-note {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #555;
+}
+.standings-fcc-note a {
+  color: #4065af;
+  text-decoration: none;
+}
+.standings-fcc-note a:hover {
+  text-decoration: underline;
+}
+
+/* Resources tab: 3-column grid, buttons like Game Plan (blue fill, white bold) */
+.resources-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 480px;
+  margin-top: 20px;
+}
+.resources-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 20px;
+  background: #4065af;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  box-sizing: border-box;
+}
+.resources-btn:hover {
+  background: #345a94;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.resources-btn.is-dead,
+.resources-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: auto;
+  box-shadow: none;
+  filter: grayscale(0.2);
+}
+
+.resources-btn.is-dead:hover,
+.resources-btn[aria-disabled="true"]:hover {
+  background: #4065af;
+  color: #fff;
+  transform: none;
 }

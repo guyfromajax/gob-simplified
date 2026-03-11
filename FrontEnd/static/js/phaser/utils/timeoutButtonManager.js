@@ -67,6 +67,50 @@ function ensureTimeoutSounds() {
 }
 
 /**
+ * Shared timeout popup button styles.
+ * Kept separate from popup-specific container styles so user/computer popups
+ * can reuse the exact same button design.
+ */
+function ensureTimeoutPopupButtonStyles() {
+    if (document.getElementById('timeout-popup-button-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'timeout-popup-button-styles';
+    style.textContent = `
+        .button-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .timeout-button {
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .go-to-timeout-button {
+            background: #ff9800;
+            color: #fff;
+        }
+
+        .go-to-timeout-button:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+/**
  * Ensure button is initialized (lazy initialization)
  */
 function ensureButtonInitialized() {
@@ -513,6 +557,8 @@ async function handleTimeoutButtonClick(executeOnly = false) {
  * @param {Object} scene - Game scene object
  */
 async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
+    ensureTimeoutPopupButtonStyles();
+
     // Remove any existing popup
     const existingPopup = document.querySelector('.user-timeout-popup');
     if (existingPopup) {
@@ -582,36 +628,6 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
                 letter-spacing: 2px;
             }
 
-            .button-container {
-                display: flex;
-                gap: 20px;
-                width: 100%;
-                justify-content: center;
-            }
-
-            .timeout-button {
-                padding: 15px 40px;
-                font-size: 18px;
-                font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
-                transition: all 0.3s;
-                font-family: 'Inter', sans-serif;
-            }
-
-            .go-to-timeout-button {
-                background: #ff9800;
-                color: #fff;
-            }
-
-            .go-to-timeout-button:hover {
-                background: #f57c00;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
-            }
         `;
         document.head.appendChild(style);
     }
@@ -645,6 +661,107 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
 }
 
 /**
+ * Show computer timeout popup with "Go To Timeout" button.
+ * Mirrors user timeout UX so computer timeouts do not auto-navigate.
+ * @param {Object} timeoutResult - Timeout result object
+ * @param {string} gameId - Game ID
+ * @param {Object} scene - Game scene object
+ * @param {string|null} computerTeamName - Name of team calling timeout
+ */
+export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, computerTeamName = null) {
+    ensureTimeoutPopupButtonStyles();
+
+    // Remove any existing popup of this type
+    const existingPopup = document.querySelector('.computer-timeout-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+
+    // Play timeout airhorn when computer timeout popup appears
+    ensureTimeoutSounds();
+    if (airhornSound) {
+        try {
+            airhornSound.currentTime = 0;
+            airhornSound.play().catch(err => {
+                console.warn('⚠️ [TIMEOUT] Could not play airhorn (computer timeout popup):', err);
+            });
+        } catch (error) {
+            console.warn('⚠️ [TIMEOUT] Airhorn play error (computer timeout popup):', error);
+        }
+    }
+
+    // Resolve display name with safe fallback
+    const callingTeamName = computerTeamName ||
+        timeoutResult?.calling_team ||
+        'Computer Team';
+
+    // Create popup (same visual pattern as user timeout popup)
+    const popup = document.createElement('div');
+    popup.className = 'computer-timeout-popup';
+    popup.innerHTML = `
+        <div class="computer-timeout-content">
+            <h2>${callingTeamName} Called Timeout</h2>
+            <div class="button-container">
+                <button class="timeout-button go-to-timeout-button">Go To Timeout</button>
+            </div>
+        </div>
+    `;
+
+    // Add styles once
+    if (!document.getElementById('computer-timeout-popup-styles')) {
+        const style = document.createElement('style');
+        style.id = 'computer-timeout-popup-styles';
+        style.textContent = `
+            .computer-timeout-popup {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            }
+
+            .computer-timeout-content {
+                background: #fff;
+                border: 6px solid #c0c0c0;
+                border-radius: 12px;
+                padding: 40px 60px;
+                display: flex;
+                flex-direction: column;
+                gap: 30px;
+                align-items: center;
+                min-width: 400px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            }
+
+            .computer-timeout-content h2 {
+                font-size: 36px;
+                font-weight: bold;
+                color: #333;
+                margin: 0;
+                font-family: 'Bebas Neue', sans-serif;
+                letter-spacing: 2px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Navigate only on explicit user click
+    const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
+    goToTimeoutBtn.addEventListener('click', async () => {
+        if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+        popup.remove();
+        await showTimeoutPopup(timeoutResult, gameId, scene, true, computerTeamName);
+    });
+
+    document.body.appendChild(popup);
+}
+
+/**
  * Show timeout popup and navigate to lineup screen
  * @param {Object} timeoutResult - Timeout result object
  * @param {string} gameId - Game ID
@@ -653,25 +770,9 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  * @param {string} [computerTeamName] - Name of the computer team that called timeout
  * 
  * ✅ FIX 2: For user timeouts, this should ONLY be called when user clicks "Go To Timeout" button
- * Computer timeouts can call this directly for automatic navigation
+ * Computer timeout flow should also call this from its popup button click handler.
  */
 export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTimeout = false, computerTeamName = null) {
-    // Computer timeout: play airhorn when timeout triggers (same as user timeout), then brief delay so it’s audible before navigation
-    if (computerTimeout) {
-        ensureTimeoutSounds(); // Load sounds if not yet loaded (button may never have been initialized)
-        if (airhornSound) {
-            try {
-                airhornSound.currentTime = 0;
-                airhornSound.play().catch(err => {
-                    console.warn('⚠️ [TIMEOUT] Could not play airhorn (computer timeout):', err);
-                });
-            } catch (err) {
-                console.warn('⚠️ [TIMEOUT] Airhorn play error (computer timeout):', err);
-            }
-            await new Promise(r => setTimeout(r, 800));
-        }
-    }
-
     // ✅ FIX 2: Guard against auto-navigation for user timeouts
     // If this is a user timeout (not computer), make sure it's being called from button click
     if (!computerTimeout) {

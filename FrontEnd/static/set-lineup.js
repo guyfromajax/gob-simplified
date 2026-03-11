@@ -885,11 +885,13 @@ function updateSlotDisplay(slot) {
       rightWidth = `${fillPercent}%`;
     }
     
+    const imgBase = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/' : '/images/players/');
+    const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
-        <img class="player-image" src="/images/players/${playerId}.png" 
-             onerror="this.src='/images/players/default.png'" alt="${player.name}">
+        <img class="player-image" src="${imgBase}${playerId}.png" 
+             onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
       <div class="player-name">${player.name}</div>
       <div class="player-rating">${rating}</div>
@@ -1176,7 +1178,7 @@ async function setHeader() {
   
   const logo = document.getElementById('team-logo');
   if (logo) {
-    logo.src = `/images/homepage-logos/${teamName}.png`;
+    logo.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'logo_square') : '/images/teams/general/general_logo_square.png';
     logo.alt = `${teamName} logo`;
     logo.hidden = false;
     logo.onerror = () => { logo.hidden = true; };
@@ -1806,7 +1808,7 @@ function createCardFront(player) {
   // Use environment-aware path
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const staticPrefix = isLocalhost ? '/static' : '';
-  headshotContainer.style.backgroundImage = `url(${staticPrefix}/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  headshotContainer.style.backgroundImage = `url(${(typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'background') : staticPrefix + '/images/teams/general/general_background.png')})`;
   headshotContainer.style.backgroundSize = 'cover';
   headshotContainer.style.backgroundPosition = 'center';
   
@@ -1830,14 +1832,14 @@ function createCardFront(player) {
     headshotContainer.style.transform = 'scale(1)';
   });
   
-  // Player image
+  // Player image (use static prefix for localhost)
+  const playerImgBase = staticPrefix + '/images/players/';
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `/images/players/${player._id}.png`;
+  img.src = player.photo || `${playerImgBase}${player._id}.png`;
   img.alt = player.name;
   img.onerror = () => {
-    // Fallback to white background if image fails
-    img.style.display = 'none';
+    img.src = staticPrefix + '/images/players/generic_headshot.png';
   };
   headshotContainer.appendChild(img);
   

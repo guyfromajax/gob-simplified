@@ -80,6 +80,13 @@ body {
   justify-content: flex-end;
 }
 
+.submit-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
 .page-title {
   font-size: 2.5rem;
   color: var(--color-accent);
@@ -120,7 +127,8 @@ body {
 }
 
 .auto-train-button,
-.submit-button {
+.submit-button,
+.recruiting-invites-button {
   background: var(--color-accent-orange);
   color: #fff;
   border: none;
@@ -138,6 +146,11 @@ body {
   box-shadow: 0 2px 8px rgba(108, 92, 231, 0.35);
 }
 
+.recruiting-invites-button {
+  background: #2f8f46;
+  box-shadow: 0 2px 8px rgba(47, 143, 70, 0.35);
+}
+
 .auto-train-button:hover:not(:disabled) {
   background: #7e6df0;
   transform: translateY(-1px);
@@ -150,8 +163,15 @@ body {
   box-shadow: 0 4px 12px rgba(255, 122, 0, 0.4);
 }
 
+.recruiting-invites-button:hover:not(:disabled) {
+  background: #39a553;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(47, 143, 70, 0.45);
+}
+
 .auto-train-button:disabled,
-.submit-button:disabled {
+.submit-button:disabled,
+.recruiting-invites-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   pointer-events: none;

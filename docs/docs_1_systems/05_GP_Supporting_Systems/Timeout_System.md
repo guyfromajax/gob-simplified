@@ -146,7 +146,7 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 **How it works (same as Defensive Foul announcement):**
 - **Id only for the image.** Do not use `player.photo` or any other field for the image URL. The image is built from the fouling-out player’s id and the path only.
 - **Id from the turn.** Call sites pass `foulOutPlayerId` from the turn: `turn.foul_out_player?.player_id ?? turn.foul_out_player?.playerId` (gameScene) or `turnData.foul_out_player?.player_id ?? turnData.foul_out_player?.playerId` (AnimationEngine). If that’s missing, the popup falls back to `player?.player_id ?? player?.playerId ?? player?.id` for the image id.
-- **Image path:** `/images/players/{foulOutPlayerId}.png` (string id; same as API `player_id`). Fallback: `/images/players/default.png` on img `onerror`.
+- **Image path:** `/images/players/{foulOutPlayerId}.png` (string id; same as API `player_id`). Fallback: `/images/players/generic_headshot.png` on img `onerror`.
 - **Static prefix:** On localhost/127.0.0.1 prepend `/static`. On Netlify and production use no prefix (site root is the static publish folder).
 
 **Frontend (popup):**

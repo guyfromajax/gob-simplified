@@ -20,8 +20,18 @@ const userTeamName = localStorage.getItem('franchise_user_team') || '';
 // ✅ SS&S: Store team ObjectId for consistent navigation
 let userTeamId = null; // Will be resolved from command center data or URL params
 let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting
+let userConference = null; // User team's conference (for Stats/Traits scope)
+let userRegion = null;    // User team's region (for Stats/Traits scope)
 let teamColorCache = null; // Cache for team primary colors
+let leadersDataCache = null;
+let teamStatsDataCache = null;
+let teamTraitsDataCache = null;
+let leanRecruitsDataCache = [];
+let signedRecruitsDataCache = [];
+let statsScope = 'conference';   // 'conference' | 'region' | 'national'
+let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
+const recruitSortState = { key: 'rt', direction: 'desc' };
 
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
@@ -44,12 +54,29 @@ const teamMap = {
 };
 
 const teamIdNameMap = {};
+const teamIdMetaMap = {};
+
+function formatConferenceTooltipLabel(conference) {
+  const numericConference = Number(conference);
+  if (!Number.isInteger(numericConference) || numericConference < 1 || numericConference > 16) {
+    return String(conference || '');
+  }
+  const regionLetter = String.fromCharCode(65 + Math.floor((numericConference - 1) / 2));
+  const conferenceNumber = ((numericConference - 1) % 2) + 1;
+  return `${conferenceNumber}${regionLetter}`;
+}
 
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
-  const logoSrc = `/images/homepage-logos/${formattedTeam}.png`;
+  const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
+  const seasonLabelEl = document.getElementById('fcc-season-label');
+  if (seasonLabelEl) {
+    const seasonNumber = Number(data.current_season || 1);
+    const weekNumber = Number(data.week || 1);
+    seasonLabelEl.textContent = `Season ${seasonNumber} / Week ${weekNumber}`;
+  }
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -93,34 +120,316 @@ function populateTop(data) {
   document.getElementById('stat-rank').textContent = `Nat'l Rank: ${data.rank || '--'}`;
 }
 
-function renderStandings(data) {
+let standingsDataCache = null;
+
+function buildTeamLink(t) {
+  const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+  const teamLink = document.createElement('a');
+  teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
+  teamLink.textContent = t.name;
+  teamLink.style.color = '#4a90e2';
+  teamLink.style.textDecoration = 'none';
+  teamLink.style.cursor = 'pointer';
+  teamLink.addEventListener('mouseenter', () => { teamLink.style.textDecoration = 'underline'; });
+  teamLink.addEventListener('mouseleave', () => { teamLink.style.textDecoration = 'none'; });
+  return teamLink;
+}
+
+function renderStandings(data, selectedRegion) {
   if (!data) return;
-  const tbody = document.getElementById('standings-body');
-  tbody.innerHTML = '';
-  (data.standings || []).forEach(t => {
-    teamIdNameMap[t.team_id] = t.name;
-    const tr = document.createElement('tr');
-    
-    // Make team name clickable
-    const teamNameTd = document.createElement('td');
-    const teamLink = document.createElement('a');
-    const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-    teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
-    teamLink.textContent = t.name;
-    teamLink.style.color = '#4a90e2';
-    teamLink.style.textDecoration = 'none';
-    teamLink.style.cursor = 'pointer';
-    teamLink.addEventListener('mouseenter', () => {
-      teamLink.style.textDecoration = 'underline';
+  const list = data.standings || [];
+  list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
+
+  const container = document.getElementById('standings-by-region');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // FCC slim view: two blocks (user conference, sister conference) when API returned user_conference/sister_conference
+  const userConf = data.user_conference;
+  const sisterConf = data.sister_conference;
+  if (userConf != null && sisterConf != null && list.length > 0) {
+    const regionLabels = { 1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2', 7: 'D1', 8: 'D2', 9: 'E1', 10: 'E2', 11: 'F1', 12: 'F2', 13: 'G1', 14: 'G2', 15: 'H1', 16: 'H2' };
+    [userConf, sisterConf].forEach((confNum, idx) => {
+      const teams = list.filter(t => t.conference === confNum);
+      if (teams.length === 0) return;
+      const label = idx === 0 ? 'Your conference' : 'Sister conference';
+      const subLabel = regionLabels[confNum] ? ` (Conf ${regionLabels[confNum]})` : '';
+      const heading = document.createElement('h4');
+      heading.className = 'standings-conference-heading';
+      heading.textContent = label + subLabel;
+      container.appendChild(heading);
+      const scrollWrap = document.createElement('div');
+      scrollWrap.className = 'scroll-x';
+      const table = document.createElement('table');
+      table.className = 'leaders-table standings-conference-table';
+      table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
+      const tbody = table.querySelector('tbody');
+      teams.forEach(t => {
+        const tr = document.createElement('tr');
+        const teamTd = document.createElement('td');
+        teamTd.appendChild(buildTeamLink(t));
+        tr.appendChild(teamTd);
+        tr.appendChild(document.createElement('td')).textContent = t.W;
+        tr.appendChild(document.createElement('td')).textContent = t.L;
+        tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
+        tr.appendChild(document.createElement('td')).textContent = t.PF;
+        tr.appendChild(document.createElement('td')).textContent = t.PA;
+        tr.appendChild(document.createElement('td')).textContent = t.next || '';
+        tbody.appendChild(tr);
+      });
+      scrollWrap.appendChild(table);
+      container.appendChild(scrollWrap);
     });
-    teamLink.addEventListener('mouseleave', () => {
-      teamLink.style.textDecoration = 'none';
+    return;
+  }
+
+  // Fallback: full standings by region (e.g. from standalone standings page)
+  selectedRegion = selectedRegion || 'A';
+  const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
+  const byConference = {};
+  byRegion.forEach(t => {
+    const c = t.conference != null ? t.conference : 0;
+    if (!byConference[c]) byConference[c] = [];
+    byConference[c].push(t);
+  });
+  const confNumbers = Object.keys(byConference).map(Number).sort((a, b) => a - b);
+
+  confNumbers.forEach(confNum => {
+    const teams = byConference[confNum];
+    teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
+
+    const heading = document.createElement('h4');
+    heading.className = 'standings-conference-heading';
+    heading.textContent = `Conference ${selectedRegion}${confNum}`;
+    container.appendChild(heading);
+
+    const scrollWrap = document.createElement('div');
+    scrollWrap.className = 'scroll-x';
+    const table = document.createElement('table');
+    table.className = 'leaders-table standings-conference-table';
+    table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
+    const tbody = table.querySelector('tbody');
+    teams.forEach(t => {
+      const tr = document.createElement('tr');
+      const teamTd = document.createElement('td');
+      teamTd.appendChild(buildTeamLink(t));
+      tr.appendChild(teamTd);
+      tr.appendChild(document.createElement('td')).textContent = t.W;
+      tr.appendChild(document.createElement('td')).textContent = t.L;
+      tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
+      tr.appendChild(document.createElement('td')).textContent = t.PF;
+      tr.appendChild(document.createElement('td')).textContent = t.PA;
+      tr.appendChild(document.createElement('td')).textContent = t.next || '';
+      tbody.appendChild(tr);
     });
-    teamNameTd.appendChild(teamLink);
-    
-    tr.appendChild(teamNameTd);
-    tr.innerHTML += `<td>${t.W}</td><td>${t.L}</td><td>${t.pct.toFixed(3)}</td><td>${t.PF}</td><td>${t.PA}</td><td>${t.next}</td>`;
-    tbody.appendChild(tr);
+    scrollWrap.appendChild(table);
+    container.appendChild(scrollWrap);
+  });
+
+  document.querySelectorAll('.standings-region-btn').forEach(btn => {
+    if (btn) btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
+  });
+}
+
+function bindStandingsRegionButtons() {
+  document.querySelectorAll('.standings-region-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const region = btn.getAttribute('data-region');
+      if (standingsDataCache) renderStandings(standingsDataCache, region);
+    });
+  });
+}
+
+function buildResourceUrl(page, extraParams) {
+  if (!franchiseId || !userTeamId) return '#';
+  const params = new URLSearchParams();
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  if (extraParams) Object.keys(extraParams).forEach(k => params.set(k, extraParams[k]));
+  return `/${page}?${params.toString()}`;
+}
+
+function bindResourcesLinks() {
+  const q = () => (franchiseId && userTeamId ? `?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}` : '');
+  const standingsLink = document.getElementById('standings-resources-link');
+  if (standingsLink) standingsLink.href = `/standings.html${q()}`;
+  const rStandings = document.getElementById('resources-standings');
+  if (rStandings) rStandings.href = `/standings.html${q()}`;
+  const rStats = document.getElementById('resources-stats');
+  if (rStats) rStats.href = `/stats.html${q()}`;
+  const rSchedule = document.getElementById('resources-schedule');
+  if (rSchedule) rSchedule.href = `/schedule.html${q()}`;
+  const rTraits = document.getElementById('resources-team-traits');
+  if (rTraits) rTraits.href = `/team-traits.html${q()}`;
+  const rRankings = document.getElementById('resources-rankings');
+  if (rRankings) rRankings.href = `/rankings.html${q()}`;
+  const rRecruits = document.getElementById('resources-recruits');
+  if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
+  const rAwards = document.getElementById('resources-awards');
+  if (rAwards) rAwards.href = `/awards.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
+}
+
+function bindStatsAndTraitsScopeButtons() {
+  document.querySelectorAll('.stats-scope-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      statsScope = btn.getAttribute('data-scope') || 'conference';
+      document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === statsScope));
+      if (leadersDataCache) renderLeaders(leadersDataCache, statsScope);
+      if (teamStatsDataCache) renderTeamStats(teamStatsDataCache, statsScope);
+    });
+  });
+  document.querySelectorAll('.traits-scope-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      traitsScope = btn.getAttribute('data-scope') || 'conference';
+      document.querySelectorAll('.traits-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === traitsScope));
+      if (teamTraitsDataCache) renderTeamTraits(teamTraitsDataCache, traitsScope);
+    });
+  });
+}
+
+function renderFccRecruits() {
+  const tbody = document.getElementById('fcc-recruits-body');
+  const table = document.getElementById('fcc-recruits-table');
+  const heading = document.querySelector('#recruits-tab h3');
+  const lastCol = document.getElementById('fcc-recruits-last-col');
+  const fullListCopy = document.getElementById('fcc-recruits-link-copy');
+  const fullListLink = document.getElementById('fcc-recruits-full-link');
+  if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
+
+  const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
+  if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
+  if (fullListCopy) fullListCopy.style.display = useSignedRecruits ? 'none' : 'block';
+  if (fullListLink) {
+    fullListLink.href = `/recruiting.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+  }
+  if (lastCol) {
+    lastCol.textContent = 'Current Lean';
+    lastCol.dataset.sortKey = 'lean';
+    lastCol.style.display = useSignedRecruits ? 'none' : '';
+  }
+
+  if (useSignedRecruits) {
+    if (!signedRecruitsDataCache.length) {
+      tbody.innerHTML = '<tr><td colspan="19">No recruits or walk-ons joined your team.</td></tr>';
+      return;
+    }
+    const rows = RecruitingCommon.sortRecruits(signedRecruitsDataCache, recruitSortState);
+    tbody.innerHTML = '';
+    rows.forEach(function (recruit) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = [
+        '<td>' + recruit.name + '</td>',
+        '<td>' + recruit.homeRegion + '</td>',
+        '<td>' + recruit.archetype + '</td>',
+        '<td>' + recruit.height + '</td>',
+        '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
+        '<td>' + recruit.pos + '</td>',
+        '<td>' + recruit.attrs.SC + '</td>',
+        '<td>' + recruit.attrs.SH + '</td>',
+        '<td>' + recruit.attrs.ID + '</td>',
+        '<td>' + recruit.attrs.OD + '</td>',
+        '<td>' + recruit.attrs.PS + '</td>',
+        '<td>' + recruit.attrs.BH + '</td>',
+        '<td>' + recruit.attrs.RB + '</td>',
+        '<td>' + recruit.attrs.AG + '</td>',
+        '<td>' + recruit.attrs.ST + '</td>',
+        '<td>' + recruit.attrs.ND + '</td>',
+        '<td>' + recruit.attrs.IQ + '</td>',
+        '<td>' + recruit.attrs.FT + '</td>',
+        '<td>' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
+      ].join('');
+      tbody.appendChild(tr);
+    });
+    return;
+  }
+
+  if (!leanRecruitsDataCache.length) {
+    tbody.innerHTML = '<tr><td colspan="20">No recruits currently have your team on their lean list.</td></tr>';
+    return;
+  }
+  RecruitingCommon.renderRecruitTableRows(
+    tbody,
+    RecruitingCommon.sortRecruits(leanRecruitsDataCache, recruitSortState),
+    {}
+  );
+}
+
+function initFccRecruits(topData) {
+  if (typeof RecruitingCommon === 'undefined') return;
+  document.body.dataset.fccWeek = String(Number(topData?.week || 1));
+  leanRecruitsDataCache = RecruitingCommon.normalizeRecruits(
+    topData?.lean_recruits || [],
+    topData?.team_name_map || {}
+  );
+  signedRecruitsDataCache = (topData?.week_35_user_recruits || []).map((player) => {
+    const attrs = player.attributes || {};
+    return {
+      recruitId: player.recruit_id || player.player_id,
+      name: player.walk_on ? player.name + ' (walk on)' : player.name,
+      homeRegion: player.home_region || '--',
+      archetype: player.archetype || '--',
+      height: typeof formatHeight === 'function' ? formatHeight(player.height) : '--',
+      heightRaw: Number(player.height) || 0,
+      weight: player.weight != null ? Number(player.weight) : null,
+      pos: player.pos || '--',
+      rt: player.rt != null ? Number(player.rt) : null,
+      leanDisplay: '',
+      leanSortValue: '',
+      attrs: {
+        SC: Math.floor((Number(attrs.SC) || 0) / 10),
+        SH: Math.floor((Number(attrs.SH) || 0) / 10),
+        ID: Math.floor((Number(attrs.ID) || 0) / 10),
+        OD: Math.floor((Number(attrs.OD) || 0) / 10),
+        PS: Math.floor((Number(attrs.PS) || 0) / 10),
+        BH: Math.floor((Number(attrs.BH) || 0) / 10),
+        RB: Math.floor((Number(attrs.RB) || 0) / 10),
+        AG: Math.floor((Number(attrs.AG) || 0) / 10),
+        ST: Math.floor((Number(attrs.ST) || 0) / 10),
+        ND: Math.floor((Number(attrs.ND) || 0) / 10),
+        IQ: Math.floor((Number(attrs.IQ) || 0) / 10),
+        FT: Math.floor((Number(attrs.FT) || 0) / 10)
+      },
+      raw: player
+    };
+  });
+  RecruitingCommon.bindSortableHeaders(
+    document.getElementById('fcc-recruits-table'),
+    recruitSortState,
+    renderFccRecruits
+  );
+  renderFccRecruits();
+  if (typeof initAttributeTooltips !== 'undefined') {
+    const recruitsTable = document.getElementById('fcc-recruits-table');
+    if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
+  }
+}
+
+let rankingsFullList = [];
+
+function renderRankings(rankings, showAll) {
+  const listEl = document.getElementById('rankings-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  if (!rankings || rankings.length === 0) return;
+  const toShow = showAll ? rankings : rankings.slice(0, 25);
+  toShow.forEach((r) => {
+    const li = document.createElement('li');
+    li.appendChild(document.createTextNode(`${r.natl_rank}. `));
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = r.team_name;
+    if (r.conference === 1) {
+      nameSpan.className = 'rankings-team conference-1';
+      nameSpan.style.color = r.primary_color || '#000';
+      nameSpan.style.fontWeight = 'bold';
+    }
+    li.appendChild(nameSpan);
+    listEl.appendChild(li);
   });
 }
 
@@ -147,8 +456,28 @@ function getTeamPrimaryColor(teamName) {
   return teamColorCache[teamName] || null;
 }
 
-function renderLeaders(data) {
+function filterLeadersByScope(data, scope) {
+  if (!data || scope === 'national') return data;
+  const out = {};
+  const confMatch = scope === 'conference' && userConference != null;
+  const regionMatch = scope === 'region' && userRegion != null;
+  const regionNorm = (v) => (v || '').toString().toUpperCase();
+  const userRegionNorm = regionNorm(userRegion);
+  Object.keys(data).forEach(cat => {
+    const list = data[cat] || [];
+    out[cat] = list.filter((p) => {
+      if (confMatch) return p.conference === userConference;
+      if (regionMatch) return regionNorm(p.region) === userRegionNorm;
+      return true;
+    });
+  });
+  return out;
+}
+
+function renderLeaders(data, scope) {
   if (!data) return;
+  scope = scope || statsScope;
+  const filtered = filterLeadersByScope(data, scope);
   const container = document.getElementById('leaders-container');
   container.innerHTML = '';
   const preferredOrderGroups = [
@@ -160,11 +489,11 @@ function renderLeaders(data) {
     ['STL']
   ];
   const ordered = preferredOrderGroups
-    .map(group => group.find(cat => Object.prototype.hasOwnProperty.call(data, cat)))
+    .map(group => group.find(cat => Object.prototype.hasOwnProperty.call(filtered, cat)))
     .filter(Boolean);
   const categories = [
     ...ordered,
-    ...Object.keys(data).filter(cat => !ordered.includes(cat))
+    ...Object.keys(filtered).filter(cat => !ordered.includes(cat))
   ];
   const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   
@@ -201,7 +530,7 @@ function renderLeaders(data) {
     const valueHeader = valueHeaderMap[cat] || 'Value';
     table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>${valueHeader}</th></tr></thead>`;
     const body = document.createElement('tbody');
-    (data[cat] || []).forEach((p, idx) => {
+    (filtered[cat] || []).forEach((p, idx) => {
       const tr = document.createElement('tr');
       const isUserTeam = userTeamNameForLeaders && p.team === userTeamNameForLeaders;
       
@@ -239,9 +568,25 @@ function renderLeaders(data) {
 // Store teams data for sorting
 let teamsDataForSorting = [];
 
-function renderTeamStats(data) {
+function filterTeamsByScope(teams, scope) {
+  if (!teams || scope === 'national') return teams || [];
+  const confMatch = scope === 'conference' && userConference != null;
+  const regionMatch = scope === 'region' && userRegion != null;
+  const regionNorm = (v) => (v || '').toString().toUpperCase();
+  const userRegionNorm = regionNorm(userRegion);
+  return teams.filter((t) => {
+    if (confMatch) return t.conference === userConference;
+    if (regionMatch) return regionNorm(t.region) === userRegionNorm;
+    return true;
+  });
+}
+
+function renderTeamStats(data, scope) {
   if (!data) return;
-  teamsDataForSorting = JSON.parse(JSON.stringify(data.teams || [])); // Deep copy for sorting
+  scope = scope || statsScope;
+  const allTeams = data.teams || [];
+  const filtered = filterTeamsByScope(JSON.parse(JSON.stringify(allTeams)), scope);
+  teamsDataForSorting = filtered;
   TeamStatsTable.renderTeamStatsTable(teamsDataForSorting);
   
   // Add click handlers to sortable headers (only once)
@@ -423,6 +768,20 @@ function renderTeam(data) {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.has_playing_time_promise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.is_graduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     // Add other columns directly as DOM elements
@@ -612,139 +971,18 @@ function sortRosterTable(columnName, direction) {
   }
 }
 
-function renderSchedule(data) {
-  if (!data) return;
-  // Schedule container is now in the schedule-tab, not standings-tab
-  const container = document.getElementById('schedule-container');
-  if (!container) return;
-  container.innerHTML = '';
-  const teamId = data.team_id;
-  (data.schedule || []).forEach((weekGames, idx) => {
-    if (!weekGames || weekGames.length === 0) return; // Skip empty weeks
-    
-    const weekDiv = document.createElement('div');
-    weekDiv.className = 'schedule-week';
-    const h4 = document.createElement('h4');
-    
-    // ✅ EOS TOURNAMENT: Check if this is a tournament game
-    const isTournamentWeek = weekGames[0]?.is_tournament || false;
-    const roundName = weekGames[0]?.round || '';
-    
-    if (isTournamentWeek && roundName) {
-      h4.textContent = `Week ${idx + 1} - ${roundName}`;
-      weekDiv.classList.add('tournament-week');
-    } else {
-      h4.textContent = `Week ${idx + 1}`;
-    }
-    weekDiv.appendChild(h4);
-      weekGames.forEach(g => {
-      const gameDiv = document.createElement('div');
-      gameDiv.className = 'schedule-game';
-      const away = teamIdNameMap[g.away_team_id] || g.away_team_id;
-      const home = teamIdNameMap[g.home_team_id] || g.home_team_id;
-      
-      // Create clickable team links
-      const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-      const createTeamLink = (teamName, teamId) => {
-        const link = document.createElement('a');
-        link.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId || teamName)}&team_name=${encodeURIComponent(teamName)}&return_tab=schedule-tab&return_url=${returnUrl}`;
-        link.textContent = teamName;
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.cursor = 'pointer';
-        link.addEventListener('mouseenter', () => {
-          link.style.textDecoration = 'underline';
-        });
-        link.addEventListener('mouseleave', () => {
-          link.style.textDecoration = 'none';
-        });
-        return link;
-      };
-      
-      if (g.status === 'complete') {
-        const awayLink = createTeamLink(away, g.away_team_id);
-        const homeLink = createTeamLink(home, g.home_team_id);
-        const awayText = document.createTextNode(` (${g.away_score})`);
-        const homeText = document.createTextNode(` (${g.home_score})`);
-        const atText = document.createTextNode(' at ');
-        
-        const awayContainer = document.createElement('span');
-        if (g.away_score > g.home_score) {
-          awayContainer.style.fontWeight = 'bold';
-        }
-        awayContainer.appendChild(awayLink);
-        awayContainer.appendChild(awayText);
-        
-        const homeContainer = document.createElement('span');
-        if (g.home_score > g.away_score) {
-          homeContainer.style.fontWeight = 'bold';
-        }
-        homeContainer.appendChild(homeLink);
-        homeContainer.appendChild(homeText);
-        
-        gameDiv.appendChild(awayContainer);
-        gameDiv.appendChild(atText);
-        gameDiv.appendChild(homeContainer);
-      } else {
-        const awayLink = createTeamLink(away, g.away_team_id);
-        const homeLink = createTeamLink(home, g.home_team_id);
-        const atText = document.createTextNode(' at ');
-        
-        gameDiv.appendChild(awayLink);
-        gameDiv.appendChild(atText);
-        gameDiv.appendChild(homeLink);
-      }
-      
-      // ✅ SS&S: Add box score link for all completed games
-      if (g.status === 'complete' && g.game_id) {
-        const boxScoreLink = document.createElement('a');
-        const boxScoreParams = new URLSearchParams();
-        boxScoreParams.set('mode', 'franchise');
-        boxScoreParams.set('franchise_id', franchiseId);
-        boxScoreParams.set('game_id', g.game_id);
-        // ✅ Add team names for roster loading
-        if (home) boxScoreParams.set('home', home);
-        if (away) boxScoreParams.set('away', away);
-        boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
-        boxScoreLink.textContent = ' [Box Score]';
-        boxScoreLink.className = 'box-score-link';
-        boxScoreLink.style.color = '#4a90e2';
-        boxScoreLink.style.textDecoration = 'none';
-        boxScoreLink.style.marginLeft = '8px';
-        boxScoreLink.style.fontSize = 'calc(1em - 2px)';
-        gameDiv.appendChild(boxScoreLink);
-      }
-      
-      // Add training report link if this is user's team's game and training report exists
-      if (g.is_user_team && g.has_training_report) {
-        const link = document.createElement('a');
-        // ✅ SS&S: Use ObjectId for consistent navigation
-        const teamIdParam = userTeamId || teamId;
-        link.href = `/training-report.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamIdParam}&week=${g.week}`;
-        link.textContent = ' [Training Report]';
-        link.className = 'training-report-link';
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.marginLeft = '8px';
-        link.style.fontSize = 'calc(1em - 2px)';
-        gameDiv.appendChild(link);
-      }
-      
-      weekDiv.appendChild(gameDiv);
-    });
-    container.appendChild(weekDiv);
-  });
-}
+// Schedule tab removed; full schedule is on schedule.html (Resources).
 
 // Store team traits data for sorting
 let teamTraitsDataForSorting = [];
 let teamTraitsSortColumn = 'total';
 let teamTraitsSortDirection = 'desc';
 
-function renderTeamTraits(data) {
+function renderTeamTraits(data, scope) {
   if (!data || !data.teams) return;
-  
-  teamTraitsDataForSorting = data.teams;
+  scope = scope || traitsScope;
+  const filtered = filterTeamsByScope(JSON.parse(JSON.stringify(data.teams)), scope);
+  teamTraitsDataForSorting = filtered;
   
   // Calculate totals for each team and add to data
   teamTraitsDataForSorting.forEach(team => {
@@ -765,29 +1003,27 @@ function renderTeamTraits(data) {
   // Sort by default (total descending)
   sortTeamTraitsTable(teamTraitsSortColumn, teamTraitsSortDirection);
   
-  // Setup sortable headers
+  // Setup sortable headers (clone + replace to avoid duplicate listeners when switching scope)
   const headers = document.querySelectorAll('#team-traits-table thead th.sortable');
   headers.forEach(header => {
-    header.style.cursor = 'pointer';
-    header.style.userSelect = 'none';
-    
-    header.addEventListener('click', () => {
-      const attr = header.dataset.attr;
-      
-      // Toggle sort direction if clicking the same column
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const attr = newHeader.dataset.attr;
       if (teamTraitsSortColumn === attr) {
         teamTraitsSortDirection = teamTraitsSortDirection === 'desc' ? 'asc' : 'desc';
       } else {
         teamTraitsSortColumn = attr;
         teamTraitsSortDirection = 'desc';
       }
-      
       sortTeamTraitsTable(attr, teamTraitsSortDirection);
     });
   });
   
   // Render Top 10 list (excluding FT)
-  renderTeamTraitsTop10(data.teams);
+  renderTeamTraitsTop10(teamTraitsDataForSorting);
 }
 
 function sortTeamTraitsTable(columnName, direction) {
@@ -988,10 +1224,15 @@ async function init() {
   }
   
   populateTop(topData);
+  initFccRecruits(topData);
   
-  // Store user team name for leaderboard highlighting
+  // Store user team name and scope keys (used by roster/team if needed)
   if (topData && topData.team) {
     userTeamNameForLeaders = topData.team;
+  }
+  if (topData) {
+    userConference = topData.user_conference != null ? topData.user_conference : null;
+    userRegion = topData.user_region != null && topData.user_region !== '' ? topData.user_region : null;
   }
   
   // Initialize team color cache for leaderboard highlighting
@@ -1000,7 +1241,12 @@ async function init() {
   // Update button based on training status
   updatePlayButton(topData);
   updateScoutingButton(topData);
+  updateRecruitingButton(topData);
+  updateAwardsButton(topData);
   maybeShowChampionshipCompleteModal(topData);
+  if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
+    showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+  }
   
   if (topData && (topData.team_id || topData.team) && userTeamId) {
     console.log('Loading franchise roster for team_id:', userTeamId, 'franchiseId:', franchiseId);
@@ -1021,22 +1267,15 @@ async function init() {
     }
   }
   const standingsStartTime = performance.now();
-  const standingsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`);
+  const standingsUrl = userTeamId
+    ? `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&scope=user_region&team_id=${encodeURIComponent(userTeamId)}&profile=1`
+    : `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`;
+  const standingsData = await fetchJSON(standingsUrl);
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
-  renderStandings(standingsData);
-  
-    const scheduleStartTime = performance.now();
-    const scheduleData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?franchise_id=${franchiseId}`);
-    const scheduleEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/schedule: ${(scheduleEndTime - scheduleStartTime).toFixed(2)}ms`);
-    renderSchedule(scheduleData);
-    
-    const leadersStartTime = performance.now();
-    const leadersData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${franchiseId}`);
-    const leadersEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/leaders: ${(leadersEndTime - leadersStartTime).toFixed(2)}ms`);
-    renderLeaders(leadersData);
+  standingsDataCache = standingsData;
+  renderStandings(standingsData, 'A');
+  bindResourcesLinks();
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
@@ -1054,31 +1293,12 @@ async function init() {
     // 🛠️ END DEV MODE FEATURE
     // ============================================================================
     
-    const teamStatsStartTime = performance.now();
-    const teamStatsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
-    const teamStatsEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/team-stats: ${(teamStatsEndTime - teamStatsStartTime).toFixed(2)}ms`);
-    renderTeamStats(teamStatsData);
-    
-    const recruitsStartTime = performance.now();
-    const recruitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/recruits')}?franchise_id=${franchiseId}`);
-    const recruitsEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/recruits: ${(recruitsEndTime - recruitsStartTime).toFixed(2)}ms`);
-    renderRecruits(recruitsData);
-    
-    const teamTraitsStartTime = performance.now();
-    const teamTraitsData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-traits')}?franchise_id=${franchiseId}`);
-    const teamTraitsEndTime = performance.now();
-    console.log(`⏱️ [PERF] /franchise/team-traits: ${(teamTraitsEndTime - teamTraitsStartTime).toFixed(2)}ms`);
-    renderTeamTraits(teamTraitsData);
-    // ✅ Removed: renderTrainingResults - Training Reports are now linked directly on Schedule page
+    // ✅ Stats, Team Traits, Rankings moved to standalone pages (Resources tab)
     
     // Initialize tooltips for table headers
     if (typeof initAttributeTooltips !== 'undefined') {
       const rosterTable = document.querySelector('#roster-tab .roster-table');
-      const recruitsTable = document.querySelector('#recruits-tab .roster-table');
       if (rosterTable) initAttributeTooltips(rosterTable, ['th']);
-      if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
     }
     
     // Load team data for Team tab
@@ -1185,9 +1405,9 @@ function showNewSeasonConfirmModal() {
   overlay.className = 'fcc-modal-overlay';
   overlay.innerHTML = `
     <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="New Season">
-      <h3 class="fcc-modal-title">Start New Season?</h3>
-      <p class="fcc-modal-copy">All current season data will be deleted.</p>
-      <p class="fcc-modal-copy">This action cannot be undone.</p>
+      <h3 class="fcc-modal-title">Go To Next Season?</h3>
+      <p class="fcc-modal-copy">This will create the next season for this franchise instance.</p>
+      <p class="fcc-modal-copy">Your current season cannot be reopened after you proceed.</p>
       <div class="fcc-modal-actions">
         <button class="fcc-modal-btn fcc-modal-btn-secondary" id="fcc-new-season-cancel">Cancel</button>
         <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-new-season-proceed">Proceed</button>
@@ -1196,6 +1416,24 @@ function showNewSeasonConfirmModal() {
   `;
   document.body.appendChild(overlay);
   return overlay;
+}
+
+function showCutPlayersRequiredModal(cutCount) {
+  const overlay = document.createElement('div');
+  overlay.className = 'fcc-modal-overlay';
+  overlay.innerHTML = `
+    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="Cut Players Required">
+      <h3 class="fcc-modal-title">Cut Players Required</h3>
+      <p class="fcc-modal-copy">You need to cut ${cutCount} player${cutCount === 1 ? '' : 's'}.</p>
+      <div class="fcc-modal-actions">
+        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-cut-required-close">Close</button>
+      </div>
+    </div>
+  `;
+  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', () => {
+    overlay.remove();
+  });
+  document.body.appendChild(overlay);
 }
 
 function updatePlayButton(data) {
@@ -1217,21 +1455,31 @@ function updatePlayButton(data) {
     const userInMatchup = allMatchups.some(m =>
       String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
     );
-    userTeamEliminated = !userInMatchup && week >= 15;
+    userTeamEliminated = !userInMatchup && week >= 27;
   }
   
   const eliminated = userEliminated != null ? userEliminated : userTeamEliminated;
   const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
   const tournamentComplete = eosTournament?.completed || false;
+  const cutRequired = !!data.cut_required;
   
-  if (tournamentComplete && week >= 17) {
-    playNowBtn.textContent = 'Next Season';
+  if (cutRequired) {
+    playNowBtn.textContent = 'Cut Players';
+    playNowBtn.dataset.mode = 'cut-players';
+  } else if (week === 35) {
+    playNowBtn.textContent = 'Recruiting';
+    playNowBtn.dataset.mode = 'week35-recruiting';
+  } else if (week === 36) {
+    playNowBtn.textContent = 'Go To Next Season';
+    playNowBtn.dataset.mode = 'new-season';
+  } else if (tournamentComplete && week >= 37) {
+    playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
-    playNowBtn.textContent = 'Sim Rest Of Tournament';
+    playNowBtn.textContent = 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else if (trainingDisabledForEos || eliminated) {
-    playNowBtn.textContent = 'Next Season';
+    playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else {
     const trainingCompleted = data.training_completed || false;
@@ -1240,9 +1488,66 @@ function updatePlayButton(data) {
       playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
       playNowBtn.dataset.mode = 'training';
     } else {
-      playNowBtn.textContent = 'Play Now';
+      playNowBtn.textContent = 'Play Next Game';
       playNowBtn.dataset.mode = 'play';
     }
+  }
+}
+
+function updateRecruitingButton(data) {
+  const recruitingBtn = document.getElementById('fcc-recruiting-btn');
+  const liveCopy = document.getElementById('fcc-recruiting-live-copy');
+  if (!recruitingBtn || !liveCopy) return;
+  const week = Number(data?.week || 1);
+  const resultsWeek = Number(data?.current_recruiting_results_week || 0);
+  let text = 'Recruiting Begins Week 20';
+  let href = null;
+  let showButton = false;
+
+  if (week >= 20 && week <= 26 && resultsWeek === week) {
+    showButton = true;
+    text = `Week ${week} Recruiting Visits`;
+    href = `/recruiting-results.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc&week=${encodeURIComponent(String(week))}`;
+  } else if (week >= 20 && week <= 26) {
+    text = 'Recruiting Invites Active';
+  } else if (week === 19) {
+    text = 'Recruiting Invites Begin Next Week';
+  } else if (week >= 1 && week <= 18) {
+    text = 'Recruiting Invites Begin Week 20';
+  } else if (week === 35) {
+    text = 'Recruiting Is Live';
+  } else if (week === 36) {
+    text = 'Recruiting Closed';
+  } else if (week > 26) {
+    text = 'Recruiting Runs After National Tourney';
+  }
+
+  liveCopy.textContent = text;
+  liveCopy.style.display = showButton ? 'none' : 'block';
+  recruitingBtn.style.display = showButton ? 'inline-flex' : 'none';
+  recruitingBtn.textContent = text;
+  recruitingBtn.disabled = !showButton;
+  recruitingBtn.classList.toggle('is-dead', !showButton);
+  recruitingBtn.onclick = null;
+  if (showButton && href) {
+    recruitingBtn.onclick = () => {
+      window.location.href = href;
+    };
+  }
+}
+
+function updateAwardsButton(data) {
+  const awardsBtn = document.getElementById('resources-awards');
+  if (!awardsBtn) return;
+  const week = Number(data?.week || 1);
+  const active = week >= 35;
+  awardsBtn.classList.toggle('is-dead', !active);
+  awardsBtn.setAttribute('aria-disabled', active ? 'false' : 'true');
+  awardsBtn.onclick = null;
+  if (!active) {
+    awardsBtn.onclick = function (e) {
+      e.preventDefault();
+    };
   }
 }
 
@@ -1269,6 +1574,16 @@ playNowBtn.addEventListener('click', async () => {
     const sessionType = topData?.session_type || 'in-season';
     const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
     window.location.href = `/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
+    return;
+  }
+
+  if (mode === 'week35-recruiting') {
+    window.location.href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+    return;
+  }
+
+  if (mode === 'cut-players') {
+    window.location.href = `/cut-players.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
     return;
   }
   
@@ -1346,7 +1661,7 @@ playNowBtn.addEventListener('click', async () => {
     return;
   }
   
-  // End-of-season alpha flow: delete current season data and start fresh
+  // End-of-season franchise rollover: keep the same franchise instance and build the next season from franchise data
   if (mode === 'new-season') {
     const modal = showNewSeasonConfirmModal();
     modal.querySelector('#fcc-new-season-cancel')?.addEventListener('click', () => {
@@ -1357,13 +1672,13 @@ playNowBtn.addEventListener('click', async () => {
       playNowBtn.disabled = true;
       playNowBtn.textContent = 'Starting...';
       try {
-        const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
+        const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
           method: 'POST',
-          headers: API_CONFIG.getAuthHeaders(),
+          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ franchise_id: franchiseId }),
         });
-        if (!res.ok) throw new Error('Delete current franchise failed');
-        clearFranchiseLocalStorage();
-        window.location.href = '/franchise-select-team.html';
+        if (!res.ok) throw new Error('Finish season failed');
+        window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
       } catch (err) {
         console.error(err);
         alert('Unable to start new season');
@@ -1984,15 +2299,28 @@ function createMetricBar(title, value, maxValue, color, change) {
 // ✅ EOS TOURNAMENT: Render tournament bracket (shared with TCC via bracket.js)
 async function renderTournamentBracket() {
   const container = document.getElementById('tournament-bracket-container');
+  const titleEl = document.getElementById('fcc-tournament-title');
   if (!container) return;
 
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const eosTournament = topData?.eos_tournament;
+  const week = Number(topData?.week || 0);
 
   if (!eosTournament) {
+    if (titleEl) titleEl.textContent = 'End-of-Season Tournament';
     container.innerHTML = '<p>Tournament bracket not available.</p>';
     return;
   }
+
+  let tournamentTitle = 'End-of-Season Tournament';
+  if (week >= 27 && week <= 29) {
+    tournamentTitle = 'Conference Tournament';
+  } else if (week >= 30 && week <= 31) {
+    tournamentTitle = 'Region Tournament';
+  } else if (week >= 32 && week <= 36) {
+    tournamentTitle = 'National Tournament';
+  }
+  if (titleEl) titleEl.textContent = tournamentTitle;
 
   // SS&S: Get team id→name map from franchise/team-stats (same pattern as TCC)
   let teamIdToNameMap = {};
@@ -2002,25 +2330,109 @@ async function renderTournamentBracket() {
     teams.forEach(function (t) {
       if (t.team_id != null && t.team != null) {
         teamIdToNameMap[String(t.team_id)] = t.team;
+        teamIdMetaMap[String(t.team_id)] = {
+          team: t.team,
+          mascot: t.mascot || '',
+          conference: t.conference,
+        };
       }
     });
   } catch (e) {
     console.warn('[FCC] Could not load team-stats for bracket names:', e);
   }
 
-  if (typeof renderBracketShared === 'function') {
-    renderBracketShared(container, eosTournament.bracket || {}, teamIdToNameMap, {
-      seeds: eosTournament.seeds || {},
-      getLogo: function (name) {
-        return '/images/homepage-logos/' + (typeof formatTeamName === 'function' ? formatTeamName(name) : (name || '')) + '.png';
+  function normalizeRegionBracket(rt) {
+    if (!rt) return null;
+    const finalList = rt.final || [];
+    return {
+      bracket: {
+        round1: rt.round1 || [],
+        round2: [],
+        final: finalList,
       },
-      isUserTeam: function (id) {
-        return userTeamId != null && (String(id) === String(userTeamId));
-      },
-    });
-  } else {
-    container.innerHTML = '<p>Bracket renderer not loaded.</p>';
+      seeds: {},
+    };
   }
+
+  function createBracketSection(sectionTitle, bracketPayload, layout, toneClass) {
+    if (!bracketPayload || !bracketPayload.bracket) return null;
+
+    const section = document.createElement('section');
+    section.className = `fcc-tournament-section ${toneClass || ''}`.trim();
+
+    const heading = document.createElement('h4');
+    heading.className = 'fcc-tournament-section-title';
+    heading.textContent = sectionTitle;
+    section.appendChild(heading);
+
+    const bracketRoot = document.createElement('div');
+    bracketRoot.className = 'bracket';
+    section.appendChild(bracketRoot);
+
+    if (typeof renderBracketShared === 'function') {
+      renderBracketShared(bracketRoot, bracketPayload.bracket || {}, teamIdToNameMap, {
+        seeds: bracketPayload.seeds || {},
+        layout: layout || 'full',
+        getLogo: function (name) {
+          return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+        },
+        isUserTeam: function (id) {
+          return userTeamId != null && (String(id) === String(userTeamId));
+        },
+        getTooltip: function (id, name) {
+          const meta = teamIdMetaMap[String(id)] || {};
+          const teamName = meta.team || name || '';
+          const mascot = meta.mascot || '';
+          const conferenceLabel = formatConferenceTooltipLabel(meta.conference);
+          if (!teamName || !mascot || !conferenceLabel) return '';
+          return `${teamName} ${mascot}, conference ${conferenceLabel}`;
+        },
+      });
+    } else {
+      bracketRoot.innerHTML = '<p>Bracket renderer not loaded.</p>';
+    }
+
+    return section;
+  }
+
+  container.innerHTML = '';
+
+  const userConference = topData?.user_conference != null ? String(topData.user_conference) : '';
+  const userRegion = String(topData?.user_region || '').toUpperCase();
+  const conferenceTournament = userConference ? (topData?.conference_tournaments || {})[userConference] : null;
+  const regionTournamentRaw = userRegion ? (topData?.region_tournaments || {})[userRegion] : null;
+  const regionTournament = regionTournamentRaw ? normalizeRegionBracket(regionTournamentRaw) : null;
+  const nationalTournament = topData?.national_tournament || null;
+
+  const sections = [];
+  if (week >= 27 && week <= 29 && conferenceTournament) {
+    sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
+  } else if (week >= 30 && week <= 31) {
+    if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
+    if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
+  } else if (week >= 32 && week <= 36) {
+    if (nationalTournament) sections.push(createBracketSection('National Tournament', nationalTournament, 'full', 'fcc-tournament-tone-national'));
+    if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
+    if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
+  } else if (eosTournament) {
+    sections.push(createBracketSection(tournamentTitle, eosTournament, week >= 30 && week <= 31 ? 'compact4' : 'full', 'fcc-tournament-tone-conference'));
+  }
+
+  const renderedSections = sections.filter(Boolean);
+  if (!renderedSections.length) {
+    container.innerHTML = '<p>Tournament bracket not available.</p>';
+    return;
+  }
+
+  renderedSections.forEach(function (section, index) {
+    if (index > 0) {
+      const divider = document.createElement('hr');
+      divider.className = 'fcc-tournament-divider';
+      container.appendChild(divider);
+    }
+    container.appendChild(section);
+  });
+
 }
 
 // Scouting Report functionality
@@ -2031,7 +2443,7 @@ function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
   
-  // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-14) and EOS Tournament (weeks 15-17)
+  // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-26) and EOS Tournament (weeks 27-34)
   // Also show during preseason (week 0 or undefined) if there's a schedule
   const week = data?.week || data?.training_status?.current_week || 0;
   const eosTournamentActive = data?.eos_tournament_active || false;
@@ -2039,7 +2451,7 @@ function updateScoutingButton(data) {
   
   // Check if user team is eliminated from tournament
   let userTeamEliminated = false;
-  if (eosTournamentActive && eosTournament && userTeamId && week >= 15) {
+  if (eosTournamentActive && eosTournament && userTeamId && week >= 27) {
     const bracket = eosTournament.bracket || {};
     const round1 = bracket.round1 || [];
     const round2 = bracket.round2 || [];
@@ -2051,8 +2463,8 @@ function updateScoutingButton(data) {
     userTeamEliminated = !userInMatchup;
   }
   
-  // Show button if: (regular season weeks 0-14) OR (EOS Tournament weeks 15-17 and user not eliminated)
-  if (data && ((week >= 0 && week <= 14) || (week >= 15 && week <= 17 && !userTeamEliminated))) {
+  // Show button if: (regular season weeks 0-26) OR (EOS Tournament weeks 27-34 and user not eliminated)
+  if (data && ((week >= 0 && week <= 26) || (week >= 27 && week <= 34 && !userTeamEliminated))) {
     // Get upcoming opponent from play-next-game endpoint (now handles both regular season and EOS Tournament)
     fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
       method: 'POST',

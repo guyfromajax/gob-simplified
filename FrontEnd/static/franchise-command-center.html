@@ -34,6 +34,7 @@
         <img id="team-logo" src="" alt="Team Logo" class="team-logo">
         <div class="left-info">
           <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
+          <div id="fcc-season-label" class="fcc-season-label">Season --</div>
         </div>
       </div>
       <div id="top-center">
@@ -57,7 +58,11 @@
           <button id="playbooks-franchise" class="secondary-btn">Playbooks</button>
           <button id="scouting-report-btn" class="secondary-btn" style="display: none;">Scouting Report</button>
         </div>
-        <button id="play-now" class="hero-btn">Run Training</button>
+        <div class="hero-buttons-group">
+          <button id="play-now" class="hero-btn">Run Training</button>
+          <button id="fcc-recruiting-btn" class="recruiting-access-btn is-dead" type="button" disabled>Recruiting Begins Week 20</button>
+          <div id="fcc-recruiting-live-copy" class="fcc-recruiting-live-copy" style="display:none;">Recruiting Is Live</div>
+        </div>
       </div>
     </div>
 
@@ -66,22 +71,14 @@
         <button data-tab="standings-tab" class="active">Standings</button>
         <button data-tab="roster-tab">Roster</button>
         <button data-tab="team-tab">Team</button>
-        <button data-tab="stats-tab">Stats</button>
-        <button data-tab="schedule-tab">Schedule</button>
-        <button data-tab="team-traits-tab">Team Traits</button>
         <button data-tab="recruits-tab">Recruits</button>
         <button data-tab="tournament-tab">Tournament</button>
+        <button data-tab="resources-tab">Coaching Resources</button>
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
-        <div class="scroll-x">
-          <table class="leaders-table" id="standings-table">
-            <thead>
-              <tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr>
-            </thead>
-            <tbody id="standings-body"></tbody>
-          </table>
-        </div>
+        <p class="standings-fcc-note">Your conference and sister conference (same region). For all 16 conferences, use <a href="#" id="standings-resources-link">Resources → Standings</a>.</p>
+        <div id="standings-by-region" class="standings-by-region"></div>
       </div>
       <div id="roster-tab" class="tab-content">
         <div class="scroll-x">
@@ -158,103 +155,57 @@
           </section>
         </div>
       </div>
-      <div id="stats-tab" class="tab-content">
-        <div style="margin-top: 20px; width: 100%; overflow-x: auto;">
-          <h3>Team Stats</h3>
-          <table class="stats-table">
+      <div id="recruits-tab" class="tab-content">
+        <h3>Recruits Leaning Your Way</h3>
+        <p id="fcc-recruits-link-copy" class="standings-fcc-note" style="margin-top: 0;">
+          Click <a id="fcc-recruits-full-link" href="#">here</a> to see the full list of recruits.
+        </p>
+        <div class="scroll-x">
+          <table id="fcc-recruits-table" class="roster-table recruiting-table">
             <thead>
               <tr>
-                <th class="sortable" data-stat="team">Team</th>
-                <th class="sortable" data-stat="W">W</th>
-                <th class="sortable" data-stat="L">L</th>
-                <th class="sortable" data-stat="PF">PF</th>
-                <th class="sortable" data-stat="PA">PA</th>
-                <th class="sortable" data-stat="FGM">FGM</th>
-                <th class="sortable" data-stat="FGA">FGA</th>
-                <th class="sortable" data-stat="FG%">FG%</th>
-                <th class="sortable" data-stat="3PTM">3PTM</th>
-                <th class="sortable" data-stat="TPA">3PTA</th>
-                <th class="sortable" data-stat="3PT%">3PT%</th>
-                <th class="sortable" data-stat="FTM">FTM</th>
-                <th class="sortable" data-stat="FTA">FTA</th>
-                <th class="sortable" data-stat="FT%">FT%</th>
-                <th class="sortable" data-stat="DREB">DREB</th>
-                <th class="sortable" data-stat="OREB">OREB</th>
-                <th class="sortable" data-stat="TREB">TREB</th>
-                <th class="sortable" data-stat="AST">AST</th>
-                <th class="sortable" data-stat="STL">STL</th>
-                <th class="sortable" data-stat="BLK">BLK</th>
-                <th class="sortable" data-stat="F">F</th>
-                <th class="sortable" data-stat="TO">TO</th>
-                <th class="sortable" data-stat="DEF_A">DEFA</th>
-                <th class="sortable" data-stat="DEF%">DEF%</th>
-                <th class="sortable" data-stat="SCR_A">SCRA</th>
-                <th class="sortable" data-stat="SCR%">SCR%</th>
+                <th data-sort-key="name">Name</th>
+                <th data-sort-key="homeRegion">Home Region</th>
+                <th data-sort-key="archetype">Archetype</th>
+                <th data-sort-key="height">HT</th>
+                <th data-sort-key="weight">WT</th>
+                <th data-sort-key="pos">POS</th>
+                <th data-sort-key="SC">SC</th>
+                <th data-sort-key="SH">SH</th>
+                <th data-sort-key="ID">ID</th>
+                <th data-sort-key="OD">OD</th>
+                <th data-sort-key="PS">PS</th>
+                <th data-sort-key="BH">BH</th>
+                <th data-sort-key="RB">RB</th>
+                <th data-sort-key="AG">AG</th>
+                <th data-sort-key="ST">ST</th>
+                <th data-sort-key="ND">ND</th>
+                <th data-sort-key="IQ">IQ</th>
+                <th data-sort-key="FT">FT</th>
+                <th data-sort-key="rt">RT</th>
+                <th id="fcc-recruits-last-col" data-sort-key="lean">Current Lean</th>
               </tr>
             </thead>
-            <tbody id="teamstats-body"></tbody>
-          </table>
-        </div>
-        <div id="leaders-container"></div>
-      </div>
-      <div id="recruits-tab" class="tab-content">
-        <div class="scroll-x">
-          <table class="roster-table">
-            <thead>
-              <tr><th>Name</th><th>Archetype</th><th>HT</th><th>WT</th><th>POS</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th><th>RT</th></tr>
-            </thead>
-            <tbody id="recruits-body"></tbody>
-          </table>
-        </div>
-      </div>
-      <div id="schedule-tab" class="tab-content">
-        <h3>Season Schedule</h3>
-        <div id="schedule-container" class="schedule-container"></div>
-      </div>
-      <div id="team-traits-tab" class="tab-content">
-        <h3>Team Attribute Totals</h3>
-        <div class="scroll-x">
-          <table class="roster-table" id="team-traits-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-attr="team">Team</th>
-                <th class="sortable" data-attr="SC">SC</th>
-                <th class="sortable" data-attr="SH">SH</th>
-                <th class="sortable" data-attr="ID">ID</th>
-                <th class="sortable" data-attr="OD">OD</th>
-                <th class="sortable" data-attr="PS">PS</th>
-                <th class="sortable" data-attr="BH">BH</th>
-                <th class="sortable" data-attr="RB">RB</th>
-                <th class="sortable" data-attr="AG">AG</th>
-                <th class="sortable" data-attr="ST">ST</th>
-                <th class="sortable" data-attr="ND">ND</th>
-                <th class="sortable" data-attr="IQ">IQ</th>
-                <th class="sortable" data-attr="FT">FT</th>
-                <th class="sortable" data-attr="total">Total</th>
-              </tr>
-            </thead>
-            <tbody id="team-traits-body"></tbody>
-          </table>
-        </div>
-        <div style="margin-top: 40px;">
-          <h3>Top 10 (excluding FT)</h3>
-          <div id="team-traits-top10"></div>
-        </div>
-      </div>
-      <div id="recruits-tab" class="tab-content">
-        <div class="scroll-x">
-          <table class="roster-table">
-            <thead>
-              <tr><th>Name</th><th>Archetype</th><th>HT</th><th>WT</th><th>POS</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th><th>RT</th></tr>
-            </thead>
-            <tbody id="recruits-body"></tbody>
+            <tbody id="fcc-recruits-body"></tbody>
           </table>
         </div>
       </div>
       <div id="tournament-tab" class="tab-content">
-        <h3>End-of-Season Tournament</h3>
+        <h3 id="fcc-tournament-title">End-of-Season Tournament</h3>
         <div style="width: 100%; overflow-x: auto;">
           <div id="tournament-bracket-container" class="bracket"></div>
+        </div>
+      </div>
+      <div id="resources-tab" class="tab-content">
+        <h3>Coaching Resources</h3>
+        <div class="resources-grid">
+          <a id="resources-standings" class="resources-btn" href="#">Standings</a>
+          <a id="resources-stats" class="resources-btn" href="#">Stats</a>
+          <a id="resources-schedule" class="resources-btn" href="#">Schedule</a>
+          <a id="resources-team-traits" class="resources-btn" href="#">Team Traits</a>
+          <a id="resources-rankings" class="resources-btn" href="#">Rankings</a>
+          <a id="resources-recruits" class="resources-btn" href="#">Recruits</a>
+          <a id="resources-awards" class="resources-btn is-dead" href="#" aria-disabled="true">Awards</a>
         </div>
       </div>
     </div>
@@ -313,6 +264,7 @@
   <script src="/js/shared/commandCenterTabs.js"></script>
   <script src="/js/shared/scoutingReport.js"></script>
   <script src="/js/shared/alphaBanner.js"></script>
+  <script src="/recruiting-common.js"></script>
   <script src="/franchise-command-center.js"></script>
 </body>
 </html>

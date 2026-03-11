@@ -7,6 +7,7 @@ from BackEnd.db import (
     teams_collection,
     franchises_collection,
     franchise_players_data_collection,
+    franchise_team_data_collection,
 )
 from pymongo.errors import PyMongoError
 from bson import ObjectId
@@ -17,8 +18,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
     import time
     import logging
     logger = logging.getLogger(__name__)
-    from bson import ObjectId  # ✅ FIX: Import at function level so it's available throughout
-    
+
     total_start = time.time()
     try:
         # Find the team document by name
@@ -36,7 +36,12 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
         if franchise_id:
             logger.warning(f"🔍 [ROSTER LOADER DEBUG] franchise_id={franchise_id}, team_name={team_name}")
             try:
-                team_player_ids = team_doc.get("player_ids", [])
+                team_object_id = team_doc.get("_id")
+                ftd_doc = franchise_team_data_collection.find_one(
+                    {"franchise_id": ObjectId(franchise_id), "team_id": team_object_id},
+                    {"players": 1},
+                ) or {}
+                team_player_ids = ftd_doc.get("players") or team_doc.get("player_ids", [])
                 if not team_player_ids or not isinstance(team_player_ids, (list, tuple)):
                     if not team_player_ids:
                         logger.error(f"❌ [ROSTER LOADER] team_player_ids is empty! team_doc keys: {list(team_doc.keys())}")
@@ -52,14 +57,8 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
                     franchise_players = {d["player_id"]: d for d in fpd_docs}
-                    # ✅ PERFORMANCE: One batch find for universal player bios instead of find_one per player
-                    oids = []
-                    for pid in team_player_ids:
-                        try:
-                            oids.append(ObjectId(pid) if isinstance(pid, str) else pid)
-                        except Exception:
-                            oids.append(pid)
-                    base_docs = list(players_collection.find({"_id": {"$in": oids}}))
+                    # Query players by string id so both gob (string _id) and gob-staging after migration work.
+                    base_docs = list(players_collection.find({"_id": {"$in": pid_list}}))
                     base_by_id = {str(d["_id"]): dict(d) for d in base_docs}
 
                     players = []
@@ -76,15 +75,39 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                                 continue
                             base_player = base_by_id.get(pid_str)
                             if not base_player:
-                                logger.error(f"❌ [ROSTER LOADER] Player {pid_str} not found in universal collection")
-                                continue
+                                meta = franchise_player_data.get("meta", {})
+                                base_player = {
+                                    "_id": pid_str,
+                                    "first_name": meta.get("first_name", ""),
+                                    "last_name": meta.get("last_name", ""),
+                                    "team": meta.get("team", team_name),
+                                    "height": meta.get("height"),
+                                    "weight": meta.get("weight"),
+                                    "jersey": meta.get("jersey"),
+                                    "year": meta.get("year"),
+                                }
                             if not isinstance(franchise_attrs, dict):
                                 logger.error(f"❌ [ROSTER LOADER] franchise_attrs is not a dict! Type: {type(franchise_attrs)}, Value: {franchise_attrs}")
                                 continue
+                            meta = franchise_player_data.get("meta", {})
                             base_player["attributes"] = franchise_attrs
                             franchise_position_ratings = franchise_player_data.get("position_ratings", {})
                             if franchise_position_ratings:
                                 base_player["position_ratings"] = franchise_position_ratings
+                            if meta.get("height") is not None:
+                                base_player["height"] = meta.get("height")
+                            if meta.get("weight") is not None:
+                                base_player["weight"] = meta.get("weight")
+                            if meta.get("jersey") is not None:
+                                base_player["jersey"] = meta.get("jersey")
+                            if meta.get("year"):
+                                base_player["year"] = meta.get("year")
+                            if meta.get("first_name"):
+                                base_player["first_name"] = meta.get("first_name")
+                            if meta.get("last_name"):
+                                base_player["last_name"] = meta.get("last_name")
+                            if meta.get("team"):
+                                base_player["team"] = meta.get("team")
                             players.append(base_player)
                         except Exception as e:
                             logger.error(f"❌ [ROSTER LOADER] Exception processing player {pid} (idx {idx}): {type(e).__name__}: {str(e)}")

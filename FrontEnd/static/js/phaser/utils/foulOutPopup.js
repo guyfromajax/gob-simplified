@@ -121,7 +121,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   const staticPrefix = (hostname === 'localhost' || hostname === '127.0.0.1') ? '/static' : '';
   let photoUrl = playerId ? `/images/players/${playerId}.png` : '';
   if (photoUrl) photoUrl = staticPrefix + photoUrl;
-  const defaultPlayerImg = staticPrefix + '/images/players/default.png';
+  const defaultPlayerImg = staticPrefix + '/images/players/generic_headshot.png';
   const safePhotoUrl = photoUrl ? photoUrl.replace(/"/g, '&quot;') : '';
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');
   const safeName = (player?.name || 'Player').replace(/"/g, '&quot;');

@@ -7,13 +7,13 @@ Uses shared bracket_engine for bracket init, advance, and save-result.
 from __future__ import annotations
 
 import logging
-import random
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 
 from BackEnd.tournament import bracket_engine
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
+from BackEnd.db import franchise_team_data_collection
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def calculate_standings(
     team_ids must be provided from franchise_team_data (FTD); franchise_teams is no longer used.
 
     Returns:
-        List of team standings sorted by: Wins (desc), PF-PA delta (desc), Random
+        List of team standings sorted by: Wins (desc), natl_rank (asc; lower = higher). No differential.
     """
     if team_ids is None:
         raise ValueError(
@@ -41,6 +41,16 @@ def calculate_standings(
     franchise_results = franchise_doc.get("results", {})
     team_ids_map = {str(tid): {} for tid in team_ids}
     standings_data = calculate_franchise_standings(franchise_results, team_ids_map)
+
+    # Load natl_rank from FTD for tiebreaker (lower natl_rank = higher in standings)
+    franchise_id = franchise_doc.get("_id")
+    natl_rank_by_team_id = {}
+    if franchise_id:
+        ftd_docs = list(franchise_team_data_collection.find(
+            {"franchise_id": franchise_id},
+            {"team_id": 1, "natl_rank": 1},
+        ))
+        natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_docs if d.get("team_id")}
 
     # Fetch team names
     teams = list(teams_collection.find(
@@ -58,6 +68,7 @@ def calculate_standings(
         pf = data.get("PF", 0)
         pa = data.get("PA", 0)
         differential = pf - pa
+        natl_rank = natl_rank_by_team_id.get(tid_str, 999)
         standings.append({
             "team_id": tid_str,
             "name": name_by_id.get(tid_str, ""),
@@ -66,10 +77,11 @@ def calculate_standings(
             "pf": pf,
             "pa": pa,
             "differential": differential,
-            "tiebreaker_random": random.random(),
+            "natl_rank": natl_rank,
         })
 
-    standings.sort(key=lambda x: (x["wins"], x["differential"], x["tiebreaker_random"]), reverse=True)
+    # Tiebreaker: W desc, then natl_rank asc (lower = higher). No differential.
+    standings.sort(key=lambda x: (-x["wins"], x["natl_rank"]))
     return standings
 
 
@@ -96,7 +108,7 @@ def initialize_eos_tournament(
     team_ids: Optional[List[Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Initialize EOS Tournament after week 14 completion.
+    Initialize EOS Tournament after regular season (week 26) completion.
 
     Args:
         franchise_doc: Franchise document
