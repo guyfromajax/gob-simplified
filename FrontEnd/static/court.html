@@ -4072,6 +4072,39 @@
     const loadGameStatsModule = await import(`${staticPath}/js/phaser/utils/loadGameStats.js`);
     const { applyVibrantColors } = vibrantColorsModule;
     const { initializeGameStats } = loadGameStatsModule;
+
+    async function hydrateCourtColorsFromRoster(homeTeamName, awayTeamName) {
+      if (!homeTeamName || !awayTeamName) return false;
+
+      const params = new URLSearchParams();
+      const mode = urlParams.get('mode');
+      const franchiseId = urlParams.get('franchise_id');
+      const tournamentId = urlParams.get('tournament_id');
+      if (mode === 'franchise' && franchiseId) params.append('franchise_id', franchiseId);
+      if (mode === 'tournament' && tournamentId) params.append('tournament_id', tournamentId);
+      params.append('profile', '1');
+      const query = params.toString() ? `?${params.toString()}` : '';
+
+      try {
+        const [homeRes, awayRes] = await Promise.all([
+          fetch(API_CONFIG.buildUrl(`/roster/${encodeURIComponent(homeTeamName)}${query}`)),
+          fetch(API_CONFIG.buildUrl(`/roster/${encodeURIComponent(awayTeamName)}${query}`)),
+        ]);
+        if (!homeRes.ok || !awayRes.ok) return false;
+
+        const [homeRoster, awayRoster] = await Promise.all([homeRes.json(), awayRes.json()]);
+        const homeColor = homeRoster?.primary_color;
+        const awayColor = awayRoster?.primary_color;
+        if (!homeColor || !awayColor) return false;
+
+        document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
+        document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
+        return true;
+      } catch (err) {
+        console.warn('⚠️ Failed to hydrate real team colors for pre-game court UI:', err);
+        return false;
+      }
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
@@ -4088,7 +4121,10 @@
     }
     
     if (homeTeam && awayTeam) {
-      applyVibrantColors(homeTeam, awayTeam);
+      const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
+      if (!appliedRealColors) {
+        applyVibrantColors(homeTeam, awayTeam);
+      }
     } else {
       console.warn('⚠️ No teams found in URL, using default vibrant colors');
     }
