@@ -5958,7 +5958,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                     players.append({
                         "id": pid_str,
                         "name": player_name,
-                        "attributes": player_attrs
+                        "attributes": player_attrs,
+                        "position_ratings": player_data.get("position_ratings", {}),
                     })
             
             logger.info(f"🔍 [TRAINING REPORT] Found {len(players)} players for team {team_id_str}")
@@ -6093,7 +6094,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                     players.append({
                         "id": pid_str,
                         "name": player_name,
-                        "attributes": player_attrs
+                        "attributes": player_attrs,
+                        "position_ratings": tournament_player_data.get("position_ratings", {}),
                     })
             
             # Get current team attributes from tournament teams (matches Franchise pattern)
