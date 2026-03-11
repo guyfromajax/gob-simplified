@@ -1519,7 +1519,7 @@ function updateRecruitingButton(data) {
   } else if (week === 36) {
     text = 'Recruiting Closed';
   } else if (week > 26) {
-    text = 'Recruiting Returns Later';
+    text = 'Recruiting Runs After National Tourney';
   }
 
   liveCopy.textContent = text;
