@@ -3818,6 +3818,22 @@ def _zero_stats_block() -> dict[str, Any]:
     return zero_stats
 
 
+def _normalize_new_franchise_player_attributes(raw_attributes: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Convert recruit-style attributes into the full franchise-player shape.
+    New freshmen need anchor baselines plus CH/EM/MO/NG before week 1 training.
+    """
+    attrs = (raw_attributes or {}).copy()
+    core_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+
+    for attr in core_attrs:
+        base_val = int(attrs.get(attr, 0) or 0)
+        attrs[attr] = base_val
+        attrs[f"anchor_{attr}"] = base_val
+
+    return Player.randomize_game_attributes(attrs)
+
+
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
@@ -6489,7 +6505,9 @@ def finish_season(req: FinishSeasonRequest):
             },
             "season": zero_stats.copy(),
             "career": zero_stats.copy(),
-            "attributes": (signed_player.get("attributes") or {}).copy(),
+            "attributes": _normalize_new_franchise_player_attributes(
+                signed_player.get("attributes") or {}
+            ),
             "position_ratings": (signed_player.get("position_ratings") or {}).copy(),
         })
 

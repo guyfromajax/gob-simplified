@@ -60,11 +60,13 @@ When the user confirms `Go To Next Season`:
   - `franchise.results` is cleared, so W / L / PF / PA all return to zero for the new season
 - seniors are removed from the franchise instance
 - signed recruits and walk-ons are carried into the next season
+  - when they are materialized into next-season franchise player docs, their recruit attributes are normalized into the full franchise-player shape
+  - this includes anchor baselines for core attributes plus initialized `CH`, `EM`, `MO`, and `NG`, so week 1 training camp treats them like normal franchise players
 - career stats persist
 - season stats reset
 - a new franchise-season schedule is generated
 - old FRD docs are deleted
-- 200 new recruits are generated for the next season
+- 300 new recruits are generated for the next season
 - roster rendering for the next season is franchise-instance driven
   - signed recruits and walk-ons do not need universal `players` docs to appear on roster pages
 
