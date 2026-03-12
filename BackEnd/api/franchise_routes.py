@@ -2212,7 +2212,16 @@ def command_center_data(
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
         )
-        if eos_tournament_active:
+        post_eos_bracket_history_visible = bool(
+            not eos_tournament_active
+            and week in {35, 36}
+            and (
+                franchise_doc.get("conference_tournaments")
+                or franchise_doc.get("region_tournaments")
+                or franchise_doc.get("national_tournament")
+            )
+        )
+        if eos_tournament_active or post_eos_bracket_history_visible:
             response["eos_tournament_active"] = True
             response["conference_tournaments"] = franchise_doc.get("conference_tournaments")
             response["region_tournaments"] = franchise_doc.get("region_tournaments")
