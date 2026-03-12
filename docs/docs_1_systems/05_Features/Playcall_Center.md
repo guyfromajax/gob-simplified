@@ -2,9 +2,13 @@
 
 **Structure**
 1. Top Row: Status displays (offense playcall name, defense type + aggression)
-2. Left Panel: Offense override (6 plays in slot order, player headshots, navigation buttons)
+2. Left Panel: Offense override (6 plays in slot order, player headshots, navigation buttons, red X clear button)
 3. Center: Lean meter (visual effectiveness indicator, -100 to +100 range)
-4. Right Panel: Defense override (Man/Zone buttons, Passive/Normal/Aggressive buttons)
+4. Right Panel: Defense override (Man/Zone buttons, Passive/Normal/Aggressive buttons, red X clear buttons for defense and aggression rows)
+
+**Visible UI Notes**
+- The large `OFFENSE OVERRIDE` / `DEFENSE OVERRIDE` headers are intentionally hidden in the live court UI because the top-row `OFFENSE:` / `DEFENSE:` labels already provide that context.
+- The bottom `Clear Override` button on the defense side is intentionally hidden. Defense overrides are cleared via the red `X` buttons attached to the defense and aggression rows.
 
 **Override System Flow (4 Steps)**
 1. User Selection (Frontend)
@@ -61,4 +65,3 @@ team.strategy_calls = {
 - `BackEnd/models/turn_manager.py`: `set_playcalls()`, `set_strategy_calls()`
 - `BackEnd/models/team_manager.py`: `TeamManager.__init__()` initializes `strategy_calls`
 - `BackEnd/engine/phase_resolution.py`: Calculates `lean_result_value`, embeds in turn text
-

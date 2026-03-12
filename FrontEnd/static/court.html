@@ -1173,6 +1173,11 @@
       margin-bottom: 2px;  /* CHANGE: reduced margin */
     }
 
+    .panel-title-spacer {
+      visibility: hidden;
+      user-select: none;
+    }
+
     /* Offense Play Scroller Container */
     .play-scroller-container {
       display: flex;
@@ -1409,6 +1414,15 @@
       background: rgba(244, 67, 54, 0.15);
       border-color: rgba(244, 67, 54, 0.5);
       color: #F44336;
+    }
+
+    .clear-override-placeholder {
+      width: 100%;
+      padding: 6px;
+      margin-top: 2px;
+      visibility: hidden;
+      pointer-events: none;
+      box-sizing: border-box;
     }
 
     /* Lean Meter (Center Focal Point) */
@@ -2641,7 +2655,7 @@
       
       <!-- Offense Panel (switches sides) -->
       <div id="offense-panel" class="tactical-panel">
-        <div class="panel-title">OFFENSE OVERRIDE</div>
+        <div class="panel-title panel-title-spacer" aria-hidden="true">OFFENSE OVERRIDE</div>
         <div class="play-scroller-container">
           <div id="offense-play-scroller" class="play-scroller">
           <div class="play-option" data-play="4-1 Motion" data-focus="inside">
@@ -2706,7 +2720,7 @@
 
       <!-- Defense Panel (switches sides) -->
       <div id="defense-panel" class="tactical-panel">
-        <div class="panel-title">DEFENSE OVERRIDE</div>
+        <div class="panel-title panel-title-spacer" aria-hidden="true">DEFENSE OVERRIDE</div>
         <div class="defense-overrides">
           <div class="defense-row">
             <button class="defense-override-btn" data-defense="Man">MAN</button>
@@ -2720,7 +2734,7 @@
             <button id="clear-aggression-override-x" class="defense-clear-x-btn">✕</button>
       </div>
         </div>
-        <button id="clear-defense-override" class="clear-override-btn">Clear Override</button>
+        <div class="clear-override-placeholder" aria-hidden="true"></div>
       </div>
       
     </div>  <!-- Close #playcall-main-row -->
