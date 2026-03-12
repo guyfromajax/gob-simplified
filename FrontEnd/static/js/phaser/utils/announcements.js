@@ -9,6 +9,96 @@ import gameStore from '../../state/gameStore.js';
 
 let currentAnnouncement = null;
 
+function getPlayerJerseyValue(player) {
+  if (!player) return '';
+  if (typeof player.jersey === 'number') return String(player.jersey);
+  if (player.jersey !== undefined && player.jersey !== null && player.jersey !== '') return String(player.jersey);
+  if (typeof player.jerseyNumber === 'number') return String(player.jerseyNumber);
+  if (player.jerseyNumber !== undefined && player.jerseyNumber !== null && player.jerseyNumber !== '') return String(player.jerseyNumber);
+  if (typeof player.jersey_number === 'number') return String(player.jersey_number);
+  if (player.jersey_number !== undefined && player.jersey_number !== null && player.jersey_number !== '') return String(player.jersey_number);
+  return '';
+}
+
+function getPlayerLastName(player) {
+  if (!player) return '';
+  const directLastName = String(player.last_name || player.lastName || '').trim();
+  if (directLastName) return directLastName;
+  const rawName = String(player.name || '').trim();
+  if (!rawName) return '';
+  const parts = rawName.split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
+function findRosterPlayer(playerId) {
+  if (!playerId) return null;
+  const rosters = gameStore.getRosters() || {};
+  const allPlayers = []
+    .concat(Array.isArray(rosters.home?.players) ? rosters.home.players : [])
+    .concat(Array.isArray(rosters.away?.players) ? rosters.away.players : []);
+  return allPlayers.find((player) => String(player?.playerId || player?._id || player?.id) === String(playerId)) || null;
+}
+
+function buildAnnouncementPlayerLabel(playerData) {
+  if (!playerData) return '';
+  const rosterPlayer = findRosterPlayer(playerData.playerId);
+  const jersey = getPlayerJerseyValue(rosterPlayer || playerData);
+  const lastName = getPlayerLastName(rosterPlayer || playerData);
+  if (!jersey && !lastName) return '';
+  if (!jersey) return lastName;
+  if (!lastName) return `#${jersey}`;
+  return `#${jersey} ${lastName}`;
+}
+
+function createPlayerAnnouncementCard(playerData, scale = 1.0) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'announcement-player-card';
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.justifyContent = 'flex-start';
+  wrapper.style.gap = `${Math.max(4, Math.round(6 * scale))}px`;
+  wrapper.style.flexShrink = '0';
+
+  const container = document.createElement('div');
+  container.className = 'announcement-headshot';
+  container.style.width = `${60 * scale}px`;
+  container.style.height = `${60 * scale}px`;
+  container.style.flexShrink = '0';
+  container.style.backgroundColor = playerData.secondaryColor || '#333333';
+  container.style.backgroundSize = 'cover';
+  container.style.backgroundPosition = 'center';
+
+  const img = document.createElement('img');
+  img.src = getPlayerImageUrl(playerData.photo, playerData.playerId);
+  img.alt = 'Player';
+  img.style.width = '100%';
+  img.style.height = '100%';
+  img.style.objectFit = 'cover';
+  img.onerror = () => {
+    img.src = getPlayerImageUrl(null, null);
+  };
+  container.appendChild(img);
+  wrapper.appendChild(container);
+
+  const labelText = buildAnnouncementPlayerLabel(playerData);
+  if (labelText) {
+    const label = document.createElement('div');
+    label.className = 'announcement-player-label';
+    label.textContent = labelText;
+    label.style.fontSize = `${Math.max(0.7, 0.85 * scale)}rem`;
+    label.style.fontWeight = '700';
+    label.style.lineHeight = '1';
+    label.style.textAlign = 'center';
+    label.style.color = '#ffffff';
+    label.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.8)';
+    label.style.whiteSpace = 'nowrap';
+    wrapper.appendChild(label);
+  }
+
+  return wrapper;
+}
+
 /** Build player image URL with static prefix for current environment (localhost vs production). Use generic_headshot when playerId is falsy. */
 function getPlayerImageUrl(photo, playerId) {
   const base = (typeof window !== 'undefined' && window.API_CONFIG?.buildStaticPath)
@@ -162,27 +252,7 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
  * Headshot background uses team secondary color (no team background image).
  */
 function createHeadshotElement(playerData, scale = 1.0) {
-  const container = document.createElement('div');
-  container.className = 'announcement-headshot';
-  container.style.width = `${60 * scale}px`;
-  container.style.height = `${60 * scale}px`;
-  container.style.flexShrink = '0';
-  container.style.backgroundColor = playerData.secondaryColor || '#333333';
-  container.style.backgroundSize = 'cover';
-  container.style.backgroundPosition = 'center';
-
-  const img = document.createElement('img');
-  img.src = getPlayerImageUrl(playerData.photo, playerData.playerId);
-  img.alt = 'Player';
-  img.style.width = '100%';
-  img.style.height = '100%';
-  img.style.objectFit = 'cover';
-  img.onerror = () => {
-    img.src = getPlayerImageUrl(null, null);
-  };
-  container.appendChild(img);
-
-  return container;
+  return createPlayerAnnouncementCard(playerData, scale);
 }
 
 /**
@@ -259,24 +329,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
   
   // Add player headshot if provided (will appear after text). Background = team secondary color.
   if (playerData && (playerData.photo || playerData.playerId)) {
-    const headshotContainer = document.createElement('div');
-    headshotContainer.className = 'announcement-headshot';
-    headshotContainer.style.backgroundColor = playerData.secondaryColor || '#333333';
-    headshotContainer.style.backgroundSize = 'cover';
-    headshotContainer.style.backgroundPosition = 'center';
-
-    const img = document.createElement('img');
-    img.src = getPlayerImageUrl(playerData.photo, playerData.playerId);
-    img.alt = 'Player';
-    img.style.width = '100%';
-    img.style.height = '100%';
-    img.style.objectFit = 'cover';
-    img.onerror = () => {
-      img.src = getPlayerImageUrl(null, null);
-    };
-    headshotContainer.appendChild(img);
-
-    announcement.appendChild(headshotContainer);
+    announcement.appendChild(createPlayerAnnouncementCard(playerData, 1.0));
   }
   
   // SFX: foul/turnover announcements (synced to on-screen announcement)
@@ -567,4 +620,3 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     }
   }
 }
-

@@ -26,9 +26,9 @@
      - Suppressed if `turn.roles?.is_steal_entry` is true (steal announcement takes priority)
 
 2. **End Announcements** (`timing='end'`)
-   - **"It's Good!"** - Made shot (ballManager.js, when ball reaches rim)
-   - **"It's Good! And 1!"** - Made shot with shooting foul (two-row announcement with shooter and fouler headshots)
-   - **"Shooting Foul!"** - Defensive shooting foul on miss (with fouling player headshot)
+    - **"It's Good!"** - Made shot (ballManager.js, when ball reaches rim)
+    - **"It's Good! And 1!"** - Made shot with shooting foul (two-row announcement with shooter and fouler headshots plus jersey number / last name labels)
+    - **"Shooting Foul!"** - Defensive shooting foul on miss (with fouling player headshot)
    - **"STEAL!"** - Steal occurred (takes priority over Fast Break announcement)
    - **"Travel!" / "Double Dribble!"** - Dead ball turnovers (randomly chosen 50/50)
    - **"OUT OF BOUNDS!" / "BAD PASS!"** - Other turnover types
@@ -66,6 +66,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 - **"It's Good!"** - Handled in `ballManager.js` when ball reaches rim (line 542); **Fast Break** shots use `fastBreak.js` (see below).
 - **"It's Good! And 1!"** - Detected when text includes "AND-1" OR (`foul_player_id` exists + `result === "MAKE"` + `foul_team === "DEFENSE"`)
   - Uses `showAndOneAnnouncement()` for two-row announcement with shooter and fouler headshots
+  - Both player images display `#jersey lastName` directly beneath the headshot when that data is available
   - Fallback: Single-row announcement if player data missing
 - **"Shooting Foul!"** - Detected when `result === "MISS"` and (`next_play_type === 'FREE_THROW'` or `free_throws_remaining > 0`)
   - Always displays announcement even if player sprite/info is missing (fallback pattern)
@@ -164,9 +165,10 @@ When a steal leads to a fast break:
 
 **Player Headshots:**
 - Displayed for: Steals, turnovers, fouls, AND-1 situations
+- When a player image is shown, the UI also displays `#jersey lastName` directly beneath the headshot when roster data is available
 - Fallback: Announcement still displays even if player data is missing (matches AND-1 pattern for consistency)
 
-**How we access player images:** Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, headshot `img.src` is `playerData.photo || \`/images/players/${playerData.playerId}.png\``. No static path prefix in this file; `/images/players/` is assumed correct for the environment. Player ids are strings in both gob and gob-staging (see `scripts/migrate_gob_staging_players_to_string_id.py`).
+**How we access player images and labels:** Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, the headshot `img.src` is `playerData.photo || \`/images/players/${playerData.playerId}.png\``. Jersey number / last-name labels are resolved first from the active game rosters in `gameStore`, then fall back to any name / jersey values already present on `playerData`. Player ids are strings in both gob and gob-staging (see `scripts/migrate_gob_staging_players_to_string_id.py`).
 
 ### Key Files
 
@@ -193,4 +195,3 @@ When a steal leads to a fast break:
 **Backend:**
 - `BackEnd/engine/phase_resolution.py` - Sets `is_steal_entry` flag for steal-initiated Fast Breaks
 - `BackEnd/models/turn_manager.py` - Populates turn data with announcement triggers
-
