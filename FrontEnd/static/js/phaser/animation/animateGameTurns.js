@@ -18,7 +18,7 @@ import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
 // ✅ PHASE 2.6 COMPLETE: These are now handled by AnimationRouter via turnPreparation.js
 // import { updatePlaycallDisplay } from "../utils/playcallDisplay.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 // import { updateStrategyBars } from "../utils/strategyBars.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
-// import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
+// import { updatePlaycallCenter } from "../ui/playcallCenter.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js"; // ✅ RESTORED: Needed for outlet passes (sets scene.currentTurn before routing)
 import { announceFromTurnData } from "../utils/announcements.js";
 import {

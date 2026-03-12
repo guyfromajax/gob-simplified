@@ -10,7 +10,7 @@
 
 import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
-import { updatePlaycallCenter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
+import { updatePlaycallCenter } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
@@ -22,8 +22,7 @@ import { announceFromTurnData } from "../utils/announcements.js";
  * - Setting scene.currentTurn and turn.index
  * - Updating playcall display
  * - Updating strategy bars
- * - Updating playcall center (including lean score parsing)
- * - Calculating lean meter animation step
+ * - Updating playcall center
  * - Showing turn start announcements
  * 
  * @param {Object} params - Preparation parameters
@@ -57,31 +56,10 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   // Update strategy bars at start of turn
   updateStrategyBars(turn, homeTeamId);
   
-  // Update Playcall Center (panels and reset lean meter)
+  // Update Playcall Center panels
   updatePlaycallCenter(turn, homeTeamId);
   
-  // Parse lean score for later animation (at middle step)
-  const leanScore = parseLeanScoreFromText(turn);
-  const animations = turn.animations || [];
-  
-  // Calculate middle step for lean meter animation
-  if (leanScore !== null && animations.length > 0) {
-    // Find the max number of steps across all player animations
-    const maxSteps = Math.max(
-      0,
-      ...animations.map(anim => anim.movement?.length || 0)
-    );
-    
-    // Calculate middle step (round up for even numbers)
-    const middleStep = Math.ceil(maxSteps / 2);
-    
-    // Store for use during animation
-    scene._leanScoreToAnimate = leanScore;
-    scene._leanAnimationStep = middleStep;
-    scene._leanAnimationTriggered = false;
-  } else {
-    scene._leanScoreToAnimate = null;
-  }
+  scene._leanScoreToAnimate = null;
   
   // ✅ SS&S: Use central announcement dispatcher
   // Check turn context and announce appropriately
@@ -315,4 +293,3 @@ export async function finalizeTurnAfterAnimation({
     updateDebugScore(turn, { turnIndex, possessionId });
   }
 }
-

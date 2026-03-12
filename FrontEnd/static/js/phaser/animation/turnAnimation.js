@@ -2270,18 +2270,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       break;
     }
 
-    // Trigger lean meter animation at middle step
-    if (scene._leanScoreToAnimate !== null && 
-        scene._leanAnimationStep === stepIndex && 
-        !scene._leanAnimationTriggered) {
-      // ✅ REMOVED: LEAN animation logging (cluttering console)
-      const { animateLeanMeter } = await import('../ui/playcallCenter.js');
-      animateLeanMeter(scene._leanScoreToAnimate);
-      scene._leanAnimationTriggered = true;
-    } else if (scene._leanScoreToAnimate !== null && stepIndex === scene._leanAnimationStep) {
-      // ✅ REMOVED: LEAN animation mismatch logging (cluttering console)
-    }
-
     // ✅ FIX: Skip updateBallOwnership if a pass is happening at this step OR
     // if a pass just completed (passInFlight is still true from previous step)
     // We'll handle the pass explicitly after movements complete (like shots)

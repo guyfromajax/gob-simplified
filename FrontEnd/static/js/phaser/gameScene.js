@@ -1623,11 +1623,29 @@ export function createGameScene(Phaser) {
       
       // Game Speed button handler
       if (gameSpeedBtn && speedDropdown && !gameSpeedBtn.disabled) {
+        const positionSpeedDropdown = () => {
+          if (!gameSpeedBtn || !speedDropdown) return;
+          const rect = gameSpeedBtn.getBoundingClientRect();
+          speedDropdown.style.left = `${Math.round(rect.left)}px`;
+          speedDropdown.style.top = `${Math.round(rect.top - speedDropdown.offsetHeight - 8)}px`;
+        };
+
         gameSpeedBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           const isVisible = speedDropdown.style.display !== 'none';
-          speedDropdown.style.display = isVisible ? 'none' : 'flex';
+          if (isVisible) {
+            speedDropdown.style.display = 'none';
+          } else {
+            speedDropdown.style.display = 'flex';
+            positionSpeedDropdown();
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          if (speedDropdown.style.display !== 'none') {
+            positionSpeedDropdown();
+          }
         });
         
         // Close dropdown when clicking outside

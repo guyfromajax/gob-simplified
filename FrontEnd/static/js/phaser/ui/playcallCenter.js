@@ -1,8 +1,8 @@
 /**
  * Playcall Center Module
  * 
- * Updates the offense/defense panels and lean meter at the bottom of the court.
- * Shows play calls, defense type, and animated lean score visualization.
+ * Updates the offense/defense panels at the bottom of the court.
+ * Shows play calls and defense type.
  */
 
 /**
@@ -87,9 +87,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     }
   }
 
-  // Reset lean meter to neutral
-  resetLeanMeter();
-
   // ✅ SS&S: Headshots are set once on page load via populatePlayHeadshots() in court.html
   // Do NOT update headshots dynamically during gameplay - this causes images to change mid-game
   // and can show computer team players. Images remain static based on user's lineup.
@@ -130,56 +127,19 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 }
 
 /**
- * Reset lean meter to neutral (just yellow center line)
+ * Legacy no-op retained so existing imports remain safe after lean meter removal.
  */
 export function resetLeanMeter() {
-  const posFill = document.getElementById('lean-fill-positive');
-  const negFill = document.getElementById('lean-fill-negative');
-
-  if (posFill) posFill.style.height = '0%';
-  if (negFill) negFill.style.height = '0%';
+  return;
 }
 
 /**
- * Animate lean meter based on lean score
+ * Legacy no-op retained so existing imports remain safe after lean meter removal.
  * @param {number} leanScore - Score from -100 to 100 (raw result value)
  */
 export function animateLeanMeter(leanScore) {
-  if (leanScore == null || isNaN(leanScore)) {
-    return;
-  }
-
-  // Clamp to -100 to 100 range
-  const clampedScore = Math.max(-100, Math.min(100, leanScore));
-
-  const posFill = document.getElementById('lean-fill-positive');
-  const negFill = document.getElementById('lean-fill-negative');
-
-  if (!posFill || !negFill) {
-    return;
-  }
-
-  if (clampedScore > 0) {
-    // Positive score: fill upward (green)
-    // Fill percentage of the space from center (50%) to top (100%)
-    // Map -100 to 100 range to 0-50% fill (half the container)
-    // Formula: fillPercentage = (clampedScore / 100) * 50
-    const fillPercentage = (Math.abs(clampedScore) / 100) * 50; // 0-50% of container
-    posFill.style.height = `${fillPercentage}%`;
-    negFill.style.height = '0%';
-  } else if (clampedScore < 0) {
-    // Negative score: fill downward (red)
-    // Fill percentage of the space from center (50%) to bottom (0%)
-    // Map -100 to 100 range to 0-50% fill (half the container)
-    // Formula: fillPercentage = (Math.abs(clampedScore) / 100) * 50
-    const fillPercentage = (Math.abs(clampedScore) / 100) * 50; // 0-50% of container
-    posFill.style.height = '0%';
-    negFill.style.height = `${fillPercentage}%`;
-  } else {
-    // Exactly 0: neutral (just yellow line)
-    posFill.style.height = '0%';
-    negFill.style.height = '0%';
-  }
+  void leanScore;
+  return;
 }
 
 /**
@@ -203,4 +163,3 @@ export function parseLeanScoreFromText(turnData) {
 
   return null;
 }
-

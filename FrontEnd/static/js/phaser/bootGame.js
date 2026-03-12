@@ -349,7 +349,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const contentEl = document.getElementById('sim-quarter-scroll-content');
   
   // ✅ NEW: Hide game control buttons when Sim Quarter popup is visible
-  const gameControlsEl = document.querySelector('.game-controls');
+  const gameControlsEl = document.querySelector('#game-controls-strip, .game-controls');
   if (gameControlsEl) {
     gameControlsEl.style.display = 'none';
   }

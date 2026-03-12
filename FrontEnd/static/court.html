@@ -54,6 +54,7 @@
       grid-template-rows:
         var(--scoreboard-height)
         1fr
+        56px
         clamp(160px, 25vh, 300px);
       grid-template-columns:
         var(--player-stats-width)
@@ -62,6 +63,7 @@
       grid-template-areas:
         "scoreboard scoreboard scoreboard"
         "left-stats court right-stats"
+        "left-stats controls right-stats"
         "left-stats playcall right-stats";
       height: 100vh;
       width: 100vw;
@@ -92,6 +94,21 @@
       /* Canvas fills grid-allocated container; Phaser must match container dimensions */
     }
     #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
+    #app-grid #game-controls-strip {
+      grid-area: controls;
+      grid-column: 2;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1));
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 0 40px;
+      box-sizing: border-box;
+      position: relative;
+      z-index: 925;
+    }
     #app-grid #playcall-center {
       grid-area: playcall;
       grid-column: 2; /* Force center column only so container does not cover side panels */
@@ -1089,12 +1106,12 @@
       overflow-y: auto;  /* Scroll if content exceeds available space */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
-      padding: 8px 40px 12px 40px;  /* CHANGE: reduced padding for compactness */
+      padding: 6px 24px 8px 24px;
       box-sizing: border-box;
       z-index: 900;
       display: flex;
       flex-direction: column;
-      gap: 8px;  /* CHANGE: reduced gap */
+      gap: 6px;
     }
 
     /* FIXED POSITIONING - Dynamically positioned below canvas, constrained height */
@@ -1147,10 +1164,12 @@
     /* Main Row: 3-Column Layout */
     #playcall-main-row {
       display: flex;
-      align-items: center;  /* CHANGE: center instead of stretch to prevent vertical stretching */
+      flex-direction: row;
+      align-items: center;
       justify-content: space-between;
-      gap: 16px;  /* CHANGE: reduced gap */
-      min-height: 0;  /* CHANGE: allow shrinking */
+      gap: 24px;
+      padding: 0 20px;
+      min-height: 0;
     }
 
     /* Tactical Panels (Offense & Defense) */
@@ -1159,7 +1178,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;  /* CHANGE: reduced gap */
-      max-width: 320px;
+      max-width: 48%;
       min-height: 0;  /* CHANGE: allow shrinking */
     }
 
@@ -1229,15 +1248,15 @@
 
     /* Red X Clear Override Button */
     .clear-override-x-btn {
-      width: 32px;
-      height: 60px;  /* Default height, will be set dynamically to 50% of container */
-      min-height: 50px;  /* Minimum height for visibility */
-      max-height: 120px;  /* Maximum height to prevent it from being too large */
+      width: 28px;
+      height: 28px;
+      min-height: unset;
+      max-height: unset;
       border-radius: 4px;
       background: rgba(244, 67, 54, 0.2);
       border: 2px solid rgba(244, 67, 54, 0.6);
       color: #F44336;
-      font-size: 20px;
+      font-size: 14px;
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -1245,8 +1264,8 @@
       align-items: center;
       justify-content: center;
       line-height: 1;
-      align-self: center;  /* Vertically center relative to container */
-      margin-left: 8px;  /* Space between nav buttons and X button */
+      align-self: unset;
+      margin-left: 0;
     }
 
     .clear-override-x-btn:hover {
@@ -1423,67 +1442,6 @@
       visibility: hidden;
       pointer-events: none;
       box-sizing: border-box;
-    }
-
-    /* Lean Meter (Center Focal Point) */
-    #lean-meter-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 100px;
-      max-width: 120px;
-    }
-
-    #lean-meter {
-      width: 64px;  /* CHANGE: 20% thinner (was 80px) */
-      height: 120px;  /* CHANGE: fixed height instead of 100% to prevent stretching */
-      min-height: 120px;
-      max-height: 120px;  /* Prevent stretching beyond intended size */
-      background: rgba(255, 255, 255, 0.1);
-      border: 3px solid rgba(255, 215, 0, 0.4);
-      border-radius: 20px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-    }
-
-    #lean-center-line {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: #FFD700;
-      transform: translateY(-50%);
-      z-index: 2;
-      box-shadow: 0 0 15px rgba(255, 215, 0, 0.9);
-    }
-
-    .lean-fill {
-      position: absolute;
-      left: 0;
-      right: 0;
-      transition: height 0.8s ease-out;
-    }
-
-    .lean-fill-pos {
-      bottom: 50%;
-      height: 0%;
-      background: linear-gradient(to top, rgba(76, 175, 80, 0.7), rgba(76, 175, 80, 0.95));
-      border-radius: 25px 25px 0 0;
-    }
-
-    .lean-fill-neg {
-      top: 50%;
-      height: 0%;
-      background: linear-gradient(to bottom, rgba(244, 67, 54, 0.7), rgba(244, 67, 54, 0.95));
-      border-radius: 0 0 25px 25px;
-    }
-
-    /* Panel Order: Always offense left, defense right (no flipping) */
-    #playcall-main-row {
-      flex-direction: row;  /* Fixed: offense always left, defense always right */
     }
 
     /* ==================== PLAYCALL REVEAL HUD ==================== */
@@ -1948,6 +1906,16 @@
       transform: scale(1.05); /* Slightly larger */
       font-weight: 900; /* Extra bold text */
     }
+
+    #game-controls-strip #pause-btn {
+      position: static;
+      left: auto;
+      transform: none;
+    }
+
+    #game-controls-strip #timeout-btn {
+      margin-left: 0;
+    }
     
     @keyframes timeoutPulse {
       0%, 100% {
@@ -1971,9 +1939,9 @@
     /* ==================== GAME SPEED DROPDOWN ==================== */
     /* Align with Game Speed button (left edge of .game-controls, which is 500px wide and centered) */
     .speed-dropdown {
-      position: absolute;
-      bottom: 52px; /* Just above .game-controls (12px + button height) */
-      left: calc(50% - 250px); /* Same left edge as .game-controls so dropdown is over Game Speed button */
+      position: fixed;
+      top: 0;
+      left: 0;
       transform: none;
       background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
       border: 2px solid #9c27b0;
@@ -2530,20 +2498,6 @@
         </div>
       </div>
       
-      <!-- Game controls (pause/skip) at bottom of court -->
-      <div class="game-controls">
-        <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
-        <button id="pause-btn">Pause</button>
-        <button id="skip-btn" class="dead-control" disabled title="Coming in a future update">Skip To End</button>
-        <button id="timeout-btn">Timeout</button>
-      </div>
-      
-      <!-- Game Speed Selection Dropdown -->
-      <div id="speed-dropdown" class="speed-dropdown" style="display: none;">
-        <button class="speed-option" data-speed="450">Normal</button>
-        <button class="speed-option" data-speed="550">Fast</button>
-        <button class="speed-option speed-option-superfast" data-speed="1000">Super Fast</button>
-      </div>
     </div>
 
     <!-- HOME PLAYER STATS PANEL (RIGHT) - grid-area: right-stats -->
@@ -2635,6 +2589,18 @@
       </div>
     </div>
 
+    <div id="game-controls-strip">
+      <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
+      <button id="pause-btn">Pause</button>
+      <button id="timeout-btn">Timeout</button>
+    </div>
+
+    <div id="speed-dropdown" class="speed-dropdown" style="display: none;">
+      <button class="speed-option" data-speed="450">Normal</button>
+      <button class="speed-option" data-speed="550">Fast</button>
+      <button class="speed-option speed-option-superfast" data-speed="1000">Super Fast</button>
+    </div>
+
   <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB - grid-area: playcall ==================== -->
   <div id="playcall-center" style="grid-area: playcall;">
     
@@ -2650,7 +2616,7 @@
       </div>
     </div>
     
-    <!-- Main Row: Offense Panel | Lean Meter | Defense Panel -->
+    <!-- Main Row: Offense Panel | Defense Panel -->
     <div id="playcall-main-row">
       
       <!-- Offense Panel (switches sides) -->
@@ -2704,18 +2670,9 @@
           <div class="play-nav-buttons">
             <button class="play-nav-btn" id="play-nav-up">▲</button>
             <button class="play-nav-btn" id="play-nav-down">▼</button>
+            <button id="clear-offense-override-x" class="clear-override-x-btn">✕</button>
           </div>
-          <button id="clear-offense-override-x" class="clear-override-x-btn">✕</button>
         </div>  <!-- Close .play-scroller-container -->
-    </div>
-
-      <!-- Lean Meter (Center - Absolute Focal Point) -->
-    <div id="lean-meter-container">
-      <div id="lean-meter">
-        <div id="lean-fill-positive" class="lean-fill lean-fill-pos"></div>
-        <div id="lean-center-line"></div>
-        <div id="lean-fill-negative" class="lean-fill lean-fill-neg"></div>
-      </div>
     </div>
 
       <!-- Defense Panel (switches sides) -->
@@ -3478,22 +3435,6 @@
       const playOptions = document.querySelectorAll('.play-option');
       const defenseButtons = document.querySelectorAll('.defense-override-btn');
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
-      const clearDefenseBtn = document.getElementById('clear-defense-override');
-      
-      // Set red X button height to 50% of play-scroller-container height
-      function setClearXButtonHeight() {
-        const playScrollerContainer = document.querySelector('.play-scroller-container');
-        const clearXBtn = document.getElementById('clear-offense-override-x');
-        if (playScrollerContainer && clearXBtn) {
-          const containerHeight = playScrollerContainer.offsetHeight;
-          const buttonHeight = containerHeight * 0.5; // 50% of container height
-          clearXBtn.style.height = `${buttonHeight}px`;
-        }
-      }
-      
-      // Set height on load and resize
-      setClearXButtonHeight();
-      window.addEventListener('resize', setClearXButtonHeight);
       
       // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
@@ -3695,15 +3636,6 @@
           playSound('x-back.mp3');
           document.querySelectorAll('#offense-play-scroller .play-option').forEach(opt => opt.classList.remove('selected'));
           await setPlaycallOverride('offense', null); // null clears the override
-        });
-      }
-      
-      // Clear defense override (legacy button at bottom - clears both)
-      if (clearDefenseBtn) {
-        clearDefenseBtn.addEventListener('click', async () => {
-          defenseButtons.forEach(btn => btn.classList.remove('selected'));
-          await setPlaycallOverride('defense', null);
-          await setPlaycallOverride('aggression', null);
         });
       }
       
