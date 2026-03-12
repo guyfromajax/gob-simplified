@@ -53,6 +53,44 @@ RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 AWARDS_FIELD = "awards"
 WEEK_35_RECRUITING_POINTS_BUDGET = 20
+SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
+
+
+def _mint_season_transition_token() -> str:
+    return str(uuid.uuid4())
+
+
+def _ensure_season_transition_token(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+) -> str:
+    token = str(franchise_doc.get(SEASON_TRANSITION_TOKEN_FIELD) or "").strip()
+    if token:
+        return token
+    if int(franchise_doc.get("week", 1) or 1) != 36:
+        return ""
+
+    token = _mint_season_transition_token()
+    result = db.franchises.update_one(
+        {
+            "_id": franchise_id,
+            "$or": [
+                {SEASON_TRANSITION_TOKEN_FIELD: {"$exists": False}},
+                {SEASON_TRANSITION_TOKEN_FIELD: None},
+                {SEASON_TRANSITION_TOKEN_FIELD: ""},
+            ],
+        },
+        {"$set": {SEASON_TRANSITION_TOKEN_FIELD: token}},
+    )
+    if result.modified_count:
+        franchise_doc[SEASON_TRANSITION_TOKEN_FIELD] = token
+        return token
+
+    refreshed = db.franchises.find_one({"_id": franchise_id}, {SEASON_TRANSITION_TOKEN_FIELD: 1}) or {}
+    refreshed_token = str(refreshed.get(SEASON_TRANSITION_TOKEN_FIELD) or "").strip()
+    if refreshed_token:
+        franchise_doc[SEASON_TRANSITION_TOKEN_FIELD] = refreshed_token
+    return refreshed_token
 
 
 def _game_doc_richness_score(game_doc: dict) -> int:
@@ -4752,6 +4790,9 @@ def save_recruiting_orders(
         raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
     if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
         raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+    current_week_results = franchise_doc.get("recruiting_results", {}) or {}
+    if is_visit_window and current_week_results.get(str(week)):
+        raise HTTPException(status_code=400, detail="Recruiting invites have already been processed for this week")
 
     orders_payload = _normalize_recruiting_orders(recruit_ids)
     franchise_team_data_collection.update_one(
@@ -4790,6 +4831,7 @@ def run_week_35_recruiting(
         raise HTTPException(status_code=400, detail="Recruiting orders must be saved before recruiting can run")
 
     results = _run_week_35_signings(franchise_doc)
+    season_transition_token = _mint_season_transition_token()
     db.franchises.update_one(
         {"_id": fid},
         {
@@ -4797,6 +4839,7 @@ def run_week_35_recruiting(
                 "week": 36,
                 "week_35_recruiting_ran": True,
                 WEEK_35_RECRUITING_RESULTS_FIELD: results,
+                SEASON_TRANSITION_TOKEN_FIELD: season_transition_token,
             }
         },
     )
@@ -6435,6 +6478,23 @@ def finish_season(req: FinishSeasonRequest):
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
+    if int(franchise_doc.get("week", 1) or 1) != 36:
+        raise HTTPException(status_code=400, detail="Season transition is only available during week 36")
+
+    transition_token = _ensure_season_transition_token(franchise_id, franchise_doc)
+    if not transition_token:
+        raise HTTPException(status_code=409, detail="Season transition is not ready")
+
+    consume_result = db.franchises.update_one(
+        {
+            "_id": franchise_id,
+            "week": 36,
+            SEASON_TRANSITION_TOKEN_FIELD: transition_token,
+        },
+        {"$unset": {SEASON_TRANSITION_TOKEN_FIELD: ""}},
+    )
+    if consume_result.modified_count == 0:
+        raise HTTPException(status_code=409, detail="Season transition has already been processed")
     
     # Get current season
     current_season = franchise_doc.get("current_season", 1)

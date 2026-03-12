@@ -33,6 +33,12 @@ let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
 
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);

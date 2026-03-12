@@ -42,6 +42,26 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+async function redirectIfFranchiseGameplayAlreadyCommitted() {
+  if (modeParam !== 'franchise' || !franchiseId || !weekParam) return false;
+  try {
+    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
+      headers: API_CONFIG.getAuthHeaders()
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    const currentWeek = Number(data.week || 1);
+    const pageWeek = Number(weekParam || 0);
+    if (pageWeek && currentWeek > pageWeek) {
+      window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+      return true;
+    }
+  } catch (error) {
+    console.warn('⚠️ [SET-LINEUP] Unable to verify franchise gameplay state:', error);
+  }
+  return false;
+}
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
@@ -2400,7 +2420,15 @@ function dndLog(label, data) {
   while (list.childNodes.length > 20) list.removeChild(list.firstChild);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const redirected = await redirectIfFranchiseGameplayAlreadyCommitted();
+  if (redirected) return;
   init();
   initViewToggle();
   

@@ -4105,40 +4105,72 @@
         return false;
       }
     }
+
+    async function redirectIfFranchiseGameplayAlreadyCommitted(urlParams) {
+      const mode = urlParams.get('mode');
+      const franchiseId = urlParams.get('franchise_id');
+      const pageWeek = Number(urlParams.get('week') || 0);
+      if (mode !== 'franchise' || !franchiseId || !pageWeek) return false;
+
+      try {
+        const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
+          headers: API_CONFIG.getAuthHeaders()
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        const currentWeek = Number(data.week || 1);
+        if (currentWeek > pageWeek) {
+          window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+          return true;
+        }
+      } catch (err) {
+        console.warn('⚠️ Unable to verify franchise gameplay state before court load:', err);
+      }
+      return false;
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
-    
-    // Update Player Box Score headers with actual team names
-    if (homeTeam) {
-      const homePlayersHeader = document.getElementById('home-players-header');
-      if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
-    }
-    if (awayTeam) {
-      const awayPlayersHeader = document.getElementById('away-players-header');
-      if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
-    }
-    
-    if (homeTeam && awayTeam) {
-      const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
-      if (!appliedRealColors) {
-        applyVibrantColors(homeTeam, awayTeam);
+
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        window.location.reload();
       }
-    } else {
-      console.warn('⚠️ No teams found in URL, using default vibrant colors');
-    }
-    
-    // Load accumulated stats if this is a resumed game
-    try {
-      await initializeGameStats();
-      // Initialize stats toggle functionality
-      initializeStatsToggle();
-      // Initialize team box score tabs
-      initializeTeamBoxscoreTabs();
-    } finally {
-      // Always hide overlay when this init block is done (success, early return, or error)
-      if (window.PageLoadOverlay) window.PageLoadOverlay.hide();
+    });
+
+    const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
+    if (!redirected) {
+      // Update Player Box Score headers with actual team names
+      if (homeTeam) {
+        const homePlayersHeader = document.getElementById('home-players-header');
+        if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
+      }
+      if (awayTeam) {
+        const awayPlayersHeader = document.getElementById('away-players-header');
+        if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
+      }
+
+      if (homeTeam && awayTeam) {
+        const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
+        if (!appliedRealColors) {
+          applyVibrantColors(homeTeam, awayTeam);
+        }
+      } else {
+        console.warn('⚠️ No teams found in URL, using default vibrant colors');
+      }
+
+      // Load accumulated stats if this is a resumed game
+      try {
+        await initializeGameStats();
+        // Initialize stats toggle functionality
+        initializeStatsToggle();
+        // Initialize team box score tabs
+        initializeTeamBoxscoreTabs();
+      } finally {
+        // Always hide overlay when this init block is done (success, early return, or error)
+        if (window.PageLoadOverlay) window.PageLoadOverlay.hide();
+      }
     }
   </script>
   <script>

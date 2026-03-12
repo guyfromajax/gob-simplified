@@ -16,6 +16,37 @@ const autoTrainModalMessage = document.getElementById('auto-train-modal-message'
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
 let currentWeek = 1;
 
+async function fetchFranchiseCommandCenterData(franchiseId) {
+  const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
+    headers: API_CONFIG.getAuthHeaders()
+  });
+  if (!response.ok) throw new Error(`Failed loading franchise command center data (${response.status})`);
+  return response.json();
+}
+
+async function redirectIfTrainingAlreadyCommitted() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const franchiseId = urlParams.get('franchise_id');
+  const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
+  if (mode !== 'franchise' || !franchiseId) return false;
+
+  try {
+    const data = await fetchFranchiseCommandCenterData(franchiseId);
+    if (!data || !data.training_completed) return false;
+    const params = new URLSearchParams();
+    params.set('mode', 'franchise');
+    params.set('franchise_id', franchiseId);
+    if (teamId) params.set('team_id', teamId);
+    params.set('week', String(Number(data.week || 1)));
+    window.location.replace(`/training-report.html?${params.toString()}`);
+    return true;
+  } catch (error) {
+    console.warn('⚠️ [TRAINING] Unable to verify committed training state:', error);
+    return false;
+  }
+}
+
 // Track previous slider values to prevent over-allocation
 allSliders.forEach(slider => {
   slider.dataset.prev = '0';
@@ -590,8 +621,18 @@ async function initializeTrainingPoints() {
   updatePointsRemaining();
 }
 
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 // Initialize training points on page load
-initializeTrainingPoints();
+(async function initTrainingPage() {
+  const redirected = await redirectIfTrainingAlreadyCommitted();
+  if (redirected) return;
+  initializeTrainingPoints();
+})();
 
 // Debug: Verify scrimmages element exists on page load
 (function() {

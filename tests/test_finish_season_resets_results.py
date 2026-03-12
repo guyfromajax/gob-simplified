@@ -14,12 +14,16 @@ def test_finish_season_resets_franchise_results(monkeypatch):
     mock_franchises = MagicMock()
     mock_franchises.find_one.return_value = {
         "_id": franchise_id,
+        "week": 36,
         "current_season": 1,
         "results": {"1": [{"team1_score": 80, "team2_score": 70}]},
     }
 
-    def capture_update(_query, update_doc):
+    def capture_update(query, update_doc):
+        if "$unset" in update_doc:
+            return SimpleNamespace(modified_count=1)
         captured_update.update(update_doc.get("$set", {}))
+        return SimpleNamespace(modified_count=1)
 
     mock_franchises.update_one.side_effect = capture_update
 
@@ -56,6 +60,7 @@ def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):
     mock_franchises = MagicMock()
     mock_franchises.find_one.return_value = {
         "_id": franchise_id,
+        "week": 36,
         "current_season": 1,
         "results": {},
         "week_35_recruiting_results": {
@@ -79,7 +84,7 @@ def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):
         },
     }
 
-    mock_franchises.update_one = MagicMock()
+    mock_franchises.update_one = MagicMock(return_value=SimpleNamespace(modified_count=1))
     mock_games = MagicMock()
 
     monkeypatch.setattr(
@@ -148,3 +153,41 @@ def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):
     assert attrs["anchor_MO"] == 0
     assert attrs["NG"] == 1.0
     assert attrs["anchor_NG"] == 1.0
+
+
+def test_finish_season_rejects_duplicate_transition(monkeypatch):
+    franchise_id = ObjectId()
+
+    mock_franchises = MagicMock()
+    mock_franchises.find_one.return_value = {
+        "_id": franchise_id,
+        "week": 36,
+        "current_season": 1,
+        "results": {},
+        "season_transition_token": "token-123",
+        "week_35_recruiting_results": {},
+    }
+
+    def update_one(query, update_doc):
+        if "$unset" in update_doc:
+            return SimpleNamespace(modified_count=0)
+        return SimpleNamespace(modified_count=1)
+
+    mock_franchises.update_one.side_effect = update_one
+    monkeypatch.setattr(
+        franchise_routes,
+        "db",
+        SimpleNamespace(franchises=mock_franchises, games=MagicMock()),
+    )
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", MagicMock(find=MagicMock(return_value=[])))
+    monkeypatch.setattr(franchise_routes, "franchise_players_data_collection", MagicMock(find=MagicMock(return_value=[]), delete_many=MagicMock()))
+    monkeypatch.setattr(franchise_routes, "franchise_recruits_data_collection", MagicMock(delete_many=MagicMock()))
+
+    try:
+        franchise_routes.finish_season(
+            franchise_routes.FinishSeasonRequest(franchise_id=str(franchise_id))
+        )
+        assert False, "Expected duplicate season transition to be rejected"
+    except franchise_routes.HTTPException as exc:
+        assert exc.status_code == 409
+        assert "already been processed" in exc.detail
