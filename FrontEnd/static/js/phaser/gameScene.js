@@ -33,6 +33,28 @@ const DEBUG_SKIP =
   (typeof process !== 'undefined' && process.env.DEBUG_SKIP) ||
   false;
 
+function resolveCourtImagePath(teamNameOrSlug) {
+  const fallbackPath = '/images/teams/general/general_court.jpg';
+  const preferredPath = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(teamNameOrSlug, 'court')
+    : fallbackPath;
+
+  if (!preferredPath || preferredPath === fallbackPath) {
+    return Promise.resolve(fallbackPath);
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function () {
+      resolve(preferredPath);
+    };
+    img.onerror = function () {
+      resolve(fallbackPath);
+    };
+    img.src = preferredPath;
+  });
+}
+
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
     constructor() {
@@ -156,7 +178,7 @@ export function createGameScene(Phaser) {
       if (this.animate) {
         this.load.image("ball", "/images/ball.png");
         const { home } = gameStore.getTeams();
-        const courtPath = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(home, 'court') : '/images/teams/general/general_court.jpg';
+        const courtPath = await resolveCourtImagePath(home);
         this.load.image("court-bg", courtPath);
       }
 

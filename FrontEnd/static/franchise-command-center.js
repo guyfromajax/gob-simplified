@@ -2305,8 +2305,15 @@ async function renderTournamentBracket() {
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const eosTournament = topData?.eos_tournament;
   const week = Number(topData?.week || 0);
+  const userConference = topData?.user_conference != null ? String(topData.user_conference) : '';
+  const userRegion = String(topData?.user_region || '').toUpperCase();
+  const conferenceTournament = userConference ? (topData?.conference_tournaments || {})[userConference] : null;
+  const regionTournamentRaw = userRegion ? (topData?.region_tournaments || {})[userRegion] : null;
+  const regionTournament = regionTournamentRaw ? normalizeRegionBracket(regionTournamentRaw) : null;
+  const nationalTournament = topData?.national_tournament || null;
 
-  if (!eosTournament) {
+  const hasBracketHistory = Boolean(eosTournament || conferenceTournament || regionTournament || nationalTournament);
+  if (!hasBracketHistory) {
     if (titleEl) titleEl.textContent = 'End-of-Season Tournament';
     container.innerHTML = '<p>Tournament bracket not available.</p>';
     return;
@@ -2396,13 +2403,6 @@ async function renderTournamentBracket() {
   }
 
   container.innerHTML = '';
-
-  const userConference = topData?.user_conference != null ? String(topData.user_conference) : '';
-  const userRegion = String(topData?.user_region || '').toUpperCase();
-  const conferenceTournament = userConference ? (topData?.conference_tournaments || {})[userConference] : null;
-  const regionTournamentRaw = userRegion ? (topData?.region_tournaments || {})[userRegion] : null;
-  const regionTournament = regionTournamentRaw ? normalizeRegionBracket(regionTournamentRaw) : null;
-  const nationalTournament = topData?.national_tournament || null;
 
   const sections = [];
   if (week >= 27 && week <= 29 && conferenceTournament) {

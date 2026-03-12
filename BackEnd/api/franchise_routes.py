@@ -2212,7 +2212,16 @@ def command_center_data(
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
         )
-        if eos_tournament_active:
+        post_eos_bracket_history_visible = bool(
+            not eos_tournament_active
+            and week in {35, 36}
+            and (
+                franchise_doc.get("conference_tournaments")
+                or franchise_doc.get("region_tournaments")
+                or franchise_doc.get("national_tournament")
+            )
+        )
+        if eos_tournament_active or post_eos_bracket_history_visible:
             response["eos_tournament_active"] = True
             response["conference_tournaments"] = franchise_doc.get("conference_tournaments")
             response["region_tournaments"] = franchise_doc.get("region_tournaments")
@@ -3816,6 +3825,22 @@ def _zero_stats_block() -> dict[str, Any]:
     zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
     zero_stats["Outlet_Score_List"] = []
     return zero_stats
+
+
+def _normalize_new_franchise_player_attributes(raw_attributes: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Convert recruit-style attributes into the full franchise-player shape.
+    New freshmen need anchor baselines plus CH/EM/MO/NG before week 1 training.
+    """
+    attrs = (raw_attributes or {}).copy()
+    core_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+
+    for attr in core_attrs:
+        base_val = int(attrs.get(attr, 0) or 0)
+        attrs[attr] = base_val
+        attrs[f"anchor_{attr}"] = base_val
+
+    return Player.randomize_game_attributes(attrs)
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -6489,7 +6514,9 @@ def finish_season(req: FinishSeasonRequest):
             },
             "season": zero_stats.copy(),
             "career": zero_stats.copy(),
-            "attributes": (signed_player.get("attributes") or {}).copy(),
+            "attributes": _normalize_new_franchise_player_attributes(
+                signed_player.get("attributes") or {}
+            ),
             "position_ratings": (signed_player.get("position_ratings") or {}).copy(),
         })
 
