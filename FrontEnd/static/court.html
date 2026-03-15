@@ -54,7 +54,6 @@
       grid-template-rows:
         var(--scoreboard-height)
         1fr
-        56px
         clamp(160px, 25vh, 300px);
       grid-template-columns:
         var(--player-stats-width)
@@ -63,7 +62,6 @@
       grid-template-areas:
         "scoreboard scoreboard scoreboard"
         "left-stats court right-stats"
-        "left-stats controls right-stats"
         "left-stats playcall right-stats";
       height: 100vh;
       width: 100vw;
@@ -94,21 +92,7 @@
       /* Canvas fills grid-allocated container; Phaser must match container dimensions */
     }
     #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
-    #app-grid #game-controls-strip {
-      grid-area: controls;
-      grid-column: 2;
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1));
-      border-top: 1px solid rgba(255,255,255,0.08);
-      padding: 0 40px;
-      box-sizing: border-box;
-      position: relative;
-      z-index: 925;
-    }
+    /* Game controls strip lives inside #phaser-container; styled below under PAUSE/SKIP CONTROLS */
     #app-grid #playcall-center {
       grid-area: playcall;
       grid-column: 2; /* Force center column only so container does not cover side panels */
@@ -1889,7 +1873,25 @@
     }
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
-    /* Bottom offset: fixed 12px from bottom of court container (grid layout; no PBP bar in cell) */
+    /* Controls strip lives inside #phaser-container; positioned at bottom (out-of-bounds area) */
+    #phaser-container #game-controls-strip {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      width: 500px;
+      padding: 0 40px;
+      box-sizing: border-box;
+      background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.6));
+      border-top: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px 8px 0 0;
+      z-index: 925;
+    }
     .game-controls {
       position: absolute;
       bottom: 12px;
@@ -1899,8 +1901,8 @@
       flex-direction: row;
       align-items: center;
       justify-content: space-between;
-      width: 500px; /* Increased width to accommodate timeout button */
-      z-index: 950; /* Below HUD (1000) but above Playcall Center (900) */
+      width: 500px;
+      z-index: 950;
     }
 
     #game-speed-btn,
@@ -2634,6 +2636,13 @@
           </div>
         </div>
       </div>
+
+      <!-- Game controls: inside court container, bottom out-of-bounds -->
+      <div id="game-controls-strip">
+        <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
+        <button id="pause-btn">Pause</button>
+        <button id="timeout-btn">Timeout</button>
+      </div>
       
     </div>
 
@@ -2724,12 +2733,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <div id="game-controls-strip">
-      <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
-      <button id="pause-btn">Pause</button>
-      <button id="timeout-btn">Timeout</button>
     </div>
 
     <div id="speed-dropdown" class="speed-dropdown" style="display: none;">
