@@ -1747,6 +1747,13 @@
       background: #F79420;
       z-index: 2;
     }
+    .ann-card.standard-card.no-player .ann-portrait-zone {
+      display: none;
+    }
+    .ann-card.standard-card.no-player .ann-event-zone {
+      justify-content: center;
+      padding-left: 32px;
+    }
     .ann-portrait-zone {
       position: relative;
       width: 100px;
@@ -4281,9 +4288,15 @@
         } else {
           foulCard.style.display = 'none';
           standardCard.style.display = 'flex';
-          standardCard.querySelector('.ann-portrait-img').src = data.photoUrl || '';
-          standardCard.querySelector('.ann-jersey-name').textContent = ((data.jersey || '') + ' ' + (data.lastName || '')).trim();
-          standardCard.querySelector('.ann-pos-label').textContent = data.position || '';
+          var hasPlayer = (data.photoUrl && data.photoUrl.length) || (data.lastName && data.lastName.length);
+          if (hasPlayer) {
+            standardCard.classList.remove('no-player');
+            standardCard.querySelector('.ann-portrait-img').src = data.photoUrl || '';
+            standardCard.querySelector('.ann-jersey-name').textContent = ((data.jersey || '') + ' ' + (data.lastName || '')).trim();
+            standardCard.querySelector('.ann-pos-label').textContent = data.position || '';
+          } else {
+            standardCard.classList.add('no-player');
+          }
           var raw = data.eventText || '';
           var hasExclaim = raw.endsWith('!');
           var base = hasExclaim ? raw.slice(0, -1) : raw;

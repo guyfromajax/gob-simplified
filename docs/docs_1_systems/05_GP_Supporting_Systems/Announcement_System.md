@@ -6,10 +6,15 @@
    - `timing='start'` - Context announcements (situation being entered)
    - `timing='end'` - Result announcements (outcome of turn)
 
-2. **Visual Styling**:
-   - **Foul Announcements:** Dark yellow text (`#b8860b`) with silver border (`#c0c0c0`)
-   - **All Other Announcements:** Dark silver text (`#a8a8a8`) with black border (`#000000`)
-   - **Special Cases:** "DOUBLE TEAM!" uses red text (`#ff0000`)
+2. **Display Layer (Center-Court Overlay)**:
+   - **Location:** `#announcement-overlay` inside `#phaser-container` (position: absolute, centered). HTML, CSS, and controller live in `FrontEnd/static/court.html`.
+   - **API:** All announcement display is routed through `window.showAnnouncementOverlay(data)`. The modules in `announcements.js` build the payload and call this; no other display API is used.
+   - **Variants:**
+     - **Standard** — Single player portrait (left), caption bar (#jersey lastName + position), and event text (right). Used for all single-player events (made shot, rebound, block, steal, fouls, turnovers, etc.).
+     - **Foul (AND-1)** — Shooter portrait (left), center panel ("It's Good!" + "+ Free Throw" + "And one"), fouler portrait (right). Used only for made shot with shooting foul.
+   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **Trap!**, **Press!**, **Fast Break!**, **Slow It Down**, **Quick Shot**, **Final Shot**, **DOUBLE TEAM!**
+   - **Data shapes:** Standard `{ type: 'standard', eventText, photoUrl, jersey, lastName, position }`. Foul `{ type: 'foul', foulEventText, shooterPhotoUrl, shooterJersey, shooterLastName, foulerPhotoUrl, foulerJersey, foulerLastName }`.
+   - **Duration:** Overlay is shown for 2200 ms then hidden.
 
 3. **Idempotent Flags**:
    - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
@@ -27,7 +32,7 @@
 
 2. **End Announcements** (`timing='end'`)
     - **"It's Good!"** - Made shot (ballManager.js, when ball reaches rim)
-    - **"It's Good! And 1!"** - Made shot with shooting foul (two-row announcement with shooter and fouler headshots plus jersey number / last name labels)
+    - **"It's Good! And 1!"** - Made shot with shooting foul (overlay foul card: shooter portrait, center "It's Good!" + Free Throw, fouler portrait)
     - **"Shooting Foul!"** - Defensive shooting foul on miss (with fouling player headshot)
    - **"STEAL!"** - Steal occurred (takes priority over Fast Break announcement)
    - **"Travel!" / "Double Dribble!"** - Dead ball turnovers (randomly chosen 50/50)
@@ -148,38 +153,33 @@ When a steal leads to a fast break:
 
 **Implementation:** `FrontEnd/static/js/phaser/animation/turnPreparation.js` (lines 95-100)
 
-### Visual Styling
+### Visual Styling (Center-Court Overlay)
 
-**Foul Announcements:**
-- Text color: Dark yellow (`#b8860b`)
-- Border color: Silver (`#c0c0c0`)
-- Applied to: Shooting fouls, offensive fouls, defensive fouls
+**Overlay card:**
+- Dark semi-opaque background (`rgba(10,10,10,0.82)`), orange left accent bar (`#F79420`), subtle shadow. Barlow Condensed for all text.
+- **Standard card:** Portrait zone (100×130px, diagonal cut on right), caption bar at bottom of portrait with `#jersey lastName` and position label (orange). Event text (large italic, white, optional orange accent on trailing "!").
+- **Foul card:** Shooter portrait (left), center panel with foul event text and "+ Free Throw" / "And one", fouler portrait (right, red border). Caption bars show jersey + last name; fouler caption uses red tint.
 
-**All Other Announcements:**
-- Text color: Dark silver (`#a8a8a8`)
-- Border color: Black (`#000000`)
-- Applied to: Shot results, steals, turnovers, rebounds, pressure announcements
+**No-player announcements:**
+- When `photoUrl` and `lastName` are both empty, the portrait zone is hidden (`.ann-card.standard-card.no-player .ann-portrait-zone { display: none }`) and the event text is centered. Used for: Trap!, Press!, Fast Break!, Slow It Down, Quick Shot, Final Shot, DOUBLE TEAM!
 
-**Special Cases:**
-- "DOUBLE TEAM!" uses red text (`#ff0000`)
-
-**Player Headshots:**
-- Displayed for: Steals, turnovers, fouls, AND-1 situations
-- When a player image is shown, the UI also displays `#jersey lastName` directly beneath the headshot when roster data is available
-- Fallback: Announcement still displays even if player data is missing (matches AND-1 pattern for consistency)
-
-**How we access player images and labels:** Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, the headshot `img.src` is `playerData.photo || \`/images/players/${playerData.playerId}.png\``. Jersey number / last-name labels are resolved first from the active game rosters in `gameStore`, then fall back to any name / jersey values already present on `playerData`. Player ids are strings in both gob and gob-staging (see `scripts/migrate_gob_staging_players_to_string_id.py`).
+**Player images and labels:**
+- Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, `getPlayerImageUrl()` builds the image URL; jersey and last name are resolved from `gameStore` rosters or `playerData`. The overlay displays `#jersey lastName` in the portrait caption. If no player data is provided, the overlay hides the portrait zone (see above).
 
 ### Key Files
 
 **Frontend:**
+- `FrontEnd/static/court.html`
+  - `#announcement-overlay` — HTML for standard and foul overlay cards (last child inside `#phaser-container`)
+  - CSS for `.ann-card`, `.ann-portrait-zone`, `.ann-event-zone`, `.ann-foul-event-zone`, `.no-player` state, etc.
+  - `window.showAnnouncementOverlay(data)` — Inline IIFE; receives payload and shows/hides overlay for 2200 ms
 - `FrontEnd/static/js/phaser/animation/turnPreparation.js`
   - `prepareTurnForAnimation()` - Start announcements (lines 89-112)
   - `finalizeTurnAfterAnimation()` - End announcements (if needed)
 - `FrontEnd/static/js/phaser/utils/announcements.js`
   - `announceFromTurnData()` - Main announcement dispatcher (lines 290-493)
-  - `showAnnouncement()` - Visual announcement display (lines 169-281)
-  - `showAndOneAnnouncement()` - Special AND-1 two-row announcement
+  - `showAnnouncement(text, team, playerData)` - Builds standard payload, calls `window.showAnnouncementOverlay(data)`
+  - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` - Builds foul payload, calls `window.showAnnouncementOverlay(data)`
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent()` - Event-based announcement router (lines 24-125)
   - Handlers for specific event types (shot makes, fouls, steals, turnovers)
