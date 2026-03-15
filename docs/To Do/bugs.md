@@ -1,9 +1,9 @@
 1. Make end of season progression in franchise mode a true EOS (age players, recruiting process, manage player stats, manage user stats?)
 2. 3 pointer on P/T Break does not register as a 3
+3. 
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
 20. We need to clean up user Timeout implementation cadence
-34. Player Of The Game
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
 37. Player Foul Out Next Step bug
@@ -11,7 +11,11 @@
 
 
 40. **Final play of quarter hold — clock display:** ~~During the 3-second hold… show **0:00**.~~ **Fixed:** AnimationEngine calls `context.onUpdate({ clock: '0:00' })` at the start of the hold in `handleFinalTurnShot` and `handleFreeThrow` when `quarter_ends_after`, so the scoreboard shows 0:00 for the full hold.
-41. Disable Game Speed button
+41. Final Shot carry over quarter bug
+
+43. Customize computer teams more strategically
+44. Tournament tab, show team name & conference on hover
+
 
 
 ## Future Cleanup (Non-Critical Warnings)

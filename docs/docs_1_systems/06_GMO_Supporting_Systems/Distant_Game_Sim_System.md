@@ -78,6 +78,9 @@ drives the margin — the further from the threshold, the larger the blowout.
        home_score = losing_score
 ```
 
+
+**Ignore everything below this line, these are working notes**
+
 ### Templates
 - **Count**: Five hundred pre-baked outcome templates
 - **Structure**: Outcome-class specific (blowout win, close win, close loss, blowout loss, etc.)
