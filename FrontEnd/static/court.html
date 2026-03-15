@@ -13,7 +13,7 @@
   <script src="/common.js"></script>
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
     /*
@@ -1676,7 +1676,8 @@
       margin: 10px 0;
     }
 
-    /* ==================== GAME ANNOUNCEMENTS ==================== */
+    /* ==================== GAME ANNOUNCEMENTS (OLD - commented out; new strip below) ==================== */
+    /*
     .game-announcement {
       position: fixed;
       top: calc(var(--scoreboard-height) + 10px);
@@ -1694,98 +1695,253 @@
       align-items: center;
       gap: 20px;
     }
-    
     .announcement-headshot {
-      width: 98px; /* 75% larger: 56 * 1.75 = 98px */
-      height: 131px; /* 3:4 aspect ratio: 98 * 4/3 = 131px */
+      width: 98px;
+      height: 131px;
       border-radius: 6px;
       overflow: hidden;
       background: #fff;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
-    
-    /* Home team announcements - use home vibrant color */
-    .game-announcement.home-team {
-      color: var(--home-vibrant-color);
-      text-shadow: 
-        -2px -2px 4px rgba(0, 0, 0, 0.9),
-        2px -2px 4px rgba(0, 0, 0, 0.9),
-        -2px 2px 4px rgba(0, 0, 0, 0.9),
-        2px 2px 4px rgba(0, 0, 0, 0.9);
-    }
-    
-    /* Away team announcements - white with away color outline (like Away Players heading) */
-    .game-announcement.away-team {
-      color: #fff;
-      text-shadow: 
-        -1px -1px 0 var(--away-vibrant-color),
-        1px -1px 0 var(--away-vibrant-color),
-        -1px 1px 0 var(--away-vibrant-color),
-        1px 1px 0 var(--away-vibrant-color),
-        -2px 0 0 var(--away-vibrant-color),
-        2px 0 0 var(--away-vibrant-color),
-        0 -2px 0 var(--away-vibrant-color),
-        0 2px 0 var(--away-vibrant-color),
-        -2px -2px 2px rgba(0, 0, 0, 0.9),
-        2px -2px 2px rgba(0, 0, 0, 0.9),
-        -2px 2px 2px rgba(0, 0, 0, 0.9),
-        2px 2px 2px rgba(0, 0, 0, 0.9);
-    }
-    
-    /* Defense team announcements - use away team style (since defense is usually away in context) */
-    .game-announcement.defense-team {
-      color: #fff;
-      text-shadow: 
-        -1px -1px 0 var(--away-vibrant-color),
-        1px -1px 0 var(--away-vibrant-color),
-        -1px 1px 0 var(--away-vibrant-color),
-        1px 1px 0 var(--away-vibrant-color),
-        -2px 0 0 var(--away-vibrant-color),
-        2px 0 0 var(--away-vibrant-color),
-        0 -2px 0 var(--away-vibrant-color),
-        0 2px 0 var(--away-vibrant-color),
-        -2px -2px 2px rgba(0, 0, 0, 0.9),
-        2px -2px 2px rgba(0, 0, 0, 0.9),
-        -2px 2px 2px rgba(0, 0, 0, 0.9),
-        2px 2px 2px rgba(0, 0, 0, 0.9);
-    }
-    
-    /* Neutral announcements - gold color (for non-team specific events) */
-    .game-announcement.neutral {
-      color: #FFD700;
-      text-shadow: 
-        -2px -2px 4px rgba(0, 0, 0, 0.9),
-        2px -2px 4px rgba(0, 0, 0, 0.9),
-        -2px 2px 4px rgba(0, 0, 0, 0.9),
-        2px 2px 4px rgba(0, 0, 0, 0.9),
-        0 0 12px rgba(255, 215, 0, 0.6);
-    }
-
+    .game-announcement.home-team { ... }
+    .game-announcement.away-team { ... }
+    .game-announcement.defense-team { ... }
+    .game-announcement.neutral { ... }
     .game-announcement.active {
       animation: announcement-pop 2500ms ease-out forwards;
     }
+    @keyframes announcement-pop { ... }
+    */
 
-    @keyframes announcement-pop {
-      0% {
-        top: calc(var(--scoreboard-height) + 10px);
-        opacity: 0;
-        transform: translateX(-50%) scale(0.5);
-      }
-      30% {
-        top: 50%;
-        opacity: 1;
-        transform: translateX(-50%) translateY(-50%) scale(1.2);
-      }
-      60% {
-        top: 50%;
-        opacity: 1;
-        transform: translateX(-50%) translateY(-50%) scale(1);
-      }
-      100% {
-        top: 50%;
-        opacity: 0;
-        transform: translateX(-50%) translateY(-50%) scale(0.8);
-      }
+    /* ==================== ANNOUNCEMENT STRIP ==================== */
+    #announcement-strip {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 950;
+      pointer-events: none;
+    }
+    #announcement-strip.hidden {
+      display: none;
+    }
+    .announcement-inner.standard-variant {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 560px;
+      height: 80px;
+      background: #f4f4f2;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.45),
+                  0 1px 0 rgba(255,255,255,0.15) inset;
+      overflow: hidden;
+      animation: stripIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .announcement-inner.foul-variant {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 560px;
+      height: 96px;
+      background: #f4f4f2;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.45),
+                  0 1px 0 rgba(255,255,255,0.15) inset;
+      overflow: hidden;
+      animation: stripIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes stripIn {
+      from { transform: scaleX(0.6) scaleY(0.85); opacity: 0; }
+      to   { transform: scaleX(1) scaleY(1); opacity: 1; }
+    }
+    .announcement-inner::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 5px;
+      background: #F79420;
+    }
+    .announcement-inner.standard-variant::after {
+      content: '';
+      position: absolute;
+      left: 112px;
+      top: -10px; bottom: -10px;
+      width: 2px;
+      background: rgba(0,0,0,0.08);
+      transform: skewX(-8deg);
+    }
+    .announcement-inner.foul-variant::after {
+      content: '';
+      position: absolute;
+      left: 168px;
+      top: -10px; bottom: -10px;
+      width: 2px;
+      background: rgba(0,0,0,0.08);
+      transform: skewX(-8deg);
+    }
+    .ann-player-zone {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px 0 18px;
+      width: 126px;
+      flex-shrink: 0;
+    }
+    .ann-photo-wrap { position: relative; flex-shrink: 0; }
+    .ann-photo {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2.5px solid #F79420;
+      display: block;
+      background: #ddd;
+    }
+    .ann-jersey-badge {
+      position: absolute;
+      bottom: -2px; right: -4px;
+      background: #4065AF;
+      color: #fff;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 10px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+    }
+    .ann-name-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+    .ann-last-name {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 14px;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ann-position {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 400;
+      font-size: 10px;
+      color: #9e9d9d;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .ann-event-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding: 0 18px 0 20px;
+    }
+    .ann-event-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-style: italic;
+      font-size: 30px;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .ann-event-text .ann-accent { color: #F79420; }
+    .ann-foul-player-zone {
+      display: flex;
+      align-items: center;
+      padding: 0 14px 0 18px;
+      width: 182px;
+      flex-shrink: 0;
+    }
+    .ann-dual-players { display: flex; flex-direction: column; gap: 6px; }
+    .ann-dual-row { display: flex; align-items: center; gap: 8px; }
+    .ann-dual-photo-wrap { position: relative; flex-shrink: 0; }
+    .ann-dual-photo {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      background: #ddd;
+    }
+    .shooter-photo { border: 2px solid #4065AF; }
+    .fouler-photo  { border: 2px solid #cc3333; }
+    .ann-dual-jersey {
+      position: absolute;
+      bottom: -2px; right: -4px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 8px;
+      line-height: 1;
+      padding: 1px 3px;
+      border-radius: 2px;
+      color: #fff;
+    }
+    .shooter-jersey { background: #4065AF; }
+    .fouler-jersey  { background: #cc3333; }
+    .ann-dual-name-block { display: flex; flex-direction: column; gap: 1px; }
+    .ann-dual-last {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 12px;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 1;
+    }
+    .ann-dual-role {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 400;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .shooter-role { color: #4065AF; }
+    .fouler-role  { color: #cc3333; }
+    .ann-foul-event-zone {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      padding: 0 16px 0 20px;
+    }
+    .ann-foul-primary {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-style: italic;
+      font-size: 26px;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .ann-foul-primary .ann-accent { color: #F79420; }
+    .ann-foul-secondary {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-style: italic;
+      font-size: 14px;
+      color: #cc3333;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+    .ann-foul-note {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 400;
+      color: #9e9d9d;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
     }
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
@@ -2494,6 +2650,56 @@
         <div class="sim-quarter-scroll-container">
           <div id="sim-quarter-scroll-content" class="sim-quarter-scroll-content">
             <!-- Shot results will be inserted here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- In-game announcement strip (new system) -->
+      <div id="announcement-strip" class="announcement-strip hidden">
+        <div class="announcement-inner standard-variant">
+          <div class="ann-player-zone">
+            <div class="ann-photo-wrap">
+              <img class="ann-photo" src="" alt="Player" />
+              <span class="ann-jersey-badge"></span>
+            </div>
+            <div class="ann-name-stack">
+              <span class="ann-last-name"></span>
+              <span class="ann-position"></span>
+            </div>
+          </div>
+          <div class="ann-event-zone">
+            <span class="ann-event-text"></span>
+          </div>
+        </div>
+        <div class="announcement-inner foul-variant" style="display:none;">
+          <div class="ann-foul-player-zone">
+            <div class="ann-dual-players">
+              <div class="ann-dual-row shooter-row">
+                <div class="ann-dual-photo-wrap">
+                  <img class="ann-dual-photo shooter-photo" src="" alt="Shooter" />
+                  <span class="ann-dual-jersey shooter-jersey"></span>
+                </div>
+                <div class="ann-dual-name-block">
+                  <span class="ann-dual-last shooter-name"></span>
+                  <span class="ann-dual-role shooter-role">Shooter</span>
+                </div>
+              </div>
+              <div class="ann-dual-row fouler-row">
+                <div class="ann-dual-photo-wrap">
+                  <img class="ann-dual-photo fouler-photo" src="" alt="Fouler" />
+                  <span class="ann-dual-jersey fouler-jersey"></span>
+                </div>
+                <div class="ann-dual-name-block">
+                  <span class="ann-dual-last fouler-name"></span>
+                  <span class="ann-dual-role fouler-role">Foul</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ann-foul-event-zone">
+            <span class="ann-foul-primary"></span>
+            <span class="ann-foul-secondary">+ Free Throw</span>
+            <span class="ann-foul-note">And one</span>
           </div>
         </div>
       </div>
@@ -4126,6 +4332,48 @@
     const timeoutHelperScript = document.createElement('script');
     timeoutHelperScript.src = `${staticPrefix}/js/shared/timeoutNavigationHelper.js`;
     document.head.appendChild(timeoutHelperScript);
+  </script>
+  <script>
+    (function() {
+      let _annTimer = null;
+      window.showAnnouncementStrip = function(data) {
+        var strip = document.getElementById('announcement-strip');
+        if (!strip) return;
+        if (_annTimer) { clearTimeout(_annTimer); _annTimer = null; }
+        var standardEl = strip.querySelector('.standard-variant');
+        var foulEl = strip.querySelector('.foul-variant');
+        if (data.type === 'foul') {
+          standardEl.style.display = 'none';
+          foulEl.style.display = 'flex';
+          foulEl.querySelector('.shooter-photo').src = data.shooterPhotoUrl || '';
+          foulEl.querySelector('.shooter-jersey').textContent = data.shooterJersey || '';
+          foulEl.querySelector('.shooter-name').textContent = data.shooterLastName || '';
+          foulEl.querySelector('.fouler-photo').src = data.foulerPhotoUrl || '';
+          foulEl.querySelector('.fouler-jersey').textContent = data.foulerJersey || '';
+          foulEl.querySelector('.fouler-name').textContent = data.foulerLastName || '';
+          var fp = (data.foulPrimaryText || "It's Good! + Foul").trim();
+          foulEl.querySelector('.ann-foul-primary').innerHTML = fp.indexOf('!') !== -1 ? fp.replace('!', '<span class="ann-accent">!</span>') : fp;
+          void foulEl.offsetWidth;
+        } else {
+          foulEl.style.display = 'none';
+          standardEl.style.display = 'flex';
+          standardEl.querySelector('.ann-photo').src = data.photoUrl || '';
+          standardEl.querySelector('.ann-jersey-badge').textContent = data.jersey || '';
+          standardEl.querySelector('.ann-last-name').textContent = data.lastName || '';
+          standardEl.querySelector('.ann-position').textContent = data.position || '';
+          var raw = data.eventText || '';
+          var hasExclaim = raw.endsWith('!');
+          var base = hasExclaim ? raw.slice(0, -1) : raw;
+          standardEl.querySelector('.ann-event-text').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
+          void standardEl.offsetWidth;
+        }
+        strip.classList.remove('hidden');
+        _annTimer = setTimeout(function() {
+          strip.classList.add('hidden');
+          _annTimer = null;
+        }, 2200);
+      };
+    })();
   </script>
   <script type="module">
     // ✅ PHASE 1.1: Load error handler before bootGame.js

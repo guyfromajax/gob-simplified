@@ -30,6 +30,13 @@ function getPlayerLastName(player) {
   return parts.length ? parts[parts.length - 1] : '';
 }
 
+function getPlayerPosition(player) {
+  if (!player) return '';
+  const p = String(player.position || player.primary_position || player.pos || '').trim().toUpperCase();
+  if (p) return p;
+  return '';
+}
+
 function findRosterPlayer(playerId) {
   if (!playerId) return null;
   const rosters = gameStore.getRosters() || {};
@@ -140,109 +147,34 @@ function triggerVisualEffect(scene, playerId, effectType) {
 }
 
 /**
- * Show AND-1 announcement with two rows (made shot + foul)
+ * Show AND-1 announcement with two rows (made shot + foul) — uses new announcement strip.
  * @param {string} team - Team that made the shot
  * @param {Object} shooterData - Shooter data { playerId, photo, teamName }
  * @param {Object} foulPlayerData - Fouling player data { playerId, photo, teamName }
  */
 export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
-  // Remove any existing announcement
-  if (currentAnnouncement) {
-    currentAnnouncement.remove();
-    currentAnnouncement = null;
-  }
-  
-  // Create announcement container with red background (foul overlay)
-  const announcement = document.createElement('div');
-  announcement.className = 'game-announcement and-one-announcement';
-  announcement.style.display = 'flex';
-  announcement.style.flexDirection = 'column';  // Vertical stacking
-  announcement.style.alignItems = 'center';
-  announcement.style.gap = '10px';
-  announcement.style.backgroundColor = 'rgba(255, 0, 0, 0.85)';  // Red background at 85% opacity
-  announcement.style.padding = '20px 30px';
-  announcement.style.borderRadius = '12px';
-  announcement.style.border = '3px solid rgba(255, 255, 255, 0.3)';  // Subtle white border
-  announcement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.5)';  // Strong shadow for depth
-  if (team === 'home') {
-    announcement.classList.add('home-team');
-  } else if (team === 'away') {
-    announcement.classList.add('away-team');
-  }
-  
-  // Row 1: "IT'S GOOD!" + shooter headshot
-  const row1 = document.createElement('div');
-  row1.className = 'and-one-row-1';
-  row1.style.display = 'flex';
-  row1.style.alignItems = 'center';
-  row1.style.justifyContent = 'center';
-  row1.style.gap = '15px';
-  
-  const madeText = document.createElement('span');
-  madeText.textContent = "IT'S GOOD!";
-  madeText.style.fontSize = '2.5rem';
-  madeText.style.fontWeight = 'bold';
-  madeText.style.color = '#ffffff';  // White text on red background
-  
-  const shooterHeadshot = createHeadshotElement(shooterData, 1.0); // Full size
-  
-  row1.appendChild(madeText);
-  row1.appendChild(shooterHeadshot);
-  
-  // Row 2: Foul player headshot + "←" + "FOUL" (yellow, smaller)
-  const row2 = document.createElement('div');
-  row2.className = 'and-one-row-2';
-  row2.style.display = 'flex';
-  row2.style.alignItems = 'center';
-  row2.style.justifyContent = 'center';
-  row2.style.gap = '10px';
-  
-  const foulHeadshot = createHeadshotElement(foulPlayerData, 1.0); // Full size (same as shooter)
-  
-  const arrow = document.createElement('span');
-  arrow.textContent = '←';
-  arrow.style.fontSize = '1.5rem';
-  arrow.style.color = '#ffff00';
-  arrow.style.fontWeight = 'bold';
-  
-  const foulText = document.createElement('span');
-  foulText.textContent = "FOUL";
-  foulText.style.fontSize = '1.5rem'; // 60% of 2.5rem
-  foulText.style.fontWeight = 'bold';
-  foulText.style.color = '#ffff00'; // Yellow
-  
-  row2.appendChild(foulHeadshot);
-  row2.appendChild(arrow);
-  row2.appendChild(foulText);
-  
-  announcement.appendChild(row1);
-  announcement.appendChild(row2);
-  
-  // SFX: AND-1 shooting foul (synced to on-screen announcement)
+  const shooterRoster = shooterData ? findRosterPlayer(shooterData.playerId) : null;
+  const foulerRoster = foulPlayerData ? findRosterPlayer(foulPlayerData.playerId) : null;
+  const shooter = shooterRoster || shooterData;
+  const fouler = foulerRoster || foulPlayerData;
+  const data = {
+    type: 'foul',
+    shooterPhotoUrl: getPlayerImageUrl(shooterData?.photo, shooterData?.playerId),
+    shooterJersey: getPlayerJerseyValue(shooter) ? `#${getPlayerJerseyValue(shooter)}` : '',
+    shooterLastName: getPlayerLastName(shooter) || '',
+    foulerPhotoUrl: getPlayerImageUrl(foulPlayerData?.photo, foulPlayerData?.playerId),
+    foulerJersey: getPlayerJerseyValue(fouler) ? `#${getPlayerJerseyValue(fouler)}` : '',
+    foulerLastName: getPlayerLastName(fouler) || '',
+    foulPrimaryText: "It's Good! + Foul",
+  };
   try {
     const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-1.mp3'));
     sfx.volume = 0.7;
     sfx.play().catch(() => {});
   } catch (e) {}
-
-  // Add to body
-  document.body.appendChild(announcement);
-  currentAnnouncement = announcement;
-  
-  // Trigger animation
-  requestAnimationFrame(() => {
-    announcement.classList.add('active');
-  });
-  
-  // Remove after animation completes
-  setTimeout(() => {
-    if (announcement.parentElement) {
-      announcement.remove();
-    }
-    if (currentAnnouncement === announcement) {
-      currentAnnouncement = null;
-    }
-  }, 2500);
+  if (typeof window !== 'undefined' && window.showAnnouncementStrip) {
+    window.showAnnouncementStrip(data);
+  }
 }
 
 /**
@@ -256,85 +188,28 @@ function createHeadshotElement(playerData, scale = 1.0) {
 }
 
 /**
- * Show an announcement with pop-to-center animation
+ * Show an announcement — uses new announcement strip (standard variant).
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
- * @param {string} team - 'home', 'away', 'defense', or 'neutral' for color styling
+ * @param {string} team - 'home', 'away', 'defense', or 'neutral' (unused by strip; kept for API)
  * @param {Object} playerData - Optional player data { playerId, photo, teamName } to show headshot
  */
 export function showAnnouncement(text, team = 'home', playerData = null) {
-  // Remove any existing announcement
-  if (currentAnnouncement) {
-    currentAnnouncement.remove();
-    currentAnnouncement = null;
-  }
-  
-  // Create announcement element
-  const announcement = document.createElement('div');
-  announcement.className = 'game-announcement';
-  
-  // Check if this is a foul announcement
-  const isFoulAnnouncement = text.includes('FOUL') || text.includes('Foul');
-  
-  // Apply team-specific styling
-  if (team === 'home') {
-    announcement.classList.add('home-team');
-  } else if (team === 'away') {
-    announcement.classList.add('away-team');
-  } else if (team === 'defense') {
-    announcement.classList.add('defense-team');
-  } else {
-    announcement.classList.add('neutral');
-  }
-  
-  // Add text first (so image appears on the right)
-  const textSpan = document.createElement('span');
-  textSpan.textContent = text;
-  
-  // Special styling for foul announcements: dark yellow with silver border
-  if (isFoulAnnouncement) {
-    textSpan.style.color = '#b8860b'; // Dark yellow (darkgoldenrod)
-    textSpan.style.textShadow = `
-      -2px -2px 0 #c0c0c0,
-      2px -2px 0 #c0c0c0,
-      -2px 2px 0 #c0c0c0,
-      2px 2px 0 #c0c0c0,
-      -2px 0 0 #c0c0c0,
-      2px 0 0 #c0c0c0,
-      0 -2px 0 #c0c0c0,
-      0 2px 0 #c0c0c0
-    `;
-    textSpan.style.fontWeight = 'bold';
-  } else if (text === "DOUBLE TEAM!") {
-    // Special styling for "DOUBLE TEAM!" - red text
-    textSpan.style.color = '#ff0000'; // Red text
-    textSpan.style.fontWeight = 'bold';
-    textSpan.style.fontSize = '2.5rem';
-  } else {
-    // All other announcements: dark silver with black border
-    textSpan.style.color = '#a8a8a8'; // Dark silver
-    textSpan.style.textShadow = `
-      -2px -2px 0 #000000,
-      2px -2px 0 #000000,
-      -2px 2px 0 #000000,
-      2px 2px 0 #000000,
-      -2px 0 0 #000000,
-      2px 0 0 #000000,
-      0 -2px 0 #000000,
-      0 2px 0 #000000
-    `;
-    textSpan.style.fontWeight = 'bold';
-  }
-  
-  announcement.appendChild(textSpan);
-  
-  // Add player headshot if provided (will appear after text). Background = team secondary color.
-  if (playerData && (playerData.photo || playerData.playerId)) {
-    announcement.appendChild(createPlayerAnnouncementCard(playerData, 1.0));
-  }
-  
-  // SFX: foul/turnover announcements (synced to on-screen announcement)
-  // Dead-ball turnovers only (no whistle for STEAL! — live-ball turnover)
-  const isDeadBallTurnoverAnnouncement = text.includes('Turnover') && text !== 'STEAL!';
+  const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
+  const player = rosterPlayer || playerData;
+  const photoUrl = playerData && (playerData.photo || playerData.playerId)
+    ? getPlayerImageUrl(playerData.photo, playerData.playerId)
+    : '';
+  const jerseyVal = getPlayerJerseyValue(player);
+  const data = {
+    type: 'standard',
+    eventText: text || '',
+    photoUrl,
+    jersey: jerseyVal ? `#${jerseyVal}` : '',
+    lastName: getPlayerLastName(player) || '',
+    position: getPlayerPosition(player) || '',
+  };
+  const isFoulAnnouncement = text && (text.includes('FOUL') || text.includes('Foul'));
+  const isDeadBallTurnoverAnnouncement = text && text.includes('Turnover') && text !== 'STEAL!';
   const isShotClockViolation = text === 'Shot Clock Violation!';
   if (isShotClockViolation) {
     try {
@@ -349,26 +224,9 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
       sfx.play().catch(() => {});
     } catch (e) {}
   }
-
-  // Add to body
-  document.body.appendChild(announcement);
-  currentAnnouncement = announcement;
-  
-  // Trigger animation by adding active class after a frame
-  requestAnimationFrame(() => {
-    announcement.classList.add('active');
-  });
-  
-  // Remove after animation completes (2500ms total)
-  setTimeout(() => {
-    if (announcement.parentElement) {
-      announcement.remove();
-    }
-    if (currentAnnouncement === announcement) {
-      currentAnnouncement = null;
-    }
-  }, 2500);
-  
+  if (typeof window !== 'undefined' && window.showAnnouncementStrip) {
+    window.showAnnouncementStrip(data);
+  }
 }
 
 /**
