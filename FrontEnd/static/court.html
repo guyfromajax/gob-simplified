@@ -1763,7 +1763,7 @@
     .announcement-inner.standard-variant::after {
       content: '';
       position: absolute;
-      left: 161px;
+      left: 181px;
       top: -10px; bottom: -10px;
       width: 2px;
       background: rgba(0,0,0,0.08);
@@ -1783,13 +1783,13 @@
       align-items: center;
       gap: 10px;
       padding: 0 14px 0 18px;
-      width: 175px;
+      width: 195px;
       flex-shrink: 0;
     }
     .ann-photo-wrap { position: relative; flex-shrink: 0; }
     .ann-photo {
-      width: 64px;
-      height: 64px;
+      width: 77px;
+      height: 77px;
       border-radius: 50%;
       object-fit: cover;
       border: 2.5px solid #F79420;
@@ -1797,28 +1797,19 @@
       background: #ddd;
     }
     .ann-jersey-badge {
-      position: absolute;
-      bottom: -2px; right: -4px;
-      background: #4065AF;
-      color: #fff;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 900;
-      font-size: 10px;
-      line-height: 1;
-      padding: 2px 5px;
-      border-radius: 3px;
-      letter-spacing: 0.5px;
+      display: none;
     }
     .ann-name-stack {
       display: flex;
       flex-direction: column;
       gap: 1px;
-      min-width: 0;
+      flex: 1;
+      min-width: 100px;
     }
     .ann-last-name {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
-      font-size: 14px;
+      font-size: 17px;
       color: #1a1a1a;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -1830,7 +1821,7 @@
     .ann-position {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 400;
-      font-size: 10px;
+      font-size: 12px;
       color: #9e9d9d;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -1874,15 +1865,7 @@
     .shooter-photo { border: 2px solid #4065AF; }
     .fouler-photo  { border: 2px solid #cc3333; }
     .ann-dual-jersey {
-      position: absolute;
-      bottom: -2px; right: -4px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 900;
-      font-size: 8px;
-      line-height: 1;
-      padding: 1px 3px;
-      border-radius: 2px;
-      color: #fff;
+      display: none;
     }
     .shooter-jersey { background: #4065AF; }
     .fouler-jersey  { background: #cc3333; }
@@ -1890,7 +1873,7 @@
     .ann-dual-last {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
-      font-size: 12px;
+      font-size: 14px;
       color: #1a1a1a;
       text-transform: uppercase;
       letter-spacing: 0.3px;
@@ -1899,7 +1882,7 @@
     .ann-dual-role {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 400;
-      font-size: 9px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.8px;
     }
@@ -4346,11 +4329,9 @@
           standardEl.style.display = 'none';
           foulEl.style.display = 'flex';
           foulEl.querySelector('.shooter-photo').src = data.shooterPhotoUrl || '';
-          foulEl.querySelector('.shooter-jersey').textContent = data.shooterJersey || '';
-          foulEl.querySelector('.shooter-name').textContent = data.shooterLastName || '';
+          foulEl.querySelector('.shooter-name').textContent = (data.shooterJersey ? data.shooterJersey + ' ' : '') + (data.shooterLastName || '');
           foulEl.querySelector('.fouler-photo').src = data.foulerPhotoUrl || '';
-          foulEl.querySelector('.fouler-jersey').textContent = data.foulerJersey || '';
-          foulEl.querySelector('.fouler-name').textContent = data.foulerLastName || '';
+          foulEl.querySelector('.fouler-name').textContent = (data.foulerJersey ? data.foulerJersey + ' ' : '') + (data.foulerLastName || '');
           var fp = (data.foulPrimaryText || "It's Good! + Foul").trim();
           foulEl.querySelector('.ann-foul-primary').innerHTML = fp.indexOf('!') !== -1 ? fp.replace('!', '<span class="ann-accent">!</span>') : fp;
           void foulEl.offsetWidth;
@@ -4358,8 +4339,7 @@
           foulEl.style.display = 'none';
           standardEl.style.display = 'flex';
           standardEl.querySelector('.ann-photo').src = data.photoUrl || '';
-          standardEl.querySelector('.ann-jersey-badge').textContent = data.jersey || '';
-          standardEl.querySelector('.ann-last-name').textContent = data.lastName || '';
+          standardEl.querySelector('.ann-last-name').textContent = (data.jersey ? data.jersey + ' ' : '') + (data.lastName || '');
           standardEl.querySelector('.ann-position').textContent = data.position || '';
           var raw = data.eventText || '';
           var hasExclaim = raw.endsWith('!');
