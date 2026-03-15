@@ -1713,104 +1713,91 @@
     @keyframes announcement-pop { ... }
     */
 
-    /* ==================== ANNOUNCEMENT STRIP ==================== */
-    #announcement-strip {
+    /* ==================== ANNOUNCEMENT OVERLAY ==================== */
+    #announcement-overlay {
       position: absolute;
-      bottom: 0;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);
       z-index: 950;
       pointer-events: none;
     }
-    #announcement-strip.hidden {
+    #announcement-overlay.hidden {
       display: none;
     }
-    .announcement-inner.standard-variant {
+    .ann-card {
       position: relative;
       display: flex;
-      align-items: center;
-      width: 560px;
-      height: 80px;
-      background: #f4f4f2;
-      box-shadow: 0 4px 32px rgba(0,0,0,0.45),
-                  0 1px 0 rgba(255,255,255,0.15) inset;
-      overflow: hidden;
-      animation: stripIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+      flex-direction: row;
+      align-items: stretch;
+      background: rgba(10,10,10,0.82);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      overflow: visible;
+      animation: annCardIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
-    .announcement-inner.foul-variant {
-      position: relative;
-      display: flex;
-      align-items: center;
-      width: 560px;
-      height: 96px;
-      background: #f4f4f2;
-      box-shadow: 0 4px 32px rgba(0,0,0,0.45),
-                  0 1px 0 rgba(255,255,255,0.15) inset;
-      overflow: hidden;
-      animation: stripIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-    @keyframes stripIn {
+    @keyframes annCardIn {
       from { transform: scaleX(0.6) scaleY(0.85); opacity: 0; }
       to   { transform: scaleX(1) scaleY(1); opacity: 1; }
     }
-    .announcement-inner::before {
+    .ann-card::before {
       content: '';
       position: absolute;
       left: 0; top: 0; bottom: 0;
       width: 5px;
       background: #F79420;
+      z-index: 2;
     }
-    .announcement-inner.standard-variant::after {
-      content: '';
-      position: absolute;
-      left: 181px;
-      top: -10px; bottom: -10px;
-      width: 2px;
-      background: rgba(0,0,0,0.08);
-      transform: skewX(-8deg);
-    }
-    .announcement-inner.foul-variant::after {
-      content: '';
-      position: absolute;
-      left: 206px;
-      top: -10px; bottom: -10px;
-      width: 2px;
-      background: rgba(0,0,0,0.08);
-      transform: skewX(-8deg);
-    }
-    .ann-player-zone {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 14px 0 18px;
-      width: 195px;
+    .ann-portrait-zone {
+      position: relative;
+      width: 100px;
+      height: 130px;
       flex-shrink: 0;
+      overflow: hidden;
+      background: #111;
     }
-    .ann-photo-wrap { position: relative; flex-shrink: 0; }
-    .ann-photo {
-      width: 77px;
-      height: 77px;
-      border-radius: 50%;
+    .ann-portrait-zone::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      right: -16px;
+      width: 32px;
+      background: rgba(10,10,10,0.82);
+      transform: skewX(-6deg);
+      z-index: 1;
+    }
+    .ann-fouler-zone {
+      position: relative;
+      width: 100px;
+      height: 130px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #111;
+      border: 3px solid #cc3333;
+      box-sizing: border-box;
+    }
+    .ann-portrait-img {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      border: 2.5px solid #F79420;
+      object-position: top center;
       display: block;
-      background: #ddd;
+      opacity: 0.92;
     }
-    .ann-jersey-badge {
-      display: none;
+    .ann-portrait-caption {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.75);
+      padding: 4px 8px;
+      z-index: 2;
     }
-    .ann-name-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-      flex: 1;
-      min-width: 100px;
+    .fouler-caption {
+      background: rgba(180,40,40,0.85);
     }
-    .ann-last-name {
+    .ann-jersey-name {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
-      font-size: 17px;
-      color: #1a1a1a;
+      font-size: 11px;
+      color: #fff;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       line-height: 1;
@@ -1818,101 +1805,68 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .ann-position {
+    .ann-pos-label {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 400;
-      font-size: 12px;
-      color: #9e9d9d;
+      font-size: 9px;
+      color: #F79420;
       text-transform: uppercase;
       letter-spacing: 1px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+    .fouler-role {
+      color: rgba(255,255,255,0.7);
     }
     .ann-event-zone {
       flex: 1;
       display: flex;
       align-items: center;
-      padding: 0 18px 0 20px;
+      padding: 18px 32px 18px 24px;
     }
     .ann-event-text {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
       font-style: italic;
-      font-size: 30px;
-      color: #1a1a1a;
+      font-size: 48px;
+      color: #fff;
       text-transform: uppercase;
       letter-spacing: 1px;
       line-height: 1;
       white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }
-    .ann-event-text .ann-accent { color: #F79420; }
-    .ann-foul-player-zone {
-      display: flex;
-      align-items: center;
-      padding: 0 14px 0 18px;
-      width: 220px;
-      flex-shrink: 0;
+    .ann-event-text .ann-accent {
+      color: #F79420;
     }
-    .ann-dual-players { display: flex; flex-direction: column; gap: 6px; }
-    .ann-dual-row { display: flex; align-items: center; gap: 8px; }
-    .ann-dual-photo-wrap { position: relative; flex-shrink: 0; }
-    .ann-dual-photo {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      object-fit: cover;
-      display: block;
-      background: #ddd;
-    }
-    .shooter-photo { border: 2px solid #4065AF; }
-    .fouler-photo  { border: 2px solid #cc3333; }
-    .ann-dual-jersey {
-      display: none;
-    }
-    .shooter-jersey { background: #4065AF; }
-    .fouler-jersey  { background: #cc3333; }
-    .ann-dual-name-block { display: flex; flex-direction: column; gap: 1px; }
-    .ann-dual-last {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 900;
-      font-size: 14px;
-      color: #1a1a1a;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      line-height: 1;
-    }
-    .ann-dual-role {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 400;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-    .shooter-role { color: #4065AF; }
-    .fouler-role  { color: #cc3333; }
     .ann-foul-event-zone {
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 2px;
-      padding: 0 16px 0 20px;
+      gap: 3px;
+      padding: 14px 20px 14px 22px;
     }
     .ann-foul-primary {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
       font-style: italic;
-      font-size: 26px;
-      color: #1a1a1a;
+      font-size: 40px;
+      color: #fff;
       text-transform: uppercase;
       letter-spacing: 1px;
       line-height: 1;
       white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }
-    .ann-foul-primary .ann-accent { color: #F79420; }
+    .ann-foul-primary .ann-accent {
+      color: #F79420;
+    }
     .ann-foul-secondary {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 700;
       font-style: italic;
-      font-size: 14px;
+      font-size: 18px;
       color: #cc3333;
       text-transform: uppercase;
       letter-spacing: 2px;
@@ -1920,9 +1874,9 @@
     }
     .ann-foul-note {
       font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
       font-weight: 400;
-      color: #9e9d9d;
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
       text-transform: uppercase;
       letter-spacing: 1.5px;
     }
@@ -2637,52 +2591,39 @@
         </div>
       </div>
 
-      <!-- In-game announcement strip (new system) -->
-      <div id="announcement-strip" class="announcement-strip hidden">
-        <div class="announcement-inner standard-variant">
-          <div class="ann-player-zone">
-            <div class="ann-photo-wrap">
-              <img class="ann-photo" src="" alt="Player" />
-              <span class="ann-jersey-badge"></span>
-            </div>
-            <div class="ann-name-stack">
-              <span class="ann-last-name"></span>
-              <span class="ann-position"></span>
+      <!-- In-game announcement overlay (center-court) -->
+      <div id="announcement-overlay" class="ann-overlay hidden">
+        <div class="ann-card standard-card">
+          <div class="ann-portrait-zone">
+            <img class="ann-portrait-img" src="" alt="Player" />
+            <div class="ann-portrait-caption">
+              <div class="ann-jersey-name"></div>
+              <div class="ann-pos-label"></div>
             </div>
           </div>
           <div class="ann-event-zone">
             <span class="ann-event-text"></span>
           </div>
         </div>
-        <div class="announcement-inner foul-variant" style="display:none;">
-          <div class="ann-foul-player-zone">
-            <div class="ann-dual-players">
-              <div class="ann-dual-row shooter-row">
-                <div class="ann-dual-photo-wrap">
-                  <img class="ann-dual-photo shooter-photo" src="" alt="Shooter" />
-                  <span class="ann-dual-jersey shooter-jersey"></span>
-                </div>
-                <div class="ann-dual-name-block">
-                  <span class="ann-dual-last shooter-name"></span>
-                  <span class="ann-dual-role shooter-role">Shooter</span>
-                </div>
-              </div>
-              <div class="ann-dual-row fouler-row">
-                <div class="ann-dual-photo-wrap">
-                  <img class="ann-dual-photo fouler-photo" src="" alt="Fouler" />
-                  <span class="ann-dual-jersey fouler-jersey"></span>
-                </div>
-                <div class="ann-dual-name-block">
-                  <span class="ann-dual-last fouler-name"></span>
-                  <span class="ann-dual-role fouler-role">Foul</span>
-                </div>
-              </div>
+        <div class="ann-card foul-card" style="display:none;">
+          <div class="ann-portrait-zone shooter-zone">
+            <img class="ann-portrait-img shooter-img" src="" alt="Shooter" />
+            <div class="ann-portrait-caption shooter-caption">
+              <div class="ann-jersey-name shooter-name"></div>
+              <div class="ann-pos-label shooter-role">Shooter</div>
             </div>
           </div>
           <div class="ann-foul-event-zone">
             <span class="ann-foul-primary"></span>
             <span class="ann-foul-secondary">+ Free Throw</span>
             <span class="ann-foul-note">And one</span>
+          </div>
+          <div class="ann-fouler-zone">
+            <img class="ann-portrait-img fouler-img" src="" alt="Fouler" />
+            <div class="ann-portrait-caption fouler-caption">
+              <div class="ann-jersey-name fouler-name"></div>
+              <div class="ann-pos-label fouler-role">Foul</div>
+            </div>
           </div>
         </div>
       </div>
@@ -4318,38 +4259,40 @@
   </script>
   <script>
     (function() {
-      let _annTimer = null;
-      window.showAnnouncementStrip = function(data) {
-        var strip = document.getElementById('announcement-strip');
-        if (!strip) return;
+      var _annTimer = null;
+      window.showAnnouncementOverlay = function(data) {
+        var overlay = document.getElementById('announcement-overlay');
+        if (!overlay) return;
         if (_annTimer) { clearTimeout(_annTimer); _annTimer = null; }
-        var standardEl = strip.querySelector('.standard-variant');
-        var foulEl = strip.querySelector('.foul-variant');
+        var standardCard = overlay.querySelector('.standard-card');
+        var foulCard = overlay.querySelector('.foul-card');
         if (data.type === 'foul') {
-          standardEl.style.display = 'none';
-          foulEl.style.display = 'flex';
-          foulEl.querySelector('.shooter-photo').src = data.shooterPhotoUrl || '';
-          foulEl.querySelector('.shooter-name').textContent = (data.shooterJersey ? data.shooterJersey + ' ' : '') + (data.shooterLastName || '');
-          foulEl.querySelector('.fouler-photo').src = data.foulerPhotoUrl || '';
-          foulEl.querySelector('.fouler-name').textContent = (data.foulerJersey ? data.foulerJersey + ' ' : '') + (data.foulerLastName || '');
-          var fp = (data.foulPrimaryText || "It's Good! + Foul").trim();
-          foulEl.querySelector('.ann-foul-primary').innerHTML = fp.indexOf('!') !== -1 ? fp.replace('!', '<span class="ann-accent">!</span>') : fp;
-          void foulEl.offsetWidth;
+          standardCard.style.display = 'none';
+          foulCard.style.display = 'flex';
+          foulCard.querySelector('.shooter-img').src = data.shooterPhotoUrl || '';
+          foulCard.querySelector('.shooter-name').textContent = ((data.shooterJersey || '') + ' ' + (data.shooterLastName || '')).trim();
+          foulCard.querySelector('.fouler-img').src = data.foulerPhotoUrl || '';
+          foulCard.querySelector('.fouler-name').textContent = ((data.foulerJersey || '') + ' ' + (data.foulerLastName || '')).trim();
+          var raw = data.foulEventText || "It's Good!";
+          var hasExclaim = raw.endsWith('!');
+          var base = hasExclaim ? raw.slice(0, -1) : raw;
+          foulCard.querySelector('.ann-foul-primary').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
+          void foulCard.offsetWidth;
         } else {
-          foulEl.style.display = 'none';
-          standardEl.style.display = 'flex';
-          standardEl.querySelector('.ann-photo').src = data.photoUrl || '';
-          standardEl.querySelector('.ann-last-name').textContent = (data.jersey ? data.jersey + ' ' : '') + (data.lastName || '');
-          standardEl.querySelector('.ann-position').textContent = data.position || '';
+          foulCard.style.display = 'none';
+          standardCard.style.display = 'flex';
+          standardCard.querySelector('.ann-portrait-img').src = data.photoUrl || '';
+          standardCard.querySelector('.ann-jersey-name').textContent = ((data.jersey || '') + ' ' + (data.lastName || '')).trim();
+          standardCard.querySelector('.ann-pos-label').textContent = data.position || '';
           var raw = data.eventText || '';
           var hasExclaim = raw.endsWith('!');
           var base = hasExclaim ? raw.slice(0, -1) : raw;
-          standardEl.querySelector('.ann-event-text').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
-          void standardEl.offsetWidth;
+          standardCard.querySelector('.ann-event-text').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
+          void standardCard.offsetWidth;
         }
-        strip.classList.remove('hidden');
+        overlay.classList.remove('hidden');
         _annTimer = setTimeout(function() {
-          strip.classList.add('hidden');
+          overlay.classList.add('hidden');
           _annTimer = null;
         }, 2200);
       };

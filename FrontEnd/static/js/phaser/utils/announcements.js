@@ -159,21 +159,21 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   const fouler = foulerRoster || foulPlayerData;
   const data = {
     type: 'foul',
+    foulEventText: "It's Good!",
     shooterPhotoUrl: getPlayerImageUrl(shooterData?.photo, shooterData?.playerId),
     shooterJersey: getPlayerJerseyValue(shooter) ? `#${getPlayerJerseyValue(shooter)}` : '',
     shooterLastName: getPlayerLastName(shooter) || '',
     foulerPhotoUrl: getPlayerImageUrl(foulPlayerData?.photo, foulPlayerData?.playerId),
     foulerJersey: getPlayerJerseyValue(fouler) ? `#${getPlayerJerseyValue(fouler)}` : '',
     foulerLastName: getPlayerLastName(fouler) || '',
-    foulPrimaryText: "It's Good! + Foul",
   };
   try {
     const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-1.mp3'));
     sfx.volume = 0.7;
     sfx.play().catch(() => {});
   } catch (e) {}
-  if (typeof window !== 'undefined' && window.showAnnouncementStrip) {
-    window.showAnnouncementStrip(data);
+  if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
+    window.showAnnouncementOverlay(data);
   }
 }
 
@@ -224,8 +224,8 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
       sfx.play().catch(() => {});
     } catch (e) {}
   }
-  if (typeof window !== 'undefined' && window.showAnnouncementStrip) {
-    window.showAnnouncementStrip(data);
+  if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
+    window.showAnnouncementOverlay(data);
   }
 }
 
