@@ -3676,6 +3676,8 @@
       function updateDefenseCardDisplay() {
         const el = document.querySelector('.defense-play-name');
         if (el) el.textContent = DEFENSE_SCHEMES[currentDefenseIndex];
+        const defenseCard = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
+        if (defenseCard) defenseCard.classList.add('selected');
       }
 
       // Tempo stack
@@ -3785,7 +3787,8 @@
         updateDefenseCardDisplay();
         console.log('📋 Override selections cleared');
       };
-      
+
+      updateDefenseCardDisplay();
     })();
     
     // Team boxscore tabs and data population

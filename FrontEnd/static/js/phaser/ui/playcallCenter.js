@@ -86,24 +86,33 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     }
   }
 
-  // Sync stack button .selected state from turn data (guarded — no-op if fields missing)
+  // Sync stack button .selected state only when the call belongs to the user's team
   const stackZone = document.getElementById('pcc-stacks-zone');
   if (stackZone) {
-    if (turnData.offense_tempo_call || turnData.tempo_call) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const userTeamSide = urlParams.get('my_team');
+    const offId = turnData.offense_team_id != null ? String(turnData.offense_team_id) : null;
+    const homeId = homeTeamId != null ? String(homeTeamId) : null;
+    const isUserOnOffense = userTeamSide && offId && homeId &&
+      ((userTeamSide === 'home' && offId === homeId) || (userTeamSide === 'away' && offId !== homeId));
+    const isUserOnDefense = userTeamSide && offId && homeId &&
+      ((userTeamSide === 'home' && offId !== homeId) || (userTeamSide === 'away' && offId === homeId));
+
+    if (isUserOnOffense && (turnData.offense_tempo_call || turnData.tempo_call)) {
       const tempo = (turnData.offense_tempo_call || turnData.tempo_call || '').toLowerCase();
       stackZone.querySelectorAll('.pcc-stack.tempo .pcc-stack-btn').forEach(btn => {
         const v = btn.id === 'tempo-fast' ? 'fast' : btn.id === 'tempo-slow' ? 'slow' : 'normal';
         btn.classList.toggle('selected', v === tempo);
       });
     }
-    if (turnData.defense_aggression_call || turnData.aggression) {
+    if (isUserOnDefense && (turnData.defense_aggression_call || turnData.aggression)) {
       const aggr = (turnData.defense_aggression_call || turnData.aggression || '').toLowerCase();
       stackZone.querySelectorAll('.pcc-stack.aggression .pcc-stack-btn').forEach(btn => {
         const v = btn.id === 'aggr-passive' ? 'passive' : btn.id === 'aggr-aggressive' ? 'aggressive' : 'normal';
         btn.classList.toggle('selected', v === aggr);
       });
     }
-    if (turnData.press_trap_override != null) {
+    if (isUserOnDefense && turnData.press_trap_override != null) {
       const pt = (turnData.press_trap_override || '').toLowerCase();
       stackZone.querySelectorAll('.pcc-stack.press-trap .pcc-stack-btn').forEach(btn => {
         const v = btn.id === 'press-btn' ? 'press' : btn.id === 'trap-btn' ? 'trap' : 'none';
