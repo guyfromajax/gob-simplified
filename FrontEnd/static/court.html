@@ -3541,6 +3541,7 @@
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
       const DEFENSE_SCHEMES = ['Man Normal', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
       let currentDefenseIndex = 0;
+      let userHasSetDefenseOverride = false;
       
       // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
@@ -3677,7 +3678,10 @@
         const el = document.querySelector('.defense-play-name');
         if (el) el.textContent = DEFENSE_SCHEMES[currentDefenseIndex];
         const defenseCard = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
-        if (defenseCard) defenseCard.classList.add('selected');
+        if (defenseCard) {
+          if (userHasSetDefenseOverride) defenseCard.classList.add('selected');
+          else defenseCard.classList.remove('selected');
+        }
       }
 
       // Tempo stack
@@ -3751,18 +3755,21 @@
       }
       document.getElementById('defense-nav-up')?.addEventListener('click', async () => {
         playSound('click-tiny.wav');
+        userHasSetDefenseOverride = true;
         currentDefenseIndex = (currentDefenseIndex - 1 + DEFENSE_SCHEMES.length) % DEFENSE_SCHEMES.length;
         updateDefenseCardDisplay();
         await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
       });
       document.getElementById('defense-nav-down')?.addEventListener('click', async () => {
         playSound('click-tiny.wav');
+        userHasSetDefenseOverride = true;
         currentDefenseIndex = (currentDefenseIndex + 1) % DEFENSE_SCHEMES.length;
         updateDefenseCardDisplay();
         await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
       });
       document.getElementById('clear-defense-card-x')?.addEventListener('click', async () => {
         playSound('x-back.mp3');
+        userHasSetDefenseOverride = false;
         currentDefenseIndex = 0;
         updateDefenseCardDisplay();
         await setPlaycallOverride('defense', null);
@@ -3783,6 +3790,7 @@
       window.clearPlaycallOverrides = function() {
         playOptions.forEach(opt => opt.classList.remove('selected'));
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
+        userHasSetDefenseOverride = false;
         currentDefenseIndex = 0;
         updateDefenseCardDisplay();
         console.log('📋 Override selections cleared');
