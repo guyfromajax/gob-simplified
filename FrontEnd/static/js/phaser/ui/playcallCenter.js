@@ -10,13 +10,12 @@
  * Called when a play is used or override is cleared
  */
 export function clearPlaycallHighlights() {
-  // Clear offense play highlights
   const playOptions = document.querySelectorAll('.play-option');
   playOptions.forEach(opt => opt.classList.remove('selected'));
-  
-  // Clear defense highlights
-  const defenseButtons = document.querySelectorAll('.defense-override-btn');
-  defenseButtons.forEach(btn => btn.classList.remove('selected'));
+  const stackZone = document.getElementById('pcc-stacks-zone');
+  if (stackZone) {
+    stackZone.querySelectorAll('.pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
+  }
 }
 
 /**
@@ -74,7 +73,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   }
   
   if (defenseStatusText) {
-    // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
+    // Use defensive_playcall if available (contains full name like "Man Normal", "2-3 Zone", etc.)
     // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
     const defPlaycall = turnData.defensive_playcall || turnData.defense_playcall;
     const defType = defPlaycall || turnData.defensive_play_type;
@@ -84,6 +83,32 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
       const aggrRaw = turnData.defense_aggression_call || turnData.aggression || 'normal';
       const aggr = aggrRaw.charAt(0).toUpperCase() + aggrRaw.slice(1); // Capitalize first letter
       defenseStatusText.textContent = `${formattedDefType} ${aggr}`;
+    }
+  }
+
+  // Sync stack button .selected state from turn data (guarded — no-op if fields missing)
+  const stackZone = document.getElementById('pcc-stacks-zone');
+  if (stackZone) {
+    if (turnData.offense_tempo_call || turnData.tempo_call) {
+      const tempo = (turnData.offense_tempo_call || turnData.tempo_call || '').toLowerCase();
+      stackZone.querySelectorAll('.pcc-stack.tempo .pcc-stack-btn').forEach(btn => {
+        const v = btn.id === 'tempo-fast' ? 'fast' : btn.id === 'tempo-slow' ? 'slow' : 'normal';
+        btn.classList.toggle('selected', v === tempo);
+      });
+    }
+    if (turnData.defense_aggression_call || turnData.aggression) {
+      const aggr = (turnData.defense_aggression_call || turnData.aggression || '').toLowerCase();
+      stackZone.querySelectorAll('.pcc-stack.aggression .pcc-stack-btn').forEach(btn => {
+        const v = btn.id === 'aggr-passive' ? 'passive' : btn.id === 'aggr-aggressive' ? 'aggressive' : 'normal';
+        btn.classList.toggle('selected', v === aggr);
+      });
+    }
+    if (turnData.press_trap_override != null) {
+      const pt = (turnData.press_trap_override || '').toLowerCase();
+      stackZone.querySelectorAll('.pcc-stack.press-trap .pcc-stack-btn').forEach(btn => {
+        const v = btn.id === 'press-btn' ? 'press' : btn.id === 'trap-btn' ? 'trap' : 'none';
+        btn.classList.toggle('selected', v === pt);
+      });
     }
   }
 

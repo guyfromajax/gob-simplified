@@ -247,17 +247,19 @@ class TeamManager:
                 "tempo_override": None,
                 "press_override": None,
                 "trap_override": None,
+                "press_trap_override": None,  # "press", "trap", "none", or None
             }
             self.strategy_calls = {**default_calls, **strategy_calls}  # Saved calls override defaults
         else:
             # Initialize fresh (new game or no saved calls)
             self.strategy_calls = {
                 "offense_call": None,          # Play name string or None (user override persists until used)
-                "defense_call": None,          # "Man", "Zone", or None (user override persists until used)
+                "defense_call": None,          # "Man Normal", "2-3 Zone", etc., or None
                 "aggression_override": None,   # "normal", "aggressive", "passive", or None (temporary override)
                 "tempo_override": None,        # "slow", "normal", "fast", or None (temporary override)
                 "press_override": None,        # Future: FCP override
                 "trap_override": None,         # Future: HCT override
+                "press_trap_override": None,   # "press", "trap", "none", or None (playcall center)
             }
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}

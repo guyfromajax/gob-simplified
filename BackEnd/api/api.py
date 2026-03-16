@@ -389,9 +389,10 @@ try:
         game_id: str
         user_team_side: str  # "home" or "away"
         offense_override: str | None = None  # Play name (e.g., "3-2 Motion")
-        defense_override: str | None = None  # "Man" or "Zone"
+        defense_override: str | None = None  # "Man Normal", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
         aggression_override: str | None = None  # "normal", "aggressive", "passive"
         tempo_override: str | None = None  # "slow", "normal", "fast"
+        press_trap_override: str | None = None  # "press", "trap", "none"
     
     
     # Helper functions for tournament/franchise mode
@@ -4456,17 +4457,28 @@ try:
                 logging.warning(f"🔴   Override that was cleared: '{old_override}'")
                 logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
         
-        if "tempo_override" in provided_fields and req.tempo_override is not None:
-            user_team.strategy_calls["tempo_override"] = req.tempo_override
-            logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {req.tempo_override}")
-        
+        if "tempo_override" in provided_fields:
+            if req.tempo_override is not None:
+                user_team.strategy_calls["tempo_override"] = req.tempo_override
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {req.tempo_override}")
+            else:
+                user_team.strategy_calls["tempo_override"] = None
+
+        if "press_trap_override" in provided_fields:
+            if req.press_trap_override is not None:
+                user_team.strategy_calls["press_trap_override"] = req.press_trap_override
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Set press_trap override for {user_team.name}: {req.press_trap_override}")
+            else:
+                user_team.strategy_calls["press_trap_override"] = None
+
         response_data = {
             "status": "success",
             "overrides": {
                 "offense": user_team.strategy_calls.get("offense_call"),
                 "defense": user_team.strategy_calls.get("defense_call"),
                 "aggression": user_team.strategy_calls.get("aggression_override"),
-                "tempo": user_team.strategy_calls.get("tempo_override")
+                "tempo": user_team.strategy_calls.get("tempo_override"),
+                "press_trap": user_team.strategy_calls.get("press_trap_override")
             }
         }
         return JSONResponse(content=response_data, status_code=200)

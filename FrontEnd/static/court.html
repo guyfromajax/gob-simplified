@@ -1113,168 +1113,221 @@
       z-index: 900 !important;
     }
 
-    /* Top Row: Current Playcall Status */
+    /* ── STATUS ROW ── */
     #playcall-status-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 0 20px;
-      border-bottom: 1px solid rgba(255, 215, 0, 0.2);
-      padding-bottom: 6px;  /* CHANGE: reduced padding */
-      min-height: 24px;  /* CHANGE: ensure minimum height */
-    }
-
-    .status-display {
-      display: flex;
-      gap: 8px;
       align-items: baseline;
+      border-bottom: 1px solid rgba(255,215,0,0.18);
+      padding-bottom: 5px;
+      flex-shrink: 0;
     }
 
-    .status-label {
-      font-size: 10px;  /* CHANGE: smaller font */
-      font-weight: 600;
-      color: rgba(255, 215, 0, 0.6);
-      letter-spacing: 1px;
-    }
+    .status-display { display: flex; align-items: baseline; gap: 8px; }
+    .status-label { font-size: 11px; color: rgba(255,215,0,0.5); letter-spacing: 1.5px; }
+    #offense-status-text, #defense-status-text { font-size: 17px; color: #FFD700; letter-spacing: 0.5px; }
 
-    #offense-status-text,
-    #defense-status-text {
-      font-size: 11px;  /* CHANGE: smaller font */
-      font-weight: 700;
-      color: #FFD700;
-      letter-spacing: 0.5px;
-    }
-
-    /* Main Row: 3-Column Layout */
+    /* ── MAIN ROW ── */
     #playcall-main-row {
       display: flex;
       flex-direction: row;
       align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      padding: 0 20px;
+      flex: 1;
       min-height: 0;
     }
 
-    /* Tactical Panels (Offense & Defense) */
-    .tactical-panel {
-      flex: 1;
+    /* ── CARD ZONES ── */
+    .pcc-card-zone {
+      flex: 0 0 33%;
       display: flex;
-      flex-direction: column;
-      gap: 6px;  /* CHANGE: reduced gap */
-      max-width: 48%;
-      min-height: 0;  /* CHANGE: allow shrinking */
+      flex-direction: row;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      padding: 0 8px 0 0;
     }
 
-    .panel-title {
-      font-size: 10px;  /* CHANGE: smaller font */
-      font-weight: 700;
-      color: rgba(255, 215, 0, 0.7);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      text-align: center;
-      margin-bottom: 2px;  /* CHANGE: reduced margin */
+    .pcc-card-zone.defense-zone {
+      padding: 0 0 0 8px;
+      flex-direction: row-reverse;
     }
 
-    .panel-title-spacer {
-      visibility: hidden;
-      user-select: none;
-    }
-
-    /* Offense Play Scroller Container */
-    .play-scroller-container {
+    /* ── PLAY CARD (offense and defense) ── */
+    .pcc-play-card {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 0 10px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.14);
+      border-radius: 6px;
       flex: 1;
-      min-height: 0; /* Allow flex shrinking */
-    }
-
-    /* Offense Play Scroller - Show only 1 play at a time */
-    .play-scroller {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      overflow: hidden;  /* Hide other plays */
-    }
-
-    /* Navigation Buttons */
-    .play-nav-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 215, 0, 0.4);
-      color: rgba(255, 215, 0, 0.8);
-      font-size: 18px;
-      font-weight: bold;
+      height: 66px;
+      min-width: 0;
       cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
+      overflow: hidden;
     }
 
-    .play-nav-btn:hover {
-      background: rgba(255, 215, 0, 0.2);
+    .pcc-play-card.selected {
+      background: rgba(255,215,0,0.2);
       border-color: #FFD700;
-      color: #FFD700;
+      box-shadow: 0 0 14px rgba(255,215,0,0.3);
     }
 
-    .play-nav-buttons {
+    .pcc-play-card .play-name { font-size: 13px; }
+    .pcc-play-card .play-focus { font-size: 10px; }
+    .pcc-play-card.selected .play-name { color: #FFD700; }
+    .pcc-play-card.selected .play-focus { color: rgba(255,215,0,0.6); }
+
+    /* Offense play scroller inside card — one play visible at a time */
+    .pcc-play-card .play-scroller {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      align-items: center;
+      gap: 0;
     }
 
-    /* Red X Clear Override Button */
-    .clear-override-x-btn {
-      width: 28px;
-      height: 28px;
-      min-height: unset;
-      max-height: unset;
-      border-radius: 4px;
-      background: rgba(244, 67, 54, 0.2);
-      border: 2px solid rgba(244, 67, 54, 0.6);
-      color: #F44336;
+    .defense-play-name {
+      font-family: 'Bebas Neue', sans-serif;
       font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 0.3px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── NAV COLUMN ── */
+    .pcc-nav-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+
+    .pcc-nav-btn {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,215,0,0.3);
+      color: rgba(255,215,0,0.75);
+      font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .pcc-nav-x {
+      width: 24px; height: 24px; border-radius: 4px;
+      background: rgba(244,67,54,0.14);
+      border: 2px solid rgba(244,67,54,0.45);
+      color: #F44336; font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── STACKS ZONE ── */
+    #pcc-stacks-zone {
+      flex: 0 0 34%;
       display: flex;
-      align-items: center;
+      flex-direction: row;
+      align-items: stretch;
       justify-content: center;
-      line-height: 1;
-      align-self: unset;
-      margin-left: 0;
+      gap: 6px;
+      padding: 2px 8px;
+      border-left: 1px solid rgba(255,255,255,0.07);
+      border-right: 1px solid rgba(255,255,255,0.07);
+      min-width: 0;
     }
 
-    .clear-override-x-btn:hover {
-      background: rgba(244, 67, 54, 0.4);
-      border-color: #F44336;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
+    /* ── STACK ── */
+    .pcc-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 3px;
+      flex: 1;
+      min-width: 0;
+      padding-top: 4px;
+      position: relative;
     }
 
+    .pcc-stack::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    .pcc-stack.tempo::before      { background: #4a90d9; }
+    .pcc-stack.aggression::before  { background: #FFD700; }
+    .pcc-stack.press-trap::before  { background: #cc3333; }
+
+    .pcc-stack-label {
+      font-size: 9px;
+      letter-spacing: 1.2px;
+      text-align: center;
+      margin-bottom: 1px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .pcc-stack.tempo .pcc-stack-label      { color: #4a90d9; }
+    .pcc-stack.aggression .pcc-stack-label  { color: #FFD700; }
+    .pcc-stack.press-trap .pcc-stack-label  { color: #cc3333; }
+
+    .pcc-stack-btn {
+      padding: 5px 4px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      color: rgba(255,255,255,0.55);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 12px; letter-spacing: 0.6px;
+      cursor: pointer; text-align: center;
+      white-space: nowrap; line-height: 1.2;
+    }
+
+    .pcc-stack.tempo .pcc-stack-btn.selected {
+      background: rgba(74,144,217,0.2);
+      border-color: #4a90d9; color: #4a90d9;
+      box-shadow: 0 0 8px rgba(74,144,217,0.3);
+    }
+
+    .pcc-stack.aggression .pcc-stack-btn.selected {
+      background: rgba(255,215,0,0.2);
+      border-color: #FFD700; color: #FFD700;
+      box-shadow: 0 0 8px rgba(255,215,0,0.28);
+    }
+
+    .pcc-stack.press-trap .pcc-stack-btn.selected {
+      background: rgba(204,51,51,0.2);
+      border-color: #cc3333; color: #cc3333;
+      box-shadow: 0 0 8px rgba(204,51,51,0.3);
+    }
+
+    .pcc-stack-x {
+      padding: 4px 4px;
+      background: rgba(244,67,54,0.12);
+      border: 2px solid rgba(244,67,54,0.42);
+      border-radius: 5px; color: #F44336;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 12px; cursor: pointer;
+      text-align: center; line-height: 1.2;
+    }
+
+    /* Reused play-option/headshot/info/name/focus (offense card) — dimensions updated for card height */
     .play-option {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 12px;  /* Increased padding for larger container */
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
+      padding: 8px 10px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-height: 70px;  /* Increased min-height for larger container */
+      min-height: 62px;
     }
 
     .play-option:hover {
       background: rgba(255, 215, 0, 0.1);
-      border-color: rgba(255, 215, 0, 0.5);
     }
 
     .play-option.selected {
@@ -1284,10 +1337,10 @@
     }
 
     .play-headshot {
-      width: auto;  /* Proportional to height */
-      height: 70px;  /* CHANGE: fixed height instead of 100% to prevent stretching */
-      max-height: 70px;  /* Match play-option min-height */
-      border-radius: 4px;  /* Rectangular with slight rounding */
+      width: auto;
+      height: 58px;
+      max-height: 58px;
+      border-radius: 4px;
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
       background: rgba(0, 0, 0, 0.5);
@@ -1303,10 +1356,11 @@
       flex-direction: column;
       gap: 2px;
       flex: 1;
+      min-width: 0;
     }
 
     .play-name {
-      font-size: 16px;  /* Increased font size for larger container */
+      font-size: 16px;
       font-weight: 700;
       color: rgba(255, 255, 255, 0.8);
       letter-spacing: 0.5px;
@@ -1317,7 +1371,7 @@
     }
 
     .play-focus {
-      font-size: 12px;  /* Increased font size for larger container */
+      font-size: 12px;
       font-weight: 600;
       color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
@@ -1326,106 +1380,6 @@
 
     .play-option.selected .play-focus {
       color: rgba(255, 215, 0, 0.8);
-    }
-
-    /* Defense Override Buttons */
-    .defense-overrides {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .defense-row {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      align-items: center;
-    }
-
-    /* Red X Clear Override Button for Defense Rows */
-    .defense-clear-x-btn {
-      width: 28px;
-      height: 38px;  /* Match defense button min-height exactly */
-      border-radius: 4px;
-      background: rgba(244, 67, 54, 0.2);
-      border: 2px solid rgba(244, 67, 54, 0.6);
-      color: #F44336;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      flex-shrink: 0;  /* Don't shrink */
-    }
-
-    .defense-clear-x-btn:hover {
-      background: rgba(244, 67, 54, 0.4);
-      border-color: #F44336;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
-    }
-
-    .defense-override-btn {
-      flex: 1;
-      max-width: 70px;  /* Compress horizontal size to make room for red X */
-      padding: 10px 8px;  /* Reduced horizontal padding */
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 9px;  /* Reduced font size to fit "Aggressive" when compressed */
-      font-weight: 700;
-      letter-spacing: 0.5px;  /* Reduced letter spacing */
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-transform: uppercase;
-      min-height: 38px;  /* Keep vertical height exactly as is */
-    }
-
-    .defense-override-btn:hover {
-      background: rgba(255, 215, 0, 0.1);
-      border-color: rgba(255, 215, 0, 0.5);
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .defense-override-btn.selected {
-      background: rgba(255, 215, 0, 0.25);
-      border-color: #FFD700;
-      color: #FFD700;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-    }
-
-    /* Clear Override Buttons */
-    .clear-override-btn {
-      width: 100%;
-      padding: 6px;  /* CHANGE: reduced padding */
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 4px;
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 10px;  /* CHANGE: smaller font */
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 2px;  /* CHANGE: reduced margin */
-    }
-
-    .clear-override-btn:hover {
-      background: rgba(244, 67, 54, 0.15);
-      border-color: rgba(244, 67, 54, 0.5);
-      color: #F44336;
-    }
-
-    .clear-override-placeholder {
-      width: 100%;
-      padding: 6px;
-      margin-top: 2px;
-      visibility: hidden;
-      pointer-events: none;
-      box-sizing: border-box;
     }
 
     /* ==================== PLAYCALL REVEAL HUD ==================== */
@@ -2743,98 +2697,109 @@
 
   <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB - grid-area: playcall ==================== -->
   <div id="playcall-center" style="grid-area: playcall;">
-    
-    <!-- Top Row: Current Playcall Display -->
+    <!-- Status row (unchanged IDs — JS depends on these) -->
     <div id="playcall-status-row">
       <div id="offense-status" class="status-display">
-        <span class="status-label">OFFENSE:</span>
+        <span class="status-label">OFFENSE</span>
         <span id="offense-status-text">Motion → Inside</span>
       </div>
       <div id="defense-status" class="status-display">
-        <span class="status-label">DEFENSE:</span>
         <span id="defense-status-text">Man Normal</span>
+        <span class="status-label">DEFENSE</span>
       </div>
     </div>
-    
-    <!-- Main Row: Offense Panel | Defense Panel -->
+    <!-- Main row: Offense Card (33%) | Stacks (34%) | Defense Card (33%) -->
     <div id="playcall-main-row">
-      
-      <!-- Offense Panel (switches sides) -->
-      <div id="offense-panel" class="tactical-panel">
-        <div class="panel-title panel-title-spacer" aria-hidden="true">OFFENSE OVERRIDE</div>
-        <div class="play-scroller-container">
+      <!-- Offense Card Zone (left 33%) -->
+      <div class="pcc-card-zone">
+        <div class="pcc-play-card">
           <div id="offense-play-scroller" class="play-scroller">
-          <div class="play-option" data-play="4-1 Motion" data-focus="inside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">4-1 Motion</div>
-              <div class="play-focus">Inside</div>
+            <div class="play-option" data-play="4-1 Motion" data-focus="inside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">4-1 Motion</div>
+                <div class="play-focus">Inside</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="3-2 Motion" data-focus="attack">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">3-2 Motion</div>
+                <div class="play-focus">Attack</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="5-0 Motion" data-focus="outside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">5-0 Motion</div>
+                <div class="play-focus">Outside</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="Base Post Play" data-focus="inside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">Base Post Play</div>
+                <div class="play-focus">Inside</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="Pick & Roll (Lower Wing)" data-focus="attack">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">Pick & Roll</div>
+                <div class="play-focus">Attack</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="Double Screen For SG" data-focus="outside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">Double Screen for SG</div>
+                <div class="play-focus">Outside</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pcc-nav-col">
+          <button class="pcc-nav-btn" id="play-nav-up">▲</button>
+          <button class="pcc-nav-btn" id="play-nav-down">▼</button>
+          <button class="pcc-nav-x" id="clear-offense-override-x">✕</button>
         </div>
       </div>
-          <div class="play-option" data-play="3-2 Motion" data-focus="attack">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">3-2 Motion</div>
-              <div class="play-focus">Attack</div>
+      <!-- Stacks Zone (center 34%): Tempo | Aggression | Press/Trap -->
+      <div id="pcc-stacks-zone">
+        <div class="pcc-stack tempo">
+          <span class="pcc-stack-label">Tempo</span>
+          <button type="button" class="pcc-stack-btn" id="tempo-fast">Fast</button>
+          <button type="button" class="pcc-stack-btn" id="tempo-normal">Normal</button>
+          <button type="button" class="pcc-stack-btn" id="tempo-slow">Slow</button>
+          <button type="button" class="pcc-stack-x" id="clear-tempo-x">✕</button>
+        </div>
+        <div class="pcc-stack aggression">
+          <span class="pcc-stack-label">Aggression</span>
+          <button type="button" class="pcc-stack-btn" id="aggr-passive">Passive</button>
+          <button type="button" class="pcc-stack-btn" id="aggr-normal">Normal</button>
+          <button type="button" class="pcc-stack-btn" id="aggr-aggressive">Aggr</button>
+          <button type="button" class="pcc-stack-x" id="clear-aggression-override-x">✕</button>
+        </div>
+        <div class="pcc-stack press-trap">
+          <span class="pcc-stack-label">Press/Trap</span>
+          <button type="button" class="pcc-stack-btn" id="press-btn">Press</button>
+          <button type="button" class="pcc-stack-btn" id="trap-btn">Trap</button>
+          <button type="button" class="pcc-stack-btn" id="press-trap-none-btn">None</button>
+          <button type="button" class="pcc-stack-x" id="clear-press-trap-x">✕</button>
         </div>
       </div>
-          <div class="play-option" data-play="5-0 Motion" data-focus="outside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">5-0 Motion</div>
-              <div class="play-focus">Outside</div>
-            </div>
-          </div>
-          <div class="play-option" data-play="Base Post Play" data-focus="inside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">Base Post Play</div>
-              <div class="play-focus">Inside</div>
-            </div>
-          </div>
-          <div class="play-option" data-play="Pick & Roll (Lower Wing)" data-focus="attack">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">Pick & Roll</div>
-              <div class="play-focus">Attack</div>
-            </div>
-          </div>
-          <div class="play-option" data-play="Double Screen For SG" data-focus="outside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">Double Screen for SG</div>
-              <div class="play-focus">Outside</div>
-            </div>
-          </div>
-          </div>  <!-- Close .play-scroller -->
-          <div class="play-nav-buttons">
-            <button class="play-nav-btn" id="play-nav-up">▲</button>
-            <button class="play-nav-btn" id="play-nav-down">▼</button>
-            <button id="clear-offense-override-x" class="clear-override-x-btn">✕</button>
-          </div>
-        </div>  <!-- Close .play-scroller-container -->
+      <!-- Defense Card Zone (right 33%) -->
+      <div class="pcc-card-zone defense-zone">
+        <div class="pcc-nav-col">
+          <button class="pcc-nav-btn" id="defense-nav-up">▲</button>
+          <button class="pcc-nav-btn" id="defense-nav-down">▼</button>
+          <button class="pcc-nav-x" id="clear-defense-card-x">✕</button>
+        </div>
+        <div class="pcc-play-card">
+          <div class="defense-play-name">Man Normal</div>
+        </div>
+      </div>
     </div>
-
-      <!-- Defense Panel (switches sides) -->
-      <div id="defense-panel" class="tactical-panel">
-        <div class="panel-title panel-title-spacer" aria-hidden="true">DEFENSE OVERRIDE</div>
-        <div class="defense-overrides">
-          <div class="defense-row">
-            <button class="defense-override-btn" data-defense="Man">MAN</button>
-            <button class="defense-override-btn" data-defense="Zone">ZONE</button>
-            <button id="clear-defense-override-x" class="defense-clear-x-btn">✕</button>
-        </div>
-          <div class="defense-row">
-            <button class="defense-override-btn" data-aggression="Passive">PASSIVE</button>
-            <button class="defense-override-btn" data-aggression="Normal">NORMAL</button>
-            <button class="defense-override-btn" data-aggression="Aggressive">AGGRESSIVE</button>
-            <button id="clear-aggression-override-x" class="defense-clear-x-btn">✕</button>
-      </div>
-        </div>
-        <div class="clear-override-placeholder" aria-hidden="true"></div>
-      </div>
-      
-    </div>  <!-- Close #playcall-main-row -->
   </div>  <!-- Close #playcall-center -->
   </div>  <!-- Close #app-grid -->
 
@@ -3572,9 +3537,10 @@
     });
     
     (function initPlaycallCenter() {
-      const playOptions = document.querySelectorAll('.play-option');
-      const defenseButtons = document.querySelectorAll('.defense-override-btn');
+      const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
+      const DEFENSE_SCHEMES = ['Man Normal', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
+      let currentDefenseIndex = 0;
       
       // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
@@ -3627,6 +3593,10 @@
             payload.defense_override = value;
           } else if (type === 'aggression') {
             payload.aggression_override = value;
+          } else if (type === 'tempo') {
+            payload.tempo_override = value;
+          } else if (type === 'press_trap') {
+            payload.press_trap_override = value;
           }
           
           const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
@@ -3703,73 +3673,101 @@
         });
       }
       
-      // Handle defense button clicks
-      defenseButtons.forEach(btn => {
-        btn.addEventListener('click', async () => {
-          playSound('confirm-2.mp3');
-          const defenseType = btn.dataset.defense; // 'Man' or 'Zone'
-          const aggression = btn.dataset.aggression; // 'Passive', 'Normal', or 'Aggressive'
-          
-          // ✅ SS&S: Set both defense type and aggression in a single API call if both are present
-          // This prevents race conditions and ensures both are set together
-          if (defenseType && aggression) {
-            // Button has both - set both at once
-            document.querySelectorAll('.defense-override-btn[data-defense]').forEach(b => {
-              b.classList.remove('selected');
-            });
-            document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(b => {
-              b.classList.remove('selected');
-            });
+      function updateDefenseCardDisplay() {
+        const el = document.querySelector('.defense-play-name');
+        if (el) el.textContent = DEFENSE_SCHEMES[currentDefenseIndex];
+      }
+
+      // Tempo stack
+      ['#tempo-fast', '#tempo-normal', '#tempo-slow'].forEach((sel, i) => {
+        const btn = document.querySelector(sel);
+        const values = ['fast', 'normal', 'slow'];
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            playSound('confirm-2.mp3');
+            document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            
-            const normalizedAggression = aggression.toLowerCase();
-            // Set both in one API call
-            const { gameId, userTeamSide } = getGameContext();
-            const payload = {
-              game_id: gameId,
-              user_team_side: userTeamSide,
-              offense_override: null,
-              defense_override: defenseType,
-              aggression_override: normalizedAggression,
-              tempo_override: null
-            };
-            
-            try {
-              const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              
-              if (!response.ok) {
-                const errorData = await response.json();
-                console.error('❌ [PLAYCALL OVERRIDE] Failed to set defense/aggression override:', errorData);
-                return;
-              }
-              
-              const result = await response.json();
-            } catch (error) {
-              console.error('❌ [PLAYCALL OVERRIDE] Error setting defense/aggression override:', error);
-            }
-          } else if (defenseType) {
-            // Defense type only
-            document.querySelectorAll('.defense-override-btn[data-defense]').forEach(b => {
-              b.classList.remove('selected');
-            });
-            btn.classList.add('selected');
-            await setPlaycallOverride('defense', defenseType);
-          } else if (aggression) {
-            // Aggression only
-            document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(b => {
-              b.classList.remove('selected');
-            });
-            btn.classList.add('selected');
-            const normalizedAggression = aggression.toLowerCase();
-            await setPlaycallOverride('aggression', normalizedAggression);
-          }
-        });
+            await setPlaycallOverride('tempo', values[i]);
+          });
+        }
       });
-      
+      document.getElementById('clear-tempo-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+        await setPlaycallOverride('tempo', null);
+      });
+
+      // Aggression stack (same API pattern as before)
+      const aggrMap = [
+        { id: 'aggr-passive', value: 'passive' },
+        { id: 'aggr-normal', value: 'normal' },
+        { id: 'aggr-aggressive', value: 'aggressive' }
+      ];
+      aggrMap.forEach(({ id, value }) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            playSound('confirm-2.mp3');
+            document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            await setPlaycallOverride('aggression', value);
+          });
+        }
+      });
+      document.getElementById('clear-aggression-override-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+        await setPlaycallOverride('aggression', null);
+      });
+
+      // Press/Trap stack
+      const pressTrapMap = [
+        { id: 'press-btn', value: 'press' },
+        { id: 'trap-btn', value: 'trap' },
+        { id: 'press-trap-none-btn', value: 'none' }
+      ];
+      pressTrapMap.forEach(({ id, value }) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            playSound('confirm-2.mp3');
+            document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            await setPlaycallOverride('press_trap', value);
+          });
+        }
+      });
+      document.getElementById('clear-press-trap-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+        await setPlaycallOverride('press_trap', null);
+      });
+
+      // Defense card navigation (circular)
+      function defenseSchemeToApiValue(name) {
+        return name === 'Man Normal' ? 'Man' : name;
+      }
+      document.getElementById('defense-nav-up')?.addEventListener('click', async () => {
+        playSound('click-tiny.wav');
+        currentDefenseIndex = (currentDefenseIndex - 1 + DEFENSE_SCHEMES.length) % DEFENSE_SCHEMES.length;
+        updateDefenseCardDisplay();
+        await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
+      });
+      document.getElementById('defense-nav-down')?.addEventListener('click', async () => {
+        playSound('click-tiny.wav');
+        currentDefenseIndex = (currentDefenseIndex + 1) % DEFENSE_SCHEMES.length;
+        updateDefenseCardDisplay();
+        await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
+      });
+      document.getElementById('clear-defense-card-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        currentDefenseIndex = 0;
+        updateDefenseCardDisplay();
+        await setPlaycallOverride('defense', null);
+        await setPlaycallOverride('aggression', null);
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+      });
+
       // Clear offense override (query live DOM like defense/aggression Red X)
       if (clearOffenseBtn) {
         clearOffenseBtn.addEventListener('click', async () => {
@@ -3779,36 +3777,12 @@
         });
       }
       
-      // Clear defense override only (red X in defense row)
-      const clearDefenseXBtn = document.getElementById('clear-defense-override-x');
-      if (clearDefenseXBtn) {
-        clearDefenseXBtn.addEventListener('click', async () => {
-          playSound('x-back.mp3');
-          // Only clear defense buttons (Man/Zone)
-          document.querySelectorAll('.defense-override-btn[data-defense]').forEach(btn => {
-            btn.classList.remove('selected');
-          });
-          await setPlaycallOverride('defense', null);
-        });
-      }
-      
-      // Clear aggression override only (red X in aggression row)
-      const clearAggressionXBtn = document.getElementById('clear-aggression-override-x');
-      if (clearAggressionXBtn) {
-        clearAggressionXBtn.addEventListener('click', async () => {
-          playSound('x-back.mp3');
-          // Only clear aggression buttons (Passive/Normal/Aggressive)
-          document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(btn => {
-            btn.classList.remove('selected');
-          });
-          await setPlaycallOverride('aggression', null);
-        });
-      }
-      
       // Global function to clear all visual selections (called after override is consumed)
       window.clearPlaycallOverrides = function() {
         playOptions.forEach(opt => opt.classList.remove('selected'));
-        defenseButtons.forEach(btn => btn.classList.remove('selected'));
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
+        currentDefenseIndex = 0;
+        updateDefenseCardDisplay();
         console.log('📋 Override selections cleared');
       };
       
