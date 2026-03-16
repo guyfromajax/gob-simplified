@@ -3753,20 +3753,25 @@
       function defenseSchemeToApiValue(name) {
         return name === 'Man Normal' ? 'Man' : name;
       }
-      document.getElementById('defense-nav-up')?.addEventListener('click', async () => {
+      document.getElementById('defense-nav-up')?.addEventListener('click', () => {
         playSound('click-tiny.wav');
-        userHasSetDefenseOverride = true;
         currentDefenseIndex = (currentDefenseIndex - 1 + DEFENSE_SCHEMES.length) % DEFENSE_SCHEMES.length;
         updateDefenseCardDisplay();
-        await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
       });
-      document.getElementById('defense-nav-down')?.addEventListener('click', async () => {
+      document.getElementById('defense-nav-down')?.addEventListener('click', () => {
         playSound('click-tiny.wav');
-        userHasSetDefenseOverride = true;
         currentDefenseIndex = (currentDefenseIndex + 1) % DEFENSE_SCHEMES.length;
         updateDefenseCardDisplay();
-        await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
       });
+      const defenseCardEl = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
+      if (defenseCardEl) {
+        defenseCardEl.addEventListener('click', async () => {
+          playSound('confirm-2.mp3');
+          userHasSetDefenseOverride = true;
+          updateDefenseCardDisplay();
+          await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
+        });
+      }
       document.getElementById('clear-defense-card-x')?.addEventListener('click', async () => {
         playSound('x-back.mp3');
         userHasSetDefenseOverride = false;
