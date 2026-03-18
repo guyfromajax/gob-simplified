@@ -2,6 +2,7 @@ import random
 import time
 from collections import Counter
 from datetime import datetime
+from functools import lru_cache
 from itertools import combinations, permutations
 from pathlib import Path
 import json
@@ -18,6 +19,45 @@ logger = logging.getLogger(__name__)
 
 
 # Helper ---------------------------------------------------------------------
+def _load_franchise_names_payload(filename: str, env_var: str | None = None) -> dict:
+    paths_to_try = []
+
+    env_path = os.environ.get(env_var) if env_var else None
+    if env_path:
+        paths_to_try.append(Path(env_path).expanduser())
+
+    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / filename)
+    paths_to_try.append(Path("BackEnd/data/names") / filename)
+
+    try:
+        import importlib.resources as pkg_resources
+        from BackEnd.data import names
+        if hasattr(pkg_resources, "files"):
+            names_path = pkg_resources.files(names) / filename
+            paths_to_try.append(Path(str(names_path)))
+        elif hasattr(pkg_resources, "path"):
+            with pkg_resources.path(names, filename) as p:
+                paths_to_try.append(p)
+    except Exception as e:
+        logger.debug("Could not use importlib.resources for %s: %s", filename, e)
+
+    for path in paths_to_try:
+        abs_path = path.resolve() if hasattr(path, "resolve") else Path(path)
+        exists = abs_path.is_file()
+        logger.info("Checking franchise names resource at %s (exists=%s)", abs_path, exists)
+        if not exists:
+            continue
+        try:
+            with abs_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            logger.warning("Failed to parse franchise names resource %s: %s", abs_path, exc)
+
+    msg = f"franchise names resource {filename} not found. Tried paths: {[str(p) for p in paths_to_try]}"
+    logger.error(msg)
+    raise FileNotFoundError(msg)
+
+
 def load_franchise_names() -> tuple[list[str], list[str]]:
     """Load recruit name lists from ``franchise_names.json``.
 
@@ -37,62 +77,73 @@ def load_franchise_names() -> tuple[list[str], list[str]]:
         ValueError: if the JSON is malformed or missing required keys.
     """
 
-    # Try multiple path resolution strategies
-    paths_to_try = []
-    
-    # 1. Environment variable
-    env_path = os.environ.get("FRANCHISE_NAMES_FILE")
-    if env_path:
-        paths_to_try.append(Path(env_path).expanduser())
-    
-    # 2. Relative to this file
-    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json")
-    
-    # 3. Relative to current working directory (for deployed environments)
-    paths_to_try.append(Path("BackEnd/data/names/franchise_names.json"))
-    
-    # 4. Try using importlib.resources for packaged data
+    payload = _load_franchise_names_payload("franchise_names.json", env_var="FRANCHISE_NAMES_FILE")
+    fn = payload.get("first_names")
+    ln = payload.get("last_names")
+    if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
+        raise ValueError("franchise_names.json missing non-empty first_names/last_names lists")
+
+    logger.info("✅ Loaded %d first names and %d last names", len(fn), len(ln))
+    return fn, ln
+
+
+@lru_cache(maxsize=1)
+def _load_franchise_first_name_rankings() -> tuple[str, ...]:
     try:
-        import importlib.resources as pkg_resources
-        from BackEnd.data import names
-        if hasattr(pkg_resources, 'files'):
-            # Python 3.9+
-            names_path = pkg_resources.files(names) / "franchise_names.json"
-            paths_to_try.append(Path(str(names_path)))
-        elif hasattr(pkg_resources, 'path'):
-            # Python 3.7-3.8
-            with pkg_resources.path(names, "franchise_names.json") as p:
-                paths_to_try.append(p)
-    except Exception as e:
-        logger.debug("Could not use importlib.resources: %s", e)
-    
-    # Try each path
-    for path in paths_to_try:
-        abs_path = path.resolve() if hasattr(path, 'resolve') else Path(path)
-        exists = abs_path.is_file()
-        logger.info("Checking franchise names at %s (exists=%s)", abs_path, exists)
-        
-        if exists:
-            try:
-                with abs_path.open("r", encoding="utf-8") as f:
-                    payload = json.load(f)
-                
-                fn = payload.get("first_names")
-                ln = payload.get("last_names")
-                if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
-                    logger.warning("Names JSON malformed at %s", abs_path)
-                    continue
-                
-                logger.info("✅ Loaded %d first names and %d last names from %s", len(fn), len(ln), abs_path)
-                return fn, ln
-            except Exception as exc:
-                logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
-                continue
-    
-    # If we get here, none of the paths worked
-    msg = f"franchise names file not found. Tried paths: {[str(p) for p in paths_to_try]}"
-    logger.error(msg)
-    raise FileNotFoundError(msg)
+        payload = _load_franchise_names_payload("franchise_first_name_rankings.json")
+    except FileNotFoundError:
+        logger.warning("Franchise first-name rankings not found; using uniform weighting")
+        return tuple()
+
+    ordered = payload.get("ordered_top_500")
+    if not isinstance(ordered, list):
+        logger.warning("Franchise first-name rankings malformed; using uniform weighting")
+        return tuple()
+    return tuple(str(name) for name in ordered if str(name).strip())
+
+
+def build_franchise_first_name_weights(first_names: list[str]) -> list[float]:
+    rankings = _load_franchise_first_name_rankings()
+    if not rankings:
+        return [1.0] * len(first_names)
+
+    weights_by_name: dict[str, float] = {}
+    for idx, ranked_name in enumerate(rankings):
+        key = ranked_name.casefold()
+        if idx < 250:
+            weights_by_name[key] = 1.2
+        else:
+            weights_by_name[key] = 1.1
+
+    weighted_count = 0
+    weights = []
+    for first_name in first_names:
+        weight = weights_by_name.get(first_name.casefold(), 1.0)
+        if weight > 1.0:
+            weighted_count += 1
+        weights.append(weight)
+
+    logger.info(
+        "Loaded Franchise first-name weights for %d/%d names (top250=1.2x, next250=1.1x)",
+        weighted_count,
+        len(first_names),
+    )
+    return weights
+
+
+def choose_franchise_first_name(first_names: list[str], weights: list[float] | None = None) -> str:
+    if not first_names:
+        raise ValueError("No first names available for Franchise generation")
+    if weights and len(weights) == len(first_names):
+        return random.choices(first_names, weights=weights, k=1)[0]
+    return random.choice(first_names)
+
+
+@lru_cache(maxsize=1)
+def get_franchise_name_assets() -> tuple[tuple[str, ...], tuple[str, ...], tuple[float, ...]]:
+    first_names, last_names = load_franchise_names()
+    first_name_weights = build_franchise_first_name_weights(first_names)
+    return tuple(first_names), tuple(last_names), tuple(first_name_weights)
 
 
 class FranchiseManager:
@@ -766,13 +817,15 @@ class RecruitManager:
         self.diagnostics = None
 
         try:
-            loaded_first, loaded_last = load_franchise_names()
-            self.first_names = loaded_first
-            self.last_names = loaded_last
+            loaded_first, loaded_last, loaded_weights = get_franchise_name_assets()
+            self.first_names = list(loaded_first)
+            self.last_names = list(loaded_last)
+            self.first_name_weights = list(loaded_weights)
             logger.info(f"✅ Loaded {len(self.first_names)} first names and {len(self.last_names)} last names for recruits")
         except Exception as exc:
             logger.error(f"❌ Failed to load franchise names, using fallback: {exc}")
             logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
+            self.first_name_weights = [1.0] * len(self.first_names)
 
     def generate_recruits_list(self, count=40):
         """Generate and return a list of recruits (does not save to DB)."""
@@ -780,7 +833,7 @@ class RecruitManager:
         
         recruits = []
         for _ in range(count):
-            first_name = random.choice(self.first_names)
+            first_name = choose_franchise_first_name(self.first_names, self.first_name_weights)
             last_name = random.choice(self.last_names)
             # Format last name to title case (only first letter capitalized)
             last_name_formatted = last_name.title()

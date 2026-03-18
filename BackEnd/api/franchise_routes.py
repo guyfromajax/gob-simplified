@@ -44,7 +44,7 @@ from BackEnd.eog_attr_rules import (
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 from BackEnd.utils.position_ratings import compute_position_ratings
-from BackEnd.models.franchise_manager import load_franchise_names
+from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -4482,7 +4482,7 @@ def _assign_jerseys_to_signed_players(
 
 
 def _generate_walk_on_profile() -> dict[str, Any]:
-    first_names, last_names = load_franchise_names()
+    first_names, last_names, first_name_weights = get_franchise_name_assets()
     attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
     attrs = {}
     over_19 = 0
@@ -4494,7 +4494,7 @@ def _generate_walk_on_profile() -> dict[str, Any]:
             over_19 += 1
         attrs[key] = value
     attrs = Player.randomize_game_attributes(attrs)
-    first_name = random.choice(first_names)
+    first_name = choose_franchise_first_name(first_names, first_name_weights)
     last_name = random.choice(last_names).title()
     name = f"{first_name} {last_name}"
     height = random.randint(66, 72)
