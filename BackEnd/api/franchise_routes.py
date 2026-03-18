@@ -33,6 +33,7 @@ from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
+from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.eog_attr_rules import (
@@ -1025,6 +1026,58 @@ def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, 
     return (losing_score, winning_score)
 
 
+def _persist_distant_franchise_game(
+    *,
+    franchise_id: ObjectId,
+    week: int,
+    away_team_object_id: ObjectId,
+    home_team_object_id: ObjectId,
+    away_score: int,
+    home_score: int,
+) -> tuple[dict[str, Any], str]:
+    summary = build_distant_game_summary(
+        franchise_id=str(franchise_id),
+        week=week,
+        home_team_object_id=home_team_object_id,
+        away_team_object_id=away_team_object_id,
+        home_score=home_score,
+        away_score=away_score,
+    )
+    game_id = str(summary["_id"])
+    db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+    stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
+
+    home_team_id = _normalize_team_id_to_string(home_team_object_id) or str(home_team_object_id)
+    away_team_id = _normalize_team_id_to_string(away_team_object_id) or str(away_team_object_id)
+    if home_score > away_score:
+        winner_id, loser_id = home_team_id, away_team_id
+        winner_score, loser_score = home_score, away_score
+    else:
+        winner_id, loser_id = away_team_id, home_team_id
+        winner_score, loser_score = away_score, home_score
+    _finalize_team_attributes_for_game(
+        game_id=game_id,
+        franchise_id=franchise_id,
+        home_team_id=home_team_id,
+        away_team_id=away_team_id,
+        winner_id=winner_id,
+        loser_id=loser_id,
+        winner_score=winner_score,
+        loser_score=loser_score,
+    )
+
+    sim_res = _save_game_result(
+        away_team_object_id,
+        home_team_object_id,
+        away_score,
+        home_score,
+        week,
+        franchise_id=str(franchise_id),
+        game_id=game_id,
+    )
+    return sim_res, game_id
+
+
 def _build_user_eos_sim_scope(
     franchise_doc: dict[str, Any],
     user_team_id_str: Optional[str],
@@ -1824,32 +1877,39 @@ def complete_week(req: CompleteWeekRequest):
                 home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
                 away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
                 home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+                sim_res, distant_game_id = _persist_distant_franchise_game(
+                    franchise_id=franchise_id,
+                    week=req.week,
+                    away_team_object_id=away_id,
+                    home_team_object_id=home_id,
+                    away_score=away_score,
+                    home_score=home_score,
+                )
                 results.append({
-                    "away_id": str(away_id),
-                    "home_id": str(home_id),
-                    "away_score": away_score,
-                    "home_score": home_score,
+                    "away_id": sim_res["team1_id"],
+                    "home_id": sim_res["team2_id"],
+                    "away_score": sim_res["team1_score"],
+                    "home_score": sim_res["team2_score"],
                 })
-                _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=None)
                 winner_id = home_id if home_score > away_score else away_id
                 if g["phase"] == "conference":
                     ft.save_conference_game_result(
                         franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                        "", str(winner_id), {"home": home_score, "away": away_score},
+                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
                     )
                 elif g["phase"] == "region":
                     ft.save_region_game_result(
                         franchise_doc, g["region"], g["round"], g["matchup_index"],
-                        "", str(winner_id), {"home": home_score, "away": away_score},
+                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
                     )
                 elif g["phase"] == "national":
                     ft.save_national_game_result(
                         franchise_doc, g["round"], g["matchup_index"],
-                        "", str(winner_id), {"home": home_score, "away": away_score},
+                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
                     )
                 continue
 
-        # Distant sim: regular season only; neither team in user's conference → lightweight sim (no game doc, no EOG)
+        # Distant sim: regular season only; neither team in user's conference.
         away_conf = team_id_to_conference.get(str(away_id))
         home_conf = team_id_to_conference.get(str(home_id))
         is_distant = (
@@ -1864,11 +1924,19 @@ def complete_week(req: CompleteWeekRequest):
             home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
             away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            sim_res, _distant_game_id = _persist_distant_franchise_game(
+                franchise_id=franchise_id,
+                week=req.week,
+                away_team_object_id=away_id,
+                home_team_object_id=home_id,
+                away_score=away_score,
+                home_score=home_score,
+            )
             results.append({
-                "away_id": str(away_id),
-                "home_id": str(home_id),
-                "away_score": away_score,
-                "home_score": home_score,
+                "away_id": sim_res["team1_id"],
+                "home_id": sim_res["team2_id"],
+                "away_score": sim_res["team1_score"],
+                "home_score": sim_res["team2_score"],
             })
             continue
 
