@@ -78,3 +78,46 @@ function getBestPosition(positionRatings = {}) {
   });
   return { pos: bestPos, rating: bestRating };
 }
+
+function getCurrentRelativeUrl() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash || ''}`;
+}
+
+function getSafeReturnUrl(rawReturnUrl) {
+  if (!rawReturnUrl || typeof rawReturnUrl !== 'string') return null;
+  try {
+    const parsed = new URL(rawReturnUrl, window.location.origin);
+    if (parsed.origin !== window.location.origin) return null;
+    if (!parsed.pathname || !parsed.pathname.startsWith('/')) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash || ''}`;
+  } catch (e) {
+    return null;
+  }
+}
+
+function buildFranchiseLockerRoomUrl(franchiseId, teamId, extraParams = {}) {
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  if (franchiseId) params.set('franchise_id', franchiseId);
+  if (teamId) params.set('team_id', teamId);
+  Object.keys(extraParams || {}).forEach((key) => {
+    if (extraParams[key] != null && extraParams[key] !== '') {
+      params.set(key, extraParams[key]);
+    }
+  });
+  const query = params.toString();
+  return query ? `/franchise-command-center.html?${query}` : '/franchise-command-center.html';
+}
+
+function resolveFranchiseLockerRoomUrl(options = {}) {
+  const params = options.params instanceof URLSearchParams
+    ? options.params
+    : new URLSearchParams(window.location.search);
+  const explicitReturnUrl = options.returnUrl != null ? options.returnUrl : params.get('return_url');
+  const safeReturnUrl = getSafeReturnUrl(explicitReturnUrl);
+  if (safeReturnUrl) return safeReturnUrl;
+
+  const franchiseId = options.franchiseId != null ? options.franchiseId : params.get('franchise_id');
+  const teamId = options.teamId != null ? options.teamId : params.get('team_id');
+  return buildFranchiseLockerRoomUrl(franchiseId, teamId, options.extraParams || {});
+}

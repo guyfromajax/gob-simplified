@@ -62,6 +62,17 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 - **Standalone pages:** standings.html, stats.html, schedule.html, team-traits.html, rankings.html, recruiting.html. Each has **Back To Locker Room** (orange fill) to return to FCC. **Schedule** is only on schedule.html (no Schedule tab on FCC). Stats/Team Traits: Conference | Region | National. Rankings: Top 25 / All 128. Standings: region toggles A–H.
 - **Legacy (moved off FCC):** Stats tab content is on stats.html; Team Traits on team-traits.html; Rankings on rankings.html. Scope toggles (Conference | Region | National) and full schedule/standings toggles are on the standalone pages only.
 
+### Back To Locker Room behavior
+
+- **FCC tab state lives in the URL** via `tab=...` on `franchise-command-center.html`.
+- **Direct FCC outbound links** to standalone franchise pages include a relative `return_url` that preserves the full FCC URL, including the active tab.
+- **Back To Locker Room** buttons on FCC-launched pages use `return_url` first. This restores the user to the same FCC tab they were on when they left.
+- **Fallback behavior:** if a page was not launched directly from FCC and no valid `return_url` is present, the button falls back to the normal FCC URL. That lands the user on FCC’s default tab, which is Standings.
+- **Safety rule:** `return_url` is sanitized to same-origin relative paths only. External redirects are ignored.
+- **Examples:**
+  - FCC `Roster` tab → `Standings` resource page → **Back To Locker Room** returns to FCC `Roster`
+  - end-of-game flow → `box-score.html` → **Back To Locker Room** returns to FCC default `Standings`, because the page was not entered from FCC
+
 ### Schedule
 
 - **Conference toggles:** `schedule.html` shows 16 conference toggles and lands on the user's conference by default.

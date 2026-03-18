@@ -347,8 +347,13 @@ backBtn.addEventListener('click', function() {
   if (mode === 'franchise') {
     const franchiseId = urlParams.get('franchise_id');
     const teamId = urlParams.get('team_id');
-    const url = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
-    const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
+    const finalUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
+      ? resolveFranchiseLockerRoomUrl({
+          params: urlParams,
+          franchiseId: franchiseId,
+          teamId: teamId
+        })
+      : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
     window.location.href = finalUrl;
   } else if (mode === 'tournament') {
     // Use same pattern as franchise mode - tournament.html is the command center
@@ -551,10 +556,25 @@ submitBtn.addEventListener('click', async function() {
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
-      const redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      let redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      const returnUrl = urlParams.get('return_url');
+      if (mode === 'franchise' && returnUrl) {
+        const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : returnUrl;
+        if (safeReturnUrl) {
+          const redirect = new URL(redirectUrl, window.location.origin);
+          redirect.searchParams.set('return_url', safeReturnUrl);
+          redirectUrl = `${redirect.pathname}${redirect.search}${redirect.hash || ''}`;
+        }
+      }
       window.location.href = redirectUrl;
     } else if (mode === 'franchise' && franchiseId) {
-      window.location.href = `/franchise-command-center.html?franchise_id=${franchiseId}`;
+      window.location.href = (typeof resolveFranchiseLockerRoomUrl === 'function')
+        ? resolveFranchiseLockerRoomUrl({
+            params: urlParams,
+            franchiseId: franchiseId,
+            teamId: urlParams.get('team_id')
+          })
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
     } else if (mode === 'tournament' && tournamentId) {
       // Use same pattern as franchise mode - tournament.html is the command center
       window.location.href = `/tournament.html?tournament_id=${tournamentId}`;

@@ -141,7 +141,13 @@ function setupLockerRoomButton() {
   btn.addEventListener('click', () => {
     playSound('click-strong.wav');
     if (mode === 'franchise') {
-      window.location.href = `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`;
+      const lockerRoomUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
+        ? resolveFranchiseLockerRoomUrl({
+            franchiseId: franchiseId,
+            teamId: teamId
+          })
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`;
+      window.location.href = lockerRoomUrl;
     } else if (mode === 'tournament') {
       // Use same pattern as franchise mode - tournament.html is the command center
       window.location.href = `/tournament.html?tournament_id=${tournamentId}&team_id=${teamId}`;

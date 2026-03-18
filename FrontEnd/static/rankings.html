@@ -30,7 +30,7 @@
   const teamId = params.get('team_id');
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
-    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+    backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
   }
 
   let showAll = false;

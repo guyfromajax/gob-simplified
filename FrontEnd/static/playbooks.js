@@ -2249,12 +2249,15 @@ class PlaybooksUI {
       console.log('✅ [PLAYBOOKS BACK] Navigating to Franchise Command Center');
       
       // For command centers, we don't need game context, just mode-specific params
-      const params = new URLSearchParams();
-      params.set('mode', 'franchise'); // Always include mode for consistency
-      if (franchiseId) params.set('franchise_id', franchiseId);
-      if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
-      
-      window.location.href = `/franchise-command-center.html?${params.toString()}`;
+      const returnUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
+        ? resolveFranchiseLockerRoomUrl({
+            params: urlParams,
+            franchiseId: franchiseId,
+            teamId: teamId
+          })
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId || '')}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
+
+      window.location.href = returnUrl;
       return;
     }
     
@@ -2263,13 +2266,16 @@ class PlaybooksUI {
       console.log('⚠️ [PLAYBOOKS BACK] No "from" parameter, but mode is franchise - assuming franchise-command-center');
       const franchiseId = urlParams.get('franchise_id');
       const teamId = urlParams.get('team_id') || urlParams.get('user_team_id'); // Support both for backward compatibility
-      
-      const params = new URLSearchParams();
-      params.set('mode', 'franchise'); // Always include mode for consistency
-      if (franchiseId) params.set('franchise_id', franchiseId);
-      if (teamId) params.set('team_id', teamId); // Use team_id (ObjectId), not user_team_name
-      
-      window.location.href = `/franchise-command-center.html?${params.toString()}`;
+
+      const returnUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
+        ? resolveFranchiseLockerRoomUrl({
+            params: urlParams,
+            franchiseId: franchiseId,
+            teamId: teamId
+          })
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId || '')}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
+
+      window.location.href = returnUrl;
       return;
     }
     

@@ -27,7 +27,7 @@
   const teamId = params.get('team_id');
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
-    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+    backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
   }
 
   const teamIdNameMap = {};
@@ -69,7 +69,7 @@
     if (!container) return;
     container.innerHTML = '';
     const schedule = data.schedule || [];
-    const returnUrl = encodeURIComponent(window.location.href);
+    const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
     const isUserConference = (userConference != null && selectedConference === userConference);
     schedule.forEach((weekGames, idx) => {
       if (!weekGames || weekGames.length === 0) return;
@@ -108,7 +108,7 @@
           if (isUserConference && g.game_id) {
             gameDiv.appendChild(document.createTextNode(' '));
             const boxScoreLink = document.createElement('a');
-            boxScoreLink.href = `/box-score.html?game_id=${encodeURIComponent(g.game_id)}&mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+            boxScoreLink.href = `/box-score.html?game_id=${encodeURIComponent(g.game_id)}&mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}&return_url=${returnUrl}`;
             boxScoreLink.textContent = 'Box Score';
             boxScoreLink.style.color = '#4a90e2';
             boxScoreLink.style.textDecoration = 'none';

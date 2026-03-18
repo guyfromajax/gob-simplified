@@ -19,7 +19,18 @@
   }
 
   function buildFccUrl() {
-    return '/franchise-command-center.html?mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '');
+    if (typeof resolveFranchiseLockerRoomUrl === 'function') {
+      return resolveFranchiseLockerRoomUrl({
+        params: urlParams,
+        franchiseId: franchiseId,
+        teamId: teamId
+      });
+    }
+    var params = new URLSearchParams();
+    params.set('mode', 'franchise');
+    if (franchiseId) params.set('franchise_id', franchiseId);
+    if (teamId) params.set('team_id', teamId);
+    return '/franchise-command-center.html?' + params.toString();
   }
 
   function showModal(config) {
@@ -100,7 +111,7 @@
       var attrs = player.attributes || {};
       var nameTd = document.createElement('td');
       var link = document.createElement('a');
-      link.href = '/player-detail.html?id=' + encodeURIComponent(player._id) + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '') + '&return_url=' + encodeURIComponent(window.location.pathname + window.location.search);
+      link.href = '/player-detail.html?id=' + encodeURIComponent(player._id) + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '') + '&return_url=' + encodeURIComponent(getCurrentRelativeUrl());
       link.textContent = player.name;
       link.className = 'cut-player-name-link';
       nameTd.appendChild(link);
