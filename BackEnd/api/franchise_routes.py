@@ -366,6 +366,7 @@ def update_team_attributes_after_game(
     away_totals = eog_inputs.get("away", {}).get("totals", {})
     home_scouting = eog_inputs.get("home", {}).get("scouting", {})
     away_scouting = eog_inputs.get("away", {}).get("scouting", {})
+    is_distant_sim = (game_doc.get("simulation_engine") == "distant")
 
     logger.info(
         "🔍 [UPDATE-TEAM-ATTRS] EOG canonical snapshot source=%s home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
@@ -520,43 +521,57 @@ def update_team_attributes_after_game(
         # defensive_efficiency: both teams +(−2, −1)
         changes["defensive_efficiency"] = random.randint(-2, -1)
         
-        # fb_efficiency
-        if team_scouting["fb_rate"] > 60:
-            changes["fb_efficiency"] = random.randint(0, 1)
+        if is_distant_sim:
+            changes["fb_efficiency"] = random.randint(-2, 1)
+            changes["fb_opp_modifier"] = random.randint(-2, 1)
+            changes["pt_efficiency"] = random.randint(-2, 1)
+            changes["pt_opp_modifier"] = random.randint(-2, 1)
+            logger.warning(
+                "🧪 [EOG-DISTANT-FBPT] team=%s fb_efficiency=%s fb_opp_modifier=%s pt_efficiency=%s pt_opp_modifier=%s",
+                str(team_id_label),
+                changes.get("fb_efficiency"),
+                changes.get("fb_opp_modifier"),
+                changes.get("pt_efficiency"),
+                changes.get("pt_opp_modifier"),
+            )
         else:
-            changes["fb_efficiency"] = random.randint(-2, -1)
-        
-        # fb_opp_modifier
-        changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
-        logger.warning(
-            "🧪 [EOG-BRANCH] team=%s attr=fb_opp_modifier opp_fb_rate=%.2f opp_fb_entries=%s raw_change=%s",
-            str(team_id_label),
-            float(opponent_scouting.get("fb_rate", 0)),
-            opponent_scouting.get("fb_entries", 0),
-            changes.get("fb_opp_modifier"),
-        )
-        
-        # pt_efficiency
-        if team_scouting["pt_combined_rate"] > 60:
-            changes["pt_efficiency"] = random.randint(1, 2)
-        elif team_scouting["pt_combined_rate"] < 30:
-            changes["pt_efficiency"] = random.randint(-3, -1)
-        else:
-            changes["pt_efficiency"] = random.randint(-1, 0)
-        
-        # pt_opp_modifier
-        changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
-        logger.warning(
-            "🧪 [EOG-BRANCH] team=%s attr=pt_opp_modifier opp_pt_rate=%.2f opp_pt_attempts=%s opp_hct=%s/%s opp_fcp=%s/%s raw_change=%s",
-            str(team_id_label),
-            float(opponent_scouting.get("pt_combined_rate", 0)),
-            opponent_scouting.get("pt_total_attempts", 0),
-            opponent_scouting.get("hct_success", 0),
-            opponent_scouting.get("hct_used", 0),
-            opponent_scouting.get("fcp_success", 0),
-            opponent_scouting.get("fcp_used", 0),
-            changes.get("pt_opp_modifier"),
-        )
+            # fb_efficiency
+            if team_scouting["fb_rate"] > 60:
+                changes["fb_efficiency"] = random.randint(0, 1)
+            else:
+                changes["fb_efficiency"] = random.randint(-2, -1)
+            
+            # fb_opp_modifier
+            changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
+            logger.warning(
+                "🧪 [EOG-BRANCH] team=%s attr=fb_opp_modifier opp_fb_rate=%.2f opp_fb_entries=%s raw_change=%s",
+                str(team_id_label),
+                float(opponent_scouting.get("fb_rate", 0)),
+                opponent_scouting.get("fb_entries", 0),
+                changes.get("fb_opp_modifier"),
+            )
+            
+            # pt_efficiency
+            if team_scouting["pt_combined_rate"] > 60:
+                changes["pt_efficiency"] = random.randint(1, 2)
+            elif team_scouting["pt_combined_rate"] < 30:
+                changes["pt_efficiency"] = random.randint(-3, -1)
+            else:
+                changes["pt_efficiency"] = random.randint(-1, 0)
+            
+            # pt_opp_modifier
+            changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
+            logger.warning(
+                "🧪 [EOG-BRANCH] team=%s attr=pt_opp_modifier opp_pt_rate=%.2f opp_pt_attempts=%s opp_hct=%s/%s opp_fcp=%s/%s raw_change=%s",
+                str(team_id_label),
+                float(opponent_scouting.get("pt_combined_rate", 0)),
+                opponent_scouting.get("pt_total_attempts", 0),
+                opponent_scouting.get("hct_success", 0),
+                opponent_scouting.get("hct_used", 0),
+                opponent_scouting.get("fcp_success", 0),
+                opponent_scouting.get("fcp_used", 0),
+                changes.get("pt_opp_modifier"),
+            )
         
         # team_chemistry
         score_delta = winner_score - loser_score

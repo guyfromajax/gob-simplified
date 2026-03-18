@@ -959,6 +959,7 @@ def build_distant_game_summary(
     return {
         "_id": gid,
         "game_id": gid,
+        "simulation_engine": "distant",
         "quarter": 5,
         "is_final": home_score != away_score,
         "home_team_id": home_ctx["team_id"],
