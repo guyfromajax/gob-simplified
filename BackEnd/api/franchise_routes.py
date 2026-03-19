@@ -279,7 +279,8 @@ def _game_doc_richness_score(game_doc: dict) -> int:
 
 def _build_next_matchup_map(
     franchise_doc: dict[str, Any],
-    id_to_name: dict[ObjectId, str],
+    team_name_by_id: dict[str, str],
+    natl_rank_by_team_id: dict[str, int],
 ) -> dict[str, str]:
     schedule = franchise_doc.get("schedule", [])
     week = int(franchise_doc.get("week", 1) or 1)
@@ -299,8 +300,16 @@ def _build_next_matchup_map(
                 try:
                     aid = ObjectId(away_id) if isinstance(away_id, str) else away_id
                     hid = ObjectId(home_id) if isinstance(home_id, str) else home_id
-                    home_name = id_to_name.get(hid, "")
-                    away_name = id_to_name.get(aid, "")
+                    home_name = _format_team_name_with_rank(
+                        str(hid),
+                        team_name_by_id.get(str(hid), ""),
+                        natl_rank_by_team_id,
+                    )
+                    away_name = _format_team_name_with_rank(
+                        str(aid),
+                        team_name_by_id.get(str(aid), ""),
+                        natl_rank_by_team_id,
+                    )
                     matchup_map[str(aid)] = f"at {home_name}"
                     matchup_map[str(hid)] = f"vs {away_name}"
                 except Exception:
@@ -309,8 +318,16 @@ def _build_next_matchup_map(
 
     next_games = schedule[week - 1] if week - 1 < len(schedule) else []
     for away_id, home_id in next_games:
-        home_name = id_to_name.get(home_id, "")
-        away_name = id_to_name.get(away_id, "")
+        home_name = _format_team_name_with_rank(
+            str(home_id),
+            team_name_by_id.get(str(home_id), ""),
+            natl_rank_by_team_id,
+        )
+        away_name = _format_team_name_with_rank(
+            str(away_id),
+            team_name_by_id.get(str(away_id), ""),
+            natl_rank_by_team_id,
+        )
         matchup_map[str(away_id)] = f"at {home_name}"
         matchup_map[str(home_id)] = f"vs {away_name}"
     return matchup_map
@@ -318,7 +335,8 @@ def _build_next_matchup_map(
 
 def _build_previous_week_result_map(
     franchise_doc: dict[str, Any],
-    id_to_name: dict[ObjectId, str],
+    team_name_by_id: dict[str, str],
+    natl_rank_by_team_id: dict[str, int],
 ) -> dict[str, dict[str, str]]:
     week = int(franchise_doc.get("week", 1) or 1)
     previous_week = week - 1
@@ -332,12 +350,16 @@ def _build_previous_week_result_map(
         home_id = str(result.get("home_id") or "")
         if not away_id or not home_id:
             continue
-        try:
-            away_name = id_to_name.get(ObjectId(away_id), away_id)
-            home_name = id_to_name.get(ObjectId(home_id), home_id)
-        except Exception:
-            away_name = away_id
-            home_name = home_id
+        away_name = _format_team_name_with_rank(
+            away_id,
+            team_name_by_id.get(away_id, away_id),
+            natl_rank_by_team_id,
+        )
+        home_name = _format_team_name_with_rank(
+            home_id,
+            team_name_by_id.get(home_id, home_id),
+            natl_rank_by_team_id,
+        )
         away_score = int(result.get("away_score", 0) or 0)
         home_score = int(result.get("home_score", 0) or 0)
         if away_score > home_score:
@@ -351,14 +373,25 @@ def _build_previous_week_result_map(
             home_outcome = "T"
 
         result_map[away_id] = {
-            "text": f"@{home_name}, {away_score}-{home_score} ({away_outcome})",
+            "text": f"@ {home_name}, {away_score}-{home_score}",
             "result": away_outcome,
         }
         result_map[home_id] = {
-            "text": f"{away_name}, {home_score}-{away_score} ({home_outcome})",
+            "text": f"vs {away_name}, {home_score}-{away_score}",
             "result": home_outcome,
         }
     return result_map
+
+
+def _format_team_name_with_rank(
+    team_id: str,
+    team_name: str,
+    natl_rank_by_team_id: dict[str, int],
+) -> str:
+    natl_rank = int(natl_rank_by_team_id.get(str(team_id), 999) or 999)
+    if 1 <= natl_rank <= 25:
+        return f"#{natl_rank} {team_name}"
+    return team_name
 
 
 def _resolve_team_id_to_object_id(team_id: str):
@@ -2493,8 +2526,13 @@ def command_center_data(
                         {"_id": {"$in": team_ids}},
                         {"name": 1, "primary_color": 1, "conference": 1}
                     )}
-                    id_to_name = {
-                        team_id: teams_docs.get(str(team_id), {}).get("name", str(team_id))
+                    natl_rank_by_team_id = {
+                        str(d["team_id"]): int(d.get("natl_rank", 999) or 999)
+                        for d in ftd_rank_docs
+                        if d.get("team_id") is not None
+                    }
+                    team_name_by_id = {
+                        str(team_id): teams_docs.get(str(team_id), {}).get("name", str(team_id))
                         for team_id in team_ids
                     }
                     team_list = _ftd_team_list_for_franchise(franchise_id)
@@ -2502,8 +2540,8 @@ def command_center_data(
                         franchise_doc.get("results", {}),
                         team_list,
                     )
-                    next_matchup_map = _build_next_matchup_map(franchise_doc, id_to_name)
-                    previous_week_result_map = _build_previous_week_result_map(franchise_doc, id_to_name)
+                    next_matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
+                    previous_week_result_map = _build_previous_week_result_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
                     rankings = [
                         {
                             "team_id": str(d["team_id"]),
@@ -2730,34 +2768,6 @@ def standings(
             raise HTTPException(status_code=404, detail="Franchise not found")
         schedule = franchise_doc.get("schedule", [])
         week = franchise_doc.get("week", 1)
-        id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
-        matchup_map = {}
-        eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-        eos_has_state = bool(
-            franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
-        )
-        if eos_tournament_active and eos_has_state and week in ft.EOS_WEEKS:
-            week_games_meta = ft.get_eos_week_games(franchise_doc, week)
-            for g in week_games_meta:
-                away_id = g.get("away_id")
-                home_id = g.get("home_id")
-                if away_id and home_id:
-                    try:
-                        aid = ObjectId(away_id) if isinstance(away_id, str) else away_id
-                        hid = ObjectId(home_id) if isinstance(home_id, str) else home_id
-                        home_name = id_to_name.get(hid, "")
-                        away_name = id_to_name.get(aid, "")
-                        matchup_map[str(aid)] = f"at {home_name}"
-                        matchup_map[str(hid)] = f"vs {away_name}"
-                    except Exception:
-                        continue
-        else:
-            next_games = schedule[week - 1] if week - 1 < len(schedule) else []
-            for away_id, home_id in next_games:
-                home_name = id_to_name.get(home_id, "")
-                away_name = id_to_name.get(away_id, "")
-                matchup_map[str(away_id)] = f"at {home_name}"
-                matchup_map[str(home_id)] = f"vs {away_name}"
         from BackEnd.utils.franchise_standings import calculate_franchise_standings
         franchise_results = franchise_doc.get("results", {})
         team_list = _ftd_team_list_for_franchise(franchise_id)
@@ -2769,6 +2779,11 @@ def standings(
             {"team_id": 1, "natl_rank": 1},
         ))
         natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
+        team_name_by_id = {
+            str(t["_id"]): t.get("name", "")
+            for t in db.teams.find({}, {"name": 1})
+        }
+        matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
         teams = list(db.teams.find(
             {"_id": {"$in": team_ids_list}},
@@ -3032,12 +3047,26 @@ def season_schedule(franchise_id: str, conference: Optional[int] = None):
         for team_doc in team_docs
         if str(team_doc["_id"]) in included_team_ids
     }
+    ftd_rank_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": ObjectId(franchise_id)},
+        {"team_id": 1, "natl_rank": 1},
+    ))
+    natl_rank_by_team_id = {
+        str(doc["team_id"]): int(doc.get("natl_rank", 999) or 999)
+        for doc in ftd_rank_docs
+        if doc.get("team_id")
+    }
+    team_display_name_map = {
+        team_id: _format_team_name_with_rank(team_id, team_name, natl_rank_by_team_id)
+        for team_id, team_name in team_name_map.items()
+    }
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
     return {
         "schedule": weeks,
         "team_id": team_id,
         "team_conferences": team_conferences,
         "team_name_map": team_name_map,
+        "team_display_name_map": team_display_name_map,
         "conference": conference,
     }
 
