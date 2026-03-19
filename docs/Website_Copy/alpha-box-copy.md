@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body:
-- **March 11 Update*** Added expanded 26-game regular season, conference, region, and national tournaments, full recruiting system, and cleaned up a number of bugs.
+- **March 19 Update** Added full team prestige and ranking systems. Added more team logos (64 of 128 now exist). Added full computer sim game stats tracking. Various UX and quality of life updates.
 
 Source:
 - `FrontEnd/static/mode-select.html`
