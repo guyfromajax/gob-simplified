@@ -135,42 +135,18 @@
   }
 
   function getNumericNationalRank(team) {
-    const stats = team && team.stats ? team.stats : {};
-    const rankValue = team?.natl_rank ?? team?.rank ?? stats.natl_rank ?? stats.rank ?? stats.Rank;
+    const rankValue = team?.natl_rank;
     const parsed = Number(rankValue);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 
-  function rankTeamsWithinScope(teams) {
-    const ranked = cloneTeams(teams);
-    ranked.sort((a, b) => {
-      const aNationalRank = getNumericNationalRank(a);
-      const bNationalRank = getNumericNationalRank(b);
-      if (scope === 'national' && aNationalRank != null && bNationalRank != null && aNationalRank !== bNationalRank) {
-        return aNationalRank - bNationalRank;
-      }
-      const s1 = a.stats || {};
-      const s2 = b.stats || {};
-      const winDiff = (s2.W || 0) - (s1.W || 0);
-      if (winDiff) return winDiff;
-      const lossDiff = (s1.L || 0) - (s2.L || 0);
-      if (lossDiff) return lossDiff;
-      const pointDiff = ((s2.PF || 0) - (s2.PA || 0)) - ((s1.PF || 0) - (s1.PA || 0));
-      if (pointDiff) return pointDiff;
-      const pfDiff = (s2.PF || 0) - (s1.PF || 0);
-      if (pfDiff) return pfDiff;
-      if (aNationalRank != null && bNationalRank != null && aNationalRank !== bNationalRank) {
-        return aNationalRank - bNationalRank;
-      }
-      return (a.team || '').localeCompare(b.team || '');
-    });
-    return ranked.map((team, index) => ({ ...team, scope_rank: index + 1 }));
-  }
-
   function getFilteredTeamsForDisplay(teams) {
-    const ranked = rankTeamsWithinScope(teams);
-    if (scope !== 'national' || nationalTeamFilter !== 'top25') return ranked;
-    return ranked.filter(t => (t.scope_rank || 0) <= 25);
+    const cloned = cloneTeams(teams);
+    if (scope !== 'national' || nationalTeamFilter !== 'top25') return cloned;
+    return cloned.filter((team) => {
+      const nationalRank = getNumericNationalRank(team);
+      return nationalRank != null && nationalRank <= 25;
+    });
   }
 
   function renderTeamStatsBody(teams) {
@@ -189,7 +165,7 @@
           return;
         }
         if (key === 'rank') {
-          html += '<td>' + (t.scope_rank || '') + '</td>';
+          html += '<td>' + (getNumericNationalRank(t) ?? '--') + '</td>';
           return;
         }
         const cls = (key === 'W' ? 'col-w' : key === 'L' ? 'col-l' : '') + groupStart;
@@ -248,8 +224,8 @@
       let v1, v2;
       if (key === 'team') { v1 = a.team||''; v2 = b.team||''; return direction === 'asc' ? v1.localeCompare(v2) : v2.localeCompare(v1); }
       if (key === 'rank') {
-        v1 = a.scope_rank || 0;
-        v2 = b.scope_rank || 0;
+        v1 = getNumericNationalRank(a) ?? Number.MAX_SAFE_INTEGER;
+        v2 = getNumericNationalRank(b) ?? Number.MAX_SAFE_INTEGER;
         return direction === 'asc' ? v1 - v2 : v2 - v1;
       }
       if (key === 'FG%') { v1 = s1.FGA>0 ? (s1.FGM||0)/s1.FGA : 0; v2 = s2.FGA>0 ? (s2.FGM||0)/s2.FGA : 0; }

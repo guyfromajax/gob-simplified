@@ -2975,12 +2975,14 @@ def team_stats(franchise_id: str, scope: str = "national"):
                         filtered_team_list[team_id_str] = team_name
                 team_list = filtered_team_list
     # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
-    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1}))
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1, "natl_rank": 1}))
     franchise_team_rosters = {}
+    natl_rank_by_team_id = {}
     for ftd in ftd_docs:
         tid_str = str(ftd["team_id"])
         roster = ftd.get("players") or []
         franchise_team_rosters[tid_str] = [str(pid) for pid in roster]
+        natl_rank_by_team_id[tid_str] = int(ftd.get("natl_rank", 999) or 999)
     
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(team_list)} teams, {len(franchise_results)} weeks of results")
     
@@ -3012,7 +3014,11 @@ def team_stats(franchise_id: str, scope: str = "national"):
             t["conference"] = meta.get("conference")
             t["region"] = meta.get("region", "")
             t["mascot"] = meta.get("mascot", "")
-    
+            t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
+    else:
+        for t in output:
+            t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
+
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
