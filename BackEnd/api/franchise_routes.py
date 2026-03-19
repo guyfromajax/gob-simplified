@@ -2796,6 +2796,8 @@ def get_leaders(
     scope: str = "season",
     stat: str = "PTS",
     limit: int = 10,
+    allowed_team_ids: Optional[set[str]] = None,
+    allowed_team_names: Optional[set[str]] = None,
 ):
     """Return the top players for a given stat within a franchise.
 
@@ -2818,8 +2820,15 @@ def get_leaders(
 
     # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
     aggregation_start = time.time()
-    pipeline = [
-        {"$match": {"franchise_id": str(franchise_id)}},
+    pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
+    if allowed_team_ids or allowed_team_names:
+        team_filters = []
+        if allowed_team_ids:
+            team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
+        if allowed_team_names:
+            team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
+        pipeline.append({"$match": {"$or": team_filters}})
+    pipeline.extend([
         {
             "$project": {
                 "player_id": 1,
@@ -2829,7 +2838,7 @@ def get_leaders(
         },
         {"$sort": {"value": -1}},
         {"$limit": limit},
-    ]
+    ])
     agg = list(franchise_players_data_collection.aggregate(pipeline))
     aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
@@ -2886,20 +2895,14 @@ def leaders(
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
         cat_start = time.time()
-        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=256)
-        if allowed_team_ids is not None or allowed_team_names is not None:
-            filtered_top = []
-            for player in top:
-                player_team = player.get("team")
-                player_team_id = str(player_team) if player_team is not None else ""
-                if allowed_team_ids and player_team_id in allowed_team_ids:
-                    filtered_top.append(player)
-                    continue
-                if allowed_team_names and player_team in allowed_team_names:
-                    filtered_top.append(player)
-            top = filtered_top[:limit]
-        else:
-            top = top[:limit]
+        top = get_leaders(
+            franchise_id,
+            scope=scope,
+            stat=cat,
+            limit=limit,
+            allowed_team_ids=allowed_team_ids,
+            allowed_team_names=allowed_team_names,
+        )
         cat_time = time.time() - cat_start
         result[cat] = [
             {

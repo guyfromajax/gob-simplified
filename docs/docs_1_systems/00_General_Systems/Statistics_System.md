@@ -420,6 +420,12 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - Season stats: Aggregated across games in tournament/franchise mode
 - Career stats: Aggregated across all seasons for franchise mode
 
+**Stats Page Scoped Leaders:**
+- `stats.html` shows Individual Leaders for `conference`, `region`, and `national` scopes.
+- Each leaders card must display the true top `10` players within the selected view scope for that stat category.
+- Scope filtering occurs before ranking and before limiting.
+- Conference and region leader boards must not be derived from a pre-limited national list.
+
 ### Key Files
 
 **Backend:**
@@ -432,4 +438,4 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - `BackEnd/models/team_manager.py` - Team stat aggregation (`get_team_game_stats()`)
 - `BackEnd/constants/__init__.py` - `BOX_SCORE_KEYS` definition (all trackable stats)
 - `BackEnd/utils/stat_updater.py` - Stat persistence and aggregation (`apply_stats_from_summary()`, `finalize_game()`)
-
+- `BackEnd/api/franchise_routes.py` - Franchise leaders/team-stats endpoints (`/franchise/leaders`, `/franchise/team-stats`)
