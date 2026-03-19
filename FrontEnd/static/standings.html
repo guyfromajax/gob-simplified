@@ -36,7 +36,7 @@
   const teamId = params.get('team_id');
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
-    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+    backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
   }
 
   let resourceCache = null;
@@ -49,7 +49,7 @@
 
   function buildTeamLink(t) {
     const a = document.createElement('a');
-    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_url=${encodeURIComponent(window.location.href)}`;
+    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_url=${encodeURIComponent(getCurrentRelativeUrl())}`;
     a.textContent = t.name;
     a.style.color = '#4a90e2';
     a.style.textDecoration = 'none';

@@ -448,6 +448,21 @@ export function createGameScene(Phaser) {
       // Extract team colors (unified structure preferred)
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
       const awayColors = awayTeamObj?.colors || simData.away_team_colors;
+      const formatRankedTeamName = (teamName, teamObj) => {
+        const rank = Number(teamObj?.natl_rank);
+        if (teamName && Number.isInteger(rank) && rank >= 1) {
+          return `#${rank} ${teamName}`;
+        }
+        return teamName || '';
+      };
+      const homePlayersHeaderEl = document.getElementById('home-players-header');
+      const awayPlayersHeaderEl = document.getElementById('away-players-header');
+      if (homePlayersHeaderEl) {
+        homePlayersHeaderEl.textContent = formatRankedTeamName(logHome, homeTeamObj);
+      }
+      if (awayPlayersHeaderEl) {
+        awayPlayersHeaderEl.textContent = formatRankedTeamName(logAway, awayTeamObj);
+      }
       
       if (DEBUG_TEAMS) {
         console.log('Resolved team IDs:', { home_team_id: homeId, away_team_id: awayId });
@@ -638,11 +653,15 @@ export function createGameScene(Phaser) {
       const homeBody = document.getElementById('home-stats-body');
       const awayBody = document.getElementById('away-stats-body');
 
-      const formatName = (name) => {
-        if (!name) return '';
-        const parts = name.trim().split(/\s+/);
-        if (parts.length === 1) return parts[0];
-        return `${parts[0][0]}. ${parts[parts.length - 1]}`;
+      const formatName = (name, jersey) => {
+        if (!name && jersey == null) return '';
+        const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+        const lastName = parts.length ? parts[parts.length - 1] : '';
+        const hasJersey = jersey !== undefined && jersey !== null && jersey !== '';
+        if (hasJersey && lastName) return `#${jersey} ${lastName}`;
+        if (lastName) return lastName;
+        if (hasJersey) return `#${jersey}`;
+        return '';
       };
 
       const getEnergyColor = (ng) => {
@@ -845,7 +864,7 @@ export function createGameScene(Phaser) {
           const defAttemptsTd = document.createElement('td');
           const defTd = document.createElement('td');
           
-          nameTd.textContent = formatName(player?.name) || '';
+          nameTd.textContent = formatName(player?.name, player?.jersey) || '';
           nameTd.style.cursor = 'pointer';
           nameTd.dataset.playerId = playerId;
           
@@ -943,7 +962,7 @@ export function createGameScene(Phaser) {
           const info = this.playerInfo[playerId];
           const row = this.rowRefs[teamKey][pos];
           if (info && row) {
-            row.nameCell.textContent = formatName(info.name);
+            row.nameCell.textContent = formatName(info.name, info.jersey);
             const stats = this.playerStats[playerId] || { 
               PTS: 0, F: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, DEF_A: 0, DEF_S: 0 
             };
@@ -1623,11 +1642,29 @@ export function createGameScene(Phaser) {
       
       // Game Speed button handler
       if (gameSpeedBtn && speedDropdown && !gameSpeedBtn.disabled) {
+        const positionSpeedDropdown = () => {
+          if (!gameSpeedBtn || !speedDropdown) return;
+          const rect = gameSpeedBtn.getBoundingClientRect();
+          speedDropdown.style.left = `${Math.round(rect.left)}px`;
+          speedDropdown.style.top = `${Math.round(rect.top - speedDropdown.offsetHeight - 8)}px`;
+        };
+
         gameSpeedBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           const isVisible = speedDropdown.style.display !== 'none';
-          speedDropdown.style.display = isVisible ? 'none' : 'flex';
+          if (isVisible) {
+            speedDropdown.style.display = 'none';
+          } else {
+            speedDropdown.style.display = 'flex';
+            positionSpeedDropdown();
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          if (speedDropdown.style.display !== 'none') {
+            positionSpeedDropdown();
+          }
         });
         
         // Close dropdown when clicking outside

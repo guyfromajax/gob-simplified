@@ -704,10 +704,14 @@ function executeNavigateToCommandCenter() {
     const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
     window.location.href = finalUrl;
   } else if (mode === 'franchise' && franchiseId) {
-    // Include team_id in URL for franchise command center
     const teamIdParam = teamId || userTeamIdParam || teamName;
-    const url = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
-    const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
+    const finalUrl = typeof resolveFranchiseLockerRoomUrl === 'function'
+      ? resolveFranchiseLockerRoomUrl({
+          params: urlParams,
+          franchiseId: franchiseId,
+          teamId: teamIdParam
+        })
+      : buildFranchiseLockerRoomUrl(franchiseId, teamIdParam);
     window.location.href = finalUrl;
   } else {
     // ✅ PHASE 2: Navigate to mode-select instead of homepage (more appropriate)
@@ -943,5 +947,4 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
 

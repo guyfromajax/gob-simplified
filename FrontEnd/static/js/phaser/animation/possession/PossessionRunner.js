@@ -444,17 +444,6 @@ export class PossessionRunner {
   }
 
   onFrameStart(frame, frameIndex, duration, rawDuration) {
-    // Trigger lean meter animation at middle step
-    if (this.scene._leanScoreToAnimate !== null && 
-        this.scene._leanAnimationStep === frameIndex && 
-        !this.scene._leanAnimationTriggered) {
-      import('../ui/playcallCenter.js').then(module => {
-        module.animateLeanMeter(this.scene._leanScoreToAnimate);
-        this.scene._leanAnimationTriggered = true;
-        console.log(`📊 Lean meter animated at frame ${frameIndex}`);
-      });
-    }
-    
     const debugEnabled = isAnimationDebugEnabled();
     if (debugEnabled) {
       this.scene?.events?.emit?.(

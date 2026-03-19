@@ -33,6 +33,7 @@ from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
 from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
+from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.eog_attr_rules import (
@@ -43,7 +44,15 @@ from BackEnd.eog_attr_rules import (
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 from BackEnd.utils.position_ratings import compute_position_ratings
-from BackEnd.models.franchise_manager import load_franchise_names
+from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets
+from BackEnd.utils.franchise_rank_prestige import (
+    FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
+    SOS_AVG_DEFAULT,
+    apply_prestige_delta,
+    core_total_player_attrs,
+    rank_teams_for_week,
+    use_franchise_rank_prestige_v2,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -53,6 +62,184 @@ RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 AWARDS_FIELD = "awards"
 WEEK_35_RECRUITING_POINTS_BUDGET = 20
+SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
+RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
+RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
+
+
+def _mint_season_transition_token() -> str:
+    return str(uuid.uuid4())
+
+
+def _ensure_season_transition_token(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+) -> str:
+    token = str(franchise_doc.get(SEASON_TRANSITION_TOKEN_FIELD) or "").strip()
+    if token:
+        return token
+    if int(franchise_doc.get("week", 1) or 1) != 36:
+        return ""
+
+    token = _mint_season_transition_token()
+    result = db.franchises.update_one(
+        {
+            "_id": franchise_id,
+            "$or": [
+                {SEASON_TRANSITION_TOKEN_FIELD: {"$exists": False}},
+                {SEASON_TRANSITION_TOKEN_FIELD: None},
+                {SEASON_TRANSITION_TOKEN_FIELD: ""},
+            ],
+        },
+        {"$set": {SEASON_TRANSITION_TOKEN_FIELD: token}},
+    )
+    if result.modified_count:
+        franchise_doc[SEASON_TRANSITION_TOKEN_FIELD] = token
+        return token
+
+    refreshed = db.franchises.find_one({"_id": franchise_id}, {SEASON_TRANSITION_TOKEN_FIELD: 1}) or {}
+    refreshed_token = str(refreshed.get(SEASON_TRANSITION_TOKEN_FIELD) or "").strip()
+    if refreshed_token:
+        franchise_doc[SEASON_TRANSITION_TOKEN_FIELD] = refreshed_token
+    return refreshed_token
+
+
+def _should_freeze_total_player_attrs(franchise_doc: dict[str, Any] | None) -> bool:
+    return use_franchise_rank_prestige_v2(franchise_doc)
+
+
+def _update_ftd_roster_state(
+    franchise_id: ObjectId,
+    team_object_id: ObjectId,
+    update_fields: dict[str, Any],
+) -> None:
+    franchise_doc = db.franchises.find_one({"_id": franchise_id}, {RANK_PRESTIGE_SYSTEM_VERSION_FIELD: 1}) or {}
+    if _should_freeze_total_player_attrs(franchise_doc):
+        update_fields = {k: v for k, v in update_fields.items() if k != "total_player_attrs"}
+    franchise_team_data_collection.update_one(
+        {"franchise_id": franchise_id, "team_id": team_object_id},
+        {"$set": update_fields},
+    )
+
+
+def _apply_regular_season_rank_prestige_updates(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+    completed_week: int,
+    week_results: list[dict[str, Any]],
+) -> None:
+    if not use_franchise_rank_prestige_v2(franchise_doc):
+        return
+    if completed_week < 1 or completed_week > ScheduleManager.REGULAR_SEASON_WEEKS:
+        return
+
+    last_applied_week = int(franchise_doc.get(RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD, 0) or 0)
+    if last_applied_week >= completed_week:
+        logger.info(
+            "⏭️ [RANK_PRESTIGE] Skipping franchise=%s week=%s; already applied through week=%s",
+            franchise_id,
+            completed_week,
+            last_applied_week,
+        )
+        return
+
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "prestige": 1, "total_player_attrs": 1, "natl_rank": 1, "sos_avg": 1, "sos_rank_sum": 1, "sos_games_played": 1},
+    ))
+    team_state_by_id: dict[str, dict[str, Any]] = {}
+    previous_rank_by_team: dict[str, int] = {}
+    for doc in ftd_docs:
+        team_id = str(doc.get("team_id") or "")
+        if not team_id:
+            continue
+        previous_rank = int(doc.get("natl_rank", 999) or 999)
+        previous_rank_by_team[team_id] = previous_rank
+        team_state_by_id[team_id] = {
+            "team_id": team_id,
+            "prestige": int(doc.get("prestige", 0) or 0),
+            "total_player_attrs": int(doc.get("total_player_attrs", 0) or 0),
+            "natl_rank": previous_rank,
+            "sos_avg": float(doc.get("sos_avg", SOS_AVG_DEFAULT) or SOS_AVG_DEFAULT),
+            "sos_rank_sum": float(doc.get("sos_rank_sum", 0) or 0),
+            "sos_games_played": int(doc.get("sos_games_played", 0) or 0),
+        }
+
+    for result in week_results:
+        away_id = str(result.get("away_id") or "")
+        home_id = str(result.get("home_id") or "")
+        if away_id not in team_state_by_id or home_id not in team_state_by_id:
+            continue
+        away_state = team_state_by_id[away_id]
+        home_state = team_state_by_id[home_id]
+
+        away_rank_entering_week = previous_rank_by_team.get(away_id, 64)
+        home_rank_entering_week = previous_rank_by_team.get(home_id, 64)
+        away_state["sos_rank_sum"] += home_rank_entering_week
+        away_state["sos_games_played"] += 1
+        home_state["sos_rank_sum"] += away_rank_entering_week
+        home_state["sos_games_played"] += 1
+
+        away_score = int(result.get("away_score", 0) or 0)
+        home_score = int(result.get("home_score", 0) or 0)
+        if away_score == home_score:
+            logger.warning("⚠️ [RANK_PRESTIGE] Tied game detected for franchise=%s week=%s teams=%s/%s; prestige unchanged", franchise_id, completed_week, away_id, home_id)
+            continue
+
+        if away_score > home_score:
+            new_winner_prestige, new_loser_prestige = apply_prestige_delta(
+                away_state["prestige"],
+                home_state["prestige"],
+                week=completed_week,
+            )
+            away_state["prestige"] = new_winner_prestige
+            home_state["prestige"] = new_loser_prestige
+        else:
+            new_winner_prestige, new_loser_prestige = apply_prestige_delta(
+                home_state["prestige"],
+                away_state["prestige"],
+                week=completed_week,
+            )
+            home_state["prestige"] = new_winner_prestige
+            away_state["prestige"] = new_loser_prestige
+
+    ranking_inputs: list[dict[str, Any]] = []
+    for team_id, state in team_state_by_id.items():
+        games_played = int(state.get("sos_games_played", 0) or 0)
+        sos_avg = SOS_AVG_DEFAULT if games_played <= 0 else float(state.get("sos_rank_sum", 0) or 0) / games_played
+        state["sos_avg"] = sos_avg
+        ranking_inputs.append({
+            "team_id": team_id,
+            "prestige": int(state.get("prestige", 0) or 0),
+            "total_player_attrs": int(state.get("total_player_attrs", 0) or 0),
+            "sos_avg": sos_avg,
+        })
+
+    ranked = rank_teams_for_week(ranking_inputs, week=completed_week, previous_rank_by_team=previous_rank_by_team)
+    ranked_by_team = {str(entry["team_id"]): entry for entry in ranked}
+
+    for doc in ftd_docs:
+        team_id = str(doc.get("team_id") or "")
+        if team_id not in team_state_by_id or team_id not in ranked_by_team:
+            continue
+        state = team_state_by_id[team_id]
+        ranked_entry = ranked_by_team[team_id]
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": doc["team_id"]},
+            {"$set": {
+                "prestige": int(state["prestige"]),
+                "natl_rank": int(ranked_entry["natl_rank"]),
+                "sos_avg": float(state["sos_avg"]),
+                "sos_rank_sum": float(state["sos_rank_sum"]),
+                "sos_games_played": int(state["sos_games_played"]),
+                "updated_at": datetime.utcnow(),
+            }},
+        )
+
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: completed_week}},
+    )
 
 
 def _game_doc_richness_score(game_doc: dict) -> int:
@@ -88,6 +275,123 @@ def _game_doc_richness_score(game_doc: dict) -> int:
         score += 3
 
     return score
+
+
+def _build_next_matchup_map(
+    franchise_doc: dict[str, Any],
+    team_name_by_id: dict[str, str],
+    natl_rank_by_team_id: dict[str, int],
+) -> dict[str, str]:
+    schedule = franchise_doc.get("schedule", [])
+    week = int(franchise_doc.get("week", 1) or 1)
+    matchup_map: dict[str, str] = {}
+    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+    eos_has_state = bool(
+        franchise_doc.get("conference_tournaments")
+        or franchise_doc.get("region_tournaments")
+        or franchise_doc.get("national_tournament")
+    )
+    if eos_tournament_active and eos_has_state and week in ft.EOS_WEEKS:
+        week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+        for g in week_games_meta:
+            away_id = g.get("away_id")
+            home_id = g.get("home_id")
+            if away_id and home_id:
+                try:
+                    aid = ObjectId(away_id) if isinstance(away_id, str) else away_id
+                    hid = ObjectId(home_id) if isinstance(home_id, str) else home_id
+                    home_name = _format_team_name_with_rank(
+                        str(hid),
+                        team_name_by_id.get(str(hid), ""),
+                        natl_rank_by_team_id,
+                    )
+                    away_name = _format_team_name_with_rank(
+                        str(aid),
+                        team_name_by_id.get(str(aid), ""),
+                        natl_rank_by_team_id,
+                    )
+                    matchup_map[str(aid)] = f"at {home_name}"
+                    matchup_map[str(hid)] = f"vs {away_name}"
+                except Exception:
+                    continue
+        return matchup_map
+
+    next_games = schedule[week - 1] if week - 1 < len(schedule) else []
+    for away_id, home_id in next_games:
+        home_name = _format_team_name_with_rank(
+            str(home_id),
+            team_name_by_id.get(str(home_id), ""),
+            natl_rank_by_team_id,
+        )
+        away_name = _format_team_name_with_rank(
+            str(away_id),
+            team_name_by_id.get(str(away_id), ""),
+            natl_rank_by_team_id,
+        )
+        matchup_map[str(away_id)] = f"at {home_name}"
+        matchup_map[str(home_id)] = f"vs {away_name}"
+    return matchup_map
+
+
+def _build_previous_week_result_map(
+    franchise_doc: dict[str, Any],
+    team_name_by_id: dict[str, str],
+    natl_rank_by_team_id: dict[str, int],
+) -> dict[str, dict[str, str]]:
+    week = int(franchise_doc.get("week", 1) or 1)
+    previous_week = week - 1
+    if previous_week < 1:
+        return {}
+
+    previous_results = list((franchise_doc.get("results", {}) or {}).get(str(previous_week), []) or [])
+    result_map: dict[str, dict[str, str]] = {}
+    for result in previous_results:
+        away_id = str(result.get("away_id") or "")
+        home_id = str(result.get("home_id") or "")
+        if not away_id or not home_id:
+            continue
+        away_name = _format_team_name_with_rank(
+            away_id,
+            team_name_by_id.get(away_id, away_id),
+            natl_rank_by_team_id,
+        )
+        home_name = _format_team_name_with_rank(
+            home_id,
+            team_name_by_id.get(home_id, home_id),
+            natl_rank_by_team_id,
+        )
+        away_score = int(result.get("away_score", 0) or 0)
+        home_score = int(result.get("home_score", 0) or 0)
+        if away_score > home_score:
+            away_outcome = "W"
+            home_outcome = "L"
+        elif home_score > away_score:
+            away_outcome = "L"
+            home_outcome = "W"
+        else:
+            away_outcome = "T"
+            home_outcome = "T"
+
+        result_map[away_id] = {
+            "text": f"@ {home_name}, {away_score}-{home_score}",
+            "result": away_outcome,
+        }
+        result_map[home_id] = {
+            "text": f"vs {away_name}, {home_score}-{away_score}",
+            "result": home_outcome,
+        }
+    return result_map
+
+
+def _format_team_name_with_rank(
+    team_id: str,
+    team_name: str,
+    natl_rank_by_team_id: dict[str, int],
+) -> str:
+    natl_rank = int(natl_rank_by_team_id.get(str(team_id), 999) or 999)
+    if 1 <= natl_rank <= 25:
+        return f"#{natl_rank} {team_name}"
+    return team_name
 
 
 def _resolve_team_id_to_object_id(team_id: str):
@@ -327,6 +631,7 @@ def update_team_attributes_after_game(
     away_totals = eog_inputs.get("away", {}).get("totals", {})
     home_scouting = eog_inputs.get("home", {}).get("scouting", {})
     away_scouting = eog_inputs.get("away", {}).get("scouting", {})
+    is_distant_sim = (game_doc.get("simulation_engine") == "distant")
 
     logger.info(
         "🔍 [UPDATE-TEAM-ATTRS] EOG canonical snapshot source=%s home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
@@ -481,43 +786,57 @@ def update_team_attributes_after_game(
         # defensive_efficiency: both teams +(−2, −1)
         changes["defensive_efficiency"] = random.randint(-2, -1)
         
-        # fb_efficiency
-        if team_scouting["fb_rate"] > 60:
-            changes["fb_efficiency"] = random.randint(0, 1)
+        if is_distant_sim:
+            changes["fb_efficiency"] = random.randint(-2, 1)
+            changes["fb_opp_modifier"] = random.randint(-2, 1)
+            changes["pt_efficiency"] = random.randint(-2, 1)
+            changes["pt_opp_modifier"] = random.randint(-2, 1)
+            logger.warning(
+                "🧪 [EOG-DISTANT-FBPT] team=%s fb_efficiency=%s fb_opp_modifier=%s pt_efficiency=%s pt_opp_modifier=%s",
+                str(team_id_label),
+                changes.get("fb_efficiency"),
+                changes.get("fb_opp_modifier"),
+                changes.get("pt_efficiency"),
+                changes.get("pt_opp_modifier"),
+            )
         else:
-            changes["fb_efficiency"] = random.randint(-2, -1)
-        
-        # fb_opp_modifier
-        changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
-        logger.warning(
-            "🧪 [EOG-BRANCH] team=%s attr=fb_opp_modifier opp_fb_rate=%.2f opp_fb_entries=%s raw_change=%s",
-            str(team_id_label),
-            float(opponent_scouting.get("fb_rate", 0)),
-            opponent_scouting.get("fb_entries", 0),
-            changes.get("fb_opp_modifier"),
-        )
-        
-        # pt_efficiency
-        if team_scouting["pt_combined_rate"] > 60:
-            changes["pt_efficiency"] = random.randint(1, 2)
-        elif team_scouting["pt_combined_rate"] < 30:
-            changes["pt_efficiency"] = random.randint(-3, -1)
-        else:
-            changes["pt_efficiency"] = random.randint(-1, 0)
-        
-        # pt_opp_modifier
-        changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
-        logger.warning(
-            "🧪 [EOG-BRANCH] team=%s attr=pt_opp_modifier opp_pt_rate=%.2f opp_pt_attempts=%s opp_hct=%s/%s opp_fcp=%s/%s raw_change=%s",
-            str(team_id_label),
-            float(opponent_scouting.get("pt_combined_rate", 0)),
-            opponent_scouting.get("pt_total_attempts", 0),
-            opponent_scouting.get("hct_success", 0),
-            opponent_scouting.get("hct_used", 0),
-            opponent_scouting.get("fcp_success", 0),
-            opponent_scouting.get("fcp_used", 0),
-            changes.get("pt_opp_modifier"),
-        )
+            # fb_efficiency
+            if team_scouting["fb_rate"] > 60:
+                changes["fb_efficiency"] = random.randint(0, 1)
+            else:
+                changes["fb_efficiency"] = random.randint(-2, -1)
+            
+            # fb_opp_modifier
+            changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
+            logger.warning(
+                "🧪 [EOG-BRANCH] team=%s attr=fb_opp_modifier opp_fb_rate=%.2f opp_fb_entries=%s raw_change=%s",
+                str(team_id_label),
+                float(opponent_scouting.get("fb_rate", 0)),
+                opponent_scouting.get("fb_entries", 0),
+                changes.get("fb_opp_modifier"),
+            )
+            
+            # pt_efficiency
+            if team_scouting["pt_combined_rate"] > 60:
+                changes["pt_efficiency"] = random.randint(1, 2)
+            elif team_scouting["pt_combined_rate"] < 30:
+                changes["pt_efficiency"] = random.randint(-3, -1)
+            else:
+                changes["pt_efficiency"] = random.randint(-1, 0)
+            
+            # pt_opp_modifier
+            changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
+            logger.warning(
+                "🧪 [EOG-BRANCH] team=%s attr=pt_opp_modifier opp_pt_rate=%.2f opp_pt_attempts=%s opp_hct=%s/%s opp_fcp=%s/%s raw_change=%s",
+                str(team_id_label),
+                float(opponent_scouting.get("pt_combined_rate", 0)),
+                opponent_scouting.get("pt_total_attempts", 0),
+                opponent_scouting.get("hct_success", 0),
+                opponent_scouting.get("hct_used", 0),
+                opponent_scouting.get("fcp_success", 0),
+                opponent_scouting.get("fcp_used", 0),
+                changes.get("pt_opp_modifier"),
+            )
         
         # team_chemistry
         score_delta = winner_score - loser_score
@@ -985,6 +1304,58 @@ def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, 
     if home_won:
         return (winning_score, losing_score)
     return (losing_score, winning_score)
+
+
+def _persist_distant_franchise_game(
+    *,
+    franchise_id: ObjectId,
+    week: int,
+    away_team_object_id: ObjectId,
+    home_team_object_id: ObjectId,
+    away_score: int,
+    home_score: int,
+) -> tuple[dict[str, Any], str]:
+    summary = build_distant_game_summary(
+        franchise_id=str(franchise_id),
+        week=week,
+        home_team_object_id=home_team_object_id,
+        away_team_object_id=away_team_object_id,
+        home_score=home_score,
+        away_score=away_score,
+    )
+    game_id = str(summary["_id"])
+    db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+    stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
+
+    home_team_id = _normalize_team_id_to_string(home_team_object_id) or str(home_team_object_id)
+    away_team_id = _normalize_team_id_to_string(away_team_object_id) or str(away_team_object_id)
+    if home_score > away_score:
+        winner_id, loser_id = home_team_id, away_team_id
+        winner_score, loser_score = home_score, away_score
+    else:
+        winner_id, loser_id = away_team_id, home_team_id
+        winner_score, loser_score = away_score, home_score
+    _finalize_team_attributes_for_game(
+        game_id=game_id,
+        franchise_id=franchise_id,
+        home_team_id=home_team_id,
+        away_team_id=away_team_id,
+        winner_id=winner_id,
+        loser_id=loser_id,
+        winner_score=winner_score,
+        loser_score=loser_score,
+    )
+
+    sim_res = _save_game_result(
+        away_team_object_id,
+        home_team_object_id,
+        away_score,
+        home_score,
+        week,
+        franchise_id=str(franchise_id),
+        game_id=game_id,
+    )
+    return sim_res, game_id
 
 
 def _build_user_eos_sim_scope(
@@ -1786,32 +2157,39 @@ def complete_week(req: CompleteWeekRequest):
                 home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
                 away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
                 home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+                sim_res, distant_game_id = _persist_distant_franchise_game(
+                    franchise_id=franchise_id,
+                    week=req.week,
+                    away_team_object_id=away_id,
+                    home_team_object_id=home_id,
+                    away_score=away_score,
+                    home_score=home_score,
+                )
                 results.append({
-                    "away_id": str(away_id),
-                    "home_id": str(home_id),
-                    "away_score": away_score,
-                    "home_score": home_score,
+                    "away_id": sim_res["team1_id"],
+                    "home_id": sim_res["team2_id"],
+                    "away_score": sim_res["team1_score"],
+                    "home_score": sim_res["team2_score"],
                 })
-                _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=None)
                 winner_id = home_id if home_score > away_score else away_id
                 if g["phase"] == "conference":
                     ft.save_conference_game_result(
                         franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                        "", str(winner_id), {"home": home_score, "away": away_score},
+                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
                     )
                 elif g["phase"] == "region":
                     ft.save_region_game_result(
                         franchise_doc, g["region"], g["round"], g["matchup_index"],
-                        "", str(winner_id), {"home": home_score, "away": away_score},
+                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
                     )
                 elif g["phase"] == "national":
                     ft.save_national_game_result(
                         franchise_doc, g["round"], g["matchup_index"],
-                        "", str(winner_id), {"home": home_score, "away": away_score},
+                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
                     )
                 continue
 
-        # Distant sim: regular season only; neither team in user's conference → lightweight sim (no game doc, no EOG)
+        # Distant sim: regular season only; neither team in user's conference.
         away_conf = team_id_to_conference.get(str(away_id))
         home_conf = team_id_to_conference.get(str(home_id))
         is_distant = (
@@ -1826,11 +2204,19 @@ def complete_week(req: CompleteWeekRequest):
             home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
             away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            sim_res, _distant_game_id = _persist_distant_franchise_game(
+                franchise_id=franchise_id,
+                week=req.week,
+                away_team_object_id=away_id,
+                home_team_object_id=home_id,
+                away_score=away_score,
+                home_score=home_score,
+            )
             results.append({
-                "away_id": str(away_id),
-                "home_id": str(home_id),
-                "away_score": away_score,
-                "home_score": home_score,
+                "away_id": sim_res["team1_id"],
+                "home_id": sim_res["team2_id"],
+                "away_score": sim_res["team1_score"],
+                "home_score": sim_res["team2_score"],
             })
             continue
 
@@ -1905,6 +2291,7 @@ def complete_week(req: CompleteWeekRequest):
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
     _apply_complete_week_recruiting_lean_updates(franchise_doc, req.week, results)
+    _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, req.week, results)
     
     # Reset training status for next week
     next_week = req.week + 1
@@ -2128,6 +2515,7 @@ def command_center_data(
         if franchise_id and franchise_doc:
             try:
                 fid = franchise_doc["_id"]
+                from BackEnd.utils.franchise_standings import calculate_franchise_standings
                 ftd_rank_docs = list(franchise_team_data_collection.find(
                     {"franchise_id": fid},
                     {"team_id": 1, "natl_rank": 1}
@@ -2138,12 +2526,34 @@ def command_center_data(
                         {"_id": {"$in": team_ids}},
                         {"name": 1, "primary_color": 1, "conference": 1}
                     )}
+                    natl_rank_by_team_id = {
+                        str(d["team_id"]): int(d.get("natl_rank", 999) or 999)
+                        for d in ftd_rank_docs
+                        if d.get("team_id") is not None
+                    }
+                    team_name_by_id = {
+                        str(team_id): teams_docs.get(str(team_id), {}).get("name", str(team_id))
+                        for team_id in team_ids
+                    }
+                    team_list = _ftd_team_list_for_franchise(franchise_id)
+                    standings_data = calculate_franchise_standings(
+                        franchise_doc.get("results", {}),
+                        team_list,
+                    )
+                    next_matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
+                    previous_week_result_map = _build_previous_week_result_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
                     rankings = [
                         {
+                            "team_id": str(d["team_id"]),
                             "natl_rank": d.get("natl_rank", 128),
                             "team_name": teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
                             "primary_color": teams_docs.get(str(d["team_id"]), {}).get("primary_color") or "#000000",
                             "conference": teams_docs.get(str(d["team_id"]), {}).get("conference"),
+                            "W": int((standings_data.get(str(d["team_id"]), {}) or {}).get("W", 0) or 0),
+                            "L": int((standings_data.get(str(d["team_id"]), {}) or {}).get("L", 0) or 0),
+                            "last_week": (previous_week_result_map.get(str(d["team_id"])) or {}).get("text", ""),
+                            "last_week_result": (previous_week_result_map.get(str(d["team_id"])) or {}).get("result", ""),
+                            "next": next_matchup_map.get(str(d["team_id"]), ""),
                         }
                         for d in ftd_rank_docs
                     ]
@@ -2358,34 +2768,6 @@ def standings(
             raise HTTPException(status_code=404, detail="Franchise not found")
         schedule = franchise_doc.get("schedule", [])
         week = franchise_doc.get("week", 1)
-        id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
-        matchup_map = {}
-        eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-        eos_has_state = bool(
-            franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
-        )
-        if eos_tournament_active and eos_has_state and week in ft.EOS_WEEKS:
-            week_games_meta = ft.get_eos_week_games(franchise_doc, week)
-            for g in week_games_meta:
-                away_id = g.get("away_id")
-                home_id = g.get("home_id")
-                if away_id and home_id:
-                    try:
-                        aid = ObjectId(away_id) if isinstance(away_id, str) else away_id
-                        hid = ObjectId(home_id) if isinstance(home_id, str) else home_id
-                        home_name = id_to_name.get(hid, "")
-                        away_name = id_to_name.get(aid, "")
-                        matchup_map[str(aid)] = f"at {home_name}"
-                        matchup_map[str(hid)] = f"vs {away_name}"
-                    except Exception:
-                        continue
-        else:
-            next_games = schedule[week - 1] if week - 1 < len(schedule) else []
-            for away_id, home_id in next_games:
-                home_name = id_to_name.get(home_id, "")
-                away_name = id_to_name.get(away_id, "")
-                matchup_map[str(away_id)] = f"at {home_name}"
-                matchup_map[str(home_id)] = f"vs {away_name}"
         from BackEnd.utils.franchise_standings import calculate_franchise_standings
         franchise_results = franchise_doc.get("results", {})
         team_list = _ftd_team_list_for_franchise(franchise_id)
@@ -2397,6 +2779,11 @@ def standings(
             {"team_id": 1, "natl_rank": 1},
         ))
         natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
+        team_name_by_id = {
+            str(t["_id"]): t.get("name", "")
+            for t in db.teams.find({}, {"name": 1})
+        }
+        matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
         teams = list(db.teams.find(
             {"_id": {"$in": team_ids_list}},
@@ -2660,12 +3047,26 @@ def season_schedule(franchise_id: str, conference: Optional[int] = None):
         for team_doc in team_docs
         if str(team_doc["_id"]) in included_team_ids
     }
+    ftd_rank_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": ObjectId(franchise_id)},
+        {"team_id": 1, "natl_rank": 1},
+    ))
+    natl_rank_by_team_id = {
+        str(doc["team_id"]): int(doc.get("natl_rank", 999) or 999)
+        for doc in ftd_rank_docs
+        if doc.get("team_id")
+    }
+    team_display_name_map = {
+        team_id: _format_team_name_with_rank(team_id, team_name, natl_rank_by_team_id)
+        for team_id, team_name in team_name_map.items()
+    }
     logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
     return {
         "schedule": weeks,
         "team_id": team_id,
         "team_conferences": team_conferences,
         "team_name_map": team_name_map,
+        "team_display_name_map": team_display_name_map,
         "conference": conference,
     }
 
@@ -2675,6 +3076,8 @@ def get_leaders(
     scope: str = "season",
     stat: str = "PTS",
     limit: int = 10,
+    allowed_team_ids: Optional[set[str]] = None,
+    allowed_team_names: Optional[set[str]] = None,
 ):
     """Return the top players for a given stat within a franchise.
 
@@ -2697,8 +3100,15 @@ def get_leaders(
 
     # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
     aggregation_start = time.time()
-    pipeline = [
-        {"$match": {"franchise_id": str(franchise_id)}},
+    pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
+    if allowed_team_ids or allowed_team_names:
+        team_filters = []
+        if allowed_team_ids:
+            team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
+        if allowed_team_names:
+            team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
+        pipeline.append({"$match": {"$or": team_filters}})
+    pipeline.extend([
         {
             "$project": {
                 "player_id": 1,
@@ -2708,7 +3118,7 @@ def get_leaders(
         },
         {"$sort": {"value": -1}},
         {"$limit": limit},
-    ]
+    ])
     agg = list(franchise_players_data_collection.aggregate(pipeline))
     aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
@@ -2765,20 +3175,14 @@ def leaders(
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
         cat_start = time.time()
-        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=256)
-        if allowed_team_ids is not None or allowed_team_names is not None:
-            filtered_top = []
-            for player in top:
-                player_team = player.get("team")
-                player_team_id = str(player_team) if player_team is not None else ""
-                if allowed_team_ids and player_team_id in allowed_team_ids:
-                    filtered_top.append(player)
-                    continue
-                if allowed_team_names and player_team in allowed_team_names:
-                    filtered_top.append(player)
-            top = filtered_top[:limit]
-        else:
-            top = top[:limit]
+        top = get_leaders(
+            franchise_id,
+            scope=scope,
+            stat=cat,
+            limit=limit,
+            allowed_team_ids=allowed_team_ids,
+            allowed_team_names=allowed_team_names,
+        )
         cat_time = time.time() - cat_start
         result[cat] = [
             {
@@ -2854,12 +3258,14 @@ def team_stats(franchise_id: str, scope: str = "national"):
                         filtered_team_list[team_id_str] = team_name
                 team_list = filtered_team_list
     # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
-    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1}))
+    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1, "natl_rank": 1}))
     franchise_team_rosters = {}
+    natl_rank_by_team_id = {}
     for ftd in ftd_docs:
         tid_str = str(ftd["team_id"])
         roster = ftd.get("players") or []
         franchise_team_rosters[tid_str] = [str(pid) for pid in roster]
+        natl_rank_by_team_id[tid_str] = int(ftd.get("natl_rank", 999) or 999)
     
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Found {len(players)} players, {len(team_list)} teams, {len(franchise_results)} weeks of results")
     
@@ -2891,7 +3297,11 @@ def team_stats(franchise_id: str, scope: str = "national"):
             t["conference"] = meta.get("conference")
             t["region"] = meta.get("region", "")
             t["mascot"] = meta.get("mascot", "")
-    
+            t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
+    else:
+        for t in output:
+            t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
+
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
@@ -4058,22 +4468,20 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
             str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
             if str(player_id) in remaining_ids
         ]
-        total_player_attrs = 0
-        for player_id in remaining_ids:
-            attrs = (fpd_map.get(player_id) or {}).get("attributes") or {}
-            total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
-
-        franchise_team_data_collection.update_one(
-            {"franchise_id": franchise_id, "team_id": ftd_doc.get("team_id")},
+        total_player_attrs = sum(
+            core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
+            for player_id in remaining_ids
+        )
+        _update_ftd_roster_state(
+            franchise_id,
+            ftd_doc.get("team_id"),
             {
-                "$set": {
-                    "players": remaining_ids,
-                    "scholarship_players": remaining_scholarships,
-                    "training_squad_players": [],
-                    "playing_time_promise_players": remaining_ptp,
-                    "total_player_attrs": total_player_attrs,
-                    "updated_at": datetime.utcnow(),
-                }
+                "players": remaining_ids,
+                "scholarship_players": remaining_scholarships,
+                "training_squad_players": [],
+                "playing_time_promise_players": remaining_ptp,
+                "total_player_attrs": total_player_attrs,
+                "updated_at": datetime.utcnow(),
             },
         )
         if cut_ids:
@@ -4361,7 +4769,7 @@ def _assign_jerseys_to_signed_players(
 
 
 def _generate_walk_on_profile() -> dict[str, Any]:
-    first_names, last_names = load_franchise_names()
+    first_names, last_names, first_name_weights = get_franchise_name_assets()
     attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
     attrs = {}
     over_19 = 0
@@ -4373,7 +4781,7 @@ def _generate_walk_on_profile() -> dict[str, Any]:
             over_19 += 1
         attrs[key] = value
     attrs = Player.randomize_game_attributes(attrs)
-    first_name = random.choice(first_names)
+    first_name = choose_franchise_first_name(first_names, first_name_weights)
     last_name = random.choice(last_names).title()
     name = f"{first_name} {last_name}"
     height = random.randint(66, 72)
@@ -4752,6 +5160,9 @@ def save_recruiting_orders(
         raise HTTPException(status_code=400, detail="Recruiting orders cannot contain duplicate recruits")
     if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
         raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
+    current_week_results = franchise_doc.get("recruiting_results", {}) or {}
+    if is_visit_window and current_week_results.get(str(week)):
+        raise HTTPException(status_code=400, detail="Recruiting invites have already been processed for this week")
 
     orders_payload = _normalize_recruiting_orders(recruit_ids)
     franchise_team_data_collection.update_one(
@@ -4790,6 +5201,7 @@ def run_week_35_recruiting(
         raise HTTPException(status_code=400, detail="Recruiting orders must be saved before recruiting can run")
 
     results = _run_week_35_signings(franchise_doc)
+    season_transition_token = _mint_season_transition_token()
     db.franchises.update_one(
         {"_id": fid},
         {
@@ -4797,6 +5209,7 @@ def run_week_35_recruiting(
                 "week": 36,
                 "week_35_recruiting_ran": True,
                 WEEK_35_RECRUITING_RESULTS_FIELD: results,
+                SEASON_TRANSITION_TOKEN_FIELD: season_transition_token,
             }
         },
     )
@@ -5147,22 +5560,20 @@ def cut_franchise_players(
         if str(player_id) in remaining_roster_ids
     ]
 
-    total_player_attrs = 0
-    for player_id in remaining_roster_ids:
-        attrs = (fpd_map.get(player_id) or {}).get("attributes") or {}
-        total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
-
-    franchise_team_data_collection.update_one(
-        {"franchise_id": fid, "team_id": team_object_id},
+    total_player_attrs = sum(
+        core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
+        for player_id in remaining_roster_ids
+    )
+    _update_ftd_roster_state(
+        fid,
+        team_object_id,
         {
-            "$set": {
-                "players": remaining_roster_ids,
-                "scholarship_players": remaining_scholarships,
-                "training_squad_players": remaining_training_squad,
-                "playing_time_promise_players": remaining_ptp,
-                "total_player_attrs": total_player_attrs,
-                "updated_at": datetime.utcnow(),
-            }
+            "players": remaining_roster_ids,
+            "scholarship_players": remaining_scholarships,
+            "training_squad_players": remaining_training_squad,
+            "playing_time_promise_players": remaining_ptp,
+            "total_player_attrs": total_player_attrs,
+            "updated_at": datetime.utcnow(),
         },
     )
     franchise_players_data_collection.delete_many(
@@ -6435,10 +6846,30 @@ def finish_season(req: FinishSeasonRequest):
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
+    if int(franchise_doc.get("week", 1) or 1) != 36:
+        raise HTTPException(status_code=400, detail="Season transition is only available during week 36")
+
+    transition_token = _ensure_season_transition_token(franchise_id, franchise_doc)
+    if not transition_token:
+        raise HTTPException(status_code=409, detail="Season transition is not ready")
+
+    consume_result = db.franchises.update_one(
+        {
+            "_id": franchise_id,
+            "week": 36,
+            SEASON_TRANSITION_TOKEN_FIELD: transition_token,
+        },
+        {"$unset": {SEASON_TRANSITION_TOKEN_FIELD: ""}},
+    )
+    if consume_result.modified_count == 0:
+        raise HTTPException(status_code=409, detail="Season transition has already been processed")
     
     # Get current season
     current_season = franchise_doc.get("current_season", 1)
     next_season = current_season + 1
+    rank_prestige_system_version = int(
+        franchise_doc.get(RANK_PRESTIGE_SYSTEM_VERSION_FIELD, 1) or 1
+    )
 
     from BackEnd.models.franchise_manager import FranchiseManager
 
@@ -6521,10 +6952,16 @@ def finish_season(req: FinishSeasonRequest):
         })
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
+    existing_ftd_by_team_id = {
+        str(doc.get("team_id")): doc
+        for doc in ftd_docs
+        if doc.get("team_id")
+    }
 
     def highest_rt(player_id: str) -> int:
         return int((_best_position((next_fpd_map.get(player_id) or {}).get("position_ratings") or {}).get("rating") or 0))
 
+    next_ftd_state_by_team_id: dict[str, dict[str, Any]] = {}
     for ftd_doc in ftd_docs:
         team_id = str(ftd_doc.get("team_id"))
         roster = list(returning_players_by_team.get(team_id, []))
@@ -6538,26 +6975,73 @@ def finish_season(req: FinishSeasonRequest):
             if signed_player.get("playing_time"):
                 pt_promise_players.append(player_id)
         ordered_roster = sorted(roster, key=highest_rt, reverse=True)
+        total_player_attrs = sum(
+            core_total_player_attrs((next_fpd_map.get(player_id) or {}).get("attributes") or {})
+            for player_id in ordered_roster
+        )
+        existing_ftd = existing_ftd_by_team_id.get(team_id) or {}
+        next_ftd_state_by_team_id[team_id] = {
+            "team_object_id": ftd_doc["team_id"],
+            "players": ordered_roster,
+            "scholarship_players": sorted(scholarship_players, key=highest_rt, reverse=True),
+            "training_squad_players": [],
+            "playing_time_promise_players": pt_promise_players,
+            "Recruits": {str(i): None for i in range(1, 21)},
+            RECRUITING_ORDERS_WEEK_35_FIELD: {},
+            "recruit_visit": None,
+            "training_reports": {},
+            "total_player_attrs": total_player_attrs,
+            "prestige": int(existing_ftd.get("prestige", 0) or 0),
+            "sos_avg": SOS_AVG_DEFAULT,
+            "sos_rank_sum": 0.0,
+            "sos_games_played": 0,
+            "updated_at": datetime.utcnow(),
+        }
 
-        total_player_attrs = 0
-        for player_id in ordered_roster:
-            attrs = (next_fpd_map.get(player_id) or {}).get("attributes") or {}
-            total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
+    if rank_prestige_system_version >= FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION:
+        preseason_inputs = [
+            {
+                "team_id": team_id,
+                "prestige": state["prestige"],
+                "total_player_attrs": state["total_player_attrs"],
+                "sos_avg": state["sos_avg"],
+            }
+            for team_id, state in next_ftd_state_by_team_id.items()
+        ]
+        for ranked in rank_teams_for_week(preseason_inputs, week=0):
+            state = next_ftd_state_by_team_id.get(str(ranked["team_id"]))
+            if state is not None:
+                state["natl_rank"] = int(ranked["natl_rank"])
+    else:
+        legacy_ranked = sorted(
+            next_ftd_state_by_team_id.items(),
+            key=lambda item: (
+                -(int(item[1]["total_player_attrs"]) + int(item[1]["prestige"])),
+                random.random(),
+            ),
+        )
+        for rank_index, (_, state) in enumerate(legacy_ranked, start=1):
+            state["natl_rank"] = rank_index
 
+    for team_id, state in next_ftd_state_by_team_id.items():
         franchise_team_data_collection.update_one(
-            {"franchise_id": franchise_id, "team_id": ftd_doc["team_id"]},
+            {"franchise_id": franchise_id, "team_id": state["team_object_id"]},
             {
                 "$set": {
-                    "players": ordered_roster,
-                    "scholarship_players": sorted(scholarship_players, key=highest_rt, reverse=True),
-                    "training_squad_players": [],
-                    "playing_time_promise_players": pt_promise_players,
-                    "Recruits": {str(i): None for i in range(1, 21)},
-                    RECRUITING_ORDERS_WEEK_35_FIELD: {},
-                    "recruit_visit": None,
-                    "training_reports": {},
-                    "total_player_attrs": total_player_attrs,
-                    "updated_at": datetime.utcnow(),
+                    "players": state["players"],
+                    "scholarship_players": state["scholarship_players"],
+                    "training_squad_players": state["training_squad_players"],
+                    "playing_time_promise_players": state["playing_time_promise_players"],
+                    "Recruits": state["Recruits"],
+                    RECRUITING_ORDERS_WEEK_35_FIELD: state[RECRUITING_ORDERS_WEEK_35_FIELD],
+                    "recruit_visit": state["recruit_visit"],
+                    "training_reports": state["training_reports"],
+                    "total_player_attrs": state["total_player_attrs"],
+                    "sos_avg": state["sos_avg"],
+                    "sos_rank_sum": state["sos_rank_sum"],
+                    "sos_games_played": state["sos_games_played"],
+                    "updated_at": state["updated_at"],
+                    **({"natl_rank": state["natl_rank"]} if "natl_rank" in state else {}),
                 }
             },
         )
@@ -6620,6 +7104,8 @@ def finish_season(req: FinishSeasonRequest):
             "stats.top_10_assists": [],
             "stats.top_10_blocks": [],
             "stats.top_10_steals": [],
+            RANK_PRESTIGE_SYSTEM_VERSION_FIELD: rank_prestige_system_version,
+            RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: 0,
         }}
     )
     

@@ -389,9 +389,10 @@ try:
         game_id: str
         user_team_side: str  # "home" or "away"
         offense_override: str | None = None  # Play name (e.g., "3-2 Motion")
-        defense_override: str | None = None  # "Man" or "Zone"
+        defense_override: str | None = None  # "Man Normal", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
         aggression_override: str | None = None  # "normal", "aggressive", "passive"
         tempo_override: str | None = None  # "slow", "normal", "fast"
+        press_trap_override: str | None = None  # "press", "trap", "none"
     
     
     # Helper functions for tournament/franchise mode
@@ -627,6 +628,23 @@ try:
             logging.warning(f"⚠️ Error loading FTD data: {e}")
             import traceback
             traceback.print_exc()
+            return None
+
+    def load_franchise_team_rank(franchise_id: str, team_id: str | None):
+        """Load natl_rank for a franchise team from FTD. Returns None if unavailable."""
+        if not franchise_id or not team_id:
+            return None
+        try:
+            team_object_id = ObjectId(team_id) if not isinstance(team_id, ObjectId) else team_id
+            ftd_doc = franchise_team_data_collection.find_one(
+                {"franchise_id": ObjectId(franchise_id), "team_id": team_object_id},
+                {"natl_rank": 1},
+            )
+            if not ftd_doc:
+                return None
+            rank = ftd_doc.get("natl_rank")
+            return int(rank) if rank is not None else None
+        except Exception:
             return None
     
     def load_team_settings_from_doc(mode: str, doc_id: str, team_id: str, team_name: str, game_id: str = None):
@@ -1576,6 +1594,8 @@ try:
                     "teams": 1,                # Teams object (will project nested fields if needed)
                     "points_by_quarter": 1,    # Points by quarter (may be in teams object, but include for backward compatibility)
                     "team_attribute_changes": 1,  # Franchise post-game attribute deltas (box score)
+                    "mode": 1,
+                    "franchise_id": 1,
                     "_id": 1
                 }
                 
@@ -1613,6 +1633,18 @@ try:
                         # Return empty game state structure (energy levels, but no stats/scores)
                         home_team_data = saved.get("home_team", {})
                         away_team_data = saved.get("away_team", {})
+                        saved_mode = saved.get("mode", "single")
+                        saved_franchise_id = saved.get("franchise_id")
+                        home_team_rank = (
+                            load_franchise_team_rank(saved_franchise_id, saved.get("home_team_id"))
+                            if saved_mode == "franchise" and saved_franchise_id
+                            else None
+                        )
+                        away_team_rank = (
+                            load_franchise_team_rank(saved_franchise_id, saved.get("away_team_id"))
+                            if saved_mode == "franchise" and saved_franchise_id
+                            else None
+                        )
                         
                         # Extract players with energy but no stats
                         players = saved.get("players", [])
@@ -1655,12 +1687,14 @@ try:
                             "home_team": {
                                 "name": home_team_data.get("name", ""),
                                 "team_fouls": 0,
-                                "attributes": home_team_data.get("attributes", {})
+                                "attributes": home_team_data.get("attributes", {}),
+                                "natl_rank": home_team_rank,
                             },
                             "away_team": {
                                 "name": away_team_data.get("name", ""),
                                 "team_fouls": 0,
-                                "attributes": away_team_data.get("attributes", {})
+                                "attributes": away_team_data.get("attributes", {}),
+                                "natl_rank": away_team_rank,
                             }
                         }
                         response_size = len(json.dumps(response_data))
@@ -1783,6 +1817,18 @@ try:
                     #     logging.warning(f"⚠️ [SCORE DEBUG] Saved score is empty or all zeroes: {saved_score}")
                     # else:
                     #     logging.info(f"✅ [SCORE DEBUG] Score loaded from DB: {saved_score}")
+                    saved_mode = saved.get("mode", "single")
+                    saved_franchise_id = saved.get("franchise_id")
+                    home_team_rank = (
+                        load_franchise_team_rank(saved_franchise_id, home_team_id)
+                        if saved_mode == "franchise" and saved_franchise_id
+                        else None
+                    )
+                    away_team_rank = (
+                        load_franchise_team_rank(saved_franchise_id, away_team_id)
+                        if saved_mode == "franchise" and saved_franchise_id
+                        else None
+                    )
                     
                     response_data = {
                         "game_id": game_id,
@@ -1812,6 +1858,7 @@ try:
                             "name": home_team_name,
                             "team_fouls": home_team_data.get("team_fouls", 0),
                             "attributes": home_team_data.get("attributes", {}),  # Team attributes for S3 tab
+                            "natl_rank": home_team_rank,
                             "colors": home_team_data.get("colors", {}),
                             "score": home_team_data.get("score", 0),
                             "timeouts": home_team_data.get("timeouts", 4),
@@ -1823,6 +1870,7 @@ try:
                             "name": away_team_name,
                             "team_fouls": away_team_data.get("team_fouls", 0),
                             "attributes": away_team_data.get("attributes", {}),  # Team attributes for S3 tab
+                            "natl_rank": away_team_rank,
                             "colors": away_team_data.get("colors", {}),
                             "score": away_team_data.get("score", 0),
                             "timeouts": away_team_data.get("timeouts", 4),
@@ -4456,17 +4504,28 @@ try:
                 logging.warning(f"🔴   Override that was cleared: '{old_override}'")
                 logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
         
-        if "tempo_override" in provided_fields and req.tempo_override is not None:
-            user_team.strategy_calls["tempo_override"] = req.tempo_override
-            logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {req.tempo_override}")
-        
+        if "tempo_override" in provided_fields:
+            if req.tempo_override is not None:
+                user_team.strategy_calls["tempo_override"] = req.tempo_override
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {req.tempo_override}")
+            else:
+                user_team.strategy_calls["tempo_override"] = None
+
+        if "press_trap_override" in provided_fields:
+            if req.press_trap_override is not None:
+                user_team.strategy_calls["press_trap_override"] = req.press_trap_override
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Set press_trap override for {user_team.name}: {req.press_trap_override}")
+            else:
+                user_team.strategy_calls["press_trap_override"] = None
+
         response_data = {
             "status": "success",
             "overrides": {
                 "offense": user_team.strategy_calls.get("offense_call"),
                 "defense": user_team.strategy_calls.get("defense_call"),
                 "aggression": user_team.strategy_calls.get("aggression_override"),
-                "tempo": user_team.strategy_calls.get("tempo_override")
+                "tempo": user_team.strategy_calls.get("tempo_override"),
+                "press_trap": user_team.strategy_calls.get("press_trap_override")
             }
         }
         return JSONResponse(content=response_data, status_code=200)

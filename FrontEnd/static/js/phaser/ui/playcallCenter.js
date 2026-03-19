@@ -1,8 +1,8 @@
 /**
  * Playcall Center Module
  * 
- * Updates the offense/defense panels and lean meter at the bottom of the court.
- * Shows play calls, defense type, and animated lean score visualization.
+ * Updates the offense/defense panels at the bottom of the court.
+ * Shows play calls and defense type.
  */
 
 /**
@@ -10,13 +10,12 @@
  * Called when a play is used or override is cleared
  */
 export function clearPlaycallHighlights() {
-  // Clear offense play highlights
   const playOptions = document.querySelectorAll('.play-option');
   playOptions.forEach(opt => opt.classList.remove('selected'));
-  
-  // Clear defense highlights
-  const defenseButtons = document.querySelectorAll('.defense-override-btn');
-  defenseButtons.forEach(btn => btn.classList.remove('selected'));
+  const stackZone = document.getElementById('pcc-stacks-zone');
+  if (stackZone) {
+    stackZone.querySelectorAll('.pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
+  }
 }
 
 /**
@@ -74,7 +73,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   }
   
   if (defenseStatusText) {
-    // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
+    // Use defensive_playcall if available (contains full name like "Man Normal", "2-3 Zone", etc.)
     // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
     const defPlaycall = turnData.defensive_playcall || turnData.defense_playcall;
     const defType = defPlaycall || turnData.defensive_play_type;
@@ -87,8 +86,40 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     }
   }
 
-  // Reset lean meter to neutral
-  resetLeanMeter();
+  // Sync stack button .selected state only when the call belongs to the user's team
+  const stackZone = document.getElementById('pcc-stacks-zone');
+  if (stackZone) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const userTeamSide = urlParams.get('my_team');
+    const offId = turnData.offense_team_id != null ? String(turnData.offense_team_id) : null;
+    const homeId = homeTeamId != null ? String(homeTeamId) : null;
+    const isUserOnOffense = userTeamSide && offId && homeId &&
+      ((userTeamSide === 'home' && offId === homeId) || (userTeamSide === 'away' && offId !== homeId));
+    const isUserOnDefense = userTeamSide && offId && homeId &&
+      ((userTeamSide === 'home' && offId !== homeId) || (userTeamSide === 'away' && offId === homeId));
+
+    if (isUserOnOffense && (turnData.offense_tempo_call || turnData.tempo_call)) {
+      const tempo = (turnData.offense_tempo_call || turnData.tempo_call || '').toLowerCase();
+      stackZone.querySelectorAll('.pcc-stack.tempo .pcc-stack-btn').forEach(btn => {
+        const v = btn.id === 'tempo-fast' ? 'fast' : btn.id === 'tempo-slow' ? 'slow' : 'normal';
+        btn.classList.toggle('selected', v === tempo);
+      });
+    }
+    if (isUserOnDefense && (turnData.defense_aggression_call || turnData.aggression)) {
+      const aggr = (turnData.defense_aggression_call || turnData.aggression || '').toLowerCase();
+      stackZone.querySelectorAll('.pcc-stack.aggression .pcc-stack-btn').forEach(btn => {
+        const v = btn.id === 'aggr-passive' ? 'passive' : btn.id === 'aggr-aggressive' ? 'aggressive' : 'normal';
+        btn.classList.toggle('selected', v === aggr);
+      });
+    }
+    if (isUserOnDefense && turnData.press_trap_override != null) {
+      const pt = (turnData.press_trap_override || '').toLowerCase();
+      stackZone.querySelectorAll('.pcc-stack.press-trap .pcc-stack-btn').forEach(btn => {
+        const v = btn.id === 'press-btn' ? 'press' : btn.id === 'trap-btn' ? 'trap' : 'none';
+        btn.classList.toggle('selected', v === pt);
+      });
+    }
+  }
 
   // ✅ SS&S: Headshots are set once on page load via populatePlayHeadshots() in court.html
   // Do NOT update headshots dynamically during gameplay - this causes images to change mid-game
@@ -130,56 +161,19 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 }
 
 /**
- * Reset lean meter to neutral (just yellow center line)
+ * Legacy no-op retained so existing imports remain safe after lean meter removal.
  */
 export function resetLeanMeter() {
-  const posFill = document.getElementById('lean-fill-positive');
-  const negFill = document.getElementById('lean-fill-negative');
-
-  if (posFill) posFill.style.height = '0%';
-  if (negFill) negFill.style.height = '0%';
+  return;
 }
 
 /**
- * Animate lean meter based on lean score
+ * Legacy no-op retained so existing imports remain safe after lean meter removal.
  * @param {number} leanScore - Score from -100 to 100 (raw result value)
  */
 export function animateLeanMeter(leanScore) {
-  if (leanScore == null || isNaN(leanScore)) {
-    return;
-  }
-
-  // Clamp to -100 to 100 range
-  const clampedScore = Math.max(-100, Math.min(100, leanScore));
-
-  const posFill = document.getElementById('lean-fill-positive');
-  const negFill = document.getElementById('lean-fill-negative');
-
-  if (!posFill || !negFill) {
-    return;
-  }
-
-  if (clampedScore > 0) {
-    // Positive score: fill upward (green)
-    // Fill percentage of the space from center (50%) to top (100%)
-    // Map -100 to 100 range to 0-50% fill (half the container)
-    // Formula: fillPercentage = (clampedScore / 100) * 50
-    const fillPercentage = (Math.abs(clampedScore) / 100) * 50; // 0-50% of container
-    posFill.style.height = `${fillPercentage}%`;
-    negFill.style.height = '0%';
-  } else if (clampedScore < 0) {
-    // Negative score: fill downward (red)
-    // Fill percentage of the space from center (50%) to bottom (0%)
-    // Map -100 to 100 range to 0-50% fill (half the container)
-    // Formula: fillPercentage = (Math.abs(clampedScore) / 100) * 50
-    const fillPercentage = (Math.abs(clampedScore) / 100) * 50; // 0-50% of container
-    posFill.style.height = '0%';
-    negFill.style.height = `${fillPercentage}%`;
-  } else {
-    // Exactly 0: neutral (just yellow line)
-    posFill.style.height = '0%';
-    negFill.style.height = '0%';
-  }
+  void leanScore;
+  return;
 }
 
 /**
@@ -203,4 +197,3 @@ export function parseLeanScoreFromText(turnData) {
 
   return null;
 }
-

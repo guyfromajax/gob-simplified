@@ -3957,6 +3957,18 @@ class TurnManager:
         if self.game.game_state.get("_situational_quick_shot_fcp_hct_override"):
             return "HCO"
         
+        # ✅ Playcall Center: If user's team is applying pressure, honor press_trap_override
+        user_team_side = self.game.game_state.get("user_team_side")
+        is_user_team = (user_team_side == "home" and def_team.is_home_team) or (user_team_side == "away" and not def_team.is_home_team)
+        if is_user_team:
+            pt_override = def_team.strategy_calls.get("press_trap_override")
+            if pt_override == "press":
+                return "FCP"
+            if pt_override == "trap":
+                return "HCT"
+            if pt_override == "none":
+                return "HCO"
+        
         # Ensure strategy_settings is initialized (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict
         if not hasattr(def_team, 'strategy_settings') or def_team.strategy_settings is None:

@@ -16,6 +16,37 @@ const autoTrainModalMessage = document.getElementById('auto-train-modal-message'
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
 let currentWeek = 1;
 
+async function fetchFranchiseCommandCenterData(franchiseId) {
+  const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
+    headers: API_CONFIG.getAuthHeaders()
+  });
+  if (!response.ok) throw new Error(`Failed loading franchise command center data (${response.status})`);
+  return response.json();
+}
+
+async function redirectIfTrainingAlreadyCommitted() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const franchiseId = urlParams.get('franchise_id');
+  const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
+  if (mode !== 'franchise' || !franchiseId) return false;
+
+  try {
+    const data = await fetchFranchiseCommandCenterData(franchiseId);
+    if (!data || !data.training_completed) return false;
+    const params = new URLSearchParams();
+    params.set('mode', 'franchise');
+    params.set('franchise_id', franchiseId);
+    if (teamId) params.set('team_id', teamId);
+    params.set('week', String(Number(data.week || 1)));
+    window.location.replace(`/training-report.html?${params.toString()}`);
+    return true;
+  } catch (error) {
+    console.warn('⚠️ [TRAINING] Unable to verify committed training state:', error);
+    return false;
+  }
+}
+
 // Track previous slider values to prevent over-allocation
 allSliders.forEach(slider => {
   slider.dataset.prev = '0';
@@ -316,8 +347,13 @@ backBtn.addEventListener('click', function() {
   if (mode === 'franchise') {
     const franchiseId = urlParams.get('franchise_id');
     const teamId = urlParams.get('team_id');
-    const url = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
-    const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
+    const finalUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
+      ? resolveFranchiseLockerRoomUrl({
+          params: urlParams,
+          franchiseId: franchiseId,
+          teamId: teamId
+        })
+      : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
     window.location.href = finalUrl;
   } else if (mode === 'tournament') {
     // Use same pattern as franchise mode - tournament.html is the command center
@@ -520,10 +556,25 @@ submitBtn.addEventListener('click', async function() {
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
-      const redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      let redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      const returnUrl = urlParams.get('return_url');
+      if (mode === 'franchise' && returnUrl) {
+        const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : returnUrl;
+        if (safeReturnUrl) {
+          const redirect = new URL(redirectUrl, window.location.origin);
+          redirect.searchParams.set('return_url', safeReturnUrl);
+          redirectUrl = `${redirect.pathname}${redirect.search}${redirect.hash || ''}`;
+        }
+      }
       window.location.href = redirectUrl;
     } else if (mode === 'franchise' && franchiseId) {
-      window.location.href = `/franchise-command-center.html?franchise_id=${franchiseId}`;
+      window.location.href = (typeof resolveFranchiseLockerRoomUrl === 'function')
+        ? resolveFranchiseLockerRoomUrl({
+            params: urlParams,
+            franchiseId: franchiseId,
+            teamId: urlParams.get('team_id')
+          })
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
     } else if (mode === 'tournament' && tournamentId) {
       // Use same pattern as franchise mode - tournament.html is the command center
       window.location.href = `/tournament.html?tournament_id=${tournamentId}`;
@@ -590,8 +641,18 @@ async function initializeTrainingPoints() {
   updatePointsRemaining();
 }
 
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 // Initialize training points on page load
-initializeTrainingPoints();
+(async function initTrainingPage() {
+  const redirected = await redirectIfTrainingAlreadyCommitted();
+  if (redirected) return;
+  initializeTrainingPoints();
+})();
 
 // Debug: Verify scrimmages element exists on page load
 (function() {

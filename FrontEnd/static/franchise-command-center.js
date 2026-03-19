@@ -28,17 +28,24 @@ let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
+let commandCenterTopDataCache = null;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
 
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
   if (franchiseId) qs.set('mode', 'franchise');
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  qs.set('return_url', window.location.pathname + window.location.search);
+  qs.set('return_url', getCurrentRelativeUrl());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -123,7 +130,7 @@ function populateTop(data) {
 let standingsDataCache = null;
 
 function buildTeamLink(t) {
-  const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+  const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
   const teamLink = document.createElement('a');
   teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
   teamLink.textContent = t.name;
@@ -247,12 +254,20 @@ function buildResourceUrl(page, extraParams) {
   const params = new URLSearchParams();
   params.set('franchise_id', franchiseId);
   params.set('team_id', userTeamId);
+  params.set('return_url', getCurrentRelativeUrl());
   if (extraParams) Object.keys(extraParams).forEach(k => params.set(k, extraParams[k]));
   return `/${page}?${params.toString()}`;
 }
 
 function bindResourcesLinks() {
-  const q = () => (franchiseId && userTeamId ? `?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}` : '');
+  const q = () => {
+    if (!franchiseId || !userTeamId) return '';
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamId);
+    params.set('return_url', getCurrentRelativeUrl());
+    return `?${params.toString()}`;
+  };
   const standingsLink = document.getElementById('standings-resources-link');
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
@@ -306,7 +321,12 @@ function renderFccRecruits() {
   if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
   if (fullListCopy) fullListCopy.style.display = useSignedRecruits ? 'none' : 'block';
   if (fullListLink) {
-    fullListLink.href = `/recruiting.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamId);
+    params.set('from', 'fcc');
+    params.set('return_url', getCurrentRelativeUrl());
+    fullListLink.href = `/recruiting.html?${params.toString()}`;
   }
   if (lastCol) {
     lastCol.textContent = 'Current Lean';
@@ -1195,6 +1215,7 @@ async function init() {
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  commandCenterTopDataCache = topData;
 
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
@@ -1507,7 +1528,13 @@ function updateRecruitingButton(data) {
   if (week >= 20 && week <= 26 && resultsWeek === week) {
     showButton = true;
     text = `Week ${week} Recruiting Visits`;
-    href = `/recruiting-results.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc&week=${encodeURIComponent(String(week))}`;
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamId);
+    params.set('from', 'fcc');
+    params.set('week', String(week));
+    params.set('return_url', getCurrentRelativeUrl());
+    href = `/recruiting-results.html?${params.toString()}`;
   } else if (week >= 20 && week <= 26) {
     text = 'Recruiting Invites Active';
   } else if (week === 19) {
@@ -1572,18 +1599,33 @@ playNowBtn.addEventListener('click', async () => {
       return;
     }
     const sessionType = topData?.session_type || 'in-season';
-    const teamIdParam = userTeamId ? `&team_id=${encodeURIComponent(userTeamId)}` : '';
-    window.location.href = `/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}${teamIdParam}`;
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('mode', 'franchise');
+    params.set('session_type', sessionType);
+    params.set('return_url', getCurrentRelativeUrl());
+    if (userTeamId) params.set('team_id', userTeamId);
+    window.location.href = `/training.html?${params.toString()}`;
     return;
   }
 
   if (mode === 'week35-recruiting') {
-    window.location.href = `/recruiting-orders.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamId);
+    params.set('from', 'fcc');
+    params.set('return_url', getCurrentRelativeUrl());
+    window.location.href = `/recruiting-orders.html?${params.toString()}`;
     return;
   }
 
   if (mode === 'cut-players') {
-    window.location.href = `/cut-players.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=fcc`;
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamId);
+    params.set('from', 'fcc');
+    params.set('return_url', getCurrentRelativeUrl());
+    window.location.href = `/cut-players.html?${params.toString()}`;
     return;
   }
   
@@ -1744,8 +1786,13 @@ function wireFccNavButtons() {
         alert('Franchise or user team not loaded');
         return;
       }
-      const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
-      window.location.href = url;
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('franchise_id', franchiseId);
+      params.set('team_id', userTeamId);
+      params.set('from', 'command_center');
+      params.set('return_url', getCurrentRelativeUrl());
+      window.location.href = `/game-plan.html?${params.toString()}`;
     });
   }
   const playbooksBtn = document.getElementById('playbooks-franchise');
@@ -1761,6 +1808,7 @@ function wireFccNavButtons() {
       params.set('franchise_id', franchiseId);
       params.set('team_id', userTeamId);
       params.set('from', 'franchise-command-center');
+      params.set('return_url', getCurrentRelativeUrl());
       window.location.href = `/playbooks.html?${params.toString()}`;
     });
   }
@@ -1795,6 +1843,13 @@ window.addEventListener('DOMContentLoaded', () => {
     CommandCenterTabs.initCommandCenterTabs({
       defaultTab: 'standings-tab',
       onTabShow: (tabName) => {
+        bindResourcesLinks();
+        if (commandCenterTopDataCache) {
+          updateRecruitingButton(commandCenterTopDataCache);
+        }
+        if (tabName === 'recruits-tab') {
+          renderFccRecruits();
+        }
         if (tabName === 'tournament-tab') {
           renderTournamentBracket();
         }

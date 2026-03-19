@@ -31,11 +31,20 @@
       franchiseId: params.get('franchise_id'),
       teamId: params.get('team_id'),
       from: params.get('from') || 'fcc',
+      returnUrl: params.get('return_url'),
     };
   }
 
   function buildFccUrl(context) {
+    if (global.resolveFranchiseLockerRoomUrl) {
+      return global.resolveFranchiseLockerRoomUrl({
+        returnUrl: context.returnUrl,
+        franchiseId: context.franchiseId,
+        teamId: context.teamId
+      });
+    }
     var params = new URLSearchParams();
+    params.set('mode', 'franchise');
     if (context.franchiseId) params.set('franchise_id', context.franchiseId);
     if (context.teamId) params.set('team_id', context.teamId);
     return '/franchise-command-center.html?' + params.toString();
@@ -46,6 +55,7 @@
     if (context.franchiseId) params.set('franchise_id', context.franchiseId);
     if (context.teamId) params.set('team_id', context.teamId);
     if (context.from) params.set('from', context.from);
+    if (context.returnUrl) params.set('return_url', context.returnUrl);
     Object.keys(extraParams || {}).forEach(function (key) {
       if (extraParams[key] != null) params.set(key, extraParams[key]);
     });

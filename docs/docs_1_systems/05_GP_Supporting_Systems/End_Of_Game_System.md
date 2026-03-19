@@ -84,6 +84,15 @@ Team attributes will adjust at the end of game based on the notes below. Note th
     - elif opponents (press success rate + trap success rate) combined > 50% OR total FCP and HCT run by opponent in the game > 12: += random.randint(-3,-2)
     - else: += (-2,-1)
     - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
+  - **Distant-sim override (Franchise distant games only):**
+    - Distant-simmed games do not generate TBT special-situations scouting data.
+    - For those games only, bypass the normal scouting-driven logic for:
+      - `fb_efficiency`
+      - `fb_opp_modifier`
+      - `pt_efficiency`
+      - `pt_opp_modifier`
+    - Instead apply: `random.randint(-2, 1)` to each of the four attrs.
+    - All other EOG team-attribute logic continues to use the normal totals-based rules.
   - `team_chemistry` - Team chemistry rating
     - score delta = winning team final score - losing team final score
     - if score_delta < 4:
@@ -222,6 +231,7 @@ The End of Game System handles game completion, displays final scores, and provi
   - `teams[team_id].scouting` for FB/HCT/FCP rates and attempts
   - `team_totals` for box-score totals (`FGM/FGA`, `TO/STL`, `DREB/OREB`)
   - fallback to aggregated `box_score` only if `team_totals` is missing
+- **Distant-sim note:** Distant franchise games persist `simulation_engine="distant"` on the game doc. EOG uses this as an explicit branch signal so only the four FB/PT attrs switch to the simplified random rule; TBT games keep the normal scouting-based formulas.
 - **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()`
 - **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
 - **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.

@@ -4,6 +4,21 @@
 ## Overview
 Efficient simulation for 56-60 distant games per week (all non-user-conference matchups). User's 4-8 conference games run full turn-based sim.
 
+## EOG Team Attributes
+
+- Distant-simmed franchise games now persist full game documents with:
+  - final scores
+  - player box scores
+  - team totals
+- This allows the normal end-of-game team-attribute system to run for distant games as well.
+- Totals-driven EOG attributes use the same rules as TBT games.
+- Special-situations-driven attrs do not have true TBT scouting inputs in distant sim, so for distant games only:
+  - `fb_efficiency` = `random.randint(-2, 1)`
+  - `fb_opp_modifier` = `random.randint(-2, 1)`
+  - `pt_efficiency` = `random.randint(-2, 1)`
+  - `pt_opp_modifier` = `random.randint(-2, 1)`
+- The game doc is marked with `simulation_engine="distant"` so EOG can branch explicitly without affecting TBT behavior.
+
 ## Architecture
 
 ### Win Probability Calculation (implement now)
@@ -77,6 +92,9 @@ drives the margin — the further from the threshold, the larger the blowout.
        away_score = winning_score
        home_score = losing_score
 ```
+
+
+**Ignore everything below this line, these are working notes**
 
 ### Templates
 - **Count**: Five hundred pre-baked outcome templates

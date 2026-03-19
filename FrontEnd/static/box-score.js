@@ -1665,21 +1665,13 @@ function setupLockerRoomButton() {
     }
   } else if (navMode === 'franchise' || (navMode === 'single' && urlFranchiseId)) {
     navMode = 'franchise';
-    // ✅ FIX: Use correct franchise command center path
-    lockerRoomUrl = '/franchise-command-center.html';
-    const franchiseParams = new URLSearchParams();
-    franchiseParams.set('mode', 'franchise'); // ✅ Always include mode for consistency
-    // ✅ PHASE 2.4: Removed localStorage fallback - franchise_id must come from URL
-    const finalFranchiseId = urlFranchiseId;
-    if (finalFranchiseId) {
-      franchiseParams.set('franchise_id', finalFranchiseId);
-    }
-    if (urlTeamId) {
-      franchiseParams.set('team_id', urlTeamId);
-    }
-    if (franchiseParams.toString()) {
-      lockerRoomUrl += `?${franchiseParams.toString()}`;
-    }
+    lockerRoomUrl = typeof resolveFranchiseLockerRoomUrl === 'function'
+      ? resolveFranchiseLockerRoomUrl({
+          params: urlParams,
+          franchiseId: urlFranchiseId,
+          teamId: urlTeamId
+        })
+      : buildFranchiseLockerRoomUrl(urlFranchiseId, urlTeamId);
   } else {
     // ✅ PHASE 2.4: Removed localStorage fallbacks - mode and IDs must come from URL
     // If no mode/ID in URL, default to single game mode

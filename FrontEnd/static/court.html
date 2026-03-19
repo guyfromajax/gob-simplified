@@ -13,7 +13,7 @@
   <script src="/common.js"></script>
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
     /*
@@ -92,6 +92,7 @@
       /* Canvas fills grid-allocated container; Phaser must match container dimensions */
     }
     #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
+    /* Game controls strip lives inside #phaser-container; styled below under PAUSE/SKIP CONTROLS */
     #app-grid #playcall-center {
       grid-area: playcall;
       grid-column: 2; /* Force center column only so container does not cover side panels */
@@ -1089,12 +1090,12 @@
       overflow-y: auto;  /* Scroll if content exceeds available space */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
-      padding: 8px 40px 12px 40px;  /* CHANGE: reduced padding for compactness */
+      padding: 6px 24px 8px 24px;
       box-sizing: border-box;
       z-index: 900;
       display: flex;
       flex-direction: column;
-      gap: 8px;  /* CHANGE: reduced gap */
+      gap: 6px;
     }
 
     /* FIXED POSITIONING - Dynamically positioned below canvas, constrained height */
@@ -1112,161 +1113,221 @@
       z-index: 900 !important;
     }
 
-    /* Top Row: Current Playcall Status */
+    /* ── STATUS ROW ── */
     #playcall-status-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 0 20px;
-      border-bottom: 1px solid rgba(255, 215, 0, 0.2);
-      padding-bottom: 6px;  /* CHANGE: reduced padding */
-      min-height: 24px;  /* CHANGE: ensure minimum height */
-    }
-
-    .status-display {
-      display: flex;
-      gap: 8px;
       align-items: baseline;
+      border-bottom: 1px solid rgba(255,215,0,0.18);
+      padding-bottom: 5px;
+      flex-shrink: 0;
     }
 
-    .status-label {
-      font-size: 10px;  /* CHANGE: smaller font */
-      font-weight: 600;
-      color: rgba(255, 215, 0, 0.6);
-      letter-spacing: 1px;
-    }
+    .status-display { display: flex; align-items: baseline; gap: 8px; }
+    .status-label { font-size: 11px; color: rgba(255,215,0,0.5); letter-spacing: 1.5px; }
+    #offense-status-text, #defense-status-text { font-size: 17px; color: #FFD700; letter-spacing: 0.5px; }
 
-    #offense-status-text,
-    #defense-status-text {
-      font-size: 11px;  /* CHANGE: smaller font */
-      font-weight: 700;
-      color: #FFD700;
-      letter-spacing: 0.5px;
-    }
-
-    /* Main Row: 3-Column Layout */
+    /* ── MAIN ROW ── */
     #playcall-main-row {
       display: flex;
-      align-items: center;  /* CHANGE: center instead of stretch to prevent vertical stretching */
-      justify-content: space-between;
-      gap: 16px;  /* CHANGE: reduced gap */
-      min-height: 0;  /* CHANGE: allow shrinking */
-    }
-
-    /* Tactical Panels (Offense & Defense) */
-    .tactical-panel {
+      flex-direction: row;
+      align-items: center;
       flex: 1;
+      min-height: 0;
+    }
+
+    /* ── CARD ZONES ── */
+    .pcc-card-zone {
+      flex: 0 0 33%;
       display: flex;
-      flex-direction: column;
-      gap: 6px;  /* CHANGE: reduced gap */
-      max-width: 320px;
-      min-height: 0;  /* CHANGE: allow shrinking */
+      flex-direction: row;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      padding: 0 8px 0 0;
     }
 
-    .panel-title {
-      font-size: 10px;  /* CHANGE: smaller font */
-      font-weight: 700;
-      color: rgba(255, 215, 0, 0.7);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      text-align: center;
-      margin-bottom: 2px;  /* CHANGE: reduced margin */
+    .pcc-card-zone.defense-zone {
+      padding: 0 0 0 8px;
+      flex-direction: row-reverse;
     }
 
-    /* Offense Play Scroller Container */
-    .play-scroller-container {
+    /* ── PLAY CARD (offense and defense) ── */
+    .pcc-play-card {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 0 10px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.14);
+      border-radius: 6px;
       flex: 1;
-      min-height: 0; /* Allow flex shrinking */
-    }
-
-    /* Offense Play Scroller - Show only 1 play at a time */
-    .play-scroller {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      overflow: hidden;  /* Hide other plays */
-    }
-
-    /* Navigation Buttons */
-    .play-nav-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 215, 0, 0.4);
-      color: rgba(255, 215, 0, 0.8);
-      font-size: 18px;
-      font-weight: bold;
+      height: 66px;
+      min-width: 0;
       cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
+      overflow: hidden;
     }
 
-    .play-nav-btn:hover {
-      background: rgba(255, 215, 0, 0.2);
+    .pcc-play-card.selected {
+      background: rgba(255,215,0,0.2);
       border-color: #FFD700;
-      color: #FFD700;
+      box-shadow: 0 0 14px rgba(255,215,0,0.3);
     }
 
-    .play-nav-buttons {
+    .pcc-play-card .play-name { font-size: 13px; }
+    .pcc-play-card .play-focus { font-size: 10px; }
+    .pcc-play-card.selected .play-name { color: #FFD700; }
+    .pcc-play-card.selected .play-focus { color: rgba(255,215,0,0.6); }
+
+    /* Offense play scroller inside card — one play visible at a time */
+    .pcc-play-card .play-scroller {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      align-items: center;
+      gap: 0;
     }
 
-    /* Red X Clear Override Button */
-    .clear-override-x-btn {
-      width: 32px;
-      height: 60px;  /* Default height, will be set dynamically to 50% of container */
-      min-height: 50px;  /* Minimum height for visibility */
-      max-height: 120px;  /* Maximum height to prevent it from being too large */
-      border-radius: 4px;
-      background: rgba(244, 67, 54, 0.2);
-      border: 2px solid rgba(244, 67, 54, 0.6);
-      color: #F44336;
-      font-size: 20px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
+    .defense-play-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 0.3px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── NAV COLUMN ── */
+    .pcc-nav-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+
+    .pcc-nav-btn {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,215,0,0.3);
+      color: rgba(255,215,0,0.75);
+      font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .pcc-nav-x {
+      width: 24px; height: 24px; border-radius: 4px;
+      background: rgba(244,67,54,0.14);
+      border: 2px solid rgba(244,67,54,0.45);
+      color: #F44336; font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── STACKS ZONE ── */
+    #pcc-stacks-zone {
+      flex: 0 0 34%;
       display: flex;
-      align-items: center;
+      flex-direction: row;
+      align-items: stretch;
       justify-content: center;
-      line-height: 1;
-      align-self: center;  /* Vertically center relative to container */
-      margin-left: 8px;  /* Space between nav buttons and X button */
+      gap: 6px;
+      padding: 2px 8px;
+      border-left: 1px solid rgba(255,255,255,0.07);
+      border-right: 1px solid rgba(255,255,255,0.07);
+      min-width: 0;
     }
 
-    .clear-override-x-btn:hover {
-      background: rgba(244, 67, 54, 0.4);
-      border-color: #F44336;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
+    /* ── STACK ── */
+    .pcc-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 3px;
+      flex: 1;
+      min-width: 0;
+      padding-top: 4px;
+      position: relative;
     }
 
+    .pcc-stack::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    .pcc-stack.tempo::before      { background: #4a90d9; }
+    .pcc-stack.aggression::before  { background: #FFD700; }
+    .pcc-stack.press-trap::before  { background: #cc3333; }
+
+    .pcc-stack-label {
+      font-size: 9px;
+      letter-spacing: 1.2px;
+      text-align: center;
+      margin-bottom: 1px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .pcc-stack.tempo .pcc-stack-label      { color: #4a90d9; }
+    .pcc-stack.aggression .pcc-stack-label  { color: #FFD700; }
+    .pcc-stack.press-trap .pcc-stack-label  { color: #cc3333; }
+
+    .pcc-stack-btn {
+      padding: 5px 4px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      color: rgba(255,255,255,0.55);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 12px; letter-spacing: 0.6px;
+      cursor: pointer; text-align: center;
+      white-space: nowrap; line-height: 1.2;
+    }
+
+    .pcc-stack.tempo .pcc-stack-btn.selected {
+      background: rgba(74,144,217,0.2);
+      border-color: #4a90d9; color: #4a90d9;
+      box-shadow: 0 0 8px rgba(74,144,217,0.3);
+    }
+
+    .pcc-stack.aggression .pcc-stack-btn.selected {
+      background: rgba(255,215,0,0.2);
+      border-color: #FFD700; color: #FFD700;
+      box-shadow: 0 0 8px rgba(255,215,0,0.28);
+    }
+
+    .pcc-stack.press-trap .pcc-stack-btn.selected {
+      background: rgba(204,51,51,0.2);
+      border-color: #cc3333; color: #cc3333;
+      box-shadow: 0 0 8px rgba(204,51,51,0.3);
+    }
+
+    .pcc-stack-x {
+      padding: 4px 4px;
+      background: rgba(244,67,54,0.12);
+      border: 2px solid rgba(244,67,54,0.42);
+      border-radius: 5px; color: #F44336;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 12px; cursor: pointer;
+      text-align: center; line-height: 1.2;
+    }
+
+    /* Reused play-option/headshot/info/name/focus (offense card) — dimensions updated for card height */
     .play-option {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 12px;  /* Increased padding for larger container */
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
+      padding: 8px 10px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-height: 70px;  /* Increased min-height for larger container */
+      min-height: 62px;
     }
 
     .play-option:hover {
       background: rgba(255, 215, 0, 0.1);
-      border-color: rgba(255, 215, 0, 0.5);
     }
 
     .play-option.selected {
@@ -1276,10 +1337,10 @@
     }
 
     .play-headshot {
-      width: auto;  /* Proportional to height */
-      height: 70px;  /* CHANGE: fixed height instead of 100% to prevent stretching */
-      max-height: 70px;  /* Match play-option min-height */
-      border-radius: 4px;  /* Rectangular with slight rounding */
+      width: auto;
+      height: 58px;
+      max-height: 58px;
+      border-radius: 4px;
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
       background: rgba(0, 0, 0, 0.5);
@@ -1295,10 +1356,11 @@
       flex-direction: column;
       gap: 2px;
       flex: 1;
+      min-width: 0;
     }
 
     .play-name {
-      font-size: 16px;  /* Increased font size for larger container */
+      font-size: 16px;
       font-weight: 700;
       color: rgba(255, 255, 255, 0.8);
       letter-spacing: 0.5px;
@@ -1309,7 +1371,7 @@
     }
 
     .play-focus {
-      font-size: 12px;  /* Increased font size for larger container */
+      font-size: 12px;
       font-weight: 600;
       color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
@@ -1318,158 +1380,6 @@
 
     .play-option.selected .play-focus {
       color: rgba(255, 215, 0, 0.8);
-    }
-
-    /* Defense Override Buttons */
-    .defense-overrides {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .defense-row {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      align-items: center;
-    }
-
-    /* Red X Clear Override Button for Defense Rows */
-    .defense-clear-x-btn {
-      width: 28px;
-      height: 38px;  /* Match defense button min-height exactly */
-      border-radius: 4px;
-      background: rgba(244, 67, 54, 0.2);
-      border: 2px solid rgba(244, 67, 54, 0.6);
-      color: #F44336;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      flex-shrink: 0;  /* Don't shrink */
-    }
-
-    .defense-clear-x-btn:hover {
-      background: rgba(244, 67, 54, 0.4);
-      border-color: #F44336;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
-    }
-
-    .defense-override-btn {
-      flex: 1;
-      max-width: 70px;  /* Compress horizontal size to make room for red X */
-      padding: 10px 8px;  /* Reduced horizontal padding */
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 9px;  /* Reduced font size to fit "Aggressive" when compressed */
-      font-weight: 700;
-      letter-spacing: 0.5px;  /* Reduced letter spacing */
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-transform: uppercase;
-      min-height: 38px;  /* Keep vertical height exactly as is */
-    }
-
-    .defense-override-btn:hover {
-      background: rgba(255, 215, 0, 0.1);
-      border-color: rgba(255, 215, 0, 0.5);
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .defense-override-btn.selected {
-      background: rgba(255, 215, 0, 0.25);
-      border-color: #FFD700;
-      color: #FFD700;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-    }
-
-    /* Clear Override Buttons */
-    .clear-override-btn {
-      width: 100%;
-      padding: 6px;  /* CHANGE: reduced padding */
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 4px;
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 10px;  /* CHANGE: smaller font */
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 2px;  /* CHANGE: reduced margin */
-    }
-
-    .clear-override-btn:hover {
-      background: rgba(244, 67, 54, 0.15);
-      border-color: rgba(244, 67, 54, 0.5);
-      color: #F44336;
-    }
-
-    /* Lean Meter (Center Focal Point) */
-    #lean-meter-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 100px;
-      max-width: 120px;
-    }
-
-    #lean-meter {
-      width: 64px;  /* CHANGE: 20% thinner (was 80px) */
-      height: 120px;  /* CHANGE: fixed height instead of 100% to prevent stretching */
-      min-height: 120px;
-      max-height: 120px;  /* Prevent stretching beyond intended size */
-      background: rgba(255, 255, 255, 0.1);
-      border: 3px solid rgba(255, 215, 0, 0.4);
-      border-radius: 20px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-    }
-
-    #lean-center-line {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: #FFD700;
-      transform: translateY(-50%);
-      z-index: 2;
-      box-shadow: 0 0 15px rgba(255, 215, 0, 0.9);
-    }
-
-    .lean-fill {
-      position: absolute;
-      left: 0;
-      right: 0;
-      transition: height 0.8s ease-out;
-    }
-
-    .lean-fill-pos {
-      bottom: 50%;
-      height: 0%;
-      background: linear-gradient(to top, rgba(76, 175, 80, 0.7), rgba(76, 175, 80, 0.95));
-      border-radius: 25px 25px 0 0;
-    }
-
-    .lean-fill-neg {
-      top: 50%;
-      height: 0%;
-      background: linear-gradient(to bottom, rgba(244, 67, 54, 0.7), rgba(244, 67, 54, 0.95));
-      border-radius: 0 0 25px 25px;
-    }
-
-    /* Panel Order: Always offense left, defense right (no flipping) */
-    #playcall-main-row {
-      flex-direction: row;  /* Fixed: offense always left, defense always right */
     }
 
     /* ==================== PLAYCALL REVEAL HUD ==================== */
@@ -1704,7 +1614,8 @@
       margin: 10px 0;
     }
 
-    /* ==================== GAME ANNOUNCEMENTS ==================== */
+    /* ==================== GAME ANNOUNCEMENTS (OLD - commented out; new strip below) ==================== */
+    /*
     .game-announcement {
       position: fixed;
       top: calc(var(--scoreboard-height) + 10px);
@@ -1722,102 +1633,219 @@
       align-items: center;
       gap: 20px;
     }
-    
     .announcement-headshot {
-      width: 98px; /* 75% larger: 56 * 1.75 = 98px */
-      height: 131px; /* 3:4 aspect ratio: 98 * 4/3 = 131px */
+      width: 98px;
+      height: 131px;
       border-radius: 6px;
       overflow: hidden;
       background: #fff;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
-    
-    /* Home team announcements - use home vibrant color */
-    .game-announcement.home-team {
-      color: var(--home-vibrant-color);
-      text-shadow: 
-        -2px -2px 4px rgba(0, 0, 0, 0.9),
-        2px -2px 4px rgba(0, 0, 0, 0.9),
-        -2px 2px 4px rgba(0, 0, 0, 0.9),
-        2px 2px 4px rgba(0, 0, 0, 0.9);
-    }
-    
-    /* Away team announcements - white with away color outline (like Away Players heading) */
-    .game-announcement.away-team {
-      color: #fff;
-      text-shadow: 
-        -1px -1px 0 var(--away-vibrant-color),
-        1px -1px 0 var(--away-vibrant-color),
-        -1px 1px 0 var(--away-vibrant-color),
-        1px 1px 0 var(--away-vibrant-color),
-        -2px 0 0 var(--away-vibrant-color),
-        2px 0 0 var(--away-vibrant-color),
-        0 -2px 0 var(--away-vibrant-color),
-        0 2px 0 var(--away-vibrant-color),
-        -2px -2px 2px rgba(0, 0, 0, 0.9),
-        2px -2px 2px rgba(0, 0, 0, 0.9),
-        -2px 2px 2px rgba(0, 0, 0, 0.9),
-        2px 2px 2px rgba(0, 0, 0, 0.9);
-    }
-    
-    /* Defense team announcements - use away team style (since defense is usually away in context) */
-    .game-announcement.defense-team {
-      color: #fff;
-      text-shadow: 
-        -1px -1px 0 var(--away-vibrant-color),
-        1px -1px 0 var(--away-vibrant-color),
-        -1px 1px 0 var(--away-vibrant-color),
-        1px 1px 0 var(--away-vibrant-color),
-        -2px 0 0 var(--away-vibrant-color),
-        2px 0 0 var(--away-vibrant-color),
-        0 -2px 0 var(--away-vibrant-color),
-        0 2px 0 var(--away-vibrant-color),
-        -2px -2px 2px rgba(0, 0, 0, 0.9),
-        2px -2px 2px rgba(0, 0, 0, 0.9),
-        -2px 2px 2px rgba(0, 0, 0, 0.9),
-        2px 2px 2px rgba(0, 0, 0, 0.9);
-    }
-    
-    /* Neutral announcements - gold color (for non-team specific events) */
-    .game-announcement.neutral {
-      color: #FFD700;
-      text-shadow: 
-        -2px -2px 4px rgba(0, 0, 0, 0.9),
-        2px -2px 4px rgba(0, 0, 0, 0.9),
-        -2px 2px 4px rgba(0, 0, 0, 0.9),
-        2px 2px 4px rgba(0, 0, 0, 0.9),
-        0 0 12px rgba(255, 215, 0, 0.6);
-    }
-
+    .game-announcement.home-team { ... }
+    .game-announcement.away-team { ... }
+    .game-announcement.defense-team { ... }
+    .game-announcement.neutral { ... }
     .game-announcement.active {
       animation: announcement-pop 2500ms ease-out forwards;
     }
+    @keyframes announcement-pop { ... }
+    */
 
-    @keyframes announcement-pop {
-      0% {
-        top: calc(var(--scoreboard-height) + 10px);
-        opacity: 0;
-        transform: translateX(-50%) scale(0.5);
-      }
-      30% {
-        top: 50%;
-        opacity: 1;
-        transform: translateX(-50%) translateY(-50%) scale(1.2);
-      }
-      60% {
-        top: 50%;
-        opacity: 1;
-        transform: translateX(-50%) translateY(-50%) scale(1);
-      }
-      100% {
-        top: 50%;
-        opacity: 0;
-        transform: translateX(-50%) translateY(-50%) scale(0.8);
-      }
+    /* ==================== ANNOUNCEMENT OVERLAY ==================== */
+    #announcement-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 950;
+      pointer-events: none;
+    }
+    #announcement-overlay.hidden {
+      display: none;
+    }
+    .ann-card {
+      position: relative;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      background: rgba(10,10,10,0.82);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      overflow: visible;
+      animation: annCardIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes annCardIn {
+      from { transform: scaleX(0.6) scaleY(0.85); opacity: 0; }
+      to   { transform: scaleX(1) scaleY(1); opacity: 1; }
+    }
+    .ann-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 5px;
+      background: #F79420;
+      z-index: 2;
+    }
+    .ann-card.standard-card.no-player .ann-portrait-zone {
+      display: none;
+    }
+    .ann-card.standard-card.no-player .ann-event-zone {
+      justify-content: center;
+      padding-left: 32px;
+    }
+    .ann-portrait-zone {
+      position: relative;
+      width: 100px;
+      height: 130px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #111;
+    }
+    .ann-portrait-zone::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      right: -16px;
+      width: 32px;
+      background: rgba(10,10,10,0.82);
+      transform: skewX(-6deg);
+      z-index: 1;
+    }
+    .ann-fouler-zone {
+      position: relative;
+      width: 100px;
+      height: 130px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #111;
+      border: 3px solid #cc3333;
+      box-sizing: border-box;
+    }
+    .ann-portrait-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+      opacity: 0.92;
+    }
+    .ann-portrait-caption {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.75);
+      padding: 4px 8px;
+      z-index: 2;
+    }
+    .fouler-caption {
+      background: rgba(180,40,40,0.85);
+    }
+    .ann-jersey-name {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 11px;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ann-pos-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 400;
+      font-size: 9px;
+      color: #F79420;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+    .fouler-role {
+      color: rgba(255,255,255,0.7);
+    }
+    .ann-event-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding: 18px 32px 18px 24px;
+    }
+    .ann-event-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-style: italic;
+      font-size: 48px;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1;
+      white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .ann-event-text .ann-accent {
+      color: #F79420;
+    }
+    .ann-foul-event-zone {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+      padding: 14px 20px 14px 22px;
+    }
+    .ann-foul-primary {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-style: italic;
+      font-size: 40px;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1;
+      white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .ann-foul-primary .ann-accent {
+      color: #F79420;
+    }
+    .ann-foul-secondary {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-style: italic;
+      font-size: 18px;
+      color: #cc3333;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+    .ann-foul-note {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 400;
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
     }
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
-    /* Bottom offset: fixed 12px from bottom of court container (grid layout; no PBP bar in cell) */
+    /* Controls strip lives inside #phaser-container; positioned at bottom (out-of-bounds area) */
+    #phaser-container #game-controls-strip {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      width: 500px;
+      padding: 0 40px;
+      box-sizing: border-box;
+      background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.6));
+      border-top: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px 8px 0 0;
+      z-index: 925;
+    }
     .game-controls {
       position: absolute;
       bottom: 12px;
@@ -1827,8 +1855,8 @@
       flex-direction: row;
       align-items: center;
       justify-content: space-between;
-      width: 500px; /* Increased width to accommodate timeout button */
-      z-index: 950; /* Below HUD (1000) but above Playcall Center (900) */
+      width: 500px;
+      z-index: 950;
     }
 
     #game-speed-btn,
@@ -1934,6 +1962,16 @@
       transform: scale(1.05); /* Slightly larger */
       font-weight: 900; /* Extra bold text */
     }
+
+    #game-controls-strip #pause-btn {
+      position: static;
+      left: auto;
+      transform: none;
+    }
+
+    #game-controls-strip #timeout-btn {
+      margin-left: 0;
+    }
     
     @keyframes timeoutPulse {
       0%, 100% {
@@ -1957,9 +1995,9 @@
     /* ==================== GAME SPEED DROPDOWN ==================== */
     /* Align with Game Speed button (left edge of .game-controls, which is 500px wide and centered) */
     .speed-dropdown {
-      position: absolute;
-      bottom: 52px; /* Just above .game-controls (12px + button height) */
-      left: calc(50% - 250px); /* Same left edge as .game-controls so dropdown is over Game Speed button */
+      position: fixed;
+      top: 0;
+      left: 0;
       transform: none;
       background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
       border: 2px solid #9c27b0;
@@ -2515,21 +2553,51 @@
           </div>
         </div>
       </div>
-      
-      <!-- Game controls (pause/skip) at bottom of court -->
-      <div class="game-controls">
+
+      <!-- In-game announcement overlay (center-court) -->
+      <div id="announcement-overlay" class="ann-overlay hidden">
+        <div class="ann-card standard-card">
+          <div class="ann-portrait-zone">
+            <img class="ann-portrait-img" src="" alt="Player" />
+            <div class="ann-portrait-caption">
+              <div class="ann-jersey-name"></div>
+              <div class="ann-pos-label"></div>
+            </div>
+          </div>
+          <div class="ann-event-zone">
+            <span class="ann-event-text"></span>
+          </div>
+        </div>
+        <div class="ann-card foul-card" style="display:none;">
+          <div class="ann-portrait-zone shooter-zone">
+            <img class="ann-portrait-img shooter-img" src="" alt="Shooter" />
+            <div class="ann-portrait-caption shooter-caption">
+              <div class="ann-jersey-name shooter-name"></div>
+              <div class="ann-pos-label shooter-role">Shooter</div>
+            </div>
+          </div>
+          <div class="ann-foul-event-zone">
+            <span class="ann-foul-primary"></span>
+            <span class="ann-foul-secondary">+ Free Throw</span>
+            <span class="ann-foul-note">And one</span>
+          </div>
+          <div class="ann-fouler-zone">
+            <img class="ann-portrait-img fouler-img" src="" alt="Fouler" />
+            <div class="ann-portrait-caption fouler-caption">
+              <div class="ann-jersey-name fouler-name"></div>
+              <div class="ann-pos-label fouler-role">Foul</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game controls: inside court container, bottom out-of-bounds -->
+      <div id="game-controls-strip">
         <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
         <button id="pause-btn">Pause</button>
-        <button id="skip-btn" class="dead-control" disabled title="Coming in a future update">Skip To End</button>
         <button id="timeout-btn">Timeout</button>
       </div>
       
-      <!-- Game Speed Selection Dropdown -->
-      <div id="speed-dropdown" class="speed-dropdown" style="display: none;">
-        <button class="speed-option" data-speed="450">Normal</button>
-        <button class="speed-option" data-speed="550">Fast</button>
-        <button class="speed-option speed-option-superfast" data-speed="1000">Super Fast</button>
-      </div>
     </div>
 
     <!-- HOME PLAYER STATS PANEL (RIGHT) - grid-area: right-stats -->
@@ -2621,109 +2689,117 @@
       </div>
     </div>
 
+    <div id="speed-dropdown" class="speed-dropdown" style="display: none;">
+      <button class="speed-option" data-speed="450">Normal</button>
+      <button class="speed-option" data-speed="550">Fast</button>
+      <button class="speed-option speed-option-superfast" data-speed="1000">Super Fast</button>
+    </div>
+
   <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB - grid-area: playcall ==================== -->
   <div id="playcall-center" style="grid-area: playcall;">
-    
-    <!-- Top Row: Current Playcall Display -->
+    <!-- Status row (unchanged IDs — JS depends on these) -->
     <div id="playcall-status-row">
       <div id="offense-status" class="status-display">
-        <span class="status-label">OFFENSE:</span>
+        <span class="status-label">OFFENSE</span>
         <span id="offense-status-text">Motion → Inside</span>
       </div>
       <div id="defense-status" class="status-display">
-        <span class="status-label">DEFENSE:</span>
         <span id="defense-status-text">Man Normal</span>
+        <span class="status-label">DEFENSE</span>
       </div>
     </div>
-    
-    <!-- Main Row: Offense Panel | Lean Meter | Defense Panel -->
+    <!-- Main row: Offense Card (33%) | Stacks (34%) | Defense Card (33%) -->
     <div id="playcall-main-row">
-      
-      <!-- Offense Panel (switches sides) -->
-      <div id="offense-panel" class="tactical-panel">
-        <div class="panel-title">OFFENSE OVERRIDE</div>
-        <div class="play-scroller-container">
+      <!-- Offense Card Zone (left 33%) -->
+      <div class="pcc-card-zone">
+        <div class="pcc-play-card">
           <div id="offense-play-scroller" class="play-scroller">
-          <div class="play-option" data-play="4-1 Motion" data-focus="inside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">4-1 Motion</div>
-              <div class="play-focus">Inside</div>
+            <div class="play-option" data-play="4-1 Motion" data-focus="inside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">4-1 Motion</div>
+                <div class="play-focus">Inside</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="3-2 Motion" data-focus="attack">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">3-2 Motion</div>
+                <div class="play-focus">Attack</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="5-0 Motion" data-focus="outside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">5-0 Motion</div>
+                <div class="play-focus">Outside</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="Base Post Play" data-focus="inside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">Base Post Play</div>
+                <div class="play-focus">Inside</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="Pick & Roll (Lower Wing)" data-focus="attack">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">Pick & Roll</div>
+                <div class="play-focus">Attack</div>
+              </div>
+            </div>
+            <div class="play-option" data-play="Double Screen For SG" data-focus="outside">
+              <img class="play-headshot" src="" alt="Shooter">
+              <div class="play-info">
+                <div class="play-name">Double Screen for SG</div>
+                <div class="play-focus">Outside</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pcc-nav-col">
+          <button class="pcc-nav-btn" id="play-nav-up">▲</button>
+          <button class="pcc-nav-btn" id="play-nav-down">▼</button>
+          <button class="pcc-nav-x" id="clear-offense-override-x">✕</button>
         </div>
       </div>
-          <div class="play-option" data-play="3-2 Motion" data-focus="attack">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">3-2 Motion</div>
-              <div class="play-focus">Attack</div>
+      <!-- Stacks Zone (center 34%): Tempo | Aggression | Press/Trap -->
+      <div id="pcc-stacks-zone">
+        <div class="pcc-stack tempo">
+          <span class="pcc-stack-label">Tempo</span>
+          <button type="button" class="pcc-stack-btn" id="tempo-fast">Fast</button>
+          <button type="button" class="pcc-stack-btn" id="tempo-normal">Normal</button>
+          <button type="button" class="pcc-stack-btn" id="tempo-slow">Slow</button>
+          <button type="button" class="pcc-stack-x" id="clear-tempo-x">✕</button>
+        </div>
+        <div class="pcc-stack aggression">
+          <span class="pcc-stack-label">Aggression</span>
+          <button type="button" class="pcc-stack-btn" id="aggr-passive">Passive</button>
+          <button type="button" class="pcc-stack-btn" id="aggr-normal">Normal</button>
+          <button type="button" class="pcc-stack-btn" id="aggr-aggressive">Aggr</button>
+          <button type="button" class="pcc-stack-x" id="clear-aggression-override-x">✕</button>
+        </div>
+        <div class="pcc-stack press-trap">
+          <span class="pcc-stack-label">Press/Trap</span>
+          <button type="button" class="pcc-stack-btn" id="press-btn">Press</button>
+          <button type="button" class="pcc-stack-btn" id="trap-btn">Trap</button>
+          <button type="button" class="pcc-stack-btn" id="press-trap-none-btn">None</button>
+          <button type="button" class="pcc-stack-x" id="clear-press-trap-x">✕</button>
         </div>
       </div>
-          <div class="play-option" data-play="5-0 Motion" data-focus="outside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">5-0 Motion</div>
-              <div class="play-focus">Outside</div>
-            </div>
-          </div>
-          <div class="play-option" data-play="Base Post Play" data-focus="inside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">Base Post Play</div>
-              <div class="play-focus">Inside</div>
-            </div>
-          </div>
-          <div class="play-option" data-play="Pick & Roll (Lower Wing)" data-focus="attack">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">Pick & Roll</div>
-              <div class="play-focus">Attack</div>
-            </div>
-          </div>
-          <div class="play-option" data-play="Double Screen For SG" data-focus="outside">
-            <img class="play-headshot" src="" alt="Shooter">
-            <div class="play-info">
-              <div class="play-name">Double Screen for SG</div>
-              <div class="play-focus">Outside</div>
-            </div>
-          </div>
-          </div>  <!-- Close .play-scroller -->
-          <div class="play-nav-buttons">
-            <button class="play-nav-btn" id="play-nav-up">▲</button>
-            <button class="play-nav-btn" id="play-nav-down">▼</button>
-          </div>
-          <button id="clear-offense-override-x" class="clear-override-x-btn">✕</button>
-        </div>  <!-- Close .play-scroller-container -->
+      <!-- Defense Card Zone (right 33%) -->
+      <div class="pcc-card-zone defense-zone">
+        <div class="pcc-nav-col">
+          <button class="pcc-nav-btn" id="defense-nav-up">▲</button>
+          <button class="pcc-nav-btn" id="defense-nav-down">▼</button>
+          <button class="pcc-nav-x" id="clear-defense-card-x">✕</button>
+        </div>
+        <div class="pcc-play-card">
+          <div class="defense-play-name">Man Normal</div>
+        </div>
+      </div>
     </div>
-
-      <!-- Lean Meter (Center - Absolute Focal Point) -->
-    <div id="lean-meter-container">
-      <div id="lean-meter">
-        <div id="lean-fill-positive" class="lean-fill lean-fill-pos"></div>
-        <div id="lean-center-line"></div>
-        <div id="lean-fill-negative" class="lean-fill lean-fill-neg"></div>
-      </div>
-    </div>
-
-      <!-- Defense Panel (switches sides) -->
-      <div id="defense-panel" class="tactical-panel">
-        <div class="panel-title">DEFENSE OVERRIDE</div>
-        <div class="defense-overrides">
-          <div class="defense-row">
-            <button class="defense-override-btn" data-defense="Man">MAN</button>
-            <button class="defense-override-btn" data-defense="Zone">ZONE</button>
-            <button id="clear-defense-override-x" class="defense-clear-x-btn">✕</button>
-        </div>
-          <div class="defense-row">
-            <button class="defense-override-btn" data-aggression="Passive">PASSIVE</button>
-            <button class="defense-override-btn" data-aggression="Normal">NORMAL</button>
-            <button class="defense-override-btn" data-aggression="Aggressive">AGGRESSIVE</button>
-            <button id="clear-aggression-override-x" class="defense-clear-x-btn">✕</button>
-      </div>
-        </div>
-        <button id="clear-defense-override" class="clear-override-btn">Clear Override</button>
-      </div>
-      
-    </div>  <!-- Close #playcall-main-row -->
   </div>  <!-- Close #playcall-center -->
   </div>  <!-- Close #app-grid -->
 
@@ -3461,25 +3537,11 @@
     });
     
     (function initPlaycallCenter() {
-      const playOptions = document.querySelectorAll('.play-option');
-      const defenseButtons = document.querySelectorAll('.defense-override-btn');
+      const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
-      const clearDefenseBtn = document.getElementById('clear-defense-override');
-      
-      // Set red X button height to 50% of play-scroller-container height
-      function setClearXButtonHeight() {
-        const playScrollerContainer = document.querySelector('.play-scroller-container');
-        const clearXBtn = document.getElementById('clear-offense-override-x');
-        if (playScrollerContainer && clearXBtn) {
-          const containerHeight = playScrollerContainer.offsetHeight;
-          const buttonHeight = containerHeight * 0.5; // 50% of container height
-          clearXBtn.style.height = `${buttonHeight}px`;
-        }
-      }
-      
-      // Set height on load and resize
-      setClearXButtonHeight();
-      window.addEventListener('resize', setClearXButtonHeight);
+      const DEFENSE_SCHEMES = ['Man Normal', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
+      let currentDefenseIndex = 0;
+      let userHasSetDefenseOverride = false;
       
       // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
@@ -3532,6 +3594,10 @@
             payload.defense_override = value;
           } else if (type === 'aggression') {
             payload.aggression_override = value;
+          } else if (type === 'tempo') {
+            payload.tempo_override = value;
+          } else if (type === 'press_trap') {
+            payload.press_trap_override = value;
           }
           
           const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
@@ -3608,73 +3674,114 @@
         });
       }
       
-      // Handle defense button clicks
-      defenseButtons.forEach(btn => {
-        btn.addEventListener('click', async () => {
-          playSound('confirm-2.mp3');
-          const defenseType = btn.dataset.defense; // 'Man' or 'Zone'
-          const aggression = btn.dataset.aggression; // 'Passive', 'Normal', or 'Aggressive'
-          
-          // ✅ SS&S: Set both defense type and aggression in a single API call if both are present
-          // This prevents race conditions and ensures both are set together
-          if (defenseType && aggression) {
-            // Button has both - set both at once
-            document.querySelectorAll('.defense-override-btn[data-defense]').forEach(b => {
-              b.classList.remove('selected');
-            });
-            document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(b => {
-              b.classList.remove('selected');
-            });
+      function updateDefenseCardDisplay() {
+        const el = document.querySelector('.defense-play-name');
+        if (el) el.textContent = DEFENSE_SCHEMES[currentDefenseIndex];
+        const defenseCard = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
+        if (defenseCard) {
+          if (userHasSetDefenseOverride) defenseCard.classList.add('selected');
+          else defenseCard.classList.remove('selected');
+        }
+      }
+
+      // Tempo stack
+      ['#tempo-fast', '#tempo-normal', '#tempo-slow'].forEach((sel, i) => {
+        const btn = document.querySelector(sel);
+        const values = ['fast', 'normal', 'slow'];
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            playSound('confirm-2.mp3');
+            document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            
-            const normalizedAggression = aggression.toLowerCase();
-            // Set both in one API call
-            const { gameId, userTeamSide } = getGameContext();
-            const payload = {
-              game_id: gameId,
-              user_team_side: userTeamSide,
-              offense_override: null,
-              defense_override: defenseType,
-              aggression_override: normalizedAggression,
-              tempo_override: null
-            };
-            
-            try {
-              const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              
-              if (!response.ok) {
-                const errorData = await response.json();
-                console.error('❌ [PLAYCALL OVERRIDE] Failed to set defense/aggression override:', errorData);
-                return;
-              }
-              
-              const result = await response.json();
-            } catch (error) {
-              console.error('❌ [PLAYCALL OVERRIDE] Error setting defense/aggression override:', error);
-            }
-          } else if (defenseType) {
-            // Defense type only
-            document.querySelectorAll('.defense-override-btn[data-defense]').forEach(b => {
-              b.classList.remove('selected');
-            });
-            btn.classList.add('selected');
-            await setPlaycallOverride('defense', defenseType);
-          } else if (aggression) {
-            // Aggression only
-            document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(b => {
-              b.classList.remove('selected');
-            });
-            btn.classList.add('selected');
-            const normalizedAggression = aggression.toLowerCase();
-            await setPlaycallOverride('aggression', normalizedAggression);
-          }
-        });
+            await setPlaycallOverride('tempo', values[i]);
+          });
+        }
       });
-      
+      document.getElementById('clear-tempo-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+        await setPlaycallOverride('tempo', null);
+      });
+
+      // Aggression stack (same API pattern as before)
+      const aggrMap = [
+        { id: 'aggr-passive', value: 'passive' },
+        { id: 'aggr-normal', value: 'normal' },
+        { id: 'aggr-aggressive', value: 'aggressive' }
+      ];
+      aggrMap.forEach(({ id, value }) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            playSound('confirm-2.mp3');
+            document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            await setPlaycallOverride('aggression', value);
+          });
+        }
+      });
+      document.getElementById('clear-aggression-override-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+        await setPlaycallOverride('aggression', null);
+      });
+
+      // Press/Trap stack
+      const pressTrapMap = [
+        { id: 'press-btn', value: 'press' },
+        { id: 'trap-btn', value: 'trap' },
+        { id: 'press-trap-none-btn', value: 'none' }
+      ];
+      pressTrapMap.forEach(({ id, value }) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            playSound('confirm-2.mp3');
+            document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            await setPlaycallOverride('press_trap', value);
+          });
+        }
+      });
+      document.getElementById('clear-press-trap-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+        await setPlaycallOverride('press_trap', null);
+      });
+
+      // Defense card navigation (circular)
+      function defenseSchemeToApiValue(name) {
+        return name === 'Man Normal' ? 'Man' : name;
+      }
+      document.getElementById('defense-nav-up')?.addEventListener('click', () => {
+        playSound('click-tiny.wav');
+        currentDefenseIndex = (currentDefenseIndex - 1 + DEFENSE_SCHEMES.length) % DEFENSE_SCHEMES.length;
+        updateDefenseCardDisplay();
+      });
+      document.getElementById('defense-nav-down')?.addEventListener('click', () => {
+        playSound('click-tiny.wav');
+        currentDefenseIndex = (currentDefenseIndex + 1) % DEFENSE_SCHEMES.length;
+        updateDefenseCardDisplay();
+      });
+      const defenseCardEl = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
+      if (defenseCardEl) {
+        defenseCardEl.addEventListener('click', async () => {
+          playSound('confirm-2.mp3');
+          userHasSetDefenseOverride = true;
+          updateDefenseCardDisplay();
+          await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
+        });
+      }
+      document.getElementById('clear-defense-card-x')?.addEventListener('click', async () => {
+        playSound('x-back.mp3');
+        userHasSetDefenseOverride = false;
+        currentDefenseIndex = 0;
+        updateDefenseCardDisplay();
+        await setPlaycallOverride('defense', null);
+        await setPlaycallOverride('aggression', null);
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
+      });
+
       // Clear offense override (query live DOM like defense/aggression Red X)
       if (clearOffenseBtn) {
         clearOffenseBtn.addEventListener('click', async () => {
@@ -3684,48 +3791,17 @@
         });
       }
       
-      // Clear defense override (legacy button at bottom - clears both)
-      if (clearDefenseBtn) {
-        clearDefenseBtn.addEventListener('click', async () => {
-          defenseButtons.forEach(btn => btn.classList.remove('selected'));
-          await setPlaycallOverride('defense', null);
-          await setPlaycallOverride('aggression', null);
-        });
-      }
-      
-      // Clear defense override only (red X in defense row)
-      const clearDefenseXBtn = document.getElementById('clear-defense-override-x');
-      if (clearDefenseXBtn) {
-        clearDefenseXBtn.addEventListener('click', async () => {
-          playSound('x-back.mp3');
-          // Only clear defense buttons (Man/Zone)
-          document.querySelectorAll('.defense-override-btn[data-defense]').forEach(btn => {
-            btn.classList.remove('selected');
-          });
-          await setPlaycallOverride('defense', null);
-        });
-      }
-      
-      // Clear aggression override only (red X in aggression row)
-      const clearAggressionXBtn = document.getElementById('clear-aggression-override-x');
-      if (clearAggressionXBtn) {
-        clearAggressionXBtn.addEventListener('click', async () => {
-          playSound('x-back.mp3');
-          // Only clear aggression buttons (Passive/Normal/Aggressive)
-          document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(btn => {
-            btn.classList.remove('selected');
-          });
-          await setPlaycallOverride('aggression', null);
-        });
-      }
-      
       // Global function to clear all visual selections (called after override is consumed)
       window.clearPlaycallOverrides = function() {
         playOptions.forEach(opt => opt.classList.remove('selected'));
-        defenseButtons.forEach(btn => btn.classList.remove('selected'));
+        document.querySelectorAll('#pcc-stacks-zone .pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
+        userHasSetDefenseOverride = false;
+        currentDefenseIndex = 0;
+        updateDefenseCardDisplay();
         console.log('📋 Override selections cleared');
       };
-      
+
+      updateDefenseCardDisplay();
     })();
     
     // Team boxscore tabs and data population
@@ -4105,40 +4181,72 @@
         return false;
       }
     }
+
+    async function redirectIfFranchiseGameplayAlreadyCommitted(urlParams) {
+      const mode = urlParams.get('mode');
+      const franchiseId = urlParams.get('franchise_id');
+      const pageWeek = Number(urlParams.get('week') || 0);
+      if (mode !== 'franchise' || !franchiseId || !pageWeek) return false;
+
+      try {
+        const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
+          headers: API_CONFIG.getAuthHeaders()
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        const currentWeek = Number(data.week || 1);
+        if (currentWeek > pageWeek) {
+          window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+          return true;
+        }
+      } catch (err) {
+        console.warn('⚠️ Unable to verify franchise gameplay state before court load:', err);
+      }
+      return false;
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
-    
-    // Update Player Box Score headers with actual team names
-    if (homeTeam) {
-      const homePlayersHeader = document.getElementById('home-players-header');
-      if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
-    }
-    if (awayTeam) {
-      const awayPlayersHeader = document.getElementById('away-players-header');
-      if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
-    }
-    
-    if (homeTeam && awayTeam) {
-      const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
-      if (!appliedRealColors) {
-        applyVibrantColors(homeTeam, awayTeam);
+
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        window.location.reload();
       }
-    } else {
-      console.warn('⚠️ No teams found in URL, using default vibrant colors');
-    }
-    
-    // Load accumulated stats if this is a resumed game
-    try {
-      await initializeGameStats();
-      // Initialize stats toggle functionality
-      initializeStatsToggle();
-      // Initialize team box score tabs
-      initializeTeamBoxscoreTabs();
-    } finally {
-      // Always hide overlay when this init block is done (success, early return, or error)
-      if (window.PageLoadOverlay) window.PageLoadOverlay.hide();
+    });
+
+    const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
+    if (!redirected) {
+      // Update Player Box Score headers with actual team names
+      if (homeTeam) {
+        const homePlayersHeader = document.getElementById('home-players-header');
+        if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
+      }
+      if (awayTeam) {
+        const awayPlayersHeader = document.getElementById('away-players-header');
+        if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
+      }
+
+      if (homeTeam && awayTeam) {
+        const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
+        if (!appliedRealColors) {
+          applyVibrantColors(homeTeam, awayTeam);
+        }
+      } else {
+        console.warn('⚠️ No teams found in URL, using default vibrant colors');
+      }
+
+      // Load accumulated stats if this is a resumed game
+      try {
+        await initializeGameStats();
+        // Initialize stats toggle functionality
+        initializeStatsToggle();
+        // Initialize team box score tabs
+        initializeTeamBoxscoreTabs();
+      } finally {
+        // Always hide overlay when this init block is done (success, early return, or error)
+        if (window.PageLoadOverlay) window.PageLoadOverlay.hide();
+      }
     }
   </script>
   <script>
@@ -4148,6 +4256,62 @@
     const timeoutHelperScript = document.createElement('script');
     timeoutHelperScript.src = `${staticPrefix}/js/shared/timeoutNavigationHelper.js`;
     document.head.appendChild(timeoutHelperScript);
+  </script>
+  <script>
+    (function() {
+      var _annTimer = null;
+      window.showAnnouncementOverlay = function(data) {
+        var overlay = document.getElementById('announcement-overlay');
+        if (!overlay) return;
+        var genericHeadshot = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
+        var applyHeadshotFallback = function(imgEl, src) {
+          if (!imgEl) return;
+          imgEl.onerror = function() {
+            this.onerror = null;
+            this.src = genericHeadshot;
+          };
+          imgEl.src = src || genericHeadshot;
+        };
+        if (_annTimer) { clearTimeout(_annTimer); _annTimer = null; }
+        var standardCard = overlay.querySelector('.standard-card');
+        var foulCard = overlay.querySelector('.foul-card');
+        if (data.type === 'foul') {
+          standardCard.style.display = 'none';
+          foulCard.style.display = 'flex';
+          applyHeadshotFallback(foulCard.querySelector('.shooter-img'), data.shooterPhotoUrl);
+          foulCard.querySelector('.shooter-name').textContent = ((data.shooterJersey || '') + ' ' + (data.shooterLastName || '')).trim();
+          applyHeadshotFallback(foulCard.querySelector('.fouler-img'), data.foulerPhotoUrl);
+          foulCard.querySelector('.fouler-name').textContent = ((data.foulerJersey || '') + ' ' + (data.foulerLastName || '')).trim();
+          var raw = data.foulEventText || "It's Good!";
+          var hasExclaim = raw.endsWith('!');
+          var base = hasExclaim ? raw.slice(0, -1) : raw;
+          foulCard.querySelector('.ann-foul-primary').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
+          void foulCard.offsetWidth;
+        } else {
+          foulCard.style.display = 'none';
+          standardCard.style.display = 'flex';
+          var hasPlayer = (data.photoUrl && data.photoUrl.length) || (data.lastName && data.lastName.length);
+          if (hasPlayer) {
+            standardCard.classList.remove('no-player');
+            applyHeadshotFallback(standardCard.querySelector('.ann-portrait-img'), data.photoUrl);
+            standardCard.querySelector('.ann-jersey-name').textContent = ((data.jersey || '') + ' ' + (data.lastName || '')).trim();
+            standardCard.querySelector('.ann-pos-label').textContent = data.position || '';
+          } else {
+            standardCard.classList.add('no-player');
+          }
+          var raw = data.eventText || '';
+          var hasExclaim = raw.endsWith('!');
+          var base = hasExclaim ? raw.slice(0, -1) : raw;
+          standardCard.querySelector('.ann-event-text').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
+          void standardCard.offsetWidth;
+        }
+        overlay.classList.remove('hidden');
+        _annTimer = setTimeout(function() {
+          overlay.classList.add('hidden');
+          _annTimer = null;
+        }, 2200);
+      };
+    })();
   </script>
   <script type="module">
     // ✅ PHASE 1.1: Load error handler before bootGame.js

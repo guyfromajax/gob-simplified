@@ -1701,6 +1701,31 @@ def finalize_game(
                     logger.error(f"❌ [FINALIZE_GAME] game_id: {game_id}, gid_for_reread: {gid_for_reread}")
                     return
 
+        claim_token = str(game.get("_id") or game_id)
+        existing_claim_doc = db.franchises.find_one({"_id": fid}, {"applied_games": 1}) or {}
+        existing_claims = [str(g) for g in (existing_claim_doc.get("applied_games") or []) if g is not None]
+        if claim_token in existing_claims or str(game_id) in existing_claims:
+            logger.warning(f"⚠️ [FINALIZE_GAME] Game {claim_token} already in applied_games, skipping (idempotent)")
+            return
+
+        claim_values = []
+        for candidate in [claim_token, game_id, gid_for_reread]:
+            if candidate is None:
+                continue
+            if candidate not in claim_values:
+                claim_values.append(candidate)
+
+        claim_filter = {"_id": fid}
+        if claim_values:
+            claim_filter["$and"] = [{"applied_games": {"$ne": candidate}} for candidate in claim_values]
+        claim_result = db.franchises.update_one(
+            claim_filter,
+            {"$addToSet": {"applied_games": claim_token}},
+        )
+        if claim_result.modified_count == 0:
+            logger.warning(f"⚠️ [FINALIZE_GAME] Franchise game claim failed for {claim_token}, skipping (idempotent)")
+            return
+
         # ✅ UNIFIED STRUCTURE: Extract team data from unified teams object
         home_team_id = game.get('home_team_id')
         away_team_id = game.get('away_team_id')
@@ -2048,33 +2073,7 @@ def finalize_game(
 
         logger.info(f"🔍 [FINALIZE_GAME] Applied stats/meta to FPD for {len(processed_player_ids)} players")
 
-        franchise_check_before = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
-        if franchise_check_before:
-            applied_before = franchise_check_before.get("applied_games", [])
-            if game_id in applied_before or str(game_id) in [str(g) for g in applied_before]:
-                logger.warning(f"⚠️ [FINALIZE_GAME] Game {game_id} already in applied_games: {applied_before}, skipping (idempotent)")
-                return
-
-        result = db.franchises.update_one(
-            {"_id": fid, "applied_games": {"$ne": game_id}},
-            {"$addToSet": {"applied_games": game_id}},
-        )
-
-        logger.info(f"🔍 [FINALIZE_GAME] Franchise applied_games update: matched={result.matched_count}, modified={result.modified_count}")
-
-        if result.modified_count == 0:
-            franchise_check = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
-            if franchise_check:
-                applied = franchise_check.get("applied_games", [])
-                if game_id in applied or str(game_id) in [str(g) for g in applied]:
-                    logger.info(f"ℹ️ [FINALIZE_GAME] Game {game_id} already in applied_games, skipping (idempotent)")
-                else:
-                    logger.error(f"❌ [FINALIZE_GAME] Franchise found but applied_games update failed.")
-            else:
-                logger.error(f"❌ [FINALIZE_GAME] Franchise document not found: {fid}")
-            return
-
-        logger.info(f"✅ [FINALIZE_GAME] Successfully updated franchise applied_games and FPD stats")
+        logger.info(f"✅ [FINALIZE_GAME] Successfully claimed game {claim_token} and updated FPD stats")
         
         # ✅ FIX: Remove redundant apply_stats_from_summary() call
         # apply_stats_from_summary() only updates players_collection for franchise mode, not the franchise document

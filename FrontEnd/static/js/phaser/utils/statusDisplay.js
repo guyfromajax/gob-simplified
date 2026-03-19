@@ -23,6 +23,16 @@ export function showStatus(msg) {
     el.style.fontSize = '24px';
     el.style.zIndex = '10000';
     el.style.pointerEvents = 'none';
+    el.style.padding = '16px 24px';
+    el.style.background = 'rgba(12, 12, 12, 0.82)';
+    el.style.border = '2px solid rgba(255, 255, 255, 0.18)';
+    el.style.borderRadius = '14px';
+    el.style.boxShadow = '0 18px 40px rgba(0, 0, 0, 0.42)';
+    el.style.backdropFilter = 'blur(3px)';
+    el.style.textAlign = 'center';
+    el.style.letterSpacing = '0.04em';
+    el.style.textTransform = 'uppercase';
+    el.style.minWidth = '320px';
     container.appendChild(el);
   }
   el.textContent = msg;
@@ -38,4 +48,3 @@ export function hideStatus() {
     el.style.display = 'none';
   }
 }
-

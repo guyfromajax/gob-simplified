@@ -75,6 +75,42 @@ def test_save_recruiting_orders_week20_only_persists_orders(monkeypatch):
     assert update_doc["Recruits"] == {"1": "r2", "2": "r1"}
 
 
+def test_save_recruiting_orders_week20_rejects_late_save_after_results(monkeypatch):
+    franchise_id = str(ObjectId())
+    team_id = str(ObjectId())
+    fake_ftd = _FakeCollection()
+    fake_frd = _FakeCollection(distinct_result=["r1"])
+
+    monkeypatch.setattr(
+        franchise_routes,
+        "verify_franchise_owned_by_user",
+        lambda _franchise_id, _user_id: {
+            "_id": ObjectId(franchise_id),
+            "week": 20,
+            "user_team_id": "Morristown",
+            "user_team_object_id": team_id,
+            "recruiting_results": {"20": {"status": "processed"}},
+        },
+    )
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", fake_ftd)
+    monkeypatch.setattr(franchise_routes, "franchise_recruits_data_collection", fake_frd)
+    monkeypatch.setattr(franchise_routes, "db", _UnusedDb())
+
+    try:
+        franchise_routes.save_recruiting_orders(
+            franchise_routes.SaveRecruitingOrdersRequest(
+                franchise_id=franchise_id,
+                recruit_ids=["r1"],
+            ),
+            user={"user_id": "test-user-123"},
+        )
+        assert False, "Expected late recruiting save to be rejected after weekly results exist"
+    except franchise_routes.HTTPException as exc:
+        assert exc.status_code == 400
+        assert "already been processed" in exc.detail
+    assert fake_ftd.update_calls == []
+
+
 def test_run_training_week20_requires_saved_recruiting_orders(monkeypatch):
     franchise_id = str(ObjectId())
     team_id = str(ObjectId())

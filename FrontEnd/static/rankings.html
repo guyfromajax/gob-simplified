@@ -9,6 +9,89 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
+  <style>
+    .rankings-results-table {
+      width: 100%;
+      min-width: 920px;
+      table-layout: fixed;
+      border-collapse: collapse;
+    }
+    .rankings-results-table th,
+    .rankings-results-table td {
+      padding: 0.9rem 1rem;
+      vertical-align: middle;
+      line-height: 1.35;
+    }
+    .rankings-results-table th {
+      letter-spacing: 0.03em;
+    }
+    .rankings-results-table th:nth-child(1),
+    .rankings-results-table .team-cell {
+      width: 32%;
+      white-space: nowrap;
+    }
+    .rankings-results-table th:nth-child(2),
+    .rankings-results-table .wl-cell {
+      width: 10%;
+      white-space: nowrap;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .rankings-results-table th:nth-child(3),
+    .rankings-results-table td:nth-child(3) {
+      width: 34%;
+    }
+    .rankings-results-table th:nth-child(4),
+    .rankings-results-table td:nth-child(4) {
+      width: 24%;
+    }
+    .rankings-results-table td:nth-child(3),
+    .rankings-results-table td:nth-child(4) {
+      white-space: nowrap;
+    }
+    .rankings-results-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.035);
+    }
+    .rankings-results-table .team-cell a {
+      font-weight: 700;
+    }
+    .rankings-results-table .team-cell span:first-child {
+      display: inline-block;
+      min-width: 2.5rem;
+    }
+    .rankings-results-table .last-week-win {
+      color: #1f8f47;
+      font-weight: 700;
+    }
+    .rankings-results-table .last-week-loss {
+      color: #c0392b;
+      font-weight: 700;
+    }
+    .rankings-results-table .last-week-tie {
+      font-weight: 700;
+    }
+    @media (max-width: 900px) {
+      .rankings-results-table {
+        min-width: 760px;
+      }
+      .rankings-results-table th,
+      .rankings-results-table td {
+        padding: 0.78rem 0.8rem;
+      }
+      .rankings-results-table th:nth-child(1),
+      .rankings-results-table .team-cell {
+        width: 34%;
+      }
+      .rankings-results-table th:nth-child(3),
+      .rankings-results-table td:nth-child(3) {
+        width: 32%;
+      }
+      .rankings-results-table th:nth-child(4),
+      .rankings-results-table td:nth-child(4) {
+        width: 24%;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="resource-page-container">
@@ -18,7 +101,19 @@
       <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
       <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
     </div>
-    <ul id="rankings-list" class="rankings-list"></ul>
+    <div class="scroll-x">
+      <table id="rankings-table" class="leaders-table standings-conference-table rankings-results-table">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>W-L</th>
+            <th>Last Week</th>
+            <th>Next</th>
+          </tr>
+        </thead>
+        <tbody id="rankings-table-body"></tbody>
+      </table>
+    </div>
   </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/resourceCache.js"></script>
@@ -30,7 +125,7 @@
   const teamId = params.get('team_id');
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
-    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+    backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
   }
 
   let showAll = false;
@@ -43,23 +138,57 @@
     return res.json();
   }
 
+  function buildTeamLink(r) {
+    const a = document.createElement('a');
+    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(r.team_id)}&team_name=${encodeURIComponent(r.team_name)}&return_url=${encodeURIComponent(getCurrentRelativeUrl())}`;
+    a.textContent = r.team_name;
+    a.style.color = '#4a90e2';
+    a.style.textDecoration = 'none';
+    return a;
+  }
+
   function render() {
-    const listEl = document.getElementById('rankings-list');
-    if (!listEl) return;
-    listEl.innerHTML = '';
+    const tbody = document.getElementById('rankings-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
     const toShow = showAll ? rankings : rankings.slice(0, 25);
     toShow.forEach((r) => {
-      const li = document.createElement('li');
-      li.appendChild(document.createTextNode(r.natl_rank + '. '));
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = r.team_name;
+      const tr = document.createElement('tr');
+
+      const teamTd = document.createElement('td');
+      teamTd.className = 'team-cell';
+      const rankSpan = document.createElement('span');
+      rankSpan.textContent = `${r.natl_rank}. `;
+      teamTd.appendChild(rankSpan);
+      const nameSpan = buildTeamLink(r);
       if (r.conference === 1) {
         nameSpan.className = 'rankings-team conference-1';
         nameSpan.style.color = r.primary_color || '#000';
         nameSpan.style.fontWeight = 'bold';
       }
-      li.appendChild(nameSpan);
-      listEl.appendChild(li);
+      teamTd.appendChild(nameSpan);
+      tr.appendChild(teamTd);
+
+      const wlTd = document.createElement('td');
+      wlTd.className = 'wl-cell';
+      wlTd.textContent = `${r.W || 0}-${r.L || 0}`;
+      tr.appendChild(wlTd);
+
+      const lastWeekTd = document.createElement('td');
+      const lastWeekSpan = document.createElement('span');
+      const result = (r.last_week_result || '').toUpperCase();
+      if (result === 'W') lastWeekSpan.className = 'last-week-win';
+      else if (result === 'L') lastWeekSpan.className = 'last-week-loss';
+      else if (result === 'T') lastWeekSpan.className = 'last-week-tie';
+      lastWeekSpan.textContent = r.last_week || '';
+      lastWeekTd.appendChild(lastWeekSpan);
+      tr.appendChild(lastWeekTd);
+
+      const nextTd = document.createElement('td');
+      nextTd.textContent = r.next || '';
+      tr.appendChild(nextTd);
+
+      tbody.appendChild(tr);
     });
   }
 
@@ -71,7 +200,7 @@
   }
 
   if (!franchiseId) {
-    document.getElementById('rankings-list').innerHTML = '<li>Missing franchise_id in URL.</li>';
+    document.getElementById('rankings-table-body').innerHTML = '<tr><td colspan="4">Missing franchise_id in URL.</td></tr>';
     return;
   }
   fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId))
@@ -94,7 +223,7 @@
       });
     })
     .catch(err => {
-      document.getElementById('rankings-list').innerHTML = '<li>Failed to load rankings.</li>';
+      document.getElementById('rankings-table-body').innerHTML = '<tr><td colspan="4">Failed to load rankings.</td></tr>';
       console.error(err);
     });
 })();

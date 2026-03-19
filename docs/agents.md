@@ -99,15 +99,6 @@ Assigns `ballSprite` position to the player with `hasBallAtStep[stepIndex] === t
 
 ---
 
-## 🚦Known Edge Cases (as of July 2025)
-
-- `event_type = "SHOT"` is hardcoded due to incomplete foul/turnover logic
-- On **away team possessions**, the **second pass (PG → PF)** is skipped
-- On **home team possessions**, the **third pass (PF → C)** is skipped
-- Defensive player movement is slightly off and will be addressed after pass logic is fixed
-
----
-
 ## 📦 Shared Game Assets
 
 ### `ballSprite`

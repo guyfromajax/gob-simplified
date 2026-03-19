@@ -15,6 +15,12 @@
   var mode = 'visits';
   var WEEK_35_POINTS_BUDGET = 20;
 
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+
   function isWeek35Mode() {
     return mode === 'week35';
   }

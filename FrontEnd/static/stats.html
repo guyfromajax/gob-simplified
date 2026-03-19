@@ -8,6 +8,31 @@
   <title>Stats</title>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/stats.css">
+  <style>
+    .stats-page .stats-team-filter-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.78);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font: 600 12px/1 'Barlow', sans-serif;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+
+    .stats-page .stats-team-filter-btn:hover {
+      border-color: rgba(255, 255, 255, 0.34);
+      color: #fff;
+    }
+
+    .stats-page .stats-team-filter-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.36);
+      color: #fff;
+    }
+  </style>
 </head>
 <body class="stats-page">
   <header class="stats-topbar">
@@ -21,11 +46,15 @@
       <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
       <button type="button" class="stats-scope-btn" data-scope="national">National</button>
     </div>
+    <div id="national-team-filter-wrap" class="stats-scope-toggle-wrap" style="display:none; margin-top: 12px;">
+      <button type="button" class="stats-team-filter-btn active" data-team-filter="top25">Top 25</button>
+      <button type="button" class="stats-team-filter-btn" data-team-filter="all">All Teams</button>
+    </div>
     <div class="stats-table-wrap">
       <table class="stats-table">
         <thead>
           <tr class="group-row">
-            <th colspan="5"></th>
+            <th colspan="6"></th>
             <th colspan="3">Shooting</th>
             <th colspan="3">3-Point</th>
             <th colspan="3">Free Throws</th>
@@ -35,6 +64,7 @@
           </tr>
           <tr class="col-row">
             <th class="sortable col-group-start" data-stat="team">Team <span class="sort-arrow"></span></th>
+            <th class="sortable" data-stat="rank">Rank <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="W">W <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="L">L <span class="sort-arrow"></span></th>
             <th class="sortable" data-stat="PF">PF <span class="sort-arrow"></span></th>
@@ -78,7 +108,7 @@
   const teamId = params.get('team_id');
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
-    backBtn.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}`;
+    backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
   }
 
   async function fetchJSON(url) {
@@ -89,15 +119,35 @@
 
   let userConference = null, userRegion = null;
   let scope = 'conference';
+  let nationalTeamFilter = 'top25';
   let leadersData = null, teamStatsData = null;
   let resourceCache = null;
   let defaultOrderTeams = null;
-  let sortColumn = null;
-  let sortDirection = null;
+  let sortColumn = 'rank';
+  let sortDirection = 'asc';
 
-  const COLUMN_ORDER = ['team','W','L','PF','PA','FGM','FGA','FG%','3PTM','3PTA','3PT%','FTM','FTA','FT%','DREB','OREB','TREB','AST','F','TO','SCR_A','SCR%','STL','BLK','DEF_A','DEF%'];
-  const COL_GROUP_START_INDEX = { 0:1, 5:1, 8:1, 11:1, 14:1, 17:1, 22:1 };
-  const STAT_MAP = { 'team':'team', 'W':'W', 'L':'L', 'PF':'PF', 'PA':'PA', 'FGM':'FGM', 'FGA':'FGA', 'FG%':'FG%', '3PTM':'3PTM', '3PTA':'3PTA', '3PT%':'3PT%', 'FTM':'FTM', 'FTA':'FTA', 'FT%':'FT%', 'DREB':'DREB', 'OREB':'OREB', 'TREB':'TREB', 'AST':'AST', 'F':'F', 'TO':'TO', 'SCR_A':'SCR_A', 'SCR%':'SCR%', 'STL':'STL', 'BLK':'BLK', 'DEF_A':'DEF_A', 'DEF%':'DEF%' };
+  const COLUMN_ORDER = ['team','rank','W','L','PF','PA','FGM','FGA','FG%','3PTM','3PTA','3PT%','FTM','FTA','FT%','DREB','OREB','TREB','AST','F','TO','SCR_A','SCR%','STL','BLK','DEF_A','DEF%'];
+  const COL_GROUP_START_INDEX = { 0:1, 6:1, 9:1, 12:1, 15:1, 18:1, 23:1 };
+  const STAT_MAP = { 'team':'team', 'rank':'rank', 'W':'W', 'L':'L', 'PF':'PF', 'PA':'PA', 'FGM':'FGM', 'FGA':'FGA', 'FG%':'FG%', '3PTM':'3PTM', '3PTA':'3PTA', '3PT%':'3PT%', 'FTM':'FTM', 'FTA':'FTA', 'FT%':'FT%', 'DREB':'DREB', 'OREB':'OREB', 'TREB':'TREB', 'AST':'AST', 'F':'F', 'TO':'TO', 'SCR_A':'SCR_A', 'SCR%':'SCR%', 'STL':'STL', 'BLK':'BLK', 'DEF_A':'DEF_A', 'DEF%':'DEF%' };
+
+  function cloneTeams(teams) {
+    return (teams || []).map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+  }
+
+  function getNumericNationalRank(team) {
+    const rankValue = team?.natl_rank;
+    const parsed = Number(rankValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function getFilteredTeamsForDisplay(teams) {
+    const cloned = cloneTeams(teams);
+    if (scope !== 'national' || nationalTeamFilter !== 'top25') return cloned;
+    return cloned.filter((team) => {
+      const nationalRank = getNumericNationalRank(team);
+      return nationalRank != null && nationalRank <= 25;
+    });
+  }
 
   function renderTeamStatsBody(teams) {
     const tbody = document.getElementById('teamstats-body');
@@ -112,6 +162,10 @@
         const groupStart = COL_GROUP_START_INDEX[i] ? ' col-group-start' : '';
         if (key === 'team') {
           html += '<td class="col-group-start">' + (t.team || '') + '</td>';
+          return;
+        }
+        if (key === 'rank') {
+          html += '<td>' + (getNumericNationalRank(t) ?? '--') + '</td>';
           return;
         }
         const cls = (key === 'W' ? 'col-w' : key === 'L' ? 'col-l' : '') + groupStart;
@@ -151,7 +205,7 @@
     });
     const totTr = document.createElement('tr');
     totTr.className = 'totals-row';
-    let totHtml = '<td class="col-group-start">TOTALS</td><td class="col-w">' + totals.W + '</td><td class="col-l">' + totals.L + '</td><td>' + totals.PF + '</td><td>' + totals.PA + '</td>';
+    let totHtml = '<td class="col-group-start">TOTALS</td><td>--</td><td class="col-w">' + totals.W + '</td><td class="col-l">' + totals.L + '</td><td>' + totals.PF + '</td><td>' + totals.PA + '</td>';
     totHtml += '<td class="col-group-start">' + totals.FGM + '</td><td>' + totals.FGA + '</td><td>' + (totals.FGA > 0 ? (totals.FGM/totals.FGA*100).toFixed(1)+'%' : '0.0%') + '</td>';
     totHtml += '<td class="col-group-start">' + totals['3PTM'] + '</td><td>' + totals['3PTA'] + '</td><td>' + (totals['3PTA'] > 0 ? (totals['3PTM']/totals['3PTA']*100).toFixed(1)+'%' : '0.0%') + '</td>';
     totHtml += '<td class="col-group-start">' + totals.FTM + '</td><td>' + totals.FTA + '</td><td>' + (totals.FTA > 0 ? (totals.FTM/totals.FTA*100).toFixed(1)+'%' : '0.0%') + '</td>';
@@ -164,11 +218,16 @@
 
   function sortTeams(teams, statKey, direction) {
     const key = STAT_MAP[statKey] || statKey;
-    const copy = teams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    const copy = cloneTeams(teams);
     copy.sort((a, b) => {
       const s1 = a.stats || {}, s2 = b.stats || {};
       let v1, v2;
       if (key === 'team') { v1 = a.team||''; v2 = b.team||''; return direction === 'asc' ? v1.localeCompare(v2) : v2.localeCompare(v1); }
+      if (key === 'rank') {
+        v1 = getNumericNationalRank(a) ?? Number.MAX_SAFE_INTEGER;
+        v2 = getNumericNationalRank(b) ?? Number.MAX_SAFE_INTEGER;
+        return direction === 'asc' ? v1 - v2 : v2 - v1;
+      }
       if (key === 'FG%') { v1 = s1.FGA>0 ? (s1.FGM||0)/s1.FGA : 0; v2 = s2.FGA>0 ? (s2.FGM||0)/s2.FGA : 0; }
       else if (key === '3PT%') { v1 = s1['3PTA']>0 ? (s1['3PTM']||0)/s1['3PTA'] : 0; v2 = s2['3PTA']>0 ? (s2['3PTM']||0)/s2['3PTA'] : 0; }
       else if (key === 'FT%') { v1 = s1.FTA>0 ? (s1.FTM||0)/s1.FTA : 0; v2 = s2.FTA>0 ? (s2.FTM||0)/s2.FTA : 0; }
@@ -207,8 +266,9 @@
       } else {
         sortColumn = stat;
         sortDirection = 'desc';
+        if (stat === 'rank') sortDirection = 'asc';
       }
-      let dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+      let dataToRender = getFilteredTeamsForDisplay(defaultOrderTeams);
       if (sortColumn && sortDirection) {
         dataToRender = sortTeams(dataToRender, sortColumn, sortDirection);
       }
@@ -223,15 +283,23 @@
 
   function render() {
     if (!teamStatsData) return;
-    const filtered = (teamStatsData.teams || []).map(t => ({ ...t }));
-    defaultOrderTeams = filtered.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
-    let dataToRender = defaultOrderTeams.map(t => ({ ...t, stats: { ...(t.stats || {}) } }));
+    const filtered = cloneTeams(teamStatsData.teams || []);
+    defaultOrderTeams = filtered;
+    let dataToRender = getFilteredTeamsForDisplay(defaultOrderTeams);
     if (sortColumn && sortDirection) {
       dataToRender = sortTeams(dataToRender, sortColumn, sortDirection);
     }
     renderTeamStatsBody(dataToRender);
     updateSortHeaders();
     bindSortHeaders();
+
+    const nationalFilterWrap = document.getElementById('national-team-filter-wrap');
+    if (nationalFilterWrap) {
+      nationalFilterWrap.style.display = scope === 'national' ? 'flex' : 'none';
+      nationalFilterWrap.querySelectorAll('.stats-team-filter-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-team-filter') === nationalTeamFilter);
+      });
+    }
 
     const container = document.getElementById('leaders-container');
     if (!container) return;
@@ -279,7 +347,7 @@
   }
 
   if (!franchiseId) {
-    document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Missing franchise_id in URL.</td></tr>';
+    document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="27">Missing franchise_id in URL.</td></tr>';
     return;
   }
   Promise.all([
@@ -292,11 +360,24 @@
     leadersData = payload.leaders;
     teamStatsData = payload.teamStats;
     render();
+    document.querySelectorAll('.stats-team-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nextFilter = btn.getAttribute('data-team-filter') || 'top25';
+        if (nationalTeamFilter === nextFilter) return;
+        nationalTeamFilter = nextFilter;
+        render();
+      });
+    });
     document.querySelectorAll('.stats-scope-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         scope = btn.getAttribute('data-scope') || 'conference';
+        sortColumn = 'rank';
+        sortDirection = 'asc';
+        if (scope === 'national') {
+          nationalTeamFilter = 'top25';
+        }
         document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === scope));
-        document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Loading stats...</td></tr>';
+        document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="27">Loading stats...</td></tr>';
         const nextPayload = await loadScope(scope);
         leadersData = nextPayload.leaders;
         teamStatsData = nextPayload.teamStats;
@@ -304,7 +385,7 @@
       });
     });
   }).catch(err => {
-    document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="26">Failed to load stats.</td></tr>';
+    document.getElementById('teamstats-body').innerHTML = '<tr><td colspan="27">Failed to load stats.</td></tr>';
     console.error(err);
   });
 })();
