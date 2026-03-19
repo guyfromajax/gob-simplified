@@ -21,7 +21,15 @@ def core_total_player_attrs(attrs: dict[str, Any] | None) -> int:
     )
 
 
-def calculate_prestige_delta(winner_prestige: int, loser_prestige: int) -> tuple[int, int]:
+def _prestige_delta_multiplier(week: int | None = None) -> int:
+    return 2 if week is not None and 1 <= int(week) <= 4 else 1
+
+
+def calculate_prestige_delta(
+    winner_prestige: int,
+    loser_prestige: int,
+    week: int | None = None,
+) -> tuple[int, int]:
     diff = winner_prestige - loser_prestige
     if diff > 100:
         winner_gain = 8
@@ -39,6 +47,10 @@ def calculate_prestige_delta(winner_prestige: int, loser_prestige: int) -> tuple
         winner_gain = 18
         loser_loss = 15
 
+    multiplier = _prestige_delta_multiplier(week)
+    winner_gain *= multiplier
+    loser_loss *= multiplier
+
     floor_proximity = min(1.0, max(0.0, (loser_prestige - PRESTIGE_FLOOR) / 100.0))
     loser_loss = round(loser_loss * floor_proximity)
 
@@ -47,8 +59,12 @@ def calculate_prestige_delta(winner_prestige: int, loser_prestige: int) -> tuple
     return winner_gain, loser_loss
 
 
-def apply_prestige_delta(winner_prestige: int, loser_prestige: int) -> tuple[int, int]:
-    winner_gain, loser_loss = calculate_prestige_delta(winner_prestige, loser_prestige)
+def apply_prestige_delta(
+    winner_prestige: int,
+    loser_prestige: int,
+    week: int | None = None,
+) -> tuple[int, int]:
+    winner_gain, loser_loss = calculate_prestige_delta(winner_prestige, loser_prestige, week=week)
     new_winner_prestige = min(PRESTIGE_CEILING, winner_prestige + winner_gain)
     new_loser_prestige = max(PRESTIGE_FLOOR, loser_prestige - loser_loss)
     return new_winner_prestige, new_loser_prestige

@@ -8,6 +8,7 @@ These team traits apply to Franchise mode only.
 - `natl_rank` persists in FTD and is recalculated only during regular season weeks `1-26`.
 - `natl_rank` freezes for EOS/tournament weeks and is reused for EOS seeding/display.
 - `prestige` updates only during regular season weeks `1-26`.
+- Regular season weeks `1-4` use a `2x` prestige-delta multiplier before dampeners/floor/ceiling are applied.
 - `sos_avg` persists in FTD during the regular season, defaults to `64`, and freezes during tournament play.
 - `total_player_attrs` is calculated at season creation / season rollover and then remains frozen for the rest of that season.
 - Weekly rank/prestige updates run inside `complete_week()` after all user and computer games for that week have completed.
@@ -35,6 +36,10 @@ Set manually per team before season starts. Ranges:
 
 ### Weekly Prestige Delta
 After every regular-season game, both teams' prestige updates based on the result.
+
+### Early Season Multiplier
+- Weeks `1-4`: multiply both `winner_gain` and `loser_loss` by `2` before applying the floor/ceiling dampeners.
+- Week `5` onward: revert to normal `1x` delta behavior.
 
 ```python
 def calculate_prestige_delta(
@@ -66,6 +71,10 @@ def calculate_prestige_delta(
 
     # Floor dampener — reduce loss as loser approaches 200
     # Prevents teams from dropping below floor
+    if 1 <= week <= 4:
+        winner_gain *= 2
+        loser_loss *= 2
+
     floor_proximity = min(1.0, max(0.0, (loser_prestige - 200) / 100))
     loser_loss = round(loser_loss * floor_proximity)
 
@@ -308,4 +317,3 @@ def generate_national_rankings(
 - `BackEnd/models/franchise_manager.py` — new-franchise preseason initialization
 - `BackEnd/utils/franchise_rank_prestige.py` — shared rank/prestige utility functions
 - `docs/docs_1_systems/06_GMO_Supporting_Systems/Rank_Prestige_System.md` — system doc
-

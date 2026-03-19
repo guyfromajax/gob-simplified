@@ -187,11 +187,19 @@ def _apply_regular_season_rank_prestige_updates(
             continue
 
         if away_score > home_score:
-            new_winner_prestige, new_loser_prestige = apply_prestige_delta(away_state["prestige"], home_state["prestige"])
+            new_winner_prestige, new_loser_prestige = apply_prestige_delta(
+                away_state["prestige"],
+                home_state["prestige"],
+                week=completed_week,
+            )
             away_state["prestige"] = new_winner_prestige
             home_state["prestige"] = new_loser_prestige
         else:
-            new_winner_prestige, new_loser_prestige = apply_prestige_delta(home_state["prestige"], away_state["prestige"])
+            new_winner_prestige, new_loser_prestige = apply_prestige_delta(
+                home_state["prestige"],
+                away_state["prestige"],
+                week=completed_week,
+            )
             home_state["prestige"] = new_winner_prestige
             away_state["prestige"] = new_loser_prestige
 
