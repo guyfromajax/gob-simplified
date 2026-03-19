@@ -619,7 +619,10 @@ export function createGameScene(Phaser) {
       // Filtered active players from roster
       
       this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
-      this.playerInfo = Object.fromEntries(actualPlayers.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
+      this.playerInfo = Object.fromEntries(actualPlayers.map(p => [
+        p.playerId ?? p.player_id,
+        { name: p.name, team: p.team, pos: p.pos, jersey: p.jersey },
+      ]));
       
       // Initialize player stats from simData.players (accumulated stats from previous quarters)
       // For Q2+, stats are restored from the database; for Q1, stats start at 0
