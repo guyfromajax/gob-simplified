@@ -4263,15 +4263,24 @@
       window.showAnnouncementOverlay = function(data) {
         var overlay = document.getElementById('announcement-overlay');
         if (!overlay) return;
+        var genericHeadshot = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
+        var applyHeadshotFallback = function(imgEl, src) {
+          if (!imgEl) return;
+          imgEl.onerror = function() {
+            this.onerror = null;
+            this.src = genericHeadshot;
+          };
+          imgEl.src = src || genericHeadshot;
+        };
         if (_annTimer) { clearTimeout(_annTimer); _annTimer = null; }
         var standardCard = overlay.querySelector('.standard-card');
         var foulCard = overlay.querySelector('.foul-card');
         if (data.type === 'foul') {
           standardCard.style.display = 'none';
           foulCard.style.display = 'flex';
-          foulCard.querySelector('.shooter-img').src = data.shooterPhotoUrl || '';
+          applyHeadshotFallback(foulCard.querySelector('.shooter-img'), data.shooterPhotoUrl);
           foulCard.querySelector('.shooter-name').textContent = ((data.shooterJersey || '') + ' ' + (data.shooterLastName || '')).trim();
-          foulCard.querySelector('.fouler-img').src = data.foulerPhotoUrl || '';
+          applyHeadshotFallback(foulCard.querySelector('.fouler-img'), data.foulerPhotoUrl);
           foulCard.querySelector('.fouler-name').textContent = ((data.foulerJersey || '') + ' ' + (data.foulerLastName || '')).trim();
           var raw = data.foulEventText || "It's Good!";
           var hasExclaim = raw.endsWith('!');
@@ -4284,7 +4293,7 @@
           var hasPlayer = (data.photoUrl && data.photoUrl.length) || (data.lastName && data.lastName.length);
           if (hasPlayer) {
             standardCard.classList.remove('no-player');
-            standardCard.querySelector('.ann-portrait-img').src = data.photoUrl || '';
+            applyHeadshotFallback(standardCard.querySelector('.ann-portrait-img'), data.photoUrl);
             standardCard.querySelector('.ann-jersey-name').textContent = ((data.jersey || '') + ' ' + (data.lastName || '')).trim();
             standardCard.querySelector('.ann-pos-label').textContent = data.position || '';
           } else {

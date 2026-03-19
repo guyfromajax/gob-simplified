@@ -106,13 +106,12 @@ function createPlayerAnnouncementCard(playerData, scale = 1.0) {
   return wrapper;
 }
 
-/** Build player image URL with static prefix for current environment (localhost vs production). Use generic_headshot when playerId is falsy. */
+/** Build player image URL with static prefix for current environment (localhost vs production). Use generic_headshot unless an explicit photo is provided. */
 function getPlayerImageUrl(photo, playerId) {
   const base = (typeof window !== 'undefined' && window.API_CONFIG?.buildStaticPath)
     ? window.API_CONFIG.buildStaticPath('/images/players/')
     : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/');
-  const filename = playerId ? `${playerId}.png` : 'generic_headshot.png';
-  return photo || `${base}${filename}`;
+  return photo || `${base}generic_headshot.png`;
 }
 
 /** Resolve team secondary color from scene (home/away by team_id). Returns hex string or fallback. */

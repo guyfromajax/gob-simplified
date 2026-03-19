@@ -164,7 +164,12 @@ When a steal leads to a fast break:
 - When `photoUrl` and `lastName` are both empty, the portrait zone is hidden (`.ann-card.standard-card.no-player .ann-portrait-zone { display: none }`) and the event text is centered. Used for: Trap!, Press!, Fast Break!, Slow It Down, Quick Shot, Final Shot, DOUBLE TEAM!
 
 **Player images and labels:**
-- Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, `getPlayerImageUrl()` builds the image URL; jersey and last name are resolved from `gameStore` rosters or `playerData`. The overlay displays `#jersey lastName` in the portrait caption. If no player data is provided, the overlay hides the portrait zone (see above).
+- Callers pass `playerData` with `playerId` (string) and optional `photo`. In `announcements.js`, `getPlayerImageUrl()` treats player portraits as **opt-in**:
+  - if an explicit `photo` path is provided, use it
+  - otherwise use `generic_headshot.png`
+- The announcement system does **not** assume `/images/players/{playerId}.png` exists for every player.
+- `court.html` also applies an image `onerror` fallback to `generic_headshot.png`, so bad or missing portrait paths degrade cleanly instead of rendering a broken-image icon.
+- Jersey and last name are resolved from `gameStore` rosters or `playerData`. The overlay displays `#jersey lastName` in the portrait caption. If no player data is provided, the overlay hides the portrait zone (see above).
 
 ### Key Files
 
@@ -180,6 +185,7 @@ When a steal leads to a fast break:
   - `announceFromTurnData()` - Main announcement dispatcher (lines 290-493)
   - `showAnnouncement(text, team, playerData)` - Builds standard payload, calls `window.showAnnouncementOverlay(data)`
   - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` - Builds foul payload, calls `window.showAnnouncementOverlay(data)`
+  - `getPlayerImageUrl(photo, playerId)` - Uses explicit portrait paths when available; otherwise falls back to `generic_headshot.png`
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent()` - Event-based announcement router (lines 24-125)
   - Handlers for specific event types (shot makes, fouls, steals, turnovers)
