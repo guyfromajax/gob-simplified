@@ -28,6 +28,7 @@ let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
+let commandCenterTopDataCache = null;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -1214,6 +1215,7 @@ async function init() {
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  commandCenterTopDataCache = topData;
 
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
@@ -1841,6 +1843,13 @@ window.addEventListener('DOMContentLoaded', () => {
     CommandCenterTabs.initCommandCenterTabs({
       defaultTab: 'standings-tab',
       onTabShow: (tabName) => {
+        bindResourcesLinks();
+        if (commandCenterTopDataCache) {
+          updateRecruitingButton(commandCenterTopDataCache);
+        }
+        if (tabName === 'recruits-tab') {
+          renderFccRecruits();
+        }
         if (tabName === 'tournament-tab') {
           renderTournamentBracket();
         }

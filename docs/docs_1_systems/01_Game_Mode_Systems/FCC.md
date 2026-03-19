@@ -66,6 +66,7 @@ Franchise-mode hub: team info, standings, roster, team report, recruits, tournam
 
 - **FCC tab state lives in the URL** via `tab=...` on `franchise-command-center.html`.
 - **Direct FCC outbound links** to standalone franchise pages include a relative `return_url` that preserves the full FCC URL, including the active tab.
+- **Link freshness:** FCC refreshes those outbound URLs when the active tab changes, so `return_url` reflects the tab the user actually leaves from, not just the tab that was active on initial FCC load.
 - **Back To Locker Room** buttons on FCC-launched pages use `return_url` first. This restores the user to the same FCC tab they were on when they left.
 - **Fallback behavior:** if a page was not launched directly from FCC and no valid `return_url` is present, the button falls back to the normal FCC URL. That lands the user on FCC’s default tab, which is Standings.
 - **Safety rule:** `return_url` is sanitized to same-origin relative paths only. External redirects are ignored.
