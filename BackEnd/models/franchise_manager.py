@@ -426,7 +426,7 @@ class FranchiseManager:
             team_name = team.get("name") or ""
             total_attrs = team.get("total_player_attrs") if team.get("total_player_attrs") is not None else team_name_to_total_attrs.get(team_name, 0)
             base_prestige = int(team.get("prestige") or 0)
-            prestige_ftd = max(0, base_prestige + random.randint(-30, 30))
+            prestige_ftd = max(200, base_prestige + random.randint(-30, 30))
             rank_inputs.append({
                 "team_id": str(team_object_id),
                 "team_name": team_name,

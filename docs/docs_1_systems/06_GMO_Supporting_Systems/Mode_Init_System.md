@@ -138,17 +138,18 @@ Ranges will be determined by each team's seed
   2. All players from all teams are loaded
   3. `Player.randomize_game_attributes()` is called for each player
   4. Team attributes are initialized in the **franchise_team_data (FTD)** structure with Franchise-specific ranges
-  5. Each team's FTD doc includes **`total_player_attrs`**: the sum of that team's player core attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT). Used for national ranking. When the universal **teams** collection has a `total_player_attrs` field for a team, franchise init uses that value; otherwise it is computed from the universal **players** collection (sum by team name) during init.
- 6. Each team's FTD doc includes recruiting support fields:
+  5. Each team's Franchise starting **`prestige`** is derived from the universal team prestige plus a one-time `random.randint(-30, 30)` adjustment, then clamped to a minimum of `200`.
+  6. Each team's FTD doc includes **`total_player_attrs`**: the sum of that team's player core attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT). Used for national ranking. When the universal **teams** collection has a `total_player_attrs` field for a team, franchise init uses that value; otherwise it is computed from the universal **players** collection (sum by team name) during init.
+  7. Each team's FTD doc includes recruiting support fields:
      - `scholarship_players`: array of the team's 12 initial player id strings
      - `training_squad_players`: array of the other 3 initial player id strings
      - `playing_time_promise_players`: initialized to `[]`
      - `Recruits`: keys `"1"` through `"20"` initialized to `None`
      - `recruiting_orders_week_35`: initialized to `{}`
      - `recruit_visit`: initialized to `None`
- 7. On each new franchise season, those recruiting support fields are reset before the new season begins.
+  8. On each new franchise season, those recruiting support fields are reset before the new season begins.
     - `scholarship_players` and `training_squad_players` are retained in the schema for future use, but are currently dormant in roster-assignment UI/logic.
-  8. Brand new franchise init still loads from universal collections. Continuing franchise seasons do not; see `Season_Init_System.md`.
+  9. Brand new franchise init still loads from universal collections. Continuing franchise seasons do not; see `Season_Init_System.md`.
 
 ### Playbook Settings Initialization
 
