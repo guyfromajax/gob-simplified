@@ -45,6 +45,14 @@ from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets
+from BackEnd.utils.franchise_rank_prestige import (
+    FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
+    SOS_AVG_DEFAULT,
+    apply_prestige_delta,
+    core_total_player_attrs,
+    rank_teams_for_week,
+    use_franchise_rank_prestige_v2,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -55,6 +63,8 @@ WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 AWARDS_FIELD = "awards"
 WEEK_35_RECRUITING_POINTS_BUDGET = 20
 SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
+RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
+RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
 
 
 def _mint_season_transition_token() -> str:
@@ -92,6 +102,136 @@ def _ensure_season_transition_token(
     if refreshed_token:
         franchise_doc[SEASON_TRANSITION_TOKEN_FIELD] = refreshed_token
     return refreshed_token
+
+
+def _should_freeze_total_player_attrs(franchise_doc: dict[str, Any] | None) -> bool:
+    return use_franchise_rank_prestige_v2(franchise_doc)
+
+
+def _update_ftd_roster_state(
+    franchise_id: ObjectId,
+    team_object_id: ObjectId,
+    update_fields: dict[str, Any],
+) -> None:
+    franchise_doc = db.franchises.find_one({"_id": franchise_id}, {RANK_PRESTIGE_SYSTEM_VERSION_FIELD: 1}) or {}
+    if _should_freeze_total_player_attrs(franchise_doc):
+        update_fields = {k: v for k, v in update_fields.items() if k != "total_player_attrs"}
+    franchise_team_data_collection.update_one(
+        {"franchise_id": franchise_id, "team_id": team_object_id},
+        {"$set": update_fields},
+    )
+
+
+def _apply_regular_season_rank_prestige_updates(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+    completed_week: int,
+    week_results: list[dict[str, Any]],
+) -> None:
+    if not use_franchise_rank_prestige_v2(franchise_doc):
+        return
+    if completed_week < 1 or completed_week > ScheduleManager.REGULAR_SEASON_WEEKS:
+        return
+
+    last_applied_week = int(franchise_doc.get(RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD, 0) or 0)
+    if last_applied_week >= completed_week:
+        logger.info(
+            "⏭️ [RANK_PRESTIGE] Skipping franchise=%s week=%s; already applied through week=%s",
+            franchise_id,
+            completed_week,
+            last_applied_week,
+        )
+        return
+
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "prestige": 1, "total_player_attrs": 1, "natl_rank": 1, "sos_avg": 1, "sos_rank_sum": 1, "sos_games_played": 1},
+    ))
+    team_state_by_id: dict[str, dict[str, Any]] = {}
+    previous_rank_by_team: dict[str, int] = {}
+    for doc in ftd_docs:
+        team_id = str(doc.get("team_id") or "")
+        if not team_id:
+            continue
+        previous_rank = int(doc.get("natl_rank", 999) or 999)
+        previous_rank_by_team[team_id] = previous_rank
+        team_state_by_id[team_id] = {
+            "team_id": team_id,
+            "prestige": int(doc.get("prestige", 0) or 0),
+            "total_player_attrs": int(doc.get("total_player_attrs", 0) or 0),
+            "natl_rank": previous_rank,
+            "sos_avg": float(doc.get("sos_avg", SOS_AVG_DEFAULT) or SOS_AVG_DEFAULT),
+            "sos_rank_sum": float(doc.get("sos_rank_sum", 0) or 0),
+            "sos_games_played": int(doc.get("sos_games_played", 0) or 0),
+        }
+
+    for result in week_results:
+        away_id = str(result.get("away_id") or "")
+        home_id = str(result.get("home_id") or "")
+        if away_id not in team_state_by_id or home_id not in team_state_by_id:
+            continue
+        away_state = team_state_by_id[away_id]
+        home_state = team_state_by_id[home_id]
+
+        away_rank_entering_week = previous_rank_by_team.get(away_id, 64)
+        home_rank_entering_week = previous_rank_by_team.get(home_id, 64)
+        away_state["sos_rank_sum"] += home_rank_entering_week
+        away_state["sos_games_played"] += 1
+        home_state["sos_rank_sum"] += away_rank_entering_week
+        home_state["sos_games_played"] += 1
+
+        away_score = int(result.get("away_score", 0) or 0)
+        home_score = int(result.get("home_score", 0) or 0)
+        if away_score == home_score:
+            logger.warning("⚠️ [RANK_PRESTIGE] Tied game detected for franchise=%s week=%s teams=%s/%s; prestige unchanged", franchise_id, completed_week, away_id, home_id)
+            continue
+
+        if away_score > home_score:
+            new_winner_prestige, new_loser_prestige = apply_prestige_delta(away_state["prestige"], home_state["prestige"])
+            away_state["prestige"] = new_winner_prestige
+            home_state["prestige"] = new_loser_prestige
+        else:
+            new_winner_prestige, new_loser_prestige = apply_prestige_delta(home_state["prestige"], away_state["prestige"])
+            home_state["prestige"] = new_winner_prestige
+            away_state["prestige"] = new_loser_prestige
+
+    ranking_inputs: list[dict[str, Any]] = []
+    for team_id, state in team_state_by_id.items():
+        games_played = int(state.get("sos_games_played", 0) or 0)
+        sos_avg = SOS_AVG_DEFAULT if games_played <= 0 else float(state.get("sos_rank_sum", 0) or 0) / games_played
+        state["sos_avg"] = sos_avg
+        ranking_inputs.append({
+            "team_id": team_id,
+            "prestige": int(state.get("prestige", 0) or 0),
+            "total_player_attrs": int(state.get("total_player_attrs", 0) or 0),
+            "sos_avg": sos_avg,
+        })
+
+    ranked = rank_teams_for_week(ranking_inputs, week=completed_week, previous_rank_by_team=previous_rank_by_team)
+    ranked_by_team = {str(entry["team_id"]): entry for entry in ranked}
+
+    for doc in ftd_docs:
+        team_id = str(doc.get("team_id") or "")
+        if team_id not in team_state_by_id or team_id not in ranked_by_team:
+            continue
+        state = team_state_by_id[team_id]
+        ranked_entry = ranked_by_team[team_id]
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": doc["team_id"]},
+            {"$set": {
+                "prestige": int(state["prestige"]),
+                "natl_rank": int(ranked_entry["natl_rank"]),
+                "sos_avg": float(state["sos_avg"]),
+                "sos_rank_sum": float(state["sos_rank_sum"]),
+                "sos_games_played": int(state["sos_games_played"]),
+                "updated_at": datetime.utcnow(),
+            }},
+        )
+
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: completed_week}},
+    )
 
 
 def _game_doc_richness_score(game_doc: dict) -> int:
@@ -2026,6 +2166,7 @@ def complete_week(req: CompleteWeekRequest):
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
     _apply_complete_week_recruiting_lean_updates(franchise_doc, req.week, results)
+    _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, req.week, results)
     
     # Reset training status for next week
     next_week = req.week + 1
@@ -4188,22 +4329,20 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
             str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
             if str(player_id) in remaining_ids
         ]
-        total_player_attrs = 0
-        for player_id in remaining_ids:
-            attrs = (fpd_map.get(player_id) or {}).get("attributes") or {}
-            total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
-
-        franchise_team_data_collection.update_one(
-            {"franchise_id": franchise_id, "team_id": ftd_doc.get("team_id")},
+        total_player_attrs = sum(
+            core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
+            for player_id in remaining_ids
+        )
+        _update_ftd_roster_state(
+            franchise_id,
+            ftd_doc.get("team_id"),
             {
-                "$set": {
-                    "players": remaining_ids,
-                    "scholarship_players": remaining_scholarships,
-                    "training_squad_players": [],
-                    "playing_time_promise_players": remaining_ptp,
-                    "total_player_attrs": total_player_attrs,
-                    "updated_at": datetime.utcnow(),
-                }
+                "players": remaining_ids,
+                "scholarship_players": remaining_scholarships,
+                "training_squad_players": [],
+                "playing_time_promise_players": remaining_ptp,
+                "total_player_attrs": total_player_attrs,
+                "updated_at": datetime.utcnow(),
             },
         )
         if cut_ids:
@@ -5282,22 +5421,20 @@ def cut_franchise_players(
         if str(player_id) in remaining_roster_ids
     ]
 
-    total_player_attrs = 0
-    for player_id in remaining_roster_ids:
-        attrs = (fpd_map.get(player_id) or {}).get("attributes") or {}
-        total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
-
-    franchise_team_data_collection.update_one(
-        {"franchise_id": fid, "team_id": team_object_id},
+    total_player_attrs = sum(
+        core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
+        for player_id in remaining_roster_ids
+    )
+    _update_ftd_roster_state(
+        fid,
+        team_object_id,
         {
-            "$set": {
-                "players": remaining_roster_ids,
-                "scholarship_players": remaining_scholarships,
-                "training_squad_players": remaining_training_squad,
-                "playing_time_promise_players": remaining_ptp,
-                "total_player_attrs": total_player_attrs,
-                "updated_at": datetime.utcnow(),
-            }
+            "players": remaining_roster_ids,
+            "scholarship_players": remaining_scholarships,
+            "training_squad_players": remaining_training_squad,
+            "playing_time_promise_players": remaining_ptp,
+            "total_player_attrs": total_player_attrs,
+            "updated_at": datetime.utcnow(),
         },
     )
     franchise_players_data_collection.delete_many(
@@ -6591,6 +6728,9 @@ def finish_season(req: FinishSeasonRequest):
     # Get current season
     current_season = franchise_doc.get("current_season", 1)
     next_season = current_season + 1
+    rank_prestige_system_version = int(
+        franchise_doc.get(RANK_PRESTIGE_SYSTEM_VERSION_FIELD, 1) or 1
+    )
 
     from BackEnd.models.franchise_manager import FranchiseManager
 
@@ -6673,10 +6813,16 @@ def finish_season(req: FinishSeasonRequest):
         })
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
+    existing_ftd_by_team_id = {
+        str(doc.get("team_id")): doc
+        for doc in ftd_docs
+        if doc.get("team_id")
+    }
 
     def highest_rt(player_id: str) -> int:
         return int((_best_position((next_fpd_map.get(player_id) or {}).get("position_ratings") or {}).get("rating") or 0))
 
+    next_ftd_state_by_team_id: dict[str, dict[str, Any]] = {}
     for ftd_doc in ftd_docs:
         team_id = str(ftd_doc.get("team_id"))
         roster = list(returning_players_by_team.get(team_id, []))
@@ -6690,26 +6836,73 @@ def finish_season(req: FinishSeasonRequest):
             if signed_player.get("playing_time"):
                 pt_promise_players.append(player_id)
         ordered_roster = sorted(roster, key=highest_rt, reverse=True)
+        total_player_attrs = sum(
+            core_total_player_attrs((next_fpd_map.get(player_id) or {}).get("attributes") or {})
+            for player_id in ordered_roster
+        )
+        existing_ftd = existing_ftd_by_team_id.get(team_id) or {}
+        next_ftd_state_by_team_id[team_id] = {
+            "team_object_id": ftd_doc["team_id"],
+            "players": ordered_roster,
+            "scholarship_players": sorted(scholarship_players, key=highest_rt, reverse=True),
+            "training_squad_players": [],
+            "playing_time_promise_players": pt_promise_players,
+            "Recruits": {str(i): None for i in range(1, 21)},
+            RECRUITING_ORDERS_WEEK_35_FIELD: {},
+            "recruit_visit": None,
+            "training_reports": {},
+            "total_player_attrs": total_player_attrs,
+            "prestige": int(existing_ftd.get("prestige", 0) or 0),
+            "sos_avg": SOS_AVG_DEFAULT,
+            "sos_rank_sum": 0.0,
+            "sos_games_played": 0,
+            "updated_at": datetime.utcnow(),
+        }
 
-        total_player_attrs = 0
-        for player_id in ordered_roster:
-            attrs = (next_fpd_map.get(player_id) or {}).get("attributes") or {}
-            total_player_attrs += sum(int(attrs.get(attr, 0) or 0) for attr in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"])
+    if rank_prestige_system_version >= FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION:
+        preseason_inputs = [
+            {
+                "team_id": team_id,
+                "prestige": state["prestige"],
+                "total_player_attrs": state["total_player_attrs"],
+                "sos_avg": state["sos_avg"],
+            }
+            for team_id, state in next_ftd_state_by_team_id.items()
+        ]
+        for ranked in rank_teams_for_week(preseason_inputs, week=0):
+            state = next_ftd_state_by_team_id.get(str(ranked["team_id"]))
+            if state is not None:
+                state["natl_rank"] = int(ranked["natl_rank"])
+    else:
+        legacy_ranked = sorted(
+            next_ftd_state_by_team_id.items(),
+            key=lambda item: (
+                -(int(item[1]["total_player_attrs"]) + int(item[1]["prestige"])),
+                random.random(),
+            ),
+        )
+        for rank_index, (_, state) in enumerate(legacy_ranked, start=1):
+            state["natl_rank"] = rank_index
 
+    for team_id, state in next_ftd_state_by_team_id.items():
         franchise_team_data_collection.update_one(
-            {"franchise_id": franchise_id, "team_id": ftd_doc["team_id"]},
+            {"franchise_id": franchise_id, "team_id": state["team_object_id"]},
             {
                 "$set": {
-                    "players": ordered_roster,
-                    "scholarship_players": sorted(scholarship_players, key=highest_rt, reverse=True),
-                    "training_squad_players": [],
-                    "playing_time_promise_players": pt_promise_players,
-                    "Recruits": {str(i): None for i in range(1, 21)},
-                    RECRUITING_ORDERS_WEEK_35_FIELD: {},
-                    "recruit_visit": None,
-                    "training_reports": {},
-                    "total_player_attrs": total_player_attrs,
-                    "updated_at": datetime.utcnow(),
+                    "players": state["players"],
+                    "scholarship_players": state["scholarship_players"],
+                    "training_squad_players": state["training_squad_players"],
+                    "playing_time_promise_players": state["playing_time_promise_players"],
+                    "Recruits": state["Recruits"],
+                    RECRUITING_ORDERS_WEEK_35_FIELD: state[RECRUITING_ORDERS_WEEK_35_FIELD],
+                    "recruit_visit": state["recruit_visit"],
+                    "training_reports": state["training_reports"],
+                    "total_player_attrs": state["total_player_attrs"],
+                    "sos_avg": state["sos_avg"],
+                    "sos_rank_sum": state["sos_rank_sum"],
+                    "sos_games_played": state["sos_games_played"],
+                    "updated_at": state["updated_at"],
+                    **({"natl_rank": state["natl_rank"]} if "natl_rank" in state else {}),
                 }
             },
         )
@@ -6772,6 +6965,8 @@ def finish_season(req: FinishSeasonRequest):
             "stats.top_10_assists": [],
             "stats.top_10_blocks": [],
             "stats.top_10_steals": [],
+            RANK_PRESTIGE_SYSTEM_VERSION_FIELD: rank_prestige_system_version,
+            RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: 0,
         }}
     )
     

@@ -13,6 +13,12 @@ from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.constants import BOX_SCORE_KEYS
+from BackEnd.utils.franchise_rank_prestige import (
+    FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
+    SOS_AVG_DEFAULT,
+    core_total_player_attrs,
+    rank_teams_for_week,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -314,6 +320,8 @@ class FranchiseManager:
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
             "applied_games": [],
+            "rank_prestige_system_version": FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
+            "rank_prestige_last_applied_week": 0,
             "training_status": training_status,
             # Add missing document-level fields (matches Tournament pattern)
             "created_at": datetime.utcnow(),
@@ -403,38 +411,40 @@ class FranchiseManager:
             franchise_recruits_data_collection.insert_many(frd_docs)
         _perf["frd_insert_many"] = (time.time() - _t0) * 1000
 
-        # National rank: total_player_attrs (from universal players) + randomized prestige; rank 1-128, ties broken randomly
-        CORE_ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
-
-        def _player_attr_sum(attrs):
-            if not attrs:
-                return 0
-            return sum(int(attrs.get(k, 0) or 0) for k in CORE_ATTR_KEYS if isinstance(attrs.get(k), (int, float)))
-
         _t0 = time.time()
         team_name_to_total_attrs = {}
         for p in self.db.players.find({}, {"team": 1, "attributes": 1}):
             tname = (p.get("team") or "").strip()
             if tname:
-                team_name_to_total_attrs[tname] = team_name_to_total_attrs.get(tname, 0) + _player_attr_sum(p.get("attributes") or {})
+                team_name_to_total_attrs[tname] = team_name_to_total_attrs.get(tname, 0) + core_total_player_attrs(p.get("attributes") or {})
         _perf["team_total_attrs_agg"] = (time.time() - _t0) * 1000
 
-        # Build (team_object_id, team_name, total_player_attrs, prestige_ftd); prestige = universal + rand(-30, 30), clamp >= 0
-        # total_player_attrs: use universal team doc if present, else computed from players (see Mode_Init_System.md)
-        rows = []
+        # Preseason natl_rank: prestige + 10% total_player_attrs; ties broken randomly once.
+        rank_inputs = []
         for team in self.teams:
             team_object_id = team["_id"]
             team_name = team.get("name") or ""
             total_attrs = team.get("total_player_attrs") if team.get("total_player_attrs") is not None else team_name_to_total_attrs.get(team_name, 0)
             base_prestige = int(team.get("prestige") or 0)
             prestige_ftd = max(0, base_prestige + random.randint(-30, 30))
-            rows.append((team_object_id, team_name, total_attrs, prestige_ftd))
+            rank_inputs.append({
+                "team_id": str(team_object_id),
+                "team_name": team_name,
+                "total_player_attrs": total_attrs,
+                "prestige": prestige_ftd,
+                "sos_avg": SOS_AVG_DEFAULT,
+            })
 
-        # Sort by (total_attrs + prestige_ftd) desc; break ties randomly
-        rows.sort(key=lambda r: (-(r[2] + r[3]), random.random()))
         team_id_to_rank_data = {}
-        for rank, (team_object_id, _name, total_attrs, prestige_ftd) in enumerate(rows, start=1):
-            team_id_to_rank_data[team_object_id] = {"prestige": prestige_ftd, "total_player_attrs": total_attrs, "natl_rank": rank}
+        for ranked in rank_teams_for_week(rank_inputs, week=0):
+            team_id_to_rank_data[ranked["team_id"]] = {
+                "prestige": ranked["prestige"],
+                "total_player_attrs": ranked["total_player_attrs"],
+                "natl_rank": ranked["natl_rank"],
+                "sos_avg": SOS_AVG_DEFAULT,
+                "sos_rank_sum": 0,
+                "sos_games_played": 0,
+            }
         _perf["natl_rank_compute"] = (time.time() - _t0) * 1000
 
         _t0 = time.time()
@@ -464,7 +474,7 @@ class FranchiseManager:
             team_player_ids = team.get("player_ids", [])
             players = [str(pid) for pid in team_player_ids]
 
-            rank_data = team_id_to_rank_data.get(team_object_id, {})
+            rank_data = team_id_to_rank_data.get(str(team_object_id), {})
             prestige_ftd = rank_data.get("prestige", 0)
             total_player_attrs = rank_data.get("total_player_attrs", 0)
             natl_rank = rank_data.get("natl_rank", 128)
@@ -488,6 +498,9 @@ class FranchiseManager:
                 "prestige": prestige_ftd,
                 "total_player_attrs": total_player_attrs,
                 "natl_rank": natl_rank,
+                "sos_avg": rank_data.get("sos_avg", SOS_AVG_DEFAULT),
+                "sos_rank_sum": rank_data.get("sos_rank_sum", 0),
+                "sos_games_played": rank_data.get("sos_games_played", 0),
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
             }
