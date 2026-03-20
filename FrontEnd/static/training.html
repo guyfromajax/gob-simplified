@@ -335,21 +335,13 @@
           </div>
           <div class="archetype-options">
             <label class="archetype-option">
-              <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="archetype-radio">
-              <span>Top 3 Attributes</span>
+              <input type="radio" name="coaching-focus" value="player-maximizer-choose-attributes" class="archetype-radio">
+              <span>Choose Attributes</span>
             </label>
-            <label class="archetype-option">
-              <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="archetype-radio">
-              <span>Attributes 4–6</span>
-            </label>
-            <label class="archetype-option">
-              <input type="radio" name="coaching-focus" value="player-maximizer-custom" class="archetype-radio">
-              <span>Custom Attributes</span>
-            </label>
-            <label class="archetype-option">
-              <input type="radio" name="coaching-focus" value="player-maximizer-opportunity" class="archetype-radio">
-              <span>Opportunity</span>
-            </label>
+            <!-- Auto-Train: leaf values not shown in main UI -->
+            <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+            <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+            <input type="radio" name="coaching-focus" value="player-maximizer-positional-focus" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
           </div>
   </div>
 
@@ -381,11 +373,29 @@
     </div>
   </div>
 
-  <!-- Player Maximizer: Custom Attributes -->
+  <!-- Player Maximizer: Choose Attributes modal -->
   <div id="custom-focus-modal" class="custom-focus-modal" style="display: none;" aria-hidden="true">
     <div class="custom-focus-modal-content">
-      <h2 class="custom-focus-modal-title">Custom focus attributes</h2>
-      <p class="custom-focus-modal-hint">Pick <strong>three</strong> attributes per player (ranking set). A fourth pick replaces your most recent pick. Commit when every player has three distinct picks.</p>
+      <h2 class="custom-focus-modal-title">Custom Focus Attributes</h2>
+      <div class="pm-modal-mode-row" role="radiogroup" aria-label="Focus mode">
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="top-3" class="archetype-radio">
+          <span>Top 3</span>
+        </label>
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="attributes-4-6" class="archetype-radio">
+          <span>Attributes 4–6</span>
+        </label>
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="positional" class="archetype-radio">
+          <span>Positional Focus</span>
+        </label>
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="custom" class="archetype-radio">
+          <span>Custom</span>
+        </label>
+      </div>
+      <p id="pm-modal-custom-hint" class="pm-modal-custom-hint" hidden>Pick three attributes per player.</p>
       <div class="custom-focus-table-wrap">
         <table class="custom-focus-table" id="custom-focus-table">
           <thead id="custom-focus-thead"></thead>
@@ -393,7 +403,7 @@
         </table>
       </div>
       <div class="custom-focus-modal-actions">
-        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign focus attributes</button>
+        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign Focus Attributes</button>
         <button type="button" id="custom-focus-cancel-btn" class="custom-focus-cancel-btn">Cancel</button>
       </div>
     </div>

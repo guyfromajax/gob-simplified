@@ -50,6 +50,14 @@ class TestParseCoachingFocus(unittest.TestCase):
             parse_coaching_focus("player-maximizer-top-3"),
             ("player-maximizer", "player-maximizer-top-3"),
         )
+        self.assertEqual(
+            parse_coaching_focus("player-maximizer-positional-focus"),
+            ("player-maximizer", "player-maximizer-positional-focus"),
+        )
+        self.assertEqual(
+            parse_coaching_focus("player-maximizer-choose-attributes"),
+            ("player-maximizer", "player-maximizer-choose-attributes"),
+        )
 
     def test_culture_builder_leaf(self):
         self.assertEqual(
@@ -134,6 +142,12 @@ class TestParseCoachingFocus(unittest.TestCase):
             coaching_focus_leaf_display_name("culture-builder-teamwork"), "Team Building"
         )
         self.assertIsNone(coaching_focus_leaf_display_name("culture-builder-inspire"))
+
+    def test_positional_focus_leaf_display_name(self):
+        self.assertEqual(
+            coaching_focus_leaf_display_name("player-maximizer-positional-focus"),
+            "Positional Focus",
+        )
 
 
 if __name__ == "__main__":

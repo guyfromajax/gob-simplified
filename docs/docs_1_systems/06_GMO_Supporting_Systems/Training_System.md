@@ -111,7 +111,7 @@
   - **Systems Coach** (dark/burnt yellow header fill)
     - Sub-options: Offense, Defense, Fast Breaks, Press / Trap
   - **Player Maximizer** (darker green header fill)
-    - Sub-options: Top 3 Attributes, Attributes 4–6, Custom Attributes, Opportunity
+    - **Choose Attributes** opens a modal: **Top 3**, **Attributes 4–6**, **Positional Focus** (primary by highest RT, fixed triple per position), or **Custom** (three distinct attrs per player). Submit sends the resolved leaf (`player-maximizer-top-3`, `player-maximizer-attributes-4-6`, `player-maximizer-positional-focus`, or `player-maximizer-custom`). Off-screen radios support Auto-Train picking top-3 / 4–6 / positional without the modal.
   - **Culture Builder** (purple header fill)
     - Sub-options: Inspire, Confidence, Community Engagement, Team Building
 
@@ -144,7 +144,8 @@
 - Disabled / visually muted (reduced opacity, non-clickable) until:
   1. All training points are allocated (Points Remaining = 0) - 30 for first training, 24 otherwise
   2. A coaching focus is selected
-- Becomes active only when both conditions are met
+  3. **Player Maximizer / Choose Attributes:** user has tapped **Assign Focus Attributes** in the modal (or Auto-Train selected a hidden leaf). For **Custom**, every player needs three distinct picks.
+- Becomes active only when all conditions are met
 
 ### Auto-Train Button
 
@@ -156,7 +157,7 @@
       - **24 points**: 4 sliders set to `2` (20 + 4 = 24)
       - **30 points**: 10 sliders set to `2` (20 + 10 = 30)
   - Randomly selects a Coaching Focus (one of the existing focus options, not archetype headers)
-  - Shows confirmation popup: `Training Points Assigned - {Focus Name} Focus Chosen`
+  - Shows confirmation popup: `Training Points Assigned` then `Assigned {Focus Name} Focus` (e.g. `Assigned Attributes 4–6 (Player Maximizer) Focus` for hidden PM leaves)
     - Popup has a "Close" button; closing keeps the user on the Training page
   - After auto-assign, Points Remaining = 0 and Submit becomes eligible (provided focus set by auto-train)
 
@@ -345,8 +346,8 @@ Then use the following CH scale for each player
 **Player Maximizer:**
 - Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
 - Attributes 4-6: Amplifies gains to player's 4th–6th highest attributes among the same set as Top 3 (excluding CH, EM, MO, NG)
-- Custom: User picks **three** distinct attributes per player (from the same ranking set as Top 3 / 4–6: trainable anchors excluding CH). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB, attrC] }` for every roster player; drill gains to those attrs use the same 1.5–1.8× focus multiplier as other Player Maximizer options. Custom modal and training report list players by **highest RT** (max position rating) descending.
-- Be Opportunistic: Improves Set Play and Motion Shot Scores (carried to next game)
+- **Positional Focus** (`player-maximizer-positional-focus`): Primary position from highest **RT** (ties PG→SG→SF→PF→C); fixed triple per primary—PG: PS/BH/IQ; SG: SH/OD/AG; SF: SC/ST/AG; PF: RB/ID/ST; C: SC/ID/ST. Same focus multiplier on drill gains to those attrs.
+- **Custom:** User picks **three** distinct attributes per player (same ranking set as Top 3 / 4–6). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB, attrC] }` for every roster player. Roster rows include `attrs` and `position_ratings`; list order **highest RT** descending.
 
 **Culture Builder:**
 - Inspire: **Flat block:** each player gets **EM** `+random.randint(2, 5)` and **MO** `+random.randint(1, 2)` (caps apply); no focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
@@ -530,8 +531,8 @@ The training focus is formatted as "Focus (Archetype)" with the focus outside pa
 - **Player Maximizer** archetype options:
   - "Top 3 Attributes (Player Maximizer)"
   - "Attributes 4-6 (Player Maximizer)"
+  - "Positional Focus (Player Maximizer)"
   - "Custom (Player Maximizer)"
-  - "Be Opportunistic (Player Maximizer)"
 - **Culture Builder** archetype options:
   - "Inspire (Culture Builder)"
   - "Community Engagement (Culture Builder)"
@@ -553,7 +554,7 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 
 1. **Training Submission:**
    - User allocates 24 training points (or 30 for first training) and selects coaching focus on `training.html`
-   - **Player Maximizer / Custom:** `GET /franchise/training-points` includes roster rows and ranking attr codes for the modal; submit payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
+   - **Player Maximizer:** `GET /franchise/training-points` includes `custom_focus_roster` (attrs + `position_ratings`) and `player_maximizer_ranking_attrs` for the modal. Submit sends a **resolved** leaf (never bare `player-maximizer-choose-attributes`). Payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
    - Frontend sends POST request to `/franchise/run-training` with training data
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`

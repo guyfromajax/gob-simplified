@@ -1063,7 +1063,7 @@ def generate_random_coaching_focus() -> str:
         "player-maximizer",
         "player-maximizer-top-3",
         "player-maximizer-attributes-4-6",
-        "player-maximizer-opportunity",
+        "player-maximizer-positional-focus",
         "culture-builder",
         "culture-builder-inspire",
         "culture-builder-community",
@@ -5734,11 +5734,16 @@ def _build_custom_focus_roster_for_franchise(
         attr_vals = {}
         for a in ranking:
             attr_vals[a] = int(attrs_obj.get(f"anchor_{a}", attrs_obj.get(a, 0)) or 0)
+        pr_raw = fpd.get("position_ratings") or {}
+        position_ratings = (
+            {str(k): v for k, v in pr_raw.items()} if isinstance(pr_raw, dict) else {}
+        )
         rows.append(
             {
                 "player_id": pid_str,
                 "name": name,
                 "attrs": attr_vals,
+                "position_ratings": position_ratings,
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }
         )
@@ -6037,6 +6042,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     logger.warning(f"🔋 [API] allocations.team_drills: {allocations.get('team_drills', {})}")
     coaching_focus = training_data.get("coaching_focus")
     raw_custom = training_data.get("coaching_focus_custom_by_player")
+
+    if coaching_focus == "player-maximizer-choose-attributes":
+        raise HTTPException(
+            status_code=400,
+            detail="Open Player Maximizer attributes, choose a mode, and tap Assign Focus Attributes before submitting.",
+        )
 
     # Execute new training system
     # This applies pre-training conditions, then training points, and returns training report

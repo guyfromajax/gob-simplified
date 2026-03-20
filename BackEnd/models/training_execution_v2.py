@@ -148,6 +148,42 @@ TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO",
 # Player Maximizer (top 3 / attributes 4–6 / custom picks): rank by anchor; CH excluded (team chemistry not a maximizer target)
 PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
 
+# Primary position from max RT → three focus attrs (Player Maximizer / Positional Focus)
+POSITIONAL_FOCUS_ATTRS_BY_PRIMARY: Dict[str, Tuple[str, str, str]] = {
+    "PG": ("PS", "BH", "IQ"),
+    "SG": ("SH", "OD", "AG"),
+    "SF": ("SC", "ST", "AG"),
+    "PF": ("RB", "ID", "ST"),
+    "C": ("SC", "ID", "ST"),
+}
+PRIMARY_POSITION_RT_ORDER: Tuple[str, ...] = ("PG", "SG", "SF", "PF", "C")
+
+
+def primary_position_from_position_ratings(ratings: Optional[dict]) -> str:
+    """Position with highest rating; ties broken by PG → C order."""
+    if not ratings:
+        return "PG"
+    best_val = -1.0
+    best_pos = "PG"
+    for pos in PRIMARY_POSITION_RT_ORDER:
+        raw = ratings.get(pos)
+        if raw is None and isinstance(pos, str):
+            raw = ratings.get(pos.upper())
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            v = 0.0
+        if v > best_val:
+            best_val = v
+            best_pos = pos
+    return best_pos
+
+
+def positional_focus_attrs_for_player(player: dict) -> Tuple[str, str, str]:
+    ratings = player.get("position_ratings") or {}
+    pos = primary_position_from_position_ratings(ratings)
+    return POSITIONAL_FOCUS_ATTRS_BY_PRIMARY.get(pos, POSITIONAL_FOCUS_ATTRS_BY_PRIMARY["PG"])
+
 
 def normalize_coaching_focus_custom_by_player(
     coaching_focus: Optional[str],
@@ -245,6 +281,7 @@ COACHING_FOCUS_ARCHETYPE_PREFIXES = (
 COACHING_FOCUS_LEAF_DISPLAY_NAME: Dict[str, str] = {
     "authoritarian-teamwork": "Teamwork",
     "culture-builder-teamwork": "Team Building",
+    "player-maximizer-positional-focus": "Positional Focus",
 }
 
 
@@ -794,11 +831,14 @@ def _apply_player_training_points(
     # Check if this attribute should be amplified based on focus
     should_amplify = False
     
-    # Handle Player Maximizer special cases (top 3 / next 3 attributes)
+    # Handle Player Maximizer special cases (top 3 / next 3 / positional / custom)
     if sub_option in ["player-maximizer-top-3", "player-maximizer-attributes-4-6"]:
         # Rank by anchor for PLAYER_MAXIMIZER_RANKING_ATTRS (CH excluded; EM/MO/NG not in list)
         player_attrs = {a: attrs.get(f"anchor_{a}", 0) for a in PLAYER_MAXIMIZER_RANKING_ATTRS}
-        sorted_attrs = sorted(player_attrs.items(), key=lambda x: x[1], reverse=True)
+        sorted_attrs = sorted(
+            player_attrs.items(),
+            key=lambda x: (-(x[1] if isinstance(x[1], (int, float)) else 0), x[0]),
+        )
         
         if sub_option == "player-maximizer-top-3":
             # Top 3 attributes
@@ -808,6 +848,9 @@ def _apply_player_training_points(
             # Attributes 4-6
             next_attrs = [a[0] for a in sorted_attrs[3:6]]
             should_amplify = attr in next_attrs
+    elif sub_option == "player-maximizer-positional-focus":
+        triple = positional_focus_attrs_for_player(player)
+        should_amplify = attr in triple
     elif sub_option == "player-maximizer-custom" and coaching_focus_custom_by_player:
         pid = str(player.get("_id", ""))
         chosen = coaching_focus_custom_by_player.get(pid) or []
@@ -1193,8 +1236,8 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     elif sub_option == "player-maximizer-custom":
         # Per-player picks (coaching_focus_custom_by_player) handled in _apply_player_training_points
         return False
-    elif sub_option == "player-maximizer-opportunity":
-        return False  # Improves Non-Successful Set Play Skeleton Shot Scores, Improves all Motion Shot Scores (handled separately)
+    elif sub_option == "player-maximizer-positional-focus":
+        return False  # Handled in _apply_player_training_points via position_ratings
     
     # Culture Builder Options
     elif sub_option == "culture-builder-inspire":

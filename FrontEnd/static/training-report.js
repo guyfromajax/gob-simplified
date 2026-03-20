@@ -79,8 +79,9 @@ const FOCUS_DISPLAY = {
   'player-maximizer': {
     'top-3': 'Player Maximizer - Top 3 Attributes',
     'attributes-4-6': 'Player Maximizer - Attributes 4-6',
+    'positional-focus': 'Player Maximizer - Positional Focus',
     'custom': 'Player Maximizer - Custom',
-    'be-opportunistic': 'Player Maximizer - Be Opportunistic'
+    'choose-attributes': 'Player Maximizer - Choose Attributes'
   },
   'culture-builder': {
     'inspire': 'Culture Builder - Inspire',

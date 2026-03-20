@@ -43,8 +43,9 @@
 |---|----------|---------|--------|-----------------------------|
 | 9 | Top 3 Attributes | `player-maximizer-top-3` | **Implemented** | In `_apply_player_training_points`, per player, ranks trainable anchor attrs (excl. CH, EM, MO, NG), amplifies gains to **top 3** with same focus multiplier. |
 | 10 | Attributes 4–6 | `player-maximizer-attributes-4-6` | **Implemented** | Same as above for **4th–6th** highest trainable attrs. |
-| 11 | Custom Attributes | `player-maximizer-custom` | **Implemented** | **Franchise:** `GET /franchise/training-points` returns `custom_focus_roster` (rows sorted by max **RT** descending) + `player_maximizer_ranking_attrs`; UI modal collects **three** distinct attrs per roster player (`coaching_focus_custom_by_player` on submit). **`normalize_coaching_focus_custom_by_player`** validates; **`_apply_player_training_points`** amplifies drill gains when `attr` is in that player’s triple (same 1.5–1.8× band). CH / EM / MO / NG not allowed (ranking set). **Auto-train / random CPU focus** excludes this leaf (needs per-player payload). Training report player table: same RT sort (API + `training-report.js`). |
-| 12 | Opportunity | `player-maximizer-opportunity` | **Not implemented** | **`_should_amplify_*`:** `False`; comment references set play / motion shot scoring “handled separately” — **no** implementation found for this `sub_option`. |
+| 11 | Custom (modal) | `player-maximizer-custom` | **Implemented** | **Franchise:** `GET /franchise/training-points` returns `custom_focus_roster` (rows sorted by max **RT** descending, includes `position_ratings`) + `player_maximizer_ranking_attrs`. Main PM UI is **Choose Attributes** (`player-maximizer-choose-attributes`); the modal’s **Custom** mode collects **three** distinct attrs per roster player (`coaching_focus_custom_by_player` on submit). API **rejects** bare `choose-attributes` (user must tap **Assign Focus Attributes** so payload sends a real leaf). **`normalize_coaching_focus_custom_by_player`** validates; **`_apply_player_training_points`** amplifies drill gains when `attr` is in that player’s triple. **Auto-train** skips choose + custom (no payload). |
+| 12 | Positional Focus | `player-maximizer-positional-focus` | **Implemented** | Highest **RT** primary (ties **PG → SG → SF → PF → C**) maps to a fixed triple: PG→PS/BH/IQ, SG→SH/OD/AG, SF→SC/ST/AG, PF→RB/ID/ST, C→SC/ID/ST. Drill gains to those attrs use the same Player Maximizer multiplier (`positional_focus_attrs_for_player` in `training_execution_v2.py`). |
+| — | Choose Attributes (UI only) | `player-maximizer-choose-attributes` | **N/A** | Opens modal; not a valid training leaf on submit. |
 
 ---
 
@@ -91,13 +92,13 @@ No flat EM/MO block on Confidence; no **team_chemistry** focus mult on Confidenc
 
 ## Summary counts
 
-Leaf options above: **16** (four per archetype block, excluding archetype header radios).
+Leaf options above: **16** valid training leaves (four per archetype API block) + **Choose Attributes** (UI-only placeholder).
 
 | Status | Count | Focus keys |
 |--------|-------|------------|
-| Implemented | **13** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (3):** top-3, attributes 4–6, custom. **Culture (4):** inspire*, confidence†, community engagement§, team building‡ |
+| Implemented | **14** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (4):** top-3, attributes 4–6, custom, positional focus. **Culture (4):** inspire*, confidence†, community engagement§, team building‡ |
 | Partial | **2** | **Systems (2):** fast breaks, press/trap |
-| Not implemented | **1** | **Player maximizer (1):** opportunity |
+| Not implemented | **0** | — |
 
 \* **Inspire** — see **Inspire (plain summary)** above.  
 † **Confidence** — see **Confidence (plain summary)** above.  
