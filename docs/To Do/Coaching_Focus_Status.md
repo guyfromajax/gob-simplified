@@ -52,22 +52,39 @@
 
 | # | UI label | `value` | Status | What the code actually does |
 |---|----------|---------|--------|-----------------------------|
-| 13 | Inspire | `culture-builder-inspire` | **Implemented** | **Dedicated block:** all players get **EM** and **MO** bumps `random.randint(1, 2)` each (capped 100 / 10)—absolute only; **no** EM/MO drill multipliers. **`_should_amplify_player_attr`:** amplifies **CH** (conditioning, film study) and **FT** (free throws) drill gains with `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coeff). **`_should_amplify_team_attr`:** **team_chemistry** gains use the same focus multiplier band. |
+| 13 | Inspire | `culture-builder-inspire` | **Implemented** | See **Inspire (plain summary)** below (flat EM/MO + amplified CH, FT, team_chemistry). |
 | 14 | Confidence | `culture-builder-confidence` | **Not implemented** | **`_should_amplify_*`:** `False`; comment only; no play/man-defense hook. |
 | 15 | Community Engagement | `culture-builder-community` | **Partial** | **Dedicated block:** all players **EM** +1–2. Comment: crowd min/max for next home/away — **not** implemented in this module (no game-creation hook found here). |
 | 16 | Teamwork | `culture-builder-teamwork` | **Partial** | **`_should_amplify_player_attr`:** **PS** only. **`_should_amplify_team_attr`:** no **team_chemistry** line for this focus (contrast **Inspire**). **Not** implemented: motion / zone defense effectiveness boosts from doc. |
+
+### Inspire (plain summary)
+
+**What happens automatically (not from your sliders):**  
+Every player gets a **flat** **+1 or +2** to **EM** and **+1 or +2** to **MO** once per training when Inspire is selected (**EM** capped at 100, **MO** at 10). These bumps **do not** use the 1.5–1.8× focus multiplier.
+
+**What Inspire *amplifies* (1.5×, 1.6×, 1.7×, or 1.8× — one random roll per session, same as other wired focuses):**
+
+| Kind | Attribute | Where it comes from in training |
+|------|-----------|--------------------------------|
+| Player | **CH** | Points on **Conditioning** and **Film study** (CH still uses its normal **0.5×** drill coefficient on the rolled step; then the focus multiplier applies). |
+| Player | **FT** | Points on **Free throws**. |
+| Team | **team_chemistry** | Any training path that adds **team** chemistry (e.g. **Scrimmages**, **Free throws** / **Film study** fractional contributions, **Breaks** at 4–5). |
+
+**Not amplified by Inspire:** play/defense effectiveness, install pools, EM/MO (those use the flat block only). Crowd / community-style effects are N/A here.
 
 ---
 
 ## Summary counts
 
+Leaf options above: **16** (four per archetype block, excluding archetype header radios).
+
 | Status | Count | Focus keys |
 |--------|-------|------------|
-| Implemented | **10** | discipline, rebounding, execution (set + Man), **teamwork** (motion + zone install gains + PS/IQ drills), systems offense, systems defense, player top-3, player 4–6, **player custom**, culture inspire* |
-| Partial | **4** | systems fast breaks, systems press/trap, culture community, culture teamwork |
-| Not implemented | **2** | player opportunity, culture confidence |
+| Implemented | **10** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (3):** top-3, attributes 4–6, custom. **Culture (1):** inspire* |
+| Partial | **4** | **Systems (2):** fast breaks, press/trap. **Culture (2):** community, teamwork |
+| Not implemented | **2** | **Player maximizer (1):** opportunity. **Culture (1):** confidence |
 
-\*Inspire = absolute +1/+2 EM/MO + CH/FT drill amplify + team_chemistry amplify; crowd N/A.
+\* **Inspire** — see **Inspire (plain summary)** above.
 
 ---
 
