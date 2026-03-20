@@ -19,6 +19,31 @@ const round = parseInt(urlParams.get('round'), 10); // For tournament mode (opti
 
 let reportData = null;
 let currentView = 'changes'; // 'attributes' or 'changes'
+/** Projected Starting 5 sub-toggle: 'attributes' | 'stats' */
+let projectedLineupView = 'attributes';
+
+// Season stat columns (aligned with franchise command center roster stats table)
+const TRAINING_PROJECTED_STATS_COLUMNS = [
+  'PTS',
+  'FGM',
+  'FGA',
+  'FG%',
+  '3PTM',
+  '3PTA',
+  '3PT%',
+  'FTM',
+  'FTA',
+  'FT%',
+  'DREB',
+  'OREB',
+  'TREB',
+  'AST',
+  'STL',
+  'BLK',
+  'F',
+  'MIN',
+  'TO',
+];
 
 // Attribute abbreviations mapping
 // NOTE: Order is critical - this is the exact order attributes should be displayed horizontally
@@ -109,6 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set up view toggle
   setupViewToggle();
+
+  setupProjectedLineupToggle();
   
   // Set up locker room button
   setupLockerRoomButton();
@@ -117,8 +144,131 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTrainingReport();
 });
 
+function setupProjectedLineupToggle() {
+  const buttons = document.querySelectorAll('.projected-lineup-toggle .toggle-btn');
+  if (!buttons.length) return;
+  buttons.forEach((b) => {
+    if (b.getAttribute('data-projected-view') === projectedLineupView) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      playSound('click-tiny.wav');
+      buttons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      projectedLineupView = btn.getAttribute('data-projected-view') || 'attributes';
+      renderProjectedStartingFiveSection();
+    });
+  });
+}
+
+function formatTrainingSeasonStat(stats, col) {
+  const s = stats || {};
+  const num = (x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : 0;
+  };
+  switch (col) {
+    case 'FG%': {
+      const fga = num(s.FGA);
+      const fgm = num(s.FGM);
+      return fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0';
+    }
+    case '3PT%': {
+      const tpa = num(s['3PTA'] != null ? s['3PTA'] : s.TPA);
+      const tpm = num(s['3PTM'] != null ? s['3PTM'] : s.TPM);
+      return tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
+    }
+    case 'FT%': {
+      const fta = num(s.FTA);
+      const ftm = num(s.FTM);
+      return fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0';
+    }
+    case 'TREB': {
+      if (s.TREB != null && s.TREB !== '') return String(s.TREB);
+      return String(num(s.OREB) + num(s.DREB));
+    }
+    default: {
+      const v = s[col];
+      if (v == null || v === '') return '0';
+      return String(v);
+    }
+  }
+}
+
+function buildSeasonStatsByPlayerId() {
+  const map = new Map();
+  (reportData.players || []).forEach((p) => {
+    const pid = p.player_id || p.id;
+    if (pid != null && pid !== '') map.set(String(pid), p.season_stats || {});
+  });
+  return map;
+}
+
+function renderProjectedStartingFiveStats(rows) {
+  const el = document.getElementById('training-projected-lineup');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rows || rows.length === 0) {
+    el.innerHTML =
+      '<p class="training-projected-empty">No projected lineup (missing position ratings or roster data).</p>';
+    return;
+  }
+  const statsMap = buildSeasonStatsByPlayerId();
+  const table = document.createElement('table');
+  table.className = 'training-projected-table';
+  const thead = document.createElement('thead');
+  const hrow = document.createElement('tr');
+  const headers = ['Pos', 'Player'].concat(TRAINING_PROJECTED_STATS_COLUMNS);
+  headers.forEach((h) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    const pid = r.player_id != null ? String(r.player_id) : '';
+    const stats = statsMap.get(pid) || {};
+    const playerLabel =
+      typeof formatNameWithJersey === 'function'
+        ? formatNameWithJersey(r.jersey, r.name || '')
+        : r.name || '—';
+    const cells = [r.position || '—', playerLabel];
+    TRAINING_PROJECTED_STATS_COLUMNS.forEach((col) => {
+      cells.push(formatTrainingSeasonStat(stats, col));
+    });
+    cells.forEach((text) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  el.appendChild(table);
+}
+
+function renderProjectedStartingFiveSection() {
+  if (!reportData) return;
+  const rows = reportData.projected_starting_five || [];
+  if (projectedLineupView === 'stats') {
+    renderProjectedStartingFiveStats(rows);
+    return;
+  }
+  if (typeof renderProjectedStartingFive === 'function') {
+    renderProjectedStartingFive(rows, {
+      containerId: 'training-projected-lineup',
+      tableClass: 'training-projected-table',
+      emptyClass: 'training-projected-empty',
+    });
+  }
+}
+
 function setupViewToggle() {
-  const toggleButtons = document.querySelectorAll('.toggle-btn');
+  const toggleButtons = document.querySelectorAll('.players-section .toggle-btn');
   // Enforce initial active button from currentView
   toggleButtons.forEach(b => {
     if (b.dataset.view === currentView) b.classList.add('active');
@@ -215,6 +365,8 @@ function renderPage() {
   
   // Render playbook summary
   renderPlaybookSummary();
+
+  renderProjectedStartingFiveSection();
   
   // Render training notes
   renderTrainingNotes();

@@ -263,6 +263,83 @@ body {
   min-width: 80px;
 }
 
+/* Projected Starting 5 (training report) */
+.projected-lineup-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+}
+
+.projected-lineup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.projected-lineup-section h2 {
+  font-size: 1.8rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  margin: 0;
+}
+
+.training-projected-lineup-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table.training-projected-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.8rem;
+  min-width: 720px;
+}
+
+.training-projected-table thead {
+  background: rgba(255, 215, 0, 0.12);
+}
+
+.training-projected-table th,
+.training-projected-table td {
+  padding: var(--spacing-sm);
+  text-align: center;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  color: var(--color-text);
+}
+
+.training-projected-table th:first-child,
+.training-projected-table td:first-child,
+.training-projected-table th:nth-child(2),
+.training-projected-table td:nth-child(2) {
+  text-align: left;
+}
+
+.training-projected-table th {
+  color: var(--color-accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.training-projected-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.training-projected-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.training-projected-empty {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  padding: var(--spacing-md) 0;
+  margin: 0;
+}
+
 /* Team Section */
 .team-section {
   background: var(--color-surface);

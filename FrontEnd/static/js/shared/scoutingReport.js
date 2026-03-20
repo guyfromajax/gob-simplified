@@ -18,19 +18,30 @@ function scoutingFormatHeight(raw) {
 /**
  * Render projected starting five (from API `projected_starting_five` array).
  * @param {Array<{position:string,name:string,jersey:number,year:string,height:number,weight:number,rt:number,attributes:Object}>} rows
+ * @param {string|{containerId?:string,tableClass?:string,emptyClass?:string}} [containerOrOpts] - optional container id or options (default: scouting modal)
  */
-function renderProjectedStartingFive(rows) {
-  const el = document.getElementById('scouting-projected-lineup');
+function renderProjectedStartingFive(rows, containerOrOpts) {
+  let containerId = 'scouting-projected-lineup';
+  let tableClass = 'scouting-projected-table';
+  let emptyClass = 'scouting-projected-empty';
+  if (typeof containerOrOpts === 'string') {
+    containerId = containerOrOpts;
+  } else if (containerOrOpts && typeof containerOrOpts === 'object') {
+    if (containerOrOpts.containerId) containerId = containerOrOpts.containerId;
+    if (containerOrOpts.tableClass) tableClass = containerOrOpts.tableClass;
+    if (containerOrOpts.emptyClass) emptyClass = containerOrOpts.emptyClass;
+  }
+  const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = '';
   if (!rows || rows.length === 0) {
     el.innerHTML =
-      '<p class="scouting-projected-empty">No projected lineup (missing position ratings or roster data).</p>';
+      '<p class="' + emptyClass + '">No projected lineup (missing position ratings or roster data).</p>';
     return;
   }
 
   const table = document.createElement('table');
-  table.className = 'scouting-projected-table';
+  table.className = tableClass;
   const thead = document.createElement('thead');
   const hrow = document.createElement('tr');
   const headers = ['Pos', 'Player', 'Year', 'Ht', 'Wt'].concat(SCOUTING_PROJECTED_ATTR_COLS).concat(['RT']);

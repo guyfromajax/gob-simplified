@@ -72,6 +72,20 @@
       <div class="team-attributes-grid" id="team-attributes-grid"></div>
     </section>
 
+    <!-- Projected Starting 5 -->
+    <section class="projected-lineup-section">
+      <div class="section-header projected-lineup-header">
+        <h2>Projected Starting 5</h2>
+        <div class="view-toggle projected-lineup-toggle" role="group" aria-label="Projected lineup columns">
+          <button type="button" class="toggle-btn active" data-projected-view="attributes">Attributes</button>
+          <button type="button" class="toggle-btn" data-projected-view="stats">Stats</button>
+        </div>
+      </div>
+      <div class="scroll-x">
+        <div id="training-projected-lineup" class="training-projected-lineup-wrap"></div>
+      </div>
+    </section>
+
     <!-- Playbook Summary Section -->
     <section class="playbook-summary-section">
       <h2>Playbook Summary</h2>
@@ -83,6 +97,7 @@
 
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/scoutingReport.js"></script>
   <script src="/training-report.js"></script>
 </body>
 </html>

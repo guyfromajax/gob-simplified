@@ -6520,11 +6520,21 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 player_name = f"{first_name} {last_name}".strip()
                 
                 if player_name:  # Only add if we have a name
+                    season_raw = player_data.get("season") or {}
+                    season_stats = dict(season_raw) if isinstance(season_raw, dict) else {}
                     players.append({
                         "id": pid_str,
+                        "player_id": pid_str,
                         "name": player_name,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "jersey": meta.get("jersey"),
+                        "year": meta.get("year") or player_data.get("year"),
+                        "height": meta.get("height") or player_data.get("height"),
+                        "weight": meta.get("weight") or player_data.get("weight"),
                         "attributes": player_attrs,
                         "position_ratings": player_data.get("position_ratings", {}),
+                        "season_stats": season_stats,
                     })
             
             logger.info(f"🔍 [TRAINING REPORT] Found {len(players)} players for team {team_id_str}")
@@ -6579,9 +6589,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if report_data and report_data.get("round") != current_round:
                 report_data = {}
             
-            # Get upcoming opponent from bracket
-            current_round = doc.get("current_round", 1)
-            round_key = get_round_name(current_round)
+            # Get upcoming opponent from bracket (do not clobber report round `week`)
+            bracket_round = doc.get("current_round", 1)
+            round_key = get_round_name(bracket_round)
             matchups = doc.get("bracket", {}).get(round_key, [])
             upcoming_opponent = None
             
@@ -6657,11 +6667,21 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 player_name = f"{first_name} {last_name}".strip()
                 
                 if player_name:
+                    season_raw = tournament_player_data.get("season") or {}
+                    season_stats = dict(season_raw) if isinstance(season_raw, dict) else {}
                     players.append({
                         "id": pid_str,
+                        "player_id": pid_str,
                         "name": player_name,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "jersey": meta.get("jersey"),
+                        "year": meta.get("year") or tournament_player_data.get("year"),
+                        "height": meta.get("height") or tournament_player_data.get("height"),
+                        "weight": meta.get("weight") or tournament_player_data.get("weight"),
                         "attributes": player_attrs,
                         "position_ratings": tournament_player_data.get("position_ratings", {}),
+                        "season_stats": season_stats,
                     })
             
             _sort_training_report_players_by_max_rt(players)
@@ -6685,10 +6705,14 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         if not report_data:
             raise HTTPException(status_code=404, detail="Training report not found")
 
+        from BackEnd.utils.scouting_utils import compute_projected_starting_five
+
+        projected_starting_five = compute_projected_starting_five(players) if players else []
+
         return {
             "status": "success",
             "week": week if mode == "franchise" else None,  # Only for franchise mode
-            "round": current_round if mode == "tournament" else None,  # Only for tournament mode
+            "round": week if mode == "tournament" else None,  # Tournament: training report round (not bracket cursor)
             "upcoming_opponent": upcoming_opponent,
             "coaching_focus": report_data.get("coaching_focus", {}),
             # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
@@ -6700,7 +6724,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "plays_effectiveness_changes": report_data.get("plays_effectiveness_changes", {}),
             "defenses_effectiveness_changes": report_data.get("defenses_effectiveness_changes", {}),
             "players": players,
-            "team_attributes": team_attrs
+            "team_attributes": team_attrs,
+            "projected_starting_five": projected_starting_five,
         }
         
     except HTTPException:
