@@ -52,7 +52,7 @@
 
 | # | UI label | `value` | Status | What the code actually does |
 |---|----------|---------|--------|-----------------------------|
-| 13 | Inspire | `culture-builder-inspire` | **Implemented** (with caveat) | **Dedicated block:** all players get **EM** and **MO** bumps `random.randint(1, 2)` each (capped 100 / 10). **`_should_amplify_team_attr`:** **team_chemistry** gains amplified. **`_should_amplify_player_attr`:** also lists EM/MO — but **EM/MO are not** in `TRAINABLE_PLAYER_ATTRS`, so drill loops never apply extra focus mult to EM/MO; the **flat block** is what implements the doc-style EM/MO bump. |
+| 13 | Inspire | `culture-builder-inspire` | **Implemented** | **Dedicated block:** all players get **EM** and **MO** bumps `random.randint(1, 2)` each (capped 100 / 10)—absolute only; **no** EM/MO drill multipliers. **`_should_amplify_player_attr`:** amplifies **CH** (conditioning, film study) and **FT** (free throws) drill gains with `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coeff). **`_should_amplify_team_attr`:** **team_chemistry** gains use the same focus multiplier band. |
 | 14 | Confidence | `culture-builder-confidence` | **Not implemented** | **`_should_amplify_*`:** `False`; comment only; no play/man-defense hook. |
 | 15 | Community Engagement | `culture-builder-community` | **Partial** | **Dedicated block:** all players **EM** +1–2. Comment: crowd min/max for next home/away — **not** implemented in this module (no game-creation hook found here). |
 | 16 | Teamwork | `culture-builder-teamwork` | **Partial** | **`_should_amplify_player_attr`:** **PS** only. **`_should_amplify_team_attr`:** no **team_chemistry** line for this focus (contrast **Inspire**). **Not** implemented: motion / zone defense effectiveness boosts from doc. |
@@ -67,7 +67,7 @@
 | Partial | **4** | systems fast breaks, systems press/trap, culture community, culture teamwork |
 | Not implemented | **2** | player opportunity, culture confidence |
 
-\*Inspire = implemented for EM/MO block + CH amplify; crowd N/A.
+\*Inspire = absolute +1/+2 EM/MO + CH/FT drill amplify + team_chemistry amplify; crowd N/A.
 
 ---
 

@@ -7,6 +7,7 @@ from BackEnd.models.training_execution_v2 import (
     _scale_install_training_effectiveness_points,
     PLAYER_MAXIMIZER_RANKING_ATTRS,
     normalize_coaching_focus_custom_by_player,
+    _should_amplify_player_attr,
 )
 
 
@@ -101,6 +102,13 @@ class TestParseCoachingFocus(unittest.TestCase):
             normalize_coaching_focus_custom_by_player(
                 "player-maximizer-custom", {"p1": ["SC", "CH"]}, players
             )
+
+    def test_inspire_amplifies_ch_and_ft_not_em_mo_drills(self):
+        sub = "culture-builder-inspire"
+        self.assertTrue(_should_amplify_player_attr("CH", "culture-builder", sub))
+        self.assertTrue(_should_amplify_player_attr("FT", "culture-builder", sub))
+        self.assertFalse(_should_amplify_player_attr("EM", "culture-builder", sub))
+        self.assertFalse(_should_amplify_player_attr("MO", "culture-builder", sub))
 
 
 if __name__ == "__main__":

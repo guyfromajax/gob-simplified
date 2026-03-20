@@ -1174,7 +1174,8 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     
     # Culture Builder Options
     elif sub_option == "culture-builder-inspire":
-        return attr in ["EM", "MO"]  # Improves EM, MO by random.randint(1,2), amplifies Team Chemistry gains
+        # EM/MO: absolute +1/+2 block only (no drill multipliers). CH/FT: drill gains amplified here.
+        return attr in ["CH", "FT"]
     elif sub_option == "culture-builder-community":
         return attr == "EM"  # Improves EM, Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
     elif sub_option == "culture-builder-teamwork":

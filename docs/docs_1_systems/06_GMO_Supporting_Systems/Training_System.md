@@ -338,7 +338,7 @@ Then use the following CH scale for each player
 - Be Opportunistic: Improves Set Play and Motion Shot Scores (carried to next game)
 
 **Culture Builder:**
-- Inspire: Improves EM, MO by `random.randint(1, 2)`, amplifies Team Chemistry gains
+- Inspire: Each player gets **absolute** **EM** and **MO** improvements of `random.randint(1, 2)` each (dedicated block)—no extra multipliers on those two. **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient on the rolled increment). **team_chemistry** training gains use the same multiplier band under Inspire.
 - Community Engagement: Improves EM, affects crowd factors (carried to next game)
 - Teamwork: Amplifies Team Chemistry gains, improves Motion Play and Zone Defense Effectiveness
 - Build Confidence: Design: set play / man defense effectiveness boost (multiplier band in code for wired focuses is `1.5–1.8`; **not yet implemented** for this sub-option—see `Coaching_Focus_Status.md`)
