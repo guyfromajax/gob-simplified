@@ -5,7 +5,7 @@ import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
-import { generateBothLineups } from './utils/autosetLineup.js';
+import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
 
 // API_CONFIG is loaded as a global script, access via window
 const API_CONFIG = window.API_CONFIG;
@@ -2104,13 +2104,13 @@ async function handleSimQuarter() {
   await loadGamePlanSettings();
   await loadPlaybookSettings();
 
-  // Fetch rosters for auto-set lineup generation (needed for Q2-Q4)
+  // Fetch rosters for Q2–Q4 autoset (unified API; includes team_chemistry in franchise/tournament modes)
   let homeRoster, awayRoster;
   try {
-    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`) + '?profile=1');
-    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`) + '?profile=1');
-    if (homeRes.ok) homeRoster = await homeRes.json();
-    if (awayRes.ok) awayRoster = await awayRes.json();
+    [homeRoster, awayRoster] = await Promise.all([
+      fetchTeamRoster(homeTeam),
+      fetchTeamRoster(awayTeam),
+    ]);
   } catch (err) {
     console.error('Error fetching rosters for auto-set:', err);
   }
@@ -2153,12 +2153,16 @@ async function handleSimQuarter() {
         console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, strategy: gamePlanSettings.strategy_settings });
       }
     } else {
-      // Q2-Q4: Auto-set lineups
+      // Q2-Q4: Auto-set lineups (server /api/autoset-lineup — same as lineup screen)
       if (homeRoster && awayRoster) {
-        const autoLineups = generateBothLineups(homeRoster, awayRoster);
+        const timeRem = nextQuarter > 4 ? 240 : 480;
+        const autoLineups = await generateBothLineupsFromApi(homeRoster, awayRoster, {
+          quarter: nextQuarter,
+          time_remaining: timeRem,
+        });
         payload.home_lineup = autoLineups.home_lineup;
         payload.away_lineup = autoLineups.away_lineup;
-        console.log(`🤖 Q${nextQuarter}: Auto-set lineups generated for both teams`);
+        console.log(`🤖 Q${nextQuarter}: Auto-set lineups from API for both teams`);
       }
       // Reuse game plan settings from Q1
       if (gamePlanSettings && userTeamSide) {
@@ -2367,13 +2371,12 @@ async function handleSimFullGame() {
   await loadGamePlanSettings();
   await loadPlaybookSettings();
 
-  // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
   try {
-    const homeRes = await fetch(API_CONFIG.buildUrl(`/roster/${homeTeam}`) + '?profile=1');
-    const awayRes = await fetch(API_CONFIG.buildUrl(`/roster/${awayTeam}`) + '?profile=1');
-    if (homeRes.ok) homeRoster = await homeRes.json();
-    if (awayRes.ok) awayRoster = await awayRes.json();
+    [homeRoster, awayRoster] = await Promise.all([
+      fetchTeamRoster(homeTeam),
+      fetchTeamRoster(awayTeam),
+    ]);
   } catch (err) {
     console.error('Error fetching rosters for auto-set:', err);
   }
@@ -2429,12 +2432,16 @@ async function handleSimFullGame() {
           console.warn('⚠️ Not sending game plan settings (sim full):', { hasSettings: !!gamePlanSettings, userTeamSide });
         }
       } else {
-        // Q2-Q4: Auto-set lineups
+        // Q2-Q4: unified API autoset
         if (homeRoster && awayRoster) {
-          const autoLineups = generateBothLineups(homeRoster, awayRoster);
+          const timeRem = currentQ > 4 ? 240 : 480;
+          const autoLineups = await generateBothLineupsFromApi(homeRoster, awayRoster, {
+            quarter: currentQ,
+            time_remaining: timeRem,
+          });
           payload.home_lineup = autoLineups.home_lineup;
           payload.away_lineup = autoLineups.away_lineup;
-          console.log(`🤖 Q${currentQ}: Auto-set lineups generated for both teams`);
+          console.log(`🤖 Q${currentQ}: Auto-set lineups from API for both teams`);
         }
         // Reuse game plan settings from Q1
         if (gamePlanSettings && userTeamSide) {

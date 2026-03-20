@@ -6,10 +6,12 @@ from unittest.mock import patch
 import pytest
 
 from BackEnd.constants import ALL_ATTRS
+from BackEnd.models.player import Player
 from BackEnd.utils import db_utils
 from BackEnd.utils.db_utils import (
     _team_chemistry_pool_sizes,
     autoset_lineup_player_ids_from_payload,
+    fill_unified_lineup_gaps,
 )
 
 
@@ -126,3 +128,34 @@ def test_autoset_uses_waterfall_when_default_ng_too_strict():
     # Without waterfall, only 4 players pass NG>=0.8; relaxed steps include 0.6 then 0.4, etc.
     assert set(lineup.values()) == {"1", "2", "3", "4", "5"}
     assert len(lineup) == 5
+
+
+def test_fill_unified_lineup_gaps_respects_existing_slots():
+    """One open slot (C); only the C specialist should fill it."""
+    payload = _five_distinct_payload()
+    players = [Player(dict(row)) for row in payload]
+    existing = {
+        "PG": players[0],
+        "SG": players[1],
+        "SF": players[2],
+        "PF": players[3],
+    }
+
+    def noop_shuffle(x):
+        return None
+
+    def first_choice(seq):
+        return seq[0]
+
+    with patch.object(db_utils.random, "shuffle", noop_shuffle), patch.object(
+        db_utils.random, "choice", first_choice
+    ):
+        filled = fill_unified_lineup_gaps(
+            players,
+            21.0,
+            ["C"],
+            existing_assignments=existing,
+        )
+
+    assert filled["C"].player_id == "5"
+    assert filled["PG"] is players[0]

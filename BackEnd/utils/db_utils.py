@@ -197,6 +197,40 @@ def build_unified_autoset_lineup_from_eligible(
     return lineup
 
 
+def fill_unified_lineup_gaps(
+    eligible_players: List[Player],
+    team_chemistry: float,
+    missing_positions: List[str],
+    *,
+    existing_assignments: Dict[str, Player],
+) -> Dict[str, Player]:
+    """
+    Fill only ``missing_positions`` using the same pool-size bands as full autoset,
+    but with pool_sizes[0..] applied to the shuffled *missing* slots (not all five).
+    Used when a partial lineup already has valid players (e.g. foul-out cleared one slot).
+    """
+    pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
+    order = list(missing_positions)
+    random.shuffle(order)
+    assigned_ids = {p.player_id for p in existing_assignments.values() if p is not None}
+    result: Dict[str, Player] = dict(existing_assignments)
+    for fill_idx, pos in enumerate(order):
+        n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
+        available = [p for p in eligible_players if p.player_id not in assigned_ids]
+        rated = [(p, _player_slot_rating(p, pos)) for p in available]
+        rated.sort(key=lambda t: (-t[1], t[0].player_id))
+        if not rated:
+            raise ValueError(
+                f"No eligible players left to fill lineup gap at position {pos} (fill index {fill_idx})"
+            )
+        take = min(max(1, n), len(rated))
+        candidates = rated[:take]
+        chosen = candidates[0][0] if len(candidates) == 1 else random.choice(candidates)[0]
+        result[pos] = chosen
+        assigned_ids.add(chosen.player_id)
+    return result
+
+
 def autoset_lineup_player_ids_from_payload(
     players_payload: List[dict],
     game_state: Optional[dict],

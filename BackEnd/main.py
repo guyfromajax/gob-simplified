@@ -198,33 +198,24 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
             f"(need {len(missing)}, {fouled_out_count} fouled out) even after relaxing NG and foul limits"
         )
     
-    # Fill missing positions with available players
-    # Use simple assignment based on position needs
-    from BackEnd.utils.db_utils import POSITION_TRAITS, get_player_rating
-    import random
-    
-    position_order = ["PG", "SG", "SF", "PF", "C"]
-    random.shuffle(position_order)  # Randomize order for variety
-    
-    remaining_available = available_players.copy()
-    
+    # Fill gaps with unified autoset (position_ratings + chemistry pools; same family as build_lineup_from_mongo)
+    from BackEnd.utils.db_utils import fill_unified_lineup_gaps
+
+    tc = 15.0
+    if getattr(team, "team_attributes", None):
+        try:
+            tc = float(team.team_attributes.get("team_chemistry", 15))
+        except (TypeError, ValueError):
+            tc = 15.0
+    existing = {pos: team.lineup.get(pos) for pos in POSITION_LIST if team.lineup.get(pos)}
+    filled = fill_unified_lineup_gaps(
+        available_players,
+        tc,
+        missing,
+        existing_assignments=existing,
+    )
     for pos in missing:
-        if not remaining_available:
-            raise ValueError(
-                f"Team '{team.name}' lineup incomplete; missing positions: {missing}"
-            )
-        
-        # Rate players for this position
-        traits = POSITION_TRAITS.get(pos, [])
-        rated = [(p, get_player_rating(p, traits)) for p in remaining_available]
-        rated.sort(key=lambda tup: tup[1], reverse=True)
-        
-        # Pick from top 3 candidates (or all if fewer)
-        top_candidates = rated[:3] if len(rated) >= 3 else rated
-        chosen_player = random.choice(top_candidates)[0]
-        
-        team.lineup[pos] = chosen_player
-        remaining_available.remove(chosen_player)
+        team.lineup[pos] = filled[pos]
     
     # Final validation
     remaining = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
