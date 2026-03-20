@@ -6,6 +6,17 @@
 /** Core 12 display columns (matches BackEnd roster_builder ATTR_KEYS order for ST/AG). */
 const SCOUTING_PROJECTED_ATTR_COLS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
+/** Season stat columns for scouting modal Stats toggle (matches command center roster stats). */
+const SCOUTING_PROJECTED_STATS_COLUMNS = [
+  'PTS', 'FGM', 'FGA', 'FG%', '3PTM', '3PTA', '3PT%', 'FTM', 'FTA', 'FT%',
+  'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'MIN', 'TO',
+];
+
+var scoutingProjectedRowsCache = [];
+var scoutingPlayerSeasonStatsCache = {};
+var scoutingProjectedViewMode = 'attributes';
+var scoutingProjectedToggleWired = false;
+
 function scoutingFormatHeight(raw) {
   if (typeof formatHeight === 'function') return formatHeight(raw);
   const inches = parseInt(raw, 10);
@@ -81,6 +92,147 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
   });
   table.appendChild(tbody);
   el.appendChild(table);
+}
+
+function formatScoutingSeasonStat(stats, col) {
+  const s = stats || {};
+  const num = (x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : 0;
+  };
+  switch (col) {
+    case 'FG%': {
+      const fga = num(s.FGA);
+      const fgm = num(s.FGM);
+      return fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0';
+    }
+    case '3PT%': {
+      const tpa = num(s['3PTA'] != null ? s['3PTA'] : s.TPA);
+      const tpm = num(s['3PTM'] != null ? s['3PTM'] : s.TPM);
+      return tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
+    }
+    case 'FT%': {
+      const fta = num(s.FTA);
+      const ftm = num(s.FTM);
+      return fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0';
+    }
+    case 'TREB': {
+      if (s.TREB != null && s.TREB !== '') return String(s.TREB);
+      return String(num(s.OREB) + num(s.DREB));
+    }
+    default: {
+      const v = s[col];
+      if (v == null || v === '') return '0';
+      return String(v);
+    }
+  }
+}
+
+/**
+ * Stats view for projected starting five (scouting modal).
+ * @param {string} containerId
+ * @param {Array} rows - projected_starting_five from API
+ * @param {Object<string, Object>} statsByPlayerId - player_season_stats from API
+ */
+function renderProjectedStartingFiveStatsInto(containerId, rows, statsByPlayerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  const map = statsByPlayerId && typeof statsByPlayerId === 'object' ? statsByPlayerId : {};
+  if (!rows || rows.length === 0) {
+    el.innerHTML =
+      '<p class="scouting-projected-empty">No projected lineup (missing position ratings or roster data).</p>';
+    return;
+  }
+  const table = document.createElement('table');
+  table.className = 'scouting-projected-table';
+  const thead = document.createElement('thead');
+  const hrow = document.createElement('tr');
+  const headers = ['Pos', 'Player'].concat(SCOUTING_PROJECTED_STATS_COLUMNS);
+  headers.forEach((h) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    const pid = r.player_id != null ? String(r.player_id) : '';
+    const stats = map[pid] || {};
+    const playerLabel =
+      typeof formatNameWithJersey === 'function'
+        ? formatNameWithJersey(r.jersey, r.name || '')
+        : r.name || '—';
+    const cells = [r.position || '—', playerLabel];
+    SCOUTING_PROJECTED_STATS_COLUMNS.forEach((col) => {
+      cells.push(formatScoutingSeasonStat(stats, col));
+    });
+    cells.forEach((text) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  el.appendChild(table);
+}
+
+function renderScoutingProjectedLineupTable() {
+  if (scoutingProjectedViewMode === 'stats') {
+    renderProjectedStartingFiveStatsInto(
+      'scouting-projected-lineup',
+      scoutingProjectedRowsCache,
+      scoutingPlayerSeasonStatsCache
+    );
+    return;
+  }
+  renderProjectedStartingFive(scoutingProjectedRowsCache, {
+    containerId: 'scouting-projected-lineup',
+    tableClass: 'scouting-projected-table',
+    emptyClass: 'scouting-projected-empty',
+  });
+}
+
+/**
+ * Cache scouting projected rows + season stats and render (Attributes view by default).
+ * Call after fetching /franchise/scouting-report or /tournament/scouting-report.
+ * @param {Array} rows
+ * @param {Object<string, Object>} [playerSeasonStats]
+ */
+function setScoutingProjectedLineupData(rows, playerSeasonStats) {
+  scoutingProjectedRowsCache = rows || [];
+  scoutingPlayerSeasonStatsCache =
+    playerSeasonStats && typeof playerSeasonStats === 'object' ? playerSeasonStats : {};
+  scoutingProjectedViewMode = 'attributes';
+  const wrap = document.querySelector('.scouting-projected-toggle');
+  if (wrap) {
+    wrap.querySelectorAll('.toggle-btn').forEach((b) => {
+      const v = b.getAttribute('data-scouting-projected');
+      if (v === 'attributes') b.classList.add('active');
+      else b.classList.remove('active');
+    });
+  }
+  ensureScoutingProjectedToggleWired();
+  renderScoutingProjectedLineupTable();
+}
+
+function ensureScoutingProjectedToggleWired() {
+  if (scoutingProjectedToggleWired) return;
+  const wrap = document.querySelector('.scouting-projected-toggle');
+  if (!wrap) return;
+  scoutingProjectedToggleWired = true;
+  wrap.querySelectorAll('.toggle-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      scoutingProjectedViewMode = btn.getAttribute('data-scouting-projected') || 'attributes';
+      wrap.querySelectorAll('.toggle-btn').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
+      renderScoutingProjectedLineupTable();
+    });
+  });
 }
 
 /**
@@ -191,5 +343,7 @@ function setupScoutingReport(loadScoutingReportCallback) {
       }
     });
   }
+
+  ensureScoutingProjectedToggleWired();
 }
 

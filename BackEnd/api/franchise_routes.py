@@ -5656,10 +5656,30 @@ def get_scouting_report(franchise_id: str, team_name: str):
     _, scout_players = load_roster(team_name, franchise_id=str(franchise_id))
     projected_starting_five = compute_projected_starting_five(scout_players)
 
+    team_oid_str = str(team_object_id)
+    player_season_stats: dict[str, dict] = {}
+    for fpd in franchise_players_data_collection.find(
+        {
+            "franchise_id": str(franchise_id),
+            "$or": [
+                {"meta.team_id": team_oid_str},
+                {"meta.team": team_name},
+            ],
+        },
+        {"player_id": 1, "season": 1},
+    ):
+        pid = str(fpd.get("player_id") or "")
+        if not pid:
+            continue
+        season_raw = fpd.get("season") or {}
+        if isinstance(season_raw, dict):
+            player_season_stats[pid] = dict(season_raw)
+
     return {
         "team_attributes": team_attributes,
         "plays": plays_data,
         "projected_starting_five": projected_starting_five,
+        "player_season_stats": player_season_stats,
     }
 
 

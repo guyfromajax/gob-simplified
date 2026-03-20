@@ -2619,7 +2619,12 @@ async function loadScoutingReport() {
       console.error('Play usage rendering function not available');
     }
 
-    if (typeof renderProjectedStartingFive === 'function') {
+    if (typeof setScoutingProjectedLineupData === 'function') {
+      setScoutingProjectedLineupData(
+        playUsage.projected_starting_five || [],
+        playUsage.player_season_stats || {}
+      );
+    } else if (typeof renderProjectedStartingFive === 'function') {
       renderProjectedStartingFive(playUsage.projected_starting_five || []);
     }
     
