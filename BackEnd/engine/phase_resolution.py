@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from BackEnd.models.animator import Animator
 
 from BackEnd.constants import CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+from BackEnd.utils.home_crowd import effective_ft_miss_to_make_second_chance
 from BackEnd.utils.shared import (
     get_name_safe,
     get_time_elapsed,
@@ -1668,9 +1669,9 @@ def resolve_free_throw_logic(game):
     text = f"ft_shot_score: {ft_shot_score}, roll: {result}  "
     makes_shot = result < ft_shot_score
 
-    # Secondary check: 40% chance to convert miss to make
+    # Secondary check: miss → make (global default for home FT; away uses crowd tiers)
     if not makes_shot:
-        if random.random() < 0.40:
+        if random.random() < effective_ft_miss_to_make_second_chance(game, off_team):
             makes_shot = True
 
     shooter.record_stat("FTA")

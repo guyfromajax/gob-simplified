@@ -1260,6 +1260,10 @@ try:
         # Update quarter
         if "quarter" in saved:
             gm.quarter = saved["quarter"]
+
+        from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
+
+        restore_home_crowd_from_saved(gm.game_state, saved)
     
     def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
         """
@@ -1355,6 +1359,10 @@ try:
             gm.game_state[COMPUTER_MATCHUPS_KEY] = saved.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
         elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
             gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
+
+        from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
+
+        restore_home_crowd_from_saved(gm.game_state, saved)
         
         # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
         if "score" in saved and isinstance(saved["score"], dict):
@@ -2529,6 +2537,10 @@ try:
                                 gm.game_state[COMPUTER_MATCHUPS_KEY] = saved.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
                             elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
                                 gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
+
+                            from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
+
+                            restore_home_crowd_from_saved(gm.game_state, saved)
                             
                             # ✅ TIMEOUT RESUME: Do NOT set body.resume_from_timeout from doc here.
                             # We only treat as timeout resume when the client sent resume_from_timeout=true (see earlier block).

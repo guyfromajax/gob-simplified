@@ -154,6 +154,9 @@ SOFT_PROB = 0.16
 # Shooting Foul Calibration constants (chance that a defensive shooting foul forces a miss)
 THREE_POINTER_FOUL_MISS_CHANCE = 0.4  # 40% chance foul forces miss on 3-pointers
 TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointers
+# After primary FT roll (1–100 vs ft_shot_score), if miss: this probability upgrades miss → make (baseline;
+# home crowd / other systems can substitute an adjusted value at call site).
+FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.40
 # Three-point shot threshold modifier: shot_threshold += (THREE_POINT_SHOT_THRESHOLD_INCREASE - (random(1,5)*momentum))
 THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 

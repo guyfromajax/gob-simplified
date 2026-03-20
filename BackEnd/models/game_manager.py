@@ -55,7 +55,10 @@ class GameManager:
         self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
-        
+        from BackEnd.utils.home_crowd import initialize_home_crowd_in_game_state
+
+        initialize_home_crowd_in_game_state(self.game_state, self.home_team)
+
         # ✅ SS&S: Store user_team_side in game_state for persistent override checking
         # This is more reliable than is_user_team flag which isn't persisted to DB
         if user_team_side:
