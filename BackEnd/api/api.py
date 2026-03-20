@@ -2425,7 +2425,8 @@ try:
                                 away_strategy_calls=away_strategy_calls,  # ✅ SS&S: Restore playcall overrides
                                 mode=saved_mode,  # Use saved mode (could be franchise/tournament)
                                 user_team_side=body.user_team_side,  # ✅ SS&S: Set is_user_team flags
-                                franchise_id=franchise_id_for_roster  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                                franchise_id=franchise_id_for_roster,  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                                community_engagement_crowd_shift="none",
                             )
                             gm_create_time = (time.time() - gm_create_start) * 1000
                             # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: GameManager created from DB: {gm_create_time:.2f}ms")
@@ -2968,6 +2969,16 @@ try:
                                                 }
                                             }
                         
+                        ce_crowd_shift = "none"
+                        if mode == "franchise" and body.franchise_id and body.user_team_side:
+                            from BackEnd.utils.home_crowd import consume_franchise_community_engagement_for_matchup
+
+                            ce_crowd_shift = consume_franchise_community_engagement_for_matchup(
+                                body.franchise_id,
+                                body.home_team,
+                                body.away_team,
+                                body.user_team_side,
+                            )
                         gm = GameManager(
                             body.home_team, 
                             body.away_team,
@@ -2981,7 +2992,8 @@ try:
                             away_plays_data=away_plays_data if mode == "franchise" and body.franchise_id and away_ftd else None,
                             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
                             user_team_side=body.user_team_side,  # ✅ SS&S: Set is_user_team flags
-                            franchise_id=body.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                            franchise_id=body.franchise_id if mode == "franchise" else None,  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                            community_engagement_crowd_shift=ce_crowd_shift,
                         )
                         
                         # ✅ SS&S: Ensure user_team_side is set in game_state (GameManager should set it, but double-check)
@@ -3396,7 +3408,8 @@ try:
                 away_team_attributes=away_team_attributes,
                 mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
                 user_team_side=body.user_team_side,  # ✅ SS&S: Pass user_team_side to set is_user_team flags
-                franchise_id=body.franchise_id if mode == "franchise" else None  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                franchise_id=body.franchise_id if mode == "franchise" else None,  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+                community_engagement_crowd_shift="none",
             )
             
             # ✅ SS&S: Require game_id for Q2-Q4 - cannot start mid-game without existing game document
@@ -5100,7 +5113,15 @@ try:
         
         # Generate game_id
         game_id = generate_game_id()
-        
+
+        ce_crowd_shift = "none"
+        if mode == "franchise" and franchise_id and user_team_side:
+            from BackEnd.utils.home_crowd import consume_franchise_community_engagement_for_matchup
+
+            ce_crowd_shift = consume_franchise_community_engagement_for_matchup(
+                franchise_id, home_team, away_team, user_team_side,
+            )
+
         # Create GameManager (this initializes teams and players)
         gm_start = time.time()
         profile_summary = None
@@ -5111,11 +5132,16 @@ try:
                 _gm_ref[0] = GameManager(
                     home_team, away_team, mode=mode, user_team_side=user_team_side,
                     franchise_id=franchise_id if mode == "franchise" else None,
+                    community_engagement_crowd_shift=ce_crowd_shift,
                 )
             profile_summary = run_profiled(_create_gm)
             gm = _gm_ref[0]
         else:
-            gm = GameManager(home_team, away_team, mode=mode, user_team_side=user_team_side, franchise_id=franchise_id if mode == "franchise" else None)  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
+            gm = GameManager(
+                home_team, away_team, mode=mode, user_team_side=user_team_side,
+                franchise_id=franchise_id if mode == "franchise" else None,
+                community_engagement_crowd_shift=ce_crowd_shift,
+            )
         # ✅ CRITICAL: Set game_id on GameManager immediately after creation
         gm.game_id = game_id
         gm_create_time = (time.time() - gm_start) * 1000

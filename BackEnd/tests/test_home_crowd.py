@@ -18,6 +18,23 @@ def test_band_weights_sum_to_100():
     ]
     for weights, label in bands:
         assert sum(weights) == 100, f"band {label} should sum to 100, got {sum(weights)}"
+    assert sum([0, 10, 20, 30, 40]) == 100
+
+
+def test_crowd_shift_weights():
+    assert hc.crowd_weights_for_home_team_chemistry(12, "none") == [20, 30, 25, 15, 10]
+    assert hc.crowd_weights_for_home_team_chemistry(12, "up") == [10, 20, 30, 20, 20]
+    assert hc.crowd_weights_for_home_team_chemistry(12, "down") == [30, 40, 15, 10, 5]
+    assert hc.crowd_weights_for_home_team_chemistry(23, "up") == [0, 10, 20, 30, 40]
+    assert hc.crowd_weights_for_home_team_chemistry(8, "down") == [30, 40, 15, 10, 5]
+
+
+def test_community_engagement_crowd_shift_resolution():
+    assert hc.community_engagement_crowd_shift(True, True, True) == "none"
+    assert hc.community_engagement_crowd_shift(True, False, True) == "up"
+    assert hc.community_engagement_crowd_shift(True, False, False) == "down"
+    assert hc.community_engagement_crowd_shift(False, True, False) == "up"
+    assert hc.community_engagement_crowd_shift(False, True, True) == "down"
 
 
 @patch("BackEnd.utils.home_crowd.random.choices")

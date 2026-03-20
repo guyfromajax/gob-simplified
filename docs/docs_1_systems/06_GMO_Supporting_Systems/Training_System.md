@@ -174,6 +174,17 @@ The training execution system applies pre-training conditions, allocates trainin
   - **`sub_option`**: the **full** radio value for a leaf selection (same string as the UI), or `None` if only an archetype-level value is sent (e.g. some auto-train random picks).
 - Amplifiers and Systems Coach play-point multipliers compare **`sub_option`** to those full values (they must **not** use a naive `split("-", 1)` on the raw string, which breaks multi-word archetypes like `systems-coach`).
 
+#### Community Engagement (`culture-builder-community`)
+
+- **Franchise only** (no training in Single Game / Tournament).
+- **Immediate training effect:** small EM bump for all players (see `training_execution_v2.py`).
+- **Next franchise game (home crowd roll):** sets **`pending_community_engagement`** on that team’s **FTD** (`franchise_team_data`). When a franchise game is started (`/api/init-game` or new-game `simulate-quarter` path), the engine reads pending flags for **both** teams, resolves a single band shift for the **home crowd weight table** (see `Home_Crowd_System.md`), then clears both teams’ flags.
+- **User home:** shift crowd weights **up** one chemistry band vs the user’s current `team_chemistry` for the home team in that game; if already in **21–25**, use the **Upper Bonus Range** row from `Home_Crowd_System.md` instead.
+- **User away:** shift **down** one band vs the **home opponent’s** `team_chemistry`; if opponent chemistry is in **7–10**, no downward effect.
+- **Computer:** distant training templates may set `community_engagement` on the template; when applied, that CPU team gets `pending_community_engagement` on FTD for the same rules (only CE vs no CE: CPU home → shift up from CPU chemistry; CPU away → shift down from user’s home chemistry).
+- **Both teams pending CE** in the same matchup: shifts **cancel** (normal roll from actual home `team_chemistry`).
+- **Bye week:** if no game is played after training, the pending flag stays until the **next** game in that season.
+
 #### Training Execution Flow
 
 0. **Pre-Training Effectiveness Decay** (`_apply_pre_training_effectiveness_decay`, `_apply_pre_training_defense_decay`)

@@ -32,7 +32,7 @@ from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
-from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
+from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP, parse_coaching_focus
 from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
@@ -6112,6 +6112,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     if is_first_training:
         ftd_update["training_squad_players"] = []
 
+    # Community Engagement → pending home-crowd band shift for user's next franchise game (consumed at game start)
+    _, ce_sub = parse_coaching_focus(coaching_focus)
+    if ce_sub == "culture-builder-community":
+        ftd_update["pending_community_engagement"] = True
+
     if 20 <= week <= 26 and str(week) not in recruiting_results:
         _process_weekly_recruiting_invites(franchise_doc)
 
@@ -6192,10 +6197,13 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                         else:
                             new_val = int(round(new_val))
                         ftd_update[f"team_attributes.{attr_name}"] = new_val
-                if ftd_update:
+                set_payload = dict(ftd_update)
+                if template.get("community_engagement"):
+                    set_payload["pending_community_engagement"] = True
+                if set_payload:
                     franchise_team_data_collection.update_one(
                         {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                        {"$set": ftd_update},
+                        {"$set": set_payload},
                     )
                 player_order = ftd_doc.get("players")
                 if not player_order:

@@ -546,8 +546,8 @@ def apply_training_points(
         # Improve EM for all players
         for player in players:
             attrs = player.get("attributes", {})
-            # Note: Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
-            # will be handled separately when game is created
+            # Home crowd band shift is applied at franchise game start via FTD
+            # ``pending_community_engagement`` + Home_Crowd_System.md / Training_System.md
             em_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
             attrs["anchor_EM"] = attrs["EM"]

@@ -15,7 +15,7 @@ import logging
 import uuid
 
 class GameManager:
-    def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None):
+    def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None, community_engagement_crowd_shift="none"):
         import time
         # ⏱️ Coarse timers for gm_create breakdown
         _t0 = time.time()
@@ -57,7 +57,10 @@ class GameManager:
         self.game_state = self._init_game_state()
         from BackEnd.utils.home_crowd import initialize_home_crowd_in_game_state
 
-        initialize_home_crowd_in_game_state(self.game_state, self.home_team)
+        _ce_shift = community_engagement_crowd_shift or "none"
+        if _ce_shift not in ("none", "up", "down"):
+            _ce_shift = "none"
+        initialize_home_crowd_in_game_state(self.game_state, self.home_team, crowd_shift=_ce_shift)
 
         # ✅ SS&S: Store user_team_side in game_state for persistent override checking
         # This is more reliable than is_user_team flag which isn't persisted to DB

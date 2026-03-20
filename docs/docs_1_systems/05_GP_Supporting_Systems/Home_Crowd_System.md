@@ -17,8 +17,12 @@ At the start of each game, determine the Home Crowd Factor for that game. it wil
 - 1: 5%, 2: 15%, 3: 20%, 4: 30%, 5: 30%
 
 ##Upper Bonus Range##
-*(Reserved — training-linked upper band; not implemented yet.)*
+Used **only** when the **home** team’s Community Engagement (Franchise training, ``culture-builder-community``) shifts the roll **up** one band from the 21–25 chemistry tier (see ``Training_System.md``). Same percentages for every user/CPU home game that qualifies.
 - 1: 0%, 2: 10%, 3: 20%, 4: 30%, 5: 40%
+
+
+**Franchise: Community Engagement (summary)**  
+Single Game and Tournament have no training; this applies **only in Franchise**. If the user or the computer (distant training template) selected Community Engagement and the flag is still pending on franchise team data, the **next franchise game started** adjusts which row above is used for the home crowd roll: **up** one chemistry band for the home team when the beneficiary is **home**, **down** one band when the beneficiary is **away** (floor at 7–10 = no downward effect). If **both** teams in the matchup have pending Community Engagement, shifts **cancel** and the roll uses normal home chemistry. Pending flags are cleared when that game is started. If there is no game that week (e.g. bye), the effect carries to the **next** game played in that season.
 
 
 **Home Crowd Factor Impact**
