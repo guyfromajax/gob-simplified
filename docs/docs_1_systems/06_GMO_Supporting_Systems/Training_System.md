@@ -113,7 +113,7 @@
   - **Player Maximizer** (darker green header fill)
     - Sub-options: Top 3 Attributes, Attributes 4–6, Custom Attributes, Opportunity
   - **Culture Builder** (purple header fill)
-    - Sub-options: Inspire, Confidence, Community Engagement, Teamwork
+    - Sub-options: Inspire, Confidence, Community Engagement, Team Building
 
 ### Slider Behavior
 
@@ -340,7 +340,7 @@ Then use the following CH scale for each player
 **Culture Builder:**
 - Inspire: **Flat block:** each player gets **EM** `+random.randint(2, 5)` and **MO** `+random.randint(1, 2)` (caps apply); no focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
 - Community Engagement: Improves EM, affects crowd factors (carried to next game)
-- Teamwork: Amplifies Team Chemistry gains, improves Motion Play and Zone Defense Effectiveness
+- **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged.
 - **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). No flat EM/MO block; no Inspire-style team chemistry mult.
 
 #### Breaks Effect
@@ -524,7 +524,7 @@ The training focus is formatted as "Focus (Archetype)" with the focus outside pa
 - **Culture Builder** archetype options:
   - "Inspire (Culture Builder)"
   - "Community Engagement (Culture Builder)"
-  - "Teamwork (Culture Builder)"
+  - "Team Building (Culture Builder)"
   - "Build Confidence (Culture Builder)"
 
 **Note:** Archetype names inside parentheses must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"

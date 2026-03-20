@@ -535,6 +535,13 @@ def apply_training_points(
             em_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
             attrs["anchor_EM"] = attrs["EM"]
+
+    if sub_option == "culture-builder-teamwork":
+        # UI label "Team Building": flat team chemistry only (radio value unchanged for API)
+        ch_lo, ch_hi = TEAM_ATTR_CLAMPS["team_chemistry"]
+        team_ch_bump = random.randint(1, 3)
+        cur_ch = team.get("team_chemistry", 0)
+        team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + team_ch_bump))
     
     # Apply team training points
     for category, allocation_data in normalized_allocations.items():
@@ -1179,7 +1186,7 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     elif sub_option == "culture-builder-community":
         return attr == "EM"  # Improves EM, Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
     elif sub_option == "culture-builder-teamwork":
-        return attr == "PS"  # Amplifies Team Chemistry gains, Improves Motion Play Effectiveness Scores, Zone Defense Effectiveness Scores
+        return False  # "Team Building" UI: flat team_chemistry bump only (apply_training block)
     elif sub_option == "culture-builder-confidence":
         return attr in ["CH", "FT"]
     

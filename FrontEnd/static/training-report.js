@@ -85,7 +85,7 @@ const FOCUS_DISPLAY = {
   'culture-builder': {
     'inspire': 'Culture Builder - Inspire',
     'community': 'Culture Builder - Community Engagement',
-    'teamwork': 'Culture Builder - Teamwork',
+    'teamwork': 'Culture Builder - Team Building',
     'build-confidence': 'Culture Builder - Build Confidence'
   }
 };

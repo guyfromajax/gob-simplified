@@ -114,6 +114,10 @@ class TestParseCoachingFocus(unittest.TestCase):
         self.assertTrue(_should_amplify_player_attr("FT", "culture-builder", sub))
         self.assertFalse(_should_amplify_player_attr("EM", "culture-builder", sub))
 
+    def test_team_building_no_player_drill_amplify(self):
+        sub = "culture-builder-teamwork"
+        self.assertFalse(_should_amplify_player_attr("PS", "culture-builder", sub))
+
 
 if __name__ == "__main__":
     unittest.main()

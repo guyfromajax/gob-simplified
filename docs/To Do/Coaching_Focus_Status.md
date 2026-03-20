@@ -55,7 +55,7 @@
 | 13 | Inspire | `culture-builder-inspire` | **Implemented** | See **Inspire (plain summary)** below (flat EM/MO + **team_chemistry** amplify only). |
 | 14 | Confidence | `culture-builder-confidence` | **Implemented** | **`_should_amplify_player_attr`:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use `random.choice([1.5, 1.6, 1.7, 1.8])` after CH’s 0.5 drill coeff. See **Confidence (plain summary)** below. |
 | 15 | Community Engagement | `culture-builder-community` | **Partial** | **Dedicated block:** all players **EM** +1–2. Comment: crowd min/max for next home/away — **not** implemented in this module (no game-creation hook found here). |
-| 16 | Teamwork | `culture-builder-teamwork` | **Partial** | **`_should_amplify_player_attr`:** **PS** only. **`_should_amplify_team_attr`:** no **team_chemistry** line for this focus (contrast **Inspire**). **Not** implemented: motion / zone defense effectiveness boosts from doc. |
+| 16 | Team Building | `culture-builder-teamwork` | **Implemented** | **Dedicated block:** **team_chemistry** `+= random.randint(1, 3)` once per training (clamped 7–25). Radio **`value`** unchanged for API/back-compat. No drill multipliers, no PS / motion / zone play hooks. |
 
 ### Inspire (plain summary)
 
@@ -89,12 +89,13 @@ Leaf options above: **16** (four per archetype block, excluding archetype header
 
 | Status | Count | Focus keys |
 |--------|-------|------------|
-| Implemented | **11** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (3):** top-3, attributes 4–6, custom. **Culture (2):** inspire*, confidence† |
-| Partial | **4** | **Systems (2):** fast breaks, press/trap. **Culture (2):** community, teamwork |
+| Implemented | **12** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (3):** top-3, attributes 4–6, custom. **Culture (3):** inspire*, confidence†, team building‡ |
+| Partial | **3** | **Systems (2):** fast breaks, press/trap. **Culture (1):** community |
 | Not implemented | **1** | **Player maximizer (1):** opportunity |
 
 \* **Inspire** — see **Inspire (plain summary)** above.  
-† **Confidence** — see **Confidence (plain summary)** above.
+† **Confidence** — see **Confidence (plain summary)** above.  
+‡ **Team Building** — `culture-builder-teamwork`; flat +1–3 **team_chemistry** only (row 16).
 
 ---
 
