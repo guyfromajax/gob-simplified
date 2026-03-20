@@ -28,7 +28,10 @@ class Player:
         self.jersey = data.get("jersey", 0)
         self.year = data.get("year", "")
         self.photo = data.get("photo", None)  # Player headshot image path
+        # Optional per-position ratings (franchise / universal roster payloads)
+        self.position_ratings = dict(data.get("position_ratings") or {})
         self.stats = self._init_stats()
+        self._merge_stats_from_data(data)
         self.metadata = {
             "fouls": 0,
             "minutes_played": 0,
@@ -48,6 +51,27 @@ class Player:
         attrs["NG"] = attr_data.get("NG", data.get("NG", 1.0))
 
         return attrs
+
+    def _merge_stats_from_data(self, data):
+        """Overlay game (or flattened) stats from roster/API payloads onto init stats."""
+        raw = data.get("stats")
+        if not isinstance(raw, dict):
+            return
+        game = raw.get("game", raw)
+        if not isinstance(game, dict):
+            return
+        for k, v in game.items():
+            if k not in self.stats.get("game", {}):
+                continue
+            if isinstance(self.stats["game"][k], list):
+                continue
+            try:
+                if k in ("MIN",):
+                    self.stats["game"][k] = v
+                else:
+                    self.stats["game"][k] = int(v) if v is not None else 0
+            except (TypeError, ValueError):
+                pass
     
     @staticmethod
     def randomize_game_attributes(attributes: dict) -> dict:

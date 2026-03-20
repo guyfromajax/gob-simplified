@@ -5056,11 +5056,38 @@ try:
                 # logging.warning(f"🔍 [ROSTER DEBUG] Final response for {player_name}: SH={final_sh}, anchor_SH={final_anchor_sh}")
         process_time = (time.time() - process_start) * 1000
     
+        # Team chemistry for unified autoset (matches computer lineup / db_utils.build_lineup_from_mongo)
+        roster_team_chemistry = 15.0
+        if franchise_id and team_doc.get("_id"):
+            try:
+                ftd_for_tc = franchise_team_data_collection.find_one(
+                    {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
+                    {"team_attributes.team_chemistry": 1},
+                )
+                if ftd_for_tc:
+                    tc_val = (ftd_for_tc.get("team_attributes") or {}).get("team_chemistry")
+                    if tc_val is not None:
+                        roster_team_chemistry = float(tc_val)
+            except Exception:
+                pass
+        elif tournament_id and team_doc.get("_id"):
+            try:
+                tid_tc = ObjectId(tournament_id)
+                tdoc_tc = tournaments_collection.find_one({"_id": tid_tc}, {"teams": 1})
+                if tdoc_tc:
+                    team_key = str(team_doc["_id"])
+                    tobj = (tdoc_tc.get("teams") or {}).get(team_key, {})
+                    if tobj.get("team_chemistry") is not None:
+                        roster_team_chemistry = float(tobj["team_chemistry"])
+            except Exception:
+                pass
+
         response_data = {
             "team": team.get("name", match if match else team_identifier),
             "team_name": team.get("name", match if match else team_identifier),
             "primary_color": team.get("primary_color", "#000000"),
             "secondary_color": team.get("secondary_color", "#ffffff"),
+            "team_chemistry": roster_team_chemistry,
             "players": players
         }
         
@@ -5075,7 +5102,37 @@ try:
         # logging.warning(f"⏱️ [PERF] /roster/{team_identifier} - DB query: {query_time:.2f}ms, load_roster: {load_time:.2f}ms, processing: {process_time:.2f}ms, response_size: {response_size} bytes, total: {total_time:.2f}ms")
         
         return response_data
-    
+
+    @app.post("/api/autoset-lineup")
+    def api_autoset_lineup(request: dict):
+        """
+        Canonical lineup autoset: eligibility waterfall + team-chemistry pool sizes
+        (same path as build_lineup_from_mongo / computer lineups).
+        """
+        from BackEnd.utils.db_utils import autoset_lineup_player_ids_from_payload
+
+        players = request.get("players") or []
+        if not isinstance(players, list) or len(players) < 5:
+            raise HTTPException(
+                status_code=400,
+                detail="players must be a list with at least 5 roster rows",
+            )
+        game_state = request.get("game_state")
+        if game_state is not None and not isinstance(game_state, dict):
+            raise HTTPException(status_code=400, detail="game_state must be an object or omitted")
+        raw_tc = request.get("team_chemistry", 15.0)
+        try:
+            team_chemistry = float(raw_tc)
+        except (TypeError, ValueError):
+            team_chemistry = 15.0
+        try:
+            lineup_ids = autoset_lineup_player_ids_from_payload(
+                players, game_state, team_chemistry
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        return {"lineup": lineup_ids}
+
     
     @app.post("/api/init-game")
     def init_game(request: dict, profile: bool = False):

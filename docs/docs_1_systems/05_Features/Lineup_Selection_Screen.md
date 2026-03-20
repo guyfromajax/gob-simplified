@@ -80,13 +80,14 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Frontend:**
 - `FrontEnd/static/set-lineup.html` - Page structure
-- `FrontEnd/static/set-lineup.js` - `loadRoster()`, `updateSlotDisplay()`, `renderRoster()`, `updatePlayButton()`
+- `FrontEnd/static/set-lineup.js` - `loadRoster()`, `autosetLineup()` → `POST /api/autoset-lineup`, `updateSlotDisplay()`, `renderRoster()`, `updatePlayButton()`
 
 **Backend:**
-- `BackEnd/api/api.py` - `/api/game/{gameId}`, `/api/init-game`
+- `BackEnd/api/api.py` - `/api/game/{gameId}`, `/api/init-game`, `POST /api/autoset-lineup`, `GET /roster/...` (includes `team_chemistry` when franchise/tournament context is passed)
 - `BackEnd/api/franchise_routes.py` - `/franchise/roster`
 - `BackEnd/api/tournament_routes.py` - `/tournament/roster`
-- `BackEnd/utils/db_utils.py` - `is_player_eligible_for_lineup()`, `build_lineup_from_mongo()`
+- `BackEnd/utils/db_utils.py` - `is_player_eligible_for_lineup()`, `build_lineup_from_mongo()`, `autoset_lineup_player_ids_from_payload()`
+- `tests/test_unified_autoset_lineup.py` - pool sizes + payload autoset + waterfall smoke tests
 
 ---
 
@@ -96,7 +97,16 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 1. **Clear Current Lineup** - Remove all players from slots
 2. **Randomize Position Order** - Shuffle positions array
-3. **For Each Position**: Get available players (NG >= 80%, eligible) → Get top 3 by position rating → Randomly pick one
+3. **Lineup Selection by Team Chemistry**
+   For each position, get available players (via `is_player_eligible_for_lineup()`), then select using the pool sizes below — pool of 1 = take top rated; pool > 1 = randomly choose 1 from top N. User UI calls `POST /api/autoset-lineup` with the same rules.
+
+   | Chemistry | Pos 1 | Pos 2 | Pos 3 | Pos 4 | Pos 5 |
+   |-----------|-------|-------|-------|-------|-------|
+   | > 20      | 1     | 1     | 1     | 2     | 2     |
+   | 16–20     | 1     | 1     | 2     | 2     | 2     |
+   | 11–15     | 1     | 2     | 2     | 2     | 2     |
+   | 7–10      | 2     | 2     | 2     | 2     | 3     |
+
 4. **Update Display** - Update slot displays, re-attach event listeners
 5. **Notify User** - Show toast: "Lineup auto-generated!"
 

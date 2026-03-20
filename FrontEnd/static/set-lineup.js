@@ -285,6 +285,8 @@ const periodLabel = urlParams.get('period') || `Q${quarter}`;
 let teamName = '';
 
 let roster = [];
+/** Team chemistry from /roster (franchise/tournament FTD); single-game default 15. */
+let rosterTeamChemistry = 15;
 const lineup = {};
 const playerMap = {};
 
@@ -323,6 +325,10 @@ async function loadRoster() {
   const res = await fetch(url);
   if (!res.ok) return;
   const data = await res.json();
+  rosterTeamChemistry = data.team_chemistry != null && data.team_chemistry !== ''
+    ? Number(data.team_chemistry)
+    : 15;
+  if (Number.isNaN(rosterTeamChemistry)) rosterTeamChemistry = 15;
   roster = (data.players || []).map((p, idx) => ({ ...p, _idx: idx }));
   
   // If no gameId, initialize a new game (for pre-game lineup screen)
@@ -790,56 +796,91 @@ function updatePlayButton() {
   }
 }
 
-function autosetLineup() {
-  playSound('chaotic-choice.wav');
-  // Clear current lineup
-  document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
-  
-  // Randomize position order
-  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-  const shuffledPositions = positions.sort(() => Math.random() - 0.5);
-  
-  // Track which players have been assigned
-  const assignedPlayers = new Set();
-  
-  // For each position in random order
-  shuffledPositions.forEach(pos => {
-    // Get available players (not already assigned AND NG >= 0.8 AND not ineligible)
-    const availablePlayers = roster.filter(p => {
-      const ng = p.NG ?? p.attributes?.NG ?? 1.0;
-      const isIneligible = p.ineligible || p.fouled_out;
-      return !assignedPlayers.has(p._id) && ng >= 0.8 && !isIneligible;
-    });
-    
-    // Get players with ratings for this position, sorted by rating desc
-    const playersWithRating = availablePlayers
-      .map(p => ({
-        player: p,
-        rating: p.position_ratings?.[pos] ?? -Infinity
-      }))
-      .filter(({ rating }) => rating !== -Infinity)
-      .sort((a, b) => b.rating - a.rating);
-    
-    // Take top 3 (or all if fewer than 3)
-    const topCandidates = playersWithRating.slice(0, 3);
-    
-    // Randomly pick one from top candidates
-    if (topCandidates.length > 0) {
-      const randomIndex = Math.floor(Math.random() * topCandidates.length);
-      const { player } = topCandidates[randomIndex];
-      
-      // Assign to lineup
-      lineup[pos] = player._id;
-      assignedPlayers.add(player._id);
-    }
+function clockStringToSecondsForAutoset(clockStr) {
+  if (clockStr == null || clockStr === '') return 480;
+  const s = String(clockStr);
+  if (!s.includes(':')) {
+    const n = parseInt(s, 10);
+    return Number.isNaN(n) ? 480 : n;
+  }
+  const parts = s.split(':');
+  const m = parseInt(parts[0], 10) || 0;
+  const sec = parseInt(parts[1], 10) || 0;
+  return m * 60 + sec;
+}
+
+/** Match is_player_eligible_for_lineup clock context (quarter break / default quarter clock). */
+function buildAutosetGameState() {
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const q = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
+  let clockTime = urlParams.get('clock');
+  const isQuarterBreak = !resumeFromTimeout && q > 1;
+  if (isQuarterBreak || (!resumeFromTimeout && (!clockTime || clockTime === '0:00'))) {
+    clockTime = q > 4 ? '4:00' : '8:00';
+  }
+  return { quarter: q, time_remaining: clockStringToSecondsForAutoset(clockTime) };
+}
+
+function rosterRowsForAutosetApi() {
+  return roster.map(p => {
+    const rawStats = p.stats || {};
+    const gameStats = rawStats.game || rawStats;
+    return {
+      _id: p._id,
+      first_name: p.first_name || '',
+      last_name: p.last_name || '',
+      name: p.name,
+      attributes: p.attributes || {},
+      position_ratings: p.position_ratings || {},
+      stats: Object.keys(gameStats).length ? { game: gameStats } : {},
+    };
   });
-  
-  // Update all slot displays with correct position ratings
-  updateAllSlotDisplays();
-  updatePlayButton();
-  // Re-attach event listeners after DOM update
-  setupSlotDragAndDrop();
-  showToast('Lineup auto-generated!');
+}
+
+async function autosetLineup() {
+  playSound('chaotic-choice.wav');
+  document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
+
+  if (!roster.length || roster.length < 5) {
+    showToast('Roster not loaded yet');
+    return;
+  }
+
+  try {
+    const payload = {
+      players: rosterRowsForAutosetApi(),
+      game_state: buildAutosetGameState(),
+      team_chemistry: rosterTeamChemistry,
+    };
+    const res = await fetch(API_CONFIG.buildUrl('/api/autoset-lineup'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      let msg = `Autoset failed (${res.status})`;
+      try {
+        const err = await res.json();
+        if (err.detail) {
+          msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+        }
+      } catch (_) { /* ignore */ }
+      showToast(msg);
+      return;
+    }
+    const data = await res.json();
+    const lu = data.lineup || {};
+    ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
+      if (lu[pos]) lineup[pos] = lu[pos];
+    });
+    updateAllSlotDisplays();
+    updatePlayButton();
+    setupSlotDragAndDrop();
+    showToast('Lineup auto-generated!');
+  } catch (e) {
+    console.error('[autosetLineup]', e);
+    showToast('Autoset failed');
+  }
 }
 
 function updateSlotDisplay(slot) {
