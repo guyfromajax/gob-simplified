@@ -166,6 +166,14 @@
 
 The training execution system applies pre-training conditions, allocates training points, applies coaching focus amplifiers, and generates training reports.
 
+#### Coaching focus string (API ↔ amplifiers)
+
+- The Training page submits each radio’s **`value`** exactly as in `FrontEnd/static/training.html` (e.g. `authoritarian-discipline`, `systems-coach-offense`, `culture-builder-inspire`).
+- The backend **`parse_coaching_focus()`** in `training_execution_v2.py` maps that string to:
+  - **`archetype`**: one of `authoritarian`, `systems-coach`, `player-maximizer`, `culture-builder` (for reports and grouping).
+  - **`sub_option`**: the **full** radio value for a leaf selection (same string as the UI), or `None` if only an archetype-level value is sent (e.g. some auto-train random picks).
+- Amplifiers and Systems Coach play-point multipliers compare **`sub_option`** to those full values (they must **not** use a naive `split("-", 1)` on the raw string, which breaks multi-word archetypes like `systems-coach`).
+
 #### Training Execution Flow
 
 0. **Pre-Training Effectiveness Decay** (`_apply_pre_training_effectiveness_decay`, `_apply_pre_training_defense_decay`)

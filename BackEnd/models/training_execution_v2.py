@@ -163,6 +163,46 @@ TEAM_ATTR_CLAMPS = {
 # Player attribute clamps (lower, upper)
 PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
 
+# Archetype prefixes for coaching focus radio `value` from FrontEnd/static/training.html.
+# Order: check multi-word prefixes; "authoritarian" last (authoritarian-discipline, etc.).
+COACHING_FOCUS_ARCHETYPE_PREFIXES = (
+    "systems-coach",
+    "player-maximizer",
+    "culture-builder",
+    "authoritarian",
+)
+
+
+def parse_coaching_focus(coaching_focus: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Normalize API/UI coaching_focus into (archetype, sub_option).
+
+    sub_option is the full leaf value (e.g. systems-coach-offense) so it matches
+    _should_amplify_player_attr / _should_amplify_team_attr and Systems Coach play training.
+    Using split("-", 1) on the raw string breaks multi-word archetypes (systems, coach-offense).
+
+    Returns:
+        archetype: e.g. systems-coach, or None if empty input
+        sub_option: full radio value when a leaf is selected; None if only archetype header
+    """
+    if coaching_focus is None:
+        return None, None
+    raw = str(coaching_focus).strip()
+    if not raw:
+        return None, None
+
+    for prefix in COACHING_FOCUS_ARCHETYPE_PREFIXES:
+        if raw == prefix:
+            return prefix, None
+        if raw.startswith(prefix + "-"):
+            return prefix, raw
+
+    # Unknown / future values: best-effort legacy behavior
+    parts = raw.split("-", 1)
+    archetype = parts[0] if parts else None
+    sub_opt = parts[1] if len(parts) > 1 else None
+    return archetype, sub_opt
+
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
 PRE_TRAINING_DECAY_BY_YEAR = {
@@ -227,7 +267,7 @@ def apply_training_points(
         players: List of player dicts with attributes (already have pre-training conditions applied)
         team: Team dict with team attributes (already have pre-training conditions applied)
         allocations: Dict mapping category to allocation data
-        coaching_focus: Optional coaching focus (archetype-suboption format)
+        coaching_focus: Optional coaching focus; radio `value` from training UI (see parse_coaching_focus)
         original_baselines: Optional dict of original player baselines (before pre-training conditions)
         original_team_baseline: Optional dict of original team baseline (before pre-training conditions)
     
@@ -249,14 +289,7 @@ def apply_training_points(
     else:
         team_baseline = original_team_baseline
     
-    # Parse coaching focus (format: "archetype" or "archetype-suboption")
-    archetype = None
-    sub_option = None
-    if coaching_focus:
-        parts = coaching_focus.split("-", 1)
-        archetype = parts[0]
-        if len(parts) > 1:
-            sub_option = parts[1]
+    archetype, sub_option = parse_coaching_focus(coaching_focus)
     
     # Normalize allocations from frontend structure to flat structure
     # Frontend sends: {player_drills: {offense: {inside: 3, outside: 2}, ...}, team_drills: {...}, general: {...}}
@@ -1501,10 +1534,8 @@ def apply_play_defense_training(
     
     # Apply Systems Coach focus multiplier to playPoints if applicable
     if coaching_focus:
-        parts = coaching_focus.split("-", 1)
-        archetype = parts[0] if len(parts) > 0 else None
-        sub_option = parts[1] if len(parts) > 1 else None
-        
+        _, sub_option = parse_coaching_focus(coaching_focus)
+
         if sub_option == "systems-coach-offense" and offense_play_points > 0:
             focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
             offense_play_points = int(offense_play_points * focus_multiplier)
