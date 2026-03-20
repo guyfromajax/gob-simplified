@@ -43,7 +43,7 @@
 |---|----------|---------|--------|-----------------------------|
 | 9 | Top 3 Attributes | `player-maximizer-top-3` | **Implemented** | In `_apply_player_training_points`, per player, ranks trainable anchor attrs (excl. CH, EM, MO, NG), amplifies gains to **top 3** with same focus multiplier. |
 | 10 | Attributes 4–6 | `player-maximizer-attributes-4-6` | **Implemented** | Same as above for **4th–6th** highest trainable attrs. |
-| 11 | Custom Attributes | `player-maximizer-custom` | **Not implemented** | **`_should_amplify_*`:** explicit TODO / `False`; no backend contract for user-selected attrs; UI exposes the radio but there is no parallel “custom list” in training execution. |
+| 11 | Custom Attributes | `player-maximizer-custom` | **Implemented** | **Franchise:** `GET /franchise/training-points` returns `custom_focus_roster` + `player_maximizer_ranking_attrs`; UI modal collects **two** distinct attrs per roster player (`coaching_focus_custom_by_player` on submit). **`normalize_coaching_focus_custom_by_player`** validates; **`_apply_player_training_points`** amplifies drill gains when `attr` is in that player’s pair (same 1.5–1.8× band). CH / EM / MO / NG not allowed in the pair (ranking set). **Auto-train / random CPU focus** excludes this leaf (needs per-player payload). |
 | 12 | Opportunity | `player-maximizer-opportunity` | **Not implemented** | **`_should_amplify_*`:** `False`; comment references set play / motion shot scoring “handled separately” — **no** implementation found for this `sub_option`. |
 
 ---
@@ -63,9 +63,9 @@
 
 | Status | Count | Focus keys |
 |--------|-------|------------|
-| Implemented | **9** | discipline, rebounding, execution (set + Man), **teamwork** (motion + zone install gains + PS/IQ drills), systems offense, systems defense, player top-3, player 4–6, culture inspire* |
+| Implemented | **10** | discipline, rebounding, execution (set + Man), **teamwork** (motion + zone install gains + PS/IQ drills), systems offense, systems defense, player top-3, player 4–6, **player custom**, culture inspire* |
 | Partial | **4** | systems fast breaks, systems press/trap, culture community, culture teamwork |
-| Not implemented | **3** | player custom, player opportunity, culture confidence |
+| Not implemented | **2** | player opportunity, culture confidence |
 
 \*Inspire = implemented for EM/MO block + CH amplify; crowd N/A.
 

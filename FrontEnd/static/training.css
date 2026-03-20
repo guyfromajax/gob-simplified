@@ -538,3 +538,125 @@ body {
 .archetype-block[data-archetype="culture-builder"] .archetype-option input[type="radio"]:checked {
   accent-color: var(--color-culture-builder);
 }
+
+/* Player Maximizer — Custom attributes modal */
+.custom-focus-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  padding: var(--spacing-sm);
+}
+
+.custom-focus-modal-content {
+  background: linear-gradient(145deg, #1e2240 0%, #12182a 100%);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  max-width: min(96vw, 1200px);
+  max-height: min(92vh, 900px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.custom-focus-modal-title {
+  font-size: 1.25rem;
+  color: var(--color-accent);
+}
+
+.custom-focus-modal-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.custom-focus-table-wrap {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  border-radius: var(--radius-sm);
+}
+
+.custom-focus-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.custom-focus-table th,
+.custom-focus-table td {
+  padding: 0.35rem 0.45rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.custom-focus-table th:first-child,
+.custom-focus-table td.player-cell {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #1a1f35;
+  z-index: 1;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.custom-focus-table thead th {
+  background: #252a45;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.custom-focus-cell {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.custom-focus-cell:hover {
+  background: rgba(255, 215, 0, 0.12);
+}
+
+.custom-focus-cell.selected {
+  background: rgba(255, 215, 0, 0.35);
+  color: #1a1a1a;
+  font-weight: 800;
+}
+
+.custom-focus-modal-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.custom-focus-assign-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-player-maximizer);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.custom-focus-assign-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.custom-focus-cancel-btn {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}

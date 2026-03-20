@@ -10,7 +10,7 @@ import math
 import random
 import re
 import uuid
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
 from BackEnd.main import run_simulation
@@ -1063,7 +1063,6 @@ def generate_random_coaching_focus() -> str:
         "player-maximizer",
         "player-maximizer-top-3",
         "player-maximizer-attributes-4-6",
-        "player-maximizer-custom",
         "player-maximizer-opportunity",
         "culture-builder",
         "culture-builder-inspire",
@@ -5663,6 +5662,50 @@ class FranchiseTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
+def _build_custom_focus_roster_for_franchise(
+    franchise_doc: dict,
+    franchise_id_obj: ObjectId,
+) -> Tuple[List[dict], List[str]]:
+    """
+    Rows for the Player Maximizer Custom modal: same roster order as franchise training execution.
+    """
+    from BackEnd.models.training_execution_v2 import PLAYER_MAXIMIZER_RANKING_ATTRS
+
+    ranking = list(PLAYER_MAXIMIZER_RANKING_ATTRS)
+    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id or not user_team_object_id:
+        return [], ranking
+
+    fpd_docs = list(
+        franchise_players_data_collection.find({"franchise_id": str(franchise_id_obj)})
+    )
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id_obj, "team_id": ObjectId(user_team_object_id)}
+    )
+    if not ftd_doc:
+        return [], ranking
+
+    team_player_ids = ftd_doc.get("players") or []
+    rows: List[dict] = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        fpd = franchise_players.get(pid_str)
+        if not fpd:
+            continue
+        meta = fpd.get("meta") or {}
+        name = " ".join(
+            p for p in [meta.get("first_name", ""), meta.get("last_name", "")] if p
+        ).strip() or pid_str
+        attrs_obj = fpd.get("attributes") or {}
+        attr_vals = {}
+        for a in ranking:
+            attr_vals[a] = int(attrs_obj.get(f"anchor_{a}", attrs_obj.get(a, 0)) or 0)
+        rows.append({"player_id": pid_str, "name": name, "attrs": attr_vals})
+    return rows, ranking
+
+
 @router.get("/franchise/training-points")
 def get_training_points(franchise_id: str):
     """
@@ -5696,10 +5739,16 @@ def get_training_points(franchise_id: str):
     total_time = (time.time() - endpoint_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
     
+    custom_roster, ranking_attrs = _build_custom_focus_roster_for_franchise(
+        franchise_doc, franchise_id_obj
+    )
+
     return {
         "training_points": training_points,
         "is_first_training": is_first_training,
         "week": week,
+        "custom_focus_roster": custom_roster,
+        "player_maximizer_ranking_attrs": ranking_attrs,
     }
 
 
@@ -5945,10 +5994,21 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     }
     logger.warning(f"🔋 [API] allocations.team_drills: {allocations.get('team_drills', {})}")
     coaching_focus = training_data.get("coaching_focus")
+    raw_custom = training_data.get("coaching_focus_custom_by_player")
 
     # Execute new training system
     # This applies pre-training conditions, then training points, and returns training report
-    from BackEnd.models.training_execution_v2 import execute_training
+    from BackEnd.models.training_execution_v2 import (
+        execute_training,
+        normalize_coaching_focus_custom_by_player,
+    )
+
+    try:
+        normalized_custom = normalize_coaching_focus_custom_by_player(
+            coaching_focus, raw_custom, players_for_training
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
     players_load_time = (time.time() - players_load_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
@@ -5966,7 +6026,8 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         playbook_settings=playbook_settings,
         scouting_data=scouting_data,
         playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks"),
-        skip_pre_training_depreciation=is_first_training
+        skip_pre_training_depreciation=is_first_training,
+        coaching_focus_custom_by_player=normalized_custom,
     )
     training_exec_time = (time.time() - training_exec_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")

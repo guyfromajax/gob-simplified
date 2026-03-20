@@ -14,7 +14,21 @@ const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"
 const autoTrainModal = document.getElementById('auto-train-modal');
 const autoTrainModalMessage = document.getElementById('auto-train-modal-message');
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
+const customFocusModal = document.getElementById('custom-focus-modal');
+const customFocusThead = document.getElementById('custom-focus-thead');
+const customFocusTbody = document.getElementById('custom-focus-tbody');
+const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
+const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
 let currentWeek = 1;
+
+/** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
+let customFocusRoster = [];
+/** @type {string[]} */
+let customFocusRankingAttrs = [];
+/** @type {Record<string, string[]>} playerId -> [olderAttr, newerAttr] max length 2 */
+let customFocusDraft = {};
+/** @type {Record<string, string[]>} committed picks after Assign */
+let customFocusCommitted = {};
 
 async function fetchFranchiseCommandCenterData(franchiseId) {
   const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
@@ -83,6 +97,132 @@ function isCoachingFocusSelected() {
   return selectedFocus !== null;
 }
 
+function isCustomFocusRadioSelected() {
+  const selected = document.querySelector('input[name="coaching-focus"]:checked');
+  return selected && selected.value === 'player-maximizer-custom';
+}
+
+function isCustomFocusComplete() {
+  if (!customFocusRoster.length) return false;
+  return customFocusRoster.every(function (row) {
+    const picks = customFocusCommitted[row.player_id];
+    return Array.isArray(picks) && picks.length === 2 && picks[0] !== picks[1];
+  });
+}
+
+function resetCustomFocusCommitted() {
+  customFocusCommitted = {};
+  customFocusDraft = {};
+}
+
+function openCustomFocusModal() {
+  if (!customFocusModal || !customFocusThead || !customFocusTbody) return;
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('mode') !== 'franchise' || !urlParams.get('franchise_id')) {
+    showMessageModal('Custom attributes are available in franchise mode after roster data loads.');
+    return;
+  }
+  if (!customFocusRoster.length) {
+    showMessageModal('Roster data is still loading. Try again in a moment.');
+    return;
+  }
+  customFocusDraft = {};
+  customFocusRoster.forEach(function (row) {
+    const pid = row.player_id;
+    const c = customFocusCommitted[pid];
+    customFocusDraft[pid] = c && c.length === 2 ? [c[0], c[1]] : [];
+  });
+  renderCustomFocusTable();
+  syncCustomFocusAssignButton();
+  customFocusModal.style.display = 'flex';
+  customFocusModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeCustomFocusModal() {
+  if (!customFocusModal) return;
+  customFocusModal.style.display = 'none';
+  customFocusModal.setAttribute('aria-hidden', 'true');
+}
+
+function syncCustomFocusAssignButton() {
+  if (!customFocusAssignBtn) return;
+  const complete =
+    customFocusRoster.length > 0 &&
+    customFocusRoster.every(function (row) {
+      const picks = customFocusDraft[row.player_id];
+      return Array.isArray(picks) && picks.length === 2 && picks[0] !== picks[1];
+    });
+  customFocusAssignBtn.disabled = !complete;
+}
+
+function renderCustomFocusTable() {
+  if (!customFocusThead || !customFocusTbody) return;
+  customFocusThead.innerHTML = '';
+  customFocusTbody.innerHTML = '';
+  const headRow = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.textContent = 'Player';
+  headRow.appendChild(corner);
+  customFocusRankingAttrs.forEach(function (code) {
+    const th = document.createElement('th');
+    th.textContent = code;
+    headRow.appendChild(th);
+  });
+  customFocusThead.appendChild(headRow);
+
+  customFocusRoster.forEach(function (row) {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.className = 'player-cell';
+    nameTd.textContent = row.name || row.player_id;
+    tr.appendChild(nameTd);
+
+    const pid = row.player_id;
+    const picks = customFocusDraft[pid] || [];
+
+    customFocusRankingAttrs.forEach(function (code) {
+      const td = document.createElement('td');
+      td.className = 'custom-focus-cell';
+      const val = row.attrs && typeof row.attrs[code] === 'number' ? row.attrs[code] : '';
+      td.textContent = val === '' ? '—' : String(val);
+      if (picks.indexOf(code) !== -1) td.classList.add('selected');
+      td.addEventListener('click', function () {
+        onCustomFocusCellClick(pid, code);
+      });
+      tr.appendChild(td);
+    });
+    customFocusTbody.appendChild(tr);
+  });
+}
+
+function onCustomFocusCellClick(playerId, attrCode) {
+  if (!customFocusDraft[playerId]) customFocusDraft[playerId] = [];
+  const sel = customFocusDraft[playerId];
+  const idx = sel.indexOf(attrCode);
+  if (idx !== -1) {
+    sel.splice(idx, 1);
+  } else if (sel.length < 2) {
+    sel.push(attrCode);
+  } else {
+    sel[1] = attrCode;
+  }
+  renderCustomFocusTable();
+  syncCustomFocusAssignButton();
+}
+
+function commitCustomFocusFromModal() {
+  customFocusCommitted = {};
+  customFocusRoster.forEach(function (row) {
+    const pid = row.player_id;
+    const picks = customFocusDraft[pid];
+    if (Array.isArray(picks) && picks.length === 2 && picks[0] !== picks[1]) {
+      customFocusCommitted[pid] = [picks[0], picks[1]];
+    }
+  });
+  closeCustomFocusModal();
+  updatePointsRemaining();
+}
+
 /**
  * Get human-friendly label text for a selected focus radio
  */
@@ -113,8 +253,9 @@ function updatePointsRemaining() {
   // Enable/disable submit button based on points allocation AND coaching focus selection
   const allPointsAllocated = remaining === 0;
   const focusSelected = isCoachingFocusSelected();
-  
-  if (allPointsAllocated && focusSelected) {
+  const customOk = !isCustomFocusRadioSelected() || isCustomFocusComplete();
+
+  if (allPointsAllocated && focusSelected && customOk) {
     submitBtn.disabled = false;
     submitBtn.style.opacity = '1';
   } else {
@@ -192,7 +333,12 @@ function autoAssignTraining() {
     const validFocusRadios = Array.from(coachingRadios).filter(radio => {
       const value = radio.value || '';
       // Only include radios with hyphens (focus options) and exclude archetype-only values
-      return value.includes('-') && !archetypeValues.includes(value);
+      // Custom requires modal picks — exclude from random Auto-Train
+      return (
+        value.includes('-') &&
+        !archetypeValues.includes(value) &&
+        value !== 'player-maximizer-custom'
+      );
     });
     
     if (validFocusRadios.length > 0) {
@@ -328,10 +474,36 @@ coachingRadios.forEach(radio => {
       archetypeBlock.classList.add('active', 'sub-option-selected');
     }
     
+    if (value === 'player-maximizer-custom') {
+      openCustomFocusModal();
+    } else {
+      resetCustomFocusCommitted();
+    }
+
     // Update submit button state when focus is selected
     updatePointsRemaining();
   });
 });
+
+const customMaximizerRadio = document.querySelector('input[name="coaching-focus"][value="player-maximizer-custom"]');
+if (customMaximizerRadio) {
+  customMaximizerRadio.addEventListener('click', function () {
+    if (this.checked) openCustomFocusModal();
+  });
+}
+
+if (customFocusAssignBtn) {
+  customFocusAssignBtn.addEventListener('click', function () {
+    playSound('confirm-1.mp3');
+    commitCustomFocusFromModal();
+  });
+}
+if (customFocusCancelBtn) {
+  customFocusCancelBtn.addEventListener('click', function () {
+    playSound('click-tiny.wav');
+    closeCustomFocusModal();
+  });
+}
 
 /**
  * Handle back button click
@@ -429,7 +601,17 @@ function collectTrainingData() {
     // Playbook Training Mode
     playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'all-plays-even'
   };
-  
+
+  if (data.coaching_focus === 'player-maximizer-custom') {
+    data.coaching_focus_custom_by_player = {};
+    Object.keys(customFocusCommitted).forEach(function (pid) {
+      const picks = customFocusCommitted[pid];
+      if (Array.isArray(picks) && picks.length === 2) {
+        data.coaching_focus_custom_by_player[pid] = [picks[0], picks[1]];
+      }
+    });
+  }
+
   console.log('🔋 [FRONTEND] Collected training data:', data);
   console.log('🔋 [FRONTEND] team_drills:', data.team_drills);
   console.log('🔋 [FRONTEND] team_drills keys:', Object.keys(data.team_drills));
@@ -481,6 +663,11 @@ submitBtn.addEventListener('click', async function() {
   // Validate that coaching focus is selected
   if (!isCoachingFocusSelected()) {
     alert('Please select a Coaching Style / Focus before submitting.');
+    return;
+  }
+
+  if (isCustomFocusRadioSelected() && !isCustomFocusComplete()) {
+    alert('Player Maximizer / Custom: open Custom Attributes and assign two attributes for every player.');
     return;
   }
   
@@ -609,6 +796,12 @@ async function initializeTrainingPoints() {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
         currentWeek = Number(data.week || 1);
+        if (Array.isArray(data.custom_focus_roster)) {
+          customFocusRoster = data.custom_focus_roster;
+        }
+        if (Array.isArray(data.player_maximizer_ranking_attrs)) {
+          customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
+        }
         // Update points remaining display
         if (pointsRemainingEl) {
           pointsRemainingEl.textContent = TOTAL_POINTS;
@@ -641,6 +834,7 @@ async function initializeTrainingPoints() {
   updatePointsRemaining();
 }
 
+
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
     window.location.reload();
@@ -651,7 +845,7 @@ window.addEventListener('pageshow', (event) => {
 (async function initTrainingPage() {
   const redirected = await redirectIfTrainingAlreadyCommitted();
   if (redirected) return;
-  initializeTrainingPoints();
+  await initializeTrainingPoints();
 })();
 
 // Debug: Verify scrimmages element exists on page load

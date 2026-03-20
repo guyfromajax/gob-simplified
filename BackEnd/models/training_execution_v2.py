@@ -11,7 +11,7 @@ This module implements the new training execution system with:
 import math
 import random
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from BackEnd.constants import ALL_ATTRS
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,8 @@ def execute_training(
     playbook_settings: Optional[Dict] = None,
     scouting_data: Optional[Dict] = None,
     playbook_training_mode: str = "current-playbooks",
-    skip_pre_training_depreciation: bool = False
+    skip_pre_training_depreciation: bool = False,
+    coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
@@ -104,7 +105,8 @@ def execute_training(
         players, team, allocations, coaching_focus,
         is_training_camp=skip_pre_training_depreciation,
         original_baselines=original_player_baselines,
-        original_team_baseline=original_team_baseline
+        original_team_baseline=original_team_baseline,
+        coaching_focus_custom_by_player=coaching_focus_custom_by_player,
     )
     
     # Step 3: Apply play/defense training
@@ -143,7 +145,71 @@ def execute_training(
 # Player attributes excluding EM, MO, NG
 TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO", "NG"]]
 
-# Team attribute clamps (lower, upper). shot_threshold and rebound_modifier from constants.
+# Player Maximizer (top 3 / attributes 4–6 / custom picks): rank by anchor; CH excluded (team chemistry not a maximizer target)
+PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
+
+
+def normalize_coaching_focus_custom_by_player(
+    coaching_focus: Optional[str],
+    raw: Any,
+    players: List[dict],
+) -> Optional[Dict[str, List[str]]]:
+    """
+    Validate and normalize coaching_focus_custom_by_player for player-maximizer-custom.
+
+    Expect coaching_focus radio value ``player-maximizer-custom``. When active, ``raw`` must be a
+    dict mapping each training roster player's id (str) to a list of exactly two distinct
+    attribute codes, both in PLAYER_MAXIMIZER_RANKING_ATTRS.
+
+    Returns:
+        None if focus is not custom (extra raw data is ignored).
+        Dict[player_id, [attr_a, attr_b]] when focus is custom.
+
+    Raises:
+        ValueError: invalid or incomplete payload.
+    """
+    _, sub = parse_coaching_focus(coaching_focus)
+    if sub != "player-maximizer-custom":
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "Player Maximizer / Custom requires coaching_focus_custom_by_player (object mapping player id to two attributes)."
+        )
+    allowed = frozenset(PLAYER_MAXIMIZER_RANKING_ATTRS)
+    roster_ids = {str(p["_id"]) for p in players if p.get("_id") is not None}
+    if not roster_ids:
+        raise ValueError("No players on roster for custom focus validation.")
+
+    out: Dict[str, List[str]] = {}
+    for pid in roster_ids:
+        entry = raw.get(pid)
+        if entry is None:
+            entry = raw.get(str(pid))
+        if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+            raise ValueError(
+                f"Player Maximizer / Custom: player {pid} must have exactly two attributes (got invalid entry)."
+            )
+        a0, a1 = str(entry[0]).strip(), str(entry[1]).strip()
+        if a0 not in allowed or a1 not in allowed:
+            raise ValueError(
+                f"Player Maximizer / Custom: player {pid} attributes must be from the allowed ranking set (not CH/EM/MO/NG)."
+            )
+        if a0 == a1:
+            raise ValueError(
+                f"Player Maximizer / Custom: player {pid} must pick two different attributes."
+            )
+        out[pid] = [a0, a1]
+
+    if set(out.keys()) != roster_ids:
+        missing = roster_ids - set(out.keys())
+        raise ValueError(
+            "Player Maximizer / Custom: coaching_focus_custom_by_player must include every roster player "
+            f"(missing: {', '.join(sorted(missing))})."
+        )
+
+    return out
+
+
 from BackEnd.constants import TEAM_ATTR_RANGES
 TEAM_ATTR_CLAMPS = {
     "shot_threshold": TEAM_ATTR_RANGES["shot_threshold"],
@@ -276,7 +342,8 @@ def apply_training_points(
     coaching_focus: Optional[str] = None,
     is_training_camp: bool = False,
     original_baselines: Optional[Dict] = None,
-    original_team_baseline: Optional[Dict] = None
+    original_team_baseline: Optional[Dict] = None,
+    coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[List[dict], dict, Dict]:
     """
     Apply training points to players and team based on allocations.
@@ -411,6 +478,7 @@ def apply_training_points(
                                 sub_option,
                                 multiplier,
                                 player_baselines.get(player["_id"], {}).get(attr),
+                                coaching_focus_custom_by_player=coaching_focus_custom_by_player,
                             )
                 
                 # Track team attribute contributions from multipliers
@@ -435,6 +503,7 @@ def apply_training_points(
                             sub_option,
                             multiplier,
                             player_baselines.get(player["_id"], {}).get(attr),
+                            coaching_focus_custom_by_player=coaching_focus_custom_by_player,
                         )
             
             # Track team attribute contributions from multipliers (single-value categories)
@@ -643,6 +712,7 @@ def _apply_player_training_points(
     sub_option: Optional[str] = None,
     multiplier: float = 1.0,
     starting_baseline: Optional[int] = None,
+    coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
 ):
     """
     Apply training points to a single player attribute.
@@ -702,8 +772,8 @@ def _apply_player_training_points(
     
     # Handle Player Maximizer special cases (top 3 / next 3 attributes)
     if sub_option in ["player-maximizer-top-3", "player-maximizer-attributes-4-6"]:
-        # Get player's top attributes (excluding CH, EM, MO, NG)
-        player_attrs = {a: attrs.get(f"anchor_{a}", 0) for a in TRAINABLE_PLAYER_ATTRS}
+        # Rank by anchor for PLAYER_MAXIMIZER_RANKING_ATTRS (CH excluded; EM/MO/NG not in list)
+        player_attrs = {a: attrs.get(f"anchor_{a}", 0) for a in PLAYER_MAXIMIZER_RANKING_ATTRS}
         sorted_attrs = sorted(player_attrs.items(), key=lambda x: x[1], reverse=True)
         
         if sub_option == "player-maximizer-top-3":
@@ -714,6 +784,10 @@ def _apply_player_training_points(
             # Attributes 4-6
             next_attrs = [a[0] for a in sorted_attrs[3:6]]
             should_amplify = attr in next_attrs
+    elif sub_option == "player-maximizer-custom" and coaching_focus_custom_by_player:
+        pid = str(player.get("_id", ""))
+        chosen = coaching_focus_custom_by_player.get(pid) or []
+        should_amplify = attr in chosen
     else:
         # Standard amplification check
         should_amplify = _should_amplify_player_attr(attr, archetype, sub_option)
@@ -1093,7 +1167,7 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
         # This will be handled per-player in the calling function
         return False
     elif sub_option == "player-maximizer-custom":
-        # Custom attributes chosen by user (to be built later)
+        # Per-player picks (coaching_focus_custom_by_player) handled in _apply_player_training_points
         return False
     elif sub_option == "player-maximizer-opportunity":
         return False  # Improves Non-Successful Set Play Skeleton Shot Scores, Improves all Motion Shot Scores (handled separately)

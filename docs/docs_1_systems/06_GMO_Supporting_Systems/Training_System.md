@@ -195,11 +195,11 @@ The training execution system applies pre-training conditions, allocates trainin
    - Applies coaching focus amplifiers
    - Handles special cases (conditioning, film study, breaks)
 
-3. **Play/Defense Training Application** (placeholder - to be implemented)
-   - Updates play effectiveness and momentum based on training allocations
-   - Updates defense effectiveness and momentum based on training allocations
-   - Uses playbook_training_mode to determine which plays/defenses receive training benefits
-   - Considers playcall_settings, strategy_settings, and playbook_settings for weighted distribution
+3. **Play/Defense Training Application** (`apply_play_defense_training`, `_apply_offense_play_training`, `_apply_defense_training`)
+   - Distributes offense/defense **install** point pools to **effectiveness** (Command) on plays and defenses (not per-play momentum/cloaking).
+   - Uses `playbook_training_mode` (`current-playbooks`, `all-plays-even`, etc.), `strategy_settings`, and `playbook_settings` for motion/set and man/zone splits.
+   - **Systems Coach** offense/defense: multiplies the install point **pool** before distribution when the matching focus is selected.
+   - **Authoritarian Execution** / **Teamwork**: after points are allocated to specific plays/defenses, multiplies only the **effectiveness** gains that land on **set + Man** (Execution) or **motion + zone** defenses (Teamwork); see **Coaching Focus Amplifiers**.
 
 4. **Attribute Clamping**
    - Player attributes: Minimum 1, no maximum
@@ -315,29 +315,33 @@ Then use the following CH scale for each player
 
 #### Coaching Focus Amplifiers
 
-**Authoritarian:**
-- Discipline: Amplifies BH, `fight`, `discipline` (multiplier: `random.choice([1.3, 1.4, 1.5, 1.6])`)
-- Rebounding: Amplifies RB, `rebound_modifier` (multiplier: `random.choice([1.5, 1.6, 1.7, 1.8])`)
-- Teamwork: Amplifies PS, IQ (drill gains). For offense/defense **install** training, **effectiveness** gains on **motion** plays and **zone** defenses only are multiplied by one session roll `random.choice([1.5, 1.6, 1.7, 1.8])` (same pattern as Execution on set plays + Man). Man and set plays get base install gains only under this focus.
-- Execution: After offense/defense install points are distributed to plays, **effectiveness** gains (Command in UX terms) on **`play_type == set_play`** only and on **Man** defense only are multiplied by one session roll: `random.choice([1.5, 1.6, 1.7, 1.8])`. Motion and zone defenses are unchanged. Per-play **momentum** and **cloaking** are not trained by install points—only effectiveness receives gains today. Implemented in `apply_play_defense_training` → `_apply_offense_play_training` / `_apply_defense_training`.
+**Two multiplier mechanisms in code** (`training_execution_v2.py`):
+
+1. **Drill / team-attribute training:** When `_should_amplify_player_attr` / `_should_amplify_team_attr` (or special cases) apply, qualifying gains use `focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])` in `_apply_player_training_points`, `_apply_team_training_points`, and rebound-modifier training. *(Older docs listed 1.3–1.6 for some focuses; implementation uses this single band.)*
+2. **Install training (play/defense effectiveness only):** Authoritarian **Execution** and **Teamwork** use one session roll of the same `[1.5, 1.6, 1.7, 1.8]` values on integer **effectiveness** (Command) increments only, via `_scale_install_training_effectiveness_points`—not on momentum/cloaking (install does not allocate to those).
+
+**Authoritarian (all four sub-options implemented):**
+- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*).
+- **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*).
+- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus.
+- **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus.
 
 **Systems Coach:**
-- Offense: Amplifies `offensive_efficiency` gains, offensive play effectiveness
-- Defense: Amplifies `defensive_efficiency` gains, defensive play effectiveness
-- Fast Breaks: Amplifies `fb_efficiency` gains, `fb_opp_modifier` gains
-- Presses/Traps: Amplifies `pt_efficiency` gains, `pt_opp_modifier` gains
+- Offense / Defense: Drill gains to `offensive_efficiency` / `defensive_efficiency` use mechanism *#1* above. Install: multiplies offense or defense **play point pool** by the same `[1.5, 1.6, 1.7, 1.8]` band before `_apply_offense_play_training` / `_apply_defense_training` when `systems-coach-offense` or `systems-coach-defense` is selected.
+- Fast Breaks: Amplifies `fb_efficiency` and `fb_opp_modifier` drill gains (mechanism *#1*).
+- Presses/Traps: Amplifies `pt_efficiency` and `pt_opp_modifier` drill gains (mechanism *#1*).
 
 **Player Maximizer:**
 - Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
-- Attributes 4-6: Amplifies gains to player's 4th-6th highest attributes
-- Custom: Amplifies gains to user-selected attributes (TODO)
+- Attributes 4-6: Amplifies gains to player's 4th–6th highest attributes among the same set as Top 3 (excluding CH, EM, MO, NG)
+- Custom: User picks **two** attributes per player (from the same ranking set as Top 3 / 4–6: trainable anchors excluding CH). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB] }` for every roster player; drill gains to those attrs use the same 1.5–1.8× focus multiplier as other Player Maximizer options.
 - Be Opportunistic: Improves Set Play and Motion Shot Scores (carried to next game)
 
 **Culture Builder:**
 - Inspire: Improves EM, MO by `random.randint(1, 2)`, amplifies Team Chemistry gains
 - Community Engagement: Improves EM, affects crowd factors (carried to next game)
 - Teamwork: Amplifies Team Chemistry gains, improves Motion Play and Zone Defense Effectiveness
-- Build Confidence: Improves Set Play Effectiveness, Man Defense Effectiveness (multiplier: `random.choice([1.3, 1.4, 1.5, 1.6])`)
+- Build Confidence: Design: set play / man defense effectiveness boost (multiplier band in code for wired focuses is `1.5–1.8`; **not yet implemented** for this sub-option—see `Coaching_Focus_Status.md`)
 
 #### Breaks Effect
 
@@ -538,6 +542,7 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 
 1. **Training Submission:**
    - User allocates 24 training points (or 30 for first training) and selects coaching focus on `training.html`
+   - **Player Maximizer / Custom:** `GET /franchise/training-points` includes roster rows and ranking attr codes for the modal; submit payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
    - Frontend sends POST request to `/franchise/run-training` with training data
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
@@ -672,5 +677,4 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Tournament mode training execution
 - Single game mode training
 - Training history tracking and archiving
-- Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training
