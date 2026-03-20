@@ -25,7 +25,7 @@ let currentWeek = 1;
 let customFocusRoster = [];
 /** @type {string[]} */
 let customFocusRankingAttrs = [];
-/** @type {Record<string, string[]>} playerId -> [olderAttr, newerAttr] max length 2 */
+/** @type {Record<string, string[]>} playerId -> up to 3 distinct attr codes */
 let customFocusDraft = {};
 /** @type {Record<string, string[]>} committed picks after Assign */
 let customFocusCommitted = {};
@@ -102,11 +102,16 @@ function isCustomFocusRadioSelected() {
   return selected && selected.value === 'player-maximizer-custom';
 }
 
+function isCustomFocusThreeDistinct(picks) {
+  if (!Array.isArray(picks) || picks.length !== 3) return false;
+  return picks[0] !== picks[1] && picks[0] !== picks[2] && picks[1] !== picks[2];
+}
+
 function isCustomFocusComplete() {
   if (!customFocusRoster.length) return false;
   return customFocusRoster.every(function (row) {
     const picks = customFocusCommitted[row.player_id];
-    return Array.isArray(picks) && picks.length === 2 && picks[0] !== picks[1];
+    return isCustomFocusThreeDistinct(picks);
   });
 }
 
@@ -130,7 +135,8 @@ function openCustomFocusModal() {
   customFocusRoster.forEach(function (row) {
     const pid = row.player_id;
     const c = customFocusCommitted[pid];
-    customFocusDraft[pid] = c && c.length === 2 ? [c[0], c[1]] : [];
+    customFocusDraft[pid] =
+      c && c.length === 3 ? [c[0], c[1], c[2]] : [];
   });
   renderCustomFocusTable();
   syncCustomFocusAssignButton();
@@ -150,7 +156,7 @@ function syncCustomFocusAssignButton() {
     customFocusRoster.length > 0 &&
     customFocusRoster.every(function (row) {
       const picks = customFocusDraft[row.player_id];
-      return Array.isArray(picks) && picks.length === 2 && picks[0] !== picks[1];
+      return isCustomFocusThreeDistinct(picks);
     });
   customFocusAssignBtn.disabled = !complete;
 }
@@ -201,10 +207,10 @@ function onCustomFocusCellClick(playerId, attrCode) {
   const idx = sel.indexOf(attrCode);
   if (idx !== -1) {
     sel.splice(idx, 1);
-  } else if (sel.length < 2) {
+  } else if (sel.length < 3) {
     sel.push(attrCode);
   } else {
-    sel[1] = attrCode;
+    sel[2] = attrCode;
   }
   renderCustomFocusTable();
   syncCustomFocusAssignButton();
@@ -215,8 +221,8 @@ function commitCustomFocusFromModal() {
   customFocusRoster.forEach(function (row) {
     const pid = row.player_id;
     const picks = customFocusDraft[pid];
-    if (Array.isArray(picks) && picks.length === 2 && picks[0] !== picks[1]) {
-      customFocusCommitted[pid] = [picks[0], picks[1]];
+    if (isCustomFocusThreeDistinct(picks)) {
+      customFocusCommitted[pid] = [picks[0], picks[1], picks[2]];
     }
   });
   closeCustomFocusModal();
@@ -606,8 +612,8 @@ function collectTrainingData() {
     data.coaching_focus_custom_by_player = {};
     Object.keys(customFocusCommitted).forEach(function (pid) {
       const picks = customFocusCommitted[pid];
-      if (Array.isArray(picks) && picks.length === 2) {
-        data.coaching_focus_custom_by_player[pid] = [picks[0], picks[1]];
+      if (isCustomFocusThreeDistinct(picks)) {
+        data.coaching_focus_custom_by_player[pid] = [picks[0], picks[1], picks[2]];
       }
     });
   }
@@ -667,7 +673,7 @@ submitBtn.addEventListener('click', async function() {
   }
 
   if (isCustomFocusRadioSelected() && !isCustomFocusComplete()) {
-    alert('Player Maximizer / Custom: open Custom Attributes and assign two attributes for every player.');
+    alert('Player Maximizer / Custom: open Custom Attributes and assign three distinct attributes for every player.');
     return;
   }
   

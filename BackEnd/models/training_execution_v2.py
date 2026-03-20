@@ -158,12 +158,12 @@ def normalize_coaching_focus_custom_by_player(
     Validate and normalize coaching_focus_custom_by_player for player-maximizer-custom.
 
     Expect coaching_focus radio value ``player-maximizer-custom``. When active, ``raw`` must be a
-    dict mapping each training roster player's id (str) to a list of exactly two distinct
-    attribute codes, both in PLAYER_MAXIMIZER_RANKING_ATTRS.
+    dict mapping each training roster player's id (str) to a list of exactly **three** distinct
+    attribute codes, all in PLAYER_MAXIMIZER_RANKING_ATTRS.
 
     Returns:
         None if focus is not custom (extra raw data is ignored).
-        Dict[player_id, [attr_a, attr_b]] when focus is custom.
+        Dict[player_id, [attr_a, attr_b, attr_c]] when focus is custom.
 
     Raises:
         ValueError: invalid or incomplete payload.
@@ -173,7 +173,7 @@ def normalize_coaching_focus_custom_by_player(
         return None
     if not isinstance(raw, dict):
         raise ValueError(
-            "Player Maximizer / Custom requires coaching_focus_custom_by_player (object mapping player id to two attributes)."
+            "Player Maximizer / Custom requires coaching_focus_custom_by_player (object mapping player id to three attributes)."
         )
     allowed = frozenset(PLAYER_MAXIMIZER_RANKING_ATTRS)
     roster_ids = {str(p["_id"]) for p in players if p.get("_id") is not None}
@@ -185,20 +185,20 @@ def normalize_coaching_focus_custom_by_player(
         entry = raw.get(pid)
         if entry is None:
             entry = raw.get(str(pid))
-        if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+        if not isinstance(entry, (list, tuple)) or len(entry) != 3:
             raise ValueError(
-                f"Player Maximizer / Custom: player {pid} must have exactly two attributes (got invalid entry)."
+                f"Player Maximizer / Custom: player {pid} must have exactly three attributes (got invalid entry)."
             )
-        a0, a1 = str(entry[0]).strip(), str(entry[1]).strip()
-        if a0 not in allowed or a1 not in allowed:
+        a0, a1, a2 = str(entry[0]).strip(), str(entry[1]).strip(), str(entry[2]).strip()
+        if a0 not in allowed or a1 not in allowed or a2 not in allowed:
             raise ValueError(
                 f"Player Maximizer / Custom: player {pid} attributes must be from the allowed ranking set (not CH/EM/MO/NG)."
             )
-        if a0 == a1:
+        if len({a0, a1, a2}) != 3:
             raise ValueError(
-                f"Player Maximizer / Custom: player {pid} must pick two different attributes."
+                f"Player Maximizer / Custom: player {pid} must pick three different attributes."
             )
-        out[pid] = [a0, a1]
+        out[pid] = [a0, a1, a2]
 
     if set(out.keys()) != roster_ids:
         missing = roster_ids - set(out.keys())

@@ -621,12 +621,12 @@ body {
 }
 
 .custom-focus-cell:hover {
-  background: rgba(255, 215, 0, 0.12);
+  background: rgba(45, 143, 45, 0.18);
 }
 
 .custom-focus-cell.selected {
-  background: rgba(255, 215, 0, 0.35);
-  color: #1a1a1a;
+  background: rgba(45, 143, 45, 0.45);
+  color: #f5fff5;
   font-weight: 800;
 }
 

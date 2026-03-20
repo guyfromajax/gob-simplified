@@ -345,7 +345,7 @@ Then use the following CH scale for each player
 **Player Maximizer:**
 - Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
 - Attributes 4-6: Amplifies gains to player's 4th–6th highest attributes among the same set as Top 3 (excluding CH, EM, MO, NG)
-- Custom: User picks **two** attributes per player (from the same ranking set as Top 3 / 4–6: trainable anchors excluding CH). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB] }` for every roster player; drill gains to those attrs use the same 1.5–1.8× focus multiplier as other Player Maximizer options.
+- Custom: User picks **three** distinct attributes per player (from the same ranking set as Top 3 / 4–6: trainable anchors excluding CH). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB, attrC] }` for every roster player; drill gains to those attrs use the same 1.5–1.8× focus multiplier as other Player Maximizer options. Custom modal and training report list players by **highest RT** (max position rating) descending.
 - Be Opportunistic: Improves Set Play and Motion Shot Scores (carried to next game)
 
 **Culture Builder:**

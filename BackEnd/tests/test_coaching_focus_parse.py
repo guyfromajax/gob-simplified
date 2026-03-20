@@ -80,28 +80,35 @@ class TestParseCoachingFocus(unittest.TestCase):
             {"_id": "p1"},
             {"_id": "p2"},
         ]
-        raw = {"p1": ["SC", "SH"], "p2": ["IQ", "FT"]}
+        raw = {"p1": ["SC", "SH", "ID"], "p2": ["IQ", "FT", "RB"]}
         out = normalize_coaching_focus_custom_by_player("player-maximizer-custom", raw, players)
-        self.assertEqual(out, {"p1": ["SC", "SH"], "p2": ["IQ", "FT"]})
+        self.assertEqual(out, {"p1": ["SC", "SH", "ID"], "p2": ["IQ", "FT", "RB"]})
 
     def test_normalize_custom_focus_not_custom_ignores_raw(self):
         players = [{"_id": "p1"}]
         self.assertIsNone(
-            normalize_coaching_focus_custom_by_player("player-maximizer-top-3", {"p1": ["SC", "SH"]}, players),
+            normalize_coaching_focus_custom_by_player("player-maximizer-top-3", {"p1": ["SC", "SH", "ID"]}, players),
         )
 
     def test_normalize_custom_rejects_duplicate_attrs(self):
         players = [{"_id": "p1"}]
         with self.assertRaises(ValueError):
             normalize_coaching_focus_custom_by_player(
-                "player-maximizer-custom", {"p1": ["SC", "SC"]}, players
+                "player-maximizer-custom", {"p1": ["SC", "SH", "SC"]}, players
+            )
+
+    def test_normalize_custom_rejects_two_attrs(self):
+        players = [{"_id": "p1"}]
+        with self.assertRaises(ValueError):
+            normalize_coaching_focus_custom_by_player(
+                "player-maximizer-custom", {"p1": ["SC", "SH"]}, players
             )
 
     def test_normalize_custom_rejects_ch(self):
         players = [{"_id": "p1"}]
         with self.assertRaises(ValueError):
             normalize_coaching_focus_custom_by_player(
-                "player-maximizer-custom", {"p1": ["SC", "CH"]}, players
+                "player-maximizer-custom", {"p1": ["SC", "SH", "CH"]}, players
             )
 
     def test_inspire_does_not_amplify_player_drill_attrs_team_ch_separate(self):

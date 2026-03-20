@@ -1,6 +1,6 @@
 # Coaching focus — implementation status
 
-**Purpose:** Per-leaf coaching focus (`training.html` radio `value`), as wired today in **`BackEnd/models/training_execution_v2.py`** (and play/defense training in the same module).  
+**Purpose:** Per-leaf coaching focus (`training.html` radio `value`), as wired today in **`BackEnd/models/training_execution_v2.py`** (and play/defense training in the same module). **Community Engagement** also touches **`franchise_routes`** (FTD pending) and **`home_crowd` / `api` init-game** for franchise GP only.  
 **Prerequisite:** `parse_coaching_focus()` normalizes UI strings so `sub_option` matches these `value`s (Step 1 wiring).
 
 **Legend**
@@ -43,7 +43,7 @@
 |---|----------|---------|--------|-----------------------------|
 | 9 | Top 3 Attributes | `player-maximizer-top-3` | **Implemented** | In `_apply_player_training_points`, per player, ranks trainable anchor attrs (excl. CH, EM, MO, NG), amplifies gains to **top 3** with same focus multiplier. |
 | 10 | Attributes 4–6 | `player-maximizer-attributes-4-6` | **Implemented** | Same as above for **4th–6th** highest trainable attrs. |
-| 11 | Custom Attributes | `player-maximizer-custom` | **Implemented** | **Franchise:** `GET /franchise/training-points` returns `custom_focus_roster` + `player_maximizer_ranking_attrs`; UI modal collects **two** distinct attrs per roster player (`coaching_focus_custom_by_player` on submit). **`normalize_coaching_focus_custom_by_player`** validates; **`_apply_player_training_points`** amplifies drill gains when `attr` is in that player’s pair (same 1.5–1.8× band). CH / EM / MO / NG not allowed in the pair (ranking set). **Auto-train / random CPU focus** excludes this leaf (needs per-player payload). |
+| 11 | Custom Attributes | `player-maximizer-custom` | **Implemented** | **Franchise:** `GET /franchise/training-points` returns `custom_focus_roster` (rows sorted by max **RT** descending) + `player_maximizer_ranking_attrs`; UI modal collects **three** distinct attrs per roster player (`coaching_focus_custom_by_player` on submit). **`normalize_coaching_focus_custom_by_player`** validates; **`_apply_player_training_points`** amplifies drill gains when `attr` is in that player’s triple (same 1.5–1.8× band). CH / EM / MO / NG not allowed (ranking set). **Auto-train / random CPU focus** excludes this leaf (needs per-player payload). Training report player table: same RT sort (API + `training-report.js`). |
 | 12 | Opportunity | `player-maximizer-opportunity` | **Not implemented** | **`_should_amplify_*`:** `False`; comment references set play / motion shot scoring “handled separately” — **no** implementation found for this `sub_option`. |
 
 ---
@@ -54,7 +54,7 @@
 |---|----------|---------|--------|-----------------------------|
 | 13 | Inspire | `culture-builder-inspire` | **Implemented** | See **Inspire (plain summary)** below (flat EM/MO + **team_chemistry** amplify only). |
 | 14 | Confidence | `culture-builder-confidence` | **Implemented** | **`_should_amplify_player_attr`:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use `random.choice([1.5, 1.6, 1.7, 1.8])` after CH’s 0.5 drill coeff. See **Confidence (plain summary)** below. |
-| 15 | Community Engagement | `culture-builder-community` | **Partial** | **Dedicated block:** all players **EM** +1–2. Comment: crowd min/max for next home/away — **not** implemented in this module (no game-creation hook found here). |
+| 15 | Community Engagement | `culture-builder-community` | **Implemented** | **Training (`training_execution_v2`):** all players **EM** +1–2 (flat block). **Franchise GP only:** sets **`pending_community_engagement`** on user FTD (`franchise_routes` `run_franchise_training`). **Home crowd roll:** consumed at franchise game start (`consume_franchise_community_engagement_for_matchup` in `home_crowd.py`, called from `/api/init-game` and the new-game `simulate-quarter` path); shifts the **Home Crowd System** weight band up/down vs actual home `team_chemistry`, Upper Bonus row when applicable; **both** teams pending CE → cancel. CPU: distant template `community_engagement` sets pending on CPU FTD. Single/tournament: no training → N/A. See **Community Engagement (plain summary)** below. |
 | 16 | Team Building | `culture-builder-teamwork` | **Implemented** | **Dedicated block:** **team_chemistry** `+= random.randint(1, 3)` once per training (clamped 7–25). Radio **`value`** unchanged for API/back-compat. No drill multipliers, no PS / motion / zone play hooks. |
 
 ### Inspire (plain summary)
@@ -81,6 +81,12 @@ Amplifies **CH** and **FT** from drills (1.5×, 1.6×, 1.7×, or 1.8× per sessi
 
 No flat EM/MO block on Confidence; no **team_chemistry** focus mult on Confidence (contrast **Inspire**).
 
+### Community Engagement (plain summary)
+
+**In training:** +1–2 **EM** per player (anchors updated).
+
+**Franchise next game (home crowd weights only — not team doc chemistry):** selecting this focus sets **`pending_community_engagement`** on the user team’s FTD. At the **start** of the **next** franchise game (or after a bye, the next game that season), the home crowd factor roll uses an adjusted band per **`Home_Crowd_System.md`** (shift **up** if user is home / beneficiary is home, **down** if user is away and floor not 7–10, **Upper Bonus** row when shifting up from the 21–25 tier). Pending is **cleared** for both teams in the matchup when the game is started. If **user and CPU** both had pending CE, shifts **cancel**. Remote CPU teams can get pending from **distant training** templates with `community_engagement: true` (regenerate templates script to populate Mongo).
+
 ---
 
 ## Summary counts
@@ -89,12 +95,13 @@ Leaf options above: **16** (four per archetype block, excluding archetype header
 
 | Status | Count | Focus keys |
 |--------|-------|------------|
-| Implemented | **12** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (3):** top-3, attributes 4–6, custom. **Culture (3):** inspire*, confidence†, team building‡ |
-| Partial | **3** | **Systems (2):** fast breaks, press/trap. **Culture (1):** community |
+| Implemented | **13** | **Authoritarian (4):** discipline, rebounding, execution (set + Man), teamwork (PS/IQ drills + motion/zone install). **Systems (2):** offense, defense. **Player maximizer (3):** top-3, attributes 4–6, custom. **Culture (4):** inspire*, confidence†, community engagement§, team building‡ |
+| Partial | **2** | **Systems (2):** fast breaks, press/trap |
 | Not implemented | **1** | **Player maximizer (1):** opportunity |
 
 \* **Inspire** — see **Inspire (plain summary)** above.  
 † **Confidence** — see **Confidence (plain summary)** above.  
+§ **Community Engagement** — see **Community Engagement (plain summary)** above.  
 ‡ **Team Building** — `culture-builder-teamwork`; flat +1–3 **team_chemistry** only (row 16).
 
 ---
@@ -105,6 +112,7 @@ Leaf options above: **16** (four per archetype block, excluding archetype header
 - Parsing: `parse_coaching_focus()` in `training_execution_v2.py`.  
 - **Teamwork vs Team Building:** `COACHING_FOCUS_LEAF_DISPLAY_NAME` and `coaching_focus_leaf_display_name()` document and label **`authoritarian-teamwork`** (Authoritarian **Teamwork**) vs **`culture-builder-teamwork`** (Culture **Team Building**). Training reports include optional **`leaf_display_name`** on `coaching_focus` for stable UI copy.  
 - Amplifier tables: `_should_amplify_player_attr`, `_should_amplify_team_attr`; Culture special blocks in `apply_training_points`; Systems play pool: `apply_play_defense_training`.  
-- Design doc: `docs/docs_1_systems/06_GMO_Supporting_Systems/Training_System.md` (may describe effects not yet built — use this status doc for code truth).
+- Design doc: `docs/docs_1_systems/06_GMO_Supporting_Systems/Training_System.md` (may describe effects not yet built — use this status doc for code truth).  
+- **Community Engagement / home crowd:** `docs/docs_1_systems/05_GP_Supporting_Systems/Home_Crowd_System.md`; implementation `BackEnd/utils/home_crowd.py`, FTD pending in `BackEnd/api/franchise_routes.py` (`run_franchise_training` + distant training), game start in `BackEnd/api/api.py`.
 
-*Last reviewed against codebase in a full sweep of `training_execution_v2.py` (coaching-focus-related paths only).*
+*Last reviewed: Community Engagement marked implemented (FTD pending + home crowd consume); amplifier sweep `training_execution_v2.py`.*

@@ -5662,6 +5662,38 @@ class FranchiseTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
+def _max_position_rating_from_fpd(fpd: dict) -> int:
+    """Highest position rating (PG/SG/SF/PF/C) for sort order (custom modal + training report)."""
+    pr = (fpd or {}).get("position_ratings") or {}
+    best = 0
+    for v in pr.values():
+        try:
+            iv = int(float(v))
+        except (TypeError, ValueError):
+            continue
+        if iv > best:
+            best = iv
+    return best
+
+
+def _sort_training_report_players_by_max_rt(players: List[dict]) -> None:
+    """In-place: descending max(RT), stable by original index on tie."""
+
+    def max_rt(p: dict) -> float:
+        pr = p.get("position_ratings") or {}
+        vals = []
+        for v in pr.values():
+            try:
+                vals.append(float(v))
+            except (TypeError, ValueError):
+                pass
+        return max(vals) if vals else 0.0
+
+    decorated = [(max_rt(p), i, p) for i, p in enumerate(players)]
+    decorated.sort(key=lambda t: (-t[0], t[1]))
+    players[:] = [t[2] for t in decorated]
+
+
 def _build_custom_focus_roster_for_franchise(
     franchise_doc: dict,
     franchise_id_obj: ObjectId,
@@ -5702,7 +5734,17 @@ def _build_custom_focus_roster_for_franchise(
         attr_vals = {}
         for a in ranking:
             attr_vals[a] = int(attrs_obj.get(f"anchor_{a}", attrs_obj.get(a, 0)) or 0)
-        rows.append({"player_id": pid_str, "name": name, "attrs": attr_vals})
+        rows.append(
+            {
+                "player_id": pid_str,
+                "name": name,
+                "attrs": attr_vals,
+                "_sort_max_rt": _max_position_rating_from_fpd(fpd),
+            }
+        )
+    rows.sort(key=lambda r: r.get("_sort_max_rt", 0), reverse=True)
+    for r in rows:
+        r.pop("_sort_max_rt", None)
     return rows, ranking
 
 
@@ -6468,6 +6510,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                     })
             
             logger.info(f"🔍 [TRAINING REPORT] Found {len(players)} players for team {team_id_str}")
+            _sort_training_report_players_by_max_rt(players)
             
             # Get current team attributes (after training)
             team_attrs = {
@@ -6602,6 +6645,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                         "attributes": player_attrs,
                         "position_ratings": tournament_player_data.get("position_ratings", {}),
                     })
+            
+            _sort_training_report_players_by_max_rt(players)
             
             # Get current team attributes from tournament teams (matches Franchise pattern)
             team_attrs = {
