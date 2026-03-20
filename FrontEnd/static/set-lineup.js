@@ -584,8 +584,10 @@ function renderRoster() {
     // Use anchor attributes (don't show energy-scaled values)
     const anchorAttrs = p.attributes || {};
     
+    const displayPlayerName =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     const cells = [
-      p.name,
+      displayPlayerName,
       bestPos,
       formatHeight(p.height),
       p.weight ?? '--',
@@ -948,13 +950,15 @@ function updateSlotDisplay(slot) {
     
     const imgBase = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/' : '/images/players/');
     const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
+    const slotDisplayName =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
     // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="${imgBase}${playerId}.png" 
              onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
-      <div class="player-name">${player.name}</div>
+      <div class="player-name">${slotDisplayName}</div>
       <div class="player-rating">${rating}</div>
       <div class="player-points">${points}</div>
       <div class="player-rebounds">${rebounds}</div>
@@ -2004,7 +2008,8 @@ function createCardFront(player) {
   
   const name = document.createElement('div');
   name.className = 'player-name';
-  name.textContent = player.name;
+  name.textContent =
+    typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
   leftInfo.appendChild(name);
   
   const physical = document.createElement('div');

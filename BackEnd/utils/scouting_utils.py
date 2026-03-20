@@ -183,7 +183,7 @@ def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[
                 "position": pos,
                 "player_id": _player_sort_key(p),
                 "name": (p.get("name") or f"{p.get('first_name', '')} {p.get('last_name', '')}").strip(),
-                "jersey": p.get("jersey", 0),
+                "jersey": p.get("jersey"),
                 "year": p.get("year") or "",
                 "height": p.get("height"),
                 "weight": p.get("weight"),

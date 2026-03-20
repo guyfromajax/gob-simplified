@@ -43,7 +43,13 @@ try:
     )
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.game_summary_builder import build_game_summary
-    from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height, deserialize_computer_timeouts
+    from BackEnd.utils.shared import (
+        clean_mongo_ids,
+        summarize_game_state,
+        format_height,
+        format_player_display_name,
+        deserialize_computer_timeouts,
+    )
     from BackEnd.utils import stat_updater
     from pydantic import BaseModel
     from fastapi import HTTPException
@@ -5042,7 +5048,7 @@ try:
                 "year": p.get("year"),
                 "height": p.get("height"),
                 "weight": p.get("weight"),
-                "jersey": p.get("jersey", 0),
+                "jersey": p.get("jersey"),
                 "position_ratings": position_ratings,
                 "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
                 "has_playing_time_promise": player_id_str in pt_promise_ids,
@@ -5576,10 +5582,16 @@ try:
                 else:
                     display_attrs[attr] = int(raw_val // 10)  # Convert to 0-12 scale
     
+            first = p.get("first_name", "") or ""
+            last = p.get("last_name", "") or ""
+            name = f"{first} {last}".strip()
+            jersey = p.get("jersey")
             players.append(
                 {
                     "_id": str(p.get("_id")),  # Add player ID for linking
-                    "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                    "jersey": jersey,
+                    "name": name,
+                    "display_name": format_player_display_name(jersey, first, last),
                     "pos": pos,
                     "year": year_abbr,
                     "height": format_height(raw_height),

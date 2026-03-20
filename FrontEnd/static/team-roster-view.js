@@ -182,6 +182,7 @@ async function loadRoster() {
       return {
         _id: p._id,
         name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        jersey: p.jersey,
         pos: p.position || getBestPosition(posRatings).pos || '--',
         year: p.year || '--',
         height: heightDisplay,
@@ -365,7 +366,8 @@ function renderRoster() {
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
     nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent = p.name;
+    nameLink.textContent =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
     nameLink.addEventListener('mouseenter', () => {
@@ -452,7 +454,8 @@ function renderStats() {
     const nameTd = document.createElement('td');
     const nameLink = document.createElement('a');
     nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent = p.name;
+    nameLink.textContent =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
     nameLink.addEventListener('mouseenter', () => {
@@ -905,7 +908,8 @@ function createCardFront(player) {
   
   const name = document.createElement('div');
   name.className = 'player-name';
-  name.textContent = player.name;
+  name.textContent =
+    typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
   leftInfo.appendChild(name);
   
   const physical = document.createElement('div');

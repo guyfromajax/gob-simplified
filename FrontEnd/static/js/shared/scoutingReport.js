@@ -33,7 +33,7 @@ function renderProjectedStartingFive(rows) {
   table.className = 'scouting-projected-table';
   const thead = document.createElement('thead');
   const hrow = document.createElement('tr');
-  const headers = ['Pos', 'Player', '#', 'Year', 'Ht', 'Wt'].concat(SCOUTING_PROJECTED_ATTR_COLS).concat(['RT']);
+  const headers = ['Pos', 'Player', 'Year', 'Ht', 'Wt'].concat(SCOUTING_PROJECTED_ATTR_COLS).concat(['RT']);
   headers.forEach((h) => {
     const th = document.createElement('th');
     th.textContent = h;
@@ -45,10 +45,13 @@ function renderProjectedStartingFive(rows) {
   const tbody = document.createElement('tbody');
   rows.forEach((r) => {
     const tr = document.createElement('tr');
+    const playerLabel =
+      typeof formatNameWithJersey === 'function'
+        ? formatNameWithJersey(r.jersey, r.name || '')
+        : r.name || '—';
     const cells = [
       r.position || '—',
-      r.name || '—',
-      r.jersey != null && r.jersey !== '' ? String(r.jersey) : '—',
+      playerLabel,
       r.year != null && r.year !== '' ? String(r.year) : '—',
       scoutingFormatHeight(r.height),
       r.weight != null && r.weight !== '' ? String(r.weight) : '—',
