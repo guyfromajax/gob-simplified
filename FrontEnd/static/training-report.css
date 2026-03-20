@@ -547,6 +547,36 @@ body {
   margin-bottom: var(--spacing-md);
 }
 
+.training-note-section {
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.12);
+}
+
+.training-note-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.training-note-section-title {
+  font-size: 1.05rem;
+  color: var(--color-accent);
+  font-weight: 700;
+  margin: 0 0 var(--spacing-xs);
+}
+
+.training-note-section-body {
+  color: var(--color-text);
+}
+
+.training-note-section-p {
+  margin: 0 0 0.5rem;
+}
+
+.training-note-section-p:last-child {
+  margin-bottom: 0;
+}
+
 .training-notes-container {
   min-height: 200px;
   width: 100%;

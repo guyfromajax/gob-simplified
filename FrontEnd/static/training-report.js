@@ -271,11 +271,23 @@ function renderHeader() {
     if (archetype === 'systems-coach' && subOptionClean.startsWith('coach-')) {
       subOptionClean = subOptionClean.substring('coach-'.length);
     }
-    
-    // Format sub-option: capitalize words
-    const formatSubOption = subOptionClean.split('-').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+
+    // Player Maximizer: keep "4–6" and short labels (split('-') breaks "attributes-4-6")
+    const PM_SUBOPTION_LABEL = {
+      'top-3': 'Top 3',
+      'attributes-4-6': 'Attributes 4–6',
+      'positional-focus': 'Positional Focus',
+      'custom': 'Custom',
+      'choose-attributes': 'Choose Attributes'
+    };
+    let formatSubOption;
+    if (archetype === 'player-maximizer' && PM_SUBOPTION_LABEL[subOptionClean]) {
+      formatSubOption = PM_SUBOPTION_LABEL[subOptionClean];
+    } else {
+      formatSubOption = subOptionClean.split('-').map(word =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    }
     
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     focusText = `${formatSubOption} (${archetypeDisplay})`;
@@ -1029,12 +1041,12 @@ function renderTrainingNotes() {
   if (!reportData) return;
   
   const container = document.getElementById('training-notes-container');
+  if (!container) return;
   container.innerHTML = '';
   
   const training_notes = reportData.training_notes || [];
   
   if (training_notes.length === 0) {
-    // Show placeholder if no notes
     const placeholder = document.createElement('p');
     placeholder.className = 'notes-placeholder';
     placeholder.textContent = 'No training notes for this session.';
@@ -1043,12 +1055,43 @@ function renderTrainingNotes() {
     container.appendChild(placeholder);
     return;
   }
+
+  // Structured sections: { title, body } (Training_Notes_System.md)
+  const first = training_notes[0];
+  if (first && typeof first === 'object' && first.title != null) {
+    training_notes.forEach(function (section) {
+      const wrap = document.createElement('div');
+      wrap.className = 'training-note-section';
+      const h3 = document.createElement('h3');
+      h3.className = 'training-note-section-title';
+      h3.textContent = section.title || '';
+      const body = document.createElement('div');
+      body.className = 'training-note-section-body';
+      const text = section.body != null ? String(section.body) : '';
+      text.split('\n\n').forEach(function (para, i) {
+        const p = document.createElement('p');
+        p.className = 'training-note-section-p';
+        p.textContent = para.trim();
+        if (p.textContent) body.appendChild(p);
+      });
+      if (!body.children.length) {
+        const p = document.createElement('p');
+        p.className = 'training-note-section-p';
+        p.textContent = text || 'No Significant Updates';
+        body.appendChild(p);
+      }
+      wrap.appendChild(h3);
+      wrap.appendChild(body);
+      container.appendChild(wrap);
+    });
+    return;
+  }
   
-  // Render each note as a paragraph
+  // Legacy: flat strings
   training_notes.forEach(note => {
     const noteElement = document.createElement('p');
     noteElement.className = 'training-note';
-    noteElement.textContent = note;
+    noteElement.textContent = typeof note === 'string' ? note : JSON.stringify(note);
     container.appendChild(noteElement);
   });
 }

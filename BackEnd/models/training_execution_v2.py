@@ -139,7 +139,21 @@ def execute_training(
     training_report["defenses_effectiveness_changes"] = defenses_effectiveness_changes
     training_report["plays_data"] = updated_plays
     training_report["scouting_data"] = updated_scouting_data
-    
+
+    # Structured Training Notes (Training_Notes_System.md); replaces flat energy-only list
+    _legacy_energy = list(training_report.get("training_notes", []))
+    from BackEnd.models.training_notes import build_structured_training_report_notes
+
+    training_report["training_notes"] = build_structured_training_report_notes(
+        is_training_camp=skip_pre_training_depreciation,
+        players=players,
+        original_player_baselines=original_player_baselines,
+        team=team,
+        plays_data=updated_plays,
+        scouting_data=updated_scouting_data,
+        legacy_energy_notes=_legacy_energy,
+    )
+
     return players, team, updated_plays, updated_scouting_data, training_report
 
 # Player attributes excluding EM, MO, NG
@@ -281,6 +295,10 @@ COACHING_FOCUS_ARCHETYPE_PREFIXES = (
 COACHING_FOCUS_LEAF_DISPLAY_NAME: Dict[str, str] = {
     "authoritarian-teamwork": "Teamwork",
     "culture-builder-teamwork": "Team Building",
+    "player-maximizer-top-3": "Top 3",
+    "player-maximizer-attributes-4-6": "Attributes 4–6",
+    "player-maximizer-custom": "Custom",
+    "player-maximizer-choose-attributes": "Choose Attributes",
     "player-maximizer-positional-focus": "Positional Focus",
 }
 
