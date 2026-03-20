@@ -186,10 +186,10 @@ def build_structured_training_report_notes(
 
         sections.append({"title": "Most Positive Locker Room Influence", "body": _locker_room_body(players)})
 
-        hi = sorted(a for a, s in sums.items() if s >= 30)
+        hi = sorted(a for a, s in sums.items() if s > 49)
         sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})
 
-        lo = sorted(a for a, s in sums.items() if s <= 15)
+        lo = sorted(a for a, s in sums.items() if s < 21)
         sections.append({"title": "Concerning Progression", "body": ", ".join(lo) if lo else NSS})
     else:
         pos = [(n, t) for n, t in by_name.items() if t > 0]

@@ -38,11 +38,11 @@ Training Notes appear in the Training Report after each week’s training run. C
 
 ### Strong Cumulative Increase
 
-- List every attribute whose **team-wide sum of deltas** is **≥ +30**.
+- List every attribute whose **team-wide sum of deltas** is **> +49**.
 
 ### Concerning Progression
 
-- List every attribute whose **team-wide sum of deltas** is **≤ +15**.
+- List every attribute whose **team-wide sum of deltas** is **< +21**.
 
 ### Strongest Offensive Plays
 
