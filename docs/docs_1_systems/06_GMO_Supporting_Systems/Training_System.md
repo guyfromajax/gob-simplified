@@ -318,8 +318,8 @@ Then use the following CH scale for each player
 **Authoritarian:**
 - Discipline: Amplifies BH, `fight`, `discipline` (multiplier: `random.choice([1.3, 1.4, 1.5, 1.6])`)
 - Rebounding: Amplifies RB, `rebound_modifier` (multiplier: `random.choice([1.5, 1.6, 1.7, 1.8])`)
-- Teamwork: Amplifies PS, IQ, Motion Play Effectiveness, Zone Defense Effectiveness
-- Execution: Amplifies Set Play Effectiveness, Man Defense Effectiveness
+- Teamwork: Amplifies PS, IQ (drill gains). For offense/defense **install** training, **effectiveness** gains on **motion** plays and **zone** defenses only are multiplied by one session roll `random.choice([1.5, 1.6, 1.7, 1.8])` (same pattern as Execution on set plays + Man). Man and set plays get base install gains only under this focus.
+- Execution: After offense/defense install points are distributed to plays, **effectiveness** gains (Command in UX terms) on **`play_type == set_play`** only and on **Man** defense only are multiplied by one session roll: `random.choice([1.5, 1.6, 1.7, 1.8])`. Motion and zone defenses are unchanged. Per-play **momentum** and **cloaking** are not trained by install points—only effectiveness receives gains today. Implemented in `apply_play_defense_training` → `_apply_offense_play_training` / `_apply_defense_training`.
 
 **Systems Coach:**
 - Offense: Amplifies `offensive_efficiency` gains, offensive play effectiveness

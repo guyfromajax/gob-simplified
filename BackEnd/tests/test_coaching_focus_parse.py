@@ -2,7 +2,10 @@
 
 import unittest
 
-from BackEnd.models.training_execution_v2 import parse_coaching_focus
+from BackEnd.models.training_execution_v2 import (
+    parse_coaching_focus,
+    _scale_install_training_effectiveness_points,
+)
 
 
 class TestParseCoachingFocus(unittest.TestCase):
@@ -45,6 +48,24 @@ class TestParseCoachingFocus(unittest.TestCase):
         self.assertEqual(
             parse_coaching_focus("culture-builder-inspire"),
             ("culture-builder", "culture-builder-inspire"),
+        )
+
+    def test_scale_install_training_effectiveness_points(self):
+        self.assertEqual(
+            _scale_install_training_effectiveness_points(10, 1.5, True),
+            15,
+        )
+        self.assertEqual(
+            _scale_install_training_effectiveness_points(10, 1.5, False),
+            10,
+        )
+        self.assertEqual(
+            _scale_install_training_effectiveness_points(10, None, True),
+            10,
+        )
+        self.assertEqual(
+            _scale_install_training_effectiveness_points(0, 1.8, True),
+            0,
         )
 
 

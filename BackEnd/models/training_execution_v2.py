@@ -204,6 +204,24 @@ def parse_coaching_focus(coaching_focus: Optional[str]) -> Tuple[Optional[str], 
     return archetype, sub_opt
 
 
+# Zone defenses that share install training points in _apply_defense_training
+TRAINING_ZONE_DEFENSE_NAMES = frozenset({"2-3 Zone", "3-2 Zone", "1-3-1 Zone"})
+
+
+def _scale_install_training_effectiveness_points(
+    points: int,
+    multiplier: Optional[float],
+    apply_multiplier: bool,
+) -> int:
+    """
+    Scale integer effectiveness (Command) gains from offense/defense install training.
+    Used for Authoritarian / Execution (set plays, Man) and Authoritarian / Teamwork (motion, zones).
+    """
+    if not apply_multiplier or multiplier is None or points <= 0:
+        return points
+    return int(round(points * multiplier))
+
+
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
 PRE_TRAINING_DECAY_BY_YEAR = {
     "freshman": (-5, -2),
@@ -1532,19 +1550,36 @@ def apply_play_defense_training(
     elif defense_install == 5:
         defense_play_points = random.randint(150, 250)
     
-    # Apply Systems Coach focus multiplier to playPoints if applicable
-    if coaching_focus:
-        _, sub_option = parse_coaching_focus(coaching_focus)
+    sub_option = parse_coaching_focus(coaching_focus)[1] if coaching_focus else None
 
-        if sub_option == "systems-coach-offense" and offense_play_points > 0:
-            focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-            offense_play_points = int(offense_play_points * focus_multiplier)
-            logger.warning(f"🎯 [SYSTEMS COACH - OFFENSE] Applied {focus_multiplier}x multiplier to offense playPoints: {offense_play_points}")
-        
-        elif sub_option == "systems-coach-defense" and defense_play_points > 0:
-            focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-            defense_play_points = int(defense_play_points * focus_multiplier)
-            logger.warning(f"🎯 [SYSTEMS COACH - DEFENSE] Applied {focus_multiplier}x multiplier to defense playPoints: {defense_play_points}")
+    # Authoritarian / Execution: one roll per session; scales effectiveness gains on set plays + Man only (after distribution).
+    authoritarian_execution_eff_mult: Optional[float] = None
+    if sub_option == "authoritarian-execution":
+        authoritarian_execution_eff_mult = random.choice([1.5, 1.6, 1.7, 1.8])
+        logger.warning(
+            f"🎯 [AUTHORITARIAN EXECUTION] Effectiveness gain multiplier for set plays & Man: "
+            f"{authoritarian_execution_eff_mult}x"
+        )
+
+    # Authoritarian / Teamwork: same band; motion plays + zone defenses only (after distribution).
+    authoritarian_teamwork_eff_mult: Optional[float] = None
+    if sub_option == "authoritarian-teamwork":
+        authoritarian_teamwork_eff_mult = random.choice([1.5, 1.6, 1.7, 1.8])
+        logger.warning(
+            f"🎯 [AUTHORITARIAN TEAMWORK] Effectiveness gain multiplier for motion plays & zone defenses: "
+            f"{authoritarian_teamwork_eff_mult}x"
+        )
+
+    # Apply Systems Coach focus multiplier to playPoints if applicable
+    if sub_option == "systems-coach-offense" and offense_play_points > 0:
+        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
+        offense_play_points = int(offense_play_points * focus_multiplier)
+        logger.warning(f"🎯 [SYSTEMS COACH - OFFENSE] Applied {focus_multiplier}x multiplier to offense playPoints: {offense_play_points}")
+
+    elif sub_option == "systems-coach-defense" and defense_play_points > 0:
+        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
+        defense_play_points = int(defense_play_points * focus_multiplier)
+        logger.warning(f"🎯 [SYSTEMS COACH - DEFENSE] Applied {focus_multiplier}x multiplier to defense playPoints: {defense_play_points}")
     
     logger.warning(f"📚 [TRAINING] Offense playPoints: {offense_play_points}, Defense playPoints: {defense_play_points}")
     
@@ -1556,7 +1591,9 @@ def apply_play_defense_training(
             offense_play_points,
             playbook_training_mode,
             strategy_settings,
-            playbook_settings
+            playbook_settings,
+            authoritarian_execution_eff_mult=authoritarian_execution_eff_mult,
+            authoritarian_teamwork_eff_mult=authoritarian_teamwork_eff_mult,
         )
     
     # Apply defense training
@@ -1567,7 +1604,9 @@ def apply_play_defense_training(
             defense_play_points,
             playbook_training_mode,
             strategy_settings,
-            playbook_settings
+            playbook_settings,
+            authoritarian_execution_eff_mult=authoritarian_execution_eff_mult,
+            authoritarian_teamwork_eff_mult=authoritarian_teamwork_eff_mult,
         )
     
     return updated_plays, updated_scouting_data
@@ -1578,7 +1617,9 @@ def _apply_offense_play_training(
     total_points: int,
     playbook_training_mode: str,
     strategy_settings: Dict,
-    playbook_settings: Dict
+    playbook_settings: Dict,
+    authoritarian_execution_eff_mult: Optional[float] = None,
+    authoritarian_teamwork_eff_mult: Optional[float] = None,
 ) -> Dict:
     """
     Apply training points to offensive plays.
@@ -1589,6 +1630,8 @@ def _apply_offense_play_training(
         playbook_training_mode: "current-playbooks", "all-plays-even", or "custom"
         strategy_settings: Game plan strategy settings (used for inside/outside/attack split)
         playbook_settings: Playbook percentage settings
+        authoritarian_execution_eff_mult: If set, scale effectiveness gains on set plays only (Authoritarian / Execution)
+        authoritarian_teamwork_eff_mult: If set, scale effectiveness gains on motion plays only (Authoritarian / Teamwork)
     
     Returns:
         Updated plays_data dict
@@ -1624,6 +1667,14 @@ def _apply_offense_play_training(
             
             for i, (play_name, play_data) in enumerate(all_plays):
                 points = points_per_play + (1 if i < remainder else 0)
+                is_set_play = play_data.get("play_type") == "set_play"
+                is_motion_play = play_data.get("play_type") == "motion"
+                points = _scale_install_training_effectiveness_points(
+                    points, authoritarian_execution_eff_mult, is_set_play
+                )
+                points = _scale_install_training_effectiveness_points(
+                    points, authoritarian_teamwork_eff_mult, is_motion_play
+                )
                 old_effectiveness = play_data.get("effectiveness", 0)
                 new_effectiveness = old_effectiveness + points
                 updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1679,6 +1730,9 @@ def _apply_offense_play_training(
                     play_pct = motion_playbook.get(play_name, 0) / total_motion_pct
                     points = math.floor(motion_points * play_pct)
                     if points > 0:
+                        points = _scale_install_training_effectiveness_points(
+                            points, authoritarian_teamwork_eff_mult, True
+                        )
                         old_effectiveness = play_data.get("effectiveness", 0)
                         new_effectiveness = old_effectiveness + points
                         updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1689,6 +1743,9 @@ def _apply_offense_play_training(
                 remainder = motion_points - (points_per_play * len(motion_plays)) if motion_plays else 0
                 for i, (play_name, play_data) in enumerate(motion_plays):
                     points = points_per_play + (1 if i < remainder else 0)
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_teamwork_eff_mult, True
+                    )
                     old_effectiveness = play_data.get("effectiveness", 0)
                     new_effectiveness = old_effectiveness + points
                     updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1760,6 +1817,9 @@ def _apply_offense_play_training(
                             play_pct = set_playbook.get(play_name, 0) / total_set_pct
                             points = math.floor(focus_points * play_pct)
                             if points > 0:
+                                points = _scale_install_training_effectiveness_points(
+                                    points, authoritarian_execution_eff_mult, True
+                                )
                                 old_effectiveness = play_data.get("effectiveness", 0)
                                 new_effectiveness = old_effectiveness + points
                                 updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1770,6 +1830,9 @@ def _apply_offense_play_training(
                         remainder = focus_points - (points_per_play * len(set_plays)) if set_plays else 0
                         for i, (play_name, play_data) in enumerate(set_plays):
                             points = points_per_play + (1 if i < remainder else 0)
+                            points = _scale_install_training_effectiveness_points(
+                                points, authoritarian_execution_eff_mult, True
+                            )
                             old_effectiveness = play_data.get("effectiveness", 0)
                             new_effectiveness = old_effectiveness + points
                             updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1783,10 +1846,15 @@ def _apply_defense_training(
     total_points: int,
     playbook_training_mode: str,
     strategy_settings: Dict,
-    playbook_settings: Dict
+    playbook_settings: Dict,
+    authoritarian_execution_eff_mult: Optional[float] = None,
+    authoritarian_teamwork_eff_mult: Optional[float] = None,
 ) -> Dict:
     """
     Apply training points to defensive plays.
+
+    authoritarian_execution_eff_mult: If set, scale effectiveness gains on Man defense only (Authoritarian / Execution).
+    authoritarian_teamwork_eff_mult: If set, scale effectiveness gains on zone defenses only (Authoritarian / Teamwork).
     
     Returns:
         Updated scouting_data dict
@@ -1820,6 +1888,14 @@ def _apply_defense_training(
             for i, defense_name in enumerate(valid_defenses):
                 points = points_per_defense + (1 if i < remainder else 0)
                 if defense_name in defense_data:
+                    is_man = defense_name == "Man"
+                    is_zone = defense_name in TRAINING_ZONE_DEFENSE_NAMES
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_execution_eff_mult, is_man
+                    )
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_teamwork_eff_mult, is_zone
+                    )
                     old_eff = defense_data[defense_name].get("effectiveness", 0)
                     defense_data[defense_name]["effectiveness"] = old_eff + points
                     logger.warning(f"📚 [TRAINING] Defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")
@@ -1852,9 +1928,12 @@ def _apply_defense_training(
             # For now, we only have one man defense ("Man")
             # When more man defenses are added, we can use playbook_settings.get("man_defense", {})
             if "Man" in defense_data:
+                scaled_man = _scale_install_training_effectiveness_points(
+                    man_points, authoritarian_execution_eff_mult, True
+                )
                 old_eff = defense_data["Man"].get("effectiveness", 0)
-                defense_data["Man"]["effectiveness"] = old_eff + man_points
-                logger.warning(f"📚 [TRAINING] Defense 'Man': effectiveness {old_eff} → {old_eff + man_points} (+{man_points} points)")
+                defense_data["Man"]["effectiveness"] = old_eff + scaled_man
+                logger.warning(f"📚 [TRAINING] Defense 'Man': effectiveness {old_eff} → {old_eff + scaled_man} (+{scaled_man} points)")
         
         # Distribute zone defense points
         if zone_points > 0:
@@ -1870,6 +1949,9 @@ def _apply_defense_training(
                     defense_pct = zone_playbook.get(defense_name, 0) / total_zone_pct
                     points = math.floor(zone_points * defense_pct)
                     if points > 0:
+                        points = _scale_install_training_effectiveness_points(
+                            points, authoritarian_teamwork_eff_mult, True
+                        )
                         old_eff = defense_data[defense_name].get("effectiveness", 0)
                         defense_data[defense_name]["effectiveness"] = old_eff + points
                         logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, {defense_pct*100:.1f}% of {zone_points})")
@@ -1879,6 +1961,9 @@ def _apply_defense_training(
                 remainder = zone_points - (points_per_defense * len(valid_zone_defenses)) if valid_zone_defenses else 0
                 for i, defense_name in enumerate(valid_zone_defenses):
                     points = points_per_defense + (1 if i < remainder else 0)
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_teamwork_eff_mult, True
+                    )
                     old_eff = defense_data[defense_name].get("effectiveness", 0)
                     defense_data[defense_name]["effectiveness"] = old_eff + points
                     logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")
