@@ -103,12 +103,16 @@ class TestParseCoachingFocus(unittest.TestCase):
                 "player-maximizer-custom", {"p1": ["SC", "CH"]}, players
             )
 
-    def test_inspire_amplifies_ch_and_ft_not_em_mo_drills(self):
+    def test_inspire_does_not_amplify_player_drill_attrs_team_ch_separate(self):
         sub = "culture-builder-inspire"
+        self.assertFalse(_should_amplify_player_attr("CH", "culture-builder", sub))
+        self.assertFalse(_should_amplify_player_attr("FT", "culture-builder", sub))
+
+    def test_confidence_amplifies_ch_and_ft(self):
+        sub = "culture-builder-confidence"
         self.assertTrue(_should_amplify_player_attr("CH", "culture-builder", sub))
         self.assertTrue(_should_amplify_player_attr("FT", "culture-builder", sub))
         self.assertFalse(_should_amplify_player_attr("EM", "culture-builder", sub))
-        self.assertFalse(_should_amplify_player_attr("MO", "culture-builder", sub))
 
 
 if __name__ == "__main__":

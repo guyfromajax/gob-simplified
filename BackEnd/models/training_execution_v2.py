@@ -515,10 +515,10 @@ def apply_training_points(
     
     # Handle special focus effects that apply to all players
     if sub_option == "culture-builder-inspire":
-        # Improve EM, MO by random.randint(1,2) for all players
+        # EM/morale lift + MO tick; CH/FT amplification is culture-builder-confidence
         for player in players:
             attrs = player.get("attributes", {})
-            em_improvement = random.randint(1, 2)
+            em_improvement = random.randint(2, 5)
             mo_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
             attrs["MO"] = min(10, attrs.get("MO", 0) + mo_improvement)
@@ -1174,14 +1174,14 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     
     # Culture Builder Options
     elif sub_option == "culture-builder-inspire":
-        # EM/MO: absolute +1/+2 block only (no drill multipliers). CH/FT: drill gains amplified here.
-        return attr in ["CH", "FT"]
+        # Flat EM/MO block only; team_chemistry via _should_amplify_team_attr
+        return False
     elif sub_option == "culture-builder-community":
         return attr == "EM"  # Improves EM, Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
     elif sub_option == "culture-builder-teamwork":
         return attr == "PS"  # Amplifies Team Chemistry gains, Improves Motion Play Effectiveness Scores, Zone Defense Effectiveness Scores
     elif sub_option == "culture-builder-confidence":
-        return False  # Improves Set Play Effectiveness Scores, Man Defense Effectiveness Scores (handled separately)
+        return attr in ["CH", "FT"]
     
     return False
 
