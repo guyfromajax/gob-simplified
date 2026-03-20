@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body:
-- **March 19 Update** Added full team prestige and ranking systems. Added more team logos (64 of 128 now exist). Added full computer sim game stats tracking. Various UX and quality of life updates.
+- **March 20 Update** Added traning notes to training report. Added Player Maximizer traning functionality. Added projected starting linenup to Scouting Report. Improved autoset lineup logic for both user and computer teams. 
 
 Source:
 - `FrontEnd/static/mode-select.html`

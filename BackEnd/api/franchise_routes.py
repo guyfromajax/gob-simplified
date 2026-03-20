@@ -5649,10 +5649,17 @@ def get_scouting_report(franchise_id: str, team_name: str):
         str(team_object_id),  # Convert to string for utility function
         team_id_field
     )
-    
+
+    from BackEnd.utils.roster_loader import load_roster
+    from BackEnd.utils.scouting_utils import compute_projected_starting_five
+
+    _, scout_players = load_roster(team_name, franchise_id=str(franchise_id))
+    projected_starting_five = compute_projected_starting_five(scout_players)
+
     return {
         "team_attributes": team_attributes,
-        "plays": plays_data
+        "plays": plays_data,
+        "projected_starting_five": projected_starting_five,
     }
 
 

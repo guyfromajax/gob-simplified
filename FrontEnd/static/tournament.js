@@ -1829,6 +1829,10 @@ async function loadScoutingReport() {
     } else {
       console.error('Play usage rendering function not available');
     }
+
+    if (typeof renderProjectedStartingFive === 'function') {
+      renderProjectedStartingFive(playUsage.projected_starting_five || []);
+    }
     
     loading.style.display = 'none';
     content.style.display = 'block';

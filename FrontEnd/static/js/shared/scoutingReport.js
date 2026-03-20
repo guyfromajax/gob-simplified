@@ -3,6 +3,72 @@
  * Provides rendering functions for team attributes and play usage data.
  */
 
+/** Core 12 display columns (matches BackEnd roster_builder ATTR_KEYS order for ST/AG). */
+const SCOUTING_PROJECTED_ATTR_COLS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
+
+function scoutingFormatHeight(raw) {
+  if (typeof formatHeight === 'function') return formatHeight(raw);
+  const inches = parseInt(raw, 10);
+  if (Number.isNaN(inches)) return raw == null || raw === '' ? '--' : String(raw);
+  const ft = Math.floor(inches / 12);
+  const inch = inches % 12;
+  return `${ft}'${inch}"`;
+}
+
+/**
+ * Render projected starting five (from API `projected_starting_five` array).
+ * @param {Array<{position:string,name:string,jersey:number,year:string,height:number,weight:number,rt:number,attributes:Object}>} rows
+ */
+function renderProjectedStartingFive(rows) {
+  const el = document.getElementById('scouting-projected-lineup');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rows || rows.length === 0) {
+    el.innerHTML =
+      '<p class="scouting-projected-empty">No projected lineup (missing position ratings or roster data).</p>';
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'scouting-projected-table';
+  const thead = document.createElement('thead');
+  const hrow = document.createElement('tr');
+  const headers = ['Pos', 'Player', '#', 'Year', 'Ht', 'Wt'].concat(SCOUTING_PROJECTED_ATTR_COLS).concat(['RT']);
+  headers.forEach((h) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    const cells = [
+      r.position || '—',
+      r.name || '—',
+      r.jersey != null && r.jersey !== '' ? String(r.jersey) : '—',
+      r.year != null && r.year !== '' ? String(r.year) : '—',
+      scoutingFormatHeight(r.height),
+      r.weight != null && r.weight !== '' ? String(r.weight) : '—',
+    ];
+    SCOUTING_PROJECTED_ATTR_COLS.forEach((k) => {
+      const av = r.attributes && r.attributes[k] != null ? r.attributes[k] : '—';
+      cells.push(String(av));
+    });
+    cells.push(r.rt != null ? String(r.rt) : '—');
+    cells.forEach((text) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  el.appendChild(table);
+}
+
 /**
  * Render team attributes in the scouting report grid.
  * @param {Object} teamAttrs - Team attributes object

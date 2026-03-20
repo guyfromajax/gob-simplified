@@ -2,9 +2,12 @@
 Shared utilities for scouting report functionality.
 Extracts play usage data from game documents for both franchise and tournament modes.
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+
 from bson import ObjectId
-from BackEnd.db import teams_collection
+
+from BackEnd.db import teams_collection, players_collection
+from BackEnd.utils.roster_builder import build_roster_players, ATTR_KEYS as SCOUTING_CORE_ATTR_KEYS
 
 
 def extract_plays_from_game_document(
@@ -99,4 +102,160 @@ def extract_plays_from_game_document(
             })
     
     return plays_data
+
+
+SCOUTING_LINEUP_POSITIONS: Tuple[str, ...] = ("PG", "SG", "SF", "PF", "C")
+
+
+def _player_sort_key(p: Dict[str, Any]) -> str:
+    return str(p.get("_id") or p.get("player_id") or "")
+
+
+def _parse_rt(pr: Dict[str, Any], pos: str) -> Optional[float]:
+    raw = (pr or {}).get(pos)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Greedy projected lineup: repeatedly pick the best remaining (player, open position)
+    pair by highest RT; each player and position used at most once.
+
+    Returns rows in fixed order PG → C for display, omitting unfilled slots.
+    """
+    assigned_players: set[str] = set()
+    lineup_by_pos: Dict[str, Tuple[Dict[str, Any], float]] = {}
+
+    while len(lineup_by_pos) < 5:
+        best_key: Optional[Tuple[float, str, int]] = None  # (-rt, pid, pos_index) for min()
+        best_player: Optional[Dict[str, Any]] = None
+        best_pos: Optional[str] = None
+
+        for p in players:
+            pid = _player_sort_key(p)
+            if not pid or pid in assigned_players:
+                continue
+            pr = p.get("position_ratings") or {}
+            for pos in SCOUTING_LINEUP_POSITIONS:
+                if pos in lineup_by_pos:
+                    continue
+                rt = _parse_rt(pr, pos)
+                if rt is None:
+                    continue
+                # Minimize (-rt, pid, pos) => max rt, then stable pid, then position order
+                cand = (-rt, pid, SCOUTING_LINEUP_POSITIONS.index(pos))
+                if best_key is None or cand < best_key:
+                    best_key = cand
+                    best_player = p
+                    best_pos = pos
+
+        if best_player is None or best_pos is None:
+            break
+        rt_chosen = _parse_rt(best_player.get("position_ratings") or {}, best_pos) or 0.0
+        lineup_by_pos[best_pos] = (best_player, float(rt_chosen))
+        assigned_players.add(_player_sort_key(best_player))
+
+    rows: List[Dict[str, Any]] = []
+    attrs_keys = list(SCOUTING_CORE_ATTR_KEYS)
+    for pos in SCOUTING_LINEUP_POSITIONS:
+        if pos not in lineup_by_pos:
+            continue
+        p, rt = lineup_by_pos[pos]
+        attrs = p.get("attributes") or {}
+        attr_display = {}
+        for k in attrs_keys:
+            raw = attrs.get(f"anchor_{k}", attrs.get(k, 0))
+            try:
+                attr_display[k] = int(float(raw)) // 10
+            except (TypeError, ValueError):
+                attr_display[k] = 0
+        try:
+            rt_out = round(float(rt), 1)
+        except (TypeError, ValueError):
+            rt_out = 0.0
+        rows.append(
+            {
+                "position": pos,
+                "player_id": _player_sort_key(p),
+                "name": (p.get("name") or f"{p.get('first_name', '')} {p.get('last_name', '')}").strip(),
+                "jersey": p.get("jersey", 0),
+                "year": p.get("year") or "",
+                "height": p.get("height"),
+                "weight": p.get("weight"),
+                "rt": rt_out,
+                "attributes": attr_display,
+            }
+        )
+    return rows
+
+
+def load_tournament_roster_for_scouting(
+    tournament_doc: Dict[str, Any], team_doc: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Same player shape as GET /tournament/roster (for projected lineup)."""
+    tournament_players = tournament_doc.get("players", {}) or tournament_doc.get(
+        "player_stats", {}
+    )
+    team_player_ids = team_doc.get("player_ids", [])
+    if not team_player_ids:
+        return []
+
+    core_players_dict = {
+        str(p["_id"]): p
+        for p in players_collection.find(
+            {"_id": {"$in": team_player_ids}},
+            {
+                "position_ratings": 1,
+                "height": 1,
+                "weight": 1,
+                "jersey": 1,
+                "year": 1,
+                "attributes": 1,
+                "first_name": 1,
+                "last_name": 1,
+            },
+        )
+    }
+
+    team_name = team_doc.get("name", "")
+    pids_with_core = [pid for pid in team_player_ids if str(pid) in core_players_dict]
+    mode_overrides: Dict[str, Dict[str, Any]] = {}
+    for pid in pids_with_core:
+        pid_str = str(pid)
+        core_player = core_players_dict[pid_str]
+        tournament_player_data = tournament_players.get(pid_str, {})
+        meta = tournament_player_data.get("meta", {}) if tournament_player_data else {}
+        tournament_attributes = (
+            tournament_player_data.get("attributes", {}) if tournament_player_data else {}
+        )
+        core_attributes = core_player.get("attributes", {}) or {}
+        merged_attributes = {**core_attributes, **tournament_attributes}
+        position_ratings = (
+            tournament_player_data.get("position_ratings") if tournament_player_data else None
+        )
+        if not position_ratings:
+            position_ratings = core_player.get("position_ratings", {})
+        first = (
+            meta.get("first_name")
+            or (tournament_player_data.get("first_name") if tournament_player_data else None)
+            or core_player.get("first_name", "")
+        )
+        last = (
+            meta.get("last_name")
+            or (tournament_player_data.get("last_name") if tournament_player_data else None)
+            or core_player.get("last_name", "")
+        )
+        mode_overrides[pid_str] = {
+            "first_name": first,
+            "last_name": last,
+            "attributes": merged_attributes,
+            "position_ratings": position_ratings,
+        }
+
+    return build_roster_players(pids_with_core, mode_overrides, core_players_dict, team_name)
 

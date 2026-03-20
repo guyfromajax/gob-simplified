@@ -882,10 +882,19 @@ def get_tournament_scouting_report(tournament_id: str, team_id: str = None, team
         team_object_id,
         team_id_field
     )
-    
+
+    from BackEnd.utils.scouting_utils import (
+        compute_projected_starting_five,
+        load_tournament_roster_for_scouting,
+    )
+
+    scout_players = load_tournament_roster_for_scouting(tournament_doc, team_doc)
+    projected_starting_five = compute_projected_starting_five(scout_players)
+
     return {
         "team_attributes": team_attributes,
-        "plays": plays_data
+        "plays": plays_data,
+        "projected_starting_five": projected_starting_five,
     }
 
 
