@@ -8,6 +8,7 @@ from BackEnd.models.training_execution_v2 import (
     PLAYER_MAXIMIZER_RANKING_ATTRS,
     normalize_coaching_focus_custom_by_player,
     _should_amplify_player_attr,
+    coaching_focus_leaf_display_name,
 )
 
 
@@ -117,6 +118,15 @@ class TestParseCoachingFocus(unittest.TestCase):
     def test_team_building_no_player_drill_amplify(self):
         sub = "culture-builder-teamwork"
         self.assertFalse(_should_amplify_player_attr("PS", "culture-builder", sub))
+
+    def test_leaf_display_names_teamwork_vs_team_building(self):
+        self.assertEqual(
+            coaching_focus_leaf_display_name("authoritarian-teamwork"), "Teamwork"
+        )
+        self.assertEqual(
+            coaching_focus_leaf_display_name("culture-builder-teamwork"), "Team Building"
+        )
+        self.assertIsNone(coaching_focus_leaf_display_name("culture-builder-inspire"))
 
 
 if __name__ == "__main__":

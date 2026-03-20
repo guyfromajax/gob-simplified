@@ -238,6 +238,22 @@ COACHING_FOCUS_ARCHETYPE_PREFIXES = (
     "authoritarian",
 )
 
+# Human-facing leaf labels for APIs/reports/logs. Radio/API `value` remains the dict key.
+# NOTE: **Authoritarian** `authoritarian-teamwork` = UI **"Teamwork"** (PS/IQ + motion/zone install mult).
+# **Culture Builder** `culture-builder-teamwork` = UI **"Team Building"** (flat team_chemistry +1–3 only).
+# The shared `-teamwork` suffix on the Culture leaf is legacy for backward compatibility—do not conflate.
+COACHING_FOCUS_LEAF_DISPLAY_NAME: Dict[str, str] = {
+    "authoritarian-teamwork": "Teamwork",
+    "culture-builder-teamwork": "Team Building",
+}
+
+
+def coaching_focus_leaf_display_name(sub_option: Optional[str]) -> Optional[str]:
+    """Stable UI label for a coaching leaf `value`, if we define one; else None (client may derive)."""
+    if not sub_option:
+        return None
+    return COACHING_FOCUS_LEAF_DISPLAY_NAME.get(sub_option)
+
 
 def parse_coaching_focus(coaching_focus: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -537,7 +553,7 @@ def apply_training_points(
             attrs["anchor_EM"] = attrs["EM"]
 
     if sub_option == "culture-builder-teamwork":
-        # UI label "Team Building": flat team chemistry only (radio value unchanged for API)
+        # API value `culture-builder-teamwork` = UI **Team Building** (not Authoritarian Teamwork).
         ch_lo, ch_hi = TEAM_ATTR_CLAMPS["team_chemistry"]
         team_ch_bump = random.randint(1, 3)
         cur_ch = team.get("team_chemistry", 0)
@@ -703,7 +719,8 @@ def apply_training_points(
         "team_changes": team_changes,
         "coaching_focus": {
             "archetype": archetype,
-            "sub_option": sub_option
+            "sub_option": sub_option,
+            "leaf_display_name": coaching_focus_leaf_display_name(sub_option),
         },
         "training_notes": training_notes
     }
@@ -1186,7 +1203,7 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
     elif sub_option == "culture-builder-community":
         return attr == "EM"  # Improves EM, Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
     elif sub_option == "culture-builder-teamwork":
-        return False  # "Team Building" UI: flat team_chemistry bump only (apply_training block)
+        return False  # Team Building (`culture-builder-teamwork`): flat team_ch only—not Authoritarian Teamwork
     elif sub_option == "culture-builder-confidence":
         return attr in ["CH", "FT"]
     

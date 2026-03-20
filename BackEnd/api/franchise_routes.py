@@ -1054,7 +1054,7 @@ def generate_random_coaching_focus() -> str:
         "authoritarian-discipline",
         "authoritarian-rebounding",
         "authoritarian-execution",
-        "authoritarian-teamwork",
+        "authoritarian-teamwork",  # UI "Teamwork" (Authoritarian); differs from Culture `culture-builder-teamwork`
         "systems-coach",
         "systems-coach-offense",
         "systems-coach-defense",
@@ -1067,7 +1067,7 @@ def generate_random_coaching_focus() -> str:
         "culture-builder",
         "culture-builder-inspire",
         "culture-builder-community",
-        "culture-builder-teamwork",
+        "culture-builder-teamwork",  # UI "Team Building"; not Authoritarian "Teamwork"
         "culture-builder-confidence",
     ]
     

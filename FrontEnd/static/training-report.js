@@ -244,14 +244,20 @@ function renderHeader() {
       'authoritarian': 'Authoritarian',
       'systems-coach': 'Systems Coach',
       'player-maximizer': 'Player Maximizer',
-      'culture': 'Culture Builder'
+      'culture': 'Culture Builder',
+      'culture-builder': 'Culture Builder'
     };
     
     // Get archetype display name
     let archetypeDisplay = archetypeMap[archetype] || archetype.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
-    
+
+    // Backend may send explicit leaf label (e.g. Team Building vs Teamwork—which share no API token ambiguity once labeled)
+    const leafFromApi = focus.leaf_display_name;
+    if (leafFromApi) {
+      focusText = `${leafFromApi} (${archetypeDisplay})`;
+    } else {
     // Remove archetype prefix from sub_option (e.g., "systems-coach-offense" -> "offense")
     let subOptionClean = subOption;
     if (subOption.startsWith(archetype + '-')) {
@@ -272,6 +278,7 @@ function renderHeader() {
     
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     focusText = `${formatSubOption} (${archetypeDisplay})`;
+    }
   }
   
   document.getElementById('training-focus').textContent = focusText;

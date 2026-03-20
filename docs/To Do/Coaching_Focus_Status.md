@@ -103,6 +103,7 @@ Leaf options above: **16** (four per archetype block, excluding archetype header
 
 - UI values: `FrontEnd/static/training.html` (coaching section).  
 - Parsing: `parse_coaching_focus()` in `training_execution_v2.py`.  
+- **Teamwork vs Team Building:** `COACHING_FOCUS_LEAF_DISPLAY_NAME` and `coaching_focus_leaf_display_name()` document and label **`authoritarian-teamwork`** (Authoritarian **Teamwork**) vs **`culture-builder-teamwork`** (Culture **Team Building**). Training reports include optional **`leaf_display_name`** on `coaching_focus` for stable UI copy.  
 - Amplifier tables: `_should_amplify_player_attr`, `_should_amplify_team_attr`; Culture special blocks in `apply_training_points`; Systems play pool: `apply_play_defense_training`.  
 - Design doc: `docs/docs_1_systems/06_GMO_Supporting_Systems/Training_System.md` (may describe effects not yet built — use this status doc for code truth).
 
