@@ -33,6 +33,15 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
+/** @returns {boolean} true if response was 401/403 and redirect was triggered — caller must stop. */
+function abortIfAccessDenied(response) {
+  if (!response) return false;
+  if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
+    return AccessDenied.checkAccessDenied(response);
+  }
+  return false;
+}
+
 function playSound(filename) {
   try {
     const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
@@ -48,6 +57,7 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
       headers: API_CONFIG.getAuthHeaders()
     });
+    if (abortIfAccessDenied(response)) return false;
     if (!response.ok) return false;
     const data = await response.json();
     const currentWeek = Number(data.week || 1);
@@ -322,7 +332,8 @@ async function loadRoster() {
   }
   console.log("Loading roster for lineup", franchiseId ? "(franchise mode)" : tournamentId ? "(tournament mode)" : "(single game mode)");
   
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
+  if (abortIfAccessDenied(res)) return;
   if (!res.ok) return;
   const data = await res.json();
   rosterTeamChemistry = data.team_chemistry != null && data.team_chemistry !== ''
@@ -367,6 +378,7 @@ async function loadRoster() {
         headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(initPayload)
       });
+      if (abortIfAccessDenied(initRes)) return;
       if (initRes.ok) {
         const initData = await initRes.json();
         const newGameId = initData.game_id;
@@ -408,6 +420,7 @@ async function loadRoster() {
     try {
         // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
         const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=${quarter}&source=db`, { headers: API_CONFIG.getAuthHeaders() });
+        if (abortIfAccessDenied(gameRes)) return;
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
@@ -859,6 +872,7 @@ async function autosetLineup() {
       headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (abortIfAccessDenied(res)) return;
     if (!res.ok) {
       let msg = `Autoset failed (${res.status})`;
       try {
@@ -1161,6 +1175,7 @@ async function setHeader() {
   if (!scoresFromUrl && gameId) {
     try {
       const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}&source=db`), { headers: API_CONFIG.getAuthHeaders() });
+      if (abortIfAccessDenied(gameRes)) return;
       if (gameRes.ok) {
         gameData = await gameRes.json();
         const score = gameData.score || {};
@@ -1346,6 +1361,10 @@ function wireLineupNavButtons() {
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(initPayload)
           });
+          if (abortIfAccessDenied(initRes)) {
+            initGameInProgress = false;
+            return;
+          }
           if (initRes.ok) {
             const initData = await initRes.json();
             currentGameId = initData.game_id;
@@ -1412,6 +1431,10 @@ function wireLineupNavButtons() {
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(initPayload)
           });
+          if (abortIfAccessDenied(initRes)) {
+            initGameInProgress = false;
+            return;
+          }
           if (initRes.ok) {
             const initData = await initRes.json();
             currentGameId = initData.game_id;
@@ -1604,6 +1627,7 @@ async function init() {
               headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify(initPayload)
             });
+            if (abortIfAccessDenied(initRes)) return;
             if (initRes.ok) {
               const initData = await initRes.json();
               currentGameId = initData.game_id;

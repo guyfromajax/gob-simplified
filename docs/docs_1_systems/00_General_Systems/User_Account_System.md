@@ -114,6 +114,26 @@ Stale/invalid tokens in `localStorage` caused UI to show "logged in" state even 
 - `FrontEnd/static/mode-select.js` – handles 401 from `/api/auth/me`
 - `FrontEnd/static/tournament-select.js` – handles 401 and redirects to login
 
+### Set lineup & gameplay APIs (401/403) ✅ **FIX** (March 2025)
+
+**Issue:**  
+`authGuard.js` only checks that `localStorage.auth_token` exists before allowing protected pages (e.g. `set-lineup.html`). It does **not** prove the JWT is still valid. If the token is expired or invalid, roster and game fetches could return **401** while the page still rendered “in game” UI with **default energy/stats** (merge from `GET /api/game/...` skipped), which was easy to miss because failures were mostly `console.warn`.
+
+**Root cause:**  
+- Lineup roster fetch did not send `Authorization` headers.  
+- `GET /api/game/{id}`, `POST /api/init-game`, `POST /api/autoset-lineup`, and related calls did not use the shared access-denied handler on 401/403.
+
+**Fix:**  
+- **`set-lineup.html`** loads **`accessDenied.js`** (after `api-config.js`).  
+- **`set-lineup.js`**: `abortIfAccessDenied(response)` wraps `AccessDenied.checkAccessDenied` for roster (`/roster/...` with `API_CONFIG.getAuthHeaders()`), franchise command-center prefetch, `init-game`, `GET /api/game/...`, `autoset-lineup`, and the Game Plan / Playbooks / Play Game init paths. On **401** or **403**, the user sees a full-screen message and is redirected (401 → login with `?redirect=...`, 403 → mode-select).  
+- **`accessDenied.js`**: On **401**, clears **`auth_token`** from `localStorage` before redirect (aligned with `authBarInit.js`).
+
+**Key files:**  
+- `FrontEnd/static/set-lineup.html` – includes `js/shared/accessDenied.js`  
+- `FrontEnd/static/set-lineup.js` – `abortIfAccessDenied`, auth headers on roster, all protected fetches  
+- `FrontEnd/static/js/shared/accessDenied.js` – shared handler; clears token on 401  
+- `FrontEnd/static/js/shared/authGuard.js` – presence-only gate (still required; API layer enforces real session)
+
 ### Key Files
 
 - **BackEnd/api/auth_routes.py** – All auth endpoints (signup, login, me, config, set-username)
@@ -122,3 +142,5 @@ Stale/invalid tokens in `localStorage` caused UI to show "logged in" state even 
 - **BackEnd/utils/rate_limiter.py** – Rate limit config; auth endpoints use `AUTH_RATE_LIMIT`
 - **BackEnd/db.py** – `users_collection`, `alpha_otps_collection`, `access_code_requests_collection`, `password_reset_tokens_collection`
 - **BackEnd/utils/email_sender.py** – SendGrid password-reset email (Step 11)
+- **FrontEnd/static/js/shared/accessDenied.js** – 401/403 UX + redirect; clears `auth_token` on 401
+- **FrontEnd/static/set-lineup.js** – lineup/gameplay fetches fail closed on 401/403
