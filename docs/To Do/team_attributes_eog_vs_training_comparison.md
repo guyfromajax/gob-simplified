@@ -28,7 +28,7 @@ Comparison of how each of the **11 core team attributes** (per Team_Attribute_Sy
 
 | **defensive_efficiency** | **Both teams:** +(−2, -1). | **Defense Install** slider. Same team point ranges. **Systems Coach – Defense** amplifies. |
 
-| **team_chemistry** | **Score delta** (win score − lose score). &lt;4: win +(1–2), lose +(−2,−1); &lt;10: win +(1–3), lose +(−3,−1); else: win +(1–4), lose +(−6,−2). Capped 7–25. | **Scrimmages** (0.5 pts), **Free Throws** (0.25 pts), **Film Study** (0.25 pts). **Breaks** 4 pts: +(−1,1); 5 pts: +(−3,3). **Culture Builder – Inspire/Teamwork** amplifies. |
+| **team_chemistry** | **Score delta** (win score − lose score). &lt;4: win +(1–2), lose +(−2,−1); &lt;10: win +(1–3), lose +(−3,−1); else: win +(1–4), lose +(−6,−2). Capped 7–25. | **Scrimmages** (0.5 pts), **Free Throws** (0.25 pts), **Film Study** (0.25 pts). **Breaks** 4 pts: +(−1,1); 5 pts: +(−3,3). **Culture Builder – Inspire** amplifies drill-linked gains; **Team Building** adds flat +(1–3) per session. |
 
 | **fb_efficiency** | If FB success rate > 60%: +(0,1); else +(−2,−1). | **Fast Break Offense Install** slider. Same team point ranges. **Systems Coach – Fast Breaks** amplifies. |
 

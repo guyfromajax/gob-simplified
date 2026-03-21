@@ -17,6 +17,22 @@
     return (p && (p.name || (p.first_name || '') + ' ' + (p.last_name || '')).trim()) || '';
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function getDisplayPlayerName(p) {
+    var base = getPlayerName(p);
+    if (typeof formatNameWithJersey === 'function') {
+      return formatNameWithJersey(p.jersey, base);
+    }
+    return base;
+  }
+
   function renderRosterStatsTable(players) {
     var tbody = document.getElementById(statsBodyId);
     if (!tbody) return;
@@ -35,7 +51,7 @@
 
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td>' + getPlayerName(p) + '</td>' +
+        '<td>' + escapeHtml(getDisplayPlayerName(p)) + '</td>' +
         '<td>' + (stats.PTS || 0) + '</td>' +
         '<td>' + (stats.FGM || 0) + '</td>' +
         '<td>' + (stats.FGA || 0) + '</td>' +

@@ -15,6 +15,7 @@
 6. Add the players values for each player to the players' existing attributes
 7. Ensure all changes persist through our data persistence system
 8. Adhere to all team attribute and player attribute clamping rules as defined in the Attribute_Clamp_System.md document
+9. Optional template field **`community_engagement`** (boolean): when true, sets **`pending_community_engagement`** on that CPU team’s FTD for the next franchise game’s home-crowd roll resolution (see `Home_Crowd_System.md` and `Training_System.md` → Community Engagement). Regenerate templates with `scripts/generate_distant_training_templates.py` to populate the field in MongoDB.
 
 
 

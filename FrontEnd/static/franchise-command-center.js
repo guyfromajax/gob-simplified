@@ -753,12 +753,15 @@ function renderTeam(data) {
       const player = {
         _id: p._id, // Add missing _id field for player detail links
         name: fullName,
+        jersey: p.jersey,
         pos: best.pos,
         year: yearMap[p.year?.toLowerCase()] || p.year || '--',
         height: formatHeight(p.height),
         weight: p.weight ?? '--',
         attributes: p.attributes || {},
         rt: best.rating,
+        has_playing_time_promise: !!p.has_playing_time_promise,
+        is_graduating: !!p.is_graduating,
       };
       return player;
     } catch (error) {
@@ -778,7 +781,8 @@ function renderTeam(data) {
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
     nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent = p.name;
+    nameLink.textContent =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
     nameLink.addEventListener('mouseenter', () => {
@@ -950,7 +954,8 @@ function sortRosterTable(columnName, direction) {
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
     nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent = p.name;
+    nameLink.textContent =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
     nameLink.addEventListener('mouseenter', () => {
@@ -960,6 +965,20 @@ function sortRosterTable(columnName, direction) {
       nameLink.style.textDecoration = 'none';
     });
     nameTd.appendChild(nameLink);
+    if (p.has_playing_time_promise) {
+      const ptp = document.createElement('span');
+      ptp.textContent = ' (PTP)';
+      ptp.style.color = '#bb2f35';
+      ptp.style.fontWeight = '700';
+      nameTd.appendChild(ptp);
+    }
+    if (p.is_graduating) {
+      const gr = document.createElement('span');
+      gr.textContent = ' (GR)';
+      gr.style.color = '#2f8f46';
+      gr.style.fontWeight = '700';
+      nameTd.appendChild(gr);
+    }
     tr.appendChild(nameTd);
     
     const addCell = (content) => {
@@ -2598,6 +2617,15 @@ async function loadScoutingReport() {
       renderPlayUsage(playUsage.plays || [], 'No previous game data available. Opponent has not played a game yet this season.');
     } else {
       console.error('Play usage rendering function not available');
+    }
+
+    if (typeof setScoutingProjectedLineupData === 'function') {
+      setScoutingProjectedLineupData(
+        playUsage.projected_starting_five || [],
+        playUsage.player_season_stats || {}
+      );
+    } else if (typeof renderProjectedStartingFive === 'function') {
+      renderProjectedStartingFive(playUsage.projected_starting_five || []);
     }
     
     loading.style.display = 'none';

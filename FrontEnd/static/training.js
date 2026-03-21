@@ -14,7 +14,119 @@ const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"
 const autoTrainModal = document.getElementById('auto-train-modal');
 const autoTrainModalMessage = document.getElementById('auto-train-modal-message');
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
+const customFocusModal = document.getElementById('custom-focus-modal');
+const customFocusThead = document.getElementById('custom-focus-thead');
+const customFocusTbody = document.getElementById('custom-focus-tbody');
+const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
+const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
 let currentWeek = 1;
+
+/** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
+let customFocusRoster = [];
+/** @type {string[]} */
+let customFocusRankingAttrs = [];
+/** @type {Record<string, string[]>} playerId -> up to 3 distinct attr codes */
+let customFocusDraft = {};
+/** @type {Record<string, string[]>} committed picks after Assign */
+let customFocusCommitted = {};
+
+/** Main PM radio value; modal assigns a concrete leaf here before submit */
+const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
+
+/** Resolved leaf: top-3 | attributes-4-6 | positional-focus | custom — set when user taps Assign in modal (choose-attributes path only, or stays null until then) */
+let playerMaximizerResolvedFocus = null;
+
+const PM_POSITION_RT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
+const PM_POSITIONAL_FOCUS_ATTRS = {
+  PG: ['PS', 'BH', 'IQ'],
+  SG: ['SH', 'OD', 'AG'],
+  SF: ['SC', 'ST', 'AG'],
+  PF: ['RB', 'ID', 'ST'],
+  C: ['SC', 'ID', 'ST']
+};
+
+function primaryPositionFromRatings(ratings) {
+  if (!ratings || typeof ratings !== 'object') return 'PG';
+  let bestVal = -Infinity;
+  let bestPos = 'PG';
+  PM_POSITION_RT_ORDER.forEach(function (pos) {
+    let raw = ratings[pos];
+    if (raw === undefined || raw === null) {
+      raw = ratings[pos.toUpperCase()];
+    }
+    const v = parseFloat(raw);
+    const n = Number.isFinite(v) ? v : 0;
+    if (n > bestVal) {
+      bestVal = n;
+      bestPos = pos;
+    }
+  });
+  return bestPos;
+}
+
+function positionalFocusTripleForRow(row) {
+  const pos = primaryPositionFromRatings(row.position_ratings || {});
+  const triple = PM_POSITIONAL_FOCUS_ATTRS[pos] || PM_POSITIONAL_FOCUS_ATTRS.PG;
+  return triple.slice();
+}
+
+function sortedAttrCodesByValue(row) {
+  const attrs = row.attrs || {};
+  return customFocusRankingAttrs.slice().sort(function (a, b) {
+    const va = Number(attrs[a]) || 0;
+    const vb = Number(attrs[b]) || 0;
+    if (vb !== va) return vb - va;
+    return a.localeCompare(b);
+  });
+}
+
+function getPmModalMode() {
+  const r = document.querySelector('input[name="pm-modal-mode"]:checked');
+  return r ? r.value : 'top-3';
+}
+
+function resolvedFocusToModalMode(resolved) {
+  if (resolved === 'player-maximizer-custom') return 'custom';
+  if (resolved === 'player-maximizer-attributes-4-6') return 'attributes-4-6';
+  if (resolved === 'player-maximizer-positional-focus') return 'positional';
+  if (resolved === 'player-maximizer-top-3') return 'top-3';
+  return 'top-3';
+}
+
+function modalModeToCoachingLeaf(mode) {
+  if (mode === 'custom') return 'player-maximizer-custom';
+  if (mode === 'attributes-4-6') return 'player-maximizer-attributes-4-6';
+  if (mode === 'positional') return 'player-maximizer-positional-focus';
+  return 'player-maximizer-top-3';
+}
+
+function syncPmModalCustomHint() {
+  const el = document.getElementById('pm-modal-custom-hint');
+  if (!el) return;
+  el.hidden = getPmModalMode() !== 'custom';
+}
+
+function getRowHighlightPicks(row) {
+  const mode = getPmModalMode();
+  if (mode === 'custom') {
+    return customFocusDraft[row.player_id] || [];
+  }
+  if (mode === 'top-3') {
+    return sortedAttrCodesByValue(row).slice(0, 3);
+  }
+  if (mode === 'attributes-4-6') {
+    return sortedAttrCodesByValue(row).slice(3, 6);
+  }
+  if (mode === 'positional') {
+    return positionalFocusTripleForRow(row);
+  }
+  return [];
+}
+
+function resetPlayerMaximizerResolvedState() {
+  playerMaximizerResolvedFocus = null;
+  resetCustomFocusCommitted();
+}
 
 async function fetchFranchiseCommandCenterData(franchiseId) {
   const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
@@ -83,6 +195,176 @@ function isCoachingFocusSelected() {
   return selectedFocus !== null;
 }
 
+function isCustomFocusThreeDistinct(picks) {
+  if (!Array.isArray(picks) || picks.length !== 3) return false;
+  return picks[0] !== picks[1] && picks[0] !== picks[2] && picks[1] !== picks[2];
+}
+
+function isCustomFocusComplete() {
+  if (!customFocusRoster.length) return false;
+  return customFocusRoster.every(function (row) {
+    const picks = customFocusCommitted[row.player_id];
+    return isCustomFocusThreeDistinct(picks);
+  });
+}
+
+/** Submit enabled when PM hidden leaf is selected, or Choose Attributes + resolved leaf (custom → committed complete). */
+function isPlayerMaximizerSubmitReady() {
+  const sel = document.querySelector('input[name="coaching-focus"]:checked');
+  if (!sel || !sel.value.startsWith('player-maximizer')) return true;
+  if (sel.value === CHOOSE_ATTRIBUTES_VALUE) {
+    if (!playerMaximizerResolvedFocus) return false;
+    if (playerMaximizerResolvedFocus === 'player-maximizer-custom') {
+      return isCustomFocusComplete();
+    }
+    return true;
+  }
+  return true;
+}
+
+function resetCustomFocusCommitted() {
+  customFocusCommitted = {};
+  customFocusDraft = {};
+}
+
+function openCustomFocusModal() {
+  if (!customFocusModal || !customFocusThead || !customFocusTbody) return;
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('mode') !== 'franchise' || !urlParams.get('franchise_id')) {
+    showMessageModal('Choose Attributes is available in franchise mode after roster data loads.');
+    return;
+  }
+  if (!customFocusRoster.length) {
+    showMessageModal('Roster data is still loading. Try again in a moment.');
+    return;
+  }
+  const mode = resolvedFocusToModalMode(playerMaximizerResolvedFocus);
+  const modeInput = document.querySelector(`input[name="pm-modal-mode"][value="${mode}"]`);
+  if (modeInput) modeInput.checked = true;
+
+  customFocusDraft = {};
+  customFocusRoster.forEach(function (row) {
+    const pid = row.player_id;
+    if (mode === 'custom') {
+      const c = customFocusCommitted[pid];
+      customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
+    } else {
+      customFocusDraft[pid] = [];
+    }
+  });
+  syncPmModalCustomHint();
+  renderCustomFocusTable();
+  syncCustomFocusAssignButton();
+  customFocusModal.style.display = 'flex';
+  customFocusModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeCustomFocusModal() {
+  if (!customFocusModal) return;
+  customFocusModal.style.display = 'none';
+  customFocusModal.setAttribute('aria-hidden', 'true');
+}
+
+function syncCustomFocusAssignButton() {
+  if (!customFocusAssignBtn) return;
+  if (!customFocusRoster.length) {
+    customFocusAssignBtn.disabled = true;
+    return;
+  }
+  const mode = getPmModalMode();
+  let complete = false;
+  if (mode === 'custom') {
+    complete = customFocusRoster.every(function (row) {
+      const picks = customFocusDraft[row.player_id];
+      return isCustomFocusThreeDistinct(picks);
+    });
+  } else {
+    complete = true;
+  }
+  customFocusAssignBtn.disabled = !complete;
+}
+
+function renderCustomFocusTable() {
+  if (!customFocusThead || !customFocusTbody) return;
+  customFocusThead.innerHTML = '';
+  customFocusTbody.innerHTML = '';
+  const headRow = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.textContent = 'Player';
+  headRow.appendChild(corner);
+  customFocusRankingAttrs.forEach(function (code) {
+    const th = document.createElement('th');
+    th.textContent = code;
+    headRow.appendChild(th);
+  });
+  customFocusThead.appendChild(headRow);
+
+  customFocusRoster.forEach(function (row) {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.className = 'player-cell';
+    nameTd.textContent = row.name || row.player_id;
+    tr.appendChild(nameTd);
+
+    const pid = row.player_id;
+    const picks = getRowHighlightPicks(row);
+    const modalMode = getPmModalMode();
+    const clickable = modalMode === 'custom';
+
+    customFocusRankingAttrs.forEach(function (code) {
+      const td = document.createElement('td');
+      td.className = 'custom-focus-cell' + (clickable ? '' : ' is-readonly');
+      const val = row.attrs && typeof row.attrs[code] === 'number' ? row.attrs[code] : '';
+      td.textContent = val === '' ? '—' : String(val);
+      if (picks.indexOf(code) !== -1) td.classList.add('selected');
+      if (clickable) {
+        td.addEventListener('click', function () {
+          onCustomFocusCellClick(pid, code);
+        });
+      }
+      tr.appendChild(td);
+    });
+    customFocusTbody.appendChild(tr);
+  });
+}
+
+function onCustomFocusCellClick(playerId, attrCode) {
+  if (getPmModalMode() !== 'custom') return;
+  if (!customFocusDraft[playerId]) customFocusDraft[playerId] = [];
+  const sel = customFocusDraft[playerId];
+  const idx = sel.indexOf(attrCode);
+  if (idx !== -1) {
+    sel.splice(idx, 1);
+  } else if (sel.length < 3) {
+    sel.push(attrCode);
+  } else {
+    sel[2] = attrCode;
+  }
+  renderCustomFocusTable();
+  syncCustomFocusAssignButton();
+}
+
+function commitCustomFocusFromModal() {
+  const mode = getPmModalMode();
+  if (mode === 'custom') {
+    customFocusCommitted = {};
+    customFocusRoster.forEach(function (row) {
+      const pid = row.player_id;
+      const picks = customFocusDraft[pid];
+      if (isCustomFocusThreeDistinct(picks)) {
+        customFocusCommitted[pid] = [picks[0], picks[1], picks[2]];
+      }
+    });
+    playerMaximizerResolvedFocus = 'player-maximizer-custom';
+  } else {
+    customFocusCommitted = {};
+    customFocusDraft = {};
+    playerMaximizerResolvedFocus = modalModeToCoachingLeaf(mode);
+  }
+  closeCustomFocusModal();
+  updatePointsRemaining();
+}
+
 /**
  * Get human-friendly label text for a selected focus radio
  */
@@ -113,8 +395,9 @@ function updatePointsRemaining() {
   // Enable/disable submit button based on points allocation AND coaching focus selection
   const allPointsAllocated = remaining === 0;
   const focusSelected = isCoachingFocusSelected();
-  
-  if (allPointsAllocated && focusSelected) {
+  const pmOk = isPlayerMaximizerSubmitReady();
+
+  if (allPointsAllocated && focusSelected && pmOk) {
     submitBtn.disabled = false;
     submitBtn.style.opacity = '1';
   } else {
@@ -192,7 +475,13 @@ function autoAssignTraining() {
     const validFocusRadios = Array.from(coachingRadios).filter(radio => {
       const value = radio.value || '';
       // Only include radios with hyphens (focus options) and exclude archetype-only values
-      return value.includes('-') && !archetypeValues.includes(value);
+      // Custom requires modal picks — exclude from random Auto-Train
+      return (
+        value.includes('-') &&
+        !archetypeValues.includes(value) &&
+        value !== 'player-maximizer-choose-attributes' &&
+        value !== 'player-maximizer-custom'
+      );
     });
     
     if (validFocusRadios.length > 0) {
@@ -201,6 +490,16 @@ function autoAssignTraining() {
       if (typeof window !== 'undefined') window.__trainingAutoAssigning = true;
       randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
       focusLabel = getFocusLabelText(randomRadio);
+      // Hidden PM leaf radios have no label — use same wording as the modal row
+      const autoTrainPmLeafLabels = {
+        'player-maximizer-top-3': 'Top 3',
+        'player-maximizer-attributes-4-6': 'Attributes 4–6',
+        'player-maximizer-positional-focus': 'Positional Focus'
+      };
+      const rv = randomRadio.value || '';
+      if (autoTrainPmLeafLabels[rv]) {
+        focusLabel = autoTrainPmLeafLabels[rv];
+      }
       archetypeLabel = getArchetypeLabelText(randomRadio);
     }
   }
@@ -255,7 +554,7 @@ function autoAssignTraining() {
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     // Archetype must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
     const focusText = normalizedArchetype ? `${cleanFocus} (${normalizedArchetype})` : cleanFocus;
-    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>${focusText} Focus Chosen`;
+    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>Assigned ${focusText} Focus`;
     autoTrainModal.style.display = 'flex';
   }
 }
@@ -327,11 +626,66 @@ coachingRadios.forEach(radio => {
       // Sub-option selected - subtle outline on block, highlight the radio
       archetypeBlock.classList.add('active', 'sub-option-selected');
     }
-    
+
+    if (value.startsWith('player-maximizer')) {
+      if (value === CHOOSE_ATTRIBUTES_VALUE) {
+        openCustomFocusModal();
+      } else {
+        playerMaximizerResolvedFocus = null;
+        resetCustomFocusCommitted();
+      }
+    } else {
+      resetPlayerMaximizerResolvedState();
+    }
+
     // Update submit button state when focus is selected
     updatePointsRemaining();
   });
 });
+
+document.querySelectorAll('input[name="pm-modal-mode"]').forEach(function (radio) {
+  radio.addEventListener('change', function () {
+    if (!this.checked) return;
+    syncPmModalCustomHint();
+    const mode = getPmModalMode();
+    if (mode !== 'custom') {
+      customFocusDraft = {};
+      customFocusRoster.forEach(function (row) {
+        customFocusDraft[row.player_id] = [];
+      });
+    } else {
+      customFocusRoster.forEach(function (row) {
+        const pid = row.player_id;
+        const c = customFocusCommitted[pid];
+        customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
+      });
+    }
+    renderCustomFocusTable();
+    syncCustomFocusAssignButton();
+  });
+});
+
+const chooseAttrsRadio = document.querySelector(
+  `input[name="coaching-focus"][value="${CHOOSE_ATTRIBUTES_VALUE}"]`
+);
+if (chooseAttrsRadio) {
+  chooseAttrsRadio.addEventListener('click', function () {
+    if (this.checked) openCustomFocusModal();
+  });
+}
+
+if (customFocusAssignBtn) {
+  customFocusAssignBtn.addEventListener('click', function () {
+    playSound('confirm-1.mp3');
+    commitCustomFocusFromModal();
+  });
+}
+if (customFocusCancelBtn) {
+  customFocusCancelBtn.addEventListener('click', function () {
+    playSound('click-tiny.wav');
+    closeCustomFocusModal();
+  });
+}
 
 /**
  * Handle back button click
@@ -423,13 +777,29 @@ function collectTrainingData() {
       breaks: parseInt(document.getElementById('general-breaks').value) || 0
     },
     
-    // Coaching Focus
-    coaching_focus: document.querySelector('input[name="coaching-focus"]:checked')?.value || null,
+    // Coaching Focus (Choose Attributes → concrete leaf from modal Assign)
+    coaching_focus: (function () {
+      let cf = document.querySelector('input[name="coaching-focus"]:checked')?.value || null;
+      if (cf === CHOOSE_ATTRIBUTES_VALUE) {
+        cf = playerMaximizerResolvedFocus;
+      }
+      return cf;
+    })(),
     
     // Playbook Training Mode
     playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'all-plays-even'
   };
-  
+
+  if (data.coaching_focus === 'player-maximizer-custom') {
+    data.coaching_focus_custom_by_player = {};
+    Object.keys(customFocusCommitted).forEach(function (pid) {
+      const picks = customFocusCommitted[pid];
+      if (isCustomFocusThreeDistinct(picks)) {
+        data.coaching_focus_custom_by_player[pid] = [picks[0], picks[1], picks[2]];
+      }
+    });
+  }
+
   console.log('🔋 [FRONTEND] Collected training data:', data);
   console.log('🔋 [FRONTEND] team_drills:', data.team_drills);
   console.log('🔋 [FRONTEND] team_drills keys:', Object.keys(data.team_drills));
@@ -481,6 +851,12 @@ submitBtn.addEventListener('click', async function() {
   // Validate that coaching focus is selected
   if (!isCoachingFocusSelected()) {
     alert('Please select a Coaching Style / Focus before submitting.');
+    return;
+  }
+
+  const cfRadio = document.querySelector('input[name="coaching-focus"]:checked')?.value;
+  if (cfRadio === CHOOSE_ATTRIBUTES_VALUE && !isPlayerMaximizerSubmitReady()) {
+    alert('Player Maximizer: open Choose Attributes, pick a mode, and tap Assign Focus Attributes (for Custom, pick three distinct attributes per player).');
     return;
   }
   
@@ -609,6 +985,12 @@ async function initializeTrainingPoints() {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
         currentWeek = Number(data.week || 1);
+        if (Array.isArray(data.custom_focus_roster)) {
+          customFocusRoster = data.custom_focus_roster;
+        }
+        if (Array.isArray(data.player_maximizer_ranking_attrs)) {
+          customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
+        }
         // Update points remaining display
         if (pointsRemainingEl) {
           pointsRemainingEl.textContent = TOTAL_POINTS;
@@ -641,6 +1023,7 @@ async function initializeTrainingPoints() {
   updatePointsRemaining();
 }
 
+
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
     window.location.reload();
@@ -651,7 +1034,7 @@ window.addEventListener('pageshow', (event) => {
 (async function initTrainingPage() {
   const redirected = await redirectIfTrainingAlreadyCommitted();
   if (redirected) return;
-  initializeTrainingPoints();
+  await initializeTrainingPoints();
 })();
 
 // Debug: Verify scrimmages element exists on page load

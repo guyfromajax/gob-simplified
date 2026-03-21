@@ -111,9 +111,9 @@
   - **Systems Coach** (dark/burnt yellow header fill)
     - Sub-options: Offense, Defense, Fast Breaks, Press / Trap
   - **Player Maximizer** (darker green header fill)
-    - Sub-options: Top 3 Attributes, Attributes 4–6, Custom Attributes, Opportunity
+    - **Choose Attributes** opens a modal: **Top 3**, **Attributes 4–6**, **Positional Focus** (primary by highest RT, fixed triple per position), or **Custom** (three distinct attrs per player). Submit sends the resolved leaf (`player-maximizer-top-3`, `player-maximizer-attributes-4-6`, `player-maximizer-positional-focus`, or `player-maximizer-custom`). Off-screen radios support Auto-Train picking top-3 / 4–6 / positional without the modal.
   - **Culture Builder** (purple header fill)
-    - Sub-options: Inspire, Confidence, Community Engagement, Teamwork
+    - Sub-options: Inspire, Confidence, Community Engagement, Team Building
 
 ### Slider Behavior
 
@@ -144,7 +144,8 @@
 - Disabled / visually muted (reduced opacity, non-clickable) until:
   1. All training points are allocated (Points Remaining = 0) - 30 for first training, 24 otherwise
   2. A coaching focus is selected
-- Becomes active only when both conditions are met
+  3. **Player Maximizer / Choose Attributes:** user has tapped **Assign Focus Attributes** in the modal (or Auto-Train selected a hidden leaf). For **Custom**, every player needs three distinct picks.
+- Becomes active only when all conditions are met
 
 ### Auto-Train Button
 
@@ -156,7 +157,7 @@
       - **24 points**: 4 sliders set to `2` (20 + 4 = 24)
       - **30 points**: 10 sliders set to `2` (20 + 10 = 30)
   - Randomly selects a Coaching Focus (one of the existing focus options, not archetype headers)
-  - Shows confirmation popup: `Training Points Assigned - {Focus Name} Focus Chosen`
+  - Shows confirmation popup: `Training Points Assigned` then `Assigned {Focus Name} Focus` (e.g. `Assigned Attributes 4–6 (Player Maximizer) Focus` for hidden PM leaves)
     - Popup has a "Close" button; closing keeps the user on the Training page
   - After auto-assign, Points Remaining = 0 and Submit becomes eligible (provided focus set by auto-train)
 
@@ -165,6 +166,25 @@
 **Location:** `BackEnd/models/training_execution_v2.py`
 
 The training execution system applies pre-training conditions, allocates training points, applies coaching focus amplifiers, and generates training reports.
+
+#### Coaching focus string (API ↔ amplifiers)
+
+- The Training page submits each radio’s **`value`** exactly as in `FrontEnd/static/training.html` (e.g. `authoritarian-discipline`, `systems-coach-offense`, `culture-builder-inspire`).
+- The backend **`parse_coaching_focus()`** in `training_execution_v2.py` maps that string to:
+  - **`archetype`**: one of `authoritarian`, `systems-coach`, `player-maximizer`, `culture-builder` (for reports and grouping).
+  - **`sub_option`**: the **full** radio value for a leaf selection (same string as the UI), or `None` if only an archetype-level value is sent (e.g. some auto-train random picks).
+- Amplifiers and Systems Coach play-point multipliers compare **`sub_option`** to those full values (they must **not** use a naive `split("-", 1)` on the raw string, which breaks multi-word archetypes like `systems-coach`).
+
+#### Community Engagement (`culture-builder-community`)
+
+- **Franchise only** (no training in Single Game / Tournament).
+- **Immediate training effect:** small EM bump for all players (see `training_execution_v2.py`).
+- **Next franchise game (home crowd roll):** sets **`pending_community_engagement`** on that team’s **FTD** (`franchise_team_data`). When a franchise game is started (`/api/init-game` or new-game `simulate-quarter` path), the engine reads pending flags for **both** teams, resolves a single band shift for the **home crowd weight table** (see `Home_Crowd_System.md`), then clears both teams’ flags.
+- **User home:** shift crowd weights **up** one chemistry band vs the user’s current `team_chemistry` for the home team in that game; if already in **21–25**, use the **Upper Bonus Range** row from `Home_Crowd_System.md` instead.
+- **User away:** shift **down** one band vs the **home opponent’s** `team_chemistry`; if opponent chemistry is in **7–10**, no downward effect.
+- **Computer:** distant training templates may set `community_engagement` on the template; when applied, that CPU team gets `pending_community_engagement` on FTD for the same rules (only CE vs no CE: CPU home → shift up from CPU chemistry; CPU away → shift down from user’s home chemistry).
+- **Both teams pending CE** in the same matchup: shifts **cancel** (normal roll from actual home `team_chemistry`).
+- **Bye week:** if no game is played after training, the pending flag stays until the **next** game in that season.
 
 #### Training Execution Flow
 
@@ -187,11 +207,11 @@ The training execution system applies pre-training conditions, allocates trainin
    - Applies coaching focus amplifiers
    - Handles special cases (conditioning, film study, breaks)
 
-3. **Play/Defense Training Application** (placeholder - to be implemented)
-   - Updates play effectiveness and momentum based on training allocations
-   - Updates defense effectiveness and momentum based on training allocations
-   - Uses playbook_training_mode to determine which plays/defenses receive training benefits
-   - Considers playcall_settings, strategy_settings, and playbook_settings for weighted distribution
+3. **Play/Defense Training Application** (`apply_play_defense_training`, `_apply_offense_play_training`, `_apply_defense_training`)
+   - Distributes offense/defense **install** point pools to **effectiveness** (Command) on plays and defenses (not per-play momentum/cloaking).
+   - Uses `playbook_training_mode` (`current-playbooks`, `all-plays-even`, etc.), `strategy_settings`, and `playbook_settings` for motion/set and man/zone splits.
+   - **Systems Coach** offense/defense: multiplies the install point **pool** before distribution when the matching focus is selected.
+   - **Authoritarian Execution** / **Teamwork**: after points are allocated to specific plays/defenses, multiplies only the **effectiveness** gains that land on **set + Man** (Execution) or **motion + zone** defenses (Teamwork); see **Coaching Focus Amplifiers**.
 
 4. **Attribute Clamping**
    - Player attributes: Minimum 1, no maximum
@@ -307,29 +327,33 @@ Then use the following CH scale for each player
 
 #### Coaching Focus Amplifiers
 
-**Authoritarian:**
-- Discipline: Amplifies BH, `fight`, `discipline` (multiplier: `random.choice([1.3, 1.4, 1.5, 1.6])`)
-- Rebounding: Amplifies RB, `rebound_modifier` (multiplier: `random.choice([1.5, 1.6, 1.7, 1.8])`)
-- Teamwork: Amplifies PS, IQ, Motion Play Effectiveness, Zone Defense Effectiveness
-- Execution: Amplifies Set Play Effectiveness, Man Defense Effectiveness
+**Two multiplier mechanisms in code** (`training_execution_v2.py`):
+
+1. **Drill / team-attribute training:** When `_should_amplify_player_attr` / `_should_amplify_team_attr` (or special cases) apply, qualifying gains use `focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])` in `_apply_player_training_points`, `_apply_team_training_points`, and rebound-modifier training. *(Older docs listed 1.3–1.6 for some focuses; implementation uses this single band.)*
+2. **Install training (play/defense effectiveness only):** Authoritarian **Execution** and **Teamwork** use one session roll of the same `[1.5, 1.6, 1.7, 1.8]` values on integer **effectiveness** (Command) increments only, via `_scale_install_training_effectiveness_points`—not on momentum/cloaking (install does not allocate to those).
+
+**Authoritarian (all four sub-options implemented):**
+- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*).
+- **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*).
+- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus.
+- **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus.
 
 **Systems Coach:**
-- Offense: Amplifies `offensive_efficiency` gains, offensive play effectiveness
-- Defense: Amplifies `defensive_efficiency` gains, defensive play effectiveness
-- Fast Breaks: Amplifies `fb_efficiency` gains, `fb_opp_modifier` gains
-- Presses/Traps: Amplifies `pt_efficiency` gains, `pt_opp_modifier` gains
+- Offense / Defense: Drill gains to `offensive_efficiency` / `defensive_efficiency` use mechanism *#1* above. Install: multiplies offense or defense **play point pool** by the same `[1.5, 1.6, 1.7, 1.8]` band before `_apply_offense_play_training` / `_apply_defense_training` when `systems-coach-offense` or `systems-coach-defense` is selected.
+- Fast Breaks: Amplifies `fb_efficiency` and `fb_opp_modifier` drill gains (mechanism *#1*).
+- Presses/Traps: Amplifies `pt_efficiency` and `pt_opp_modifier` drill gains (mechanism *#1*).
 
 **Player Maximizer:**
 - Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
-- Attributes 4-6: Amplifies gains to player's 4th-6th highest attributes
-- Custom: Amplifies gains to user-selected attributes (TODO)
-- Be Opportunistic: Improves Set Play and Motion Shot Scores (carried to next game)
+- Attributes 4-6: Amplifies gains to player's 4th–6th highest attributes among the same set as Top 3 (excluding CH, EM, MO, NG)
+- **Positional Focus** (`player-maximizer-positional-focus`): Primary position from highest **RT** (ties PG→SG→SF→PF→C); fixed triple per primary—PG: PS/BH/IQ; SG: SH/OD/AG; SF: SC/ST/AG; PF: RB/ID/ST; C: SC/ID/ST. Same focus multiplier on drill gains to those attrs.
+- **Custom:** User picks **three** distinct attributes per player (same ranking set as Top 3 / 4–6). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB, attrC] }` for every roster player. Roster rows include `attrs` and `position_ratings`; list order **highest RT** descending.
 
 **Culture Builder:**
-- Inspire: Improves EM, MO by `random.randint(1, 2)`, amplifies Team Chemistry gains
+- Inspire: **Flat block:** each player gets **EM** `+random.randint(2, 5)` and **MO** `+random.randint(1, 2)` (caps apply); no focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
 - Community Engagement: Improves EM, affects crowd factors (carried to next game)
-- Teamwork: Amplifies Team Chemistry gains, improves Motion Play and Zone Defense Effectiveness
-- Build Confidence: Improves Set Play Effectiveness, Man Defense Effectiveness (multiplier: `random.choice([1.3, 1.4, 1.5, 1.6])`)
+- **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged.
+- **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). No flat EM/MO block; no Inspire-style team chemistry mult.
 
 #### Breaks Effect
 
@@ -507,12 +531,12 @@ The training focus is formatted as "Focus (Archetype)" with the focus outside pa
 - **Player Maximizer** archetype options:
   - "Top 3 Attributes (Player Maximizer)"
   - "Attributes 4-6 (Player Maximizer)"
+  - "Positional Focus (Player Maximizer)"
   - "Custom (Player Maximizer)"
-  - "Be Opportunistic (Player Maximizer)"
 - **Culture Builder** archetype options:
   - "Inspire (Culture Builder)"
   - "Community Engagement (Culture Builder)"
-  - "Teamwork (Culture Builder)"
+  - "Team Building (Culture Builder)"
   - "Build Confidence (Culture Builder)"
 
 **Note:** Archetype names inside parentheses must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
@@ -530,6 +554,7 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 
 1. **Training Submission:**
    - User allocates 24 training points (or 30 for first training) and selects coaching focus on `training.html`
+   - **Player Maximizer:** `GET /franchise/training-points` includes `custom_focus_roster` (attrs + `position_ratings`) and `player_maximizer_ranking_attrs` for the modal. Submit sends a **resolved** leaf (never bare `player-maximizer-choose-attributes`). Payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
    - Frontend sends POST request to `/franchise/run-training` with training data
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
@@ -664,5 +689,4 @@ In Franchise mode, when the user submits training for their team, all computer t
 - Tournament mode training execution
 - Single game mode training
 - Training history tracking and archiving
-- Custom attribute selection for Player Maximizer focus
 - Play effectiveness score updates from training

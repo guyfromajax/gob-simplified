@@ -212,6 +212,18 @@
       <div class="scouting-modal-body">
         <div id="scouting-loading" class="scouting-loading">Loading scouting report...</div>
         <div id="scouting-content" style="display: none;">
+          <div class="training-report-styled">
+            <section class="projected-starting-five-section">
+              <div class="scouting-projected-header">
+                <h2>Projected Starting 5</h2>
+                <div class="scouting-projected-toggle view-toggle" role="group" aria-label="Projected lineup columns">
+                  <button type="button" class="toggle-btn active" data-scouting-projected="attributes">Attributes</button>
+                  <button type="button" class="toggle-btn" data-scouting-projected="stats">Stats</button>
+                </div>
+              </div>
+              <div id="scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
+            </section>
+          </div>
           <!-- Team Report Section -->
           <div class="training-report-styled">
             <section class="team-section">

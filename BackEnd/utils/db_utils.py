@@ -135,6 +135,140 @@ def _waterfall_eligibility(game_state=None):
         relaxed = {q: min(base[q] + step, 4) for q in (1, 2, 3, 4)}
         yield (0, relaxed)
 
+
+def _team_chemistry_pool_sizes(team_chemistry: float) -> List[int]:
+    """
+    Pool sizes for fill order 1–5 after role order shuffle (Lineup_Selection_Screen.md).
+    """
+    try:
+        tc = float(team_chemistry)
+    except (TypeError, ValueError):
+        tc = 12.0
+    if tc > 25:
+        tc = 25.0
+    if tc > 20:
+        return [1, 1, 1, 2, 2]
+    if tc >= 16:
+        return [1, 1, 2, 2, 2]
+    if tc >= 11:
+        return [1, 2, 2, 2, 2]
+    if tc >= 7:
+        return [2, 2, 2, 2, 3]
+    return [2, 2, 2, 2, 3]
+
+
+def _player_slot_rating(player: Player, pos: str) -> float:
+    """Prefer position_ratings[pos], else attribute-trait average for POSITION_TRAITS[pos]."""
+    pr = getattr(player, "position_ratings", None) or {}
+    if isinstance(pr, dict) and pos in pr and pr.get(pos) is not None:
+        try:
+            return float(pr[pos])
+        except (TypeError, ValueError):
+            pass
+    return get_player_rating(player, POSITION_TRAITS[pos])
+
+
+def build_unified_autoset_lineup_from_eligible(
+    eligible_players: List[Player],
+    team_chemistry: float,
+) -> Dict[str, Player]:
+    """
+    Canonical autoset selection after eligibility + waterfall: shuffle role order,
+    then for each fill slot use team-chemistry pool size N: top N by slot rating,
+    random if N > 1 else top player.
+    """
+    pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
+    position_order = ["PG", "SG", "SF", "PF", "C"]
+    random.shuffle(position_order)
+    assigned_ids = set()
+    lineup: Dict[str, Player] = {}
+    for fill_idx, pos in enumerate(position_order):
+        n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
+        available = [p for p in eligible_players if p.player_id not in assigned_ids]
+        rated = [(p, _player_slot_rating(p, pos)) for p in available]
+        rated.sort(key=lambda t: (-t[1], t[0].player_id))
+        if not rated:
+            raise ValueError(f"No available players left for autoset at fill index {fill_idx}")
+        take = min(max(1, n), len(rated))
+        candidates = rated[:take]
+        chosen = candidates[0][0] if len(candidates) == 1 else random.choice(candidates)[0]
+        lineup[pos] = chosen
+        assigned_ids.add(chosen.player_id)
+    return lineup
+
+
+def fill_unified_lineup_gaps(
+    eligible_players: List[Player],
+    team_chemistry: float,
+    missing_positions: List[str],
+    *,
+    existing_assignments: Dict[str, Player],
+) -> Dict[str, Player]:
+    """
+    Fill only ``missing_positions`` using the same pool-size bands as full autoset,
+    but with pool_sizes[0..] applied to the shuffled *missing* slots (not all five).
+    Used when a partial lineup already has valid players (e.g. foul-out cleared one slot).
+    """
+    pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
+    order = list(missing_positions)
+    random.shuffle(order)
+    assigned_ids = {p.player_id for p in existing_assignments.values() if p is not None}
+    result: Dict[str, Player] = dict(existing_assignments)
+    for fill_idx, pos in enumerate(order):
+        n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
+        available = [p for p in eligible_players if p.player_id not in assigned_ids]
+        rated = [(p, _player_slot_rating(p, pos)) for p in available]
+        rated.sort(key=lambda t: (-t[1], t[0].player_id))
+        if not rated:
+            raise ValueError(
+                f"No eligible players left to fill lineup gap at position {pos} (fill index {fill_idx})"
+            )
+        take = min(max(1, n), len(rated))
+        candidates = rated[:take]
+        chosen = candidates[0][0] if len(candidates) == 1 else random.choice(candidates)[0]
+        result[pos] = chosen
+        assigned_ids.add(chosen.player_id)
+    return result
+
+
+def autoset_lineup_player_ids_from_payload(
+    players_payload: List[dict],
+    game_state: Optional[dict],
+    team_chemistry: float,
+) -> Dict[str, str]:
+    """
+    Server-side autoset for lineup UI: JSON roster rows -> { PG/SG/...: player_id }.
+    Uses is_player_eligible_for_lineup + waterfall + unified chemistry pools.
+    """
+    players: List[Player] = []
+    for raw in players_payload:
+        data = dict(raw)
+        if data.get("_id") is not None and not data.get("player_id"):
+            data["player_id"] = str(data["_id"])
+        players.append(Player(data))
+
+    gs = game_state if game_state else {"quarter": 1, "time_remaining": 480}
+    eligible: Optional[List[Player]] = None
+    for ng_min, foul_limits_by_quarter in _waterfall_eligibility(gs):
+        eligible = [
+            p
+            for p in players
+            if is_player_eligible_for_lineup(
+                p, gs, ng_min=ng_min, foul_limits_by_quarter=foul_limits_by_quarter
+            )
+        ]
+        if len(eligible) >= 5:
+            break
+
+    if not eligible or len(eligible) < 5:
+        raise ValueError(
+            "Fewer than 5 eligible players for autoset after waterfall (check NG/fouls/quarter)."
+        )
+
+    lineup_players = build_unified_autoset_lineup_from_eligible(eligible, team_chemistry)
+    return {pos: pl.player_id for pos, pl in lineup_players.items()}
+
+
 def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> Dict[str, Player]:
     """Build a starting lineup using existing player objects when available.
 
@@ -185,27 +319,13 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
             team_name, step, used_ng_min, used_foul_limits,
         )
 
-    position_order = ["PG", "SG", "SF", "PF", "C"]
-    random.shuffle(position_order)
-
-    available_players = eligible_players.copy()
-    lineup: Dict[str, Player] = {}
-
-    for idx, pos in enumerate(position_order):
-        traits = POSITION_TRAITS[pos]
-        rated = [(p, get_player_rating(p, traits)) for p in available_players]
-        rated.sort(key=lambda tup: tup[1], reverse=True)
-
-        if idx < 4:
-            top_candidates = rated[:2] if len(rated) >= 2 else rated
-        else:
-            top_candidates = rated[:3] if len(rated) >= 3 else rated
-        
-        chosen_player = random.choice(top_candidates)[0]
-        lineup[pos] = chosen_player
-        available_players.remove(chosen_player)
-
-    return lineup
+    tc = 15.0
+    if isinstance(team, TeamManager) and getattr(team, "team_attributes", None):
+        try:
+            tc = float(team.team_attributes.get("team_chemistry", 15))
+        except (TypeError, ValueError):
+            tc = 15.0
+    return build_unified_autoset_lineup_from_eligible(eligible_players, tc)
 
 
 def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dict[str, Player]:

@@ -41,6 +41,14 @@
       <button id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>
     </header>
 
+    <!-- Training Notes (first: Notes → Players → Team → Plays) -->
+    <section class="training-notes-section">
+      <h2>Notes</h2>
+      <div class="training-notes-container" id="training-notes-container">
+        <!-- Populated by training-report.js -->
+      </div>
+    </section>
+
     <!-- Players Section -->
     <section class="players-section">
       <div class="section-header">
@@ -64,6 +72,20 @@
       <div class="team-attributes-grid" id="team-attributes-grid"></div>
     </section>
 
+    <!-- Projected Starting 5 -->
+    <section class="projected-lineup-section">
+      <div class="section-header projected-lineup-header">
+        <h2>Projected Starting 5</h2>
+        <div class="view-toggle projected-lineup-toggle" role="group" aria-label="Projected lineup columns">
+          <button type="button" class="toggle-btn active" data-projected-view="attributes">Attributes</button>
+          <button type="button" class="toggle-btn" data-projected-view="stats">Stats</button>
+        </div>
+      </div>
+      <div class="scroll-x">
+        <div id="training-projected-lineup" class="training-projected-lineup-wrap"></div>
+      </div>
+    </section>
+
     <!-- Playbook Summary Section -->
     <section class="playbook-summary-section">
       <h2>Playbook Summary</h2>
@@ -71,18 +93,11 @@
         <!-- Plays will be populated here -->
       </div>
     </section>
-
-    <!-- Training Notes Section -->
-    <section class="training-notes-section">
-      <h2>Training Notes</h2>
-      <div class="training-notes-container" id="training-notes-container">
-        <!-- Notes will be populated here in the future -->
-      </div>
-    </section>
   </div>
 
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/scoutingReport.js"></script>
   <script src="/training-report.js"></script>
 </body>
 </html>

@@ -266,12 +266,14 @@ function renderRoster() {
       return {
         _id: p._id,
         name: fullName,
+        jersey: p.jersey,
         pos: best.pos,
         year: yearMap[p.year?.toLowerCase()] || p.year || '--',
         height: formatHeight(p.height),
         weight: p.weight ?? '--',
         attributes: p.attributes || {},
         rt: best.rating,
+        highestRT: best.rating ?? -Infinity,
         stats: p.stats || { season: {} } // ✅ SS&S: Preserve stats (matches Franchise)
       };
     } catch (error) {
@@ -293,7 +295,8 @@ function renderRoster() {
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
     nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent = p.name;
+    nameLink.textContent =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
     nameLink.addEventListener('mouseenter', () => {
@@ -445,7 +448,8 @@ function sortTournamentRoster(columnName, direction) {
     const nameTd = document.createElement("td");
     const nameLink = document.createElement("a");
     nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent = p.name;
+    nameLink.textContent =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
     nameLink.style.color = 'inherit';
     nameLink.style.textDecoration = 'none';
     nameLink.addEventListener('mouseenter', () => {
@@ -1828,6 +1832,15 @@ async function loadScoutingReport() {
       renderPlayUsage(playUsage.plays || [], 'No previous game data available. Opponent has not played a game yet this tournament.');
     } else {
       console.error('Play usage rendering function not available');
+    }
+
+    if (typeof setScoutingProjectedLineupData === 'function') {
+      setScoutingProjectedLineupData(
+        playUsage.projected_starting_five || [],
+        playUsage.player_season_stats || {}
+      );
+    } else if (typeof renderProjectedStartingFive === 'function') {
+      renderProjectedStartingFive(playUsage.projected_starting_five || []);
     }
     
     loading.style.display = 'none';

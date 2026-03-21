@@ -404,7 +404,7 @@ Each of the four coaching archetypes has:
 1. `authoritarian` - Discipline, Rebounding, Execution, Teamwork focus
 2. `systems coach` - Offense, Defense, Fast Breaks, Presses/Traps focus
 3. `player maximizer` - Top 3 Attributes, Attributes 4-6, Custom, Be Opportunistic focus
-4. `culture builder` - Inspire, Community Engagement, Teamwork, Build Confidence focus
+4. `culture builder` - Inspire, Community Engagement, Team Building, Build Confidence focus
 
 **Initialization:**
 - Script: `scripts/add_coaching_field_to_teams.py`

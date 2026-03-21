@@ -11,7 +11,7 @@ This module implements the new training execution system with:
 import math
 import random
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from BackEnd.constants import ALL_ATTRS
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,8 @@ def execute_training(
     playbook_settings: Optional[Dict] = None,
     scouting_data: Optional[Dict] = None,
     playbook_training_mode: str = "current-playbooks",
-    skip_pre_training_depreciation: bool = False
+    skip_pre_training_depreciation: bool = False,
+    coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
@@ -104,7 +105,8 @@ def execute_training(
         players, team, allocations, coaching_focus,
         is_training_camp=skip_pre_training_depreciation,
         original_baselines=original_player_baselines,
-        original_team_baseline=original_team_baseline
+        original_team_baseline=original_team_baseline,
+        coaching_focus_custom_by_player=coaching_focus_custom_by_player,
     )
     
     # Step 3: Apply play/defense training
@@ -137,13 +139,127 @@ def execute_training(
     training_report["defenses_effectiveness_changes"] = defenses_effectiveness_changes
     training_report["plays_data"] = updated_plays
     training_report["scouting_data"] = updated_scouting_data
-    
+
+    # Structured Training Notes (Training_Notes_System.md); replaces flat energy-only list
+    _legacy_energy = list(training_report.get("training_notes", []))
+    from BackEnd.models.training_notes import build_structured_training_report_notes
+
+    training_report["training_notes"] = build_structured_training_report_notes(
+        is_training_camp=skip_pre_training_depreciation,
+        players=players,
+        original_player_baselines=original_player_baselines,
+        team=team,
+        plays_data=updated_plays,
+        scouting_data=updated_scouting_data,
+        legacy_energy_notes=_legacy_energy,
+    )
+
     return players, team, updated_plays, updated_scouting_data, training_report
 
 # Player attributes excluding EM, MO, NG
 TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO", "NG"]]
 
-# Team attribute clamps (lower, upper). shot_threshold and rebound_modifier from constants.
+# Player Maximizer (top 3 / attributes 4–6 / custom picks): rank by anchor; CH excluded (team chemistry not a maximizer target)
+PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
+
+# Primary position from max RT → three focus attrs (Player Maximizer / Positional Focus)
+POSITIONAL_FOCUS_ATTRS_BY_PRIMARY: Dict[str, Tuple[str, str, str]] = {
+    "PG": ("PS", "BH", "IQ"),
+    "SG": ("SH", "OD", "AG"),
+    "SF": ("SC", "ST", "AG"),
+    "PF": ("RB", "ID", "ST"),
+    "C": ("SC", "ID", "ST"),
+}
+PRIMARY_POSITION_RT_ORDER: Tuple[str, ...] = ("PG", "SG", "SF", "PF", "C")
+
+
+def primary_position_from_position_ratings(ratings: Optional[dict]) -> str:
+    """Position with highest rating; ties broken by PG → C order."""
+    if not ratings:
+        return "PG"
+    best_val = -1.0
+    best_pos = "PG"
+    for pos in PRIMARY_POSITION_RT_ORDER:
+        raw = ratings.get(pos)
+        if raw is None and isinstance(pos, str):
+            raw = ratings.get(pos.upper())
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            v = 0.0
+        if v > best_val:
+            best_val = v
+            best_pos = pos
+    return best_pos
+
+
+def positional_focus_attrs_for_player(player: dict) -> Tuple[str, str, str]:
+    ratings = player.get("position_ratings") or {}
+    pos = primary_position_from_position_ratings(ratings)
+    return POSITIONAL_FOCUS_ATTRS_BY_PRIMARY.get(pos, POSITIONAL_FOCUS_ATTRS_BY_PRIMARY["PG"])
+
+
+def normalize_coaching_focus_custom_by_player(
+    coaching_focus: Optional[str],
+    raw: Any,
+    players: List[dict],
+) -> Optional[Dict[str, List[str]]]:
+    """
+    Validate and normalize coaching_focus_custom_by_player for player-maximizer-custom.
+
+    Expect coaching_focus radio value ``player-maximizer-custom``. When active, ``raw`` must be a
+    dict mapping each training roster player's id (str) to a list of exactly **three** distinct
+    attribute codes, all in PLAYER_MAXIMIZER_RANKING_ATTRS.
+
+    Returns:
+        None if focus is not custom (extra raw data is ignored).
+        Dict[player_id, [attr_a, attr_b, attr_c]] when focus is custom.
+
+    Raises:
+        ValueError: invalid or incomplete payload.
+    """
+    _, sub = parse_coaching_focus(coaching_focus)
+    if sub != "player-maximizer-custom":
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "Player Maximizer / Custom requires coaching_focus_custom_by_player (object mapping player id to three attributes)."
+        )
+    allowed = frozenset(PLAYER_MAXIMIZER_RANKING_ATTRS)
+    roster_ids = {str(p["_id"]) for p in players if p.get("_id") is not None}
+    if not roster_ids:
+        raise ValueError("No players on roster for custom focus validation.")
+
+    out: Dict[str, List[str]] = {}
+    for pid in roster_ids:
+        entry = raw.get(pid)
+        if entry is None:
+            entry = raw.get(str(pid))
+        if not isinstance(entry, (list, tuple)) or len(entry) != 3:
+            raise ValueError(
+                f"Player Maximizer / Custom: player {pid} must have exactly three attributes (got invalid entry)."
+            )
+        a0, a1, a2 = str(entry[0]).strip(), str(entry[1]).strip(), str(entry[2]).strip()
+        if a0 not in allowed or a1 not in allowed or a2 not in allowed:
+            raise ValueError(
+                f"Player Maximizer / Custom: player {pid} attributes must be from the allowed ranking set (not CH/EM/MO/NG)."
+            )
+        if len({a0, a1, a2}) != 3:
+            raise ValueError(
+                f"Player Maximizer / Custom: player {pid} must pick three different attributes."
+            )
+        out[pid] = [a0, a1, a2]
+
+    if set(out.keys()) != roster_ids:
+        missing = roster_ids - set(out.keys())
+        raise ValueError(
+            "Player Maximizer / Custom: coaching_focus_custom_by_player must include every roster player "
+            f"(missing: {', '.join(sorted(missing))})."
+        )
+
+    return out
+
+
 from BackEnd.constants import TEAM_ATTR_RANGES
 TEAM_ATTR_CLAMPS = {
     "shot_threshold": TEAM_ATTR_RANGES["shot_threshold"],
@@ -162,6 +278,85 @@ TEAM_ATTR_CLAMPS = {
 
 # Player attribute clamps (lower, upper)
 PLAYER_ATTR_CLAMP = (1, None)  # Min 1, no max
+
+# Archetype prefixes for coaching focus radio `value` from FrontEnd/static/training.html.
+# Order: check multi-word prefixes; "authoritarian" last (authoritarian-discipline, etc.).
+COACHING_FOCUS_ARCHETYPE_PREFIXES = (
+    "systems-coach",
+    "player-maximizer",
+    "culture-builder",
+    "authoritarian",
+)
+
+# Human-facing leaf labels for APIs/reports/logs. Radio/API `value` remains the dict key.
+# NOTE: **Authoritarian** `authoritarian-teamwork` = UI **"Teamwork"** (PS/IQ + motion/zone install mult).
+# **Culture Builder** `culture-builder-teamwork` = UI **"Team Building"** (flat team_chemistry +1–3 only).
+# The shared `-teamwork` suffix on the Culture leaf is legacy for backward compatibility—do not conflate.
+COACHING_FOCUS_LEAF_DISPLAY_NAME: Dict[str, str] = {
+    "authoritarian-teamwork": "Teamwork",
+    "culture-builder-teamwork": "Team Building",
+    "player-maximizer-top-3": "Top 3",
+    "player-maximizer-attributes-4-6": "Attributes 4–6",
+    "player-maximizer-custom": "Custom",
+    "player-maximizer-choose-attributes": "Choose Attributes",
+    "player-maximizer-positional-focus": "Positional Focus",
+}
+
+
+def coaching_focus_leaf_display_name(sub_option: Optional[str]) -> Optional[str]:
+    """Stable UI label for a coaching leaf `value`, if we define one; else None (client may derive)."""
+    if not sub_option:
+        return None
+    return COACHING_FOCUS_LEAF_DISPLAY_NAME.get(sub_option)
+
+
+def parse_coaching_focus(coaching_focus: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Normalize API/UI coaching_focus into (archetype, sub_option).
+
+    sub_option is the full leaf value (e.g. systems-coach-offense) so it matches
+    _should_amplify_player_attr / _should_amplify_team_attr and Systems Coach play training.
+    Using split("-", 1) on the raw string breaks multi-word archetypes (systems, coach-offense).
+
+    Returns:
+        archetype: e.g. systems-coach, or None if empty input
+        sub_option: full radio value when a leaf is selected; None if only archetype header
+    """
+    if coaching_focus is None:
+        return None, None
+    raw = str(coaching_focus).strip()
+    if not raw:
+        return None, None
+
+    for prefix in COACHING_FOCUS_ARCHETYPE_PREFIXES:
+        if raw == prefix:
+            return prefix, None
+        if raw.startswith(prefix + "-"):
+            return prefix, raw
+
+    # Unknown / future values: best-effort legacy behavior
+    parts = raw.split("-", 1)
+    archetype = parts[0] if parts else None
+    sub_opt = parts[1] if len(parts) > 1 else None
+    return archetype, sub_opt
+
+
+# Zone defenses that share install training points in _apply_defense_training
+TRAINING_ZONE_DEFENSE_NAMES = frozenset({"2-3 Zone", "3-2 Zone", "1-3-1 Zone"})
+
+
+def _scale_install_training_effectiveness_points(
+    points: int,
+    multiplier: Optional[float],
+    apply_multiplier: bool,
+) -> int:
+    """
+    Scale integer effectiveness (Command) gains from offense/defense install training.
+    Used for Authoritarian / Execution (set plays, Man) and Authoritarian / Teamwork (motion, zones).
+    """
+    if not apply_multiplier or multiplier is None or points <= 0:
+        return points
+    return int(round(points * multiplier))
 
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
@@ -218,7 +413,8 @@ def apply_training_points(
     coaching_focus: Optional[str] = None,
     is_training_camp: bool = False,
     original_baselines: Optional[Dict] = None,
-    original_team_baseline: Optional[Dict] = None
+    original_team_baseline: Optional[Dict] = None,
+    coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[List[dict], dict, Dict]:
     """
     Apply training points to players and team based on allocations.
@@ -227,7 +423,7 @@ def apply_training_points(
         players: List of player dicts with attributes (already have pre-training conditions applied)
         team: Team dict with team attributes (already have pre-training conditions applied)
         allocations: Dict mapping category to allocation data
-        coaching_focus: Optional coaching focus (archetype-suboption format)
+        coaching_focus: Optional coaching focus; radio `value` from training UI (see parse_coaching_focus)
         original_baselines: Optional dict of original player baselines (before pre-training conditions)
         original_team_baseline: Optional dict of original team baseline (before pre-training conditions)
     
@@ -249,14 +445,7 @@ def apply_training_points(
     else:
         team_baseline = original_team_baseline
     
-    # Parse coaching focus (format: "archetype" or "archetype-suboption")
-    archetype = None
-    sub_option = None
-    if coaching_focus:
-        parts = coaching_focus.split("-", 1)
-        archetype = parts[0]
-        if len(parts) > 1:
-            sub_option = parts[1]
+    archetype, sub_option = parse_coaching_focus(coaching_focus)
     
     # Normalize allocations from frontend structure to flat structure
     # Frontend sends: {player_drills: {offense: {inside: 3, outside: 2}, ...}, team_drills: {...}, general: {...}}
@@ -360,6 +549,7 @@ def apply_training_points(
                                 sub_option,
                                 multiplier,
                                 player_baselines.get(player["_id"], {}).get(attr),
+                                coaching_focus_custom_by_player=coaching_focus_custom_by_player,
                             )
                 
                 # Track team attribute contributions from multipliers
@@ -384,6 +574,7 @@ def apply_training_points(
                             sub_option,
                             multiplier,
                             player_baselines.get(player["_id"], {}).get(attr),
+                            coaching_focus_custom_by_player=coaching_focus_custom_by_player,
                         )
             
             # Track team attribute contributions from multipliers (single-value categories)
@@ -395,10 +586,10 @@ def apply_training_points(
     
     # Handle special focus effects that apply to all players
     if sub_option == "culture-builder-inspire":
-        # Improve EM, MO by random.randint(1,2) for all players
+        # EM/morale lift + MO tick; CH/FT amplification is culture-builder-confidence
         for player in players:
             attrs = player.get("attributes", {})
-            em_improvement = random.randint(1, 2)
+            em_improvement = random.randint(2, 5)
             mo_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
             attrs["MO"] = min(10, attrs.get("MO", 0) + mo_improvement)
@@ -410,11 +601,18 @@ def apply_training_points(
         # Improve EM for all players
         for player in players:
             attrs = player.get("attributes", {})
-            # Note: Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
-            # will be handled separately when game is created
+            # Home crowd band shift is applied at franchise game start via FTD
+            # ``pending_community_engagement`` + Home_Crowd_System.md / Training_System.md
             em_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
             attrs["anchor_EM"] = attrs["EM"]
+
+    if sub_option == "culture-builder-teamwork":
+        # API value `culture-builder-teamwork` = UI **Team Building** (not Authoritarian Teamwork).
+        ch_lo, ch_hi = TEAM_ATTR_CLAMPS["team_chemistry"]
+        team_ch_bump = random.randint(1, 3)
+        cur_ch = team.get("team_chemistry", 0)
+        team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + team_ch_bump))
     
     # Apply team training points
     for category, allocation_data in normalized_allocations.items():
@@ -576,7 +774,8 @@ def apply_training_points(
         "team_changes": team_changes,
         "coaching_focus": {
             "archetype": archetype,
-            "sub_option": sub_option
+            "sub_option": sub_option,
+            "leaf_display_name": coaching_focus_leaf_display_name(sub_option),
         },
         "training_notes": training_notes
     }
@@ -592,6 +791,7 @@ def _apply_player_training_points(
     sub_option: Optional[str] = None,
     multiplier: float = 1.0,
     starting_baseline: Optional[int] = None,
+    coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
 ):
     """
     Apply training points to a single player attribute.
@@ -649,11 +849,14 @@ def _apply_player_training_points(
     # Check if this attribute should be amplified based on focus
     should_amplify = False
     
-    # Handle Player Maximizer special cases (top 3 / next 3 attributes)
+    # Handle Player Maximizer special cases (top 3 / next 3 / positional / custom)
     if sub_option in ["player-maximizer-top-3", "player-maximizer-attributes-4-6"]:
-        # Get player's top attributes (excluding CH, EM, MO, NG)
-        player_attrs = {a: attrs.get(f"anchor_{a}", 0) for a in TRAINABLE_PLAYER_ATTRS}
-        sorted_attrs = sorted(player_attrs.items(), key=lambda x: x[1], reverse=True)
+        # Rank by anchor for PLAYER_MAXIMIZER_RANKING_ATTRS (CH excluded; EM/MO/NG not in list)
+        player_attrs = {a: attrs.get(f"anchor_{a}", 0) for a in PLAYER_MAXIMIZER_RANKING_ATTRS}
+        sorted_attrs = sorted(
+            player_attrs.items(),
+            key=lambda x: (-(x[1] if isinstance(x[1], (int, float)) else 0), x[0]),
+        )
         
         if sub_option == "player-maximizer-top-3":
             # Top 3 attributes
@@ -663,6 +866,13 @@ def _apply_player_training_points(
             # Attributes 4-6
             next_attrs = [a[0] for a in sorted_attrs[3:6]]
             should_amplify = attr in next_attrs
+    elif sub_option == "player-maximizer-positional-focus":
+        triple = positional_focus_attrs_for_player(player)
+        should_amplify = attr in triple
+    elif sub_option == "player-maximizer-custom" and coaching_focus_custom_by_player:
+        pid = str(player.get("_id", ""))
+        chosen = coaching_focus_custom_by_player.get(pid) or []
+        should_amplify = attr in chosen
     else:
         # Standard amplification check
         should_amplify = _should_amplify_player_attr(attr, archetype, sub_option)
@@ -1042,20 +1252,21 @@ def _should_amplify_player_attr(attr: str, archetype: Optional[str], sub_option:
         # This will be handled per-player in the calling function
         return False
     elif sub_option == "player-maximizer-custom":
-        # Custom attributes chosen by user (to be built later)
+        # Per-player picks (coaching_focus_custom_by_player) handled in _apply_player_training_points
         return False
-    elif sub_option == "player-maximizer-opportunity":
-        return False  # Improves Non-Successful Set Play Skeleton Shot Scores, Improves all Motion Shot Scores (handled separately)
+    elif sub_option == "player-maximizer-positional-focus":
+        return False  # Handled in _apply_player_training_points via position_ratings
     
     # Culture Builder Options
     elif sub_option == "culture-builder-inspire":
-        return attr in ["EM", "MO"]  # Improves EM, MO by random.randint(1,2), amplifies Team Chemistry gains
+        # Flat EM/MO block only; team_chemistry via _should_amplify_team_attr
+        return False
     elif sub_option == "culture-builder-community":
         return attr == "EM"  # Improves EM, Max Crowd factor for upcoming home game, Min Crowd factor for upcoming away game
     elif sub_option == "culture-builder-teamwork":
-        return attr == "PS"  # Amplifies Team Chemistry gains, Improves Motion Play Effectiveness Scores, Zone Defense Effectiveness Scores
+        return False  # Team Building (`culture-builder-teamwork`): flat team_ch only—not Authoritarian Teamwork
     elif sub_option == "culture-builder-confidence":
-        return False  # Improves Set Play Effectiveness Scores, Man Defense Effectiveness Scores (handled separately)
+        return attr in ["CH", "FT"]
     
     return False
 
@@ -1499,21 +1710,36 @@ def apply_play_defense_training(
     elif defense_install == 5:
         defense_play_points = random.randint(150, 250)
     
+    sub_option = parse_coaching_focus(coaching_focus)[1] if coaching_focus else None
+
+    # Authoritarian / Execution: one roll per session; scales effectiveness gains on set plays + Man only (after distribution).
+    authoritarian_execution_eff_mult: Optional[float] = None
+    if sub_option == "authoritarian-execution":
+        authoritarian_execution_eff_mult = random.choice([1.5, 1.6, 1.7, 1.8])
+        logger.warning(
+            f"🎯 [AUTHORITARIAN EXECUTION] Effectiveness gain multiplier for set plays & Man: "
+            f"{authoritarian_execution_eff_mult}x"
+        )
+
+    # Authoritarian / Teamwork: same band; motion plays + zone defenses only (after distribution).
+    authoritarian_teamwork_eff_mult: Optional[float] = None
+    if sub_option == "authoritarian-teamwork":
+        authoritarian_teamwork_eff_mult = random.choice([1.5, 1.6, 1.7, 1.8])
+        logger.warning(
+            f"🎯 [AUTHORITARIAN TEAMWORK] Effectiveness gain multiplier for motion plays & zone defenses: "
+            f"{authoritarian_teamwork_eff_mult}x"
+        )
+
     # Apply Systems Coach focus multiplier to playPoints if applicable
-    if coaching_focus:
-        parts = coaching_focus.split("-", 1)
-        archetype = parts[0] if len(parts) > 0 else None
-        sub_option = parts[1] if len(parts) > 1 else None
-        
-        if sub_option == "systems-coach-offense" and offense_play_points > 0:
-            focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-            offense_play_points = int(offense_play_points * focus_multiplier)
-            logger.warning(f"🎯 [SYSTEMS COACH - OFFENSE] Applied {focus_multiplier}x multiplier to offense playPoints: {offense_play_points}")
-        
-        elif sub_option == "systems-coach-defense" and defense_play_points > 0:
-            focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-            defense_play_points = int(defense_play_points * focus_multiplier)
-            logger.warning(f"🎯 [SYSTEMS COACH - DEFENSE] Applied {focus_multiplier}x multiplier to defense playPoints: {defense_play_points}")
+    if sub_option == "systems-coach-offense" and offense_play_points > 0:
+        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
+        offense_play_points = int(offense_play_points * focus_multiplier)
+        logger.warning(f"🎯 [SYSTEMS COACH - OFFENSE] Applied {focus_multiplier}x multiplier to offense playPoints: {offense_play_points}")
+
+    elif sub_option == "systems-coach-defense" and defense_play_points > 0:
+        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
+        defense_play_points = int(defense_play_points * focus_multiplier)
+        logger.warning(f"🎯 [SYSTEMS COACH - DEFENSE] Applied {focus_multiplier}x multiplier to defense playPoints: {defense_play_points}")
     
     logger.warning(f"📚 [TRAINING] Offense playPoints: {offense_play_points}, Defense playPoints: {defense_play_points}")
     
@@ -1525,7 +1751,9 @@ def apply_play_defense_training(
             offense_play_points,
             playbook_training_mode,
             strategy_settings,
-            playbook_settings
+            playbook_settings,
+            authoritarian_execution_eff_mult=authoritarian_execution_eff_mult,
+            authoritarian_teamwork_eff_mult=authoritarian_teamwork_eff_mult,
         )
     
     # Apply defense training
@@ -1536,7 +1764,9 @@ def apply_play_defense_training(
             defense_play_points,
             playbook_training_mode,
             strategy_settings,
-            playbook_settings
+            playbook_settings,
+            authoritarian_execution_eff_mult=authoritarian_execution_eff_mult,
+            authoritarian_teamwork_eff_mult=authoritarian_teamwork_eff_mult,
         )
     
     return updated_plays, updated_scouting_data
@@ -1547,7 +1777,9 @@ def _apply_offense_play_training(
     total_points: int,
     playbook_training_mode: str,
     strategy_settings: Dict,
-    playbook_settings: Dict
+    playbook_settings: Dict,
+    authoritarian_execution_eff_mult: Optional[float] = None,
+    authoritarian_teamwork_eff_mult: Optional[float] = None,
 ) -> Dict:
     """
     Apply training points to offensive plays.
@@ -1558,6 +1790,8 @@ def _apply_offense_play_training(
         playbook_training_mode: "current-playbooks", "all-plays-even", or "custom"
         strategy_settings: Game plan strategy settings (used for inside/outside/attack split)
         playbook_settings: Playbook percentage settings
+        authoritarian_execution_eff_mult: If set, scale effectiveness gains on set plays only (Authoritarian / Execution)
+        authoritarian_teamwork_eff_mult: If set, scale effectiveness gains on motion plays only (Authoritarian / Teamwork)
     
     Returns:
         Updated plays_data dict
@@ -1593,6 +1827,14 @@ def _apply_offense_play_training(
             
             for i, (play_name, play_data) in enumerate(all_plays):
                 points = points_per_play + (1 if i < remainder else 0)
+                is_set_play = play_data.get("play_type") == "set_play"
+                is_motion_play = play_data.get("play_type") == "motion"
+                points = _scale_install_training_effectiveness_points(
+                    points, authoritarian_execution_eff_mult, is_set_play
+                )
+                points = _scale_install_training_effectiveness_points(
+                    points, authoritarian_teamwork_eff_mult, is_motion_play
+                )
                 old_effectiveness = play_data.get("effectiveness", 0)
                 new_effectiveness = old_effectiveness + points
                 updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1648,6 +1890,9 @@ def _apply_offense_play_training(
                     play_pct = motion_playbook.get(play_name, 0) / total_motion_pct
                     points = math.floor(motion_points * play_pct)
                     if points > 0:
+                        points = _scale_install_training_effectiveness_points(
+                            points, authoritarian_teamwork_eff_mult, True
+                        )
                         old_effectiveness = play_data.get("effectiveness", 0)
                         new_effectiveness = old_effectiveness + points
                         updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1658,6 +1903,9 @@ def _apply_offense_play_training(
                 remainder = motion_points - (points_per_play * len(motion_plays)) if motion_plays else 0
                 for i, (play_name, play_data) in enumerate(motion_plays):
                     points = points_per_play + (1 if i < remainder else 0)
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_teamwork_eff_mult, True
+                    )
                     old_effectiveness = play_data.get("effectiveness", 0)
                     new_effectiveness = old_effectiveness + points
                     updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1729,6 +1977,9 @@ def _apply_offense_play_training(
                             play_pct = set_playbook.get(play_name, 0) / total_set_pct
                             points = math.floor(focus_points * play_pct)
                             if points > 0:
+                                points = _scale_install_training_effectiveness_points(
+                                    points, authoritarian_execution_eff_mult, True
+                                )
                                 old_effectiveness = play_data.get("effectiveness", 0)
                                 new_effectiveness = old_effectiveness + points
                                 updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1739,6 +1990,9 @@ def _apply_offense_play_training(
                         remainder = focus_points - (points_per_play * len(set_plays)) if set_plays else 0
                         for i, (play_name, play_data) in enumerate(set_plays):
                             points = points_per_play + (1 if i < remainder else 0)
+                            points = _scale_install_training_effectiveness_points(
+                                points, authoritarian_execution_eff_mult, True
+                            )
                             old_effectiveness = play_data.get("effectiveness", 0)
                             new_effectiveness = old_effectiveness + points
                             updated_plays[play_name]["effectiveness"] = new_effectiveness
@@ -1752,10 +2006,15 @@ def _apply_defense_training(
     total_points: int,
     playbook_training_mode: str,
     strategy_settings: Dict,
-    playbook_settings: Dict
+    playbook_settings: Dict,
+    authoritarian_execution_eff_mult: Optional[float] = None,
+    authoritarian_teamwork_eff_mult: Optional[float] = None,
 ) -> Dict:
     """
     Apply training points to defensive plays.
+
+    authoritarian_execution_eff_mult: If set, scale effectiveness gains on Man defense only (Authoritarian / Execution).
+    authoritarian_teamwork_eff_mult: If set, scale effectiveness gains on zone defenses only (Authoritarian / Teamwork).
     
     Returns:
         Updated scouting_data dict
@@ -1789,6 +2048,14 @@ def _apply_defense_training(
             for i, defense_name in enumerate(valid_defenses):
                 points = points_per_defense + (1 if i < remainder else 0)
                 if defense_name in defense_data:
+                    is_man = defense_name == "Man"
+                    is_zone = defense_name in TRAINING_ZONE_DEFENSE_NAMES
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_execution_eff_mult, is_man
+                    )
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_teamwork_eff_mult, is_zone
+                    )
                     old_eff = defense_data[defense_name].get("effectiveness", 0)
                     defense_data[defense_name]["effectiveness"] = old_eff + points
                     logger.warning(f"📚 [TRAINING] Defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")
@@ -1821,9 +2088,12 @@ def _apply_defense_training(
             # For now, we only have one man defense ("Man")
             # When more man defenses are added, we can use playbook_settings.get("man_defense", {})
             if "Man" in defense_data:
+                scaled_man = _scale_install_training_effectiveness_points(
+                    man_points, authoritarian_execution_eff_mult, True
+                )
                 old_eff = defense_data["Man"].get("effectiveness", 0)
-                defense_data["Man"]["effectiveness"] = old_eff + man_points
-                logger.warning(f"📚 [TRAINING] Defense 'Man': effectiveness {old_eff} → {old_eff + man_points} (+{man_points} points)")
+                defense_data["Man"]["effectiveness"] = old_eff + scaled_man
+                logger.warning(f"📚 [TRAINING] Defense 'Man': effectiveness {old_eff} → {old_eff + scaled_man} (+{scaled_man} points)")
         
         # Distribute zone defense points
         if zone_points > 0:
@@ -1839,6 +2109,9 @@ def _apply_defense_training(
                     defense_pct = zone_playbook.get(defense_name, 0) / total_zone_pct
                     points = math.floor(zone_points * defense_pct)
                     if points > 0:
+                        points = _scale_install_training_effectiveness_points(
+                            points, authoritarian_teamwork_eff_mult, True
+                        )
                         old_eff = defense_data[defense_name].get("effectiveness", 0)
                         defense_data[defense_name]["effectiveness"] = old_eff + points
                         logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, {defense_pct*100:.1f}% of {zone_points})")
@@ -1848,6 +2121,9 @@ def _apply_defense_training(
                 remainder = zone_points - (points_per_defense * len(valid_zone_defenses)) if valid_zone_defenses else 0
                 for i, defense_name in enumerate(valid_zone_defenses):
                     points = points_per_defense + (1 if i < remainder else 0)
+                    points = _scale_install_training_effectiveness_points(
+                        points, authoritarian_teamwork_eff_mult, True
+                    )
                     old_eff = defense_data[defense_name].get("effectiveness", 0)
                     defense_data[defense_name]["effectiveness"] = old_eff + points
                     logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")

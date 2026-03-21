@@ -18,6 +18,7 @@ from BackEnd.constants import (
     HARD_PROB,
     SOFT_PROB
 )
+from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
 from BackEnd.utils.shared import (
     apply_scoring,
     get_time_elapsed,
@@ -436,6 +437,8 @@ class ShotManager:
             shot_threshold = game_state.pop("fast_break_shot_threshold_override")
         else:
             shot_threshold = off_team.team_attributes["shot_threshold"]
+
+        shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
         
         # Three-point threshold: 100 - (random(1-5) * momentum)
         # Higher momentum = easier three-pointers
@@ -2007,6 +2010,7 @@ class ShotManager:
         
         # Adjust shot threshold based on defender count
         shot_threshold = off_team.team_attributes["shot_threshold"]
+        shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
         
         if defender_count == 0:
             # 0 defenders: 99% make chance (threshold = 1)

@@ -19,6 +19,31 @@ const round = parseInt(urlParams.get('round'), 10); // For tournament mode (opti
 
 let reportData = null;
 let currentView = 'changes'; // 'attributes' or 'changes'
+/** Projected Starting 5 sub-toggle: 'attributes' | 'stats' */
+let projectedLineupView = 'attributes';
+
+// Season stat columns (aligned with franchise command center roster stats table)
+const TRAINING_PROJECTED_STATS_COLUMNS = [
+  'PTS',
+  'FGM',
+  'FGA',
+  'FG%',
+  '3PTM',
+  '3PTA',
+  '3PT%',
+  'FTM',
+  'FTA',
+  'FT%',
+  'DREB',
+  'OREB',
+  'TREB',
+  'AST',
+  'STL',
+  'BLK',
+  'F',
+  'MIN',
+  'TO',
+];
 
 // Attribute abbreviations mapping
 // NOTE: Order is critical - this is the exact order attributes should be displayed horizontally
@@ -79,13 +104,14 @@ const FOCUS_DISPLAY = {
   'player-maximizer': {
     'top-3': 'Player Maximizer - Top 3 Attributes',
     'attributes-4-6': 'Player Maximizer - Attributes 4-6',
+    'positional-focus': 'Player Maximizer - Positional Focus',
     'custom': 'Player Maximizer - Custom',
-    'be-opportunistic': 'Player Maximizer - Be Opportunistic'
+    'choose-attributes': 'Player Maximizer - Choose Attributes'
   },
   'culture-builder': {
     'inspire': 'Culture Builder - Inspire',
     'community': 'Culture Builder - Community Engagement',
-    'teamwork': 'Culture Builder - Teamwork',
+    'teamwork': 'Culture Builder - Team Building',
     'build-confidence': 'Culture Builder - Build Confidence'
   }
 };
@@ -108,6 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set up view toggle
   setupViewToggle();
+
+  setupProjectedLineupToggle();
   
   // Set up locker room button
   setupLockerRoomButton();
@@ -116,8 +144,131 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTrainingReport();
 });
 
+function setupProjectedLineupToggle() {
+  const buttons = document.querySelectorAll('.projected-lineup-toggle .toggle-btn');
+  if (!buttons.length) return;
+  buttons.forEach((b) => {
+    if (b.getAttribute('data-projected-view') === projectedLineupView) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      playSound('click-tiny.wav');
+      buttons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      projectedLineupView = btn.getAttribute('data-projected-view') || 'attributes';
+      renderProjectedStartingFiveSection();
+    });
+  });
+}
+
+function formatTrainingSeasonStat(stats, col) {
+  const s = stats || {};
+  const num = (x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : 0;
+  };
+  switch (col) {
+    case 'FG%': {
+      const fga = num(s.FGA);
+      const fgm = num(s.FGM);
+      return fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0';
+    }
+    case '3PT%': {
+      const tpa = num(s['3PTA'] != null ? s['3PTA'] : s.TPA);
+      const tpm = num(s['3PTM'] != null ? s['3PTM'] : s.TPM);
+      return tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
+    }
+    case 'FT%': {
+      const fta = num(s.FTA);
+      const ftm = num(s.FTM);
+      return fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0';
+    }
+    case 'TREB': {
+      if (s.TREB != null && s.TREB !== '') return String(s.TREB);
+      return String(num(s.OREB) + num(s.DREB));
+    }
+    default: {
+      const v = s[col];
+      if (v == null || v === '') return '0';
+      return String(v);
+    }
+  }
+}
+
+function buildSeasonStatsByPlayerId() {
+  const map = new Map();
+  (reportData.players || []).forEach((p) => {
+    const pid = p.player_id || p.id;
+    if (pid != null && pid !== '') map.set(String(pid), p.season_stats || {});
+  });
+  return map;
+}
+
+function renderProjectedStartingFiveStats(rows) {
+  const el = document.getElementById('training-projected-lineup');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rows || rows.length === 0) {
+    el.innerHTML =
+      '<p class="training-projected-empty">No projected lineup (missing position ratings or roster data).</p>';
+    return;
+  }
+  const statsMap = buildSeasonStatsByPlayerId();
+  const table = document.createElement('table');
+  table.className = 'training-projected-table';
+  const thead = document.createElement('thead');
+  const hrow = document.createElement('tr');
+  const headers = ['Pos', 'Player'].concat(TRAINING_PROJECTED_STATS_COLUMNS);
+  headers.forEach((h) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    const pid = r.player_id != null ? String(r.player_id) : '';
+    const stats = statsMap.get(pid) || {};
+    const playerLabel =
+      typeof formatNameWithJersey === 'function'
+        ? formatNameWithJersey(r.jersey, r.name || '')
+        : r.name || '—';
+    const cells = [r.position || '—', playerLabel];
+    TRAINING_PROJECTED_STATS_COLUMNS.forEach((col) => {
+      cells.push(formatTrainingSeasonStat(stats, col));
+    });
+    cells.forEach((text) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  el.appendChild(table);
+}
+
+function renderProjectedStartingFiveSection() {
+  if (!reportData) return;
+  const rows = reportData.projected_starting_five || [];
+  if (projectedLineupView === 'stats') {
+    renderProjectedStartingFiveStats(rows);
+    return;
+  }
+  if (typeof renderProjectedStartingFive === 'function') {
+    renderProjectedStartingFive(rows, {
+      containerId: 'training-projected-lineup',
+      tableClass: 'training-projected-table',
+      emptyClass: 'training-projected-empty',
+    });
+  }
+}
+
 function setupViewToggle() {
-  const toggleButtons = document.querySelectorAll('.toggle-btn');
+  const toggleButtons = document.querySelectorAll('.players-section .toggle-btn');
   // Enforce initial active button from currentView
   toggleButtons.forEach(b => {
     if (b.dataset.view === currentView) b.classList.add('active');
@@ -214,6 +365,8 @@ function renderPage() {
   
   // Render playbook summary
   renderPlaybookSummary();
+
+  renderProjectedStartingFiveSection();
   
   // Render training notes
   renderTrainingNotes();
@@ -244,14 +397,20 @@ function renderHeader() {
       'authoritarian': 'Authoritarian',
       'systems-coach': 'Systems Coach',
       'player-maximizer': 'Player Maximizer',
-      'culture': 'Culture Builder'
+      'culture': 'Culture Builder',
+      'culture-builder': 'Culture Builder'
     };
     
     // Get archetype display name
     let archetypeDisplay = archetypeMap[archetype] || archetype.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
-    
+
+    // Backend may send explicit leaf label (e.g. Team Building vs Teamwork—which share no API token ambiguity once labeled)
+    const leafFromApi = focus.leaf_display_name;
+    if (leafFromApi) {
+      focusText = `${leafFromApi} (${archetypeDisplay})`;
+    } else {
     // Remove archetype prefix from sub_option (e.g., "systems-coach-offense" -> "offense")
     let subOptionClean = subOption;
     if (subOption.startsWith(archetype + '-')) {
@@ -264,14 +423,27 @@ function renderHeader() {
     if (archetype === 'systems-coach' && subOptionClean.startsWith('coach-')) {
       subOptionClean = subOptionClean.substring('coach-'.length);
     }
-    
-    // Format sub-option: capitalize words
-    const formatSubOption = subOptionClean.split('-').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+
+    // Player Maximizer: keep "4–6" and short labels (split('-') breaks "attributes-4-6")
+    const PM_SUBOPTION_LABEL = {
+      'top-3': 'Top 3',
+      'attributes-4-6': 'Attributes 4–6',
+      'positional-focus': 'Positional Focus',
+      'custom': 'Custom',
+      'choose-attributes': 'Choose Attributes'
+    };
+    let formatSubOption;
+    if (archetype === 'player-maximizer' && PM_SUBOPTION_LABEL[subOptionClean]) {
+      formatSubOption = PM_SUBOPTION_LABEL[subOptionClean];
+    } else {
+      formatSubOption = subOptionClean.split('-').map(word =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    }
     
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     focusText = `${formatSubOption} (${archetypeDisplay})`;
+    }
   }
   
   document.getElementById('training-focus').textContent = focusText;
@@ -1021,12 +1193,12 @@ function renderTrainingNotes() {
   if (!reportData) return;
   
   const container = document.getElementById('training-notes-container');
+  if (!container) return;
   container.innerHTML = '';
   
   const training_notes = reportData.training_notes || [];
   
   if (training_notes.length === 0) {
-    // Show placeholder if no notes
     const placeholder = document.createElement('p');
     placeholder.className = 'notes-placeholder';
     placeholder.textContent = 'No training notes for this session.';
@@ -1035,12 +1207,43 @@ function renderTrainingNotes() {
     container.appendChild(placeholder);
     return;
   }
+
+  // Structured sections: { title, body } (Training_Notes_System.md)
+  const first = training_notes[0];
+  if (first && typeof first === 'object' && first.title != null) {
+    training_notes.forEach(function (section) {
+      const wrap = document.createElement('div');
+      wrap.className = 'training-note-section';
+      const h3 = document.createElement('h3');
+      h3.className = 'training-note-section-title';
+      h3.textContent = section.title || '';
+      const body = document.createElement('div');
+      body.className = 'training-note-section-body';
+      const text = section.body != null ? String(section.body) : '';
+      text.split('\n\n').forEach(function (para, i) {
+        const p = document.createElement('p');
+        p.className = 'training-note-section-p';
+        p.textContent = para.trim();
+        if (p.textContent) body.appendChild(p);
+      });
+      if (!body.children.length) {
+        const p = document.createElement('p');
+        p.className = 'training-note-section-p';
+        p.textContent = text || 'No Significant Updates';
+        body.appendChild(p);
+      }
+      wrap.appendChild(h3);
+      wrap.appendChild(body);
+      container.appendChild(wrap);
+    });
+    return;
+  }
   
-  // Render each note as a paragraph
+  // Legacy: flat strings
   training_notes.forEach(note => {
     const noteElement = document.createElement('p');
     noteElement.className = 'training-note';
-    noteElement.textContent = note;
+    noteElement.textContent = typeof note === 'string' ? note : JSON.stringify(note);
     container.appendChild(noteElement);
   });
 }

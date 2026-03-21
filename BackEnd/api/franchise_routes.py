@@ -10,7 +10,7 @@ import math
 import random
 import re
 import uuid
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
 from BackEnd.main import run_simulation
@@ -32,7 +32,7 @@ from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
-from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP
+from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP, parse_coaching_focus
 from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
@@ -1054,7 +1054,7 @@ def generate_random_coaching_focus() -> str:
         "authoritarian-discipline",
         "authoritarian-rebounding",
         "authoritarian-execution",
-        "authoritarian-teamwork",
+        "authoritarian-teamwork",  # UI "Teamwork" (Authoritarian); differs from Culture `culture-builder-teamwork`
         "systems-coach",
         "systems-coach-offense",
         "systems-coach-defense",
@@ -1063,12 +1063,11 @@ def generate_random_coaching_focus() -> str:
         "player-maximizer",
         "player-maximizer-top-3",
         "player-maximizer-attributes-4-6",
-        "player-maximizer-custom",
-        "player-maximizer-opportunity",
+        "player-maximizer-positional-focus",
         "culture-builder",
         "culture-builder-inspire",
         "culture-builder-community",
-        "culture-builder-teamwork",
+        "culture-builder-teamwork",  # UI "Team Building"; not Authoritarian "Teamwork"
         "culture-builder-confidence",
     ]
     
@@ -5650,10 +5649,37 @@ def get_scouting_report(franchise_id: str, team_name: str):
         str(team_object_id),  # Convert to string for utility function
         team_id_field
     )
-    
+
+    from BackEnd.utils.roster_loader import load_roster
+    from BackEnd.utils.scouting_utils import compute_projected_starting_five
+
+    _, scout_players = load_roster(team_name, franchise_id=str(franchise_id))
+    projected_starting_five = compute_projected_starting_five(scout_players)
+
+    team_oid_str = str(team_object_id)
+    player_season_stats: dict[str, dict] = {}
+    for fpd in franchise_players_data_collection.find(
+        {
+            "franchise_id": str(franchise_id),
+            "$or": [
+                {"meta.team_id": team_oid_str},
+                {"meta.team": team_name},
+            ],
+        },
+        {"player_id": 1, "season": 1},
+    ):
+        pid = str(fpd.get("player_id") or "")
+        if not pid:
+            continue
+        season_raw = fpd.get("season") or {}
+        if isinstance(season_raw, dict):
+            player_season_stats[pid] = dict(season_raw)
+
     return {
         "team_attributes": team_attributes,
-        "plays": plays_data
+        "plays": plays_data,
+        "projected_starting_five": projected_starting_five,
+        "player_season_stats": player_season_stats,
     }
 
 
@@ -5661,6 +5687,97 @@ class FranchiseTrainingRequest(BaseModel):
     franchise_id: str
     team_id: Optional[str] = None
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
+
+
+def _max_position_rating_from_fpd(fpd: dict) -> int:
+    """Highest position rating (PG/SG/SF/PF/C) for sort order (custom modal + training report)."""
+    pr = (fpd or {}).get("position_ratings") or {}
+    best = 0
+    for v in pr.values():
+        try:
+            iv = int(float(v))
+        except (TypeError, ValueError):
+            continue
+        if iv > best:
+            best = iv
+    return best
+
+
+def _sort_training_report_players_by_max_rt(players: List[dict]) -> None:
+    """In-place: descending max(RT), stable by original index on tie."""
+
+    def max_rt(p: dict) -> float:
+        pr = p.get("position_ratings") or {}
+        vals = []
+        for v in pr.values():
+            try:
+                vals.append(float(v))
+            except (TypeError, ValueError):
+                pass
+        return max(vals) if vals else 0.0
+
+    decorated = [(max_rt(p), i, p) for i, p in enumerate(players)]
+    decorated.sort(key=lambda t: (-t[0], t[1]))
+    players[:] = [t[2] for t in decorated]
+
+
+def _build_custom_focus_roster_for_franchise(
+    franchise_doc: dict,
+    franchise_id_obj: ObjectId,
+) -> Tuple[List[dict], List[str]]:
+    """
+    Rows for the Player Maximizer Custom modal: same roster order as franchise training execution.
+    """
+    from BackEnd.models.training_execution_v2 import PLAYER_MAXIMIZER_RANKING_ATTRS
+
+    ranking = list(PLAYER_MAXIMIZER_RANKING_ATTRS)
+    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id or not user_team_object_id:
+        return [], ranking
+
+    fpd_docs = list(
+        franchise_players_data_collection.find({"franchise_id": str(franchise_id_obj)})
+    )
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
+
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id_obj, "team_id": ObjectId(user_team_object_id)}
+    )
+    if not ftd_doc:
+        return [], ranking
+
+    team_player_ids = ftd_doc.get("players") or []
+    rows: List[dict] = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        fpd = franchise_players.get(pid_str)
+        if not fpd:
+            continue
+        meta = fpd.get("meta") or {}
+        name = " ".join(
+            p for p in [meta.get("first_name", ""), meta.get("last_name", "")] if p
+        ).strip() or pid_str
+        attrs_obj = fpd.get("attributes") or {}
+        attr_vals = {}
+        for a in ranking:
+            attr_vals[a] = int(attrs_obj.get(f"anchor_{a}", attrs_obj.get(a, 0)) or 0)
+        pr_raw = fpd.get("position_ratings") or {}
+        position_ratings = (
+            {str(k): v for k, v in pr_raw.items()} if isinstance(pr_raw, dict) else {}
+        )
+        rows.append(
+            {
+                "player_id": pid_str,
+                "name": name,
+                "attrs": attr_vals,
+                "position_ratings": position_ratings,
+                "_sort_max_rt": _max_position_rating_from_fpd(fpd),
+            }
+        )
+    rows.sort(key=lambda r: r.get("_sort_max_rt", 0), reverse=True)
+    for r in rows:
+        r.pop("_sort_max_rt", None)
+    return rows, ranking
 
 
 @router.get("/franchise/training-points")
@@ -5696,10 +5813,16 @@ def get_training_points(franchise_id: str):
     total_time = (time.time() - endpoint_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
     
+    custom_roster, ranking_attrs = _build_custom_focus_roster_for_franchise(
+        franchise_doc, franchise_id_obj
+    )
+
     return {
         "training_points": training_points,
         "is_first_training": is_first_training,
         "week": week,
+        "custom_focus_roster": custom_roster,
+        "player_maximizer_ranking_attrs": ranking_attrs,
     }
 
 
@@ -5945,10 +6068,27 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     }
     logger.warning(f"🔋 [API] allocations.team_drills: {allocations.get('team_drills', {})}")
     coaching_focus = training_data.get("coaching_focus")
+    raw_custom = training_data.get("coaching_focus_custom_by_player")
+
+    if coaching_focus == "player-maximizer-choose-attributes":
+        raise HTTPException(
+            status_code=400,
+            detail="Open Player Maximizer attributes, choose a mode, and tap Assign Focus Attributes before submitting.",
+        )
 
     # Execute new training system
     # This applies pre-training conditions, then training points, and returns training report
-    from BackEnd.models.training_execution_v2 import execute_training
+    from BackEnd.models.training_execution_v2 import (
+        execute_training,
+        normalize_coaching_focus_custom_by_player,
+    )
+
+    try:
+        normalized_custom = normalize_coaching_focus_custom_by_player(
+            coaching_focus, raw_custom, players_for_training
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
     players_load_time = (time.time() - players_load_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
@@ -5966,7 +6106,8 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         playbook_settings=playbook_settings,
         scouting_data=scouting_data,
         playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks"),
-        skip_pre_training_depreciation=is_first_training
+        skip_pre_training_depreciation=is_first_training,
+        coaching_focus_custom_by_player=normalized_custom,
     )
     training_exec_time = (time.time() - training_exec_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")
@@ -6051,6 +6192,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     if is_first_training:
         ftd_update["training_squad_players"] = []
 
+    # Community Engagement → pending home-crowd band shift for user's next franchise game (consumed at game start)
+    _, ce_sub = parse_coaching_focus(coaching_focus)
+    if ce_sub == "culture-builder-community":
+        ftd_update["pending_community_engagement"] = True
+
     if 20 <= week <= 26 and str(week) not in recruiting_results:
         _process_weekly_recruiting_invites(franchise_doc)
 
@@ -6131,10 +6277,13 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                         else:
                             new_val = int(round(new_val))
                         ftd_update[f"team_attributes.{attr_name}"] = new_val
-                if ftd_update:
+                set_payload = dict(ftd_update)
+                if template.get("community_engagement"):
+                    set_payload["pending_community_engagement"] = True
+                if set_payload:
                     franchise_team_data_collection.update_one(
                         {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                        {"$set": ftd_update},
+                        {"$set": set_payload},
                     )
                 player_order = ftd_doc.get("players")
                 if not player_order:
@@ -6391,14 +6540,25 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 player_name = f"{first_name} {last_name}".strip()
                 
                 if player_name:  # Only add if we have a name
+                    season_raw = player_data.get("season") or {}
+                    season_stats = dict(season_raw) if isinstance(season_raw, dict) else {}
                     players.append({
                         "id": pid_str,
+                        "player_id": pid_str,
                         "name": player_name,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "jersey": meta.get("jersey"),
+                        "year": meta.get("year") or player_data.get("year"),
+                        "height": meta.get("height") or player_data.get("height"),
+                        "weight": meta.get("weight") or player_data.get("weight"),
                         "attributes": player_attrs,
                         "position_ratings": player_data.get("position_ratings", {}),
+                        "season_stats": season_stats,
                     })
             
             logger.info(f"🔍 [TRAINING REPORT] Found {len(players)} players for team {team_id_str}")
+            _sort_training_report_players_by_max_rt(players)
             
             # Get current team attributes (after training)
             team_attrs = {
@@ -6449,9 +6609,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if report_data and report_data.get("round") != current_round:
                 report_data = {}
             
-            # Get upcoming opponent from bracket
-            current_round = doc.get("current_round", 1)
-            round_key = get_round_name(current_round)
+            # Get upcoming opponent from bracket (do not clobber report round `week`)
+            bracket_round = doc.get("current_round", 1)
+            round_key = get_round_name(bracket_round)
             matchups = doc.get("bracket", {}).get(round_key, [])
             upcoming_opponent = None
             
@@ -6527,12 +6687,24 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 player_name = f"{first_name} {last_name}".strip()
                 
                 if player_name:
+                    season_raw = tournament_player_data.get("season") or {}
+                    season_stats = dict(season_raw) if isinstance(season_raw, dict) else {}
                     players.append({
                         "id": pid_str,
+                        "player_id": pid_str,
                         "name": player_name,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "jersey": meta.get("jersey"),
+                        "year": meta.get("year") or tournament_player_data.get("year"),
+                        "height": meta.get("height") or tournament_player_data.get("height"),
+                        "weight": meta.get("weight") or tournament_player_data.get("weight"),
                         "attributes": player_attrs,
                         "position_ratings": tournament_player_data.get("position_ratings", {}),
+                        "season_stats": season_stats,
                     })
+            
+            _sort_training_report_players_by_max_rt(players)
             
             # Get current team attributes from tournament teams (matches Franchise pattern)
             team_attrs = {
@@ -6553,10 +6725,14 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         if not report_data:
             raise HTTPException(status_code=404, detail="Training report not found")
 
+        from BackEnd.utils.scouting_utils import compute_projected_starting_five
+
+        projected_starting_five = compute_projected_starting_five(players) if players else []
+
         return {
             "status": "success",
             "week": week if mode == "franchise" else None,  # Only for franchise mode
-            "round": current_round if mode == "tournament" else None,  # Only for tournament mode
+            "round": week if mode == "tournament" else None,  # Tournament: training report round (not bracket cursor)
             "upcoming_opponent": upcoming_opponent,
             "coaching_focus": report_data.get("coaching_focus", {}),
             # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
@@ -6568,7 +6744,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "plays_effectiveness_changes": report_data.get("plays_effectiveness_changes", {}),
             "defenses_effectiveness_changes": report_data.get("defenses_effectiveness_changes", {}),
             "players": players,
-            "team_attributes": team_attrs
+            "team_attributes": team_attrs,
+            "projected_starting_five": projected_starting_five,
         }
         
     except HTTPException:

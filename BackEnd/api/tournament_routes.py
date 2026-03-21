@@ -882,10 +882,31 @@ def get_tournament_scouting_report(tournament_id: str, team_id: str = None, team
         team_object_id,
         team_id_field
     )
-    
+
+    from BackEnd.utils.scouting_utils import (
+        compute_projected_starting_five,
+        load_tournament_roster_for_scouting,
+    )
+
+    scout_players = load_tournament_roster_for_scouting(tournament_doc, team_doc)
+    projected_starting_five = compute_projected_starting_five(scout_players)
+
+    tournament_players = tournament_doc.get("players", {}) or tournament_doc.get("player_stats", {})
+    player_season_stats: dict[str, dict] = {}
+    for row in projected_starting_five:
+        pid = row.get("player_id")
+        if pid is None or pid == "":
+            continue
+        pid_s = str(pid)
+        tp = tournament_players.get(pid_s, {}) or {}
+        season_raw = tp.get("season") or {}
+        player_season_stats[pid_s] = dict(season_raw) if isinstance(season_raw, dict) else {}
+
     return {
         "team_attributes": team_attributes,
-        "plays": plays_data
+        "plays": plays_data,
+        "projected_starting_five": projected_starting_five,
+        "player_season_stats": player_season_stats,
     }
 
 

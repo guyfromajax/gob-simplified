@@ -79,6 +79,24 @@ function getBestPosition(positionRatings = {}) {
   return { pos: bestPos, rating: bestRating };
 }
 
+/**
+ * Display name with jersey prefix e.g. "#32 Ronnie Rozier". Jersey 0 is valid.
+ * @param {*} jersey - number or string; null/undefined/'' skips prefix
+ * @param {string} rawName - full name without jersey
+ */
+function formatNameWithJersey(jersey, rawName) {
+  const name = rawName != null && rawName !== '' ? String(rawName).trim() : '';
+  if (jersey === null || jersey === undefined || jersey === '') {
+    return name || '—';
+  }
+  const n = typeof jersey === 'number' ? jersey : parseInt(String(jersey).trim(), 10);
+  if (Number.isNaN(n)) {
+    return name || '—';
+  }
+  const prefix = '#' + n;
+  return name ? prefix + ' ' + name : prefix;
+}
+
 function getCurrentRelativeUrl() {
   return `${window.location.pathname}${window.location.search}${window.location.hash || ''}`;
 }

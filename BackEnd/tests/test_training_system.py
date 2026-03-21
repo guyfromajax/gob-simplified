@@ -320,9 +320,12 @@ def test_training_system():
         print("-" * 80)
         training_notes = training_report.get("training_notes", [])
         if isinstance(training_notes, list):
-            print(f"  ✅ Training notes: {len(training_notes)} notes")
+            print(f"  ✅ Training notes: {len(training_notes)} sections")
             for note in training_notes:
-                print(f"    - {note}")
+                if isinstance(note, dict) and "title" in note:
+                    print(f"    - {note.get('title')}: {note.get('body', '')[:80]}...")
+                else:
+                    print(f"    - {note}")
         else:
             print(f"  ❌ Training notes: Invalid type {type(training_notes)}")
         

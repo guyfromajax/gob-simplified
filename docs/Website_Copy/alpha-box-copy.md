@@ -7,8 +7,8 @@ Use this file as the source of truth for the "ALPHA RELEASE" box copy shown on t
 Title:
 - ALPHA RELEASE
 
-Body:
-- **March 19 Update** Added full team prestige and ranking systems. Added more team logos (64 of 128 now exist). Added full computer sim game stats tracking. Various UX and quality of life updates.
+Body (single paragraph in `.alpha-disclaimer-text`):
+- **March 20 Update** Added training notes to training report. Added Player Maximizer training functionality. Added projected starting lineup to Scouting Report. Improved autoset lineup logic for both user and computer teams.
 
 Source:
 - `FrontEnd/static/mode-select.html`

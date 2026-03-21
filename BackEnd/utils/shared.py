@@ -31,6 +31,21 @@ def format_height(value) -> str:
     feet, inches = divmod(inches, 12)
     return f"{feet}'{inches}\""
 
+
+def format_player_display_name(jersey, first_name: str, last_name: str) -> str:
+    """Full name with optional jersey prefix like '#32 Name'. Jersey 0 is valid."""
+    name = f"{first_name or ''} {last_name or ''}".strip()
+    if jersey is None or jersey == "":
+        return name
+    try:
+        j = int(float(jersey))
+    except (TypeError, ValueError):
+        return name
+    if not name:
+        return f"#{j}"
+    return f"#{j} {name}"
+
+
 def weighted_random_from_dict(weight_dict: dict) -> str:
     if not weight_dict:
         raise ValueError("weighted_random_from_dict received an empty dict")
@@ -1631,6 +1646,10 @@ def summarize_game_state(game, exclude_animations=True):
         "quarter": game.quarter,
         "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
+        # Home crowd (rolled once per game; persist so DB load / timeout resume does not re-roll)
+        "home_crowd_factor": game.game_state.get("home_crowd_factor"),
+        "home_crowd_away_shot_threshold_delta": game.game_state.get("home_crowd_away_shot_threshold_delta"),
+        "home_crowd_home_shot_threshold_delta": game.game_state.get("home_crowd_home_shot_threshold_delta"),
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         "user_team_side": game.game_state.get("user_team_side"),  # ✅ SS&S: Save user_team_side for persistent override checking
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)

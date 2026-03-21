@@ -274,6 +274,7 @@ def build_docs() -> list[dict]:
         docs.append({
             "training_type": "tc",
             "focus": "",
+            "community_engagement": (i % 16 == 0),
             "team_values": team_values,
             "players": players,
         })
@@ -285,6 +286,7 @@ def build_docs() -> list[dict]:
         docs.append({
             "training_type": "regular",
             "focus": "",
+            "community_engagement": ((50 + i) % 16 == 0),
             "team_values": team_values,
             "players": players,
         })

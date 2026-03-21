@@ -88,6 +88,106 @@
   background: #247a24;
 }
 
+.projected-starting-five-section {
+  margin-bottom: 28px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.projected-starting-five-section h2 {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 1.8rem;
+  color: #4a90e2;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.scouting-projected-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scouting-projected-header h2 {
+  margin: 0;
+}
+
+.scouting-projected-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.scouting-projected-toggle .toggle-btn {
+  background: transparent;
+  color: #555;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.scouting-projected-toggle .toggle-btn:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+.scouting-projected-toggle .toggle-btn.active {
+  background: #4a90e2;
+  color: #fff;
+}
+
+.scouting-projected-lineup-wrap {
+  overflow-x: auto;
+}
+
+.scouting-projected-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 0.8rem;
+  min-width: 960px;
+}
+
+.scouting-projected-table thead {
+  background: #333;
+  color: #fff;
+}
+
+.scouting-projected-table th,
+.scouting-projected-table td {
+  padding: 8px 6px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+.scouting-projected-table th:first-child,
+.scouting-projected-table td:first-child,
+.scouting-projected-table th:nth-child(2),
+.scouting-projected-table td:nth-child(2) {
+  text-align: left;
+}
+
+.scouting-projected-table tbody tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+.scouting-projected-empty {
+  color: #666;
+  font-size: 0.95rem;
+  padding: 12px 0;
+}
+
 .play-usage-section {
   margin-top: 40px;
   background: rgba(0, 0, 0, 0.05);

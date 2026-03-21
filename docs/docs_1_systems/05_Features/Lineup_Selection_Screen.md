@@ -80,57 +80,36 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Frontend:**
 - `FrontEnd/static/set-lineup.html` - Page structure
-- `FrontEnd/static/set-lineup.js` - `loadRoster()`, `updateSlotDisplay()`, `renderRoster()`, `updatePlayButton()`
+- `FrontEnd/static/set-lineup.js` - `loadRoster()`, `autosetLineup()` → `POST /api/autoset-lineup`, `updateSlotDisplay()`, `renderRoster()`, `updatePlayButton()`
+- `FrontEnd/static/js/phaser/utils/autosetLineupApi.js` - `generateBothLineupsFromApi()` for sim Q2–Q4 (same endpoint)
 
 **Backend:**
-- `BackEnd/api/api.py` - `/api/game/{gameId}`, `/api/init-game`
+- `BackEnd/api/api.py` - `/api/game/{gameId}`, `/api/init-game`, `POST /api/autoset-lineup`, `GET /roster/...` (includes `team_chemistry` when franchise/tournament context is passed)
 - `BackEnd/api/franchise_routes.py` - `/franchise/roster`
 - `BackEnd/api/tournament_routes.py` - `/tournament/roster`
-- `BackEnd/utils/db_utils.py` - `is_player_eligible_for_lineup()`, `build_lineup_from_mongo()`
+- `BackEnd/utils/db_utils.py` - `is_player_eligible_for_lineup()`, `build_lineup_from_mongo()`, `autoset_lineup_player_ids_from_payload()`, `fill_unified_lineup_gaps()`, `_team_chemistry_pool_sizes()`
+- `BackEnd/main.py` - `_ensure_complete_lineup()` (uses `fill_unified_lineup_gaps` for missing slots)
+- `tests/test_unified_autoset_lineup.py` - pool sizes + payload autoset + waterfall smoke tests
 
 ---
 
 ## Auto-Set Lineup Feature
 
-**Auto-Set Lineup Flow (5 Steps)**
+**Canonical algorithm (all callers)**
 
-1. **Clear Current Lineup** - Remove all players from slots
-2. **Randomize Position Order** - Shuffle positions array
-3. **For Each Position**: Get available players (NG >= 80%, eligible) → Get top 3 by position rating → Randomly pick one
-4. **Update Display** - Update slot displays, re-attach event listeners
-5. **Notify User** - Show toast: "Lineup auto-generated!"
+1. **Eligibility:** `is_player_eligible_for_lineup()` + waterfall (relax NG, then quarter foul limits) until ≥5 players qualify. Fouled out (**F ≥ 5**) always excluded.
+2. **Slot rating:** Prefer `position_ratings[pos]`; else trait average from `POSITION_TRAITS[pos]` in `BackEnd/utils/db_utils.py`.
+3. **Chemistry pools:** Shuffle PG–C order, then for each fill slot **i** (1–5), take the top **N** by slot rating (`N` from table); if **N > 1**, pick uniformly at random among those **N**.
 
-**Long Form Documentation**
+   | Chemistry | Pos 1 | Pos 2 | Pos 3 | Pos 4 | Pos 5 |
+   |-----------|-------|-------|-------|-------|-------|
+   | > 20      | 1     | 1     | 1     | 2     | 2     |
+   | 16–20     | 1     | 1     | 2     | 2     | 2     |
+   | 11–15     | 1     | 2     | 2     | 2     | 2     |
+   | 7–10      | 2     | 2     | 2     | 2     | 3     |
 
-### Overview
+4. **User lineup screen:** `set-lineup.js` clears slots → `POST /api/autoset-lineup` (roster rows + `game_state` + `team_chemistry`) → refresh UI + toast. `team_chemistry` comes from `GET /roster/...` when franchise/tournament query params are used; otherwise **15**.
+5. **Phaser sim (Q2–Q4):** `bootGame.js` → `generateBothLineupsFromApi()` (`autosetLineupApi.js`) — same endpoint; rosters via `fetchTeamRoster()`.
+6. **Computer / in-sim:** `build_lineup_from_mongo()`; **gap-fill** after foul-outs: `fill_unified_lineup_gaps()` via `_ensure_complete_lineup()` in `BackEnd/main.py`.
 
-The Auto-Set Lineup feature automatically generates a starting lineup by selecting players based on position ratings and eligibility criteria.
-
-**Location:** `FrontEnd/static/set-lineup.js` - `autosetLineup()` (lines 565-614)
-
-### Algorithm
-
-1. Clear current lineup
-2. Randomize position order
-3. For each position (in random order):
-   - Filter available players (not assigned, NG >= 80%, eligible)
-   - Get players with position ratings, sorted desc
-   - Take top 3 candidates
-   - Randomly pick one
-4. Update displays and re-attach event listeners
-5. Show notification
-
-**Selection Criteria:**
-- **Fouled Out**: 5+ fouls always excluded
-- **Energy**: NG >= 80% (default) or >= 64% (late Q4/OT) - Auto-Set only
-- **Foul Restrictions**: Quarter-specific restrictions (Q1 >1, Q2 >2, Q3 >3, Q4 >3 if >4min) - Auto-Set only
-- **Position Rating**: Only considers players with rating for target position
-- **Selection**: Top 3 rated players, random pick (adds variety)
-- **Not Already Assigned**: Players can't be assigned to multiple positions
-
-**Result:** Lineup auto-generated with top-rated eligible players at each position.
-
-### Key Files
-
-**Frontend:**
-- `FrontEnd/static/set-lineup.js` - `autosetLineup()` (lines 565-614)
+**Partial lineup repair:** When only some slots are empty, pool sizes **N₁, N₂, …** apply to the shuffled **missing** positions only (filled slots are left unchanged).
