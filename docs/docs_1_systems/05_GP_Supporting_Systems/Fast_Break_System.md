@@ -2,7 +2,7 @@
 
 **Base Constants**
 
-1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` (defender must be within ±6 y-coords of outlet receiver to force stop)
+1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` for **steal → fast break** (defender must be within ±6 y of outlet receiver to force stop). **`DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8`** for **DREB → outlet** fast breaks (Covert Release; wider band than steals).
 2. **Ball Handler Movement (Defensive Stop/Shot)**: X: 5-10 spots toward basket, Y: ±3 spots
 3. **Stopper Positioning**: 1-3 spots in front of ball handler (defensive stop)
 4. **Defender Positioning (Shot)**: Defender 1 x-coord toward basket from shooter (home offense: shooter x + 1; away offense: shooter x − 1); Y: ±2 of shooter
@@ -23,7 +23,7 @@
 3. **Determine Entry Type and Set Roles**
    - **DREB Entry**: 
      - Outlet passer = rebounder (from `game_state["last_rebounder"]`)
-     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF
+     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF. **Release selection** (Covert Release): on each shot, defense may release one defender per `DEFENSE_RELEASE_CHANCES` × `fast_breaks` (0–4); the releaser is the defender **farthest from the rim in x** among those **not** guarding the shooter (zone assignment at shot step, else man matchup). **IQ read (outlet)**: roll `the_read` 1–100; **good release** if `the_read <` release player IQ (drives tighter outlet coords in `BackEnd/engine/covert_release.py`). **Get-back IQ read**: one roll `d_read`; each get-back player uses **good D** if `d_read <` that player’s IQ.
      - Calculate outlet pass score: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100
    - **Steal Entry**:
      - Ball handler = stealer (from `game_state["last_stealer"]`)
@@ -46,13 +46,13 @@
      - **X-Coordinate Check (Ahead)**: 
        - Home offense: `defender_x >= ball_handler_x` (basket at x=90)
        - Away offense: `defender_x <= ball_handler_x` (basket at x=10)
-     - **Y-Coordinate Check (Within Range)**: `|defender_y - ball_handler_y| <= 6`
+     - **Y-Coordinate Check (Within Range)**: `|defender_y - ball_handler_y| <= 6` (steal entry) or `<= 8` (DREB/outlet entry)
    - Track closest stopping defender (x-distance only) and **closest defender overall among get-back players only** (Euclidean distance; only defenders in `offense_getback` from most recent shot are eligible for shot defender)
 
 6. **Determine Event Type**
    - **0 Defenders**: Always `SHOT`
    - **Defender Ahead AND Within Y-Range**: Skill check between ball handler and defender
-     - **Geography Check**: Defender must be ahead AND within ±6 y-coords (determines if stop attempt is possible)
+     - **Geography Check**: Defender must be ahead AND within y-range (**±6** steal, **±8** DREB/outlet) (determines if stop attempt is possible)
      - **Skill Check** (if geography check passes):
        - `break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * random(1-6)`
        - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
@@ -97,7 +97,7 @@
 The **Fast Break** system handles transition offense situations that occur after defensive rebounds or steals. The system determines whether a fast break results in a defensive stop or a shot attempt based on defender positioning relative to the ball handler after the outlet pass.
 
 **Key Functions:**
-- `FastBreakTrigger.can_trigger_from_dreb()` - Determines if fast break should trigger from DREB in `BackEnd/engine/fast_break_trigger.py`
+- **DREB outlet**: Release chance + Covert Release selection + coords in `shot_manager` / `BackEnd/engine/covert_release.py` (`FastBreakTrigger.DEFENSE_RELEASE_CHANCES`; `can_trigger_from_dreb()` is a **legacy** PG/SG helper, not the live DREB path)
 - `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py`
 - `capture_fast_break_animation()` - Builds animation packet in `BackEnd/models/animator.py`
 - `runFastBreakSequence()` - Orchestrates fast break animation in `FrontEnd/static/js/phaser/animation/fastBreak.js`
@@ -105,10 +105,9 @@ The **Fast Break** system handles transition offense situations that occur after
 ### When Fast Break Activates
 
 **Trigger Conditions:**
-- After defensive rebounds when `defense_releases = True` (defensive players release for fast break)
-- After steals with fast break chance
+- After defensive rebounds when the defense rolls a release per `fast_breaks` and Covert Release assigns a releaser (see `covert_release.py`)
+- After steals with fast break chance (`FastBreakTrigger.can_trigger_from_steal()`)
 - Set via `next_play_type = "FAST_BREAK"` in turn result
-- Determined by `FastBreakTrigger.can_trigger_from_dreb()` for DREB or `FastBreakTrigger.can_trigger_from_steal()` for steals (in `BackEnd/engine/fast_break_trigger.py`)
 
 **State Flow:**
 1. DREB or STEAL → Fast break chance determined
@@ -121,13 +120,13 @@ The **Fast Break** system handles transition offense situations that occur after
 Fast breaks can result in:
 
 1. **Defensive Stop (DEFENSIVE_STOP)**
-   - Defender is ahead of ball handler after outlet pass AND within ±6 y-coords
+   - Defender is ahead of ball handler after outlet pass AND within y-range (**±6** steal, **±8** DREB/outlet)
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
    - Closest defender ahead becomes "stopper" and is placed 1-3 spots in front of ball handler
    - Routes to: HCO (half court offense)
 
 2. **Shot Attempt (SHOT)**
-   - No defender ahead of ball handler after outlet pass OR defender not within ±6 y-coords
+   - No defender ahead of ball handler after outlet pass OR defender not within the applicable y-range (±6 vs ±8)
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
    - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender (or, if ball handler beat a stopper, closest get-back **excluding that stopper**). If 0 or 3+ get-back, or only get-back was the failed stopper, no shot defender. When present, defender is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter.
    - Routes to: Standard shot resolution flow (MAKE, MISS, or **BLOCK** — block reconciliation can run on attack shots; see Block System)
@@ -169,12 +168,12 @@ When a Fast Break shot is **blocked** (block reconciliation in `shot_manager.res
 - Backend calculations always use HOME orientation for consistency
 
 **Outlet Receiver (Ball Handler) Starting Coordinates:**
-- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player)
+- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player). Sampled in **`covert_release.sample_release_coords(good_release, will_be_home_fb_offense)`** (HOME orientation; **x** mirrored when the future fast-break offense team is away).
 - **Priority 2**: `offense_getback_coords` from most recent MISS/MAKE turn (if ball handler was a get-back player)
 - **Fallback**: `player.coords` (current position on court)
 
 **Get-Back Defender Coordinates:**
-- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only
+- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only — from **`covert_release.sample_getback_coords(good_d, will_be_home_fb_offense)`** per get-back player
 - Only defenders who were actually get-back players in the turn that triggered the fast break
 - **Fallback**: `defender.coords` (current position on court)
 
@@ -182,15 +181,15 @@ When a Fast Break shot is **blocked** (block reconciliation in `shot_manager.res
 ```
 Outlet Receiver: x=55, y=23 (from defense_release_coords)
 Get-Back Defender: x=57, y=34 (from offense_getback_coords)
-Y Difference: |34 - 23| = 11 (exceeds ±6 range)
+Y Difference: |34 - 23| = 11 (exceeds ±6 steal band and ±8 DREB/outlet band)
 Result: SHOT (defender is ahead in x but NOT within y-range)
 Note: Even though defender at x=57 is ahead of ball handler at x=55, they are 11 y-coords 
-away, which exceeds the ±6 requirement, so it becomes a shot attempt instead of defensive stop.
+away, so it becomes a shot attempt instead of defensive stop.
 
 Another Example:
 Outlet Receiver: x=55, y=23 (from defense_release_coords)
 Get-Back Defender: x=57, y=25 (from offense_getback_coords)
-Y Difference: |25 - 23| = 2 (within ±6 range)
+Y Difference: |25 - 23| = 2 (within ±6 and ±8 y-bands)
 Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 2)
 ```
 
@@ -201,14 +200,14 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 **Home Offense:**
 - Basket at x=90 (larger x is closer to basket)
 - Defender ahead if: `defender_x >= ball_handler_x`
-- **Defender must also be within ±6 y-coords of outlet receiver**
+- **Defender must also be within y-range of outlet receiver** (±6 steal, ±8 DREB/outlet — see `defensive_stop_y_range` in `resolve_fast_break_logic`)
 - If defender ahead AND within y-range → DEFENSIVE_STOP
 - Otherwise → SHOT
 
 **Away Offense:**
 - Basket at x=10 (smaller x is closer to basket)
 - Defender ahead if: `defender_x <= ball_handler_x`
-- **Defender must also be within ±6 y-coords of outlet receiver**
+- **Same y-range rule** (±6 vs ±8 by entry type)
 - If defender ahead AND within y-range → DEFENSIVE_STOP
 - Otherwise → SHOT
 
@@ -472,16 +471,17 @@ The outlet passer tracks:
 ### Key Files
 
 - `BackEnd/engine/fast_break_trigger.py`
-  - `FastBreakTrigger` - Class for determining fast break triggers
-  - `can_trigger_from_dreb()` - Determines if fast break should trigger from defensive rebound
-  - `can_trigger_from_steal()` - Determines if fast break should trigger from steal (for future use)
+  - `FastBreakTrigger` - `DEFENSE_RELEASE_CHANCES` by `fast_breaks` (0–4); steal trigger helper
+  - `can_trigger_from_dreb()` - Legacy PG/SG release tuple (live DREB uses Covert Release in `shot_manager`)
+  - `can_trigger_from_steal()` - Steal → fast break chance
+- `BackEnd/engine/covert_release.py`
+  - Covert Release: defender farthest from rim (excluding shooter’s matchup), outlet/get-back coord bands, HOME orientation + x mirror for away FB offense
 - `BackEnd/engine/phase_resolution.py`
   - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt
   - Uses coordinate comparison in HOME orientation
   - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
 - `BackEnd/models/shot_manager.py`
-  - `_calculate_getback_coordinates()` - Calculates get-back player coordinates
-  - `_calculate_release_coordinates()` - Calculates release player coordinates
+  - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` - Delegates to `covert_release` for DREB/outlet positioning
   - Stores `offense_getback_coords` and `defense_release_coords` in turn results
 - `BackEnd/models/animator.py`
   - `capture_fast_break_animation()` - Builds animation packet

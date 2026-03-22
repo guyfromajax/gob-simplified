@@ -38,7 +38,8 @@ SHOT_ATTEMPT_REBOUNDER_Y_RANGE = 10  # ±10 y-coords from rim (shot attempt)
 OUTLET_PASSER_MOVE_X = 7  # Moves forward 7 x-coords toward basket (+7 for home, -7 for away)
 
 # Defensive Stop Determination
-DEFENSIVE_STOP_Y_RANGE = 6  # Defender must be within ±6 y-coords of outlet receiver to force stop
+DEFENSIVE_STOP_Y_RANGE = 6  # Steal → FB: defender must be within ±6 y of outlet receiver to force stop
+DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8  # DREB → outlet FB: ±8 y (Covert Release; see Fast_Break_System.md)
 
 # Steal Entry Movement (Steal → Fast Break)
 STEAL_ENTRY_MOVE_X_MIN = 5  # Minimum x movement toward basket

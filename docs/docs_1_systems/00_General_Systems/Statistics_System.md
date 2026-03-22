@@ -69,7 +69,7 @@ The Statistics System tracks comprehensive player-level and team-level statistic
     - **Set Plays:** Passer identified during `assign_roles()` via `derive_roles_from_steps()` function
     - **Motion Plays:** Passer re-derived after `resolve_motion_offense_shot()` modifies skeleton and adds pass/receive steps (uses same `derive_passer_from_steps()` logic)
     - **Location:** `BackEnd/models/turn_manager.py` - `derive_passer_from_steps()` method, called from `BackEnd/engine/phase_resolution.py` for Motion plays
-- **PIP** (Points in Paint): Incremented for shooter when shot is made from paint (amount = points scored)
+- **PIP** (Points in Paint): Incremented for shooter when a **non-fast-break** shot is made from the paint (amount = points scored). Fast-break field goals are **not** counted toward PIP; they are tracked under **FB_PTS** instead. Implementation: `pip_stat_eligible = is_paint and not is_fast_break` in `BackEnd/models/shot_manager.py` (`resolve_shot`).
 - **TO** (Turnovers): Incremented for ball handler on dead ball turnovers
 - **F** (Fouls): Incremented for foul player (offensive or defensive)
 - **BLK** (Blocks): Incremented for defender when shot is blocked
@@ -232,7 +232,7 @@ The Statistics System tracks comprehensive player-level and team-level statistic
   - Dead Ball Turnover (`DEAD BALL`), or
   - Offensive Foul (`FOUL` where `foul_team == "OFFENSE"`)
 - **`FB_N`** (Fast Break Neutral): Calculated as `FB_A - (FB_S + FB_F)`
-- **Standard Stats**: FGA, FGM, 3PTM, PTS, FB_PTS (fast break points), AST (if assist on made shot)
+- **Standard Stats**: FGA, FGM, 3PTM, PTS, **FB_PTS** (fast break points only—does not add to PIP), AST (if assist on made shot)
 
 **Defensive Stats (Get-Back Players):**
 - **`FB_A_D`** (Fast Break Attempts Defense): Always incremented when player is a get-back defender on a Fast Break

@@ -22,6 +22,10 @@ class FastBreakTrigger:
         def_team_lineup: dict
     ) -> Tuple[bool, List[str], List[str]]:
         """
+        Legacy helper (PG/SG release). **DREB → outlet FB in production uses Covert Release**
+        in ``shot_manager`` (``BackEnd/engine/covert_release.py``) + ``DEFENSE_RELEASE_CHANCES``.
+        Kept for tests or callers that still expect the old tuple shape.
+        
         Determine if a fast break can be triggered from a defensive rebound.
         
         Args:

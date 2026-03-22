@@ -530,6 +530,7 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_X_MAX,
     BALL_HANDLER_MOVE_Y_RANGE,
     DEFENSIVE_STOP_Y_RANGE,
+    DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET,
     STEAL_ENTRY_MOVE_X_MIN,
     STEAL_ENTRY_MOVE_X_MAX,
     STEAL_ENTRY_MOVE_Y_RANGE,
@@ -793,6 +794,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     }
     
     rebound = game_state.get("last_rebound") == "DREB"
+    # Wider y-band for DREB/outlet breaks (Covert Release); steals keep ±6
+    defensive_stop_y_range = (
+        DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
+    )
 
     if rebound:
         #resetting last_rebound to avoid carry over bugs
@@ -1166,7 +1171,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Coordinates are stored in HOME orientation, so we compare directly in HOME orientation
         # For away offense: basket is at x=10, smaller x is closer → defender ahead if x <= ball handler x
         # For home offense: basket is at x=90, larger x is closer → defender ahead if x >= ball handler x
-        # ✅ NEW: Defender must also be within ±6 y-coords to force defensive stop
+        # ✅ Defender must also be within y-range (±6 steal, ±8 DREB/outlet) to force defensive stop
         
         # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Defender comparison for {defender_id}:")
         # logging.debug(f"  defender_actual_x (start, HOME): {defender_actual_x}")
@@ -1201,10 +1206,10 @@ def resolve_fast_break_logic(game: "GameManager"):
             is_ahead = defender_outlet_x >= ball_handler_outlet_x
             # logging.debug(f"  X Comparison (HOME orientation, home offense): {defender_outlet_x} >= {ball_handler_outlet_x} = {is_ahead}")
         
-        # ✅ NEW: Check if defender is within ±6 y-coords of outlet receiver
+        # ✅ Check if defender is within y-range of outlet receiver (see defensive_stop_y_range)
         y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
-        is_within_y_range = y_diff <= DEFENSIVE_STOP_Y_RANGE
-        # logging.debug(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= 6 = {is_within_y_range}")
+        is_within_y_range = y_diff <= defensive_stop_y_range
+        # logging.debug(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= {defensive_stop_y_range} = {is_within_y_range}")
         
         # Defender can force defensive stop if: ahead AND within y-range
         if is_ahead and is_within_y_range:

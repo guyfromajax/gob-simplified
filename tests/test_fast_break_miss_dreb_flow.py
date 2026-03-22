@@ -43,11 +43,10 @@ def simulate_full_flow(game, num_getback_defenders=1, shooting_team_is_home=True
         game.offense_team = game.away_team
         game.defense_team = game.home_team
     
-        # Set high tempo for defense to trigger release player (required for Fast Break)
-        game.defense_team.strategy_settings["tempo"] = 4  # 100% release chance
-        game.defense_team.strategy_settings["aggression"] = 0  # Lowest aggression = minimal fouls
-        # Set rebounding to any value (we'll override the get-back list directly)
-        game.offense_team.strategy_settings["rebounding"] = 2
+    # Covert Release uses fast_breaks (0–4) → DEFENSE_RELEASE_CHANCES; 4 = 100% release roll
+    game.defense_team.strategy_settings["fast_breaks"] = 4
+    game.defense_team.strategy_settings["aggression"] = 0  # Lowest aggression = minimal fouls
+    game.offense_team.strategy_settings["rebounding"] = 2
     
     # Mock random values to force specific outcomes
     with patch('BackEnd.models.shot_manager.ShotManager.check_defensive_foul_on_shot') as mock_foul_check:
@@ -55,7 +54,7 @@ def simulate_full_flow(game, num_getback_defenders=1, shooting_team_is_home=True
         
         with patch('BackEnd.models.shot_manager.random.random') as mock_random:
             # Random sequence for HCO turn:
-            # 1. defense_releases check (tempo=4 means 100% chance, but still need random < 1.0)
+            # 1. defense_releases check (fast_breaks=4 → 100% release)
             # 2. offense_getback check (we'll override the result anyway)
             # 3. shot make/miss (we want miss)
             # 4. block check
@@ -68,23 +67,24 @@ def simulate_full_flow(game, num_getback_defenders=1, shooting_team_is_home=True
                 0.3,   # rebound team selection (30% < d_weight ~0.7 = DREB)
             ]
             
-            # Mock random.randint for get-back coordinate calculation
-            with patch('BackEnd.models.shot_manager.random.randint') as mock_randint:
-                def randint_side_effect(a, b):
-                    if a == 40 and b == 55:  # Home offense get-back X (low IQ)
-                        return 50
-                    elif a == 45 and b == 60:  # Away offense get-back X (low IQ)
-                        return 52
-                    elif a == 45 and b == 55:  # High IQ get-back X
-                        return 50
-                    elif a == 14 and b == 36:  # Get-back Y
-                        return 25
-                    else:
-                        return (a + b) // 2  # Default to middle
-                mock_randint.side_effect = randint_side_effect
-                
+            # Covert Release coords use covert_release.randint; IQ rolls use shot_manager.randint(1,100)
+            with patch('BackEnd.engine.covert_release.random.randint') as mock_cr_randint, patch(
+                'BackEnd.models.shot_manager.random.randint'
+            ) as mock_sm_randint:
+
+                def cr_randint(a, b):
+                    return (a + b) // 2  # Deterministic midpoint for coord bands
+
+                def sm_randint(a, b):
+                    if a == 1 and b == 100:
+                        return 1  # Favor successful IQ reads vs typical player IQ
+                    return (a + b) // 2
+
+                mock_cr_randint.side_effect = cr_randint
+                mock_sm_randint.side_effect = sm_randint
+
                 mock_random.side_effect = hco_random_sequence
-                
+
                 # Run HCO turn
                 hco_result = game.turn_manager.run_micro_turn()
                 
@@ -126,7 +126,7 @@ def simulate_full_flow(game, num_getback_defenders=1, shooting_team_is_home=True
                             if player_id:
                                 # Use same coordinate calculation as the real code
                                 coords = shot_manager._calculate_getback_coordinates(
-                                    player, game.offense_team, game.defense_team
+                                    player, game.offense_team, game.defense_team, good_d=True
                                 )
                                 offense_getback_coords[player_id] = coords
                     hco_result["offense_getback_coords"] = offense_getback_coords
@@ -146,7 +146,7 @@ def simulate_full_flow(game, num_getback_defenders=1, shooting_team_is_home=True
                         from BackEnd.models.shot_manager import ShotManager
                         shot_manager = ShotManager(game)
                         release_coords = shot_manager._calculate_release_coordinates(
-                            release_player, game.offense_team, game.defense_team
+                            release_player, game.offense_team, game.defense_team, good_release=True
                         )
                         hco_result["defense_release_coords"] = {release_player_id: release_coords}
                         # ✅ CRITICAL: Update release player's coords so Fast Break logic can find them

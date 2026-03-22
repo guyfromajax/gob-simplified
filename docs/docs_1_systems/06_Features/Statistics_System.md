@@ -16,3 +16,9 @@
    - We **do not** call `record_stat` again in turn_manager; the stat is recorded only once in shared.py on the canonical player, avoiding double-count.
 
 Result: OREB/DREB are recorded on the same roster instance used for deltas and persistence, so putback-miss rebounds are always reflected in stats.
+
+---
+
+## PIP vs fast break points
+
+**PIP** (Points in Paint) does **not** include fast-break field goals; those increment **FB_PTS** only. See `docs/docs_1_systems/00_General_Systems/Statistics_System.md` (PIP and Fast Break sections) and `BackEnd/models/shot_manager.py` (`pip_stat_eligible`).
