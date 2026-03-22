@@ -433,11 +433,7 @@ The release player (outlet receiver) tracks:
   - Shot Make
   - Defensive Foul (non-shooting)
   - **Note**: Shot Miss (without defensive foul) does NOT count as success (matches team-level criteria)
-- **`FB_F`** (Fast Break Failure): Incremented when Fast Break results in:
-  - Steal
-  - Dead Ball Turnover
-  - Offensive Foul
-- **`FB_N`** (Fast Break Neutral): Calculated as `FB_A - (FB_S + FB_F)`
+- **`FB_F` / `FB_N`**: Retired — not tracked; use **S / A / %** from **`FB_S`** / **`FB_A`**.
 
 **Defensive Stats (Get-Back Players):**
 
@@ -479,18 +475,20 @@ The outlet passer tracks:
 - Stats are recorded in both `run_micro_turn()` and `resolve_offensive_rebound_turn()` paths
 
 **Team Stats (Scouting Data):**
-- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break
+- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break (in parallel with per-play **`A`** below)
 - **`Fast_Break_Success`** (Offense): Incremented only when Fast Break result_type is:
   - `MAKE`, or
   - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
   - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
+- **`fast_break_plays`** (Offense): Per-play **`A`** / **`S`** for `covert_release`, `rim_runner`, `thirty_two`, `after_steal` (see `BackEnd/constants/fast_break_play_types.py`). DREB outlet (incl. fallback outlet) → **`covert_release`**; steal entry → **`after_steal`**. Same success rules as **`Fast_Break_Success`**, applied to the active play bucket. **`rim_runner`** / **`thirty_two`** reserved until those plays ship.
+- Turn payloads include **`fast_break_play`** for the active bucket.
 - **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
 - **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
   - `DEFENSIVE_STOP`, or
   - `MISS`, or
   - `TURNOVER`, or
   - `FOUL` where `foul_team == "OFFENSE"`
-- **Alignment with player stats:** Player `FB_S` now matches team `Fast_Break_Success` (only `MAKE` or defensive foul). A `MISS` without defensive foul is neutral (`FB_N`) for players and not a success for the team.
+- **Alignment with player stats:** Player **`FB_S`** matches team **`Fast_Break_Success`** (only `MAKE` or defensive foul). A `MISS` without defensive foul is not a success for the team or player **`FB_S`**.
 
 **Special Handling:**
 - **`Outlet_Score_List`**: Excluded from stat delta calculations (it's a list, not numeric)
@@ -500,8 +498,8 @@ The outlet passer tracks:
 **Box Score Display:**
 - Fast Break stats are available in the Box Score page
 - Clicking a player's name opens a popup showing:
-  - Fast Breaks: Offense (Attempts / Success Rate), Defense (Attempts / Success Rate)
-  - Outlet Passes: Att / Score (average of `Outlet_Score_List`)
+  - Fast Breaks: Offense and Defense as **S / A / %** (with hint row); Outlet Passes: Att / Score
+- Scouting-notes per-play FB lines (separate UI work) use **`fast_break_plays`** in scouting data
 
 ### Key Files
 
@@ -511,8 +509,9 @@ The outlet passer tracks:
   - `can_trigger_from_steal()` - Steal → fast break chance
 - `BackEnd/engine/covert_release.py`
   - Covert Release: defender farthest from rim (excluding shooter’s matchup); **AG**-based x floors + **IQ** (`good_release` / `good_d_release`) y/x bands; HOME orientation + **x** mirror for away FB offense
+- `BackEnd/constants/fast_break_play_types.py` — Play keys, `default_fast_break_plays()`, `ensure_fast_break_plays()`, `play_key_for_fast_break_entry()`
 - `BackEnd/engine/phase_resolution.py`
-  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt
+  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt; increments **`fast_break_plays`** and sets **`fast_break_play`**
   - Uses coordinate comparison in HOME orientation
   - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
 - `BackEnd/models/shot_manager.py`

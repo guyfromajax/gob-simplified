@@ -16,7 +16,7 @@ BOX_SCORE_KEYS = [
     "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S",
     # Fast Break stats
     "Outlet_A", "Outlet_S", "Outlet_Score", "Outlet_Score_List", "Outlet_Score_Cum",
-    "FB_A", "FB_S", "FB_F", "FB_N",
+    "FB_A", "FB_S",
     "FB_A_D", "FB_S_D", "FB_F_D",
     # FCP/HCT stats
     "HCT_A", "HCT_S", "HCT_A_D", "HCT_S_D",

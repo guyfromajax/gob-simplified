@@ -564,15 +564,12 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
     # Determine success/failure criteria (aligned with team-level Fast_Break_Success)
     # FB_S (offense): Shot Make, Defensive Foul (non-shooting)
     # Note: MISS does NOT count as success (matches team-level criteria)
-    # FB_F (offense): Steal, Dead Ball Turnover, Offensive Foul
+    # Offensive FB_F / FB_N retired — only FB_A and FB_S tracked for offense
     # FB_S_D (defense): DEFENSIVE_STOP
     # FB_F_D (defense): Shot Make, Shot Miss, Defensive Foul (any shot attempt or defensive foul)
     
     is_fb_s_offense = result_type == "MAKE" or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
-    )
-    is_fb_f_offense = result_type in ["TURNOVER", "STEAL", "DEAD BALL"] or (
-        result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     is_fb_s_defense = result_type == "DEFENSIVE_STOP"
     is_fb_f_defense = result_type in ["MAKE", "MISS", "BLOCK"] or (
@@ -602,13 +599,8 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
     if offensive_player:
         # Always increment FB_A (Fast Break Attempt)
         offensive_player.record_stat("FB_A", 1)
-        
-        # Increment FB_S or FB_F based on result
         if is_fb_s_offense:
             offensive_player.record_stat("FB_S", 1)
-        elif is_fb_f_offense:
-            offensive_player.record_stat("FB_F", 1)
-        # FB_N is calculated: FB_A - (FB_S + FB_F)
     
     # Track stats for get-back players - DEFENSIVE stats
     # ✅ SS&S FIX: For DREB-initiated Fast Breaks, use getback_player_ids
@@ -780,8 +772,19 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # ✅ NOTE: Bench recharge does NOT happen during Fast Break turns (only during HCO turns)
     
+    # DREB outlet → covert_release (incl. fallback outlet); steal entry → after_steal
+    rebound = game_state.get("last_rebound") == "DREB"
+    from BackEnd.constants.fast_break_play_types import (
+        ensure_fast_break_plays,
+        play_key_for_fast_break_entry,
+    )
+
+    fb_play_key = play_key_for_fast_break_entry(rebound)
+
     off_scouting = off_team.scouting_data
     def_scouting = def_team.scouting_data
+    fb_plays = ensure_fast_break_plays(off_scouting["offense"])
+    fb_plays[fb_play_key]["A"] += 1
     off_scouting["offense"]["Fast_Break_Entries"] += 1
     def_scouting["defense"]["vs_Fast_Break"]["used"] += 1
 
@@ -791,9 +794,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         "ball_handler": None,
         "outlet_passer": None,
         "outlet_receiver": None,
+        "fast_break_play": fb_play_key,
     }
-    
-    rebound = game_state.get("last_rebound") == "DREB"
     # Wider y-band for DREB/outlet breaks (Covert Release); steals keep ±6
     defensive_stop_y_range = (
         DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
@@ -1431,6 +1433,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             "offense_team_id": off_team.team_id,  # ✅ FIX: Add offense_team_id (possession doesn't flip, same team continues)
             "roles": fb_roles,  # ✅ Include roles so frontend can animate outlet pass
             "fast_break": True,  # Legacy flag for backwards compatibility
+            "fast_break_play": fb_play_key,
         }
         
         # 🏀 [FAST BREAK RESULT] One-line debug for animation tuning (ball_handler end = where they are when turn ends)
@@ -1572,10 +1575,12 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     if turn_result["result_type"] == "MAKE": #def_scouting
         off_scouting["offense"]["Fast_Break_Success"] += 1
+        ensure_fast_break_plays(off_scouting["offense"])[fb_play_key]["S"] += 1
 
     elif turn_result["result_type"] == "FOUL":
         if game_state.get("foul_team") == "DEFENSE":
             off_scouting["offense"]["Fast_Break_Success"] += 1
+            ensure_fast_break_plays(off_scouting["offense"])[fb_play_key]["S"] += 1
         elif game_state.get("foul_team") == "OFFENSE":
             def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
@@ -1654,6 +1659,8 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # Prepend "Fast Break!" to the text
     turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
+
+    turn_result["fast_break_play"] = fb_play_key
 
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"

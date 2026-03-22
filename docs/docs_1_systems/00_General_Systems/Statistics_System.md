@@ -4,14 +4,13 @@
 
 1. **Stat Categories**:
    - **Standard Basketball Stats**: FGM, FGA, 3PTM, 3PTA, FTM, FTA, PTS, REB, OREB, DREB, AST, STL, BLK, TO, F, PIP, MIN
-   - **Special Situational Stats**: Fast Break (FB_A, FB_S, FB_F, FB_N, FB_A_D, FB_S_D, FB_F_D), FCP/HCT (FCP_A, FCP_S, FCP_A_D, FCP_S_D, HCT_A, HCT_S, HCT_A_D, HCT_S_D), Outlet Pass (Outlet_A, Outlet_S, Outlet_Score, Outlet_Score_List, Outlet_Score_Cum), Defensive Attempts/Success (DEF_A, DEF_S), Screen Attempts/Success (SCR_A, SCR_S), Help Defense (HELP_D)
+   - **Special Situational Stats**: Fast Break (FB_A, FB_S, FB_A_D, FB_S_D, FB_F_D), FCP/HCT (FCP_A, FCP_S, FCP_A_D, FCP_S_D, HCT_A, HCT_S, HCT_A_D, HCT_S_D), Outlet Pass (Outlet_A, Outlet_S, Outlet_Score, Outlet_Score_List, Outlet_Score_Cum), Defensive Attempts/Success (DEF_A, DEF_S), Screen Attempts/Success (SCR_A, SCR_S), Help Defense (HELP_D)
    - **Team-Level Stats**: Scouting data (offense/defense success rates), team totals, team-level situational stats
 
 2. **Stat Calculation Formulas**:
    - **PTS**: `(2 * FGM) + 3PTM + FTM` (auto-calculated)
    - **REB**: `OREB + DREB` (auto-calculated)
    - **Outlet_Score**: Average of `Outlet_Score_List` (auto-calculated)
-   - **FB_N**: `FB_A - (FB_S + FB_F)` (auto-calculated)
 
 3. **Stat Initialization**:
    - All stats initialized to `0` at game start (except `Outlet_Score_List` which is initialized as empty array `[]`)
@@ -21,7 +20,7 @@
 
 1. **Stat Initialization** - All stats set to `0` (or `[]` for lists) at game start for all players
 2. **Real-Time Tracking** - Stats incremented during gameplay via `player.record_stat()` calls
-3. **Auto-Calculation** - PTS, REB, Outlet_Score, FB_N calculated automatically when component stats change
+3. **Auto-Calculation** - PTS, REB, Outlet_Score calculated automatically when component stats change
 4. **Stat Aggregation** - Team totals calculated by summing all player stats from roster
 5. **Stat Persistence** - Game stats stored in game document, season/career stats aggregated at game end
 
@@ -48,7 +47,6 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **PTS**: Automatically calculated as `(2 * FGM) + 3PTM + FTM` when FGM, 3PTM, or FTM are recorded
 - **REB**: Automatically calculated as `OREB + DREB` when OREB or DREB are recorded
 - **Outlet_Score**: Automatically calculated as average of `Outlet_Score_List` when new scores are added
-- **FB_N**: Automatically calculated as `FB_A - (FB_S + FB_F)`
 
 ### HCO (Half Court Offense) Stat Tracking
 
@@ -227,11 +225,7 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **`FB_S`** (Fast Break Success): Incremented when Fast Break results in:
   - Shot Make (`MAKE`), or
   - Defensive Foul (non-shooting) (`FOUL` where `foul_team == "DEFENSE"`)
-- **`FB_F`** (Fast Break Failure): Incremented when Fast Break results in:
-  - Steal (`STEAL`), or
-  - Dead Ball Turnover (`DEAD BALL`), or
-  - Offensive Foul (`FOUL` where `foul_team == "OFFENSE"`)
-- **`FB_N`** (Fast Break Neutral): Calculated as `FB_A - (FB_S + FB_F)`
+- **Retired**: **`FB_F`** / **`FB_N`** are no longer tracked; situational display uses **S / A / %** from **`FB_S`** and **`FB_A`** only.
 - **Standard Stats**: FGA, FGM, 3PTM, PTS, **FB_PTS** (fast break points only—does not add to PIP), AST (if assist on made shot)
 
 **Defensive Stats (Get-Back Players):**
@@ -258,11 +252,12 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **Scaling Function**: `scale_score_to_100()` in `BackEnd/utils/shared.py` (universal helper for all attribute-based scores)
 
 **Team-Level Stats (Scouting Data):**
-- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break
+- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break (same total as sum of **`fast_break_plays[*].A`**)
 - **`Fast_Break_Success`** (Offense): Incremented only when Fast Break result_type is:
   - `MAKE`, or
   - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
   - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
+- **`fast_break_plays`** (Offense): Per-play **attempts (`A`)** and **successes (`S`)** for `covert_release`, `rim_runner`, `thirty_two`, `after_steal`; same success rules as **`Fast_Break_Success`**, applied to the play bucket for that possession. **`Fast_Break_Entries`** / **`Fast_Break_Success`** are incremented in parallel (both aggregate and per-play rows). Defense has **no** per-play FB scouting.
 - **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
 - **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
   - `DEFENSIVE_STOP`, or
@@ -381,7 +376,7 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 **Steals:**
 - **STL** (Steals): Incremented for defender who steals the ball
 - **TO** (Turnovers): Incremented for ball handler (victim of steal)
-- **Fast Break Stats**: May trigger fast break opportunity, tracking `FB_A`, `FB_S`, `FB_F` for release player and `FB_A_D`, `FB_S_D`, `FB_F_D` for get-back players
+- **Fast Break Stats**: May trigger fast break opportunity, tracking `FB_A`, `FB_S` for release player / ball handler and `FB_A_D`, `FB_S_D`, `FB_F_D` for get-back players
 
 **Turnovers (Dead Ball):**
 - **TO** (Turnovers): Incremented for ball handler
