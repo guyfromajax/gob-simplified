@@ -101,12 +101,52 @@ def select_covert_release_position(
     return random.choice(tied) if tied else None
 
 
-def sample_release_coords(good_release: bool, will_be_home_fb_offense: bool) -> Dict[str, int]:
-    """Covert Release outlet receiver coords (FB_Update_Brief §5, first bullet)."""
+def player_ag(player: Any) -> float:
+    """Athleticism (AG) from player.attributes for Covert Release bands."""
+    attrs = getattr(player, "attributes", None) or {}
+    if not isinstance(attrs, dict):
+        return 0.0
+    try:
+        return float(attrs.get("AG", 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def release_x_min_from_ag(ag: float) -> int:
+    """Outlet receiver (release player) lower x bound in HOME orientation when home team is FB offense."""
+    if ag >= 80:
+        return 50
+    if ag >= 60:
+        return 47
+    return 45
+
+
+def getback_def_x_min_from_ag(ag: float) -> int:
+    """Get-back defender lower x bound in HOME orientation when home team is FB offense."""
+    if ag >= 80:
+        return 55
+    if ag >= 60:
+        return 53
+    return 50
+
+
+def sample_release_coords(
+    good_release: bool, will_be_home_fb_offense: bool, ag: float
+) -> Dict[str, int]:
+    """
+    Covert Release outlet receiver coords (canonical: Fast_Break_System.md — Covert Release).
+
+    Bands use release player AG for x_min; IQ read sets good_release vs tighter/worse x,y bands.
+    """
+    x_min = release_x_min_from_ag(ag)
     if good_release:
-        x_lo, x_hi, y_lo, y_hi = 45, 55, 18, 32
+        x_lo, x_hi = x_min, 55
+        y_lo, y_hi = 18, 32
     else:
-        x_lo, x_hi, y_lo, y_hi = 40, 50, 22, 30
+        x_lo, x_hi = x_min - 5, 50
+        y_lo, y_hi = 22, 30
+    if x_lo > x_hi:
+        x_lo, x_hi = x_hi, x_lo
     x = random.randint(x_lo, x_hi)
     y = random.randint(y_lo, y_hi)
     if not will_be_home_fb_offense:
@@ -114,12 +154,21 @@ def sample_release_coords(good_release: bool, will_be_home_fb_offense: bool) -> 
     return {"x": x, "y": y}
 
 
-def sample_getback_coords(good_d: bool, will_be_home_fb_offense: bool) -> Dict[str, int]:
-    """Covert Release get-back defender coords (FB_Update_Brief §5, second bullet)."""
+def sample_getback_coords(good_d: bool, will_be_home_fb_offense: bool, ag: float) -> Dict[str, int]:
+    """
+    Covert Release get-back defender coords (canonical: Fast_Break_System.md — Covert Release).
+
+    Bands use each get-back player's AG for def_x_min; IQ read sets good_d (good_d_release) vs bands.
+    """
+    def_x_min = getback_def_x_min_from_ag(ag)
     if good_d:
-        x_lo, x_hi, y_lo, y_hi = 53, 60, 22, 30
+        x_lo, x_hi = def_x_min, 60
+        y_lo, y_hi = 22, 30
     else:
-        x_lo, x_hi, y_lo, y_hi = 45, 60, 18, 32
+        x_lo, x_hi = def_x_min - 5, 60
+        y_lo, y_hi = 18, 32
+    if x_lo > x_hi:
+        x_lo, x_hi = x_hi, x_lo
     x = random.randint(x_lo, x_hi)
     y = random.randint(y_lo, y_hi)
     if not will_be_home_fb_offense:

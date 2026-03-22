@@ -1,5 +1,7 @@
 ## Fast Break System ✅ **COMPLETE** (January 2025)
 
+> **Canonical reference (Bible):** This document is the **single source of truth** for sustained Fast Break knowledge—selection logic, coordinates, defensive stops, shot attempts, constants, and file touchpoints. Short-term project notes may live in `docs/To Do/FB_Update_Brief.md`; if something conflicts, **treat this file as authoritative** unless the team explicitly updates both.
+
 **Base Constants**
 
 1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` for **steal → fast break** (defender must be within ±6 y of outlet receiver to force stop). **`DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8`** for **DREB → outlet** fast breaks (Covert Release; wider band than steals).
@@ -23,7 +25,7 @@
 3. **Determine Entry Type and Set Roles**
    - **DREB Entry**: 
      - Outlet passer = rebounder (from `game_state["last_rebounder"]`)
-     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF. **Release selection** (Covert Release): on each shot, defense may release one defender per `DEFENSE_RELEASE_CHANCES` × `fast_breaks` (0–4); the releaser is the defender **farthest from the rim in x** among those **not** guarding the shooter (zone assignment at shot step, else man matchup). **IQ read (outlet)**: roll `the_read` 1–100; **good release** if `the_read <` release player IQ (drives tighter outlet coords in `BackEnd/engine/covert_release.py`). **Get-back IQ read**: one roll `d_read`; each get-back player uses **good D** if `d_read <` that player’s IQ.
+     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF. **Release selection** (Covert Release): on each shot, defense rolls release using `DEFENSE_RELEASE_CHANCES[fast_breaks]` (`fast_breaks` 0–4); if releasing, the releaser is the defender **farthest from the rim in x** among those **not** guarding the shooter (zone assignment at shot step, else man matchup). **IQ reads**: roll `the_read` 1–100 → **good_release** if `the_read <` release player IQ; roll `d_read` 1–100 once → each get-back player gets **good_d_release** if `d_read <` that player’s IQ. **AG**: outlet and get-back **x-band floors** use each player’s **AG** (see **Covert Release** below). Final coords sampled in `covert_release.py` (HOME orientation; mirror **x** when the future FB offense team is away).
      - Calculate outlet pass score: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100
    - **Steal Entry**:
      - Ball handler = stealer (from `game_state["last_stealer"]`)
@@ -167,13 +169,46 @@ When a Fast Break shot is **blocked** (block reconciliation in `shot_manager.res
 - Frontend flips coordinates for away team display
 - Backend calculations always use HOME orientation for consistency
 
+### Covert Release (DREB → outlet only)
+
+Steal-initiated fast breaks **do not** use Covert Release. Play-type naming (e.g. “Covert Release”) applies only to **DREB → outlet** paths.
+
+**Selection (summary)**  
+1. Defender guarding the shooter cannot release.  
+2. Among other defenders, choose the one **farthest from the basket being attacked** in x (HOME): home team shooting → lowest x on defense; away team shooting → highest x on defense; ties → random.  
+3. **`the_read`**, **`d_read`**, **`good_release`**, **`good_d_release` per get-back** — see Step 3 in **Fast Break Resolution Flow** above.
+
+**AG → x floors (HOME, when the fast-break offense team is home)**  
+These set the **lower** end of random x; upper bounds and y come from the IQ bands below.
+
+| Role | AG | Floor label | Value |
+|------|-----|-------------|--------|
+| **Outlet / release player** | AG ≥ 80 | `x_min` | 50 |
+| | 60 ≤ AG < 80 | `x_min` | 47 |
+| | AG < 60 | `x_min` | 45 |
+| **Each get-back player** | AG ≥ 80 | `def_x_min` | 55 |
+| | 60 ≤ AG < 80 | `def_x_min` | 53 |
+| | AG < 60 | `def_x_min` | 50 |
+
+**IQ → random bands (after floors)**  
+Random integer coords; **x** is mirrored with `100 - x` when the **future** fast-break **offense** team is **away** (same as before); **y** is not mirrored.
+
+| Player | Condition | x range (HOME, home FB offense) | y range |
+|--------|-----------|----------------------------------|---------|
+| Release (outlet receiver) | `good_release` | `x_min` – 55 | 18 – 32 |
+| Release | not `good_release` | `(x_min - 5)` – 50 | 22 – 30 |
+| Get-back | `good_d_release` | `def_x_min` – 60 | 22 – 30 |
+| Get-back | not `good_d_release` | `(def_x_min - 5)` – 60 | 18 – 32 |
+
+Implementation: `BackEnd/engine/covert_release.py` — `release_x_min_from_ag`, `getback_def_x_min_from_ag`, `sample_release_coords`, `sample_getback_coords`, `player_ag`.
+
 **Outlet Receiver (Ball Handler) Starting Coordinates:**
-- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player). Sampled in **`covert_release.sample_release_coords(good_release, will_be_home_fb_offense)`** (HOME orientation; **x** mirrored when the future fast-break offense team is away).
+- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player). Sampled via **`covert_release.sample_release_coords(good_release, will_be_home_fb_offense, ag)`** with **release player’s AG**.
 - **Priority 2**: `offense_getback_coords` from most recent MISS/MAKE turn (if ball handler was a get-back player)
 - **Fallback**: `player.coords` (current position on court)
 
 **Get-Back Defender Coordinates:**
-- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only — from **`covert_release.sample_getback_coords(good_d, will_be_home_fb_offense)`** per get-back player
+- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only — **`covert_release.sample_getback_coords(good_d, will_be_home_fb_offense, ag)`** per get-back player (**that player’s AG**)
 - Only defenders who were actually get-back players in the turn that triggered the fast break
 - **Fallback**: `defender.coords` (current position on court)
 
@@ -223,7 +258,7 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 **Skill Check Implementation:**
 - **Two-Step Process**: Geography determines if a stop attempt is possible, then skill check determines the outcome.
-  1. **Geography Check**: Defender must be ahead AND within ±6 y-coords (determines if stop attempt is possible)
+  1. **Geography Check**: Defender must be ahead AND within y-range (**±6** steal, **±8** DREB/outlet — determines if stop attempt is possible)
   2. **Skill Check** (if geography check passes):
      - `break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * random(1-6)`
      - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
@@ -475,13 +510,13 @@ The outlet passer tracks:
   - `can_trigger_from_dreb()` - Legacy PG/SG release tuple (live DREB uses Covert Release in `shot_manager`)
   - `can_trigger_from_steal()` - Steal → fast break chance
 - `BackEnd/engine/covert_release.py`
-  - Covert Release: defender farthest from rim (excluding shooter’s matchup), outlet/get-back coord bands, HOME orientation + x mirror for away FB offense
+  - Covert Release: defender farthest from rim (excluding shooter’s matchup); **AG**-based x floors + **IQ** (`good_release` / `good_d_release`) y/x bands; HOME orientation + **x** mirror for away FB offense
 - `BackEnd/engine/phase_resolution.py`
   - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt
   - Uses coordinate comparison in HOME orientation
   - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
 - `BackEnd/models/shot_manager.py`
-  - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` - Delegates to `covert_release` for DREB/outlet positioning
+  - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` — pass each player’s **AG** into `covert_release` for DREB/outlet positioning
   - Stores `offense_getback_coords` and `defense_release_coords` in turn results
 - `BackEnd/models/animator.py`
   - `capture_fast_break_animation()` - Builds animation packet
@@ -505,7 +540,7 @@ The outlet passer tracks:
 
 ### Future Enhancements
 
-- **More Nuanced Get-Back Logic**: Consider player attributes (speed, IQ) for get-back player selection
+- **Additional play types**: More DREB → outlet play types (beyond Covert Release) may layer on top of this flow; scope and triggers TBD
 - **Fast Break Fouls**: Add foul handling during fast break sequences
 - **Fast Break Turnovers**: Add turnover handling during fast break sequences
 

@@ -55,14 +55,16 @@ class ShotManager:
         from BackEnd.engine import covert_release as cr
 
         will_be_home_fb_offense = def_team.team_id == self.game.home_team.team_id
-        return cr.sample_getback_coords(good_d, will_be_home_fb_offense)
+        ag = cr.player_ag(getback_player) if getback_player else 0.0
+        return cr.sample_getback_coords(good_d, will_be_home_fb_offense, ag)
 
     def _calculate_release_coordinates(self, release_player, off_team, def_team, *, good_release: bool):
         """Covert Release outlet receiver coords (DREB outlet FB). See BackEnd/engine/covert_release.py."""
         from BackEnd.engine import covert_release as cr
 
         will_be_home_fb_offense = def_team.team_id == self.game.home_team.team_id
-        return cr.sample_release_coords(good_release, will_be_home_fb_offense)
+        ag = cr.player_ag(release_player) if release_player else 0.0
+        return cr.sample_release_coords(good_release, will_be_home_fb_offense, ag)
     
     def _get_shooter_position_and_spot(self, shooter, roles):
         """
