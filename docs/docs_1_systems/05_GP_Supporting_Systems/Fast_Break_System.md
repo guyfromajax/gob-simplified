@@ -499,7 +499,7 @@ The outlet passer tracks:
 - Fast Break stats are available in the Box Score page
 - Clicking a player's name opens a popup showing:
   - Fast Breaks: Offense and Defense as **S / A / %** (with hint row); Outlet Passes: Att / Score
-- Scouting-notes per-play FB lines (separate UI work) use **`fast_break_plays`** in scouting data
+- **Scouting Notes** (per team): section **Fast Breaks** appears after **Defense Play Calls**. **Total** row uses aggregate **`Fast_Break_Success` / `Fast_Break_Entries`**; nested rows **Covert Release**, **Rim Runner**, **32**, **After Steal** use **`offense.fast_break_plays`** (and EOG snapshot override when present).
 
 ### Key Files
 

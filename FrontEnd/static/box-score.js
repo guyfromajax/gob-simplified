@@ -1102,12 +1102,6 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   // Special situations use canonical EOG snapshot when available (matches EOG attribute calculations).
   const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
 
-  // Fast Breaks
-  const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
-  const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
-  const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
-  specialSection.appendChild(createScoutingItem('Fast Breaks', `${fbSuccess} / ${fbEntries}`, `${fbPct}%`));
-
   // HC Traps
   const hct = defense.HCT || {};
   const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
@@ -1209,6 +1203,59 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   defensePlayCallsSection.appendChild(zone131DefenseSection);
 
   container.appendChild(defensePlayCallsSection);
+
+  // Fast Breaks (offense scouting; per-play splits — after Defense Play Calls per product spec)
+  const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
+  const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
+  const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
+
+  const fastBreakSection = document.createElement('div');
+  fastBreakSection.className = 'scouting-section';
+  fastBreakSection.innerHTML = '<h3>Fast Breaks</h3>';
+  fastBreakSection.appendChild(
+    createScoutingItem('Total', `${fbSuccess} / ${fbEntries}`, `${fbPct}%`)
+  );
+
+  const mergedFbPlays = mergeFastBreakPlaysForBoxScore(
+    offense.fast_break_plays,
+    scoutingSnapshot.fast_break_plays
+  );
+  const fbPlayRows = [
+    { key: 'covert_release', label: 'Covert Release' },
+    { key: 'rim_runner', label: 'Rim Runner' },
+    { key: 'thirty_two', label: '32' },
+    { key: 'after_steal', label: 'After Steal' },
+  ];
+  for (const row of fbPlayRows) {
+    const p = mergedFbPlays[row.key] || { A: 0, S: 0 };
+    const a = Number(p.A) || 0;
+    const s = Number(p.S) || 0;
+    const pct = a > 0 ? ((s / a) * 100).toFixed(0) : '0';
+    fastBreakSection.appendChild(createScoutingItemNested(row.label, `${s} / ${a}`, `${pct}%`));
+  }
+
+  container.appendChild(fastBreakSection);
+}
+
+/**
+ * Merge offense.fast_break_plays with EOG snapshot (if present) for box score display.
+ */
+function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
+  const keys = ['covert_release', 'rim_runner', 'thirty_two', 'after_steal'];
+  const out = {};
+  for (const k of keys) {
+    const o = (offensePlays && offensePlays[k]) || {};
+    const s = (snapshotPlays && snapshotPlays[k]) || {};
+    const aO = o.A !== undefined && o.A !== null ? Number(o.A) : 0;
+    const sO = o.S !== undefined && o.S !== null ? Number(o.S) : 0;
+    const aSnap = s.A !== undefined && s.A !== null ? Number(s.A) : null;
+    const sSnap = s.S !== undefined && s.S !== null ? Number(s.S) : null;
+    out[k] = {
+      A: aSnap !== null ? aSnap : aO,
+      S: sSnap !== null ? sSnap : sO,
+    };
+  }
+  return out;
 }
 
 // Create playcall subsection (Motion, Set, Cumulative)
@@ -1324,6 +1371,18 @@ function createPlaycallSubsection(title, playcallData) {
 function createScoutingItem(label, value, pct) {
   const item = document.createElement('div');
   item.className = 'scouting-item';
+  item.innerHTML = `
+    <span class="scouting-item-label">${label}:</span>
+    <span class="scouting-item-value">${value}</span>
+    <span class="scouting-item-pct">(${pct})</span>
+  `;
+  return item;
+}
+
+/** Indented row for Fast Break per-play lines under the aggregate */
+function createScoutingItemNested(label, value, pct) {
+  const item = document.createElement('div');
+  item.className = 'scouting-item scouting-item-nested';
   item.innerHTML = `
     <span class="scouting-item-label">${label}:</span>
     <span class="scouting-item-value">${value}</span>

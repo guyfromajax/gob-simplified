@@ -19,7 +19,7 @@ And we will continue to track stats for FBs after a steal as "After Steal".
 - **Play-level splits (attempts / successes per play) are offense-only, team / scouting only** — defensive FB scouting stays **team-level only** (no per-play defense splits)
 - Field name **`thirty_two`** in code / data; label **"32"** in UI when we build that
 - Structure will be to track play-level stats in the scouting notes for each team, and then aggregate those play-level stats up to the team's overall Fast Break stats
-- In the Box Score, in the Scouting Notes section, add Fast Breaks after Defensive Plays and structure the data as follows
+- **Box Score Scouting Notes (implemented):** Fast Breaks section after Defense Play Calls — **Total** + Covert Release / Rim Runner / 32 / After Steal (see `box-score.js`). Prior structure was:
     "Fast Breaks: {FB_S}/{FB_A} {FB%}"
         "Covert Release: {S}/{A} {%}"
         "Rim Runner: {S}/{A} {%}"
