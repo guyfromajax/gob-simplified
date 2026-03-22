@@ -1209,12 +1209,12 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
   const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
 
+  // Match defense subsection pattern: h4 line with title + S/A/%, then scouting-item rows (vs Motion, etc.)
   const fastBreakSection = document.createElement('div');
   fastBreakSection.className = 'scouting-section';
-  fastBreakSection.innerHTML = '<h3>Fast Breaks</h3>';
-  fastBreakSection.appendChild(
-    createScoutingItem('Total', `${fbSuccess} / ${fbEntries}`, `${fbPct}%`)
-  );
+  const fastBreakSub = document.createElement('div');
+  fastBreakSub.className = 'scouting-subsection';
+  fastBreakSub.innerHTML = `<h4>Fast Breaks: ${fbSuccess} / ${fbEntries} (${fbPct}%)</h4>`;
 
   const mergedFbPlays = mergeFastBreakPlaysForBoxScore(
     offense.fast_break_plays,
@@ -1231,9 +1231,10 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
     const a = Number(p.A) || 0;
     const s = Number(p.S) || 0;
     const pct = a > 0 ? ((s / a) * 100).toFixed(0) : '0';
-    fastBreakSection.appendChild(createScoutingItemNested(row.label, `${s} / ${a}`, `${pct}%`));
+    fastBreakSub.appendChild(createScoutingItem(row.label, `${s} / ${a}`, `${pct}%`));
   }
 
+  fastBreakSection.appendChild(fastBreakSub);
   container.appendChild(fastBreakSection);
 }
 
@@ -1371,18 +1372,6 @@ function createPlaycallSubsection(title, playcallData) {
 function createScoutingItem(label, value, pct) {
   const item = document.createElement('div');
   item.className = 'scouting-item';
-  item.innerHTML = `
-    <span class="scouting-item-label">${label}:</span>
-    <span class="scouting-item-value">${value}</span>
-    <span class="scouting-item-pct">(${pct})</span>
-  `;
-  return item;
-}
-
-/** Indented row for Fast Break per-play lines under the aggregate */
-function createScoutingItemNested(label, value, pct) {
-  const item = document.createElement('div');
-  item.className = 'scouting-item scouting-item-nested';
   item.innerHTML = `
     <span class="scouting-item-label">${label}:</span>
     <span class="scouting-item-value">${value}</span>
