@@ -31,7 +31,7 @@ All logic below applies only when **quarter ≥ 4**. Evaluate the time-band tabl
 - Else if Score Delta < -1 and > -9 → Quick Shot = True  
   - If Score Delta < -2: Outside Shot Chance = 100%  
   - Else: run normal playcall logic
-- Force Foul: True if 1 < Score Delta < 9, else False
+- Force Foul: True if 0 < Score Delta < 9, else False
 
 When Score Delta falls in neither Slow It Down nor Quick Shot for that band → use normal logic (no tempo or shot overrides).
 

@@ -87,7 +87,7 @@ def is_quick_shot(game, time_remaining_seconds):
 def should_force_foul(game, time_remaining_seconds):
     """
     True when this band has Force Foul and Score Delta is in the foul range (Q4/OT).
-    Per time-band table: 0:31-1:00 → 3 < delta < 12; 0:01-0:30 → 1 < delta < 9; else False.
+    Per time-band table: 0:31-1:00 → 3 < delta < 12; 0:01-0:30 → 0 < delta < 9; else False.
     """
     if not is_situational_active(game.quarter):
         return False

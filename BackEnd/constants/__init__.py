@@ -185,7 +185,8 @@ SITUATIONAL_TIME_BANDS = (
     (121, 180, {"slow_min": 12, "quick_lo": -24, "quick_hi": -12, "outside": 0.60, "attack": 0.20, "inside": 0.20, "force_foul": False}),
     (61, 120, {"slow_min": 9, "quick_lo": -18, "quick_hi": -9, "outside": 0.70, "attack": 0.20, "inside": 0.10, "force_foul": False}),
     (31, 60, {"slow_min": 3, "quick_lo": -12, "quick_hi": -3, "outside": 0.80, "attack": 0.15, "inside": 0.05, "force_foul_lo": 3, "force_foul_hi": 12}),
-    (0, 30, {"slow_min": 1, "quick_lo": -9, "quick_hi": -1, "last_30_quick": True, "outside_if_delta_below": -2, "force_foul_lo": 1, "force_foul_hi": 9}),
+    # Last 30s Force Foul: True if 0 < Score Delta < 9 (see Situational_Logic_System.md); force_lo=0 + strict < gives delta 1..8
+    (0, 30, {"slow_min": 1, "quick_lo": -9, "quick_hi": -1, "last_30_quick": True, "outside_if_delta_below": -2, "force_foul_lo": 0, "force_foul_hi": 9}),
 )
 # Legacy: used only if a caller expects single ratio; bands above define explicit outside/attack/inside
 SITUATIONAL_QUICK_SHOT_ATTACK_RATIO = 0.75

@@ -27,7 +27,7 @@ Height (in inches) is converted to a 1–100 rating using a linear scale:
 - Formula: `1 + (height - 60) × (99 / 24)`
 - Values below 60 clamp to 1, values above 84 clamp to 100
 
-Height is used as a direct factor in PF and C position calculations.
+Height is used as a direct factor in **C** position calculations (not PF).
 
 ## Position Weights
 
@@ -70,30 +70,29 @@ SH, OD, (AG, SC), (IQ, PS)
 - **RB** (Rebounding): 0%
 
 ### Power Forward (PF)
-RB, ST, ID, (height, IQ, SC)
+RB, ST, ID, (IQ, SC)
 
-- **RB** (Rebounding): 35% // was 25%
-- **ST** (Strength): 30% // was 20%
-- **IQ** (Basketball IQ): 5% // was 15%
-- **SC** (Scoring): 5% // was 10%
-- **ID** (Inside Defense): 15% // was 10%
-- **height**: 5%
-- **FT** (Free Throw): 5% // was 5%
-- **PS** (Passing): 0% // was 5%
-- **SH** (Shooting): 0% // was 5%
+- **RB** (Rebounding): 35%
+- **ST** (Strength): 35%
+- **IQ** (Basketball IQ): 5%
+- **SC** (Scoring): 5%
+- **ID** (Inside Defense): 15%
+- **FT** (Free Throw): 5%
+- **PS** (Passing): 0%
+- **SH** (Shooting): 0%
 
 ### Center (C)
-(SC, ID, height), (ST, RB), IQ
+(SC, ID, height), (ST, RB)
 
-- **SC** (Scoring): 25% // was 20%
-- **ID** (Inside Defense): 25% // was 20%
-- **height**: 20%
-- **ST** (Strength): 10%
-- **RB** (Rebounding): 10%
-- **PS** (Passing): 0% // was 5%
-- **IQ** (Basketball IQ): 5% // was 5%
-- **FT** (Free Throw): 5% // was 5%
-- **AG** (Agility): 0% // was 5%
+- **SC** (Scoring): 15%
+- **ID** (Inside Defense): 15%
+- **height**: 40%
+- **ST** (Strength): 15%
+- **RB** (Rebounding): 15%
+- **PS** (Passing): 0%
+- **IQ** (Basketball IQ): 0%
+- **FT** (Free Throw): 0%
+- **AG** (Agility): 0%
 
 ## When Position Ratings Are Calculated
 
