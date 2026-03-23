@@ -541,7 +541,7 @@ body {
 /* Header Row */
 .lineup-header {
   display: grid;
-  grid-template-columns: 50px 80px 200px 52px 120px 80px 80px 80px 80px 50px 120px 80px 80px;
+  grid-template-columns: 50px 80px 200px 76px 120px 80px 80px 80px 80px 50px 120px 80px 80px;
   gap: 10px;
   padding: 4px 12px;
   background: #333;
@@ -560,15 +560,18 @@ body {
   text-align: left !important;
 }
 
+/* Spelled-out label; 2pt smaller than other header cells (11px) */
 .header-rim-runner {
   text-align: center !important;
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: calc(11px - 2pt);
+  line-height: 1.15;
+  font-weight: bold;
+  padding: 2px 0;
 }
 
-/* Footnote: 2pt smaller than .player-name (16px) */
+/* Footnote: 2pt smaller than .player-name (16px); below last lineup row */
 .rim-runner-footnote {
-  margin: 0 0 8px 0;
+  margin: 10px 0 0 0;
   padding: 0 4px;
   font-size: calc(16px - 2pt);
   line-height: 1.35;
@@ -628,7 +631,7 @@ body {
 
 .slot-content {
   display: grid;
-  grid-template-columns: 80px 200px 52px 120px 80px 80px 80px 80px 50px 120px 80px 80px;
+  grid-template-columns: 80px 200px 76px 120px 80px 80px 80px 80px 50px 120px 80px 80px;
   gap: 10px;
   align-items: center;
 }
