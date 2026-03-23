@@ -135,6 +135,11 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       break;
 
     case 'DEFENSIVE_STOP':
+      // Outlet denial / team stop: optional no headshot (e.g. Rim Runner outlet denied)
+      if (context.noPlayerImage) {
+        showAnnouncement('Great Stop!', defenseTeam, null);
+        break;
+      }
       // Get stopper data if available
       const stopperId = context.stopperId || turnData.stopper_id;
       let stopperData = null;

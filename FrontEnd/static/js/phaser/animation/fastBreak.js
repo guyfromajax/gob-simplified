@@ -1548,13 +1548,26 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     await Promise.all(promises);
   }
   
-  // ✅ Show "Great Stop!" announcement with stopper headshot (for Fast Break defensive stops)
-  if (turnData.fast_break === true && turnData.stopper_id) {
+  // ✅ "Great Stop!" after Fast Break defensive stops (stopper headshot; outlet denial = text only, no headshot)
+  const ballHandlerDataForStop = turnData.roles?.ball_handler;
+  const ballHandlerIdForStop =
+    ballHandlerDataForStop?.player_id || ballHandlerDataForStop || getCurrentOwner(scene);
+  const ballHandlerSpriteForStop = playerSprites[ballHandlerIdForStop];
+  const isHomeOffenseForStop = ballHandlerSpriteForStop?.team === 'home';
+  const defenseTeamForStop = isHomeOffenseForStop ? 'away' : 'home';
+
+  // Rim Runner: defense wins outlet contest — no designated stopper_id; announce Great Stop! with no player image
+  if (turnData.fast_break === true && turnData.rim_runner_outlet_failed) {
+    const { showAnnouncement } = await import('../utils/announcements.js');
+    showAnnouncement('Great Stop!', defenseTeamForStop, null);
+    const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+    await new Promise((resolve) => scene.time.delayedCall(stopHoldMs, resolve));
+  } else if (turnData.fast_break === true && turnData.stopper_id) {
     const stopperId = turnData.stopper_id;
     const stopperSprite = playerSprites[stopperId];
     
     if (stopperSprite) {
-      const { showAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const stopperInfo = scene.playerInfo?.[stopperId];
       const stopperTeamId = stopperSprite?.team_id;
       
@@ -1565,12 +1578,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
       const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
       
-      // Determine offense side for defense team calculation
-      const ballHandlerData = turnData.roles?.ball_handler;
-      const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
-      const ballHandlerSprite = playerSprites[ballHandlerId];
-      const isHomeOffense = ballHandlerSprite?.team === "home";
-      
       const stopperPlayerData = stopperInfo ? {
         playerId: stopperId,
         photo: stopperSprite?.photo || null,
@@ -1578,9 +1585,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         secondaryColor: getSecondaryColorForTeam(scene, stopperSprite?.team_id)
       } : null;
 
-      // Defensive stop: show in defense team color (they benefited)
-      const defenseTeam = isHomeOffense ? 'away' : 'home';
-      showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
+      showAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData);
       
       const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
       await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));

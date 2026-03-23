@@ -69,8 +69,18 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     // Context announcements (situation being entered)
     // ✅ FIX: Don't announce Fast Break if this turn is a steal OR if it came from a steal (steal announcement takes priority)
     // Check: 1) Not a STEAL turn itself, 2) Text doesn't mention steal, 3) Not a steal-initiated Fast Break (is_steal_entry flag)
+    // Intent: announce when entering a FAST_BREAK turn (fast_break flag and/or current_turn) — Rim Runner, Covert Release, etc.
     const isStealInitiatedFastBreak = turn.roles?.is_steal_entry;
-    if (turn.fast_break && turn.result_type !== 'STEAL' && !turn.text?.toLowerCase().includes('steal') && !isStealInitiatedFastBreak) {
+    const fastBreakIntent =
+      turn.fast_break === true ||
+      turn.current_turn === 'FAST_BREAK' ||
+      turn.roles?.rim_runner_sequence === true;
+    if (
+      fastBreakIntent &&
+      turn.result_type !== 'STEAL' &&
+      !turn.text?.toLowerCase().includes('steal') &&
+      !isStealInitiatedFastBreak
+    ) {
       announceGameEvent('FAST_BREAK', turn, scene);
     }
     if (turn.rim_runner_bat_oob) {
