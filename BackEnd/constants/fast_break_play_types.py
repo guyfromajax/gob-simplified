@@ -4,13 +4,15 @@ Fast break play identifiers (DREB → outlet) and steal bucket.
 - Code / persistence: snake_case keys below.
 - UI label for ``THIRTY_TWO`` is "32" (see Fast_Break_System / FB_Update_Brief).
 
-``rim_runner`` and ``thirty_two`` are reserved for future logic; only
-``covert_release`` (DREB outlet) and ``after_steal`` (steal entry) increment today.
+``thirty_two`` is not implemented yet. DREB outlet attempts are split 50/50 between
+``rim_runner`` and ``covert_release`` until user FB play settings ship.
+``after_steal`` is used for steal entry.
 """
 
 from __future__ import annotations
 
 import copy
+import random
 from typing import Any, Dict
 
 # Canonical keys (match scouting_data["offense"]["fast_break_plays"])
@@ -56,4 +58,7 @@ def ensure_fast_break_plays(offense_scouting: Dict[str, Any]) -> Dict[str, Dict[
 
 def play_key_for_fast_break_entry(is_dreb_outlet: bool) -> str:
     """Which scouting bucket gets an attempt for this FB possession."""
-    return COVERT_RELEASE if is_dreb_outlet else AFTER_STEAL
+    if not is_dreb_outlet:
+        return AFTER_STEAL
+    # Until user FB play settings ship: 50/50 Rim Runner vs Covert Release on DREB outlet.
+    return RIM_RUNNER if random.random() < 0.5 else COVERT_RELEASE

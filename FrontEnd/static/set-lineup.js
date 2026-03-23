@@ -1015,10 +1015,32 @@ function updateSlotDisplay(slot) {
   }
 }
 
+function refreshRimRunnerSelect() {
+  const sel = document.getElementById('rim-runner-select');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Auto (closest to basket)</option>';
+  const seen = new Set();
+  ['PG', 'SG', 'SF', 'PF', 'C'].forEach((pos) => {
+    const id = lineup[pos];
+    if (!id || seen.has(String(id))) return;
+    seen.add(String(id));
+    const p = playerMap[id];
+    if (!p) return;
+    const opt = document.createElement('option');
+    opt.value = String(id);
+    opt.textContent = p.name || String(id);
+    sel.appendChild(opt);
+  });
+  if (current && seen.has(String(current))) sel.value = String(current);
+  else sel.value = '';
+}
+
 function updateAllSlotDisplays() {
   document.querySelectorAll('.slot').forEach(slot => {
     updateSlotDisplay(slot);
   });
+  refreshRimRunnerSelect();
 }
 
 function clearSlot(slot) {
@@ -1680,6 +1702,12 @@ async function init() {
       // Pass through quarter_break_from so court knows whether to play airhorn (play_quarter only)
       const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
+
+      const rimSel = document.getElementById('rim-runner-select');
+      if (rimSel && rimSel.value && myTeamSide) {
+        const k = myTeamSide === 'home' ? 'home_rim_runner_player_id' : 'away_rim_runner_player_id';
+        params.set(k, rimSel.value);
+      }
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {
         resume_from_timeout: params.get('resume_from_timeout'),

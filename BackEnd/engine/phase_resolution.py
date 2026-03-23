@@ -762,6 +762,76 @@ def _record_hct_stats(hct_roles, turn_result, game, off_lineup, def_lineup):
             if is_hct_s_defense:
                 player.record_stat("HCT_S_D", 1)
 
+
+def apply_fast_break_cg_time(turn_result, shot_attempted=False):
+    """
+    Cover-ground timing for fast breaks (shared by Covert Release and Rim Runner).
+    """
+    roles_data = turn_result.get("roles", {}) or {}
+    animations_data = turn_result.get("animations", []) or []
+    path_points = []
+
+    bh = roles_data.get("ball_handler")
+    bh_id = getattr(bh, "player_id", None) if bh else None
+    if bh_id:
+        for anim in animations_data:
+            if anim.get("playerId") == bh_id:
+                movement = anim.get("movement", []) or []
+                for step in movement:
+                    coords = step.get("coords") or {}
+                    if "x" in coords and "y" in coords:
+                        path_points.append({"x": coords["x"], "y": coords["y"]})
+                break
+
+    if len(path_points) < 2:
+        start = {
+            "x": roles_data.get("ball_handler_outlet_x"),
+            "y": roles_data.get("ball_handler_outlet_y"),
+        }
+        end = turn_result.get("shot_spot")
+        if not end and bh_id:
+            for anim in animations_data:
+                if anim.get("playerId") == bh_id and isinstance(anim.get("end"), dict):
+                    end = anim.get("end")
+                    break
+        if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
+            path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
+
+    distance_seconds = 0.0
+    if len(path_points) >= 2:
+        for idx in range(1, len(path_points)):
+            distance_seconds += calc_isotropic_segment_seconds(
+                path_points[idx - 1], path_points[idx], CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+            )
+
+    overhead_seconds = 0.0
+    outlet_passer_x = roles_data.get("outlet_passer_x")
+    outlet_passer_y = roles_data.get("outlet_passer_y")
+    receiver_x = roles_data.get("ball_handler_outlet_x")
+    receiver_y = roles_data.get("ball_handler_outlet_y")
+    if (
+        roles_data.get("outlet_passer")
+        and roles_data.get("outlet_receiver")
+        and isinstance(outlet_passer_x, (int, float))
+        and isinstance(outlet_passer_y, (int, float))
+        and isinstance(receiver_x, (int, float))
+        and isinstance(receiver_y, (int, float))
+    ):
+        passer_coords = {"x": outlet_passer_x, "y": outlet_passer_y}
+        receiver_coords = {"x": receiver_x, "y": receiver_y}
+        overhead_seconds += calc_pass_segment_seconds(passer_coords, receiver_coords)
+    elif roles_data.get("outlet_passer") and roles_data.get("outlet_receiver"):
+        overhead_seconds += 2.0
+    if shot_attempted:
+        overhead_seconds += 1.0
+
+    turn_result["time_elapsed"] = clamp_turn_time_elapsed(
+        round(distance_seconds + overhead_seconds),
+        cap=30,
+    )
+    return turn_result
+
+
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
     # print("Entering resolve_fast_break()")
@@ -775,6 +845,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # DREB outlet → covert_release (incl. fallback outlet); steal entry → after_steal
     rebound = game_state.get("last_rebound") == "DREB"
     from BackEnd.constants.fast_break_play_types import (
+        RIM_RUNNER,
         ensure_fast_break_plays,
         play_key_for_fast_break_entry,
     )
@@ -800,6 +871,11 @@ def resolve_fast_break_logic(game: "GameManager"):
     defensive_stop_y_range = (
         DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
     )
+
+    if rebound and fb_play_key == RIM_RUNNER:
+        from BackEnd.engine.rim_runner_fast_break import resolve_rim_runner_fast_break
+
+        return resolve_rim_runner_fast_break(game, fb_play_key)
 
     if rebound:
         #resetting last_rebound to avoid carry over bugs
@@ -1336,73 +1412,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game)
     # ==================== END OUTLET PASS STAT TRACKING ====================
 
-    def _apply_fast_break_cg_time(turn_result, shot_attempted=False):
-        """
-        Cover-ground timing for fast breaks:
-        - distance time from ball handler movement path
-        - +1s pass, +1s receive, +1s shot overhead (when applicable)
-        - round at end, cap at 30
-        """
-        roles_data = turn_result.get("roles", {}) or {}
-        animations_data = turn_result.get("animations", []) or []
-        path_points = []
-
-        bh = roles_data.get("ball_handler")
-        bh_id = getattr(bh, "player_id", None) if bh else None
-        if bh_id:
-            for anim in animations_data:
-                if anim.get("playerId") == bh_id:
-                    movement = anim.get("movement", []) or []
-                    for step in movement:
-                        coords = step.get("coords") or {}
-                        if "x" in coords and "y" in coords:
-                            path_points.append({"x": coords["x"], "y": coords["y"]})
-                    break
-
-        if len(path_points) < 2:
-            start = {
-                "x": roles_data.get("ball_handler_outlet_x"),
-                "y": roles_data.get("ball_handler_outlet_y"),
-            }
-            end = turn_result.get("shot_spot")
-            if not end and bh_id:
-                for anim in animations_data:
-                    if anim.get("playerId") == bh_id and isinstance(anim.get("end"), dict):
-                        end = anim.get("end")
-                        break
-            if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
-                path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
-
-        distance_seconds = 0.0
-        if len(path_points) >= 2:
-            for idx in range(1, len(path_points)):
-                distance_seconds += calc_isotropic_segment_seconds(
-                    path_points[idx - 1], path_points[idx], CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
-                )
-
-        overhead_seconds = 0.0
-        # Outlet pass: use distance-based pass time (passer -> receiver) when coords available
-        outlet_passer_x = roles_data.get("outlet_passer_x")
-        outlet_passer_y = roles_data.get("outlet_passer_y")
-        receiver_x = roles_data.get("ball_handler_outlet_x")
-        receiver_y = roles_data.get("ball_handler_outlet_y")
-        if (roles_data.get("outlet_passer") and roles_data.get("outlet_receiver")
-                and isinstance(outlet_passer_x, (int, float)) and isinstance(outlet_passer_y, (int, float))
-                and isinstance(receiver_x, (int, float)) and isinstance(receiver_y, (int, float))):
-            passer_coords = {"x": outlet_passer_x, "y": outlet_passer_y}
-            receiver_coords = {"x": receiver_x, "y": receiver_y}
-            overhead_seconds += calc_pass_segment_seconds(passer_coords, receiver_coords)
-        elif roles_data.get("outlet_passer") and roles_data.get("outlet_receiver"):
-            overhead_seconds += 2.0  # fallback when coords missing
-        if shot_attempted:
-            overhead_seconds += 1.0
-
-        turn_result["time_elapsed"] = clamp_turn_time_elapsed(
-            round(distance_seconds + overhead_seconds),
-            cap=30
-        )
-        return turn_result
-
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
     if event_type == "DEFENSIVE_STOP":
@@ -1456,7 +1465,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Record Fast Break stats for release player (offensive) and get-back players (defensive)
         _record_fast_break_stats(fb_roles, result, game)
         # ==================== END FAST BREAK STAT TRACKING ====================
-        _apply_fast_break_cg_time(result, shot_attempted=False)
+        apply_fast_break_cg_time(result, shot_attempted=False)
         
         return result
 
@@ -1597,7 +1606,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
-    _apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
+    apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
 
     # ✅ SS&S: Backend is single source of truth for shot spot and defender placement on Fast Break shots
     # Expose so frontend uses these instead of recomputing (avoids mismatch and missing defender)

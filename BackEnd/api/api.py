@@ -360,6 +360,9 @@ try:
         # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
         resume_from_timeout: bool = False
         timeout_trace_id: str | None = None
+        # Optional: designated Rim Runner (player id) per team for fast-break resolution
+        home_rim_runner_player_id: str | None = None
+        away_rim_runner_player_id: str | None = None
     
     
     ongoing_games: dict[str, GameManager] = {}
@@ -1365,6 +1368,8 @@ try:
             gm.game_state[COMPUTER_MATCHUPS_KEY] = saved.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
         elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
             gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
+        if saved.get("rim_runner_by_team_id"):
+            gm.game_state["rim_runner_by_team_id"] = dict(saved["rim_runner_by_team_id"])
 
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
 
@@ -3632,6 +3637,12 @@ try:
                 for log in loggers_to_quiet:
                     log.setLevel(logging.ERROR)
             try:
+                # Rim Runner designation (persist on game_state for fast-break logic)
+                rr_map = gm.game_state.setdefault("rim_runner_by_team_id", {})
+                if body.home_rim_runner_player_id:
+                    rr_map[str(gm.home_team.team_id)] = body.home_rim_runner_player_id
+                if body.away_rim_runner_player_id:
+                    rr_map[str(gm.away_team.team_id)] = body.away_rim_runner_player_id
                 # ⏱️ PERFORMANCE: Time the quarter simulation
                 sim_start = time.time()
                 if profile:

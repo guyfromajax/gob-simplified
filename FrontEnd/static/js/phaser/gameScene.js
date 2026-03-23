@@ -279,6 +279,10 @@ export function createGameScene(Phaser) {
       }
       
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
+      const hRim = urlParams.get('home_rim_runner_player_id');
+      const aRim = urlParams.get('away_rim_runner_player_id');
+      if (hRim) payload.home_rim_runner_player_id = hRim;
+      if (aRim) payload.away_rim_runner_player_id = aRim;
       // Only pass game_id if we have one AND it's not a new game
       if (this.gameId && !isNewGameStart) {
         payload.game_id = this.gameId;

@@ -116,6 +116,10 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       showAnnouncement("Fast Break!", offenseTeam);
       break;
 
+    case 'RIM_RUNNER_BATTED_OOB':
+      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
+      break;
+
     // ========== SITUATIONAL LOGIC (Q4/OT) ==========
     case 'SLOW_IT_DOWN':
       showAnnouncement("Slow It Down", offenseTeam);

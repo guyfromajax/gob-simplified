@@ -73,6 +73,9 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     if (turn.fast_break && turn.result_type !== 'STEAL' && !turn.text?.toLowerCase().includes('steal') && !isStealInitiatedFastBreak) {
       announceGameEvent('FAST_BREAK', turn, scene);
     }
+    if (turn.rim_runner_bat_oob) {
+      announceGameEvent('RIM_RUNNER_BATTED_OOB', turn, scene);
+    }
     
     // Pressure announcements (only for BASELINE_INBOUND setting up pressure)
     if (turn.result_type === 'BASELINE_INBOUND') {

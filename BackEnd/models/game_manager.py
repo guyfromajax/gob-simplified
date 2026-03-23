@@ -193,7 +193,8 @@ class GameManager:
                 "SF": "SF",
                 "PF": "PF",
                 "C": "C"
-            }
+            },
+            "rim_runner_by_team_id": {},  # team_id str -> player_id for designated Rim Runner
         }
 
 
