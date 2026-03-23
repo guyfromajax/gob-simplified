@@ -525,9 +525,9 @@ body {
 
 #lineup-container {
   display: flex !important;
-  gap: 30px !important;
+  gap: 16px !important;
   align-items: flex-start !important;
-  margin: 20px !important;
+  margin: 16px !important;
   flex-wrap: nowrap !important;
 }
 
@@ -535,15 +535,16 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0; /* allow flex shrink so grid + buttons fit on screen */
 }
 
-/* Header Row */
+/* Lineup grid: tighter gaps; Rim Runner column narrow (checkbox-only). Keep readable rhythm. */
 .lineup-header {
   display: grid;
-  grid-template-columns: 50px 80px 200px 76px 120px 80px 80px 80px 80px 50px 120px 80px 80px;
-  gap: 10px;
-  padding: 4px 12px;
+  grid-template-columns: 50px 74px 185px 54px 105px 70px 70px 70px 70px 46px 105px 74px 74px;
+  gap: 6px;
+  padding: 4px 10px;
   background: #333;
   color: #fff;
   font-weight: bold;
@@ -567,6 +568,8 @@ body {
   line-height: 1.15;
   font-weight: bold;
   padding: 2px 0;
+  max-width: 54px;
+  justify-self: center;
 }
 
 /* Footnote: 2pt smaller than .player-name (16px); below last lineup row */
@@ -603,10 +606,10 @@ body {
 
 .slot {
   border: 2px dashed #ccc !important;
-  padding: 5px 10px !important;  /* Reduced from 6px to 5px */
+  padding: 5px 8px !important;
   display: grid !important;
   grid-template-columns: 50px 1fr auto !important;
-  gap: 10px !important;
+  gap: 6px !important;
   align-items: center !important;
   background: #f9f9f9 !important;
   border-radius: 4px !important;
@@ -631,8 +634,8 @@ body {
 
 .slot-content {
   display: grid;
-  grid-template-columns: 80px 200px 76px 120px 80px 80px 80px 80px 50px 120px 80px 80px;
-  gap: 10px;
+  grid-template-columns: 74px 185px 54px 105px 70px 70px 70px 70px 46px 105px 74px 74px;
+  gap: 6px;
   align-items: center;
 }
 
