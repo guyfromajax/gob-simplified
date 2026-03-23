@@ -970,16 +970,13 @@ function updateSlotDisplay(slot) {
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
     const pidStr = String(playerId);
     const rrChecked = rimRunnerPlayerId != null && String(rimRunnerPlayerId) === pidStr;
-    // Build slot content HTML (RR column between NAME and POS RATING)
+    // Build slot content HTML (RR column after ENERGY, before remove button)
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="${imgBase}${playerId}.png" 
              onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
       <div class="player-name">${slotDisplayName}</div>
-      <div class="player-rim-runner">
-        <input type="checkbox" class="rim-runner-checkbox" data-player-id="${pidStr}" aria-label="Rim Runner for ${player.name.replace(/"/g, '&quot;')}" ${rrChecked ? 'checked' : ''} />
-      </div>
       <div class="player-rating">${rating}</div>
       <div class="player-points">${points}</div>
       <div class="player-rebounds">${rebounds}</div>
@@ -995,6 +992,9 @@ function updateSlotDisplay(slot) {
       </div>
       <div class="player-fouls">${fouls}</div>
       <div class="player-energy ${energyClass}">${energyPercent}%</div>
+      <div class="player-rim-runner">
+        <input type="checkbox" class="rim-runner-checkbox" data-player-id="${pidStr}" aria-label="Rim Runner for ${player.name.replace(/"/g, '&quot;')}" ${rrChecked ? 'checked' : ''} />
+      </div>
     `;
     
     slotContent.classList.remove('empty');
@@ -1064,7 +1064,7 @@ function setupSlots() {
   const slotsContainer = document.getElementById('slots');
   if (!slotsContainer) return;
 
-  // Rim Runner: single-select checkboxes (column between Name and Pos Rating)
+  // Rim Runner: single-select checkboxes (column after Energy, before remove)
   slotsContainer.addEventListener('change', (e) => {
     const t = e.target;
     if (!t || !t.classList || !t.classList.contains('rim-runner-checkbox')) return;

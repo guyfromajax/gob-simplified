@@ -539,10 +539,10 @@ body {
   min-width: 0; /* allow flex shrink so grid + buttons fit on screen */
 }
 
-/* Lineup grid: tighter gaps; Rim Runner column narrow (checkbox-only). Keep readable rhythm. */
+/* Lineup grid: tighter gaps; Rim Runner column narrow (checkbox-only), last before remove. */
 .lineup-header {
   display: grid;
-  grid-template-columns: 50px 74px 185px 54px 105px 70px 70px 70px 70px 46px 105px 74px 74px;
+  grid-template-columns: 50px 74px 185px 105px 70px 70px 70px 70px 46px 105px 74px 74px 54px;
   gap: 6px;
   padding: 4px 10px;
   background: #333;
@@ -634,7 +634,7 @@ body {
 
 .slot-content {
   display: grid;
-  grid-template-columns: 74px 185px 54px 105px 70px 70px 70px 70px 46px 105px 74px 74px;
+  grid-template-columns: 74px 185px 105px 70px 70px 70px 70px 46px 105px 74px 74px 54px;
   gap: 6px;
   align-items: center;
 }
