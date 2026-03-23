@@ -298,6 +298,8 @@ let roster = [];
 /** Team chemistry from /roster (franchise/tournament FTD); single-game default 15. */
 let rosterTeamChemistry = 15;
 const lineup = {};
+/** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
+let rimRunnerPlayerId = null;
 const playerMap = {};
 
 function getRT(player) {
@@ -966,13 +968,18 @@ function updateSlotDisplay(slot) {
     const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     const slotDisplayName =
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
-    // Build slot content HTML
+    const pidStr = String(playerId);
+    const rrChecked = rimRunnerPlayerId != null && String(rimRunnerPlayerId) === pidStr;
+    // Build slot content HTML (RR column between NAME and POS RATING)
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="${imgBase}${playerId}.png" 
              onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
       <div class="player-name">${slotDisplayName}</div>
+      <div class="player-rim-runner">
+        <input type="checkbox" class="rim-runner-checkbox" data-player-id="${pidStr}" aria-label="Rim Runner for ${player.name.replace(/"/g, '&quot;')}" ${rrChecked ? 'checked' : ''} />
+      </div>
       <div class="player-rating">${rating}</div>
       <div class="player-points">${points}</div>
       <div class="player-rebounds">${rebounds}</div>
@@ -1015,37 +1022,29 @@ function updateSlotDisplay(slot) {
   }
 }
 
-function refreshRimRunnerSelect() {
-  const sel = document.getElementById('rim-runner-select');
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">Auto (closest to basket)</option>';
-  const seen = new Set();
-  ['PG', 'SG', 'SF', 'PF', 'C'].forEach((pos) => {
-    const id = lineup[pos];
-    if (!id || seen.has(String(id))) return;
-    seen.add(String(id));
-    const p = playerMap[id];
-    if (!p) return;
-    const opt = document.createElement('option');
-    opt.value = String(id);
-    opt.textContent = p.name || String(id);
-    sel.appendChild(opt);
-  });
-  if (current && seen.has(String(current))) sel.value = String(current);
-  else sel.value = '';
+/** Clear Rim Runner if that player is no longer in the lineup */
+function normalizeRimRunnerSelection() {
+  if (rimRunnerPlayerId == null) return;
+  const inLineup = Object.values(lineup).some((id) => String(id) === String(rimRunnerPlayerId));
+  if (!inLineup) {
+    rimRunnerPlayerId = null;
+  }
 }
 
 function updateAllSlotDisplays() {
+  normalizeRimRunnerSelection();
   document.querySelectorAll('.slot').forEach(slot => {
     updateSlotDisplay(slot);
   });
-  refreshRimRunnerSelect();
 }
 
 function clearSlot(slot) {
   const pos = slot.dataset.pos;
+  const removedId = lineup[pos];
   delete lineup[pos];
+  if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
+    rimRunnerPlayerId = null;
+  }
   updateSlotDisplay(slot);
   updatePlayButton();
   
@@ -1064,6 +1063,22 @@ function setupSlots() {
   
   const slotsContainer = document.getElementById('slots');
   if (!slotsContainer) return;
+
+  // Rim Runner: single-select checkboxes (column between Name and Pos Rating)
+  slotsContainer.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t || !t.classList || !t.classList.contains('rim-runner-checkbox')) return;
+    const pid = t.getAttribute('data-player-id');
+    if (!pid) return;
+    if (t.checked) {
+      rimRunnerPlayerId = pid;
+      slotsContainer.querySelectorAll('.rim-runner-checkbox').forEach((cb) => {
+        if (cb !== t) cb.checked = false;
+      });
+    } else if (String(rimRunnerPlayerId) === String(pid)) {
+      rimRunnerPlayerId = null;
+    }
+  });
 
   // Delegated dragstart on container
   slotsContainer.addEventListener('dragstart', (e) => {
@@ -1703,10 +1718,9 @@ async function init() {
       const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
 
-      const rimSel = document.getElementById('rim-runner-select');
-      if (rimSel && rimSel.value && myTeamSide) {
+      if (rimRunnerPlayerId && myTeamSide) {
         const k = myTeamSide === 'home' ? 'home_rim_runner_player_id' : 'away_rim_runner_player_id';
-        params.set(k, rimSel.value);
+        params.set(k, String(rimRunnerPlayerId));
       }
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {

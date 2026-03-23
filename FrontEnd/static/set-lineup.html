@@ -42,6 +42,7 @@
         <div class="header-pos">POS</div>
         <div class="header-image"></div>
         <div class="header-name">NAME</div>
+        <div class="header-rim-runner" title="Rim Runner">RR</div>
         <div class="header-rating">POS RATING</div>
         <div class="header-points">POINTS</div>
         <div class="header-rebounds">REBOUNDS</div>
@@ -54,12 +55,7 @@
       </div>
       
       <!-- Lineup Slots -->
-      <div class="rim-runner-picker" style="margin:10px 0;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:8px;max-width:520px;">
-        <label for="rim-runner-select" style="display:block;font-weight:600;margin-bottom:6px;">Rim Runner <span style="font-weight:400;opacity:0.85;">(optional — default: closest to basket)</span></label>
-        <select id="rim-runner-select" style="min-width:280px;padding:6px 8px;">
-          <option value="">Auto (closest to basket)</option>
-        </select>
-      </div>
+      <p class="rim-runner-footnote">*if no Rim Runner is chosen, default will be used (player closest to basket).</p>
       <ul id="slots">
         <li class="slot" data-pos="PG">
           <div class="slot-pos">PG</div>
