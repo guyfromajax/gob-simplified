@@ -34,10 +34,11 @@
      - No outlet pass (no outlet passer/receiver)
 
 4. **Calculate Ball Handler Position After Entry**
-   - **DREB Entry**: Ball handler receives outlet pass at starting position (no movement during outlet pass)
+   - **DREB Entry (Covert / generic)**: Ball handler receives outlet pass at starting position (no movement during outlet pass)
      - Priority 1: `defense_release_coords` from most recent MISS/MAKE turn
      - Priority 2: `offense_getback_coords` from most recent MISS/MAKE turn
      - Fallback: `player.coords`
+   - **DREB Entry (Rim Runner / 32)**: After a **successful** outlet contest, sim coords for the rim runner and outlet ball handler are set from **`rim_runner_burst_phase`** (`rr_to`, `receiver_to`); `roles["ball_handler_outlet_x/y"]` match **`receiver_to`** for stop/shot geography and animation. **Denied** outlet: coords are **not** advanced (only the burst payload is present for the client).
    - **Steal Entry**: Ball handler moves 5-10 x spots toward basket, ±4 y spots (clamped 3-47)
      - Uses `last_stealer_coords` from game_state if available
 
@@ -120,8 +121,10 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 
 - **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** is **`rim_runner`**.
 - **Designation**: Optional per team — `game_state["rim_runner_by_team_id"][str(team_id)]` = player id (set from lineup / `simulate-quarter` payload). If omitted, finisher = offensive player **closest to the attacking basket** at DREB (with transfer rule when the designated player is the rebounder; see implementation). Lineup UI: optional Rim Runner select on **Set Lineup**; URL params `home_rim_runner_player_id` / `away_rim_runner_player_id` → game payload.
-- **Outlet chain**: If **PG is rebounder OR PG is the rim runner finisher** → first receiver **SG** (outlet to SG). If **SG rebounds and PG is the finisher** → **no outlet to PG**; SG is ball handler (dribble to outlet spot). Else → **PG** as primary outlet ball handler (no Covert `last_release_player` on this path). `roles["rim_runner_sequence"]` is **true** only for **`rim_runner`**, not **`thirty_two`**.
-- **Resolution (high level)**: Dedicated module **`resolve_rim_runner_fast_break()`** — outlet contest → burst (`fb_open`) → ball-handler IQ read → pass vs hold → if pass: open lane → fast break shot; if not open → intercept tiers / bat OOB (`rim_runner_bat_oob`, SIP) / completion to shot. Uses team attrs **`fb_efficiency`** / **`fb_opp_modifier`** (clamped **−10…+10**) and `random.randint(1,6)` where applicable.
+- **Outlet chain (sim + animation)**: Offensive **outlet target** `(tx, ty)` is computed from the rim runner’s **post–burst-sprint** vertical half: `ty = 15` if rim runner ends **above** the lane (`y > 24` in HOME grid), else `ty = 35`. Each non–rim-runner offensive player gets a candidate `tx` from **their** current **x** plus **8** grid spots toward the basket, clamped to the backcourt band (**home** offense: `min(start_x + 8, 40)`; **away**: `max(start_x - 8, 60)`). The **outlet receiver** is the offensive player (not the rim runner) **closest** to their own `(tx, ty)` in grid space. If that player is the **rebounder**, there is **no outlet pass** (`roles["outlet_passer"] = null`); the rebounder **dribbles** to `(tx, ty)` in parallel with the burst-phase animation. Otherwise **`outlet_passer`** = rebounder and **`outlet_receiver`** = that closest player. `roles["rim_runner_sequence"]` is **true** only for **`rim_runner`**, not **`thirty_two`**.
+- **Rim runner sprint (animation geometry only)**: Roll `movement_factor = random.randint(1, 100)` vs organic threshold **`0.6*AG + 0.2*IQ + 0.2*CH`** (no cap at 100). **Success**: move rim runner **x** by **`random.randint(20, 25)`** toward the basket (**+** home offense, **−** away); **fail**: **`random.randint(9, 14)`**; **x** clamped **`[4, 97]`**. **New y** uses rim runner **y before the sprint**: if **`y > 24`** → **`random.randint(30, 35)`**, else **`random.randint(15, 20)`**. (Sim burst open/closed **`fb_open`** below still uses the separate AG/IQ vs defender roll.)
+- **`roles["rim_runner_burst_phase"]`**: Structured payload for the client: `rr_id`, `rr_from` / `rr_to`, `burst_success`, `movement_factor`, `burst_threshold`, `skip_outlet_pass`, `outlet_passer_id`, `outlet_receiver_id`, `receiver_to` `{x,y}`, `outlet_defender_id`, `outlet_defender_to` (closest outlet contest defender tweens to **passer x ± 2** same **y** as passer; home **+2**, away **−2`), `other_players` (everyone not passer, that defender, rim runner, or outlet receiver: **x** toward basket **`random.randint(1, 4)`**; **defense** (rebounding team’s opponent): **y** up to **6** toward **25**; **offense** (rebounding team): **y** unchanged). Present on **both** successful and **denied** outlet turns so the sprint/setup can still animate when **`rim_runner_outlet_failed`** is true.
+- **Resolution (high level)**: Dedicated module **`resolve_rim_runner_fast_break()`** — build **`rim_runner_burst_phase`** + outlet roles → outlet contest → on success, apply rim runner + ball handler **coords** to burst targets → sim **burst** (`fb_open`) → ball-handler IQ read → pass vs hold → if pass: open lane → fast break shot; if not open → intercept tiers / bat OOB (`rim_runner_bat_oob`, SIP) / completion to shot. Uses team attrs **`fb_efficiency`** / **`fb_opp_modifier`** (clamped **−10…+10**) and `random.randint(1,6)` where applicable.
 - **Outlet contest (step A)**: Offense: `(PS*0.5 + ST*0.3 + IQ*0.2) * d6` vs defense: `(IQ*0.5 + OD*0.3 + ST*0.2) * d6`; offense adds **`+3 × fb_efficiency`**, defense adds **`+2 × fb_opp_modifier`**; if offense **≤** defense, settle to HCO (outlet “denied” style result). Defender for contest: nearest defender to passer by x (implementation).
 - **Burst**: Offense `(AG*0.7 + IQ*0.3) * d6` vs primary defender — get-back pool: `(IQ*1.0 + AG*0.5) * d6`; else `(IQ*0.5 + AG*0.5) * d6`. **`fb_open`** if offense score **>** defense score.
 - **Read**: `IQ * d6` vs threshold **`200 - 5×fb_efficiency`** (offense team). **Aggression** (offense `strategy_settings`, ≥3 = aggressive) weights wrong-read pass vs hold.
@@ -369,10 +372,9 @@ else:
 ### Animation Sequence
 
 **Phase 1: Outlet Pass (DREB Entry Only)**
-- Outlet passer (rebounder) stays at rebound spot
-- Outlet receiver (ball handler) receives pass at current position (no movement)
-- Defenders stay at current position (no movement)
-- Rebounders (non-get-back, non-release) stay at current position (no movement)
+
+- **Covert Release / default DREB path (no `rim_runner_burst_phase`)**: Outlet passer (rebounder) stays at rebound spot; outlet receiver (ball handler) receives pass at current position (no movement); defenders and other players stay put (`animateOutletPhase()` in `fastBreak.js`).
+- **Rim Runner / 32 (`rim_runner_burst_phase` present)**: `animateRimRunnerBurstPhase()` runs first. **All** burst-phase tweens (rim runner sprint, outlet contest defender, `other_players`, outlet receiver run to `receiver_to`) **start together**. The **outlet pass** tween runs **only after** the **outlet receiver’s** move completes; rim runner, defender, and other players **may still be moving** during the pass. If **`skip_outlet_pass`**, the ball stays on the rebounder and moves with them to `receiver_to` (no pass). If **`rim_runner_outlet_failed`**, the same setup tweens play but the **pass is skipped** before Phase 2 (defensive stop / HCO messaging).
 
 **Phase 2: Defensive Stop or Shot Attempt**
 
@@ -557,8 +559,9 @@ The outlet passer tracks:
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
   - **Ball handler end position (shot spot)**: Defensive stop → confrontation spot (outlet + 5–10); shot attempt (with or without outlet) → shot spot near rim (so the shot always animates from near the basket, not from top-of-key). Exposed as `turn_result["shot_spot"]` in phase_resolution for frontend use.
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
-  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop)
-  - `animateOutletPhase()` - Handles outlet pass (no player movement)
+  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop); if `roles.rim_runner_burst_phase` is set, runs **`animateRimRunnerBurstPhase()`** before Phase 2 instead of the static Covert-style **`animateOutletPhase()`**
+  - `animateRimRunnerBurstPhase()` - Rim Runner burst + simultaneous role-player moves; pass gated on outlet receiver tween completion (and skipped when outlet denied or dribble-outlet)
+  - `animateOutletPhase()` - Covert-style outlet pass (no player movement)
   - `animateDefensiveStop()` - Handles defensive stop animation
   - `animateFastBreakShot()` - Handles shot attempt (MAKE/MISS/BLOCK): shot spot move, ball to rim or block spot, then make/miss/block outcome (BLOCK: block announcement, bounce from block spot, rebound/DREB)
   - `animateFastBreakShotWithStopper()` - Same outcome handling for BLOCK (block spot target, block announcement, bounce from block spot, rebound/DREB)

@@ -55,33 +55,39 @@ export async function runFastBreakSequence({
   }
   
   const currentState = scene.stateMachine?.state;
-  
+  const hasRimRunnerBurst = Boolean(turnData.roles?.rim_runner_burst_phase);
+  const hasStandardOutlet =
+    turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver;
+
   // ✅ Check current state before transitioning - avoid invalid transitions
   // For defensive stops after HCO, we're already in HalfCourt, so transition to FastBreak directly
   // For Fast Break from DREB, we should be in Rebound/OutletSetup, so can transition to FastBreakOutlet
-  if (turnData.roles?.outlet_passer && currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
-    // Only transition to FastBreakOutlet if we have outlet pass and we're not already in Fast Break state
-    // Check if we can transition (must be coming from Rebound or OutletSetup)
+  if (
+    (hasStandardOutlet || hasRimRunnerBurst) &&
+    currentState !== States.FastBreak &&
+    currentState !== States.FastBreakOutlet
+  ) {
     if (currentState === States.Rebound || currentState === States.OutletSetup) {
       safeTransition(scene.stateMachine, States.FastBreakOutlet);
     } else {
-      // Coming from HalfCourt (defensive stop scenario) - go directly to FastBreak
       safeTransition(scene.stateMachine, States.FastBreak);
     }
   } else if (currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
-    // No outlet pass or already in Fast Break state - just ensure we're in FastBreak
     safeTransition(scene.stateMachine, States.FastBreak);
   }
   
   scene.events?.emit("fb:start");
   
   // ============================================================================
-  // PHASE 1: OUTLET PASS (if applicable) - WITHOUT moving receiver toward basket
+  // PHASE 1: Rim Runner burst + outlet (or standard Covert-style outlet)
   // ============================================================================
-  if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
+  if (hasRimRunnerBurst) {
+    await animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height);
+    if (scene.stateMachine?.state !== States.FastBreak) {
+      safeTransition(scene.stateMachine, States.FastBreak);
+    }
+  } else if (hasStandardOutlet) {
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
-    
-    // Transition to FastBreak state after outlet (only if not already there)
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
@@ -134,6 +140,107 @@ export async function runFastBreakSequence({
   // PHASE 3: CLEANUP & STATE TRANSITIONS
   // ============================================================================
   scene.events?.emit("fb:end");
+}
+
+/**
+ * Rim Runner: simultaneous setup tweens (RR sprint, outlet contest defender, role players),
+ * then outlet pass only after the outlet receiver's tween completes (others may still be moving).
+ */
+async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height) {
+  const phase = turnData.roles?.rim_runner_burst_phase;
+  if (!phase) return;
+
+  const sid = (id) => (id != null ? String(id) : null);
+  const rrSprite = playerSprites[sid(phase.rr_id)];
+  const recvSprite = playerSprites[sid(phase.outlet_receiver_id)];
+  if (!rrSprite || !recvSprite) return;
+
+  const secondary = [];
+  const startTween = (sprite, grid) => {
+    if (!sprite || grid == null || grid.x == null || grid.y == null) return;
+    const px = gridToPixels(grid.x, grid.y, width, height);
+    const dur = getPlayerDuration(sprite, px.x, px.y, true);
+    secondary.push(
+      tweenPlayerTo(scene, sprite, px, { duration: dur, easing: "Linear" })
+    );
+  };
+
+  startTween(rrSprite, phase.rr_to);
+  if (phase.outlet_defender_id != null && phase.outlet_defender_to) {
+    startTween(playerSprites[sid(phase.outlet_defender_id)], phase.outlet_defender_to);
+  }
+  for (const row of phase.other_players || []) {
+    startTween(playerSprites[sid(row.player_id)], { x: row.to_x, y: row.to_y });
+  }
+
+  const recvTargetPx = gridToPixels(phase.receiver_to.x, phase.receiver_to.y, width, height);
+  const recvDur = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
+  const receiverPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
+    duration: recvDur,
+    easing: "Linear",
+  });
+
+  const passerSprite = phase.skip_outlet_pass
+    ? recvSprite
+    : playerSprites[sid(phase.outlet_passer_id ?? turnData.roles?.outlet_passer)];
+  if (passerSprite) {
+    attachBallToPlayer(scene, ballSprite, passerSprite);
+  }
+
+  await receiverPromise;
+
+  const outletDenied = Boolean(turnData.rim_runner_outlet_failed);
+  const shouldPass = !outletDenied && !phase.skip_outlet_pass && passerSprite;
+
+  if (shouldPass) {
+    await runPass(scene, {
+      fromId: sid(phase.outlet_passer_id ?? turnData.roles?.outlet_passer),
+      toId: sid(phase.outlet_receiver_id),
+      duration: 500,
+      easing: "Sine.easeInOut",
+    });
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) {
+        scene.time.delayedCall(50, resolve);
+      } else {
+        setTimeout(resolve, 50);
+      }
+    });
+    const { getBallController, synchronizeBallState } = await import("./BallControllerAdapter.js");
+    const ballController = getBallController();
+    synchronizeBallState(scene, {
+      clearPassState: true,
+      allowAttachment: true,
+    });
+    if (ballController && recvSprite) {
+      const isAttachedToReceiver =
+        ballController.isAttached && ballController.currentOwner === recvSprite;
+      const isInFlight = ballController.isInFlight;
+      const wrongOwner =
+        ballController.isAttached && ballController.currentOwner !== recvSprite;
+      if (!isAttachedToReceiver || isInFlight || wrongOwner) {
+        if (isInFlight) {
+          ballController.onPassEnd(recvSprite, { reason: "rim_runner_burst_pass_fix" });
+        } else {
+          attachBallToPlayer(scene, ballSprite, recvSprite, {
+            reason: "rim_runner_burst_pass_verify",
+            debugInfo: { reason: "rim_runner_burst_pass_verify", wasInFlight: isInFlight },
+          });
+        }
+      }
+      if (!ballController.isAttached || ballController.currentOwner !== recvSprite) {
+        synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+        attachBallToPlayer(scene, ballSprite, recvSprite, {
+          reason: "rim_runner_burst_pass_retry",
+          debugInfo: { reason: "rim_runner_burst_pass_retry" },
+        });
+      }
+    }
+  }
+
+  if (secondary.length) {
+    await Promise.all(secondary);
+  }
 }
 
 /**

@@ -50,6 +50,26 @@ def _player_x(p: Any, default: float = 50.0) -> float:
     return default
 
 
+def _player_y(p: Any, default: float = 25.0) -> float:
+    c = getattr(p, "coords", None) or {}
+    if isinstance(c, dict):
+        try:
+            return float(c.get("y", default))
+        except (TypeError, ValueError):
+            return default
+    return default
+
+
+def _y_toward_25(py: float, max_step: int = 6) -> float:
+    """Move defensive y at most ``max_step`` toward 25 (grid)."""
+    target = 25.0
+    delta = target - py
+    if delta == 0:
+        return py
+    step = int(max(-max_step, min(max_step, delta)))
+    return float(max(1, min(49, int(round(py + step)))))
+
+
 def resolve_rim_runner_player(
     off_lineup: Dict[str, Any],
     game_state: dict,
@@ -169,92 +189,153 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     }
 
     pg = off_lineup.get("PG")
-    sg = off_lineup.get("SG")
     rr = resolve_rim_runner_player(off_lineup, game_state, off_team, rebounder, is_away_offense)
 
     rid = getattr(rebounder, "player_id", None) if rebounder else None
-    pg_id = getattr(pg, "player_id", None) if pg else None
-    sg_id = getattr(sg, "player_id", None) if sg else None
     rr_id = getattr(rr, "player_id", None) if rr else None
 
-    # SG rebounds + PG is rim runner → SG dribbles to outlet spot (no pass to PG)
-    sg_rebounds_pg_rr = bool(
-        sg and rid == sg_id and rr_id == pg_id
-    )
+    if not rr:
+        rr = off_lineup.get("PG")
 
     outlet_defender = _pick_outlet_defender(def_lineup, rebounder) if rebounder else None
 
-    # --- Outlet chain ---
-    ball_handler: Any = None
-    if sg_rebounds_pg_rr:
-        ball_handler = sg
-        fb_roles["outlet_passer"] = None
-        # Treat as outlet-style receiver for FB_A stats (no pass; ball starts with SG)
-        fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
-        fb_roles["outlet_score"] = None
-    elif rebounder and (rid == pg_id or rr_id == pg_id):
-        # PG rebounded OR PG is rim runner → outlet to SG
-        first = sg or pg
-        ball_handler = first
-        if rebounder != first:
-            fb_roles["outlet_passer"] = rid
-            fb_roles["outlet_receiver"] = getattr(first, "player_id", None)
-            rc = getattr(rebounder, "coords", None) or {}
-            fb_roles["outlet_passer_x"] = rc.get("x")
-            fb_roles["outlet_passer_y"] = rc.get("y")
-            fb_roles["outlet_score"] = calculate_outlet_pass_score(rebounder)
+    x_dir = -1 if is_away_offense else 1
+    rr_x0 = _player_x(rr)
+    rr_y0 = _player_y(rr)
+    rr_attrs = getattr(rr, "attributes", {}) or {}
+    movement_factor = random.randint(1, 100)
+    burst_threshold_anim = (
+        0.6 * float(rr_attrs.get("AG", 0) or 0)
+        + 0.2 * float(rr_attrs.get("IQ", 0) or 0)
+        + 0.2 * float(rr_attrs.get("CH", 0) or 0)
+    )
+    burst_anim_success = movement_factor < burst_threshold_anim
+    dx_burst = random.randint(20, 25) if burst_anim_success else random.randint(9, 14)
+    rr_new_x = float(max(4, min(97, int(round(rr_x0 + x_dir * dx_burst)))))
+    if rr_y0 > 24:
+        rr_new_y = float(random.randint(30, 35))
     else:
-        # Primary outlet ball handler: PG (Covert release player is not used on Rim Runner / 32)
-        ball_handler = pg
-        if rebounder and ball_handler and rebounder != ball_handler:
-            fb_roles["outlet_passer"] = rid
-            fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
-            rc = getattr(rebounder, "coords", None) or {}
-            fb_roles["outlet_passer_x"] = rc.get("x")
-            fb_roles["outlet_passer_y"] = rc.get("y")
-            fb_roles["outlet_score"] = calculate_outlet_pass_score(rebounder)
-        else:
-            fb_roles["outlet_passer"] = None
-            fb_roles["outlet_receiver"] = None
-            fb_roles["outlet_score"] = None
+        rr_new_y = float(random.randint(15, 20))
 
+    receive_ty = 15.0 if rr_new_y > 24 else 35.0
+
+    offense_players = [p for p in off_lineup.values() if p is not None]
+    best_p: Any = None
+    best_d2 = float("inf")
+    best_tx = 50.0
+    for p in offense_players:
+        pid = getattr(p, "player_id", None)
+        if rr_id is not None and pid is not None and str(pid) == str(rr_id):
+            continue
+        px = _player_x(p)
+        py = _player_y(p)
+        tx_raw = px + 8 * x_dir
+        tx = min(tx_raw, 40.0) if not is_away_offense else max(tx_raw, 60.0)
+        tx = float(max(4, min(97, int(round(tx)))))
+        dy = receive_ty - py
+        d2 = (tx - px) ** 2 + dy * dy
+        if d2 < best_d2:
+            best_d2 = d2
+            best_p = p
+            best_tx = tx
+
+    if best_p is None:
+        best_p = pg or rebounder
+        if best_p is None:
+            best_p = next(p for p in offense_players if p)
+        px = _player_x(best_p)
+        tx_raw = px + 8 * x_dir
+        tx_clamped = min(tx_raw, 40.0) if not is_away_offense else max(tx_raw, 60.0)
+        best_tx = float(max(4, min(97, int(round(tx_clamped)))))
+
+    skip_outlet_pass = bool(
+        rebounder is not None
+        and best_p is not None
+        and getattr(rebounder, "player_id", None) == getattr(best_p, "player_id", None)
+    )
+
+    ball_handler = best_p
     if ball_handler is None:
         ball_handler = pg or next(p for p in off_lineup.values() if p)
+
+    if skip_outlet_pass:
+        fb_roles["outlet_passer"] = None
+        fb_roles["outlet_receiver"] = rid
+        fb_roles["outlet_score"] = None
+    else:
+        fb_roles["outlet_passer"] = rid
+        fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
+        fb_roles["outlet_score"] = calculate_outlet_pass_score(rebounder) if rebounder else None
+
+    rc = getattr(rebounder, "coords", None) or {}
+    fb_roles["outlet_passer_x"] = rc.get("x") if rebounder else None
+    fb_roles["outlet_passer_y"] = rc.get("y") if rebounder else None
+
+    od_id = None
+    od_to: Optional[Dict[str, float]] = None
+    if rebounder and outlet_defender:
+        od_id = getattr(outlet_defender, "player_id", None)
+        px_passer = _player_x(rebounder)
+        py_passer = _player_y(rebounder)
+        od_tx = float(max(4, min(97, int(round(px_passer + (2 if not is_away_offense else -2))))))
+        od_to = {"x": od_tx, "y": py_passer}
+
+    off_ids = {str(getattr(p, "player_id", None)) for p in off_lineup.values() if p}
+    passer_id = str(rid) if rid is not None else None
+    recv_id = str(getattr(ball_handler, "player_id", None)) if ball_handler else None
+    od_id_s = str(od_id) if od_id is not None else None
+    rr_id_s = str(rr_id) if rr_id is not None else ""
+
+    other_moves: List[Dict[str, Any]] = []
+    for pl in list(off_lineup.values()) + list(def_lineup.values()):
+        if not pl:
+            continue
+        pid = str(getattr(pl, "player_id", None))
+        if pid == rr_id_s or pid == passer_id or pid == recv_id or (od_id_s and pid == od_id_s):
+            continue
+        px = _player_x(pl)
+        py = _player_y(pl)
+        nx = max(4, min(97, int(round(px + x_dir * random.randint(1, 4)))))
+        if pid in off_ids:
+            ny = float(py)
+        else:
+            ny = float(_y_toward_25(py))
+        other_moves.append(
+            {"player_id": getattr(pl, "player_id", None), "to_x": float(nx), "to_y": float(ny)}
+        )
+
+    recv_id_val = getattr(ball_handler, "player_id", None)
+    fb_roles["rim_runner_burst_phase"] = {
+        "rr_id": rr_id,
+        "rr_from": {"x": rr_x0, "y": rr_y0},
+        "rr_to": {"x": rr_new_x, "y": rr_new_y},
+        "burst_success": burst_anim_success,
+        "movement_factor": movement_factor,
+        "burst_threshold": burst_threshold_anim,
+        "skip_outlet_pass": skip_outlet_pass,
+        "outlet_passer_id": None if skip_outlet_pass else rid,
+        "outlet_receiver_id": recv_id_val,
+        "receiver_to": {"x": best_tx, "y": receive_ty},
+        "outlet_defender_id": od_id,
+        "outlet_defender_to": od_to,
+        "other_players": other_moves,
+        "is_away_offense": is_away_offense,
+    }
 
     fb_roles["ball_handler"] = ball_handler
     fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
     fb_roles["rim_runner_id"] = rr_id
 
-    # Outlet coords for animation (reuse release coords if present)
-    most_recent = _find_most_recent_shot_turn(game)
-    bh_id = getattr(ball_handler, "player_id", None)
-    bh_x, bh_y = None, None
-    if most_recent and bh_id:
-        rel = most_recent.get("defense_release_coords") or {}
-        if bh_id in rel:
-            bh_x = rel[bh_id].get("x")
-            bh_y = rel[bh_id].get("y")
-        if bh_x is None:
-            gb = most_recent.get("offense_getback_coords") or {}
-            if bh_id in gb:
-                bh_x = gb[bh_id].get("x")
-                bh_y = gb[bh_id].get("y")
-    if bh_x is None:
-        bh_x = _player_x(ball_handler)
-        bh_y = float((getattr(ball_handler, "coords", {}) or {}).get("y", 25))
-
-    fb_roles["ball_handler_outlet_x"] = bh_x
-    fb_roles["ball_handler_outlet_y"] = bh_y
+    fb_roles["ball_handler_outlet_x"] = best_tx
+    fb_roles["ball_handler_outlet_y"] = receive_ty
     fb_roles["ball_handler_move_x"] = 0
     fb_roles["ball_handler_move_y"] = 0
     fb_roles["is_away_offense"] = is_away_offense
     fb_roles["is_steal_entry"] = False
+    most_recent = _find_most_recent_shot_turn(game)
     fb_roles["getback_player_ids"] = (most_recent or {}).get("offense_getback") or []
 
-    fb_roles["defense"] = []  # animator may need; fill minimally
-    target_is_away = is_away_offense
-
-    fb_roles["defense"] = get_in_play_defenders(ball_handler, def_lineup, target_is_away)
+    fb_roles["defense"] = get_in_play_defenders(ball_handler, def_lineup, is_away_offense)
 
     # --- Step A: outlet contest ---
     off_attrs = getattr(rebounder, "attributes", {}) if rebounder else {}
@@ -309,8 +390,15 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         apply_fast_break_cg_time(result, shot_attempted=False)
         return result
 
+    bp = fb_roles.get("rim_runner_burst_phase") or {}
+    rr_to = bp.get("rr_to")
+    recv_to = bp.get("receiver_to")
+    if rr and isinstance(rr_to, dict):
+        rr.coords = {"x": rr_to["x"], "y": rr_to["y"]}
+    if ball_handler and isinstance(recv_to, dict):
+        ball_handler.coords = {"x": recv_to["x"], "y": recv_to["y"]}
+
     # --- Burst ---
-    most_recent = _find_most_recent_shot_turn(game)
     getback_ids = (most_recent or {}).get("offense_getback") or []
     primary_def, in_getback = _primary_burst_defender(
         def_lineup, list(getback_ids), is_away_offense, rr
