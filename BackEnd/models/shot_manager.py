@@ -21,6 +21,7 @@ from BackEnd.constants import (
 from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
 from BackEnd.utils.shared import (
     apply_scoring,
+    get_fast_break_chance,
     get_time_elapsed,
     calc_skeleton_time_elapsed,
     calc_skeleton_step_timing_contract,
@@ -41,6 +42,12 @@ from BackEnd.utils.shared import (
     calculate_block_spot,
 )
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
+from BackEnd.constants.fast_break_play_types import (
+    COVERT_RELEASE,
+    RIM_RUNNER,
+    THIRTY_TWO,
+    play_key_for_fast_break_entry,
+)
 
 
 class ShotManager:
@@ -737,25 +744,54 @@ class ShotManager:
         # get_name_safe already imported at top of file
         shooter_name = get_name_safe(shooter)
         
-        # DREB → Fast Break: Covert Release (see docs/To Do/FB_Update_Brief.md; steal FB unchanged)
+        # DREB → Fast Break (HCO shots only): FB eligibility from offense aggression (`get_fast_break_chance`).
+        # Play key from `play_key_for_fast_break_entry` — Covert-only defense release + coords (Rim Runner / 32: all crash).
+        # `_shot_dreb_fb_play_key` is consumed on DREB → copied to `pending_dreb_fb_play_key` for the resolver (single roll).
         from BackEnd.engine.fast_break_trigger import FastBreakTrigger
         from BackEnd.engine import covert_release as cr
 
-        release_chance = FastBreakTrigger.DEFENSE_RELEASE_CHANCES.get(defense_fast_breaks_value, 0.0)
-        defense_releases = random.random() < release_chance
         defense_release_list = []
-        if defense_releases:
-            rp = cr.select_covert_release_position(
-                def_team.lineup,
-                self.game,
-                shooter,
-                shot_step_index,
-                shooter_pos,
-                off_team,
-            )
-            if rp:
-                defense_release_list = [rp]
-        defense_rebounders = [pos for pos in def_team.lineup.keys() if pos not in defense_release_list]
+        if roles.get("is_fast_break"):
+            defense_rebounders = list(def_team.lineup.keys())
+            self.game_state.pop("_shot_dreb_fb_play_key", None)
+        else:
+            dreb_fb_eligible = random.random() < get_fast_break_chance(self.game)
+            shot_fb_pk = None
+            if dreb_fb_eligible:
+                shot_fb_pk = play_key_for_fast_break_entry(True)
+                if shot_fb_pk == COVERT_RELEASE:
+                    release_chance = FastBreakTrigger.DEFENSE_RELEASE_CHANCES.get(
+                        defense_fast_breaks_value, 0.0
+                    )
+                    defense_releases = random.random() < release_chance
+                    if defense_releases:
+                        rp = cr.select_covert_release_position(
+                            def_team.lineup,
+                            self.game,
+                            shooter,
+                            shot_step_index,
+                            shooter_pos,
+                            off_team,
+                        )
+                        if rp:
+                            defense_release_list = [rp]
+                    defense_rebounders = [
+                        pos for pos in def_team.lineup.keys() if pos not in defense_release_list
+                    ]
+                    if not defense_release_list:
+                        shot_fb_pk = None
+                elif shot_fb_pk in (RIM_RUNNER, THIRTY_TWO):
+                    defense_rebounders = list(def_team.lineup.keys())
+                else:
+                    defense_rebounders = list(def_team.lineup.keys())
+                    shot_fb_pk = None
+            else:
+                defense_rebounders = list(def_team.lineup.keys())
+
+            if shot_fb_pk:
+                self.game_state["_shot_dreb_fb_play_key"] = shot_fb_pk
+            else:
+                self.game_state.pop("_shot_dreb_fb_play_key", None)
 
         release_pos = defense_release_list[0] if defense_release_list else None
         release_player = def_team.lineup.get(release_pos) if release_pos else None
@@ -836,6 +872,7 @@ class ShotManager:
         # 🎯 Shot is Made
         # ------------------------
         if made:
+            self.game_state.pop("_shot_dreb_fb_play_key", None)
             foul_out_info = {"fouled_out": False}  # default so elif BLOCKING_FOUL can safely read it
             # Debug logging for assist tracking
             if passer:
@@ -1192,6 +1229,7 @@ class ShotManager:
 
                     if stat == "OREB":
                         possession_flips = False
+                        self.game_state.pop("_shot_dreb_fb_play_key", None)
                         if self.game_state.get("final_turn"):
                             result["quarter_ends_after"] = True
                             result["next_play_type"] = None
@@ -1419,6 +1457,7 @@ class ShotManager:
                 if not is_fast_break:
                     if stat == "OREB":
                         possession_flips = False
+                        self.game_state.pop("_shot_dreb_fb_play_key", None)
                         if self.game_state.get("final_turn"):
                             result["quarter_ends_after"] = True
                             result["next_play_type"] = None
@@ -1455,19 +1494,25 @@ class ShotManager:
                                 result["force_foul_after_dreb"] = True
                                 next_play_type = "HCO"
                                 self.game_state["last_release_player"] = None
+                                self.game_state.pop("_shot_dreb_fb_play_key", None)
+                                self.game_state.pop("pending_dreb_fb_play_key", None)
                                 self.game_state["offensive_state"] = "HCO"
                                 result["next_play_type"] = next_play_type
                             else:
-                                # NEW FAST BREAK LOGIC:
-                                next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
-                                if defense_release_list:
-                                    release_pos = defense_release_list[0]
-                                    release_player = def_team.lineup.get(release_pos)
-                                    if release_player:
-                                        self.game_state["last_release_player"] = release_player
+                                shot_fb_key = self.game_state.pop("_shot_dreb_fb_play_key", None)
+                                self.game_state["last_release_player"] = None
+                                if shot_fb_key:
+                                    self.game_state["pending_dreb_fb_play_key"] = shot_fb_key
+                                    next_play_type = "FAST_BREAK"
+                                    if shot_fb_key == COVERT_RELEASE and defense_release_list:
+                                        release_pos = defense_release_list[0]
+                                        rp_fb = def_team.lineup.get(release_pos)
+                                        if rp_fb:
+                                            self.game_state["last_release_player"] = rp_fb
+                                    result["pending_dreb_fb_play_key"] = shot_fb_key
                                 else:
                                     next_play_type = "HCO"
-                                    self.game_state["last_release_player"] = None
+                                    self.game_state.pop("pending_dreb_fb_play_key", None)
                                 self.game_state["offensive_state"] = next_play_type
                                 result["next_play_type"] = next_play_type
 

@@ -4,14 +4,16 @@ Fast break play identifiers (DREB → outlet) and steal bucket.
 - Code / persistence: snake_case keys below.
 - UI label for ``THIRTY_TWO`` is "32" (see Fast_Break_System / FB_Update_Brief).
 
-``thirty_two`` is not implemented yet. **TEMP:** DREB outlet fast breaks always use
-``rim_runner`` (revert 50/50 vs ``covert_release`` in ``play_key_for_fast_break_entry`` when done testing).
+``thirty_two`` uses the same resolution stub as Rim Runner until a dedicated 32 path exists.
+DREB play key is chosen on the shot attempt (``shot_manager``) and passed via
+``pending_dreb_fb_play_key``; ``play_key_for_fast_break_entry`` is only a fallback when pending is missing.
 ``after_steal`` is used for steal entry.
 """
 
 from __future__ import annotations
 
 import copy
+import random
 from typing import Any, Dict
 
 # Canonical keys (match scouting_data["offense"]["fast_break_plays"])
@@ -59,7 +61,6 @@ def play_key_for_fast_break_entry(is_dreb_outlet: bool) -> str:
     """Which scouting bucket gets an attempt for this FB possession."""
     if not is_dreb_outlet:
         return AFTER_STEAL
-    # TEMP: 100% Rim Runner on DREB fast breaks (revert to 50/50 vs COVERT_RELEASE when done testing).
-    # Until user FB play settings ship, intended mix was:
-    # return RIM_RUNNER if random.random() < 0.5 else COVERT_RELEASE
-    return RIM_RUNNER
+    # Until user FB play settings ship: 50/50 Rim Runner vs Covert Release on DREB outlet.
+    # Normal path: key is pre-set on the shot turn as ``pending_dreb_fb_play_key``.
+    return RIM_RUNNER if random.random() < 0.5 else COVERT_RELEASE

@@ -846,11 +846,17 @@ def resolve_fast_break_logic(game: "GameManager"):
     rebound = game_state.get("last_rebound") == "DREB"
     from BackEnd.constants.fast_break_play_types import (
         RIM_RUNNER,
+        THIRTY_TWO,
         ensure_fast_break_plays,
         play_key_for_fast_break_entry,
     )
 
-    fb_play_key = play_key_for_fast_break_entry(rebound)
+    if rebound:
+        fb_play_key = game_state.pop("pending_dreb_fb_play_key", None)
+        if fb_play_key is None:
+            fb_play_key = play_key_for_fast_break_entry(True)
+    else:
+        fb_play_key = play_key_for_fast_break_entry(rebound)
 
     off_scouting = off_team.scouting_data
     def_scouting = def_team.scouting_data
@@ -872,7 +878,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
     )
 
-    if rebound and fb_play_key == RIM_RUNNER:
+    if rebound and fb_play_key in (RIM_RUNNER, THIRTY_TWO):
         from BackEnd.engine.rim_runner_fast_break import resolve_rim_runner_fast_break
 
         return resolve_rim_runner_fast_break(game, fb_play_key)
@@ -884,9 +890,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Choose outlet passer (rebounder)
         rebounder = game_state.get("last_rebounder", None)
         
-        # ✅ Use release player as outlet receiver (if available), otherwise fallback to random ball handler
-        # The release player is the defender who released for fast break during the shot
-        # This ensures outlet passes go to the player who was set up to receive it
+        # ✅ Covert Release only: release player = outlet receiver from shot turn; else random PG/SG/SF
         release_player = game_state.get("last_release_player", None)
         
         if release_player:

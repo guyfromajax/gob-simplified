@@ -3112,10 +3112,8 @@ class TurnManager:
                         logging.error(f"❌ [PUTBACK MISS => REBOUND] Cannot set pending_oreb - rebounder not found! ID: {rebounder_id}, Type: {rebound_type}")
                     elif rebound_data.get("rebound_type") == "DREB":
                         # Defensive rebound - preserve next_play_type from original shot
-                        # Fast Break is determined DURING the shot (by defense tempo), not after DREB
-                        # If defense_release_list was set during the shot, next_play_type was already set to FAST_BREAK
-                        # If not, it was set to HCO. We preserve that decision here.
-                        # Legacy: Don't recalculate fast break here - it causes bugs where fast break has no release player
+                        # FB eligibility + play key are set on the miss shot turn (`pending_dreb_fb_play_key` / offensive_state).
+                        # Don't recalculate here.
                         next_play_type = game_state.get("offensive_state", "HCO")
                         result["next_play_type"] = next_play_type
                 

@@ -23,10 +23,11 @@
    - Increment `def_scouting["defense"]["vs_Fast_Break"]["used"]`
 
 3. **Determine Entry Type and Set Roles**
-   - **DREB Entry**: First resolve **which DREB-outlet play** is active: `play_key_for_fast_break_entry(True)` in `BackEnd/constants/fast_break_play_types.py` returns **`rim_runner`** or **`covert_release`** (currently **50/50** until user FB play settings ship). **`resolve_fast_break_logic()`** branches: **`rim_runner`** → `BackEnd/engine/rim_runner_fast_break.py` (`resolve_rim_runner_fast_break`); **`covert_release`** → existing flow below.
+   - **DREB Entry (shot turn, `shot_manager`)**: **Fast-break eligibility** is independent of defense release: `random.random() < get_fast_break_chance(game)` where the chance comes from the **new offense team’s** `strategy_settings["aggression"]` (0–4 → 0%, 25%, 50%, 75%, 100%) — same helper used elsewhere for transition FB. If eligible, **`play_key_for_fast_break_entry(True)`** runs **once** on that shot (**50/50** `rim_runner` vs `covert_release` until user FB settings ship). The key is stored as **`game_state["pending_dreb_fb_play_key"]`** when the miss resolves to **DREB** and **`next_play_type == "FAST_BREAK"`** (cleared on makes, OREB, force foul after DREB, and consumed in the resolver). **Covert Release only**: defense then rolls `DEFENSE_RELEASE_CHANCES[fast_breaks]` and `select_covert_release_position` → `defense_release_list`, coords, and `last_release_player` on DREB. **Rim Runner / `thirty_two`**: no release list, no release coords, all defenders crash the board; `last_release_player` stays unset.
+   - **`resolve_fast_break_logic()`**: For DREB, **`fb_play_key = game_state.pop("pending_dreb_fb_play_key", None)`**; if missing (legacy/tests), fallback **`play_key_for_fast_break_entry(True)`**. Branches: **`rim_runner`** or **`thirty_two`** → `resolve_rim_runner_fast_break(game, fb_play_key)`; **`covert_release`** → existing Covert flow below.
    - **DREB Entry (Covert Release path only)**: 
      - Outlet passer = rebounder (from `game_state["last_rebounder"]`)
-     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF. **Release selection** (Covert Release): on each shot, defense rolls release using `DEFENSE_RELEASE_CHANCES[fast_breaks]` (`fast_breaks` 0–4); if releasing, the releaser is the defender **farthest from the rim in x** among those **not** guarding the shooter (zone assignment at shot step, else man matchup). **IQ reads**: roll `the_read` 1–100 → **good_release** if `the_read <` release player IQ; roll `d_read` 1–100 once → each get-back player gets **good_d_release** if `d_read <` that player’s IQ. **AG**: outlet and get-back **x-band floors** use each player’s **AG** (see **Covert Release** below). Final coords sampled in `covert_release.py` (HOME orientation; mirror **x** when the future FB offense team is away).
+     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF. **Release selection** runs **only when the pending play key is `covert_release`**: defense rolls release using `DEFENSE_RELEASE_CHANCES[fast_breaks]` (`fast_breaks` 0–4); if releasing, the releaser is the defender **farthest from the rim in x** among those **not** guarding the shooter (zone assignment at shot step, else man matchup). **IQ reads**: roll `the_read` 1–100 → **good_release** if `the_read <` release player IQ; roll `d_read` 1–100 once → each get-back player gets **good_d_release** if `d_read <` that player’s IQ. **AG**: outlet and get-back **x-band floors** use each player’s **AG** (see **Covert Release** below). Final coords sampled in `covert_release.py` (HOME orientation; mirror **x** when the future FB offense team is away).
      - Calculate outlet pass score: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100
    - **Steal Entry**:
      - Ball handler = stealer (from `game_state["last_stealer"]`)
@@ -100,8 +101,8 @@
 The **Fast Break** system handles transition offense situations that occur after defensive rebounds or steals. The system determines whether a fast break results in a defensive stop or a shot attempt based on defender positioning relative to the ball handler after the outlet pass.
 
 **Key Functions:**
-- **DREB outlet**: Release chance + Covert Release selection + coords in `shot_manager` / `BackEnd/engine/covert_release.py` (`FastBreakTrigger.DEFENSE_RELEASE_CHANCES`; `can_trigger_from_dreb()` is a **legacy** PG/SG helper, not the live DREB path). **Rim Runner** DREB possessions use separate resolution in `BackEnd/engine/rim_runner_fast_break.py` after play key selection.
-- `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py` (delegates to Rim Runner module when `fast_break_play == rim_runner` on DREB outlet)
+- **DREB outlet**: On the **HCO shot** turn, `shot_manager` rolls FB eligibility (`get_fast_break_chance`), then play key; **Covert** runs release chance + `covert_release` selection + coords; **Rim Runner / 32** skip release. `FastBreakTrigger.DEFENSE_RELEASE_CHANCES` applies **only** to Covert. `can_trigger_from_dreb()` is a **legacy** PG/SG helper, not the live DREB path. **Rim Runner / 32** DREB possessions resolve in `BackEnd/engine/rim_runner_fast_break.py` after **`pending_dreb_fb_play_key`** is consumed.
+- `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py` (delegates to Rim Runner module when DREB + play key is **`rim_runner`** or **`thirty_two`**)
 - `capture_fast_break_animation()` - Builds animation packet in `BackEnd/models/animator.py`
 - `runFastBreakSequence()` - Orchestrates fast break animation in `FrontEnd/static/js/phaser/animation/fastBreak.js`
 
@@ -111,15 +112,15 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 
 #### Covert Release (`covert_release`)
 
-- **When**: DREB → outlet fast break and `play_key_for_fast_break_entry` returns **`covert_release`** (shared 50/50 with Rim Runner until settings ship).
+- **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** (from the prior miss shot turn) is **`covert_release`** (50/50 vs Rim Runner until settings ship).
 - **What**: Release defender selection, IQ/AG bands, outlet receiver coords, then **defensive stop vs shot** per Steps 4–8 (geography + AG/BH vs AG/OD skill check, shot via `resolve_shot`).
-- **Code**: `BackEnd/engine/covert_release.py`, `resolve_fast_break_logic()` (Covert branch), `shot_manager` for release/get-back coords on the prior shot turn.
+- **Code**: `BackEnd/engine/covert_release.py`, `resolve_fast_break_logic()` (Covert branch), `shot_manager` for Covert-only release/get-back coords on the prior shot turn.
 
 #### Rim Runner (`rim_runner`)
 
-- **When**: DREB → outlet fast break and `play_key_for_fast_break_entry` returns **`rim_runner`**.
+- **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** is **`rim_runner`**.
 - **Designation**: Optional per team — `game_state["rim_runner_by_team_id"][str(team_id)]` = player id (set from lineup / `simulate-quarter` payload). If omitted, finisher = offensive player **closest to the attacking basket** at DREB (with transfer rule when the designated player is the rebounder; see implementation). Lineup UI: optional Rim Runner select on **Set Lineup**; URL params `home_rim_runner_player_id` / `away_rim_runner_player_id` → game payload.
-- **Outlet chain**: If **PG is rebounder OR PG is the rim runner finisher** → first receiver **SG** (outlet to SG). If **SG rebounds and PG is the finisher** → **no outlet to PG**; SG is ball handler (dribble to outlet spot). Else → **release player** (Covert Release) or PG fallback; clears `last_release_player` after use.
+- **Outlet chain**: If **PG is rebounder OR PG is the rim runner finisher** → first receiver **SG** (outlet to SG). If **SG rebounds and PG is the finisher** → **no outlet to PG**; SG is ball handler (dribble to outlet spot). Else → **PG** as primary outlet ball handler (no Covert `last_release_player` on this path). `roles["rim_runner_sequence"]` is **true** only for **`rim_runner`**, not **`thirty_two`**.
 - **Resolution (high level)**: Dedicated module **`resolve_rim_runner_fast_break()`** — outlet contest → burst (`fb_open`) → ball-handler IQ read → pass vs hold → if pass: open lane → fast break shot; if not open → intercept tiers / bat OOB (`rim_runner_bat_oob`, SIP) / completion to shot. Uses team attrs **`fb_efficiency`** / **`fb_opp_modifier`** (clamped **−10…+10**) and `random.randint(1,6)` where applicable.
 - **Outlet contest (step A)**: Offense: `(PS*0.5 + ST*0.3 + IQ*0.2) * d6` vs defense: `(IQ*0.5 + OD*0.3 + ST*0.2) * d6`; offense adds **`+3 × fb_efficiency`**, defense adds **`+2 × fb_opp_modifier`**; if offense **≤** defense, settle to HCO (outlet “denied” style result). Defender for contest: nearest defender to passer by x (implementation).
 - **Burst**: Offense `(AG*0.7 + IQ*0.3) * d6` vs primary defender — get-back pool: `(IQ*1.0 + AG*0.5) * d6`; else `(IQ*0.5 + AG*0.5) * d6`. **`fb_open`** if offense score **>** defense score.
@@ -129,7 +130,7 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 
 #### 32 (`thirty_two`)
 
-- **Status**: **Not implemented** — key exists for scouting/UI; no engine branch yet. Future: add subsection here when coded.
+- **Status**: **Stub** — same resolver as Rim Runner (`resolve_rim_runner_fast_break`) for DREB outlet until a dedicated 32 path exists. No Covert release on the shot turn (same geometry rules as Rim Runner). `roles["rim_runner_sequence"]` is **false** for **`thirty_two`** so UI/announcements can distinguish later.
 
 #### After Steal (`after_steal`)
 
@@ -139,7 +140,7 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 ### When Fast Break Activates
 
 **Trigger Conditions:**
-- After defensive rebounds when the defense rolls a release per `fast_breaks` and Covert Release assigns a releaser (see `covert_release.py`). The **FAST_BREAK** turn then runs either **Covert Release** or **Rim Runner** resolution depending on `play_key_for_fast_break_entry` (see *Fast break plays* above).
+- After **DREB** on a miss when **`get_fast_break_chance`** succeeds on the **shot attempt**; **`pending_dreb_fb_play_key`** selects **Covert** (requires successful Covert release setup) or **Rim Runner** / **32** (no release). **`next_play_type = "FAST_BREAK"`** no longer requires a non-empty defense release list.
 - After steals with fast break chance (`FastBreakTrigger.can_trigger_from_steal()`)
 - Set via `next_play_type = "FAST_BREAK"` in turn result
 
@@ -512,7 +513,7 @@ The outlet passer tracks:
   - `MAKE`, or
   - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
   - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
-- **`fast_break_plays`** (Offense): Per-play **`A`** / **`S`** for `covert_release`, `rim_runner`, `thirty_two`, `after_steal` (see `BackEnd/constants/fast_break_play_types.py`). **DREB outlet**: each attempt increments **`rim_runner`** or **`covert_release`** per `play_key_for_fast_break_entry` (currently **50/50**). **Steal entry** → **`after_steal`**. **`thirty_two`** key exists; engine path not implemented yet. Same success rules as **`Fast_Break_Success`**, applied to the active play bucket.
+- **`fast_break_plays`** (Offense): Per-play **`A`** / **`S`** for `covert_release`, `rim_runner`, `thirty_two`, `after_steal` (see `BackEnd/constants/fast_break_play_types.py`). **DREB outlet**: play key is chosen on the **miss shot** turn and stored in **`pending_dreb_fb_play_key`**; the resolver pops it and increments the matching bucket (**50/50** `rim_runner` vs `covert_release` if not pre-set). **Steal entry** → **`after_steal`**. **`thirty_two`**: stub resolution via Rim Runner module. Same success rules as **`Fast_Break_Success`**, applied to the active play bucket.
 - Turn payloads include **`fast_break_play`** for the active bucket.
 - **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
 - **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
@@ -541,15 +542,16 @@ The outlet passer tracks:
   - `can_trigger_from_steal()` - Steal → fast break chance
 - `BackEnd/engine/covert_release.py`
   - Covert Release: defender farthest from rim (excluding shooter’s matchup); **AG**-based x floors + **IQ** (`good_release` / `good_d_release`) y/x bands; HOME orientation + **x** mirror for away FB offense
-- `BackEnd/constants/fast_break_play_types.py` — Play keys, `default_fast_break_plays()`, `ensure_fast_break_plays()`, `play_key_for_fast_break_entry()` (DREB: **50/50** `rim_runner` vs `covert_release` until user settings ship)
+- `BackEnd/constants/fast_break_play_types.py` — Play keys, `default_fast_break_plays()`, `ensure_fast_break_plays()`, `play_key_for_fast_break_entry()` (DREB: **50/50** when called; live path uses **`pending_dreb_fb_play_key`** from `shot_manager`)
 - `BackEnd/engine/rim_runner_fast_break.py` — **`resolve_rim_runner_fast_break()`** — Rim Runner DREB outlet play (outlet contest, burst, read, pass/intercept/bat/shot)
 - `BackEnd/engine/phase_resolution.py`
-  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt; increments **`fast_break_plays`** and sets **`fast_break_play`**; **early return** to Rim Runner resolver when DREB + `rim_runner`
+  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt; increments **`fast_break_plays`** and sets **`fast_break_play`**; **early return** to Rim Runner resolver when DREB + **`rim_runner`** or **`thirty_two`**
   - Uses coordinate comparison in HOME orientation
   - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
 - `BackEnd/models/shot_manager.py`
-  - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` — pass each player’s **AG** into `covert_release` for DREB/outlet positioning
-  - Stores `offense_getback_coords` and `defense_release_coords` in turn results
+  - **DREB FB (HCO shots)**: `get_fast_break_chance` → play key → Covert-only release pipeline or all-defenders-crash for RR/32; sets **`_shot_dreb_fb_play_key`** → **`pending_dreb_fb_play_key`** on DREB → FAST_BREAK
+  - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` — Covert outlet positioning only when play key is **`covert_release`**
+  - Stores `offense_getback_coords` and `defense_release_coords` in turn results (release coords empty for RR/32)
 - `BackEnd/models/animator.py`
   - `capture_fast_break_animation()` - Builds animation packet
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`

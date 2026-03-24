@@ -154,7 +154,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     game_state["last_rebound"] = ""
 
     rebounder = game_state.get("last_rebounder")
-    release_player = game_state.get("last_release_player")
+    game_state.pop("last_release_player", None)
 
     is_away_offense = off_team.team_id == game.away_team.team_id
 
@@ -165,7 +165,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         "outlet_passer": None,
         "outlet_receiver": None,
         "fast_break_play": fb_play_key,
-        "rim_runner_sequence": True,
+        "rim_runner_sequence": fb_play_key == RIM_RUNNER,
     }
 
     pg = off_lineup.get("PG")
@@ -192,7 +192,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         # Treat as outlet-style receiver for FB_A stats (no pass; ball starts with SG)
         fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
         fb_roles["outlet_score"] = None
-        game_state["last_release_player"] = None
     elif rebounder and (rid == pg_id or rr_id == pg_id):
         # PG rebounded OR PG is rim runner → outlet to SG
         first = sg or pg
@@ -204,10 +203,9 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             fb_roles["outlet_passer_x"] = rc.get("x")
             fb_roles["outlet_passer_y"] = rc.get("y")
             fb_roles["outlet_score"] = calculate_outlet_pass_score(rebounder)
-        game_state["last_release_player"] = None
     else:
-        # Covert release receiver or fallback PG
-        ball_handler = release_player or pg
+        # Primary outlet ball handler: PG (Covert release player is not used on Rim Runner / 32)
+        ball_handler = pg
         if rebounder and ball_handler and rebounder != ball_handler:
             fb_roles["outlet_passer"] = rid
             fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
@@ -219,7 +217,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             fb_roles["outlet_passer"] = None
             fb_roles["outlet_receiver"] = None
             fb_roles["outlet_score"] = None
-        game_state["last_release_player"] = None
 
     if ball_handler is None:
         ball_handler = pg or next(p for p in off_lineup.values() if p)
@@ -305,7 +302,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "offense_team_id": off_team.team_id,
             "roles": fb_roles,
             "fast_break": True,
-            "fast_break_play": RIM_RUNNER,
+            "fast_break_play": fb_play_key,
             "rim_runner_outlet_failed": True,
         }
         _record_fast_break_stats(fb_roles, result, game)
@@ -371,7 +368,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "offense_team_id": off_team.team_id,
             "roles": fb_roles,
             "fast_break": True,
-            "fast_break_play": RIM_RUNNER,
+            "fast_break_play": fb_play_key,
             "rim_runner_fb_open": fb_open,
             "rim_runner_correct_read": correct_read,
         }
@@ -422,7 +419,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         turn_result["animations"] = fb_animations
         turn_result["roles"] = fb_roles
         turn_result["fast_break"] = True
-        turn_result["fast_break_play"] = RIM_RUNNER
+        turn_result["fast_break_play"] = fb_play_key
         turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
 
         if turn_result.get("result_type") == "MAKE":
@@ -431,7 +428,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             )
             from BackEnd.constants.fast_break_play_types import ensure_fast_break_plays
 
-            ensure_fast_break_plays(off_team.scouting_data["offense"])[RIM_RUNNER]["S"] += 1
+            ensure_fast_break_plays(off_team.scouting_data["offense"])[fb_play_key]["S"] += 1
         elif turn_result.get("result_type") == "MISS":
             def_team.scouting_data["defense"]["vs_Fast_Break"]["success"] = (
                 def_team.scouting_data["defense"]["vs_Fast_Break"].get("success", 0) + 1
@@ -468,7 +465,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         turn_result["animations"] = fb_animations
         turn_result["roles"] = fb_roles
         turn_result["fast_break"] = True
-        turn_result["fast_break_play"] = RIM_RUNNER
+        turn_result["fast_break_play"] = fb_play_key
         turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
         _record_fast_break_stats(fb_roles, turn_result, game)
         apply_fast_break_cg_time(turn_result, shot_attempted=True)
@@ -496,7 +493,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             tr["next_turn"] = "HCO"
         tr["text"] = "Fast Break! " + tr.get("text", "")
         tr["fast_break"] = True
-        tr["fast_break_play"] = RIM_RUNNER
+        tr["fast_break_play"] = fb_play_key
         tr["roles"] = fb_roles
         tr["rim_runner_interception"] = True
         _record_fast_break_stats(fb_roles, tr, game)
@@ -515,7 +512,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "offense_team_id": off_team.team_id,
             "current_turn": "FAST_BREAK",
             "fast_break": True,
-            "fast_break_play": RIM_RUNNER,
+            "fast_break_play": fb_play_key,
             "rim_runner_bat_oob": True,
             "roles": fb_roles,
             "animations": Animator(game).capture_fast_break_animation(fb_roles, False, None),
@@ -554,7 +551,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     turn_result["animations"] = fb_animations
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True
-    turn_result["fast_break_play"] = RIM_RUNNER
+    turn_result["fast_break_play"] = fb_play_key
     turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
     if turn_result.get("result_type") == "MAKE":
         off_team.scouting_data["offense"]["Fast_Break_Success"] = (
@@ -562,7 +559,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         )
         from BackEnd.constants.fast_break_play_types import ensure_fast_break_plays
 
-        ensure_fast_break_plays(off_team.scouting_data["offense"])[RIM_RUNNER]["S"] += 1
+        ensure_fast_break_plays(off_team.scouting_data["offense"])[fb_play_key]["S"] += 1
     elif turn_result.get("result_type") == "MISS":
         def_team.scouting_data["defense"]["vs_Fast_Break"]["success"] = (
             def_team.scouting_data["defense"]["vs_Fast_Break"].get("success", 0) + 1

@@ -13,6 +13,7 @@ This test verifies that outlet pass roles are correctly assigned.
 import pytest
 from unittest.mock import patch, MagicMock
 from BackEnd.engine.phase_resolution import resolve_fast_break_logic
+from BackEnd.constants.fast_break_play_types import COVERT_RELEASE
 from tests.test_utils import build_mock_game
 
 
@@ -37,10 +38,11 @@ class TestFastBreakOutletPassRoles:
         rebounder = game.home_team.lineup["C"]  # Use center as rebounder
         rebounder.player_id = "rebounder_c_id"
         
-        # Set up game state for DREB → Fast Break
+        # Set up game state for DREB → Fast Break (Covert path; resolver uses pending key from shot turn)
         game.game_state["last_rebound"] = "DREB"
         game.game_state["last_rebounder"] = rebounder
         game.game_state["offensive_state"] = "FAST_BREAK"
+        game.game_state["pending_dreb_fb_play_key"] = COVERT_RELEASE
         
         # Mock random calls to ensure predictable results
         # Ball handler is chosen from PG/SG/SF (75%/15%/10%)
@@ -102,6 +104,7 @@ class TestFastBreakOutletPassRoles:
         game.game_state["last_rebound"] = "DREB"
         game.game_state["last_rebounder"] = rebounder
         game.game_state["offensive_state"] = "FAST_BREAK"
+        game.game_state["pending_dreb_fb_play_key"] = COVERT_RELEASE
         
         # Force ball_handler to be PG (same as rebounder)
         with patch('BackEnd.engine.phase_resolution.random.choices') as mock_choices, \
@@ -166,6 +169,7 @@ class TestFastBreakOutletPassRoles:
         game.game_state["last_rebound"] = "DREB"
         game.game_state["last_rebounder"] = None  # No rebounder set
         game.game_state["offensive_state"] = "FAST_BREAK"
+        game.game_state["pending_dreb_fb_play_key"] = COVERT_RELEASE
         
         # Mock to ensure we get a SHOT result (not DEFENSIVE_STOP) so we can check roles
         with patch('BackEnd.engine.phase_resolution.random.choices') as mock_choices, \
