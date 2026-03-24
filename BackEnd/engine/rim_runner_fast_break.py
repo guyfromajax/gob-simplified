@@ -279,7 +279,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     fb_opp = max(-10, min(10, fb_opp))
 
     outlet_ok = (
-        outlet_offense_score + (3 * fb_eff)
+        (1.5 * outlet_offense_score) + (3 * fb_eff)
         > outlet_defense_score + (2 * fb_opp)
     )
 
