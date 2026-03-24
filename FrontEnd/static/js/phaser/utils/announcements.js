@@ -6,6 +6,7 @@
 
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import gameStore from '../../state/gameStore.js';
+import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
 
 let currentAnnouncement = null;
 
@@ -255,7 +256,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
   
   if (timing === 'start') {
     // Announcements at turn start
-    if (turnData.fast_break) {
+    if (turnData.fast_break && ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS) {
       showAnnouncement("Fast Break!", offenseTeam);
       // Don't return - may have more announcements at end
     }

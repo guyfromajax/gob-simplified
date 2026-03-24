@@ -7,6 +7,13 @@
  * All coordinates are in HOME orientation (basket at x=91 for home, x=9 for away).
  */
 
+/**
+ * When false, skips the **"Fast Break!"** entry banners (turn start / FAST_BREAK context).
+ * Makes, misses, rebounds, fouls, "Fast Break Score!", "Great Stop!", etc. are unchanged.
+ * Set to `true` after tuning to restore entry announcements.
+ */
+export const ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = false;
+
 // Ball Handler Movement (Defensive Stop / Shot Attempt)
 export const BALL_HANDLER_MOVE_X_MIN = 5;
 export const BALL_HANDLER_MOVE_X_MAX = 10;

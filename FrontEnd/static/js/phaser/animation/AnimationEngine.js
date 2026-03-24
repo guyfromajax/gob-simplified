@@ -761,7 +761,12 @@ export class AnimationEngine {
     
     // ✅ PHASE 2.6: Display text (moved from animateGameTurns.js)
     const { appendToTextScroll } = await import('../utils/textScroll.js');
-    appendToTextScroll(turnData.text || (turnData.fast_break ? "Fast Break! Defense stops the break!" : "Defense stops the break!"));
+    const { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } = await import('../constants/fastBreakConstants.js');
+    const fbStopFallback =
+      turnData.fast_break && ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS
+        ? "Fast Break! Defense stops the break!"
+        : "Defense stops the break!";
+    appendToTextScroll(turnData.text || fbStopFallback);
     
     // Note: onUpdate and updateDebugScore are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }

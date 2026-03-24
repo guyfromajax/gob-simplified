@@ -13,6 +13,7 @@
 import { showAnnouncement, showAndOneAnnouncement } from './announcements.js';
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import gameStore from '../../state/gameStore.js';
+import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
 
 function getSecondaryColorForTeam(scene, teamId) {
   if (!scene?.simData || teamId == null) return '#333333';
@@ -113,7 +114,9 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
 
     // ========== FAST BREAK ==========
     case 'FAST_BREAK':
-      showAnnouncement("Fast Break!", offenseTeam);
+      if (ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS) {
+        showAnnouncement("Fast Break!", offenseTeam);
+      }
       break;
 
     case 'RIM_RUNNER_BATTED_OOB':
