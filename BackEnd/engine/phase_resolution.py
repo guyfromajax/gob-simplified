@@ -26,7 +26,7 @@ from BackEnd.utils.shared import (
     calc_isotropic_segment_seconds,
     calc_pass_segment_seconds,
     clamp_turn_time_elapsed,
-    get_fast_break_chance,
+    fast_break_probability_from_slider,
     calculate_rebound_score,
     calculate_outlet_pass_score,
     resolve_offensive_rebound,
@@ -1790,7 +1790,10 @@ def resolve_free_throw_logic(game):
             if rebound_team == def_team:
                 possession_flips = True
                 text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
-                next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(game) else "HCO"
+                p_dreb = fast_break_probability_from_slider(
+                    def_team.strategy_settings.get("fast_breaks", 2)
+                )
+                next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
                 game_state["offensive_state"] = next_play_type
             else:
                 # Offensive rebound - store for separate turn processing
@@ -1885,9 +1888,12 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
         text = f"{stealer_name} jumps the pass"
-        fast_break_chance = get_fast_break_chance(game)
+        # Stealing team = def_team; single roll uses their aggression only.
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
         fast_break_roll = random.random()
-        if fast_break_roll < fast_break_chance:
+        if fast_break_roll < p_steal:
             game_state["offensive_state"] = "FAST_BREAK"
             text += " and takes it the other way!"
         else:
@@ -1909,7 +1915,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         logging.debug(f"🏀 [STEAL FLOW] HCO Steal detected:")
         logging.debug(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
         logging.debug(f"  Victim: {get_name_safe(ball_handler)} (ID: {victim_id})")
-        logging.debug(f"  Fast break chance: {fast_break_chance:.2%}, Roll: {fast_break_roll:.3f}")
+        logging.debug(f"  Fast break chance: {p_steal:.2%}, Roll: {fast_break_roll:.3f}")
         logging.debug(f"  Next offensive_state: {game_state['offensive_state']}")
         logging.debug(f"  last_stealer SET: {get_name_safe(defender)} (ID: {stealer_id})")
 
@@ -5461,7 +5467,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
     next_play_type = None
     if result_type == "STEAL":
-        if random.random() < get_fast_break_chance(game):
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
+        if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
             game_state["offensive_state"] = "FAST_BREAK"
         else:
@@ -6615,7 +6624,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
     next_play_type = None
     if result_type == "STEAL":
-        if random.random() < get_fast_break_chance(game):
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
+        if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
             game_state["offensive_state"] = "FAST_BREAK"
         else:

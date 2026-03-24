@@ -21,7 +21,7 @@ from BackEnd.constants import (
 from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
 from BackEnd.utils.shared import (
     apply_scoring,
-    get_fast_break_chance,
+    fast_break_probability_from_slider,
     get_time_elapsed,
     calc_skeleton_time_elapsed,
     calc_skeleton_step_timing_contract,
@@ -744,10 +744,10 @@ class ShotManager:
         # get_name_safe already imported at top of file
         shooter_name = get_name_safe(shooter)
         
-        # DREB → Fast Break (HCO shots only): FB eligibility from offense aggression (`get_fast_break_chance`).
-        # Play key from `play_key_for_fast_break_entry` — Covert-only defense release + coords (Rim Runner / 32: all crash).
-        # `_shot_dreb_fb_play_key` is consumed on DREB → copied to `pending_dreb_fb_play_key` for the resolver (single roll).
-        from BackEnd.engine.fast_break_trigger import FastBreakTrigger
+        # DREB → Fast Break (HCO shots only): single roll on shot attempt using **rebounding team's**
+        # `fast_breaks` (def_team here). No second roll for Covert — if eligible + Covert, pick release position.
+        # Play key from `play_key_for_fast_break_entry` — Rim Runner / 32: all crash.
+        # `_shot_dreb_fb_play_key` → `pending_dreb_fb_play_key` on DREB miss.
         from BackEnd.engine import covert_release as cr
 
         defense_release_list = []
@@ -755,31 +755,27 @@ class ShotManager:
             defense_rebounders = list(def_team.lineup.keys())
             self.game_state.pop("_shot_dreb_fb_play_key", None)
         else:
-            dreb_fb_eligible = random.random() < get_fast_break_chance(self.game)
+            p_fb = fast_break_probability_from_slider(defense_fast_breaks_value)
+            dreb_fb_eligible = random.random() < p_fb
             shot_fb_pk = None
             if dreb_fb_eligible:
                 shot_fb_pk = play_key_for_fast_break_entry(True)
                 if shot_fb_pk == COVERT_RELEASE:
-                    release_chance = FastBreakTrigger.DEFENSE_RELEASE_CHANCES.get(
-                        defense_fast_breaks_value, 0.0
+                    rp = cr.select_covert_release_position(
+                        def_team.lineup,
+                        self.game,
+                        shooter,
+                        shot_step_index,
+                        shooter_pos,
+                        off_team,
                     )
-                    defense_releases = random.random() < release_chance
-                    if defense_releases:
-                        rp = cr.select_covert_release_position(
-                            def_team.lineup,
-                            self.game,
-                            shooter,
-                            shot_step_index,
-                            shooter_pos,
-                            off_team,
-                        )
-                        if rp:
-                            defense_release_list = [rp]
+                    if rp:
+                        defense_release_list = [rp]
+                    else:
+                        shot_fb_pk = None
                     defense_rebounders = [
                         pos for pos in def_team.lineup.keys() if pos not in defense_release_list
                     ]
-                    if not defense_release_list:
-                        shot_fb_pk = None
                 elif shot_fb_pk in (RIM_RUNNER, THIRTY_TWO):
                     defense_rebounders = list(def_team.lineup.keys())
                 else:

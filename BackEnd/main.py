@@ -23,7 +23,6 @@ from BackEnd.utils.shared import (
     calculate_screen_score,
     choose_rebounder,
     calculate_rebound_score,
-    get_fast_break_chance,
     get_time_elapsed,
     apply_help_defense_if_triggered,
     resolve_offensive_rebound,

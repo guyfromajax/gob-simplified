@@ -8,16 +8,18 @@ Extracted from shot_manager.py for better organization and extensibility.
 import random
 from typing import List, Optional, Tuple
 
+from BackEnd.utils.shared import SLIDER_TO_FAST_BREAK_PROB
+
 
 class FastBreakTrigger:
     """Handles fast break trigger determination logic."""
     
-    # Defense release chances based on fast_breaks value (0-4)
-    DEFENSE_RELEASE_CHANCES = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
+    # Same table as DREB/steal initiation (see `fast_break_probability_from_slider` in shared.py).
+    DEFENSE_RELEASE_CHANCES = SLIDER_TO_FAST_BREAK_PROB
     
     @staticmethod
     def can_trigger_from_dreb(
-        defense_tempo_value: int,  # Note: parameter name kept for backward compatibility, but now uses fast_breaks setting
+        defense_tempo_value: int,  # Legacy name; value is fast_breaks (0-4)
         shooter_pos: str,
         def_team_lineup: dict
     ) -> Tuple[bool, List[str], List[str]]:

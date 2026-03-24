@@ -25,7 +25,7 @@ This document describes how to resolve **which DREB fast-break play** (Covert Re
 1. **Single decision point** for DREB FB **play key** when the offense is about to lose possession on a miss → DREB → FB (same “moment” as today’s positioning block in `shot_manager`).  
 2. **Execute Covert release pipeline** (select position, `defense_release` IDs, `defense_release_coords`, `last_release_player`) **only if** `fast_break_play == covert_release`.  
 3. For **Rim Runner** and **`thirty_two`** (until specified otherwise): **no** Covert release list, **no** release coords, **no** `last_release_player`; defense treats all lineup spots as rebounders for that shot’s geometry (unless a future spec adds a different rule for 32).  
-4. **Decouple** “we go to `FAST_BREAK` on this DREB” from `defense_release_list`. Use a **dedicated FB eligibility roll** (reuse or align with `get_fast_break_chance` / team `fast_breaks` — product decision).  
+4. **Decouple** “we go to `FAST_BREAK` on this DREB” from `defense_release_list`. **Done:** single `fast_break_probability_from_slider(fast_breaks)` on shot / FT DREB; see `Fast_Break_System.md`.  
 5. **`resolve_fast_break_logic`** uses **stored** play key; **no second roll** for DREB outlet.  
 6. Remove redundant branches and outdated coupling to reduce bloat.
 
@@ -50,7 +50,7 @@ This document describes how to resolve **which DREB fast-break play** (Covert Re
 1. **Offense get-back** (existing): `offense_getback_list`, rebounders, coords — **unchanged** unless product wants get-back to depend on play type (defer unless requested).
 
 2. **DREB fast-break eligibility (new / decoupled)**  
-   - Roll or compute **whether** a defensive rebound on this miss would lead to **FAST_BREAK** vs **HCO** using team settings / `get_fast_break_chance` (align with existing `phase_resolution` steal/DREB FB chance semantics — **document the chosen rule** in code comments).  
+   - Implemented: DREB uses rebounding team `fast_breaks`; steals use stealing team `aggression` (`fast_break_probability_from_slider` in `shared.py`).  
    - This boolean **must not** depend on `defense_release_list`.
 
 3. **If not eligible for DREB FB**  
@@ -147,7 +147,7 @@ Alternatively: compute play key **once** at start of miss handling and store on 
 
 ## Open product decisions (resolve before coding)
 
-1. **Exact FB eligibility formula** for DREB (reuse `get_fast_break_chance` only, or combine with defense `fast_breaks` release odds, or separate sliders).  
+1. **Exact FB eligibility formula** for DREB (see `fast_break_probability_from_slider` + `SLIDER_TO_FAST_BREAK_PROB`).  
 2. **Covert release select fails** (no `rp`): HCO vs retry vs force PG release.  
 3. **`thirty_two`**: same as RR (no release) until spec says otherwise.  
 4. Whether **offense get-back** should differ by play type (probably no for v1).

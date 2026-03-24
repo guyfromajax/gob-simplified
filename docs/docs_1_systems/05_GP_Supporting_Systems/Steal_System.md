@@ -12,7 +12,7 @@
    - Y Clamp: 3-47 (`STEAL_HCO_SETUP_Y_MIN = 3`, `STEAL_HCO_SETUP_Y_MAX = 47`)
 3. **Other Players Movement (HCO Setup)**: X: 15-30 spots toward new offense basket, Y: ±6 spots (clamped 4-46)
 4. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` (same as DREB Fast Breaks)
-5. **Fast Break Chance (Aggression-Based)**: `{0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}` (based on offensive team's aggression setting)
+5. **Fast break initiation (steals)**: Single roll using the **stealing team’s** `strategy_settings["aggression"]` (0–4) mapped through `fast_break_probability_from_slider()` — same `{0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}` table as `SLIDER_TO_FAST_BREAK_PROB` in `BackEnd/utils/shared.py`. The stealing team is **`def_team`** at steal resolution (defender recorded the steal).
 
 **Steal System Flow (6 Steps)**
 
@@ -23,9 +23,9 @@
    - `game_state["last_stealer_coords"]` stored (position at moment of steal)
 
 2. **Determine Next Turn Type**
-   - Fast break chance determined by `get_fast_break_chance()` using **offensive team's aggression setting**
-   - If fast break chance succeeds → `offensive_state = "FAST_BREAK"`
-   - If fast break chance fails → `offensive_state = "HCO"`
+   - One roll: `random.random() < fast_break_probability_from_slider(stealing_team["aggression"])` where **stealing team** = defense / `def_team` (see `resolve_turnover_logic`, FCP/HCT steal branches in `phase_resolution.py`)
+   - If the roll succeeds → `offensive_state = "FAST_BREAK"`
+   - If it fails → `offensive_state = "HCO"`
 
 3. **Steal Entry (Fast Break Path)**
    - **Trigger**: `offensive_state = "FAST_BREAK"` after steal
@@ -77,7 +77,7 @@ The **Steal System** handles steal-initiated transitions for Fast Breaks and HCO
 
 **Steal Entry (Fast Break):**
 - After a steal occurs in FCP, HCT, or HCO turns
-- When the next turn is determined to be a Fast Break (based on team aggression setting)
+- When the next turn is determined to be a Fast Break (single roll: **stealing team’s** aggression)
 - Ball is already attached to the stealer from the steal turn
 - No outlet pass occurs (steal-initiated Fast Breaks bypass outlet phase)
 
@@ -89,7 +89,7 @@ The **Steal System** handles steal-initiated transitions for Fast Breaks and HCO
 
 **State Flow (Fast Break):**
 1. Steal occurs → Ball attached to stealer
-2. Fast break chance determined by `get_fast_break_chance()` using team **aggression** setting
+2. **Single** fast break roll using **stealing team’s** **aggression** (`fast_break_probability_from_slider`)
 3. If Fast Break → Steal Entry step executes
 4. Stealer moves 5-10 x spots toward basket, ±4 y spots (clamped to 3-47)
 5. After movement, defensive stop vs shot determination occurs
@@ -97,7 +97,7 @@ The **Steal System** handles steal-initiated transitions for Fast Breaks and HCO
 
 **State Flow (HCO):**
 1. Steal occurs → Ball attached to stealer
-2. Fast break chance determined by `get_fast_break_chance()` using team **aggression** setting
+2. **Single** fast break roll using **stealing team’s** **aggression** (`fast_break_probability_from_slider`)
 3. If HCO (fast break chance fails) → Steal HCO Setup step executes
 4. Stealer moves 3-7 x spots away from basket, ±3 y spots (clamped to 3-47)
 5. All 9 other players move 15-30 x spots toward new offense basket, ±6 y spots
@@ -361,29 +361,18 @@ for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
 }
 ```
 
-### Fast Break Chance Determination
+### Fast Break Chance Determination (Steals)
 
-**Team Aggression Setting:**
-- Fast break chance after steals is determined by the **offensive team's aggression setting** (not tempo)
-- Function: `get_fast_break_chance()` in `BackEnd/utils/shared.py`
-- Aggression levels: 0-4 (0 = 0%, 1 = 25%, 2 = 50%, 3 = 75%, 4 = 100%)
-
-**Implementation:**
-```python
-def get_fast_break_chance(game):
-    """
-    Determine fast break probability based on the OFFENSIVE team's aggression setting.
-    Called after defensive rebounds or steals when the team is now on offense.
-    """
-    off_team = game.offense_team
-    level = off_team.strategy_settings.get("aggression", 2)
-    return [0.0, 0.25, 0.5, 0.75, 1.0][level]
-```
+**Stealing team’s aggression:**
+- After a steal, **one** roll uses **`fast_break_probability_from_slider(def_team.strategy_settings.get("aggression", 2))`** — the **stealing** team is **`def_team`** (the defense that recorded the steal) at resolution time.
+- Levels 0–4 map to 0%, 25%, 50%, 75%, 100% via `SLIDER_TO_FAST_BREAK_PROB` in `BackEnd/utils/shared.py`.
+- **Not** the victim / prior offense team’s aggression.
 
 **Usage:**
-- Called in `resolve_turnover_logic()` when `turnover_type == "STEAL"`
-- Determines whether `offensive_state = "FAST_BREAK"` or `offensive_state = "HCO"`
-- Same function used for both steal-initiated and DREB-initiated fast breaks
+- `resolve_turnover_logic()` when `turnover_type == "STEAL"`
+- FCP and HCT steal outcomes in `phase_resolution.py` (same `def_team` + aggression rule)
+
+**DREB fast breaks** (missed shot → rebound) use the **rebounding team’s `fast_breaks`** with the **same** probability table — see **`Fast_Break_System.md`** — not aggression.
 
 ### Key Files
 
@@ -394,7 +383,7 @@ def get_fast_break_chance(game):
 - `BackEnd/engine/phase_resolution.py`
   - `resolve_turnover_logic()` - Steal outcome handling and fast break chance determination (lines 1544-1610)
 - `BackEnd/constants/fast_break_constants.py` - Steal entry and steal HCO setup constants
-- `BackEnd/utils/shared.py` - `get_fast_break_chance()` (aggression-based fast break chance)
+- `BackEnd/utils/shared.py` - `fast_break_probability_from_slider()`, `SLIDER_TO_FAST_BREAK_PROB`
 
 **Frontend:**
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
