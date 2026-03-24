@@ -138,6 +138,7 @@ class TournamentManager:
                     "inside": 2,   # Inside focus preference
                     "attack": 2,   # Attack focus preference
                     "outside": 2,  # Outside focus preference
+                    "fast_breaks": 2,  # Defense release / fast-break defense (aligned with Game Plan)
                     "tempo": 2,   # Tempo preference
                     "defense": 2,  # Man vs Zone defense preference
                     "aggression": 2,  # Defensive aggression level

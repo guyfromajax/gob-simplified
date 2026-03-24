@@ -466,9 +466,17 @@ class FranchiseManager:
                 "pt_efficiency": team_attrs["pt_efficiency"],
             }
             strategy_settings = {
-                "offense": 2, "inside": 2, "attack": 2, "outside": 2,
-                "tempo": 2, "defense": 2, "aggression": 2,
-                "hc_trap": 2, "fc_press": 2, "rebounding": 2,
+                "offense": 2,
+                "inside": 2,
+                "attack": 2,
+                "outside": 2,
+                "fast_breaks": 2,
+                "tempo": 2,
+                "defense": 2,
+                "aggression": 2,
+                "hc_trap": 2,
+                "fc_press": 2,
+                "rebounding": 2,
             }
             # Roster for this team in this franchise (player _id UUID strings); used for roster/stats lookups
             team_player_ids = team.get("player_ids", [])
