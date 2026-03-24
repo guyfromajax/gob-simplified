@@ -7,6 +7,7 @@ from BackEnd.constants import POSITION_LIST, PLAYCALLS, BOX_SCORE_KEYS
 from copy import deepcopy
 import random
 
+from BackEnd.utils.shared import sync_lineup_coords_from_turn
 from BackEnd.utils.stat_updater import update_game_stats
 from BackEnd.utils.transition_validator import validate_transition, get_turn_type_from_offensive_state
 from BackEnd.utils.transition_event_detector import detect_instigating_event, validate_event_matches_transition
@@ -405,6 +406,8 @@ class GameManager:
 
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))
+        if isinstance(turn_result, dict):
+            sync_lineup_coords_from_turn(self, turn_result)
         self._check_lineups_for_foul_out(turn_result)
         if turn_result.get("fouled_out"):
             self._handle_foul_out_timeout(turn_result)

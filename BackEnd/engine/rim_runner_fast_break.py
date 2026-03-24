@@ -15,7 +15,6 @@ from BackEnd.models.animator import Animator
 from BackEnd.utils.shared import (
     calculate_outlet_pass_score,
     unpack_game_context,
-    update_player_coords_from_animations,
 )
 from BackEnd.engine.phase_resolution import (
     _record_fast_break_stats,
@@ -500,7 +499,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             rr.coords = shot_spot
             roles["shot_spot"] = shot_spot
 
-        update_player_coords_from_animations(game, [])
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
 
@@ -547,7 +545,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         if fb_roles.get("_bh_final_x") is not None:
             rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             roles["shot_spot"] = rr.coords
-        update_player_coords_from_animations(game, [])
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
         turn_result["animations"] = fb_animations
@@ -633,7 +630,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     if fb_roles.get("_bh_final_x") is not None:
         rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         roles["shot_spot"] = rr.coords
-    update_player_coords_from_animations(game, [])
     turn_result = game.shot_manager.resolve_shot(roles)
     game_state.pop("fast_break_shot_threshold_override", None)
     turn_result["animations"] = fb_animations

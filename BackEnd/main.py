@@ -380,8 +380,7 @@ def simulate_quarter(
                 game_state=gm.game_state,
                 source="bypass:SIP_RESUME",
             )
-            gm.turns.append(sip_turn)
-            gm.text_log.append(sip_turn.get("text", "Side inbound"))
+            gm._append_turn(sip_turn, text=sip_turn.get("text", "Side inbound"))
             # No-impact turn: SIDE_INBOUND does not consume game clock.
             logging.info(f"✅ TIMEOUT RESUME: SIP turn created with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id}), total turns: {len(gm.turns)}")
         elif resume_from_timeout and timeout_next_play_type == "FREE_THROW":
@@ -404,8 +403,7 @@ def simulate_quarter(
                 game_state=gm.game_state,
                 source="bypass:SIP_RESUME",
             )
-            gm.turns.append(sip_turn)
-            gm.text_log.append(sip_turn.get("text", "Side inbound"))
+            gm._append_turn(sip_turn, text=sip_turn.get("text", "Side inbound"))
             # No-impact turn: SIDE_INBOUND does not consume game clock.
         
         # ✅ TIMEOUT: Only clear timeout state and return early if we actually handled a timeout resume
@@ -493,7 +491,7 @@ def simulate_quarter(
             game_state=gm.game_state,
             source="bypass:OPENING_TIP",
         )
-        gm.turns.append(tip_turn)
+        gm._append_turn(tip_turn, text=tip_turn.get("text", ""))
         # Keep opening tip start clock fixed at quarter start baseline (Q1=8:00, OT=4:00).
     elif q == 2:
         # Q2: Team that didn't win opening tip gets possession via BASELINE_INBOUND
@@ -536,8 +534,7 @@ def simulate_quarter(
             game_state=gm.game_state,
             source="bypass:BIP_QUARTER_START",
         )
-        gm.turns.append(inbound_turn)
-        gm.text_log.append(inbound_turn["text"])
+        gm._append_turn(inbound_turn, text=inbound_turn["text"])
         
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
@@ -585,8 +582,7 @@ def simulate_quarter(
             game_state=gm.game_state,
             source="bypass:BIP_QUARTER_START",
         )
-        gm.turns.append(inbound_turn)
-        gm.text_log.append(inbound_turn["text"])
+        gm._append_turn(inbound_turn, text=inbound_turn["text"])
         
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
@@ -634,8 +630,7 @@ def simulate_quarter(
             game_state=gm.game_state,
             source="bypass:BIP_QUARTER_START",
         )
-        gm.turns.append(inbound_turn)
-        gm.text_log.append(inbound_turn["text"])
+        gm._append_turn(inbound_turn, text=inbound_turn["text"])
         
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]

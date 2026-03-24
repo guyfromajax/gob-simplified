@@ -29,7 +29,6 @@ from BackEnd.utils.shared import (
     get_foul_and_turnover_positions,
     get_name_safe,
     get_player_position,
-    update_player_coords_from_animations,
     serialize_lineup,
     getAwayTeamCoords,
     calc_pass_segment_seconds,
@@ -914,8 +913,8 @@ class TurnManager:
         # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
         result["turn_count"] = len(self.game.turns) + 1
         # result["possession_team_id"] = self.game.offense_team.team_id
-        update_player_coords_from_animations(self.game, result["animations"])
-        
+        # Player.coords sync: GameManager._append_turn → sync_lineup_coords_from_turn
+
         # Print turn result summary for debugging
         # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
         turn_num = len(self.game.turns) + 1

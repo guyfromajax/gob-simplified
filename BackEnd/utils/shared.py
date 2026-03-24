@@ -1,6 +1,8 @@
 import math
 import random
 import logging
+from typing import Any, Dict, List, Optional, Tuple
+
 from BackEnd.constants import (
     TURNOVER_CALC_DICT,
     POSITION_LIST,
@@ -1804,13 +1806,131 @@ def getAwayTeamCoords(coordsDict):
            coordsDict[position] = {"x": xSpot, "y": ySpot}
        return coordsDict
 
-def update_player_coords_from_animations(game, animations):
+
+# Turn payload keys: player_id -> {x, y} in HOME grid. Later keys override earlier for same id.
+TURN_COORDS_OVERLAY_KEYS: Tuple[str, ...] = (
+    "defense_release_coords",
+    "offense_getback_coords",
+)
+
+
+def _norm_player_id(pid: Any) -> Optional[str]:
+    if pid is None:
+        return None
+    return str(pid)
+
+
+def _final_xy_from_animation_row(anim: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    """Resolve final grid position from one animation row (matches FE last-step / end usage)."""
+    if not isinstance(anim, dict):
+        return None
+    end = anim.get("end")
+    if isinstance(end, dict):
+        x, y = end.get("x"), end.get("y")
+        if x is not None and y is not None:
+            return {"x": float(x), "y": float(y)}
+    movement = anim.get("movement") or []
+    for step in reversed(movement):
+        if not isinstance(step, dict):
+            continue
+        coords = step.get("coords")
+        if isinstance(coords, dict):
+            x, y = coords.get("x"), coords.get("y")
+            if x is not None and y is not None:
+                return {"x": float(x), "y": float(y)}
+        x, y = step.get("x"), step.get("y")
+        if x is not None and y is not None:
+            return {"x": float(x), "y": float(y)}
+    return None
+
+
+def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]) -> None:
+    """
+    Apply final positions from an animation list to matching lineup players only.
+    Used mid-resolution (e.g. before resolve_shot) and inside sync_lineup_coords_from_turn.
+    """
+    if not animations:
+        return
     for anim in animations:
-        pid = anim["playerId"]
-        for team in [game.home_team, game.away_team]:
-            for player in team.lineup.values():
-                if player is not None and hasattr(player, 'player_id') and player.player_id == pid:
-                    player.coords = anim["end"]
+        if not isinstance(anim, dict):
+            continue
+        pid = anim.get("playerId")
+        if pid is None:
+            continue
+        final = _final_xy_from_animation_row(anim)
+        if final is None:
+            continue
+        ns = _norm_player_id(pid)
+        if not ns:
+            continue
+        for team in (game.home_team, game.away_team):
+            for player in (team.lineup or {}).values():
+                if player is None:
+                    continue
+                if _norm_player_id(getattr(player, "player_id", None)) == ns:
+                    player.coords = dict(final)
+                    break
+
+
+def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None:
+    """
+    After a turn is finalized, align all ten active players' ``Player.coords`` with the
+    same spatial data the frontend uses: carry-forward, then animation finals, then
+    explicit overlay maps on the turn (get-back / release).
+    """
+    if game is None or not isinstance(turn_result, dict):
+        return
+
+    positions: Dict[str, Dict[str, float]] = {}
+    for team in (game.home_team, game.away_team):
+        for player in (team.lineup or {}).values():
+            if player is None or getattr(player, "player_id", None) is None:
+                continue
+            pid = _norm_player_id(player.player_id)
+            if not pid:
+                continue
+            c = getattr(player, "coords", None) or {}
+            if isinstance(c, dict) and c.get("x") is not None and c.get("y") is not None:
+                positions[pid] = {"x": float(c["x"]), "y": float(c["y"])}
+            else:
+                positions[pid] = {"x": 50.0, "y": 25.0}
+
+    animations = turn_result.get("animations")
+    if isinstance(animations, list):
+        for anim in animations:
+            if not isinstance(anim, dict):
+                continue
+            pid = anim.get("playerId")
+            if pid is None:
+                continue
+            final = _final_xy_from_animation_row(anim)
+            if final is None:
+                continue
+            ns = _norm_player_id(pid)
+            if ns:
+                positions[ns] = dict(final)
+
+    for key in TURN_COORDS_OVERLAY_KEYS:
+        block = turn_result.get(key)
+        if not isinstance(block, dict):
+            continue
+        for pid, coords in block.items():
+            if not isinstance(coords, dict):
+                continue
+            if coords.get("x") is None or coords.get("y") is None:
+                continue
+            ns = _norm_player_id(pid)
+            if ns:
+                positions[ns] = {"x": float(coords["x"]), "y": float(coords["y"])}
+
+    for team in (game.home_team, game.away_team):
+        for player in (team.lineup or {}).values():
+            if player is None or getattr(player, "player_id", None) is None:
+                continue
+            pid = _norm_player_id(player.player_id)
+            if pid and pid in positions:
+                player.coords = dict(positions[pid])
+
 
 def serialize_lineup(lineup_dict):
     return {

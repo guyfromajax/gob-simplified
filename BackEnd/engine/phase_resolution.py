@@ -34,7 +34,7 @@ from BackEnd.utils.shared import (
     unpack_game_context,
     calculate_bounce_spot,
     determine_rebounder,
-    update_player_coords_from_animations,
+    apply_coords_from_animations_list,
 )
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
@@ -1556,7 +1556,6 @@ def resolve_fast_break_logic(game: "GameManager"):
             shooter.coords = shot_spot
             roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
 
-        update_player_coords_from_animations(game, [])
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
 
@@ -4559,7 +4558,7 @@ def resolve_half_court_offense_logic(game):
 
     # 3. Shot Result
     # For SHOT path, animations was never set (it's only set inside event_type != "SHOT").
-    # Build animations from skeleton so update_player_coords_from_animations can sync coords before resolve_shot.
+    # Build animations from skeleton so apply_coords_from_animations_list can sync coords before resolve_shot.
     animations = []
     if skeleton and "steps" in skeleton:
         animator = Animator(game)
@@ -4629,7 +4628,7 @@ def resolve_half_court_offense_logic(game):
                 game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
     
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
-    update_player_coords_from_animations(game, animations)
+    apply_coords_from_animations_list(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
     shot_result = game.shot_manager.resolve_shot(roles)
     
@@ -5197,7 +5196,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
-        update_player_coords_from_animations(game, animations)
+        apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
@@ -6370,7 +6369,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
-        update_player_coords_from_animations(game, animations)
+        apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         

@@ -21,6 +21,8 @@
 
 **Key Files:**
 - `BackEnd/models/turn_manager.py` - Standard fields (Bucket 1), turn creation
+- `BackEnd/models/game_manager.py` - `_append_turn()` (single funnel for appending turns + **player coords sync**)
+- `BackEnd/utils/shared.py` - `sync_lineup_coords_from_turn()`, `apply_coords_from_animations_list()`
 - `BackEnd/models/shot_manager.py` - Shot-specific fields (Bucket 2)
 - `BackEnd/engine/phase_resolution.py` - FCP/HCT/Free Throw fields (Bucket 2), resolution calculations
 - `BackEnd/models/animator.py` - Animation data creation (Bucket 3)
@@ -30,9 +32,10 @@
 
 1. **Backend Turn Creation**: Handler creates result with Bucket 2 (bespoke fields)
 2. **Turn Manager Processing**: Adds Bucket 1 (standard fields) and calls Animator for Bucket 3
-3. **Result Serialization**: Complete turn data serialized to JSON and sent to frontend
-4. **Frontend Animation**: Receives turn data, uses all three buckets for routing, animation, and UI updates
-5. **Quarter Completion**: Final turn of quarter animated before quarter completion handling
+3. **Turn Append + Coords Sync**: `GameManager._append_turn()` appends the turn, then runs `sync_lineup_coords_from_turn()` so all **10 active players**’ `Player.coords` match the same spatial data the frontend uses for that turn (see **Player coordinates sync** below).
+4. **Result Serialization**: Complete turn data serialized to JSON and sent to frontend
+5. **Frontend Animation**: Receives turn data, uses all three buckets for routing, animation, and UI updates
+6. **Quarter Completion**: Final turn of quarter animated before quarter completion handling
 
 ## Long Form Documentation
 
@@ -177,12 +180,32 @@ Every turn result from the backend contains data organized into **three distinct
    ↓ Adds Bucket 1 (standard fields) to result
    ↓ Calls Animator to create Bucket 3 (animation data)
    
-3. Result serialized to JSON
+3. game_manager.py::_append_turn(result)
+   ↓ Appends to turns + text_log
+   ↓ sync_lineup_coords_from_turn(game, result)  ← aligns Player.coords for all 10 lineup players
+   
+4. Result serialized to JSON
    ↓ Sent to frontend
    
-4. Frontend receives complete turn data
+5. Frontend receives complete turn data
    ↓ Uses all three buckets for routing, animation, and UI updates
 ```
+
+#### Player coordinates sync (backend) ✅
+
+**Problem solved:** Logic that reads `Player.coords` on the next turn must match the floor layout implied by the turn the client just animated. Previously, only players appearing in `animations[]` had `coords` updated (`update_player_coords_from_animations`), and explicit maps such as **`offense_getback_coords`** / **`defense_release_coords`** were not applied to `Player.coords`, so some location-based logic could run on **stale** coordinates.
+
+**Single end-of-turn sync:** After every turn is appended via **`GameManager._append_turn()`**, **`sync_lineup_coords_from_turn(game, turn_result)`** (`BackEnd/utils/shared.py`) updates **all five home + five away** lineup players (non-`None` slots) using this **merge order**:
+
+1. **Carry forward** — Start from each player’s current `Player.coords` (default `50, 25` if missing).
+2. **Animations** — For each row in `turn_result["animations"]`, set final `{x, y}` from `end` if present, else from the **last** `movement[]` step’s `coords` (same family as the frontend track).
+3. **Explicit overlays** (fixed order; later wins for the same `player_id`): **`defense_release_coords`**, then **`offense_getback_coords`**.
+
+**Mid-turn shot resolution:** Before **`resolve_shot()`** in a few **`phase_resolution`** paths (HCO skeleton, FCP shot, HCT shot), **`apply_coords_from_animations_list(game, animations)`** applies only the animation list to matching players so shot/block math sees updated positions; the full **10-player** sync still runs when the turn is appended.
+
+**Quarter / bypass turns:** `BackEnd/main.py` routes opening tip, quarter-start baseline inbound, and timeout SIP turns through **`_append_turn`** so they receive the same sync (carry-forward if a turn has no spatial deltas).
+
+**Removed:** `update_player_coords_from_animations` and the duplicate coords call at the end of `run_micro_turn()` (replaced by the append-funnel sync).
 
 #### Key Design Principles
 

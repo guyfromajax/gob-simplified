@@ -29,6 +29,10 @@ FAST_BREAK_PLAY_KEYS = (
     AFTER_STEAL,
 )
 
+# TODO: Remove when user FB play weights ship and Rim Runner / Covert split is configurable.
+# When True, every DREB→outlet fast break uses Rim Runner (no Covert release roll on the shot turn).
+TEMP_FORCE_RIM_RUNNER_DREB_FB = True
+
 
 def default_fast_break_plays() -> Dict[str, Dict[str, int]]:
     """Fresh A/S counters per play (offense scouting only)."""
@@ -61,6 +65,8 @@ def play_key_for_fast_break_entry(is_dreb_outlet: bool) -> str:
     """Which scouting bucket gets an attempt for this FB possession."""
     if not is_dreb_outlet:
         return AFTER_STEAL
+    if TEMP_FORCE_RIM_RUNNER_DREB_FB:
+        return RIM_RUNNER
     # Until user FB play settings ship: 50/50 Rim Runner vs Covert Release on DREB outlet.
     # Normal path: key is pre-set on the shot turn as ``pending_dreb_fb_play_key``.
     return RIM_RUNNER if random.random() < 0.5 else COVERT_RELEASE
