@@ -1134,7 +1134,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   if (!shooterSprite) return;
   
   const isHomeOffense = shooterSprite.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const basket = getFastBreakAttackingBasket(isHomeOffense);
   
   // Ball handler moves to shot spot near rim (past the stopper)
   const shotSpot = {
@@ -1468,7 +1468,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   if (!shooterSprite) return;
   
   const isHomeOffense = shooterSprite.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const basket = getFastBreakAttackingBasket(isHomeOffense);
 
   // ✅ SS&S: Backend is single source of truth for shot spot (and defender spot)
   // Use turnData.shot_spot when present (grid coords, HOME orientation); else fallback to local random
@@ -2407,12 +2407,52 @@ function animateRebounders(
 }
 
 /**
+ * Same rim convention as `animateFastBreakShot` / `animateFastBreakShotWithStopper` (HOME grid).
+ */
+function getFastBreakAttackingBasket(isHomeOffense) {
+  return isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+}
+
+/**
+ * X band for get-back defenders to sprint toward the hoop the fast-break offense is attacking.
+ * Must match offense direction used for shot spots — do not hardcode one rim; away FB attacks low x.
+ */
+function getGetBackRetreatXRange(isHomeOffense) {
+  const basket = getFastBreakAttackingBasket(isHomeOffense);
+  if (isHomeOffense) {
+    return {
+      minX: 50,
+      maxX: Phaser.Math.Clamp(basket.x - 2, 4, 97),
+    };
+  }
+  return {
+    minX: Phaser.Math.Clamp(basket.x + 2, 4, 97),
+    maxX: 50,
+  };
+}
+
+function resolveFastBreakOffenseIsHome(playerSprites, ballHandlerId, turnData, scene) {
+  const bhSprite = ballHandlerId != null ? playerSprites[ballHandlerId] : null;
+  if (bhSprite?.team === "home") return true;
+  if (bhSprite?.team === "away") return false;
+  const oid =
+    turnData?.offense_team_id ??
+    turnData?.possession_team_id ??
+    scene?.offenseTeamId;
+  const hid = scene?.simData?.home_team_id;
+  if (oid != null && hid != null) {
+    return String(oid) === String(hid);
+  }
+  return true;
+}
+
+/**
  * Helper: Move all non-involved players to their positions
- * - Get-back players: chase toward basket (X: 50 to basket-15, Y: 15-35)
+ * - Get-back players: retreat band toward the **attacking** rim (same as shot animation), Y: 15–35
  * - Outlet passer & other trail players: same targets/tweens as animateRebounders (incl. early stop)
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
  * - Rebounders stop early when defensive stop is made (ball handler and stopper reach their spots)
- * 
+ *
  * @returns {Array} Array of tween references for rebounder animations (for early termination)
  */
 async function moveOtherPlayersToStandardPositions(
@@ -2457,13 +2497,17 @@ async function moveOtherPlayersToStandardPositions(
     // ✅ Only animate get-back players as defenders (not all players in defense list)
     // Rebounders are handled separately by animateRebounders() function
     if (getbackPlayerIdsSet.has(id)) {
-      // Retreat band toward home rim (high x). Do not use `basket` here—that is the *attacking* rim and
-      // flips with isHomeOffense, which sent defending get-backs the wrong way on away fast breaks.
-      const protectRimX = HOME_RIM_COORDS.x;
-      const minX = 50;
-      const maxX = Phaser.Math.Clamp(protectRimX - 2, 4, 97);
+      const isHomeOffense = resolveFastBreakOffenseIsHome(
+        playerSprites,
+        ballHandlerId,
+        turnData,
+        scene
+      );
+      const { minX, maxX } = getGetBackRetreatXRange(isHomeOffense);
+      const lo = Math.min(minX, maxX);
+      const hi = Math.max(minX, maxX);
       const targetSpot = {
-        x: Phaser.Math.Between(minX, maxX),
+        x: Phaser.Math.Between(lo, hi),
         y: Phaser.Math.Between(15, 35)
       };
       

@@ -570,6 +570,7 @@ The outlet passer tracks:
   - `animateFastBreakShot()` - Handles shot attempt (MAKE/MISS/BLOCK): shot spot move, ball to rim or block spot, then make/miss/block outcome (BLOCK: block announcement, bounce from block spot, rebound/DREB)
   - `animateFastBreakShotWithStopper()` - Same outcome handling for BLOCK (block spot target, block announcement, bounce from block spot, rebound/DREB)
   - `moveOtherPlayersToStandardPositions()` - Positions outlet passer and get-back defenders
+    - **Get-back retreat (client)**: Non-shooter get-back defenders tween toward an x-band toward the **rim the fast-break offense is attacking** — same HOME-grid convention as `animateFastBreakShot` (`HOME_RIM` when home has the ball, `AWAY_RIM` when away has the ball). **Do not** hardcode only the home rim in this path: that made away-FB get-backs sprint the wrong direction. Resolve offense from the ball-handler sprite’s `team` when possible, with `turnData.offense_team_id` / `possession_team_id` (+ `scene.simData.home_team_id`) as fallback. If get-backs ever look reversed after future refactors, check that `ballHandlerId` and possession fields still refer to the **FB offense** at this call site (possible second-order bugs).
   - `animateRebounders()` - Handles rebounder animation (extracted for maintainability)
     - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
     - Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
