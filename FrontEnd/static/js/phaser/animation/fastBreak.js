@@ -1,7 +1,7 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenPlayerTo, runPass } from "./ballTween.js";
+import { tweenPlayerTo, runPass, detachBall } from "./ballTween.js";
 import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
@@ -72,11 +72,9 @@ function shouldAnimateRimRunnerLanePass(turnData, phase2Kind) {
   if (!turnData.roles?.rim_runner_burst_phase && turnData.roles?.rim_runner_id == null) {
     return false;
   }
+  // Completion-to-shot only: steal / bat OOB use their own lane-style sequences
   const laneKinds =
-    phase2Kind === "fast_break_shot" ||
-    phase2Kind === "fast_break_shot_foul" ||
-    phase2Kind === "rim_runner_steal" ||
-    phase2Kind === "rim_runner_bat_oob";
+    phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul";
   if (!laneKinds) return false;
 
   const sid = (id) => (id != null ? String(id) : null);
@@ -153,6 +151,380 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
   if (!ballController?.isAttached || ballController.currentOwner !== rrSprite) {
     attachBallToPlayer(scene, ballSprite, rrSprite, { reason: "rim_runner_lane_pass" });
   }
+}
+
+function rimRunnerSpriteGrid(sprite, width, height) {
+  if (sprite && typeof sprite.gridX === "number" && typeof sprite.gridY === "number") {
+    return { x: sprite.gridX, y: sprite.gridY };
+  }
+  if (!sprite) return { x: 50, y: 25 };
+  return {
+    x: Phaser.Math.Clamp((sprite.x / width) * 100, 4, 97),
+    y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, 1, 49),
+  };
+}
+
+function setRimRunnerSpriteGrid(sprite, gx, gy) {
+  if (!sprite) return;
+  sprite.gridX = gx;
+  sprite.gridY = gy;
+}
+
+async function finalizeRimRunnerNonShotTurn(scene, turnData) {
+  if (scene.skipToEnd) return;
+  if (scene.stateMachine?.state !== States.HalfCourt) {
+    safeTransition(scene.stateMachine, States.HalfCourt);
+  }
+  if (
+    turnData.next_play_type === "HCO" &&
+    typeof scene.startNextHalfCourtOffense === "function"
+  ) {
+    scene.startNextHalfCourtOffense();
+  }
+}
+
+async function animateRimRunnerOutletDeniedBeat(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height,
+  phase,
+  passerSprite,
+  recvSprite
+) {
+  const sid = (id) => (id != null ? String(id) : null);
+  const defId = sid(phase?.outlet_defender_id);
+  const defSprite = defId ? playerSprites[defId] : null;
+  const away = Boolean(phase?.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+  const backCourt = -towardBasket;
+
+  const tw = [];
+  if (passerSprite && recvSprite && passerSprite !== recvSprite) {
+    const pg = rimRunnerSpriteGrid(passerSprite, width, height);
+    const retreat = {
+      x: Phaser.Math.Clamp(pg.x + 2 * backCourt, 4, 97),
+      y: Phaser.Math.Clamp(pg.y, 1, 49),
+    };
+    tw.push(
+      tweenPlayerTo(scene, passerSprite, gridToPixels(retreat.x, retreat.y, width, height), {
+        duration: 420,
+        easing: "Quad.easeOut",
+      })
+    );
+    setRimRunnerSpriteGrid(passerSprite, retreat.x, retreat.y);
+  }
+
+  if (defSprite && passerSprite) {
+    const dg = rimRunnerSpriteGrid(defSprite, width, height);
+    const pg = rimRunnerSpriteGrid(passerSprite, width, height);
+    const press = {
+      x: Phaser.Math.Clamp(dg.x + (pg.x - dg.x) * 0.45, 4, 97),
+      y: Phaser.Math.Clamp(dg.y + (pg.y - dg.y) * 0.28, 1, 49),
+    };
+    tw.push(
+      tweenPlayerTo(scene, defSprite, gridToPixels(press.x, press.y, width, height), {
+        duration: 400,
+        easing: "Quad.easeOut",
+      })
+    );
+    setRimRunnerSpriteGrid(defSprite, press.x, press.y);
+  }
+
+  const rg = rimRunnerSpriteGrid(recvSprite, width, height);
+  const hesitate = {
+    x: Phaser.Math.Clamp(rg.x + towardBasket, 4, 97),
+    y: rg.y,
+  };
+  tw.push(
+    tweenPlayerTo(scene, recvSprite, gridToPixels(hesitate.x, hesitate.y, width, height), {
+      duration: 380,
+      easing: "Linear",
+    })
+  );
+  setRimRunnerSpriteGrid(recvSprite, hesitate.x, hesitate.y);
+
+  if (tw.length) await Promise.all(tw);
+  appendToTextScroll("Outlet contested.");
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(200, resolve);
+    else setTimeout(resolve, 200);
+  });
+}
+
+async function animateRimRunnerHoldUpLeadIn(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height
+) {
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const bhId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const bh = playerSprites[bhId];
+  const rr = playerSprites[rrId];
+  if (!bh || !rr) return;
+
+  attachBallToPlayer(scene, ballSprite, bh);
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+  const backCourt = -towardBasket;
+
+  const rrg = rimRunnerSpriteGrid(rr, width, height);
+  const retreatRr = {
+    x: Phaser.Math.Clamp(rrg.x + 2 * backCourt, 4, 97),
+    y: Phaser.Math.Clamp(rrg.y, 1, 49),
+  };
+  const bhg = rimRunnerSpriteGrid(bh, width, height);
+  const settleBh = {
+    x: Phaser.Math.Clamp(bhg.x + towardBasket, 4, 97),
+    y: Phaser.Math.Clamp(bhg.y, 1, 49),
+  };
+
+  const defObj = roles.defender;
+  let defId = sid(
+    typeof defObj === "object" && defObj != null
+      ? defObj.player_id ?? defObj.playerId
+      : null
+  );
+  if (!defId && Array.isArray(roles.defense) && roles.defense[0]) {
+    const d0 = roles.defense[0];
+    defId = sid(typeof d0 === "string" ? d0 : d0.player_id ?? d0.playerId);
+  }
+  const defSprite = defId ? playerSprites[defId] : null;
+
+  const tw = [
+    tweenPlayerTo(scene, rr, gridToPixels(retreatRr.x, retreatRr.y, width, height), {
+      duration: 520,
+      easing: "Quad.easeInOut",
+    }),
+    tweenPlayerTo(scene, bh, gridToPixels(settleBh.x, settleBh.y, width, height), {
+      duration: 520,
+      easing: "Linear",
+    }),
+  ];
+  if (defSprite) {
+    const dg = rimRunnerSpriteGrid(defSprite, width, height);
+    const close = {
+      x: Phaser.Math.Clamp(dg.x + (bhg.x - dg.x) * 0.38, 4, 97),
+      y: Phaser.Math.Clamp(dg.y + (bhg.y - dg.y) * 0.22, 1, 49),
+    };
+    tw.push(
+      tweenPlayerTo(scene, defSprite, gridToPixels(close.x, close.y, width, height), {
+        duration: 500,
+        easing: "Linear",
+      })
+    );
+  }
+  await Promise.all(tw);
+  setRimRunnerSpriteGrid(rr, retreatRr.x, retreatRr.y);
+  setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
+  const raw = turnData.text || "";
+  const msg = raw.toLowerCase().includes("holding") ? raw.replace(/^Fast Break! /, "") : "Holding up — settling.";
+  appendToTextScroll(msg);
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(300, resolve);
+    else setTimeout(resolve, 300);
+  });
+}
+
+async function animateRimRunnerInterception(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height
+) {
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const victimId = sid(
+    turnData.victim_id ?? roles.ball_handler_id ?? roles.ball_handler?.player_id
+  );
+  const stealerId = sid(turnData.stealer_id);
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const victim = playerSprites[victimId];
+  const stealer = playerSprites[stealerId];
+  const rr = rrId ? playerSprites[rrId] : null;
+  if (!victim || !stealer) {
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    return;
+  }
+
+  attachBallToPlayer(scene, ballSprite, victim);
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+
+  let rrGx =
+    rr && typeof rr.gridX === "number"
+      ? rr.gridX
+      : phase?.rr_to?.x ?? 50;
+  let rrGy =
+    rr && typeof rr.gridY === "number"
+      ? rr.gridY
+      : phase?.rr_to?.y ?? 25;
+  const catchGx = Phaser.Math.Clamp(rrGx + 6 * towardBasket, 4, 97);
+  const catchGy = Phaser.Math.Clamp(rrGy, 1, 49);
+
+  const vg = rimRunnerSpriteGrid(victim, width, height);
+  const laneX = Phaser.Math.Clamp((vg.x + catchGx) / 2 + 2 * towardBasket, 4, 97);
+  const laneY = Phaser.Math.Clamp((vg.y + catchGy) / 2, 1, 49);
+  const lanePx = gridToPixels(laneX, laneY, width, height);
+
+  const partialGx = Phaser.Math.Clamp(rrGx + 3 * towardBasket, 4, 97);
+  const partialPx = gridToPixels(partialGx, catchGy, width, height);
+
+  const tw = [tweenPlayerTo(scene, stealer, lanePx, { duration: 420, easing: "Quad.easeOut" })];
+  if (rr) {
+    tw.push(tweenPlayerTo(scene, rr, partialPx, { duration: 450, easing: "Linear" }));
+  }
+  await Promise.all(tw);
+  if (rr) setRimRunnerSpriteGrid(rr, partialGx, catchGy);
+  setRimRunnerSpriteGrid(stealer, laneX, laneY);
+
+  await runPass(scene, {
+    fromId: victimId,
+    toId: stealerId,
+    endCoords: { x: stealer.x, y: stealer.y },
+    duration: 300,
+    easing: "Sine.easeIn",
+  });
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(45, resolve);
+    else setTimeout(resolve, 45);
+  });
+  const { synchronizeBallState } = await import("./BallControllerAdapter.js");
+  synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+  attachBallToPlayer(scene, ballSprite, stealer, { reason: "rim_runner_interception" });
+
+  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const stealerInfo = scene.playerInfo?.[stealerId];
+  const stealerTeamId = stealer?.team_id;
+  const homeTeamField = scene.simData?.home_team;
+  const awayTeamField = scene.simData?.away_team;
+  const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+  const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+  const stealerTeamName = stealerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+  const stealerPlayerData = stealerInfo
+    ? {
+        playerId: stealerId,
+        photo: stealer?.photo || null,
+        teamName: stealerTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, stealerTeamId),
+      }
+    : null;
+  const defenseSide = stealer?.team === "home" ? "home" : "away";
+  showAnnouncement("Interception!", defenseSide, stealerPlayerData);
+  const holdMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(holdMs, resolve);
+    else setTimeout(resolve, holdMs);
+  });
+
+  await finalizeRimRunnerNonShotTurn(scene, turnData);
+}
+
+async function animateRimRunnerBatOob(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height
+) {
+  const { animateBallToPosition } = await import("./ballAnimationSimple.js");
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const bhId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const bh = playerSprites[bhId];
+  const rr = rrId ? playerSprites[rrId] : null;
+
+  let defId = sid(turnData.defender_id ?? turnData.defenderId);
+  const defObj = roles.defender;
+  if (!defId && defObj && typeof defObj === "object") {
+    defId = sid(defObj.player_id ?? defObj.playerId);
+  }
+  if (!defId && Array.isArray(roles.defense) && roles.defense[0]) {
+    const d0 = roles.defense[0];
+    defId = sid(typeof d0 === "string" ? d0 : d0.player_id ?? d0.playerId);
+  }
+  const defSp = defId ? playerSprites[defId] : null;
+
+  if (!bh) {
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    return;
+  }
+
+  attachBallToPlayer(scene, ballSprite, bh);
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+  const bg = rimRunnerSpriteGrid(bh, width, height);
+  const rg = rr ? rimRunnerSpriteGrid(rr, width, height) : { x: phase?.rr_to?.x ?? bg.x, y: phase?.rr_to?.y ?? bg.y };
+  const catchGx = Phaser.Math.Clamp(rg.x + 6 * towardBasket, 4, 97);
+  const catchGy = Phaser.Math.Clamp(rg.y, 1, 49);
+  const laneX = Phaser.Math.Clamp((bg.x + catchGx) / 2 + towardBasket, 4, 97);
+  const laneY = Phaser.Math.Clamp((bg.y + catchGy) / 2, 1, 49);
+
+  const movers = [];
+  if (rr) {
+    const pc = gridToPixels(
+      Phaser.Math.Clamp(rg.x + 4 * towardBasket, 4, 97),
+      catchGy,
+      width,
+      height
+    );
+    movers.push(tweenPlayerTo(scene, rr, pc, { duration: 480, easing: "Linear" }));
+  }
+  if (defSp) {
+    movers.push(
+      tweenPlayerTo(scene, defSp, gridToPixels(laneX, laneY, width, height), {
+        duration: 400,
+        easing: "Quad.easeOut",
+      })
+    );
+  }
+  if (movers.length) await Promise.all(movers);
+
+  const tipTarget = defSp || bh;
+  attachBallToPlayer(scene, ballSprite, tipTarget);
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(500, resolve);
+    else setTimeout(resolve, 500);
+  });
+
+  const defG = defSp ? rimRunnerSpriteGrid(defSp, width, height) : bg;
+  const oobY = defG.y > 24 ? 1 : 51;
+  const oobGrid = {
+    x: Phaser.Math.Clamp(defG.x, 4, 97),
+    y: Phaser.Math.Clamp(oobY, 1, 49),
+  };
+  const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
+
+  detachBall(scene, ballSprite);
+  await animateBallToPosition(scene, oobPx, { duration: 520, easing: "Quad.easeOut" });
+
+  appendToTextScroll("Batted out of bounds.");
+  const { showAnnouncement } = await import("../utils/announcements.js");
+  showAnnouncement("Out of bounds!", "neutral", null);
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(650, resolve);
+    else setTimeout(resolve, 650);
+  });
+
+  await finalizeRimRunnerNonShotTurn(scene, turnData);
 }
 
 /**
@@ -264,13 +636,27 @@ export async function runFastBreakSequence({
   } else if (phase2Kind === "fast_break_shot_foul") {
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
   } else if (phase2Kind === "rim_runner_steal") {
-    // TODO: Lane interception / “Interception!” — payload: rim_runner_interception, stealer_id, victim_id
-    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    await animateRimRunnerInterception(
+      scene,
+      turnData,
+      playerSprites,
+      ballSprite,
+      width,
+      height
+    );
   } else if (phase2Kind === "rim_runner_bat_oob") {
-    // TODO: Bat OOB ball trajectory + SIP — payload: rim_runner_bat_oob, next SIDE_INBOUND, same offense_team_id
-    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    await animateRimRunnerBatOob(scene, turnData, playerSprites, ballSprite, width, height);
   } else if (phase2Kind === "rim_runner_hco_settle") {
-    // Outlet denied (`rim_runner_outlet_failed`) or hold-up (DEFENSIVE_STOP after lane read). TODO: spec lead-in before HCO
+    if (!turnData.rim_runner_outlet_failed) {
+      await animateRimRunnerHoldUpLeadIn(
+        scene,
+        turnData,
+        playerSprites,
+        ballSprite,
+        width,
+        height
+      );
+    }
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   } else {
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
@@ -334,6 +720,21 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   await receiverPromise;
 
   const outletDenied = Boolean(turnData.rim_runner_outlet_failed);
+  if (outletDenied) {
+    attachBallToPlayer(scene, ballSprite, recvSprite);
+    await animateRimRunnerOutletDeniedBeat(
+      scene,
+      turnData,
+      playerSprites,
+      ballSprite,
+      width,
+      height,
+      phase,
+      passerSprite,
+      recvSprite
+    );
+  }
+
   const shouldPass = !outletDenied && !phase.skip_outlet_pass && passerSprite;
 
   if (shouldPass) {

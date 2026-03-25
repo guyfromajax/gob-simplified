@@ -225,10 +225,10 @@ Alternatively: compute play key **once** at start of miss handling and store on 
 - [x] **Phase 1 close-out (stub):** `classifyFastBreakPhase2` + explicit Phase 2 ladder in `FrontEnd/static/js/phaser/animation/fastBreak.js` (steal/bat_oob/hco_settle share `animateDefensiveStop` until TODO sequences land). Optional `07_no_primary_def` fixture still open.
 - [x] **Lane pass (v1):** `shouldAnimateRimRunnerLanePass` + `animateRimRunnerLanePass` in `fastBreak.js` — parallel RR tween + `runPass` to catch grid ~`rr + 6` toward basket, before shot / foul / steal / bat OOB. Tune timing vs spec (“in-stride”) as needed.
 - [ ] **RR shot:** Ensure open-lane and “completion after crowded lane” paths both land through `animateFastBreakShot` / `WithStopper` with correct **shot_spot** / roles.
-- [ ] **Intercept (steal):** Dedicated or extended sequence (defender picks ball / direction) vs generic `animateDefensiveStop`; align with `resolve_turnover_logic` payload.
-- [ ] **Batted OOB:** Distinct from intercept and from covert stop — ball trajectory + inbound hint; align with `SIDE_INBOUND` / `rim_runner_bat_oob` announcement path.
-- [ ] **Hold-up (no lane pass):** Add **`step 0`** — RR/BH slow or stop, defense converges — before transitioning to **HCO** setup.
-- [ ] **Outlet denied:** Improve Phase 1 or add **outlet-fail** branch — shorten/cancel pass, show pressure, then HCO without looking like a full successful outlet.
+- [x] **Intercept (steal) — v1:** `animateRimRunnerInterception` (lane close-out, pass to stealer, “Interception!” + headshot, `finalizeRimRunnerNonShotTurn`); does not run full `animateDefensiveStop`.
+- [x] **Batted OOB — v1:** `animateRimRunnerBatOob` (lane tip, 500 ms on defender, ball `animateBallToPosition` to sideline grid y=1 / 51 per defender y, neutral OB shout, `finalizeRimRunnerNonShotTurn` without HCO auto-setup when next ≠ HCO).
+- [x] **Hold-up — v1:** `animateRimRunnerHoldUpLeadIn` then existing `animateDefensiveStop` (RR/BH/defender convergence + text).
+- [x] **Outlet denied — v1:** `animateRimRunnerOutletDeniedBeat` after burst (ball to outlet receiver, passer retreat / defender pressure / BH hesitation) before `animateDefensiveStop` + “Great Stop!”.
 - [ ] **State machine / `gameStateMachine`:** Confirm `FastBreak` → `HalfCourt` transitions match each outcome (stop, shot foul, turnover).
 - [ ] **Docs:** Update `Fast_Break_System.md` Rim Runner subsection once animation phases are fixed.
 
