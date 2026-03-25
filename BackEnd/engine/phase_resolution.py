@@ -39,6 +39,10 @@ from BackEnd.utils.shared import (
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 
+# TEMPORARY (Mar 2026): When False, missed FT → DREB always continues as HCO (no fast-break roll).
+# Set True to restore `fast_break_probability_from_slider` after FT miss rebounds.
+_FT_MISS_DREB_FAST_BREAK_ENABLED = False
+
 
 def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
     """Return defenders ahead of the ball handler on the fast break.
@@ -1790,10 +1794,13 @@ def resolve_free_throw_logic(game):
             if rebound_team == def_team:
                 possession_flips = True
                 text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
-                p_dreb = fast_break_probability_from_slider(
-                    def_team.strategy_settings.get("fast_breaks", 2)
-                )
-                next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
+                if _FT_MISS_DREB_FAST_BREAK_ENABLED:
+                    p_dreb = fast_break_probability_from_slider(
+                        def_team.strategy_settings.get("fast_breaks", 2)
+                    )
+                    next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
+                else:
+                    next_play_type = "HCO"
                 game_state["offensive_state"] = next_play_type
             else:
                 # Offensive rebound - store for separate turn processing
