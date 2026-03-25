@@ -182,24 +182,11 @@ async function finalizeRimRunnerNonShotTurn(scene, turnData) {
   }
 }
 
-function rimRunnerOutletMatchOtherPlayerDx(phase, playerSprites, width, height, sid, skipIds) {
-  const away = Boolean(phase?.is_away_offense);
-  const towardBasket = away ? -1 : 1;
-  const skip = new Set((skipIds || []).map((x) => sid(x)));
-  for (const row of phase?.other_players || []) {
-    const pid = sid(row.player_id);
-    if (!pid || skip.has(pid)) continue;
-    const sp = playerSprites[pid];
-    if (!sp) continue;
-    const g = rimRunnerSpriteGrid(sp, width, height);
-    const raw = row.to_x - g.x;
-    if (raw !== 0 && Math.abs(raw) <= 8) {
-      return raw;
-    }
-  }
-  return 3 * towardBasket;
-}
-
+/**
+ * Rim Runner outlet denied: defender two grid steps toward the pass direction (same as backend
+ * `outlet_defender_to`), announcement + headshot, receiver cuts to passer x and y±6, then pass.
+ * Rim runner and `other_players` burst tweens keep running in parallel (not blocked here).
+ */
 async function animateRimRunnerOutletDeniedBeat(
   scene,
   turnData,
@@ -212,72 +199,91 @@ async function animateRimRunnerOutletDeniedBeat(
   recvSprite
 ) {
   const sid = (id) => (id != null ? String(id) : null);
+  if (!passerSprite || !recvSprite) return;
+
   const defId = sid(phase?.outlet_defender_id);
   const defSprite = defId ? playerSprites[defId] : null;
   const away = Boolean(phase?.is_away_offense);
   const towardBasket = away ? -1 : 1;
 
-  const rrId = sid(phase?.rr_id);
-  const recvId = sid(phase?.outlet_receiver_id);
-  const passerIdFromPhase = sid(phase?.outlet_passer_id ?? turnData.roles?.outlet_passer);
-  const matchDx = rimRunnerOutletMatchOtherPlayerDx(phase, playerSprites, width, height, sid, [
-    rrId,
-    recvId,
-    passerIdFromPhase,
-    defId,
-  ]);
+  attachBallToPlayer(scene, ballSprite, passerSprite);
 
-  const tw = [];
-  if (passerSprite && recvSprite && passerSprite !== recvSprite) {
-    const pg = rimRunnerSpriteGrid(passerSprite, width, height);
-    const forward = {
-      x: Phaser.Math.Clamp(pg.x + matchDx, 4, 97),
-      y: Phaser.Math.Clamp(pg.y, 1, 49),
-    };
-    tw.push(
-      tweenPlayerTo(scene, passerSprite, gridToPixels(forward.x, forward.y, width, height), {
-        duration: 420,
-        easing: "Quad.easeOut",
-      })
-    );
-    setRimRunnerSpriteGrid(passerSprite, forward.x, forward.y);
-  }
-
-  if (defSprite && passerSprite) {
-    const dg = rimRunnerSpriteGrid(defSprite, width, height);
-    const pg = rimRunnerSpriteGrid(passerSprite, width, height);
-    const press = {
-      x: Phaser.Math.Clamp(dg.x + (pg.x - dg.x) * 0.45, 4, 97),
-      y: Phaser.Math.Clamp(dg.y + (pg.y - dg.y) * 0.28, 1, 49),
-    };
-    tw.push(
-      tweenPlayerTo(scene, defSprite, gridToPixels(press.x, press.y, width, height), {
-        duration: 400,
-        easing: "Quad.easeOut",
-      })
-    );
-    setRimRunnerSpriteGrid(defSprite, press.x, press.y);
-  }
-
-  const rg = rimRunnerSpriteGrid(recvSprite, width, height);
-  const bhVertical = {
-    x: rg.x,
-    y: Phaser.Math.Clamp(rg.y < 25 ? rg.y + 10 : rg.y - 10, 1, 49),
+  const pg = rimRunnerSpriteGrid(passerSprite, width, height);
+  const defenderTarget = {
+    x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, 4, 97),
+    y: Phaser.Math.Clamp(pg.y, 1, 49),
   };
-  tw.push(
-    tweenPlayerTo(scene, recvSprite, gridToPixels(bhVertical.x, bhVertical.y, width, height), {
+
+  if (defSprite && scene.tweens) {
+    scene.tweens.killTweensOf(defSprite);
+  }
+
+  if (defSprite) {
+    await tweenPlayerTo(scene, defSprite, gridToPixels(defenderTarget.x, defenderTarget.y, width, height), {
       duration: 380,
       easing: "Linear",
-    })
-  );
-  setRimRunnerSpriteGrid(recvSprite, bhVertical.x, bhVertical.y);
+    });
+    setRimRunnerSpriteGrid(defSprite, defenderTarget.x, defenderTarget.y);
+  }
 
-  if (tw.length) await Promise.all(tw);
-  appendToTextScroll("Outlet contested.");
+  const defenseTeam = passerSprite.team === "home" ? "away" : "home";
+  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  if (defSprite) {
+    const stopperInfo = scene.playerInfo?.[defId];
+    const stopperTeamId = defSprite.team_id;
+    const homeTeamField = scene.simData?.home_team;
+    const awayTeamField = scene.simData?.away_team;
+    const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+    const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+    const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    const stopperPlayerData = stopperInfo
+      ? {
+          playerId: defId,
+          photo: defSprite.photo || null,
+          teamName: stopperTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, defSprite.team_id),
+        }
+      : null;
+    showAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData);
+  } else {
+    showAnnouncement("FB Outlet Pass Denied!", defenseTeam, null);
+  }
+
+  const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
   await new Promise((resolve) => {
-    if (scene.time?.delayedCall) scene.time.delayedCall(200, resolve);
-    else setTimeout(resolve, 200);
+    if (scene.time?.delayedCall) scene.time.delayedCall(stopHoldMs, resolve);
+    else setTimeout(resolve, stopHoldMs);
   });
+
+  const recvTarget = {
+    x: Phaser.Math.Clamp(pg.x, 4, 97),
+    y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, 1, 49),
+  };
+  await tweenPlayerTo(scene, recvSprite, gridToPixels(recvTarget.x, recvTarget.y, width, height), {
+    duration: 420,
+    easing: "Linear",
+  });
+  setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
+
+  const passerId = sid(phase?.outlet_passer_id ?? turnData.roles?.outlet_passer);
+  const recvId = sid(phase?.outlet_receiver_id);
+  if (passerId && recvId && passerId !== recvId) {
+    await runPass(scene, {
+      fromId: passerId,
+      toId: recvId,
+      duration: 500,
+      easing: "Sine.easeInOut",
+    });
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);
+      else setTimeout(resolve, 50);
+    });
+    const { synchronizeBallState } = await import("./BallControllerAdapter.js");
+    synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+    attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_pass" });
+  } else {
+    attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_dribble_out" });
+  }
 }
 
 async function animateRimRunnerHoldUpLeadIn(
@@ -683,7 +689,11 @@ export async function runFastBreakSequence({
         height
       );
     }
-    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    if (turnData.rim_runner_outlet_failed) {
+      await finalizeRimRunnerNonShotTurn(scene, turnData);
+    } else {
+      await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    }
   } else {
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
@@ -747,7 +757,6 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
 
   const outletDenied = Boolean(turnData.rim_runner_outlet_failed);
   if (outletDenied) {
-    attachBallToPlayer(scene, ballSprite, recvSprite);
     await animateRimRunnerOutletDeniedBeat(
       scene,
       turnData,
@@ -2234,13 +2243,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   const isHomeOffenseForStop = ballHandlerSpriteForStop?.team === 'home';
   const defenseTeamForStop = isHomeOffenseForStop ? 'away' : 'home';
 
-  // Rim Runner: defense wins outlet contest — no designated stopper_id; announce Great Stop! with no player image
-  if (turnData.fast_break === true && turnData.rim_runner_outlet_failed) {
-    const { showAnnouncement } = await import('../utils/announcements.js');
-    showAnnouncement('Great Stop!', defenseTeamForStop, null);
-    const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
-    await new Promise((resolve) => scene.time.delayedCall(stopHoldMs, resolve));
-  } else if (turnData.fast_break === true && turnData.stopper_id) {
+  // Rim Runner outlet denied: handled in animateRimRunnerOutletDeniedBeat + finalizeRimRunnerNonShotTurn (no Great Stop! here).
+  if (turnData.fast_break === true && turnData.stopper_id) {
     const stopperId = turnData.stopper_id;
     const stopperSprite = playerSprites[stopperId];
     
