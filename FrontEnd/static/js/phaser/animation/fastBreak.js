@@ -7,7 +7,7 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
-import { runInboundSetup, getPlayerDuration } from "./turnAnimation.js";
+import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import {
@@ -219,10 +219,10 @@ async function finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites) {
  * Rim Runner outlet denied: defender two grid steps toward the pass direction (same as backend
  * `outlet_defender_to`), announcement + headshot, receiver cuts to passer x and y±6, then pass.
  *
- * While the outlet receiver tweens to the catch spot, all other players drift horizontally toward
- * the offense basket (same pattern as `animateRimRunnerHoldUpLeadIn`), excluding outlet passer,
- * outlet receiver, and outlet defender. Burst-phase tweens on those players are stopped first so
- * this drift can own their motion; see `animateRimRunnerBurstPhase` + `Promise.allSettled` when denied.
+ * While the outlet receiver tweens to the catch spot, all other players move horizontally toward
+ * the offense basket for the same phase duration (AG-scoped distance each, X clamped 4–97), excluding
+ * outlet passer, receiver, and outlet defender. Burst-phase tweens on those players are stopped first;
+ * see `animateRimRunnerBurstPhase` + `Promise.allSettled` when denied.
  */
 async function animateRimRunnerOutletDeniedBeat(
   scene,
@@ -297,13 +297,20 @@ async function animateRimRunnerOutletDeniedBeat(
     y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, 1, 49),
   };
 
-  const passerId = sid(phase?.outlet_passer_id ?? turnData.roles?.outlet_passer);
+  const rawPasserFallback = turnData.roles?.outlet_passer;
+  const passerId =
+    sid(phase?.outlet_passer_id) ??
+    sid(
+      rawPasserFallback != null && typeof rawPasserFallback === "object"
+        ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
+        : rawPasserFallback
+    );
   const recvId = sid(phase?.outlet_receiver_id);
 
-  const horizontalDriftGrid = 40;
-  const horizontalDurationMs = 15000;
-  const horizontalTweens = [];
+  const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
+  const phaseDurationMs = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
 
+  const driftPromises = [];
   for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
     if (!sprite) continue;
     const pid = sid(pidRaw);
@@ -312,29 +319,24 @@ async function animateRimRunnerOutletDeniedBeat(
       scene.tweens.killTweensOf(sprite);
     }
     const g = rimRunnerSpriteGrid(sprite, width, height);
-    const endX = Phaser.Math.Clamp(g.x + horizontalDriftGrid * towardBasket, 4, 97);
+    const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
+    const endX = Phaser.Math.Clamp(g.x + stride * towardBasket, 4, 97);
     const endY = Phaser.Math.Clamp(g.y, 1, 49);
     const px = gridToPixels(endX, endY, width, height);
-    const tween = scene.tweens.add({
-      targets: sprite,
-      x: px.x,
-      y: px.y,
-      duration: horizontalDurationMs,
-      ease: "Linear",
-    });
-    horizontalTweens.push(tween);
+    driftPromises.push(
+      tweenPlayerTo(scene, sprite, px, {
+        duration: phaseDurationMs,
+        easing: "Linear",
+      })
+    );
   }
 
-  const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
-  const recvDur = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
-  await tweenPlayerTo(scene, recvSprite, recvTargetPx, {
-    duration: recvDur,
+  const recvPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
+    duration: phaseDurationMs,
     easing: "Linear",
   });
 
-  for (const t of horizontalTweens) {
-    if (t) t.stop();
-  }
+  await Promise.all([recvPromise, ...driftPromises]);
 
   setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
   for (const [pidRaw, sprite] of Object.entries(playerSprites)) {

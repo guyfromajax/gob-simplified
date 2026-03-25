@@ -63,8 +63,7 @@
        - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
        - If `stop_score >= break_score` → `DEFENSIVE_STOP` (defender wins)
        - If `break_score > stop_score` → `SHOT` (ball handler wins, beats defender)
-         - Defender still animates to stopper position (shows the attempt)
-         - Ball handler animates past stopper to shot spot (shows offensive success)
+         - **Animation**: stopper + optional trail defender use the **unified shot contest grid** vs rim **`shot_spot`** (see **Shot contest grid**); not “1–3 from outlet start” on the sim
          - **Shot defender**: Closest get-back (by distance) **excluding the failed stopper**; if no other get-back, no shot defender (defender_count = 0)
    - **Otherwise**: `SHOT`. **Shot defender only when 1 or 2 get-back players**: closest get-back by Euclidean distance; if 0 or 3+ get-back, no shot defender (defender_count = 0)
 
@@ -130,7 +129,7 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 - **Burst**: Offense `(AG*0.7 + IQ*0.3) * d6` vs primary defender — get-back pool: `(IQ*1.0 + AG*0.5) * d6`; else `(IQ*0.5 + AG*0.5) * d6`. **`fb_open`** if offense score **>** defense score.
 - **Read**: `IQ * d6` vs threshold **`200 - 5×fb_efficiency`** (offense team). **Aggression** (offense `strategy_settings`, ≥3 = aggressive) weights wrong-read pass vs hold.
 - **Pass / shot / events**: Open lane → FB shot (Rim Runner shooter, existing `resolve_shot` attack path). Forced pass when not open: intercept roll vs **`250 - fb_opp_modifier`** / **`200 - fb_opp_modifier`** tiers; bat OOB announces **“Batted Ball Out Of Bounds!”** (`RIM_RUNNER_BATTED_OOB`). Full detail matches `rim_runner_fast_break.py`.
-- **Client — outlet denied (`rim_runner_outlet_failed`)**: After **`animateRimRunnerBurstPhase`**, the outlet pass is skipped. **`animateRimRunnerOutletDeniedBeat`** (in `fastBreak.js`): ball remains on the **outlet passer**; any burst tween on the **outlet defender** is cleared so they move to **`outlet_defender_to`** (**passer x ± 2** toward the pass, same **y** as passer — HOME grid); announcement **“FB Outlet Pass Denied!”** with the defender’s headshot; after the standard FB hold, the **receiver** tweens to **passer’s x** and **y + 6** if passer **`y < 25`** else **y − 6**; then **`runPass`** to the receiver (if passer ≠ receiver; dribble-outlet / **`skip_outlet_pass`** keeps one player with the ball). **Rim runner** and **`other_players`** keep their burst tweens in parallel (fast break still “live” for everyone except passer/defender in the denied beat). **Phase 2** calls **`finalizeRimRunnerNonShotTurn`** only — **no** **`animateDefensiveStop`**, **no** **`Great Stop!`**. Next HCO follows normal half-court entry (**`startNextHalfCourtOffense`**).
+- **Client — outlet denied (`rim_runner_outlet_failed`)**: After **`animateRimRunnerBurstPhase`**, the outlet pass is skipped. **`animateRimRunnerOutletDeniedBeat`** (in `fastBreak.js`): ball remains on the **outlet passer**; any burst tween on the **outlet defender** is cleared so they move to **`outlet_defender_to`** (**passer x ± 2** toward the pass, same **y** as passer — HOME grid); announcement **“FB Outlet Pass Denied!”** with the defender’s headshot; after the standard FB hold, **all players except** outlet passer, outlet receiver, and outlet defender run a **long horizontal drift** toward the offense basket (same idea as hold-up) while the **receiver** tweens to the catch spot; drift stops when the receiver arrives; burst tweens stopped for those players use **`Promise.allSettled`** in **`animateRimRunnerBurstPhase`** so the sequence does not reject. Then **`runPass`** to the receiver (if passer ≠ receiver; dribble-outlet / **`skip_outlet_pass`** keeps one player with the ball). **Phase 2** calls **`finalizeRimRunnerNonShotTurn`** only — **no** **`animateDefensiveStop`**, **no** **`Great Stop!`**. Next HCO follows normal half-court entry (**`startNextHalfCourtOffense`**).
 - **Client — hold-up (no lane pass after successful outlet)**: **`animateRimRunnerHoldUpLeadIn`** — ball handler (outlet receiver): **+6** grid **x** toward the basket, **+8 y** if **`y < 25`** else **−8 y**. **Everyone else** tweens in a **straight horizontal** line toward the offense basket (**y** fixed at current grid row, **x** up to **40** grid toward the rim on a long easing duration). Those horizontal tweens are **stopped** when the ball handler **finishes** his move; then grid coords are synced from pixels. **No** **`animateDefensiveStop`** / top-of-key. Phase 2 **`finalizeRimRunnerHoldUpToHco`** sets **`scene._rimRunnerHoldUpInboundPass`** when ball handler ≠ offensive **PG**, then **`finalizeRimRunnerNonShotTurn`**. On the **next HCO** turn, **`playTurnAnimation`** runs **`runRimRunnerHoldUpSetupTween`**: all players except the ball handler tween to skeleton **step 0**; when **PG** reaches step 0, **`runPass`** from the ball handler’s hold-up spot to **PG**; then remaining setup completes and the ball handler tweens to step 0 (ball stays with **PG**). If ball handler **is** PG, normal **`runSetupTween`** only. **`Great Stop!`** remains for **Covert** / **`stopper_id`** stops only, not RR hold-up. **Lineup invariant:** both teams always field **PG, SG, SF, PF, C** (one each), so offensive **PG** exists for the hold-up → HCO inbound pass path.
 - **Code**: `BackEnd/engine/rim_runner_fast_break.py`; entry from `resolve_fast_break_logic()` when DREB + `RIM_RUNNER`.
 
@@ -168,8 +167,8 @@ Fast breaks can result in:
 
 2. **Shot Attempt (SHOT)**
    - No defender ahead of ball handler after outlet pass OR defender not within the applicable y-range (±6 vs ±8)
-   - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
-   - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender (or, if ball handler beat a stopper, closest get-back **excluding that stopper**). If 0 or 3+ get-back, or only get-back was the failed stopper, no shot defender. When present, defender is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter.
+   - Ball handler moves to **rim shot spot** (see `capture_fast_break_animation`); not the old “outlet + 5–10 only” path for contested shots
+   - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender, or—if the ball handler **beat** a stopper—the closest **remaining** get-back after excluding the failed stopper. If 0 or 3+ get-back, or the only get-back was the failed stopper, no shot defender. **Animation end coords** for that defender always come from **`fast_break_shot_defender_end_coords`** vs shooter final (see **Shot contest grid** under *Animation Sequence* below); beat-stopper path stacks a second defender with **`stack_index=1`** in the animator.
    - Routes to: Standard shot resolution flow (MAKE, MISS, or **BLOCK** — block reconciliation can run on attack shots; see Block System)
 
 ### Charge and Blocking Foul (Fast Break Shot Only)
@@ -304,11 +303,10 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
      - If `stop_score >= break_score` → `DEFENSIVE_STOP` (defender successfully stops the break)
      - If `break_score > stop_score` → `SHOT` (ball handler beats the defender)
 - **Animation Behavior When Ball Handler Wins**:
-  - Defender still animates to stopper position (1-3 spots in front of ball handler's starting position)
-  - Ball handler animates past the stopper to shot spot near rim
-  - This visually shows the offensive player's success in beating the defender
-  - Flag `ball_handler_beats_defender = True` is set in `fb_roles` to trigger special animation path
-  - **Shot defender**: The failed stopper is excluded; the closest **other** get-back (by distance) becomes the shot defender, or none if he was the only get-back
+  - **Stopper** tweens to contest grid **`stack_index=0`** vs the shooter’s **final** rim shot spot (same rule as all FB shot defenders — not 1–3 from outlet start on the client)
+  - Ball handler tweens to rim shot spot; **trail shot defender** (if assigned) uses **`stack_index=1`** from the same helper so both sit on a line toward the rim
+  - Flag `ball_handler_beats_defender = True` triggers `animateFastBreakShotWithStopper` on the client
+  - **Shot defender**: The failed stopper is excluded from the *pool*; the closest **other** get-back becomes the shot defender, or none if he was the only get-back
 
 **Critical Implementation Detail - Defender Assignment (Get-Back Only, 1 or 2):**
 - **Backend Calculation**: In `phase_resolution.py`, `closest_defender_overall` is tracked **only among defenders in `getback_player_ids`** (get-back players from the most recent shot). A shot defender is assigned only when `len(getback_player_ids) in (1, 2)`; otherwise `fb_roles["defender"] = None` and `fb_roles["defender_count"] = 0`. When `ball_handler_beats_defender` is True, the stopper is excluded and the closest remaining get-back is chosen (or none).
@@ -390,9 +388,10 @@ else:
 - **Early Termination**: Rebounder animations stop when ball handler and stopper both reach their spots
 
 **Shot Attempt:**
-- Ball handler (shooter) moves to **shot spot near rim** (basket ± 2-6, ±6 Y). The backend always sets this spot for shot attempts (see "Shot spot (ball handler end position) – backend" below).
-- Defender follows to position 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
-- Get-back defenders chase toward basket
+- Ball handler (shooter) moves to **shot spot near rim** (basket ± 2-6, ±6 Y in `capture_fast_break_animation`; exposed as `turn_result["shot_spot"]`). See **Shot spot (ball handler end position)** below.
+- **Shot contest defender(s)** animate to **`fast_break_shot_defender_end_coords(shooter_final_x, shooter_final_y, …)`** — one step toward the rim in **X**, **Y** jitter ±2 vs shooter final; two defenders (beat-stopper case) use **`stack_index`** 0 then 1. `turn_result["defender_spot"]` is that row’s **`end`** in the animation packet (`phase_resolution`).
+- **Client timing**: `animateFastBreakShot` / `animateFastBreakShotWithStopper` **`await` only the shooter** reaching the shot spot before `animateShotToRim`. The shot defender’s tween **may still be in progress** when the ball is released (defender and rebounders are not awaited at the shoot cue).
+- Get-back defenders (non–shot-defender) chase toward basket per `moveOtherPlayersToStandardPositions`
 - Rebounders move to random x=5-20 spots from basket, y=rim_y ± 10 (clamped)
 - **Ball flight**: MAKE/MISS → ball to rim (or adjusted rim for make). **BLOCK** → ball to **block spot** when `ball_bounce_x`/`ball_bounce_y` are present; then bounce from that spot, "Block!" announcement, and rebound/DREB same as miss.
 - **Early Termination**: 
@@ -408,7 +407,18 @@ In `capture_fast_break_animation()` (BackEnd/models/animator.py), the ball handl
 3. **Shot attempt with outlet, no defensive stop** (`hold_up` False, outlet set): Shot spot **near the rim** (same logic as case 1). Previously this used "outlet + 5–10", which caused the shot to animate from the top-of-key area; the fix ensures all shot attempts get a rim shot spot so the animation shows the shot from near the basket.
 4. **Fallback** (no outlet): Defensive stop → top of key; shot attempt → near rim.
 
-The frontend uses `turnData.shot_spot` when present (FAST_BREAK handler) so the shot animates from the correct position.
+The frontend uses `turnData.shot_spot` when present (FAST_BREAK handler) so the shot animates from the correct position. **`animateFastBreakShotWithStopper`** also consumes **`shot_spot`** when present so stopper/trail defender targets match the sim.
+
+### Shot contest grid vs shooter final (authoritative)
+
+**Rule (all FB shot attempts in `capture_fast_break_animation`):**
+
+- Let **`(sx, sy)`** = ball handler end = **`_bh_final_x/y`** (same as `shot_spot` on the turn for shots).
+- **Single contest defender** (`hold_up` is false, or only one animated defender): end = **`fast_break_shot_defender_end_coords(sx, sy, is_away_offense, stack_index=0)`**.
+- **Handler beats stopper** (`hold_up` + `ball_handler_beats_defender`): failed **stopper** gets **`stack_index=0`**; **trail shot defender** (different player, from `fb_roles["defender"]`) gets **`stack_index=1`** — one extra step toward the rim so cells do not overlap.
+- **True defensive stop** (no shot): unchanged — stopper remains **1–3** X toward basket from ball handler **confrontation** end, same **Y**; other get-backs use *between key and rim* sampling (not the shot contest helper).
+
+**Constants / code:** `SHOT_DEFENDER_X_OFFSET`, `SHOT_DEFENDER_Y_RANGE`, **`fast_break_shot_defender_end_coords`** — `BackEnd/constants/fast_break_constants.py`. Animator: `BackEnd/models/animator.py` (`capture_fast_break_animation`). Client fallback / parity: **`fastBreakShotDefenderGridVsShooter`** — `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`; `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`).
 
 ### Fast Break MISS → DREB Transition
 
@@ -549,6 +559,7 @@ The outlet passer tracks:
   - `can_trigger_from_steal()` - Legacy steal helper
 - `BackEnd/engine/covert_release.py`
   - Covert Release: defender farthest from rim (excluding shooter’s matchup); **AG**-based x floors + **IQ** (`good_release` / `good_d_release`) y/x bands; HOME orientation + **x** mirror for away FB offense
+- `BackEnd/constants/fast_break_constants.py` — Movement bands, **`fast_break_shot_defender_end_coords()`** (single source for FB shot defender grid vs shooter final)
 - `BackEnd/constants/fast_break_play_types.py` — Play keys, `default_fast_break_plays()`, `ensure_fast_break_plays()`, `play_key_for_fast_break_entry()` (DREB: **50/50** when called; live path uses **`pending_dreb_fb_play_key`** from `shot_manager`)
 - `BackEnd/engine/rim_runner_fast_break.py` — **`resolve_rim_runner_fast_break()`** — Rim Runner DREB outlet play (outlet contest, burst, read, pass/intercept/bat/shot)
 - `BackEnd/engine/phase_resolution.py`
@@ -562,9 +573,10 @@ The outlet passer tracks:
   - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` — Covert outlet positioning only when play key is **`covert_release`**
   - Stores `offense_getback_coords` and `defense_release_coords` in turn results (release coords empty for RR/32)
 - `BackEnd/models/animator.py`
-  - `capture_fast_break_animation()` - Builds animation packet
+  - `capture_fast_break_animation()` - Builds animation packet; shot defender end coords via **`fast_break_shot_defender_end_coords`** for every FB **shot** path (including beat-stopper); defensive stop path keeps legacy stopper 1–3 + between-key-and-rim for other get-backs
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
   - **Ball handler end position (shot spot)**: Defensive stop → confrontation spot (outlet + 5–10); shot attempt (with or without outlet) → shot spot near rim (so the shot always animates from near the basket, not from top-of-key). Exposed as `turn_result["shot_spot"]` in phase_resolution for frontend use.
+- `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` — **`fastBreakShotDefenderGridVsShooter()`**, `SHOT_DEFENDER_X_OFFSET`, `SHOT_DEFENDER_Y_RANGE` (mirror backend contest grid for client fallbacks)
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
   - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop); if `roles.rim_runner_burst_phase` is set, runs **`animateRimRunnerBurstPhase()`** before Phase 2 instead of the static Covert-style **`animateOutletPhase()`**. **Rim Runner HCO settle** (`rim_runner_hco_settle`): if **`rim_runner_outlet_failed`**, Phase 2 is **`finalizeRimRunnerNonShotTurn()`** only; else (hold-up) **`animateRimRunnerHoldUpLeadIn()`** then **`finalizeRimRunnerHoldUpToHco()`** (no **`animateDefensiveStop`**).
   - `animateRimRunnerBurstPhase()` - Rim Runner burst + simultaneous role-player moves; pass gated on outlet receiver tween completion (and skipped when outlet denied or dribble-outlet); outlet denied delegates to **`animateRimRunnerOutletDeniedBeat()`**

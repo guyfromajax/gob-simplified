@@ -115,6 +115,20 @@ function resolveMovementSpeedPxPerSec(sprite, opts = {}) {
 }
 
 /**
+ * Grid X distance (0–100 court scale) covered in durationMs at AG-based px/s when
+ * 100 grid units span `width` pixels (matches gridToPixels).
+ */
+export function horizontalGridUnitsForDurationMs(sprite, durationMs, width, opts = {}) {
+  if (!sprite || !Number.isFinite(width) || width <= 0 || !Number.isFinite(durationMs) || durationMs <= 0) {
+    return 0;
+  }
+  const scene = opts.scene ?? sprite?.scene;
+  const speed = resolveMovementSpeedPxPerSec(sprite, { ...opts, scene });
+  const distPx = speed * (durationMs / 1000);
+  return (distPx * 100) / width;
+}
+
+/**
  * Calculate animation duration based on distance traveled
  * This ensures consistent speeds regardless of distance, making animations feel natural
  * 
