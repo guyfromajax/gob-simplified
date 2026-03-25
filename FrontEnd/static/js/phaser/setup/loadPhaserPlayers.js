@@ -70,6 +70,9 @@ export function loadPhaserPlayers(
     sprite.playerId = id;
     sprite.jersey = player.jersey;   // Jersey number
     sprite.name = player.name;       // Full name
+    if (player.attributes && typeof player.attributes === "object") {
+      sprite.attributes = player.attributes;
+    }
 
     playerSprites[id] = sprite;
   }

@@ -1,3 +1,6 @@
 {
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test:movement-speed": "node --test utils/playerMovementSpeed.test.js"
+  }
 }

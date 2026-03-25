@@ -54,6 +54,10 @@ import {
   clearBallHolder,
   animateBallToPosition,
 } from "./ballAnimationSimple.js";
+import {
+  getEffectiveAgilityForMovement,
+  agToSpeedPxPerSec,
+} from "../utils/playerMovementSpeed.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -86,6 +90,28 @@ function getPlayerSpeed() {
 function getBallSpeed() {
   // Ball speed matches player speed for consistency
   return getPlayerSpeed();
+}
+
+/**
+ * When opts.isBallHandler is true/false, use it; else infer from current ball owner (if scene available).
+ */
+function resolveIsBallHandler(sprite, opts = {}) {
+  if (opts.isBallHandler === true || opts.isBallHandler === false) {
+    return opts.isBallHandler;
+  }
+  const scene = sprite?.scene;
+  const pid = sprite?.playerId ?? sprite?.player_id;
+  if (!scene || pid == null) return false;
+  const owner = getCurrentOwner(scene);
+  return owner != null && String(owner) === String(pid);
+}
+
+/** Per-player px/s from AG + BH rule, then scaled by global __GAME_SPEED vs baseline */
+function resolveMovementSpeedPxPerSec(sprite, opts = {}) {
+  const isBH = resolveIsBallHandler(sprite, opts);
+  const ag = getEffectiveAgilityForMovement(sprite, opts.scene ?? sprite?.scene);
+  const base = agToSpeedPxPerSec(ag, { isBallHandler: isBH });
+  return base * (getPlayerSpeed() / DEFAULT_PLAYER_SPEED);
 }
 
 /**
@@ -280,11 +306,11 @@ async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) 
   }
 }
 
-function getPlayerDuration(sprite, targetX, targetY, isTransition = false) {
+function getPlayerDuration(sprite, targetX, targetY, isTransition = false, opts = {}) {
   const currentX = sprite.x;
   const currentY = sprite.y;
   const maxDuration = isTransition ? MAX_TRANSITION_DURATION : MAX_STEP_DURATION;
-  const speed = getPlayerSpeed();
+  const speed = resolveMovementSpeedPxPerSec(sprite, opts);
   return getDurationFromDistance(currentX, currentY, targetX, targetY, speed, maxDuration);
 }
 
@@ -2963,11 +2989,12 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
 
 export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
-export function getPlayerDurationUncapped(sprite, targetX, targetY) {
+export function getPlayerDurationUncapped(sprite, targetX, targetY, opts = {}) {
   const currentX = sprite.x;
   const currentY = sprite.y;
+  const speed = resolveMovementSpeedPxPerSec(sprite, opts);
   const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
-  const duration = (distance / PLAYER_SPEED) * 1000;
+  const duration = (distance / speed) * 1000;
   // Keep a small lower bound to avoid zero-duration tweens; no upper cap
   return Math.max(50, duration);
 }
