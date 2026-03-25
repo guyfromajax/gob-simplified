@@ -170,6 +170,14 @@ function setRimRunnerSpriteGrid(sprite, gx, gy) {
   sprite.gridY = gy;
 }
 
+/** Shared wall time for RR AG-drift beats (outlet denied + hold-up); floors snap/warp from tiny primary moves. */
+function clampRrAgSharedPhaseDurationMs(ms) {
+  const raw = Number(ms);
+  const base = Number.isFinite(raw) ? raw : 500;
+  const minMs = animationConfig.fastBreak?.agDriftSharedPhaseMinMs ?? 520;
+  return Math.max(minMs, base);
+}
+
 /**
  * Parallel horizontal drifts toward the offense basket: same duration for all, per-sprite distance
  * from AG (`horizontalGridUnitsForDurationMs`), Y fixed, grid X clamped 4–97. Skips `excludeIds`.
@@ -346,7 +354,9 @@ async function animateRimRunnerOutletDeniedBeat(
   const recvId = sid(phase?.outlet_receiver_id);
 
   const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
-  const phaseDurationMs = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
+  const phaseDurationMs = clampRrAgSharedPhaseDurationMs(
+    getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true)
+  );
 
   const driftExclude = new Set([passerId, recvId, defId].filter(Boolean));
   const driftPromises = rimRunnerAgHorizontalDriftPromises(
@@ -427,7 +437,9 @@ async function animateRimRunnerHoldUpLeadIn(
     y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, 1, 49),
   };
   const bhTargetPx = gridToPixels(settleBh.x, settleBh.y, width, height);
-  const phaseDurationMs = getPlayerDuration(bh, bhTargetPx.x, bhTargetPx.y);
+  const phaseDurationMs = clampRrAgSharedPhaseDurationMs(
+    getPlayerDuration(bh, bhTargetPx.x, bhTargetPx.y)
+  );
 
   const driftPromises = rimRunnerAgHorizontalDriftPromises(
     scene,

@@ -76,6 +76,9 @@ const defaults = {
     makeAnnouncementHoldMs: 1000,
     // Announcement hold after "Great Stop!" (FB defensive stop); 0 game time
     defensiveStopHoldMs: 500,
+    // Rim Runner outlet-denied + hold-up: shared phase for BH/receiver + AG horizontal drifts.
+    // Floors wall-clock so a tiny primary move doesn't collapse to 50ms (warp) for everyone.
+    agDriftSharedPhaseMinMs: 520,
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
