@@ -23,8 +23,30 @@ export const BALL_HANDLER_MOVE_Y_RANGE = 3; // ±3 y-coords
 export const STOPPER_OFFSET_MIN = 1;
 export const STOPPER_OFFSET_MAX = 3;
 
-// Defender Positioning (Shot Attempt)
-export const DEFENDER_X_OFFSET = 6; // Defender positioned 6 x-coords behind ball handler
+/** FB shot contest: toward rim in X vs shooter final, ±Y — matches `fast_break_shot_defender_end_coords` (Python). */
+export const SHOT_DEFENDER_X_OFFSET = 1;
+export const SHOT_DEFENDER_Y_RANGE = 2;
+
+/**
+ * @param {number} bhX shooter final grid x (HOME)
+ * @param {number} bhY shooter final grid y
+ * @param {boolean} isHomeOffense
+ * @param {number} [stackIndex=0] second contest defender uses 1 (one step further toward rim)
+ */
+export function fastBreakShotDefenderGridVsShooter(bhX, bhY, isHomeOffense, stackIndex = 0) {
+  const towardBasket = isHomeOffense ? 1 : -1;
+  const xSteps = SHOT_DEFENDER_X_OFFSET + Math.max(0, stackIndex);
+  let x = bhX + towardBasket * xSteps;
+  x = Math.max(4, Math.min(97, x));
+  const yOff =
+    -SHOT_DEFENDER_Y_RANGE +
+    Math.floor(Math.random() * (2 * SHOT_DEFENDER_Y_RANGE + 1));
+  let y = Math.max(1, Math.min(49, bhY + yOff));
+  return { x, y };
+}
+
+/** @deprecated Use fastBreakShotDefenderGridVsShooter — kept for any external imports */
+export const DEFENDER_X_OFFSET = 6;
 
 // Rebounder Positioning
 export const REBOUNDER_X_MIN = 40;

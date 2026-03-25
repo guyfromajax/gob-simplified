@@ -20,6 +20,7 @@ import {
   STEAL_ENTRY_MOVE_Y_RANGE,
   STEAL_ENTRY_Y_MIN,
   STEAL_ENTRY_Y_MAX,
+  fastBreakShotDefenderGridVsShooter,
 } from "../constants/fastBreakConstants.js";
 
 /**
@@ -1212,8 +1213,8 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
  * - All others move to standard positions
  */
 /**
- * Animate Fast Break shot when ball handler beats defender (skill check won)
- * Defender still animates to stopper position, but ball handler animates past them to shot spot
+ * Animate Fast Break shot when ball handler beats defender (skill check won).
+ * Stopper + trail defender use the same contest grid as other FB shots: ±1/±2 vs shooter final (stacked in X if both).
  */
 async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height) {
   // ✅ FIX: Import showAnnouncement/showAndOneAnnouncement at the start of the function (AND-1 / shooting foul in Fast Break path)
@@ -1227,17 +1228,22 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   const isHomeOffense = shooterSprite.team === "home";
   const basket = getFastBreakAttackingBasket(isHomeOffense);
   
-  // Ball handler moves to shot spot near rim (past the stopper)
-  const shotSpot = {
-    x: isHomeOffense
-      ? basket.x - Phaser.Math.Between(2, 6)  // Home: basket - 2-6
-      : basket.x + Phaser.Math.Between(2, 6), // Away: basket + 2-6
-    y: basket.y + Phaser.Math.Between(-6, 6)  // ±6 from basket Y
-  };
-  
-  // Clamp to bounds
-  shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
-  shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+  let shotSpot;
+  if (turnData.shot_spot && typeof turnData.shot_spot.x === "number" && typeof turnData.shot_spot.y === "number") {
+    shotSpot = {
+      x: Phaser.Math.Clamp(turnData.shot_spot.x, 4, 97),
+      y: Phaser.Math.Clamp(turnData.shot_spot.y, 1, 49),
+    };
+  } else {
+    shotSpot = {
+      x: isHomeOffense
+        ? basket.x - Phaser.Math.Between(2, 6)
+        : basket.x + Phaser.Math.Between(2, 6),
+      y: basket.y + Phaser.Math.Between(-6, 6),
+    };
+    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
+    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+  }
   
   const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
   
@@ -1258,34 +1264,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   let stopperPromise = null;
   
   if (stopperSprite) {
-    // Get ball handler's starting position (from roles or current position)
-    const ballHandlerStartX = turnData.roles?.ball_handler_outlet_x || shooterSprite.x;
-    const ballHandlerStartY = turnData.roles?.ball_handler_outlet_y || shooterSprite.y;
-    
-    // Convert to grid if needed
-    let startGridX, startGridY;
-    if (typeof ballHandlerStartX === 'number' && ballHandlerStartX <= 100) {
-      // Already in grid coordinates
-      startGridX = ballHandlerStartX;
-      startGridY = ballHandlerStartY;
-    } else {
-      // Convert from pixels to grid
-      startGridX = (ballHandlerStartX / width) * 100;
-      startGridY = 50 - (ballHandlerStartY / height) * 50;
-    }
-    
-    // Stopper position: 1-3 spots in front of ball handler (toward basket)
-    const stopperOffset = Phaser.Math.Between(1, 3);
-    const stopperSpot = {
-      x: isHomeOffense
-        ? startGridX + stopperOffset  // Home: +X toward basket (x=90)
-        : startGridX - stopperOffset, // Away: -X toward basket (x=10)
-      y: startGridY
-    };
-    
-    stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
-    stopperSpot.y = Phaser.Math.Clamp(stopperSpot.y, 1, 49);
-    
+    const stopperSpot = fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
     const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
     const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
     stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
@@ -1305,16 +1284,19 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   const defenderSprite = defenderId && defenderId !== stopperId ? playerSprites[defenderId] : null;
   
   if (defenderSprite) {
-    // Defender follows to position behind shooter
-    const defenderSpot = {
-      x: isHomeOffense
-        ? shotSpot.x + 6  // Home: defender is +6 (behind shooter)
-        : shotSpot.x - 6, // Away: defender is -6 (behind shooter)
-      y: shotSpot.y + Phaser.Math.Between(-2, 2)
-    };
-    defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
-    defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
-    
+    let defenderSpot;
+    if (
+      turnData.defender_spot &&
+      typeof turnData.defender_spot.x === "number" &&
+      typeof turnData.defender_spot.y === "number"
+    ) {
+      defenderSpot = {
+        x: Phaser.Math.Clamp(turnData.defender_spot.x, 4, 97),
+        y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49),
+      };
+    } else {
+      defenderSpot = fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 1);
+    }
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
     promises.push(
@@ -1614,12 +1596,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49)
       };
     } else {
-      defenderSpot = {
-        x: isHomeOffense ? shotSpot.x + 3 : shotSpot.x - 3,
-        y: shotSpot.y + Phaser.Math.Between(-2, 2)
-      };
-      defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
-      defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
+      defenderSpot = fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
     }
 
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);

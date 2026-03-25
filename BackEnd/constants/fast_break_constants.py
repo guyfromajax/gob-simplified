@@ -7,6 +7,8 @@ the Fast Break system (DREB → Fast Break, Steal → Fast Break).
 All coordinates are in HOME orientation (basket at x=91 for home, x=9 for away).
 """
 
+import random
+
 # Ball Handler Movement (Defensive Stop / Shot Attempt)
 BALL_HANDLER_MOVE_X_MIN = 5
 BALL_HANDLER_MOVE_X_MAX = 10
@@ -25,6 +27,32 @@ FB_SHOT_SPOT_Y_RANGE = 6  # ±y from rim center
 # Defender 1 x-coord toward basket from shooter: home offense +1, away offense -1. Y: ±2 from shooter
 SHOT_DEFENDER_X_OFFSET = 1  # Defender x = shooter x + 1 (home) or shooter x - 1 (away)
 SHOT_DEFENDER_Y_RANGE = 2  # Defender y within ±2 of shooter y
+
+
+def fast_break_shot_defender_end_coords(
+    bh_x: float,
+    bh_y: float,
+    is_away_offense: bool,
+    *,
+    stack_index: int = 0,
+) -> dict:
+    """
+    Grid destination for a fast-break shot contest defender vs the shooter's final spot (HOME grid).
+
+    Base rule (stack_index=0): SHOT_DEFENDER_X_OFFSET steps toward the attacking rim in X,
+    Y = shooter Y + uniform integer in [-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE].
+
+    When two defenders animate (e.g. beaten stopper + trail shot defender), use stack_index 0 and 1
+    so the second sits one step further toward the basket (same Y jitter rule).
+    """
+    toward_basket = -1 if is_away_offense else 1
+    x_steps = SHOT_DEFENDER_X_OFFSET + max(0, int(stack_index))
+    defender_x = float(bh_x) + toward_basket * x_steps
+    defender_x = int(max(4, min(97, round(defender_x))))
+    defender_y_off = random.randint(-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE)
+    defender_y = int(max(1, min(49, round(float(bh_y) + defender_y_off))))
+    return {"x": defender_x, "y": defender_y}
+
 
 # Rebounder Positioning
 REBOUNDER_X_MIN = 40

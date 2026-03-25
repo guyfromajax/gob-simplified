@@ -340,6 +340,7 @@ from BackEnd.constants.fast_break_constants import (
     STOPPER_OFFSET_MAX,
     SHOT_DEFENDER_X_OFFSET,
     SHOT_DEFENDER_Y_RANGE,
+    fast_break_shot_defender_end_coords,
     REBOUNDER_X_MIN,
     REBOUNDER_X_MAX,
     REBOUNDER_Y_RANGE,
