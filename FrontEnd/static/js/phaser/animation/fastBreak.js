@@ -183,6 +183,24 @@ async function finalizeRimRunnerNonShotTurn(scene, turnData) {
   }
 }
 
+function rimRunnerOutletMatchOtherPlayerDx(phase, playerSprites, width, height, sid, skipIds) {
+  const away = Boolean(phase?.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+  const skip = new Set((skipIds || []).map((x) => sid(x)));
+  for (const row of phase?.other_players || []) {
+    const pid = sid(row.player_id);
+    if (!pid || skip.has(pid)) continue;
+    const sp = playerSprites[pid];
+    if (!sp) continue;
+    const g = rimRunnerSpriteGrid(sp, width, height);
+    const raw = row.to_x - g.x;
+    if (raw !== 0 && Math.abs(raw) <= 8) {
+      return raw;
+    }
+  }
+  return 3 * towardBasket;
+}
+
 async function animateRimRunnerOutletDeniedBeat(
   scene,
   turnData,
@@ -199,22 +217,31 @@ async function animateRimRunnerOutletDeniedBeat(
   const defSprite = defId ? playerSprites[defId] : null;
   const away = Boolean(phase?.is_away_offense);
   const towardBasket = away ? -1 : 1;
-  const backCourt = -towardBasket;
+
+  const rrId = sid(phase?.rr_id);
+  const recvId = sid(phase?.outlet_receiver_id);
+  const passerIdFromPhase = sid(phase?.outlet_passer_id ?? turnData.roles?.outlet_passer);
+  const matchDx = rimRunnerOutletMatchOtherPlayerDx(phase, playerSprites, width, height, sid, [
+    rrId,
+    recvId,
+    passerIdFromPhase,
+    defId,
+  ]);
 
   const tw = [];
   if (passerSprite && recvSprite && passerSprite !== recvSprite) {
     const pg = rimRunnerSpriteGrid(passerSprite, width, height);
-    const retreat = {
-      x: Phaser.Math.Clamp(pg.x + 2 * backCourt, 4, 97),
+    const forward = {
+      x: Phaser.Math.Clamp(pg.x + matchDx, 4, 97),
       y: Phaser.Math.Clamp(pg.y, 1, 49),
     };
     tw.push(
-      tweenPlayerTo(scene, passerSprite, gridToPixels(retreat.x, retreat.y, width, height), {
+      tweenPlayerTo(scene, passerSprite, gridToPixels(forward.x, forward.y, width, height), {
         duration: 420,
         easing: "Quad.easeOut",
       })
     );
-    setRimRunnerSpriteGrid(passerSprite, retreat.x, retreat.y);
+    setRimRunnerSpriteGrid(passerSprite, forward.x, forward.y);
   }
 
   if (defSprite && passerSprite) {
@@ -234,17 +261,17 @@ async function animateRimRunnerOutletDeniedBeat(
   }
 
   const rg = rimRunnerSpriteGrid(recvSprite, width, height);
-  const hesitate = {
-    x: Phaser.Math.Clamp(rg.x + towardBasket, 4, 97),
-    y: rg.y,
+  const bhVertical = {
+    x: rg.x,
+    y: Phaser.Math.Clamp(rg.y < 25 ? rg.y + 6 : rg.y - 6, 1, 49),
   };
   tw.push(
-    tweenPlayerTo(scene, recvSprite, gridToPixels(hesitate.x, hesitate.y, width, height), {
+    tweenPlayerTo(scene, recvSprite, gridToPixels(bhVertical.x, bhVertical.y, width, height), {
       duration: 380,
       easing: "Linear",
     })
   );
-  setRimRunnerSpriteGrid(recvSprite, hesitate.x, hesitate.y);
+  setRimRunnerSpriteGrid(recvSprite, bhVertical.x, bhVertical.y);
 
   if (tw.length) await Promise.all(tw);
   appendToTextScroll("Outlet contested.");
