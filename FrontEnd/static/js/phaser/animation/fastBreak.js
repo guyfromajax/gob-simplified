@@ -15,7 +15,6 @@ import {
   REBOUNDER_X_MAX,
   REBOUNDER_Y_RANGE,
   SHOT_ATTEMPT_REBOUNDER_Y_RANGE,
-  OUTLET_PASSER_MOVE_X,
   STEAL_ENTRY_MOVE_X_MIN,
   STEAL_ENTRY_MOVE_X_MAX,
   STEAL_ENTRY_MOVE_Y_RANGE,
@@ -263,7 +262,7 @@ async function animateRimRunnerOutletDeniedBeat(
   const rg = rimRunnerSpriteGrid(recvSprite, width, height);
   const bhVertical = {
     x: rg.x,
-    y: Phaser.Math.Clamp(rg.y < 25 ? rg.y + 6 : rg.y - 6, 1, 49),
+    y: Phaser.Math.Clamp(rg.y < 25 ? rg.y + 10 : rg.y - 10, 1, 49),
   };
   tw.push(
     tweenPlayerTo(scene, recvSprite, gridToPixels(bhVertical.x, bhVertical.y, width, height), {
@@ -2317,7 +2316,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
  * @param {number} height - Scene height
  * @param {Set} getbackPlayerIdsSet - Set of get-back player IDs (to skip)
  * @param {Set} releasePlayerIdsSet - Set of release player IDs (to skip)
- * @param {string} outletPasserId - ID of outlet passer (to skip)
  * @returns {Array} Array of tween references for rebounder animations (for early termination)
  */
 function animateRebounders(
@@ -2329,8 +2327,7 @@ function animateRebounders(
   width,
   height,
   getbackPlayerIdsSet,
-  releasePlayerIdsSet,
-  outletPasserId
+  releasePlayerIdsSet
 ) {
   const rebounderTweens = [];
   const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP";
@@ -2348,11 +2345,10 @@ function animateRebounders(
   };
   
   for (const [id, sprite] of Object.entries(playerSprites)) {
-    // Skip shooter, primary defender, outlet passer, get-back players, and release players
+    // Skip shooter, primary defender, get-back players, and release players (outlet passer uses same tween path)
     if (
       id === ballHandlerId ||
       id === primaryDefenderId ||
-      id === outletPasserId ||
       getbackPlayerIdsSet.has(id) ||
       releasePlayerIdsSet.has(id)
     ) {
@@ -2412,9 +2408,8 @@ function animateRebounders(
 
 /**
  * Helper: Move all non-involved players to their positions
- * - Outlet passer: moves forward 7 x-coords toward basket (+7 for home offense, -7 for away offense)
  * - Get-back players: chase toward basket (X: 50 to basket-15, Y: 15-35)
- * - Rebounders: handled by animateRebounders() function
+ * - Outlet passer & other trail players: same targets/tweens as animateRebounders (incl. early stop)
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
  * - Rebounders stop early when defensive stop is made (ball handler and stopper reach their spots)
  * 
@@ -2448,49 +2443,9 @@ async function moveOtherPlayersToStandardPositions(
   const getbackPlayerIdsSet = new Set(getbackPlayerIds);
   const releasePlayerIdsSet = new Set(releasePlayerIds);
   
-  // ✅ Get outlet passer ID - they move forward 7 x-coords toward basket
-  const outletPasserId = turnData.roles?.outlet_passer;
-  
-  // Determine which basket is being attacked and if this is a defensive stop or shot attempt
-  const shooterSprite = playerSprites[ballHandlerId];
-  const isHomeOffense = shooterSprite?.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP";
-  
-  // Convert sprite positions to grid for starting y calculation
-  const pixelsToGrid = (pixelX, pixelY) => {
-    const gridX = (pixelX / width) * 100;
-    const gridY = 50 - (pixelY / height) * 50;
-    return { x: gridX, y: gridY };
-  };
-  
   for (const [id, sprite] of Object.entries(playerSprites)) {
     // Skip shooter and primary defender (already animated)
     if (id === ballHandlerId || id === primaryDefenderId) {
-      continue;
-    }
-    
-    // ✅ Outlet passer moves forward 7 x-coords toward basket
-    if (id === outletPasserId) {
-      const passerCurrentGrid = pixelsToGrid(sprite.x, sprite.y);
-      const passerTargetX = isHomeOffense 
-        ? Phaser.Math.Clamp(passerCurrentGrid.x + OUTLET_PASSER_MOVE_X, 4, 97)  // Home: +7 (toward x=90)
-        : Phaser.Math.Clamp(passerCurrentGrid.x - OUTLET_PASSER_MOVE_X, 4, 97); // Away: -7 (toward x=10)
-      
-      const targetSpot = {
-        x: passerTargetX,
-        y: passerCurrentGrid.y  // Keep same y-coord
-      };
-      
-      const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
-      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
-      
-      promises.push(
-        tweenPlayerTo(scene, sprite, targetPx, {
-          duration: playerDuration,
-          easing: "Linear"
-        })
-      );
       continue;
     }
     
@@ -2535,8 +2490,7 @@ async function moveOtherPlayersToStandardPositions(
     width,
     height,
     getbackPlayerIdsSet,
-    releasePlayerIdsSet,
-    outletPasserId
+    releasePlayerIdsSet
   );
   
   // Add rebounder tween promises for awaiting
