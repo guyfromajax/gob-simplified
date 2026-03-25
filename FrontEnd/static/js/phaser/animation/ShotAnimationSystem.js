@@ -542,107 +542,41 @@ export class ShotAnimationSystem {
       //   willStartInPhase2: true // ShotAnimationSystem always starts defenders in Phase 2
       // });
       
-      // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
-      // This maintains the existing behavior where pass doesn't start until passer reaches their spot
-      // All offensive players start animating simultaneously, but we only wait for the passer
+      // Phase 1 — Offense-gated: same as playTurnAnimation (defense tweens already running from loop).
       const phase1StartTime = performance.now();
       if (passInfo && passerPromise) {
-        // Wait for passer to complete before starting pass animation
-        // Other offensive players continue animating in the background
         await passerPromise;
       } else if (offensivePromises.length > 0) {
-        // No pass, wait for all offensive players to complete
         await Promise.all(offensivePromises);
       }
-      
-      // ✅ FIX: Phase 2 - Animate pass and defensive players in parallel
-      // This creates the natural feel of defensive players moving while ball is in the air
-      // Other offensive players (non-passer) continue animating from Phase 1
-      const passAndDefensePromises = [];
+
+      // Phase 2 — Await pass only; do not gate the step on defensive completion.
       const phase2StartTime = performance.now();
-      
-      // ✅ COMMENTED OUT: Phase 2 start log (cluttering console)
-      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting Phase 2`, {
-      //   hasPassInfo: !!passInfo,
-      //   defensivePromisesCount: defensivePromises.length,
-      //   phase1Duration: phase2StartTime - phase1StartTime
-      // });
-      
       if (passInfo) {
-        // Add pass animation to the parallel batch
         const passPromise = handlePassAnimation({
           scene: this.scene,
           passInfo,
-          playerSprites: this.playerSprites
+          playerSprites: this.playerSprites,
         });
-        
-        passAndDefensePromises.push(passPromise);
-        // ✅ COMMENTED OUT: Pass animation start log (cluttering console)
-        // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Starting pass animation + defensive animations in parallel`);
-      } else {
-        // ✅ COMMENTED OUT: No pass log (cluttering console)
-        // console.log(`⚠️ [SHOT ANIM] Step ${stepIndex}: No pass - starting defensive animations in Phase 2`);
+        await passPromise;
       }
-      
-      // Add all defensive player movements to the parallel batch
-      // Extract promises from defensivePromises array (which now contains objects with {promise, playerId})
-      const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
-      passAndDefensePromises.push(...defensivePromiseArray);
 
-      // 🔍 [SHOT ANIM TIMING] Log only for first step with a pass (compare DREB vs non-DREB)
       if (step4DefenderStarts && step4DefenderStarts.length > 0) {
-        const earliest = Math.min(...step4DefenderStarts.map(d => d.startTime));
-        console.log('🔍 [SHOT ANIM TIMING]', {
+        const earliest = Math.min(...step4DefenderStarts.map((d) => d.startTime));
+        console.log("🔍 [SHOT ANIM TIMING]", {
           stepIndex,
           result_type: turnData.result_type,
           rebound_type: turnData.rebound_type ?? null,
           phase2StartTime,
           defenderStarts: step4DefenderStarts,
           earliestDefenderStart: earliest,
-          msFromFirstDefenderToPhase2: Math.round(phase2StartTime - earliest)
+          msFromFirstDefenderToPhase2: Math.round(phase2StartTime - earliest),
         });
       }
-      // ✅ COMMENTED OUT: Defensive animations added log (cluttering console)
-      // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
-      
-      // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
-      // if (defensivePromises.length > 0) {
-      //   const earliestDefensiveStart = Math.min(...defensivePromises.map(dp => dp.startTime));
-      //   const timeDiff = phase2StartTime - earliestDefensiveStart;
-      //   console.log(`⏱️ [TIMING] Step ${stepIndex}: Time between defensive tween start and Phase 2 start`, {
-      //     earliestDefensiveStart,
-      //     phase2StartTime,
-      //     timeDifferenceMs: timeDiff,
-      //     note: timeDiff > 0 ? 'Defensive tweens started BEFORE Phase 2' : 'Defensive tweens started AFTER Phase 2 (unexpected)'
-      //   });
-      // }
-      // 
-      // const beforePromiseAll = performance.now();
-      // console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() about to start waiting for pass + defensive animations`, {
-      //   passAndDefensePromisesCount: passAndDefensePromises.length,
-      //   hasPass: !!passInfo,
-      //   defensiveCount: defensivePromiseArray.length
-      // });
-      
-      // Animate pass and defensive players simultaneously
-      if (passAndDefensePromises.length > 0) {
-        await Promise.all(passAndDefensePromises);
-      }
-      
-      // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
-      // const afterPromiseAll = performance.now();
-      // console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() completed`, {
-      //   waitDuration: afterPromiseAll - beforePromiseAll
-      // });
-      
-      // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
-      // This ensures all offensive players finish their movements
-      // Note: If there was no pass, we already waited for all offensive players above
-      if (passInfo && passerPromise) {
-        const remainingOffensivePromises = offensivePromises.filter(p => p !== passerPromise);
-        if (remainingOffensivePromises.length > 0) {
-          await Promise.all(remainingOffensivePromises);
-        }
+
+      // Phase 3 — After pass, wait for all offensive step tweens (passer already resolved).
+      if (passInfo && offensivePromises.length > 0) {
+        await Promise.all(offensivePromises);
       }
       
       // Handle shot if this step contains one

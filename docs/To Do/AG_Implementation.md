@@ -102,7 +102,8 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 - Extend BH modeling beyond flat **5%**.
 - Re-hook **global game speed** + clock to the helper.
 - Post–Phase A playtest: whether **Phase C** context scalars are needed for HCO / press.
-- **Animation gating (§11):** optional product change — HCO shot keyed on shooter-only vs current “all offense finish first”; rebound SS&S if shot fires early.
+- **Skeleton step gating (§11.2):** **done** — HCO / FCP / HCT steps advance when **all offensive** step tweens finish; defensive tweens are **ambient** (started in parallel or with the pass) and **do not** block step progression. Pass choreography unchanged: await **passer**, then **pass animation**, then **`Promise.all` offense** so the passer is included after the ball moves.
+- **Shot gating (§11.2–11.3):** still optional — HCO shot keyed on **shooter-only** vs current “all offense finish before `shootBall`”; rebound / display SS&S if shot fires early.
 
 ---
 
@@ -111,7 +112,8 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 - Energy / scaling: `docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`
 - Turn structure / buckets: `docs/docs_1_systems/05_GP_Supporting_Systems/Turn_by_Turn_System.md`
 - Player coords sync (animation finals → sim): `BackEnd/utils/shared.py` (`sync_lineup_coords_from_turn`, `apply_coords_from_animations_list`)
-- Duration base: `FrontEnd/static/js/phaser/animation/turnAnimation.js` (`getPlayerDuration`, `getDurationFromDistance`, `DEFAULT_PLAYER_SPEED`; HCO step gating — passer / `Promise.all` on offense)
+- Duration base: `FrontEnd/static/js/phaser/animation/turnAnimation.js` (`getPlayerDuration`, `getDurationFromDistance`, `DEFAULT_PLAYER_SPEED`; **offense-gated** skeleton steps — passer, pass only, `Promise.all` on offense; defense non-blocking)
+- Shot-turn skeleton steps (same gating): `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js` (mirrors `playTurnAnimation` step phases)
 - Fast break “everyone else” tweens: `FrontEnd/static/js/phaser/animation/fastBreak.js` (`animateRebounders` → `getPlayerDuration`)
 - Sprite load: `FrontEnd/static/js/phaser/setup/loadPhaserPlayers.js`, `createPhaserPlayer.js` (may need `attributes` attach for AG)
 - AG movement speed: `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js`, tests `utils/playerMovementSpeed.test.js`
@@ -129,14 +131,16 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 - **Ambient / trailer motion:** Spacing, trailers, get-backs — often should **not** block the beat unless the design says so.
 - **Interrupted movement:** If a new step starts before a tween ends, **retarget from current pixels** (stop old tween, new duration from current position)—normal case, not edge case.
 
-### 11.2 HCO skeleton steps (`turnAnimation.js`)
+### 11.2 HCO skeleton steps (`turnAnimation.js`, `ShotAnimationSystem.js`)
 
-**Non-shot steps (broadly “run the play”):**
+**Non-shot steps (broadly “run the play”) — offense-gated:**
 
-- **No pass on the step:** Client waits for **all offensive** step tweens (`Promise.all(offensivePromises)`), then advances. Aligns with “offense runs the scheme until landmarks are hit.”
-- **Pass on the step:** **Staged:** (1) wait **passer**; (2) run **pass + defensive** tweens together; (3) wait **remaining offensive** players. The step still **ends with all offense** at skeleton destinations; defense is tied to the pass window, not an arbitrary “slowest player globally.”
+- **No pass on the step:** Client waits for **all offensive** step tweens (`Promise.all(offensivePromises)`), then advances. Defensive tweens start **in parallel** and are **not** awaited; the next step may begin while defenders are still moving (retarget from current pixels — §11.1).
+- **Pass on the step:** **Staged:** (1) **`await` passer** (passer’s offensive tween); (2) start defensive step tweens when the pass path does (keeps pass and defense visually aligned); **`await` pass animation only** — defense does **not** gate; (3) **`await Promise.all(offensivePromises)`** so **every offensive** player (including the passer) finishes the step. The beat is “offense + pass,” not “slowest defender.”
 
-**AG note:** Today everyone on offense still **finishes the step together** (after pass choreography). Variable AG mostly changes **how long** the step takes, not “one cutter idle while the ball goes on” *within that step*—unless gating rules change.
+**FCP / HCT:** Same skeleton machinery as HCO (§11.5).
+
+**AG note:** Everyone on offense still **finishes the step together** (after pass choreography). Variable AG changes **how long** the step takes. **Shot** timing is still separate: see below — **shooter-only** shot gating is not implemented yet.
 
 **Shot steps — product vs implementation:**
 
@@ -155,7 +159,7 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 
 ### 11.5 Press / traps (FCP / HCT)
 
-**Treat like HCO for gating** until we have reason not to: same skeleton / step machinery in practice. Same pass vs no-pass and shot caveats as §11.2.
+**Same as HCO** in practice: shared skeleton / step loop uses **offense-gated** step progression (§11.2). Same pass vs no-pass and **shot** caveats as §11.2 (shooter-only shot still a future change).
 
 ### 11.6 Free throws & side inbounds (SIPs)
 
@@ -225,6 +229,7 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 
 ### 12.3 Follow-on tickets (not AG v1)
 
-- **§11.2 shot gating:** Shooter-only advance to `shootBall`; coordinate with rebound/display SS&S.
+- **Done (client):** **Offense-gated skeleton steps** — step advances on all offensive tweens (+ pass choreography); defensive completion does not block. Implemented in `turnAnimation.js` and `ShotAnimationSystem.js` (Feb 2026).
+- **§11.2 shot gating:** Shooter-only advance to `shootBall`; coordinate with rebound/display SS&S (still open).
 - **Animation speed presets:** Multiply vs baseline + game clock sync.
 - **BH attribute** modifier on top of flat 5%.

@@ -2631,64 +2631,37 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // Start defensive tweens immediately only when there is no pass; when there is a pass,
     // we'll start them alongside the pass to keep them in sync.
     let defensivePromiseArray = [];
-    
+
     if (!passInfo && defensiveStarters.length > 0) {
-      defensivePromiseArray = defensiveStarters.map(start => start());
+      defensivePromiseArray = defensiveStarters.map((start) => start());
     }
 
-    // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
-    // This maintains the existing behavior where pass doesn't start until passer reaches their spot
-    // All offensive players start animating simultaneously, but we only wait for the passer
-    const phase1StartTime = performance.now();
+    // Phase 1 — Offense-gated: passer hits spot before pass; no-pass step advances when all
+    // offense reach their spots. Defensive tweens run in parallel and do not gate the step.
     if (passInfo && passerPromise) {
-      // Wait for passer to complete before starting pass animation
-      // Other offensive players continue animating in the background
       await passerPromise;
     } else if (offensivePromises.length > 0) {
-      // No pass, wait for all offensive players to complete
       await Promise.all(offensivePromises);
     }
 
-    // ✅ FIX: Phase 2 - Animate pass and defensive players in parallel
-    // This creates the natural feel of defensive players moving while ball is in the air
-    // Other offensive players (non-passer) continue animating from Phase 1
-    const passAndDefensePromises = [];
-    const phase2StartTime = performance.now();
-    
+    // Phase 2 — Pass animation only (defense may run alongside; we do not await defense).
     if (passInfo) {
-      // Add pass animation to the parallel batch
-      const { handlePassAnimation } = await import('./passDetection.js');
+      const { handlePassAnimation } = await import("./passDetection.js");
+      if (defensiveStarters.length > 0) {
+        defensivePromiseArray = defensiveStarters.map((start) => start());
+      }
       const passPromise = handlePassAnimation({
         scene,
         passInfo,
-        playerSprites
+        playerSprites,
       });
-      
-      passAndDefensePromises.push(passPromise);
+      await passPromise;
+    }
 
-      // Start defensive tweens now (in sync with pass start)
-      if (defensiveStarters.length > 0) {
-        defensivePromiseArray = defensiveStarters.map(start => start());
-        passAndDefensePromises.push(...defensivePromiseArray);
-      }
-    } else {
-      // No pass: defensive tweens (if any) already started above
-      passAndDefensePromises.push(...defensivePromiseArray);
-    }
-    
-    // Animate pass and defensive players simultaneously
-    if (passAndDefensePromises.length > 0) {
-      await Promise.all(passAndDefensePromises);
-    }
-    
-    // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
-    // This ensures all offensive players finish their movements
-    // Note: If there was no pass, we already waited for all offensive players above
-    if (passInfo && passerPromise) {
-      const remainingOffensivePromises = offensivePromises.filter(p => p !== passerPromise);
-      if (remainingOffensivePromises.length > 0) {
-        await Promise.all(remainingOffensivePromises);
-      }
+    // Phase 3 — After a pass, ensure every offensive player (including passer) reached this step.
+    // No-pass: already satisfied in phase 1.
+    if (passInfo && offensivePromises.length > 0) {
+      await Promise.all(offensivePromises);
     }
 
     if (shotInfo) {
