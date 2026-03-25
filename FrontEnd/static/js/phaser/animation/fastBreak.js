@@ -24,6 +24,138 @@ import {
 } from "../constants/fastBreakConstants.js";
 
 /**
+ * Phase 2 resolution kind for fast break turns — mirrors Rim Runner payload contract
+ * (`docs/To Do/FB_Playcall_Update.md`, `tests/fixtures/rim_runner_contract/`).
+ *
+ * @param {object} turnData
+ * @param {{ isBlockingFoul: boolean }} opts
+ * @returns {'fast_break_shot'|'fast_break_shot_foul'|'rim_runner_steal'|'rim_runner_bat_oob'|'rim_runner_hco_settle'|'generic_fb_stop'}
+ */
+function classifyFastBreakPhase2(turnData, { isBlockingFoul }) {
+  const result = turnData.result_type;
+  if (result === "MAKE" || result === "MISS" || result === "BLOCK") {
+    return "fast_break_shot";
+  }
+  if (result === "CHARGE" || isBlockingFoul) {
+    return "fast_break_shot_foul";
+  }
+
+  const isRimRunnerSeq =
+    turnData.fast_break_play === "rim_runner" ||
+    turnData.roles?.rim_runner_sequence === true;
+
+  if (isRimRunnerSeq) {
+    if (turnData.rim_runner_interception && result === "STEAL") {
+      return "rim_runner_steal";
+    }
+    if (turnData.rim_runner_bat_oob && result === "DEAD BALL") {
+      return "rim_runner_bat_oob";
+    }
+    if (result === "DEFENSIVE_STOP" || turnData.rim_runner_outlet_failed) {
+      return "rim_runner_hco_settle";
+    }
+  }
+
+  return "generic_fb_stop";
+}
+
+/**
+ * Rim Runner lane pass (BH / outlet receiver → rim runner), spec ~6 grid toward basket from RR post-burst.
+ * Runs after burst/outlet when the sim attempted the lane pass (not hold-up, not outlet denied).
+ */
+function shouldAnimateRimRunnerLanePass(turnData, phase2Kind) {
+  if (turnData.rim_runner_outlet_failed) return false;
+  const seq =
+    turnData.fast_break_play === "rim_runner" ||
+    turnData.roles?.rim_runner_sequence === true;
+  if (!seq) return false;
+  if (!turnData.roles?.rim_runner_burst_phase && turnData.roles?.rim_runner_id == null) {
+    return false;
+  }
+  const laneKinds =
+    phase2Kind === "fast_break_shot" ||
+    phase2Kind === "fast_break_shot_foul" ||
+    phase2Kind === "rim_runner_steal" ||
+    phase2Kind === "rim_runner_bat_oob";
+  if (!laneKinds) return false;
+
+  const sid = (id) => (id != null ? String(id) : null);
+  const bh = sid(
+    turnData.roles?.ball_handler_id ??
+      turnData.roles?.ball_handler?.player_id ??
+      turnData.roles?.passer?.player_id
+  );
+  const rr = sid(turnData.roles?.rim_runner_id ?? turnData.roles?.shooter?.player_id);
+  if (!bh || !rr || bh === rr) return false;
+  return true;
+}
+
+async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height) {
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const passerId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const passerSprite = playerSprites[passerId];
+  const rrSprite = playerSprites[rrId];
+  if (!passerSprite || !rrSprite) return;
+
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+
+  let rrGridX =
+    typeof rrSprite.gridX === "number"
+      ? rrSprite.gridX
+      : phase?.rr_to?.x ?? 50;
+  let rrGridY =
+    typeof rrSprite.gridY === "number"
+      ? rrSprite.gridY
+      : phase?.rr_to?.y ?? 25;
+
+  const catchGrid = {
+    x: Phaser.Math.Clamp(rrGridX + 6 * towardBasket, 4, 97),
+    y: Phaser.Math.Clamp(rrGridY, 1, 49),
+  };
+  const catchPx = gridToPixels(catchGrid.x, catchGrid.y, width, height);
+
+  attachBallToPlayer(scene, ballSprite, passerSprite);
+
+  const rrDur = getPlayerDuration(rrSprite, catchPx.x, catchPx.y, true);
+  const passDuration = Math.max(220, Math.min(850, rrDur));
+
+  const rrTween = tweenPlayerTo(scene, rrSprite, catchPx, {
+    duration: passDuration,
+    easing: "Linear",
+  });
+
+  const passPromise = runPass(scene, {
+    fromId: passerId,
+    toId: rrId,
+    endCoords: { x: catchPx.x, y: catchPx.y },
+    duration: passDuration,
+    easing: "Sine.easeInOut",
+  });
+
+  await Promise.all([passPromise, rrTween]);
+
+  rrSprite.gridX = catchGrid.x;
+  rrSprite.gridY = catchGrid.y;
+
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);
+    else setTimeout(resolve, 50);
+  });
+  const { getBallController, synchronizeBallState } = await import("./BallControllerAdapter.js");
+  const ballController = getBallController();
+  synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+  if (!ballController?.isAttached || ballController.currentOwner !== rrSprite) {
+    attachBallToPlayer(scene, ballSprite, rrSprite, { reason: "rim_runner_lane_pass" });
+  }
+}
+
+/**
  * Simplified Fast Break Animation System
  * 
  * Flow:
@@ -109,26 +241,38 @@ export async function runFastBreakSequence({
   }
   
   // ============================================================================
-  // PHASE 2: FAST BREAK RESOLUTION - Check result BEFORE moving toward basket
+  // PHASE 2: FAST BREAK RESOLUTION — contract-ordered routing (Rim Runner + generic FB)
   // ============================================================================
   const result = turnData.result_type;
-  const isBlockingFoul = result === "FOUL" && turnData.foul_team === "DEFENSE" && turnData.text?.toLowerCase().includes("blocking foul");
+  const isBlockingFoul =
+    result === "FOUL" &&
+    turnData.foul_team === "DEFENSE" &&
+    turnData.text?.toLowerCase().includes("blocking foul");
 
-  if (result === "MAKE" || result === "MISS" || result === "BLOCK") {
-    // Shot attempt scenario (BLOCK = shot attempt that gets blocked)
-    // Check if ball handler beat the defender (skill check won)
+  const phase2Kind = classifyFastBreakPhase2(turnData, { isBlockingFoul });
+
+  if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
+    await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
+  }
+
+  if (phase2Kind === "fast_break_shot") {
     if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
-      // Ball handler won skill check - animate past stopper to shot spot
       await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
     } else {
-      // Normal shot attempt (no stopper or stopper not in position)
       await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
     }
-  } else if (result === "CHARGE" || isBlockingFoul) {
-    // Charge or blocking foul: animate to shot spot (same as MAKE/MISS) then stop; no shot animation. Announcement runs in finalizeTurnAfterAnimation.
+  } else if (phase2Kind === "fast_break_shot_foul") {
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
+  } else if (phase2Kind === "rim_runner_steal") {
+    // TODO: Lane interception / “Interception!” — payload: rim_runner_interception, stealer_id, victim_id
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+  } else if (phase2Kind === "rim_runner_bat_oob") {
+    // TODO: Bat OOB ball trajectory + SIP — payload: rim_runner_bat_oob, next SIDE_INBOUND, same offense_team_id
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+  } else if (phase2Kind === "rim_runner_hco_settle") {
+    // Outlet denied (`rim_runner_outlet_failed`) or hold-up (DEFENSIVE_STOP after lane read). TODO: spec lead-in before HCO
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   } else {
-    // Defensive stop, other foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
