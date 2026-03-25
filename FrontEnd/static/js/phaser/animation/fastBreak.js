@@ -170,6 +170,44 @@ function setRimRunnerSpriteGrid(sprite, gx, gy) {
   sprite.gridY = gy;
 }
 
+/**
+ * Parallel horizontal drifts toward the offense basket: same duration for all, per-sprite distance
+ * from AG (`horizontalGridUnitsForDurationMs`), Y fixed, grid X clamped 4–97. Skips `excludeIds`.
+ */
+function rimRunnerAgHorizontalDriftPromises(
+  scene,
+  playerSprites,
+  width,
+  height,
+  sid,
+  excludeIds,
+  towardBasket,
+  phaseDurationMs
+) {
+  const skip = excludeIds instanceof Set ? excludeIds : new Set();
+  const promises = [];
+  for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
+    if (!sprite) continue;
+    const pid = sid(pidRaw);
+    if (!pid || skip.has(pid)) continue;
+    if (scene.tweens) {
+      scene.tweens.killTweensOf(sprite);
+    }
+    const g = rimRunnerSpriteGrid(sprite, width, height);
+    const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
+    const endX = Phaser.Math.Clamp(g.x + stride * towardBasket, 4, 97);
+    const endY = Phaser.Math.Clamp(g.y, 1, 49);
+    const px = gridToPixels(endX, endY, width, height);
+    promises.push(
+      tweenPlayerTo(scene, sprite, px, {
+        duration: phaseDurationMs,
+        easing: "Linear",
+      })
+    );
+  }
+  return promises;
+}
+
 async function finalizeRimRunnerNonShotTurn(scene, turnData) {
   if (scene.skipToEnd) return;
   if (scene.stateMachine?.state !== States.HalfCourt) {
@@ -310,26 +348,17 @@ async function animateRimRunnerOutletDeniedBeat(
   const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
   const phaseDurationMs = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
 
-  const driftPromises = [];
-  for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
-    if (!sprite) continue;
-    const pid = sid(pidRaw);
-    if (pid === passerId || pid === recvId || pid === defId) continue;
-    if (scene.tweens) {
-      scene.tweens.killTweensOf(sprite);
-    }
-    const g = rimRunnerSpriteGrid(sprite, width, height);
-    const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
-    const endX = Phaser.Math.Clamp(g.x + stride * towardBasket, 4, 97);
-    const endY = Phaser.Math.Clamp(g.y, 1, 49);
-    const px = gridToPixels(endX, endY, width, height);
-    driftPromises.push(
-      tweenPlayerTo(scene, sprite, px, {
-        duration: phaseDurationMs,
-        easing: "Linear",
-      })
-    );
-  }
+  const driftExclude = new Set([passerId, recvId, defId].filter(Boolean));
+  const driftPromises = rimRunnerAgHorizontalDriftPromises(
+    scene,
+    playerSprites,
+    width,
+    height,
+    sid,
+    driftExclude,
+    towardBasket,
+    phaseDurationMs
+  );
 
   const recvPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
     duration: phaseDurationMs,
@@ -367,6 +396,10 @@ async function animateRimRunnerOutletDeniedBeat(
   }
 }
 
+/**
+ * RR hold-up (no lane pass): ball handler settles (+6 x, ±8 y); everyone else uses
+ * `rimRunnerAgHorizontalDriftPromises` (same AG / shared-duration model as outlet denied).
+ */
 async function animateRimRunnerHoldUpLeadIn(
   scene,
   turnData,
@@ -394,41 +427,25 @@ async function animateRimRunnerHoldUpLeadIn(
     y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, 1, 49),
   };
   const bhTargetPx = gridToPixels(settleBh.x, settleBh.y, width, height);
-  const bhDuration = getPlayerDuration(bh, bhTargetPx.x, bhTargetPx.y);
+  const phaseDurationMs = getPlayerDuration(bh, bhTargetPx.x, bhTargetPx.y);
 
-  // Long horizontal leg toward the offense basket; tweens are stopped when the ball handler arrives.
-  const horizontalDriftGrid = 40;
-  const horizontalDurationMs = 15000;
-
-  const horizontalTweens = [];
-  for (const [pid, sprite] of Object.entries(playerSprites)) {
-    if (sid(pid) === bhId || !sprite) continue;
-    const g = rimRunnerSpriteGrid(sprite, width, height);
-    const endX = Phaser.Math.Clamp(g.x + horizontalDriftGrid * towardBasket, 4, 97);
-    const endY = Phaser.Math.Clamp(g.y, 1, 49);
-    const px = gridToPixels(endX, endY, width, height);
-    const tween = scene.tweens.add({
-      targets: sprite,
-      x: px.x,
-      y: px.y,
-      duration: horizontalDurationMs,
-      ease: "Linear",
-    });
-    horizontalTweens.push(tween);
-  }
+  const driftPromises = rimRunnerAgHorizontalDriftPromises(
+    scene,
+    playerSprites,
+    width,
+    height,
+    sid,
+    new Set([bhId]),
+    towardBasket,
+    phaseDurationMs
+  );
 
   const bhPromise = tweenPlayerTo(scene, bh, bhTargetPx, {
-    duration: bhDuration,
+    duration: phaseDurationMs,
     easing: "Linear",
   });
 
-  await bhPromise;
-
-  for (const t of horizontalTweens) {
-    if (t) {
-      t.stop();
-    }
-  }
+  await Promise.all([bhPromise, ...driftPromises]);
 
   setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
   for (const [pid, sprite] of Object.entries(playerSprites)) {
