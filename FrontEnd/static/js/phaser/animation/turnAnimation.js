@@ -444,6 +444,140 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   await Promise.all(promises);
 }
 
+/**
+ * HCO step 0 after Rim Runner hold-up: everyone except ball handler tweens to step 0; when PG arrives,
+ * pass from ball handler (still at hold-up end) to PG; then finish remaining setup tweens; then BH → step 0.
+ */
+async function runRimRunnerHoldUpSetupTween({
+  scene,
+  ballSprite,
+  animations,
+  playerSprites,
+  currentBallOwnerRef,
+  turnData,
+  ballHandlerId,
+  pgId,
+}) {
+  if (scene.skipToEnd) return;
+  const bhIdStr = String(ballHandlerId);
+  const pgIdStr = String(pgId);
+  const stepIndex = 0;
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+
+  const promises = [];
+  let pgPromise = null;
+
+  for (const anim of animations) {
+    if (scene.skipToEnd) break;
+    const idStr = String(anim.playerId);
+    if (idStr === bhIdStr) continue;
+    const sprite = playerSprites[anim.playerId];
+    const firstStep = anim.movement?.[stepIndex];
+    if (!sprite || !firstStep?.coords) continue;
+
+    const isInboundSpot = firstStep.coords.x <= 5 || firstStep.coords.x >= 95;
+    const shouldClampXToRims =
+      !isInboundSpot &&
+      turnData?.result_type !== "SIDE_INBOUND" &&
+      turnData?.result_type !== "BASELINE_INBOUND";
+    const targetGridX = shouldClampXToRims
+      ? Phaser.Math.Clamp(firstStep.coords.x, 9, 91)
+      : firstStep.coords.x;
+
+    const { x, y } = gridToPixels(
+      targetGridX,
+      firstStep.coords.y,
+      width,
+      height
+    );
+    const duration = getPlayerDuration(sprite, x, y);
+
+    const p = new Promise((resolve) => {
+      const tween = scene.tweens.add({
+        targets: [sprite],
+        x,
+        y,
+        duration,
+        ease: "Linear",
+        onUpdate: () => {
+          if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
+            ballSprite.setPosition(sprite.x, sprite.y);
+            ballSprite.setVisible(true);
+          }
+        },
+        onComplete: resolve,
+        onStop: resolve,
+      });
+      if (scene.skipToEnd) {
+        tween.stop();
+      }
+    });
+    promises.push(p);
+    if (idStr === pgIdStr) {
+      pgPromise = p;
+    }
+  }
+
+  if (pgPromise && playerSprites[bhIdStr] && playerSprites[pgIdStr]) {
+    await pgPromise;
+    attachBallToPlayer(scene, ballSprite, playerSprites[bhIdStr]);
+    await runPass(scene, {
+      fromId: bhIdStr,
+      toId: pgIdStr,
+      duration: 480,
+      easing: "Sine.easeInOut",
+    });
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);
+      else setTimeout(resolve, 50);
+    });
+    const { synchronizeBallState } = await import("./BallControllerAdapter.js");
+    synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+    const pgSprite = playerSprites[pgIdStr];
+    if (pgSprite) {
+      attachBallToPlayer(scene, ballSprite, pgSprite);
+      currentBallOwnerRef.value = pgSprite;
+      setBallHolderId(scene, pgIdStr);
+    }
+  }
+
+  await Promise.all(promises);
+
+  const bhAnim = animations.find((a) => String(a.playerId) === bhIdStr);
+  const bhSprite = playerSprites[bhIdStr];
+  const bhFirst = bhAnim?.movement?.[stepIndex];
+  if (bhSprite && bhFirst?.coords) {
+    const isInboundSpot = bhFirst.coords.x <= 5 || bhFirst.coords.x >= 95;
+    const shouldClampXToRims =
+      !isInboundSpot &&
+      turnData?.result_type !== "SIDE_INBOUND" &&
+      turnData?.result_type !== "BASELINE_INBOUND";
+    const targetGridX = shouldClampXToRims
+      ? Phaser.Math.Clamp(bhFirst.coords.x, 9, 91)
+      : bhFirst.coords.x;
+    const { x, y } = gridToPixels(targetGridX, bhFirst.coords.y, width, height);
+    const duration = getPlayerDuration(bhSprite, x, y);
+    await new Promise((resolve) => {
+      scene.tweens.add({
+        targets: [bhSprite],
+        x,
+        y,
+        duration,
+        ease: "Linear",
+        onUpdate: () => {
+          if (currentBallOwnerRef?.value === bhSprite && ballSprite?.setPosition) {
+            ballSprite.setPosition(bhSprite.x, bhSprite.y);
+            ballSprite.setVisible(true);
+          }
+        },
+        onComplete: resolve,
+        onStop: resolve,
+      });
+    });
+  }
+}
+
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData, context = null }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow)) return;
@@ -2095,31 +2229,41 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // If we are coming directly from an inbound or opening tip, the ball should already be attached
   // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
   if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
-    for (const anim of turnData.animations) {
-      if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
-      if (anim.hasBallAtStep?.[0]) {
-        step0OwnerSprite = playerSprites[anim.playerId];
-        break;
+    const rrHoldAttach = scene._rimRunnerHoldUpInboundPass;
+    if (rrHoldAttach?.ballHandlerId && rrHoldAttach?.pgId) {
+      const bhSprite = playerSprites[String(rrHoldAttach.ballHandlerId)];
+      if (bhSprite) {
+        attachBallToPlayer(scene, ballSprite, bhSprite);
+        currentBallOwnerRef.value = bhSprite;
+        setBallHolderId(scene, String(rrHoldAttach.ballHandlerId));
       }
-    }
+    } else {
+      for (const anim of turnData.animations) {
+        if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
+        if (anim.hasBallAtStep?.[0]) {
+          step0OwnerSprite = playerSprites[anim.playerId];
+          break;
+        }
+      }
 
-    if (step0OwnerSprite) {
-      const step0OwnerId = step0OwnerSprite.playerId;
-      const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
-      
-      if (isPutbackTurn) {
-        // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
-        const { getBallController } = await import('./BallControllerAdapter.js');
-        const ballController = getBallController();
-        // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
-        // This prevents the brief attachment flash before the putback shot
-      } else {
-      attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
-      currentBallOwnerRef.value = step0OwnerSprite;
-      
-      // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
-      // This enables the new simple ball animation system to track ball holder
-      setBallHolderId(scene, step0OwnerId);
+      if (step0OwnerSprite) {
+        const step0OwnerId = step0OwnerSprite.playerId;
+        const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
+
+        if (isPutbackTurn) {
+          // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
+          const { getBallController } = await import('./BallControllerAdapter.js');
+          const ballController = getBallController();
+          // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
+          // This prevents the brief attachment flash before the putback shot
+        } else {
+          attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
+          currentBallOwnerRef.value = step0OwnerSprite;
+
+          // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
+          // This enables the new simple ball animation system to track ball holder
+          setBallHolderId(scene, step0OwnerId);
+        }
       }
     }
   }
@@ -2139,15 +2283,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // animationDebugLog("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
   // animationDebugLog("turnData.animations[0].playerId", turnData.animations[0].playerId);
   // animationDebugLog("turnData.animations[0].movement", turnData.animations[0].movement);
-  updateBallOwnership({
-    scene,
-    ballSprite,
-    animations: turnData.animations,
-    playerSprites,
-    stepIndex: 0,
-    offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
-    currentBallOwnerRef
-  });
+  const rrHoldInbound = scene._rimRunnerHoldUpInboundPass;
+  if (!(rrHoldInbound?.ballHandlerId && rrHoldInbound?.pgId)) {
+    updateBallOwnership({
+      scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites,
+      stepIndex: 0,
+      offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
+      currentBallOwnerRef,
+    });
+  }
 
   // Initial active player display update
   if (!scene.skipToEnd) {
@@ -2259,15 +2406,30 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // BIP (BASELINE_INBOUND) already positioned players at skeleton step 0 positions, so this is redundant
   // and can cause timing conflicts if the inbound pass animation is still completing
   if (!fromInbound || !isFCPHCT) {
-    await runSetupTween({
-      scene,
-      ballSprite,
-      animations: turnData.animations,
-      playerSprites,
-      currentBallOwnerRef,
-      turnData,
-      stepDurationMs: getContractStepDurationMs(0, null),
-    });
+    const rrHold = scene._rimRunnerHoldUpInboundPass;
+    if (rrHold?.ballHandlerId && rrHold?.pgId) {
+      await runRimRunnerHoldUpSetupTween({
+        scene,
+        ballSprite,
+        animations: turnData.animations,
+        playerSprites,
+        currentBallOwnerRef,
+        turnData,
+        ballHandlerId: rrHold.ballHandlerId,
+        pgId: rrHold.pgId,
+      });
+      scene._rimRunnerHoldUpInboundPass = null;
+    } else {
+      await runSetupTween({
+        scene,
+        ballSprite,
+        animations: turnData.animations,
+        playerSprites,
+        currentBallOwnerRef,
+        turnData,
+        stepDurationMs: getContractStepDurationMs(0, null),
+      });
+    }
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }

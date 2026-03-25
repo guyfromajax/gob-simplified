@@ -131,7 +131,7 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 - **Read**: `IQ * d6` vs threshold **`200 - 5×fb_efficiency`** (offense team). **Aggression** (offense `strategy_settings`, ≥3 = aggressive) weights wrong-read pass vs hold.
 - **Pass / shot / events**: Open lane → FB shot (Rim Runner shooter, existing `resolve_shot` attack path). Forced pass when not open: intercept roll vs **`250 - fb_opp_modifier`** / **`200 - fb_opp_modifier`** tiers; bat OOB announces **“Batted Ball Out Of Bounds!”** (`RIM_RUNNER_BATTED_OOB`). Full detail matches `rim_runner_fast_break.py`.
 - **Client — outlet denied (`rim_runner_outlet_failed`)**: After **`animateRimRunnerBurstPhase`**, the outlet pass is skipped. **`animateRimRunnerOutletDeniedBeat`** (in `fastBreak.js`): ball remains on the **outlet passer**; any burst tween on the **outlet defender** is cleared so they move to **`outlet_defender_to`** (**passer x ± 2** toward the pass, same **y** as passer — HOME grid); announcement **“FB Outlet Pass Denied!”** with the defender’s headshot; after the standard FB hold, the **receiver** tweens to **passer’s x** and **y + 6** if passer **`y < 25`** else **y − 6**; then **`runPass`** to the receiver (if passer ≠ receiver; dribble-outlet / **`skip_outlet_pass`** keeps one player with the ball). **Rim runner** and **`other_players`** keep their burst tweens in parallel (fast break still “live” for everyone except passer/defender in the denied beat). **Phase 2** calls **`finalizeRimRunnerNonShotTurn`** only — **no** **`animateDefensiveStop`**, **no** **`Great Stop!`**. Next HCO follows normal half-court entry (**`startNextHalfCourtOffense`**).
-- **Client — hold-up (no lane pass after successful outlet)**: **`animateRimRunnerHoldUpLeadIn`** then **`animateDefensiveStop`** (top-of-key settle, backend animations / text scroll as applicable). **`Great Stop!`** is for **Covert** and **stopper** fast-break stops ( **`stopper_id`** ). **Rim Runner outlet denied** uses **“FB Outlet Pass Denied!”** only; RR hold-up does not use that outlet-denied sequence.
+- **Client — hold-up (no lane pass after successful outlet)**: **`animateRimRunnerHoldUpLeadIn`** — ball handler (outlet receiver): **+6** grid **x** toward the basket, **+8 y** if **`y < 25`** else **−8 y**; **outlet passer** (rebounder), when distinct from the ball handler: **+6 x** toward the basket, **y** unchanged (burst phase does not move the passer). Rim runner retreat + primary defender close-in unchanged. **No** **`animateDefensiveStop`** / top-of-key. Phase 2 **`finalizeRimRunnerHoldUpToHco`** sets **`scene._rimRunnerHoldUpInboundPass`** when ball handler ≠ offensive **PG**, then **`finalizeRimRunnerNonShotTurn`**. On the **next HCO** turn, **`playTurnAnimation`** runs **`runRimRunnerHoldUpSetupTween`**: all players except the ball handler tween to skeleton **step 0**; when **PG** reaches step 0, **`runPass`** from the ball handler’s hold-up spot to **PG**; then remaining setup completes and the ball handler tweens to step 0 (ball stays with **PG**). If ball handler **is** PG, normal **`runSetupTween`** only. **`Great Stop!`** remains for **Covert** / **`stopper_id`** stops only, not RR hold-up.
 - **Code**: `BackEnd/engine/rim_runner_fast_break.py`; entry from `resolve_fast_break_logic()` when DREB + `RIM_RUNNER`.
 
 #### 32 (`thirty_two`)
@@ -382,7 +382,7 @@ else:
 **Phase 2: Defensive Stop or Shot Attempt**
 
 **Defensive Stop:**
-- *(Excludes Rim Runner **outlet denied**; that path finalizes HCO without this block.)*
+- *(Excludes Rim Runner **outlet denied** and **hold-up**; those paths finalize HCO without this block.)*
 - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
 - Stopper (closest defender ahead) moves to position 1-3 spots in front of ball handler
 - Get-back defenders chase toward basket
@@ -566,7 +566,7 @@ The outlet passer tracks:
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
   - **Ball handler end position (shot spot)**: Defensive stop → confrontation spot (outlet + 5–10); shot attempt (with or without outlet) → shot spot near rim (so the shot always animates from near the basket, not from top-of-key). Exposed as `turn_result["shot_spot"]` in phase_resolution for frontend use.
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
-  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop); if `roles.rim_runner_burst_phase` is set, runs **`animateRimRunnerBurstPhase()`** before Phase 2 instead of the static Covert-style **`animateOutletPhase()`**. **Rim Runner HCO settle** (`rim_runner_hco_settle`): if **`rim_runner_outlet_failed`**, Phase 2 is **`finalizeRimRunnerNonShotTurn()`** only; else (e.g. hold-up) **`animateRimRunnerHoldUpLeadIn()`** when not outlet denied, then **`animateDefensiveStop()`**.
+  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop); if `roles.rim_runner_burst_phase` is set, runs **`animateRimRunnerBurstPhase()`** before Phase 2 instead of the static Covert-style **`animateOutletPhase()`**. **Rim Runner HCO settle** (`rim_runner_hco_settle`): if **`rim_runner_outlet_failed`**, Phase 2 is **`finalizeRimRunnerNonShotTurn()`** only; else (hold-up) **`animateRimRunnerHoldUpLeadIn()`** then **`finalizeRimRunnerHoldUpToHco()`** (no **`animateDefensiveStop`**).
   - `animateRimRunnerBurstPhase()` - Rim Runner burst + simultaneous role-player moves; pass gated on outlet receiver tween completion (and skipped when outlet denied or dribble-outlet); outlet denied delegates to **`animateRimRunnerOutletDeniedBeat()`**
   - `animateRimRunnerOutletDeniedBeat()` - Outlet-denied sequence: defender press coords, **“FB Outlet Pass Denied!”** + defender headshot, receiver cut, pass (or dribble-outlet), then burst tweens finish
   - `animateOutletPhase()` - Covert-style outlet pass (no player movement)
@@ -581,6 +581,7 @@ The outlet passer tracks:
     - Returns tween references for early termination
   - Early termination logic for rebounder animations
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+  - `runRimRunnerHoldUpSetupTween()` - After RR hold-up, HCO step 0 with optional **BH → PG** pass when PG reaches step 0 ( **`_rimRunnerHoldUpInboundPass`** )
   - `runDefensiveReboundSetup()` - Handles DREB → HCO transition, including Fast Break MISS → DREB cases
   - Automatically looks up `offense_getback` from previous turn if current turn doesn't have it (Fast Break case)
 

@@ -182,6 +182,38 @@ async function finalizeRimRunnerNonShotTurn(scene, turnData) {
   }
 }
 
+function findOffensePgPlayerId(scene, playerSprites, offenseTeamId) {
+  if (!offenseTeamId) return null;
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    if (!sprite) continue;
+    if (String(sprite.team_id) !== String(offenseTeamId)) continue;
+    const info = scene.playerInfo?.[id];
+    const pos = String(info?.pos ?? info?.position ?? "").toUpperCase();
+    if (pos === "PG") return String(id);
+  }
+  return null;
+}
+
+/**
+ * After RR hold-up: skip generic FB defensive stop / top-of-key. Next HCO uses normal step-0 setup;
+ * if ball handler is not PG, `playTurnAnimation` runs an inbound pass when PG reaches step 0.
+ */
+async function finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites) {
+  const roles = turnData.roles || {};
+  const sid = (id) => (id != null ? String(id) : null);
+  const bhId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const offenseTeamId = turnData.offense_team_id ?? scene.offenseTeamId;
+  const pgId = findOffensePgPlayerId(scene, playerSprites, offenseTeamId);
+  if (bhId && pgId && bhId !== pgId) {
+    scene._rimRunnerHoldUpInboundPass = { ballHandlerId: bhId, pgId, offenseTeamId };
+  } else {
+    scene._rimRunnerHoldUpInboundPass = null;
+  }
+  await finalizeRimRunnerNonShotTurn(scene, turnData);
+}
+
 /**
  * Rim Runner outlet denied: defender two grid steps toward the pass direction (same as backend
  * `outlet_defender_to`), announcement + headshot, receiver cuts to passer x and y±6, then pass.
@@ -317,9 +349,21 @@ async function animateRimRunnerHoldUpLeadIn(
   };
   const bhg = rimRunnerSpriteGrid(bh, width, height);
   const settleBh = {
-    x: Phaser.Math.Clamp(bhg.x + towardBasket, 4, 97),
-    y: Phaser.Math.Clamp(bhg.y, 1, 49),
+    x: Phaser.Math.Clamp(bhg.x + 6 * towardBasket, 4, 97),
+    y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, 1, 49),
   };
+
+  const passerId = sid(phase?.outlet_passer_id ?? roles.outlet_passer);
+  const passerSprite =
+    passerId && playerSprites[passerId] && passerId !== bhId ? playerSprites[passerId] : null;
+  let settlePasser = null;
+  if (passerSprite) {
+    const passerG = rimRunnerSpriteGrid(passerSprite, width, height);
+    settlePasser = {
+      x: Phaser.Math.Clamp(passerG.x + 6 * towardBasket, 4, 97),
+      y: Phaser.Math.Clamp(passerG.y, 1, 49),
+    };
+  }
 
   const defObj = roles.defender;
   let defId = sid(
@@ -343,6 +387,14 @@ async function animateRimRunnerHoldUpLeadIn(
       easing: "Linear",
     }),
   ];
+  if (passerSprite && settlePasser) {
+    tw.push(
+      tweenPlayerTo(scene, passerSprite, gridToPixels(settlePasser.x, settlePasser.y, width, height), {
+        duration: 520,
+        easing: "Linear",
+      })
+    );
+  }
   if (defSprite) {
     const dg = rimRunnerSpriteGrid(defSprite, width, height);
     const close = {
@@ -359,6 +411,9 @@ async function animateRimRunnerHoldUpLeadIn(
   await Promise.all(tw);
   setRimRunnerSpriteGrid(rr, retreatRr.x, retreatRr.y);
   setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
+  if (passerSprite && settlePasser) {
+    setRimRunnerSpriteGrid(passerSprite, settlePasser.x, settlePasser.y);
+  }
   const raw = turnData.text || "";
   const msg = raw.toLowerCase().includes("holding") ? raw.replace(/^Fast Break! /, "") : "Holding up — settling.";
   appendToTextScroll(msg);
@@ -692,7 +747,7 @@ export async function runFastBreakSequence({
     if (turnData.rim_runner_outlet_failed) {
       await finalizeRimRunnerNonShotTurn(scene, turnData);
     } else {
-      await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+      await finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites);
     }
   } else {
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
