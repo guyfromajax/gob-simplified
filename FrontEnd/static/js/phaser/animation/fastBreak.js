@@ -332,88 +332,63 @@ async function animateRimRunnerHoldUpLeadIn(
   const bhId = sid(
     roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
   );
-  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
   const bh = playerSprites[bhId];
-  const rr = playerSprites[rrId];
-  if (!bh || !rr) return;
+  if (!bh) return;
 
   attachBallToPlayer(scene, ballSprite, bh);
   const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
   const towardBasket = away ? -1 : 1;
-  const backCourt = -towardBasket;
 
-  const rrg = rimRunnerSpriteGrid(rr, width, height);
-  const retreatRr = {
-    x: Phaser.Math.Clamp(rrg.x + 2 * backCourt, 4, 97),
-    y: Phaser.Math.Clamp(rrg.y, 1, 49),
-  };
   const bhg = rimRunnerSpriteGrid(bh, width, height);
   const settleBh = {
     x: Phaser.Math.Clamp(bhg.x + 6 * towardBasket, 4, 97),
     y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, 1, 49),
   };
+  const bhTargetPx = gridToPixels(settleBh.x, settleBh.y, width, height);
+  const bhDuration = getPlayerDuration(bh, bhTargetPx.x, bhTargetPx.y);
 
-  const passerId = sid(phase?.outlet_passer_id ?? roles.outlet_passer);
-  const passerSprite =
-    passerId && playerSprites[passerId] && passerId !== bhId ? playerSprites[passerId] : null;
-  let settlePasser = null;
-  if (passerSprite) {
-    const passerG = rimRunnerSpriteGrid(passerSprite, width, height);
-    settlePasser = {
-      x: Phaser.Math.Clamp(passerG.x + 6 * towardBasket, 4, 97),
-      y: Phaser.Math.Clamp(passerG.y, 1, 49),
-    };
+  // Long horizontal leg toward the offense basket; tweens are stopped when the ball handler arrives.
+  const horizontalDriftGrid = 40;
+  const horizontalDurationMs = 15000;
+
+  const horizontalTweens = [];
+  for (const [pid, sprite] of Object.entries(playerSprites)) {
+    if (sid(pid) === bhId || !sprite) continue;
+    const g = rimRunnerSpriteGrid(sprite, width, height);
+    const endX = Phaser.Math.Clamp(g.x + horizontalDriftGrid * towardBasket, 4, 97);
+    const endY = Phaser.Math.Clamp(g.y, 1, 49);
+    const px = gridToPixels(endX, endY, width, height);
+    const tween = scene.tweens.add({
+      targets: sprite,
+      x: px.x,
+      y: px.y,
+      duration: horizontalDurationMs,
+      ease: "Linear",
+    });
+    horizontalTweens.push(tween);
   }
 
-  const defObj = roles.defender;
-  let defId = sid(
-    typeof defObj === "object" && defObj != null
-      ? defObj.player_id ?? defObj.playerId
-      : null
-  );
-  if (!defId && Array.isArray(roles.defense) && roles.defense[0]) {
-    const d0 = roles.defense[0];
-    defId = sid(typeof d0 === "string" ? d0 : d0.player_id ?? d0.playerId);
-  }
-  const defSprite = defId ? playerSprites[defId] : null;
+  const bhPromise = tweenPlayerTo(scene, bh, bhTargetPx, {
+    duration: bhDuration,
+    easing: "Linear",
+  });
 
-  const tw = [
-    tweenPlayerTo(scene, rr, gridToPixels(retreatRr.x, retreatRr.y, width, height), {
-      duration: 520,
-      easing: "Quad.easeInOut",
-    }),
-    tweenPlayerTo(scene, bh, gridToPixels(settleBh.x, settleBh.y, width, height), {
-      duration: 520,
-      easing: "Linear",
-    }),
-  ];
-  if (passerSprite && settlePasser) {
-    tw.push(
-      tweenPlayerTo(scene, passerSprite, gridToPixels(settlePasser.x, settlePasser.y, width, height), {
-        duration: 520,
-        easing: "Linear",
-      })
-    );
+  await bhPromise;
+
+  for (const t of horizontalTweens) {
+    if (t) {
+      t.stop();
+    }
   }
-  if (defSprite) {
-    const dg = rimRunnerSpriteGrid(defSprite, width, height);
-    const close = {
-      x: Phaser.Math.Clamp(dg.x + (bhg.x - dg.x) * 0.38, 4, 97),
-      y: Phaser.Math.Clamp(dg.y + (bhg.y - dg.y) * 0.22, 1, 49),
-    };
-    tw.push(
-      tweenPlayerTo(scene, defSprite, gridToPixels(close.x, close.y, width, height), {
-        duration: 500,
-        easing: "Linear",
-      })
-    );
-  }
-  await Promise.all(tw);
-  setRimRunnerSpriteGrid(rr, retreatRr.x, retreatRr.y);
+
   setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
-  if (passerSprite && settlePasser) {
-    setRimRunnerSpriteGrid(passerSprite, settlePasser.x, settlePasser.y);
+  for (const [pid, sprite] of Object.entries(playerSprites)) {
+    if (sid(pid) === bhId || !sprite) continue;
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, 4, 97);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, 1, 49);
+    setRimRunnerSpriteGrid(sprite, gx, gy);
   }
+
   const raw = turnData.text || "";
   const msg = raw.toLowerCase().includes("holding") ? raw.replace(/^Fast Break! /, "") : "Holding up — settling.";
   appendToTextScroll(msg);
