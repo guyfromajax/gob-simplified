@@ -1,5 +1,6 @@
 import { createPhaserPlayer } from "./createPhaserPlayer.js";
 import gameStore from "../../state/gameStore.js";
+import { attachMovementAttributeAnchor } from "../utils/syncPlayerSpriteAttributes.js";
 
 /**
  * Creates Phaser player containers for all players and stores them by ID.
@@ -71,7 +72,7 @@ export function loadPhaserPlayers(
     sprite.jersey = player.jersey;   // Jersey number
     sprite.name = player.name;       // Full name
     if (player.attributes && typeof player.attributes === "object") {
-      sprite.attributes = player.attributes;
+      attachMovementAttributeAnchor(player, sprite);
     }
 
     playerSprites[id] = sprite;

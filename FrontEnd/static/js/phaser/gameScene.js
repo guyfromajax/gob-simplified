@@ -11,6 +11,7 @@ import gameStore from '../state/gameStore.js';
 import { animateCountdownTransition } from './animation/countdownAnimation.js';
 import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
 import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
+import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAttributes.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -1312,6 +1313,7 @@ export function createGameScene(Phaser) {
               }
             }
           }
+          syncSpriteAttributesFromPlayerEnergy(this.playerSprites, turn.player_energy);
         }
       };
 

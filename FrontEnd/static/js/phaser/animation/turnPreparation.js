@@ -12,6 +12,7 @@ import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
 import { updatePlaycallCenter } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
+import { syncSpriteAttributesFromPlayerEnergy } from "../utils/syncPlayerSpriteAttributes.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
 /**
@@ -40,6 +41,11 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   
   // Set turn.index (required for context)
   turn.index = turnIndex;
+
+  // AG-based movement: align sprite.attributes.AG with this turn’s NG (engine rescaling) before tweens run
+  if (turn.player_energy && scene.playerSprites) {
+    syncSpriteAttributesFromPlayerEnergy(scene.playerSprites, turn.player_energy);
+  }
   
   // ✅ FIX (Bug 1): Update offense_team_id BEFORE turn executes (not after)
   // SIP and other turns need correct offense_team_id at START, not END

@@ -91,7 +91,7 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 
 **Fixtures:** `FrontEnd/static/js/phaser/utils/playerMovementSpeed.test.js` — run:
 
-`cd FrontEnd/static/js/phaser && npm run test:movement-speed`
+`cd FrontEnd/static/js/phaser && npm run test:movement` (speed + fatigue sprite sync)
 
 ---
 
@@ -115,6 +115,7 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 - Fast break “everyone else” tweens: `FrontEnd/static/js/phaser/animation/fastBreak.js` (`animateRebounders` → `getPlayerDuration`)
 - Sprite load: `FrontEnd/static/js/phaser/setup/loadPhaserPlayers.js`, `createPhaserPlayer.js` (may need `attributes` attach for AG)
 - AG movement speed: `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js`, tests `utils/playerMovementSpeed.test.js`
+- Fatigue sync for sprites: `FrontEnd/static/js/phaser/utils/syncPlayerSpriteAttributes.js` (called from `prepareTurnForAnimation` + `applyPlayerStats`), test `utils/syncPlayerSpriteAttributes.test.js`
 
 ---
 
