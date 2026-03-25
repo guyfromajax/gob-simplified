@@ -2502,12 +2502,13 @@ async function moveOtherPlayersToStandardPositions(
     // ✅ Only animate get-back players as defenders (not all players in defense list)
     // Rebounders are handled separately by animateRebounders() function
     if (getbackPlayerIdsSet.has(id)) {
-      // Get-back defenders chase: X between 50 and 15 spots closer to basket
-      const minX = isHomeOffense ? 50 : basket.x + 2;
-      const maxX = isHomeOffense ? basket.x - 2 : 50;
-      
+      // Retreat band toward home rim (high x). Do not use `basket` here—that is the *attacking* rim and
+      // flips with isHomeOffense, which sent defending get-backs the wrong way on away fast breaks.
+      const protectRimX = HOME_RIM_COORDS.x;
+      const minX = 50;
+      const maxX = Phaser.Math.Clamp(protectRimX - 2, 4, 97);
       const targetSpot = {
-        x: Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX)),
+        x: Phaser.Math.Between(minX, maxX),
         y: Phaser.Math.Between(15, 35)
       };
       
