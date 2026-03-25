@@ -217,7 +217,11 @@ async function finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites) {
 /**
  * Rim Runner outlet denied: defender two grid steps toward the pass direction (same as backend
  * `outlet_defender_to`), announcement + headshot, receiver cuts to passer x and y±6, then pass.
- * Rim runner and `other_players` burst tweens keep running in parallel (not blocked here).
+ *
+ * While the outlet receiver tweens to the catch spot, all other players drift horizontally toward
+ * the offense basket (same pattern as `animateRimRunnerHoldUpLeadIn`), excluding outlet passer,
+ * outlet receiver, and outlet defender. Burst-phase tweens on those players are stopped first so
+ * this drift can own their motion; see `animateRimRunnerBurstPhase` + `Promise.allSettled` when denied.
  */
 async function animateRimRunnerOutletDeniedBeat(
   scene,
@@ -291,14 +295,56 @@ async function animateRimRunnerOutletDeniedBeat(
     x: Phaser.Math.Clamp(pg.x, 4, 97),
     y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, 1, 49),
   };
-  await tweenPlayerTo(scene, recvSprite, gridToPixels(recvTarget.x, recvTarget.y, width, height), {
-    duration: 420,
-    easing: "Linear",
-  });
-  setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
 
   const passerId = sid(phase?.outlet_passer_id ?? turnData.roles?.outlet_passer);
   const recvId = sid(phase?.outlet_receiver_id);
+
+  const horizontalDriftGrid = 40;
+  const horizontalDurationMs = 15000;
+  const horizontalTweens = [];
+
+  for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
+    if (!sprite) continue;
+    const pid = sid(pidRaw);
+    if (pid === passerId || pid === recvId || pid === defId) continue;
+    if (scene.tweens) {
+      scene.tweens.killTweensOf(sprite);
+    }
+    const g = rimRunnerSpriteGrid(sprite, width, height);
+    const endX = Phaser.Math.Clamp(g.x + horizontalDriftGrid * towardBasket, 4, 97);
+    const endY = Phaser.Math.Clamp(g.y, 1, 49);
+    const px = gridToPixels(endX, endY, width, height);
+    const tween = scene.tweens.add({
+      targets: sprite,
+      x: px.x,
+      y: px.y,
+      duration: horizontalDurationMs,
+      ease: "Linear",
+    });
+    horizontalTweens.push(tween);
+  }
+
+  const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
+  const recvDur = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
+  await tweenPlayerTo(scene, recvSprite, recvTargetPx, {
+    duration: recvDur,
+    easing: "Linear",
+  });
+
+  for (const t of horizontalTweens) {
+    if (t) t.stop();
+  }
+
+  setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
+  for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
+    if (!sprite) continue;
+    const pid = sid(pidRaw);
+    if (pid === passerId || pid === recvId || pid === defId) continue;
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, 4, 97);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, 1, 49);
+    setRimRunnerSpriteGrid(sprite, gx, gy);
+  }
+
   if (passerId && recvId && passerId !== recvId) {
     await runPass(scene, {
       fromId: passerId,
@@ -849,7 +895,13 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   }
 
   if (secondary.length) {
-    await Promise.all(secondary);
+    // Outlet denied stops burst tweens on non-outlet actors so horizontal drift can run; those
+    // tweens reject on stop — use allSettled so the FB sequence still finishes.
+    if (outletDenied) {
+      await Promise.allSettled(secondary);
+    } else {
+      await Promise.all(secondary);
+    }
   }
 }
 
