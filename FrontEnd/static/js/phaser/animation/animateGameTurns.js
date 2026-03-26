@@ -27,6 +27,10 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { getSceneStepLogger } from "./debugStepLogger.js";
+import {
+  createFbTelemetryDebugListener,
+  flushFbTelemetryDebugSummary,
+} from "../utils/fbTelemetryDebug.js";
 
 const DEBUG_FLOW =
   (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
@@ -528,6 +532,10 @@ export async function animateGameTurns({ //hasBallAtStep
     scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
   };
   scene.events?.on?.('possessionChange', handlePossessionFlip);
+  const handleFbTelemetry = createFbTelemetryDebugListener(scene);
+  if (handleFbTelemetry) {
+    scene.events?.on?.("animTelemetry", handleFbTelemetry);
+  }
 
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
@@ -1247,4 +1255,8 @@ export async function animateGameTurns({ //hasBallAtStep
   }
 
   scene.events?.off?.('possessionChange', handlePossessionFlip);
+  if (handleFbTelemetry) {
+    scene.events?.off?.("animTelemetry", handleFbTelemetry);
+  }
+  flushFbTelemetryDebugSummary(scene);
 }

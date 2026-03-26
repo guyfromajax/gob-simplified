@@ -61,6 +61,225 @@ function classifyFastBreakPhase2(turnData, { isBlockingFoul }) {
   return "generic_fb_stop";
 }
 
+function deriveFbBranchKind(turnData, phase2Kind) {
+  if (phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul") {
+    return turnData.fast_break_play === "rim_runner" || turnData.roles?.rim_runner_sequence
+      ? "rr_lane_shot"
+      : "generic_fb_shot_stop";
+  }
+  if (phase2Kind === "rim_runner_steal") return "rr_interception";
+  if (phase2Kind === "rim_runner_bat_oob") return "rr_bat_oob";
+  if (phase2Kind === "rim_runner_hco_settle") {
+    if (turnData.rim_runner_outlet_failed) return "rr_outlet_denied";
+    return "rr_hold_up";
+  }
+  return "generic_fb_shot_stop";
+}
+
+function initFbTelemetryContext(scene, { turnData, turnIndex, branchKind }) {
+  scene.__fbTelemetry = {
+    turnIndex,
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    resultType: turnData?.result_type ?? null,
+    branchKind,
+    offenseTeamId: turnData?.offense_team_id ?? scene?.offenseTeamId ?? null,
+    gameClock: scene?.simData?.clock ?? null,
+    quarter: turnData?.quarter ?? scene?.quarter ?? null,
+    counters: {
+      fbFallbackCount: 0,
+      fbRequiredRoleCount: 0,
+      fbClampCount: 0,
+      fbSnapCount: 0,
+    },
+  };
+}
+
+function getFbTelemetry(scene) {
+  return scene?.__fbTelemetry ?? null;
+}
+
+function getFbContractGlobalScope() {
+  return (
+    (typeof window !== "undefined" && window) ||
+    (typeof globalThis !== "undefined" && globalThis) ||
+    null
+  );
+}
+
+function resolveFbStrictContractMode() {
+  const scope = getFbContractGlobalScope();
+  const raw = scope?.FB_STRICT_CONTRACT;
+  if (raw === "throw") return "throw";
+  if (raw === "warn" || raw === true) return "warn";
+  if (raw === "off" || raw === false) return "off";
+  // Dev-default for strict branch checks while debugging.
+  if (scope?.DEBUG_FB_TELEMETRY === true || isAnimationDebugEnabled()) {
+    return "warn";
+  }
+  return "off";
+}
+
+function resolveFbStrictBranches() {
+  const defaults = ["rr_outlet_denied", "rr_hold_up", "generic_fb_shot_stop"];
+  const scope = getFbContractGlobalScope();
+  const raw = scope?.FB_STRICT_BRANCHES;
+  if (Array.isArray(raw)) {
+    const cleaned = raw
+      .map((v) => (v == null ? "" : String(v).trim()))
+      .filter((v) => v.length > 0);
+    return cleaned.length ? new Set(cleaned) : new Set(defaults);
+  }
+  if (typeof raw === "string") {
+    const cleaned = raw
+      .split(",")
+      .map((v) => String(v).trim())
+      .filter((v) => v.length > 0);
+    return cleaned.length ? new Set(cleaned) : new Set(defaults);
+  }
+  return new Set(defaults);
+}
+
+function shouldEnforceFbContractForBranch(scene) {
+  const t = getFbTelemetry(scene);
+  const branch = t?.branchKind;
+  if (!branch) return false;
+  return resolveFbStrictBranches().has(branch);
+}
+
+function enforceFbContractGuardrail(scene, {
+  playerId,
+  role,
+  requiredEndpointType,
+  reason,
+} = {}) {
+  if (!shouldEnforceFbContractForBranch(scene)) return;
+  const mode = resolveFbStrictContractMode();
+  if (mode === "off") return;
+  const t = getFbTelemetry(scene);
+  const branch = t?.branchKind ?? "unknown_branch";
+  const msg =
+    `[FB contract] missing required endpoint in strict branch ` +
+    `(branch=${branch}, playerId=${playerId ?? "?"}, role=${role ?? "?"}, ` +
+    `required=${requiredEndpointType ?? "?"}, reason=${reason ?? "unknown"})`;
+  if (mode === "throw") {
+    throw new Error(msg);
+  }
+  console.warn(msg, {
+    branch,
+    playerId,
+    role,
+    requiredEndpointType,
+    reason,
+    turnIndex: t?.turnIndex ?? null,
+    turnId: t?.turnId ?? null,
+  });
+}
+
+function emitFbTelemetry(scene, event, payload = {}) {
+  const t = getFbTelemetry(scene);
+  if (!t) return;
+  const envelope = {
+    event,
+    turnIndex: t.turnIndex,
+    turnId: t.turnId,
+    resultType: t.resultType,
+    branchKind: t.branchKind,
+    offenseTeamId: t.offenseTeamId,
+    gameClock: t.gameClock,
+    quarter: t.quarter,
+    timestampMs: Date.now(),
+  };
+  const row = { ...envelope, ...payload };
+  scene.events?.emit?.("animTelemetry", row);
+  if (isAnimationDebugEnabled()) {
+    animationDebugLog("FB telemetry", row);
+  }
+}
+
+function incrementFbCounter(scene, key, n = 1) {
+  const t = getFbTelemetry(scene);
+  if (!t) return;
+  if (!Object.prototype.hasOwnProperty.call(t.counters, key)) return;
+  t.counters[key] += Number(n) || 0;
+}
+
+function getPlayerAnimationRecord(turnData, playerId) {
+  const want = playerId != null ? String(playerId) : null;
+  if (!want || !Array.isArray(turnData?.animations)) return null;
+  return turnData.animations.find((a) => String(a?.playerId) === want) ?? null;
+}
+
+function reportMissingEndpoint(scene, turnData, {
+  playerId,
+  role,
+  requiredEndpointType = "animations_end",
+  hasRoleCoord = false,
+  reason = "missing_endpoint",
+} = {}) {
+  const rec = getPlayerAnimationRecord(turnData, playerId);
+  emitFbTelemetry(scene, "fb_contract_missing_endpoint", {
+    playerId,
+    role,
+    requiredEndpointType,
+    availableAuthority: {
+      hasAnimations: Array.isArray(turnData?.animations) && turnData.animations.length > 0,
+      hasPlayerAnimation: !!rec,
+      hasAnimEnd: !!(rec?.end && Number.isFinite(rec.end.x) && Number.isFinite(rec.end.y)),
+      hasRoleCoord,
+    },
+    reason,
+  });
+  enforceFbContractGuardrail(scene, {
+    playerId,
+    role,
+    requiredEndpointType,
+    reason,
+  });
+}
+
+function reportFallback(scene, {
+  playerId,
+  role,
+  fallbackPolicy,
+  missingAuthority = ["animations_end"],
+  source,
+  target,
+} = {}) {
+  incrementFbCounter(scene, "fbFallbackCount", 1);
+  emitFbTelemetry(scene, "fb_fallback_used", {
+    playerId,
+    role,
+    fallbackPolicy,
+    missingAuthority,
+    source,
+    target,
+  });
+}
+
+function finalizeFbTelemetry(scene) {
+  const t = getFbTelemetry(scene);
+  if (!t) return;
+  const req = t.counters.fbRequiredRoleCount || 0;
+  const rate = req > 0 ? t.counters.fbFallbackCount / req : 0;
+  scene.events?.emit?.("animTelemetry", {
+    event: "fb_telemetry_summary",
+    turnIndex: t.turnIndex,
+    turnId: t.turnId,
+    resultType: t.resultType,
+    branchKind: t.branchKind,
+    offenseTeamId: t.offenseTeamId,
+    gameClock: t.gameClock,
+    quarter: t.quarter,
+    timestampMs: Date.now(),
+    fbFallbackCount: t.counters.fbFallbackCount,
+    fbRequiredRoleCount: req,
+    fbFallbackRate: rate,
+    fbClampCount: t.counters.fbClampCount,
+    fbSnapCount: t.counters.fbSnapCount,
+  });
+  scene.__fbTelemetry = null;
+}
+
 /**
  * Rim Runner lane pass (BH / outlet receiver → rim runner), spec ~6 grid toward basket from RR post-burst.
  * Runs after burst/outlet when the sim attempted the lane pass (not hold-up, not outlet denied).
@@ -204,8 +423,25 @@ function rimRunnerAgHorizontalDriftPromises(
     }
     const g = rimRunnerSpriteGrid(sprite, width, height);
     const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
-    const endX = Phaser.Math.Clamp(g.x + stride * towardBasket, 4, 97);
+    const proposedEndX = g.x + stride * towardBasket;
+    const endX = Phaser.Math.Clamp(proposedEndX, 4, 97);
     const endY = Phaser.Math.Clamp(g.y, 1, 49);
+    if (Math.abs(endX - proposedEndX) > 0.001) {
+      incrementFbCounter(scene, "fbClampCount", 1);
+      const speedPxPerSec = phaseDurationMs > 0
+        ? ((Math.abs(stride) * width) / 100) / (phaseDurationMs / 1000)
+        : null;
+      emitFbTelemetry(scene, "fb_clamp_destination", {
+        playerId: pid,
+        role: "ag_drift",
+        sourceX: g.x,
+        proposedEndX,
+        clampedEndX: endX,
+        clampEdge: proposedEndX < 4 ? "min_x" : "max_x",
+        phaseDurationMs,
+        speedPxPerSec,
+      });
+    }
     const px = gridToPixels(endX, endY, width, height);
     promises.push(
       tweenPlayerTo(scene, sprite, px, {
@@ -217,16 +453,57 @@ function rimRunnerAgHorizontalDriftPromises(
   return promises;
 }
 
-async function finalizeRimRunnerNonShotTurn(scene, turnData) {
+async function finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites = null) {
   if (scene.skipToEnd) return;
   if (scene.stateMachine?.state !== States.HalfCourt) {
     safeTransition(scene.stateMachine, States.HalfCourt);
   }
+
+  let pre = null;
+  if (turnData.next_play_type === "HCO" && playerSprites) {
+    pre = Object.fromEntries(
+      Object.entries(playerSprites)
+        .filter(([, s]) => !!s)
+        .map(([pid, s]) => [String(pid), { x: Number(s.x), y: Number(s.y) }])
+    );
+  }
+
   if (
     turnData.next_play_type === "HCO" &&
     typeof scene.startNextHalfCourtOffense === "function"
   ) {
     scene.startNextHalfCourtOffense();
+  }
+
+  if (pre && playerSprites) {
+    const check = () => {
+      for (const [pid, sprite] of Object.entries(playerSprites)) {
+        if (!sprite || !pre[pid]) continue;
+        const dx = Number(sprite.x) - pre[pid].x;
+        const dy = Number(sprite.y) - pre[pid].y;
+        const deltaPx = Math.hypot(dx, dy);
+        if (deltaPx < 20) continue;
+        incrementFbCounter(scene, "fbSnapCount", 1);
+        emitFbTelemetry(scene, "fb_transition_snap", {
+          playerId: pid,
+          role: "player",
+          fromTurnType: "FAST_BREAK",
+          toTurnType: "HCO",
+          preTransition: pre[pid],
+          postTransition: { x: Number(sprite.x), y: Number(sprite.y) },
+          deltaPx,
+          deltaGridApprox: {
+            x: (dx / (scene.game.config.width || 1)) * 100,
+            y: (-dy / (scene.game.config.height || 1)) * 50,
+          },
+        });
+      }
+    };
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(0, check);
+    } else {
+      setTimeout(check, 0);
+    }
   }
 }
 
@@ -259,7 +536,7 @@ async function finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites) {
   } else {
     scene._rimRunnerHoldUpInboundPass = null;
   }
-  await finalizeRimRunnerNonShotTurn(scene, turnData);
+  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
 }
 
 /**
@@ -603,7 +880,7 @@ async function animateRimRunnerInterception(
     else setTimeout(resolve, holdMs);
   });
 
-  await finalizeRimRunnerNonShotTurn(scene, turnData);
+  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
 }
 
 async function animateRimRunnerBatOob(
@@ -706,7 +983,7 @@ async function animateRimRunnerBatOob(
     else setTimeout(resolve, 650);
   });
 
-  await finalizeRimRunnerNonShotTurn(scene, turnData);
+  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
 }
 
 /**
@@ -804,6 +1081,8 @@ export async function runFastBreakSequence({
     turnData.text?.toLowerCase().includes("blocking foul");
 
   const phase2Kind = classifyFastBreakPhase2(turnData, { isBlockingFoul });
+  const branchKind = deriveFbBranchKind(turnData, phase2Kind);
+  initFbTelemetryContext(scene, { turnData, turnIndex, branchKind });
 
   if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
     await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
@@ -840,7 +1119,7 @@ export async function runFastBreakSequence({
       );
     }
     if (turnData.rim_runner_outlet_failed) {
-      await finalizeRimRunnerNonShotTurn(scene, turnData);
+      await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
     } else {
       await finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites);
     }
@@ -849,6 +1128,7 @@ export async function runFastBreakSequence({
   }
   
   if (scene.skipToEnd) {
+    finalizeFbTelemetry(scene);
     return;
   }
   
@@ -856,6 +1136,7 @@ export async function runFastBreakSequence({
   // PHASE 3: CLEANUP & STATE TRANSITIONS
   // ============================================================================
   scene.events?.emit("fb:end");
+  finalizeFbTelemetry(scene);
 }
 
 /**
@@ -1337,9 +1618,29 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   let stopperPromise = null;
   
   if (stopperSprite) {
+    const stopperAnimEnd = getAnimationEndGridForPlayer(turnData, stopperId);
+    incrementFbCounter(scene, "fbRequiredRoleCount", 1);
     const stopperSpot =
-      getAnimationEndGridForPlayer(turnData, stopperId) ??
+      stopperAnimEnd ??
       fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
+    if (!stopperAnimEnd) {
+      const source = rimRunnerSpriteGrid(stopperSprite, width, height);
+      reportMissingEndpoint(scene, turnData, {
+        playerId: stopperId,
+        role: "stopper",
+        requiredEndpointType: "animations_end",
+        hasRoleCoord: false,
+        reason: "missing_stopper_animation_end",
+      });
+      reportFallback(scene, {
+        playerId: stopperId,
+        role: "stopper",
+        fallbackPolicy: "defender_vs_shooter_grid",
+        missingAuthority: ["animations_end"],
+        source,
+        target: stopperSpot,
+      });
+    }
     const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
     const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
     stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
@@ -1370,9 +1671,29 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49),
       };
     } else {
+      const defenderAnimEnd = getAnimationEndGridForPlayer(turnData, defenderId);
+      incrementFbCounter(scene, "fbRequiredRoleCount", 1);
       defenderSpot =
-        getAnimationEndGridForPlayer(turnData, defenderId) ??
+        defenderAnimEnd ??
         fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 1);
+      if (!defenderAnimEnd) {
+        const source = rimRunnerSpriteGrid(defenderSprite, width, height);
+        reportMissingEndpoint(scene, turnData, {
+          playerId: defenderId,
+          role: "defender",
+          requiredEndpointType: "animations_end",
+          hasRoleCoord: false,
+          reason: "missing_defender_animation_end",
+        });
+        reportFallback(scene, {
+          playerId: defenderId,
+          role: "defender",
+          fallbackPolicy: "defender_vs_shooter_grid",
+          missingAuthority: ["animations_end"],
+          source,
+          target: defenderSpot,
+        });
+      }
     }
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
@@ -1673,9 +1994,29 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49)
       };
     } else {
+      const defenderAnimEnd = getAnimationEndGridForPlayer(turnData, defenderId);
+      incrementFbCounter(scene, "fbRequiredRoleCount", 1);
       defenderSpot =
-        getAnimationEndGridForPlayer(turnData, defenderId) ??
+        defenderAnimEnd ??
         fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
+      if (!defenderAnimEnd) {
+        const source = rimRunnerSpriteGrid(defenderSprite, width, height);
+        reportMissingEndpoint(scene, turnData, {
+          playerId: defenderId,
+          role: "defender",
+          requiredEndpointType: "animations_end",
+          hasRoleCoord: false,
+          reason: "missing_defender_animation_end",
+        });
+        reportFallback(scene, {
+          playerId: defenderId,
+          role: "defender",
+          fallbackPolicy: "defender_vs_shooter_grid",
+          missingAuthority: ["animations_end"],
+          source,
+          target: defenderSpot,
+        });
+      }
     }
 
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
@@ -2505,6 +2846,7 @@ function animateRebounders(
     
     let targetSpot;
     const animEnd = getAnimationEndGridForPlayer(turnData, id);
+    incrementFbCounter(scene, "fbRequiredRoleCount", 1);
     if (animEnd) {
       targetSpot = animEnd;
     } else if (isDefensiveStop) {
@@ -2531,7 +2873,25 @@ function animateRebounders(
         ),
       };
     }
-    
+    if (!animEnd) {
+      const source = rimRunnerSpriteGrid(sprite, width, height);
+      reportMissingEndpoint(scene, turnData, {
+        playerId: id,
+        role: "rebounder",
+        requiredEndpointType: "animations_end",
+        hasRoleCoord: false,
+        reason: "missing_rebounder_animation_end",
+      });
+      reportFallback(scene, {
+        playerId: id,
+        role: "rebounder",
+        fallbackPolicy: isDefensiveStop ? "defensive_stop_band" : "shot_attempt_rebound_band",
+        missingAuthority: ["animations_end"],
+        source,
+        target: targetSpot,
+      });
+    }
+
     const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
     // ✅ Use distance-based duration for consistent speed
     // Players will stop at their current position if shot happens before they reach their spot
@@ -2656,10 +3016,29 @@ async function moveOtherPlayersToStandardPositions(
       const lo = Math.min(minX, maxX);
       const hi = Math.max(minX, maxX);
       const animEnd = getAnimationEndGridForPlayer(turnData, id);
+      incrementFbCounter(scene, "fbRequiredRoleCount", 1);
       const targetSpot = animEnd ?? {
         x: Phaser.Math.Between(lo, hi),
         y: Phaser.Math.Between(15, 35),
       };
+      if (!animEnd) {
+        const source = rimRunnerSpriteGrid(sprite, width, height);
+        reportMissingEndpoint(scene, turnData, {
+          playerId: id,
+          role: "getback_defender",
+          requiredEndpointType: "animations_end",
+          hasRoleCoord: false,
+          reason: "missing_getback_animation_end",
+        });
+        reportFallback(scene, {
+          playerId: id,
+          role: "getback_defender",
+          fallbackPolicy: "random_band",
+          missingAuthority: ["animations_end"],
+          source,
+          target: targetSpot,
+        });
+      }
 
       const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);

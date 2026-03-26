@@ -156,7 +156,12 @@ class Animator:
         
         # ✅ Get get-back player IDs (used in both defensive stop and shot attempt paths)
         getback_player_ids = fb_roles.get("getback_player_ids", [])
-        getback_player_ids_set = set(getback_player_ids) if getback_player_ids else set()
+        # Normalize IDs so int/string mixed payloads still map consistently.
+        getback_player_ids_set = (
+            {str(pid) for pid in getback_player_ids if pid is not None}
+            if getback_player_ids
+            else set()
+        )
 
         # Ball handler path
         # ✅ NEW LOGIC: Calculate ball handler's final position (used for both defensive stop and shot)
@@ -260,7 +265,7 @@ class Animator:
                     if d is stopper or d is shot_defender:
                         continue
                     player_id = getattr(d, "player_id", None)
-                    if player_id and player_id in getback_player_ids_set:
+                    if player_id is not None and str(player_id) in getback_player_ids_set:
                         build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                         animated_player_ids.add(player_id)
             else:
@@ -279,7 +284,7 @@ class Animator:
                     if d is stopper:
                         continue
                     player_id = getattr(d, "player_id", None)
-                    if player_id and player_id in getback_player_ids_set:
+                    if player_id is not None and str(player_id) in getback_player_ids_set:
                         build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                         animated_player_ids.add(player_id)
         else:
@@ -297,9 +302,23 @@ class Animator:
                 if d is shot_defender:
                     continue
                 player_id = getattr(d, "player_id", None)
-                if player_id and player_id in getback_player_ids_set:
+                if player_id is not None and str(player_id) in getback_player_ids_set:
                     build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                     animated_player_ids.add(player_id)
+
+        # Contract completeness guardrail:
+        # ensure every get-back player has an animation endpoint, even when they were
+        # not included in `defenders` above (role-filter mismatch or branch variance).
+        for player in all_offensive_players + all_defensive_players:
+            player_id = getattr(player, "player_id", None)
+            if player_id is None:
+                continue
+            if str(player_id) not in getback_player_ids_set:
+                continue
+            if player_id in animated_player_ids:
+                continue
+            build_movement(player, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+            animated_player_ids.add(player_id)
         
         # ✅ Animate rebounders (players who stayed near rim, not get-back, not release)
         # Get outlet passer ID - they move forward 7 x-coords toward basket
@@ -342,6 +361,23 @@ class Animator:
         #         
         #         build_movement(outlet_passer, outlet_passer_spot, has_ball=False, action=ACTIONS["DRIFT"])
         #         animated_player_ids.add(outlet_passer_id)
+        #
+        # Contract completeness guardrail: even when we intentionally skip outlet passer locomotion,
+        # emit a no-op animation endpoint so frontend authority lookup can stay on animations[].end.
+        if outlet_passer_id:
+            outlet_passer = None
+            for player in all_offensive_players + all_defensive_players:
+                if getattr(player, "player_id", None) == outlet_passer_id:
+                    outlet_passer = player
+                    break
+            if outlet_passer:
+                passer_coords = getattr(outlet_passer, "coords", {}) or {}
+                outlet_passer_spot = {
+                    "x": float(passer_coords.get("x", 50)),
+                    "y": float(passer_coords.get("y", 25)),
+                }
+                build_movement(outlet_passer, outlet_passer_spot, has_ball=False, action=ACTIONS["DRIFT"])
+                animated_player_ids.add(outlet_passer_id)
         
         for player in all_offensive_players + all_defensive_players:
             player_id = getattr(player, "player_id", None)
@@ -357,7 +393,7 @@ class Animator:
                 continue
             
             # Skip get-back players (already animated as defenders)
-            if player_id in getback_player_ids_set:
+            if str(player_id) in getback_player_ids_set:
                 continue
             
             # This is a rebounder (stayed near rim for shot attempt)
