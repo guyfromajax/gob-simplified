@@ -22,6 +22,7 @@ import {
   setBallHolderId,
   animateBallToPosition,
 } from "./ballAnimationSimple.js";
+import { getPlayerMovementDurationMs } from "../utils/playerMovementDuration.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -142,7 +143,14 @@ export function detachBall(scene, ballSprite) {
  */
 export function tweenPlayerTo(scene, sprite, target, opts = {}) {
   if (!scene || !sprite || !target) return Promise.resolve();
-  const { duration = 300, easing = 'Linear' } = opts;
+  const { easing = 'Linear' } = opts;
+  const duration =
+    opts.duration != null
+      ? opts.duration
+      : getPlayerMovementDurationMs(sprite, target.x, target.y, {
+          scene,
+          isBallHandler: opts.isBallHandler,
+        });
 
   return new Promise((resolve, reject) => {
     const startPosition = { x: sprite.x, y: sprite.y };

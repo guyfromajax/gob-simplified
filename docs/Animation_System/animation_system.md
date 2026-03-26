@@ -2707,11 +2707,10 @@ The animation system uses a unified distance-based duration calculation that ens
 #### Core Functions
 
 - **`getPlayerDuration(sprite, targetX, targetY, isTransition = false)`** (`turnAnimation.js`)
-  - Calculates player movement duration based on distance from current sprite position to target
-  - Uses `getPlayerSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
-  - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
-  - Supports transition flag for longer movements (uses `MAX_TRANSITION_DURATION` = 3000ms cap)
-  - Default speed: 450 pixels/second (Normal preset)
+  - Delegates to **`getPlayerMovementDurationMs()`** in `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` (single source of truth with `resolveMovementSpeedPxPerSec`).
+  - Calculates duration from **distance ÷ speed**, where speed is **AG-based** (`400 + AG` px/s before game-speed scale, ball-handler −5%) times **`window.__GAME_SPEED` / 450**.
+  - Formula: `duration = (distance / speed) * 1000` (ms), minimum 50ms. No fixed “450 px/s cap”; AG 50 at Normal preset ≈ 450 px/s before global scale.
+- **`tweenPlayerTo()`** (`ballTween.js`): if **`duration` is omitted**, it uses **`getPlayerMovementDurationMs`** so callers cannot accidentally fall back to a constant 300ms tween.
 
 - **`getBallDuration(ballSprite, targetX, targetY)`** (`ballTween.js`)
   - Calculates ball movement duration based on distance from current position to target

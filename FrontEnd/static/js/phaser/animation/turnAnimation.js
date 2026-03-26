@@ -55,63 +55,21 @@ import {
   animateBallToPosition,
 } from "./ballAnimationSimple.js";
 import {
-  getEffectiveAgilityForMovement,
-  agToSpeedPxPerSec,
-} from "../utils/playerMovementSpeed.js";
+  resolveMovementSpeedPxPerSec,
+  getPlayerMovementDurationMs,
+} from "../utils/playerMovementDuration.js";
 
-// Cap the time spent on any single movement step. Large timestamp gaps can
-// otherwise produce multi‑second tweens that appear as animation stalls.
-const MAX_STEP_DURATION = 1000; // ms - for HCO step movements
-const MAX_TRANSITION_DURATION = 3000; // ms - for transition movements (DREB, inbound, etc.)
-
-// Animation speed constants (pixels per second)
-// Based on learnings from WIP_GOB repository for smooth, consistent animations
-// These ensure consistent speeds regardless of distance, making animations feel natural
-// Speed can be changed dynamically via gameSpeedManager
-const DEFAULT_PLAYER_SPEED = 450; // Default speed (Normal preset)
-const DEFAULT_BALL_SPEED = 450; // Default speed (Normal preset)
-
-/**
- * Get current player speed (can be changed dynamically)
- * @returns {number} Speed in pixels per second
- */
-function getPlayerSpeed() {
-  // Check for dynamic speed from gameSpeedManager
-  if (typeof window !== 'undefined' && window.__GAME_SPEED) {
-    return window.__GAME_SPEED;
-  }
-  return DEFAULT_PLAYER_SPEED;
-}
+const DEFAULT_BALL_SPEED = 450; // Default speed (Normal preset) — ball uses same preset as players
 
 /**
  * Get current ball speed (can be changed dynamically)
  * @returns {number} Speed in pixels per second
  */
 function getBallSpeed() {
-  // Ball speed matches player speed for consistency
-  return getPlayerSpeed();
-}
-
-/**
- * When opts.isBallHandler is true/false, use it; else infer from current ball owner (if scene available).
- */
-function resolveIsBallHandler(sprite, opts = {}) {
-  if (opts.isBallHandler === true || opts.isBallHandler === false) {
-    return opts.isBallHandler;
+  if (typeof window !== "undefined" && window.__GAME_SPEED) {
+    return window.__GAME_SPEED;
   }
-  const scene = sprite?.scene;
-  const pid = sprite?.playerId ?? sprite?.player_id;
-  if (!scene || pid == null) return false;
-  const owner = getCurrentOwner(scene);
-  return owner != null && String(owner) === String(pid);
-}
-
-/** Per-player px/s from AG + BH rule, then scaled by global __GAME_SPEED vs baseline */
-function resolveMovementSpeedPxPerSec(sprite, opts = {}) {
-  const isBH = resolveIsBallHandler(sprite, opts);
-  const ag = getEffectiveAgilityForMovement(sprite, opts.scene ?? sprite?.scene);
-  const base = agToSpeedPxPerSec(ag, { isBallHandler: isBH });
-  return base * (getPlayerSpeed() / DEFAULT_PLAYER_SPEED);
+  return DEFAULT_BALL_SPEED;
 }
 
 /**
@@ -128,22 +86,10 @@ export function horizontalGridUnitsForDurationMs(sprite, durationMs, width, opts
   return (distPx * 100) / width;
 }
 
-/**
- * Calculate animation duration based on distance traveled
- * This ensures consistent speeds regardless of distance, making animations feel natural
- * 
- * @param {number} currentX - Current X position in pixels
- * @param {number} currentY - Current Y position in pixels
- * @param {number} targetX - Target X position in pixels
- * @param {number} targetY - Target Y position in pixels
- * @param {number} speed - Speed in pixels per second
- * @param {number} maxDuration - (Unused) maximum duration in milliseconds (kept for backwards compatibility)
- * @returns {number} Duration in milliseconds
- */
-function getDurationFromDistance(currentX, currentY, targetX, targetY, speed, maxDuration = MAX_STEP_DURATION) {
+/** Ball-only: distance / speed (game speed preset). Player moves use playerMovementDuration.js */
+function getDurationFromDistance(currentX, currentY, targetX, targetY, speed) {
   const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
-  const duration = (distance / speed) * 1000; // Convert to milliseconds
-  // Clamp to a small minimum to avoid zero-length tweens; no upper cap so distance fully determines time
+  const duration = (distance / speed) * 1000;
   return Math.max(50, duration);
 }
 
@@ -320,12 +266,11 @@ async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) 
   }
 }
 
-function getPlayerDuration(sprite, targetX, targetY, isTransition = false, opts = {}) {
-  const currentX = sprite.x;
-  const currentY = sprite.y;
-  const maxDuration = isTransition ? MAX_TRANSITION_DURATION : MAX_STEP_DURATION;
-  const speed = resolveMovementSpeedPxPerSec(sprite, opts);
-  return getDurationFromDistance(currentX, currentY, targetX, targetY, speed, maxDuration);
+function getPlayerDuration(sprite, targetX, targetY, _isTransition = false, opts = {}) {
+  return getPlayerMovementDurationMs(sprite, targetX, targetY, {
+    ...opts,
+    scene: opts.scene ?? sprite?.scene,
+  });
 }
 
 /**
@@ -3139,13 +3084,10 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
 export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY, opts = {}) {
-  const currentX = sprite.x;
-  const currentY = sprite.y;
-  const speed = resolveMovementSpeedPxPerSec(sprite, opts);
-  const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
-  const duration = (distance / speed) * 1000;
-  // Keep a small lower bound to avoid zero-duration tweens; no upper cap
-  return Math.max(50, duration);
+  return getPlayerMovementDurationMs(sprite, targetX, targetY, {
+    ...opts,
+    scene: opts.scene ?? sprite?.scene,
+  });
 }
 
 // Animate a short defensive stop resolution and transition to HalfCourt

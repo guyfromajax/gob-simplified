@@ -1,7 +1,7 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenPlayerTo, runPass, detachBall } from "./ballTween.js";
+import { tweenPlayerTo, runPass, detachBall, getBallDuration } from "./ballTween.js";
 import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
@@ -121,10 +121,9 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
   attachBallToPlayer(scene, ballSprite, passerSprite);
 
   const rrDur = getPlayerDuration(rrSprite, catchPx.x, catchPx.y, true);
-  const passDuration = Math.max(220, Math.min(850, rrDur));
 
   const rrTween = tweenPlayerTo(scene, rrSprite, catchPx, {
-    duration: passDuration,
+    duration: rrDur,
     easing: "Linear",
   });
 
@@ -132,7 +131,7 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
     fromId: passerId,
     toId: rrId,
     endCoords: { x: catchPx.x, y: catchPx.y },
-    duration: passDuration,
+    duration: rrDur,
     easing: "Sine.easeInOut",
   });
 
@@ -302,8 +301,9 @@ async function animateRimRunnerOutletDeniedBeat(
   }
 
   if (defSprite) {
-    await tweenPlayerTo(scene, defSprite, gridToPixels(defenderTarget.x, defenderTarget.y, width, height), {
-      duration: 380,
+    const defTargetPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
+    await tweenPlayerTo(scene, defSprite, defTargetPx, {
+      duration: getPlayerDuration(defSprite, defTargetPx.x, defTargetPx.y, true),
       easing: "Linear",
     });
     setRimRunnerSpriteGrid(defSprite, defenderTarget.x, defenderTarget.y);
@@ -391,7 +391,6 @@ async function animateRimRunnerOutletDeniedBeat(
     await runPass(scene, {
       fromId: passerId,
       toId: recvId,
-      duration: 500,
       easing: "Sine.easeInOut",
     });
     await new Promise((resolve) => {
@@ -426,6 +425,27 @@ async function animateRimRunnerHoldUpLeadIn(
   );
   const bh = playerSprites[bhId];
   if (!bh) return;
+
+  if (turnData.rim_runner_no_lane_pass) {
+    const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+    const offenseSide = bh.team === "home" ? "home" : "away";
+    const bhTeamId = bh.team_id;
+    const homeTeamField = scene.simData?.home_team;
+    const awayTeamField = scene.simData?.away_team;
+    const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+    const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+    const bhTeamName = bhTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    const bhInfo = scene.playerInfo?.[bhId];
+    const bhPlayerData = bhInfo
+      ? {
+          playerId: bhId,
+          photo: bh.photo || null,
+          teamName: bhTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, bhTeamId),
+        }
+      : null;
+    showAnnouncement("No Pass!", offenseSide, bhPlayerData);
+  }
 
   attachBallToPlayer(scene, ballSprite, bh);
   const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
@@ -523,9 +543,19 @@ async function animateRimRunnerInterception(
   const partialGx = Phaser.Math.Clamp(rrGx + 3 * towardBasket, 4, 97);
   const partialPx = gridToPixels(partialGx, catchGy, width, height);
 
-  const tw = [tweenPlayerTo(scene, stealer, lanePx, { duration: 420, easing: "Quad.easeOut" })];
+  const tw = [
+    tweenPlayerTo(scene, stealer, lanePx, {
+      duration: getPlayerDuration(stealer, lanePx.x, lanePx.y, true),
+      easing: "Quad.easeOut",
+    }),
+  ];
   if (rr) {
-    tw.push(tweenPlayerTo(scene, rr, partialPx, { duration: 450, easing: "Linear" }));
+    tw.push(
+      tweenPlayerTo(scene, rr, partialPx, {
+        duration: getPlayerDuration(rr, partialPx.x, partialPx.y, true),
+        easing: "Linear",
+      })
+    );
   }
   await Promise.all(tw);
   if (rr) setRimRunnerSpriteGrid(rr, partialGx, catchGy);
@@ -535,7 +565,6 @@ async function animateRimRunnerInterception(
     fromId: victimId,
     toId: stealerId,
     endCoords: { x: stealer.x, y: stealer.y },
-    duration: 300,
     easing: "Sine.easeIn",
   });
   await new Promise((resolve) => {
@@ -626,12 +655,18 @@ async function animateRimRunnerBatOob(
       width,
       height
     );
-    movers.push(tweenPlayerTo(scene, rr, pc, { duration: 480, easing: "Linear" }));
+    movers.push(
+      tweenPlayerTo(scene, rr, pc, {
+        duration: getPlayerDuration(rr, pc.x, pc.y, true),
+        easing: "Linear",
+      })
+    );
   }
   if (defSp) {
+    const defLanePx = gridToPixels(laneX, laneY, width, height);
     movers.push(
-      tweenPlayerTo(scene, defSp, gridToPixels(laneX, laneY, width, height), {
-        duration: 400,
+      tweenPlayerTo(scene, defSp, defLanePx, {
+        duration: getPlayerDuration(defSp, defLanePx.x, defLanePx.y, true),
         easing: "Quad.easeOut",
       })
     );
@@ -654,7 +689,10 @@ async function animateRimRunnerBatOob(
   const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
 
   detachBall(scene, ballSprite);
-  await animateBallToPosition(scene, oobPx, { duration: 520, easing: "Quad.easeOut" });
+  await animateBallToPosition(scene, oobPx, {
+    duration: getBallDuration(ballSprite, oobPx.x, oobPx.y),
+    easing: "Quad.easeOut",
+  });
 
   appendToTextScroll("Batted out of bounds.");
   const { showAnnouncement } = await import("../utils/announcements.js");
@@ -884,7 +922,6 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     await runPass(scene, {
       fromId: sid(phase.outlet_passer_id ?? turnData.roles?.outlet_passer),
       toId: sid(phase.outlet_receiver_id),
-      duration: 500,
       easing: "Sine.easeInOut",
     });
     await new Promise((resolve) => {
@@ -1053,8 +1090,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   await runPass(scene, {
     fromId: passerId,
     toId: receiverId,
-    duration: 500,
-    easing: "Sine.easeInOut"
+    easing: "Sine.easeInOut",
   });
   
   // ✅ PHASE 2.8: Defensive attachment verification for fast breaks

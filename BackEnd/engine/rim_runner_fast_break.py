@@ -563,6 +563,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "fast_break_play": fb_play_key,
             "rim_runner_fb_open": fb_open,
             "rim_runner_correct_read": correct_read,
+            # Outlet receiver (ball handler) chose not to pass to the Rim Runner — frontend announces "No Pass!"
+            "rim_runner_no_lane_pass": True,
         }
         _record_fast_break_stats(fb_roles, result, game)
         apply_fast_break_cg_time(result, shot_attempted=False)
