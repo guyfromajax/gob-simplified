@@ -33,6 +33,10 @@ from BackEnd.utils.shared import (
     getAwayTeamCoords,
     calc_pass_segment_seconds,
 )
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_phase_post_stopper_snapshot,
+)
 from BackEnd.utils.shared_defense import (
     get_defender_coords
 )
@@ -238,6 +242,22 @@ class TurnManager:
             "quarter": self.game.quarter,
         }
 
+        from BackEnd.utils.position_snapshot_ledger import (
+            attach_position_snapshots,
+            build_inbound_destinations_snapshot,
+        )
+
+        sip_snap = build_inbound_destinations_snapshot(
+            game,
+            offense_team.lineup,
+            defense_team.lineup,
+            o_dest,
+            d_dest,
+            "SIDE_INBOUND",
+            "sip_inbound_setup",
+        )
+        attach_position_snapshots(payload, [sip_snap])
+
         return payload
 
     def setup_baseline_inbound(self, next_defensive_setup=None):
@@ -388,6 +408,22 @@ class TurnManager:
                 if "pos_actions" in step_0 and step_0["pos_actions"]:
                     payload["offense_setup_positions"] = step_0["pos_actions"]
                     # logging.warning(f"✅ [BASELINE_INBOUND] Including {len(step_0['pos_actions'])} skeleton step 0 positions for {next_defensive_setup} setup")
+
+        from BackEnd.utils.position_snapshot_ledger import (
+            attach_position_snapshots,
+            build_inbound_destinations_snapshot,
+        )
+
+        bip_snap = build_inbound_destinations_snapshot(
+            game,
+            offense_team.lineup,
+            defense_team.lineup,
+            o_dest,
+            d_dest,
+            "BASELINE_INBOUND",
+            "bip_inbound_setup",
+        )
+        attach_position_snapshots(payload, [bip_snap])
 
         return payload
 
@@ -604,6 +640,26 @@ class TurnManager:
                     result["offense_team_id"] = self.game.offense_team.team_id
                     result["current_turn"] = "HCO"
                     result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
+                    if isinstance(victim_coords, dict):
+                        victim.coords = {
+                            "x": float(victim_coords.get("x", 50)),
+                            "y": float(victim_coords.get("y", 25)),
+                        }
+                    attach_position_snapshots(
+                        result,
+                        [
+                            build_phase_post_stopper_snapshot(
+                                self.game,
+                                off_lineup,
+                                def_lineup,
+                                None,
+                                roles,
+                                "HCO",
+                                "non_shooting_foul",
+                                "hco_situational_force_foul_inbound",
+                            )
+                        ],
+                    )
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
 
@@ -1200,7 +1256,22 @@ class TurnManager:
             "forced_shot": True,
             "shooter_location": shooter_spot,
         }
+        from BackEnd.utils.position_snapshot_ledger import (
+            attach_position_snapshots,
+            build_skeleton_pre_resolve_shot_snapshot,
+        )
+
+        sc_snap = build_skeleton_pre_resolve_shot_snapshot(
+            self.game,
+            off_lineup,
+            def_lineup,
+            roles.get("skeleton"),
+            roles,
+            "HCO",
+            "shot_clock_forced_shot",
+        )
         result = self.game.shot_manager.resolve_shot(roles)
+        attach_position_snapshots(result, [sc_snap])
         result["forced_shot"] = True
         result["forced_shot_reason"] = "SHOT_CLOCK"
         return result
@@ -2434,6 +2505,22 @@ class TurnManager:
         result["offense_team_id"] = self.game.offense_team.team_id
         result["current_turn"] = "HCO"
         result["quick_foul"] = True
+        victim.coords = {"x": 50.0, "y": 25.0}
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    self.game,
+                    off_lineup,
+                    def_lineup,
+                    None,
+                    roles,
+                    "HCO",
+                    "non_shooting_foul",
+                    "hco_force_foul_final_turn",
+                )
+            ],
+        )
         return result
 
     def resolve_fast_break(self):
@@ -2882,7 +2969,12 @@ class TurnManager:
                 if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
                     _pass_sec = calc_pass_segment_seconds(rc, pc)
             _oreb_te = round(_base + _pass_sec)
-            return {
+            from BackEnd.utils.position_snapshot_ledger import (
+                attach_position_snapshots,
+                build_oreb_kickout_snapshot,
+            )
+
+            block_payload = {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
@@ -2918,6 +3010,11 @@ class TurnManager:
                     }
                 },
             }
+            attach_position_snapshots(
+                block_payload,
+                [build_oreb_kickout_snapshot(self.game, off_lineup, def_lineup)],
+            )
+            return block_payload
         
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
@@ -2986,7 +3083,7 @@ class TurnManager:
                 # Update team stats before sending
                 self.game.update_team_stats()
                 
-                return {
+                pm = {
                     "result_type": "PUTBACK_MAKE",
                     "ball_handler": getattr(rebounder, "player_id", None),
                     "shooter": getattr(rebounder, "player_id", None),
@@ -3028,6 +3125,9 @@ class TurnManager:
                         }
                     },
                 }
+                if oreb_event.get("position_snapshots"):
+                    pm["position_snapshots"] = oreb_event["position_snapshots"]
+                return pm
             else:
                 # Putback missed - check for rebound
                 text = f"{get_name_safe(rebounder)} goes back up but misses."
@@ -3172,6 +3272,8 @@ class TurnManager:
                     }
                 }
                 
+                if oreb_event.get("position_snapshots"):
+                    result["position_snapshots"] = oreb_event["position_snapshots"]
                 return result
         
         else:
@@ -3218,7 +3320,7 @@ class TurnManager:
                 if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
                     _pass_sec_kickout = calc_pass_segment_seconds(rc, pc)
             _oreb_te_kickout = round(_base_kickout + _pass_sec_kickout)
-            return {
+            kick_payload = {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
@@ -3254,6 +3356,9 @@ class TurnManager:
                     }
                 },
             }
+            if oreb_event.get("position_snapshots"):
+                kick_payload["position_snapshots"] = oreb_event["position_snapshots"]
+            return kick_payload
 
     def update_clock_and_possession(self, result):
         _cc_clock_start = int(self.game.game_state.get("time_remaining", 0))

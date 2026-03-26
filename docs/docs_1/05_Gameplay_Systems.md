@@ -1,6 +1,6 @@
 # Gameplay Systems
 
-> **Last Updated:** February 2025  
+> **Last Updated:** March 2025  
 > **Status:** Current – Source of Truth for Gameplay (GP) Supporting Systems
 
 This document defines the gameplay-supporting systems that operate within **Gameplay (GP) instances**. These systems are active only during live games and interact with core game state, turn resolution, and persistence boundaries.
@@ -160,6 +160,7 @@ Rolls up game statistics into long-term records.
 ### Supporting Systems
 -Rebounding System: /Users/jamesdavies/gob-simplified/docs/docs_1_systems/05_GP_Supporting_Systems/Rebound_System.md
 -HCO Resolution System: /Users/jamesdavies/gob-simplified/docs/docs_1_systems/05_GP_Supporting_Systems/HCO_Turn_Resolution_System.md
+-Position Checkpoints & Snapshot Schema (working implementation spec; court positions per checkpoint for location-based rules): /Users/jamesdavies/gob-simplified/docs/docs_1_systems/00_General_Systems/Position_Checkpoints_and_Snapshot_Schema.md
 -Energy System
 -FCP/HCT Resolution System
 -Fast Break Resolution System

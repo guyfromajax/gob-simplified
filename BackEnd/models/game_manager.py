@@ -8,6 +8,10 @@ from copy import deepcopy
 import random
 
 from BackEnd.utils.shared import sync_lineup_coords_from_turn
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_phase_post_stopper_snapshot,
+)
 from BackEnd.utils.stat_updater import update_game_stats
 from BackEnd.utils.transition_validator import validate_transition, get_turn_type_from_offensive_state
 from BackEnd.utils.transition_event_detector import detect_instigating_event, validate_event_matches_transition
@@ -712,6 +716,25 @@ class GameManager:
                 }
                 foul_result = resolve_non_shooting_foul(
                     roles, self, time_elapsed_override=sl.force_foul_time_elapsed()
+                )
+                victim.coords = {
+                    "x": float(victim_coords.get("x", 50)),
+                    "y": float(victim_coords.get("y", 25)),
+                }
+                attach_position_snapshots(
+                    foul_result,
+                    [
+                        build_phase_post_stopper_snapshot(
+                            self,
+                            self.offense_team.lineup,
+                            self.defense_team.lineup,
+                            None,
+                            roles,
+                            "HCO",
+                            "non_shooting_foul",
+                            "hco_force_foul_after_dreb",
+                        )
+                    ],
                 )
                 foul_result["offense_team_id"] = self.offense_team.team_id
                 foul_result["current_turn"] = "HCO"

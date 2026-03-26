@@ -1,5 +1,10 @@
 import random
 
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_opening_tip_snapshot_from_animations,
+)
+
 # Starting positions for opening tip
 OPENING_TIP_POSITIONS = {
     "home": {
@@ -174,7 +179,12 @@ def execute_opening_tip(game):
         "next_turn": "HCO",  # ✅ SS&S: Explicit next turn type
         "quarter": game.quarter,  # Add quarter field for frontend filtering
     }
-    
+
+    attach_position_snapshots(
+        turn_result,
+        [build_opening_tip_snapshot_from_animations(game, animations)],
+    )
+
     return offense_team, defense_team, turn_result
 
 def is_closest_to_ball(pos, ball_coords, lineup, team):

@@ -473,6 +473,10 @@ def resolve_offensive_rebound(game, rebounder):
 
     Returns an event dictionary describing the outcome.
     """
+    from BackEnd.utils.position_snapshot_ledger import (
+        build_oreb_kickout_snapshot,
+        build_oreb_putback_attempt_snapshot,
+    )
 
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -487,6 +491,7 @@ def resolve_offensive_rebound(game, rebounder):
         }
 
     if random.random() < 0.90:  # 90% putback attempt, 10% kickout
+        oreb_putback_snap = build_oreb_putback_attempt_snapshot(game, off_lineup, def_lineup)
         attrs = rebounder.attributes
         # ✅ NEW: Use dedicated OREB shot attempt function
         shot_score = oreb_shot_attempt(attrs)
@@ -520,6 +525,7 @@ def resolve_offensive_rebound(game, rebounder):
             "timeElapsed": time_elapsed,
             "result": "MAKE" if made else "MISS",
             "possession_flips": False,
+            "position_snapshots": [oreb_putback_snap],
         }
 
         if made:
@@ -589,6 +595,8 @@ def resolve_offensive_rebound(game, rebounder):
     from_coords = getattr(rebounder, "coords", {"x": 25, "y": 50})
     to_coords = getattr(pg, "coords", {"x": 25, "y": 50}) if pg else {"x": 25, "y": 50}
 
+    oreb_kick_snap = build_oreb_kickout_snapshot(game, off_lineup, def_lineup)
+
     return {
         "event_type": "KICKOUT_RESET",
         "rebounderId": getattr(rebounder, "player_id", None),
@@ -599,6 +607,7 @@ def resolve_offensive_rebound(game, rebounder):
             "duration": duration,
         },
         "timeElapsed": duration,
+        "position_snapshots": [oreb_kick_snap],
     }
 
 def calculate_screen_score(screen_attrs):

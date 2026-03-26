@@ -13,8 +13,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from BackEnd.constants.fast_break_play_types import RIM_RUNNER
 from BackEnd.models.animator import Animator
 from BackEnd.utils.shared import (
+    apply_coords_from_animations_list,
     calculate_outlet_pass_score,
     unpack_game_context,
+)
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_fast_break_pre_shot_snapshot,
+    build_phase_post_stopper_snapshot,
 )
 from BackEnd.engine.phase_resolution import (
     _record_fast_break_stats,
@@ -598,8 +604,13 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             rr.coords = shot_spot
             roles["shot_spot"] = shot_spot
 
+        rr_snap_roles = {**roles, "ball_handler": ball_handler}
+        rr_snap = build_fast_break_pre_shot_snapshot(
+            game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
+        )
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
+        attach_position_snapshots(turn_result, [rr_snap])
 
         turn_result["animations"] = fb_animations
         turn_result["roles"] = fb_roles
@@ -644,8 +655,13 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         if fb_roles.get("_bh_final_x") is not None:
             rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             roles["shot_spot"] = rr.coords
+        rr_snap_roles = {**roles, "ball_handler": ball_handler}
+        rr_snap = build_fast_break_pre_shot_snapshot(
+            game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
+        )
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
+        attach_position_snapshots(turn_result, [rr_snap])
         turn_result["animations"] = fb_animations
         turn_result["roles"] = fb_roles
         turn_result["fast_break"] = True
@@ -680,11 +696,31 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         tr["fast_break_play"] = fb_play_key
         tr["roles"] = fb_roles
         tr["rim_runner_interception"] = True
+        rr_anims = Animator(game).capture_fast_break_animation(fb_roles, False, None)
+        tr["animations"] = rr_anims
+        if rr_anims:
+            apply_coords_from_animations_list(game, rr_anims)
+        attach_position_snapshots(
+            tr,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    None,
+                    fb_roles,
+                    "FAST_BREAK",
+                    "turnover",
+                    "fb_rr_turnover_post_stopper",
+                )
+            ],
+        )
         _record_fast_break_stats(fb_roles, tr, game)
         return tr
 
     if intercept_score > tier_mid:
         game_state["offensive_state"] = "HCO"
+        bat_anims = Animator(game).capture_fast_break_animation(fb_roles, False, None)
         result = {
             "result_type": "DEAD BALL",
             "text": "Fast Break! Batted ball out of bounds!",
@@ -699,8 +735,25 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "fast_break_play": fb_play_key,
             "rim_runner_bat_oob": True,
             "roles": fb_roles,
-            "animations": Animator(game).capture_fast_break_animation(fb_roles, False, None),
+            "animations": bat_anims,
         }
+        if bat_anims:
+            apply_coords_from_animations_list(game, bat_anims)
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    None,
+                    fb_roles,
+                    "FAST_BREAK",
+                    "turnover",
+                    "fb_rr_bat_oob_post_stopper",
+                )
+            ],
+        )
         _record_fast_break_stats(fb_roles, result, game)
         apply_fast_break_cg_time(result, shot_attempted=False)
         return result
@@ -729,8 +782,13 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     if fb_roles.get("_bh_final_x") is not None:
         rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         roles["shot_spot"] = rr.coords
+    rr_snap_roles = {**roles, "ball_handler": ball_handler}
+    rr_snap = build_fast_break_pre_shot_snapshot(
+        game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
+    )
     turn_result = game.shot_manager.resolve_shot(roles)
     game_state.pop("fast_break_shot_threshold_override", None)
+    attach_position_snapshots(turn_result, [rr_snap])
     turn_result["animations"] = fb_animations
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True

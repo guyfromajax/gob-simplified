@@ -49,6 +49,45 @@ from BackEnd.constants.fast_break_play_types import (
     play_key_for_fast_break_entry,
 )
 
+# Location-based contest / rim shortcuts (see Shot_System.md)
+CONTEST_DEFENDER_DX_MAX = 6
+CONTEST_DEFENDER_DY_MAX = 4
+RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
+
+
+def _shooter_xy_from_roles(roles, shooter):
+    shot_spot = roles.get("shot_spot")
+    if isinstance(shot_spot, dict) and shot_spot.get("x") is not None and shot_spot.get("y") is not None:
+        return float(shot_spot["x"]), float(shot_spot["y"])
+    c = getattr(shooter, "coords", None) or {}
+    return float(c.get("x", 50)), float(c.get("y", 25))
+
+
+def _attacking_basket_xy(off_team, game):
+    """Basket being attacked: home offense → away rim (x≈9); away offense → home rim (x≈91)."""
+    from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+
+    if off_team.team_id == game.home_team.team_id:
+        return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
+    return float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"])
+
+
+def _defender_in_contest_range(sx, sy, def_lineup):
+    """True if any defensive lineup player lies within the contest bounding box around the shooter."""
+    for p in (def_lineup or {}).values():
+        if p is None:
+            continue
+        c = getattr(p, "coords", None) or {}
+        dx = abs(float(c.get("x", 50)) - sx)
+        dy = abs(float(c.get("y", 25)) - sy)
+        if dx <= CONTEST_DEFENDER_DX_MAX and dy <= CONTEST_DEFENDER_DY_MAX:
+            return True
+    return False
+
+
+def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
+    return abs(sx - bx) <= margin and abs(sy - by) <= margin
+
 
 class ShotManager:
     def __init__(self, game):
@@ -367,257 +406,193 @@ class ShotManager:
         if game_state.pop("shot_at_one_second", False):
             shot_threshold += 100
 
+        sx, sy = _shooter_xy_from_roles(roles, shooter)
+        bx, by = _attacking_basket_xy(off_team, self.game)
+        has_contest = _defender_in_contest_range(sx, sy, def_lineup)
+        rim_unguarded_99 = (
+            _shot_in_rim_box(sx, sy, bx, by)
+            and not has_contest
+            and shot_type in ("inside", "attack")
+            and not is_three
+        )
+
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
         
-        # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
-        # Use shot_type instead of playcall for shot score calculation
-        shot_score, shot_score_pre_defense, d_foul, foul_player = self.calculate_shot_score(
-            shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint, second_defender, shooter_location_str
-        )
-        if forced_shot:
-            # Forced shots keep standard defender/defense scoring, then apply hard penalty.
-            shot_score -= 100
-        
-        # ✅ MOTION OFFENSE: Apply attack penalty if applicable
-        motion_attack_penalty = roles.get("motion_attack_penalty", 0) or game_state.get("motion_attack_penalty", 0)
-        if motion_attack_penalty > 0:
-            shot_score -= motion_attack_penalty
-            # Clear penalty after use
-            game_state.pop("motion_attack_penalty", None)
-
-        # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y < x
-        block_spot = None
-        block_defender_used = None
-        if shot_type in ("inside", "attack") and defender:
-            x = def_team.strategy_settings.get("aggression", 2)
-            y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
-            should_attempt_block_reconciliation = y < x
-            if not should_attempt_block_reconciliation:
-                z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
-                defense_fight = def_team.team_attributes.get("fight", 0)
-                should_attempt_block_reconciliation = z < defense_fight
-            if should_attempt_block_reconciliation:
-                # Block reconciliation: use shot_score_pre_defense vs defense_block_score
-                shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
-                logging.debug(
-                    "BLOCK_RECONCILIATION shooter coords: x=%s, y=%s (shooter_id=%s)",
-                    shooter_coords_recon.get("x"), shooter_coords_recon.get("y"),
-                    getattr(shooter, "player_id", None),
-                )
-                def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
-                def_h = height_to_block_score(def_height_inches)
-                def_scaled_height = (def_h * 10) + random.randint(-9, 9)
-                def_attrs = defender.attributes
-                defense_block_score = (
-                    def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
-                ) * random.randint(1, 6)
-                diff = shot_score_pre_defense - defense_block_score
-                if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
-                    # Shooting foul from block: shooter_finish_score vs 250
-                    # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
-                    shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
-                    shoot_scaled = (shoot_h * 10) + random.randint(-9, 9)
-                    shoot_attrs = shooter.attributes
-                    shooter_finish_score = (
-                        shoot_attrs.get("ST", 0) * 0.4 + shoot_attrs.get("SC", 0) * 0.3
-                        + shoot_scaled * 0.2 + shoot_attrs.get("IQ", 0) * 0.1
-                    ) * random.randint(1, 6)
-                    made_from_foul = shooter_finish_score > 250
-                    # Reuse existing shooting-foul flow: set game_state, record foul, build result
-                    defender.record_stat("F")
-                    def_team.team_fouls += 1
-                    self.game_state["foul_team"] = "DEFENSE"
-                    self.game_state["shooter"] = shooter
-                    self.game_state["offensive_state"] = "FREE_THROW"
-                    if made_from_foul:
-                        self.game_state["free_throws"] = 1
-                        self.game_state["free_throws_remaining"] = 1
-                        self.game_state["one_and_one"] = False
-                    else:
-                        self.game_state["free_throws"] = 2
-                        self.game_state["free_throws_remaining"] = 2
-                        self.game_state["one_and_one"] = False
-                    from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                    block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
-                    shooter.record_stat("FGA")
-                    if is_three:
-                        shooter.record_stat("3PTA")
-                    if made_from_foul:
-                        apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
-                        if pip_stat_eligible:
-                            shooter.record_stat("PIP", amount=3 if is_three else 2)
-                        text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(defender)} fouls him! AND-1 opportunity!"
-                    else:
-                        text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
-                    shooter_pos = get_player_position(off_lineup, shooter)
-                    # Keep turn timing aligned to skeleton progression for shot attempts.
-                    is_hco = self.game_state.get("offensive_state") == "HCO"
-                    timing_contract = calc_skeleton_step_timing_contract(
-                        steps,
-                        resolution_step_index=shot_step_index,
-                        include_hco_step1_bringup=is_hco,
-                        prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
-                        phase_type="HCO" if is_hco else None,
-                    )
-                    time_elapsed_ft = timing_contract["time_elapsed"]
-                    ft_remaining = 1 if made_from_foul else 2
-                    result = {
-                        "result_type": "MAKE" if made_from_foul else "MISS",
-                        "ball_handler": shooter, "shooter": shooter, "shooter_id": shooter.player_id,
-                        "shooter_pos": shooter_pos, "screener": screener, "passer": passer, "defender": defender,
-                        "text": text, "possession_flips": False, "time_elapsed": time_elapsed_ft, "events": [],
-                        "foul_player_id": defender.player_id, "foul_team": "DEFENSE",
-                        "next_play_type": "FREE_THROW", "free_throws_remaining": ft_remaining,
-                        "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
-                        "has_and_one": made_from_foul,
-                        "one_and_one": False,
-                        "step_clock_seconds": timing_contract["step_clock_seconds"],
-                        "resolution_step_index": timing_contract["resolution_step_index"],
-                        "executed_step_count": timing_contract["executed_step_count"],
-                    }
-                    if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
-                        result["fouled_out"] = True
-                        result["foul_out_player"] = {
-                            "player_id": block_recon_foul_out_info["foul_player_id"],
-                            "name": block_recon_foul_out_info["foul_player_name"],
-                            "photo": block_recon_foul_out_info["foul_player_photo"],
-                            "team": block_recon_foul_out_info["foul_player_team"],
-                        }
-                        result["foul_count"] = block_recon_foul_out_info["foul_count"]
-                        self.game_state["foul_out_context"] = {
-                            "foul_type": "DEFENSIVE",
-                            "is_shooting_foul": True,
-                            "is_bonus": False,
-                            "next_play_type": "FREE_THROW",
-                            "shooter": shooter,
-                        }
-                    return result
-                elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
-                    # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
-                    defender.record_stat("BLK")
-                    off_team.team_attributes["momentum"] = max(0, off_team.team_attributes.get("momentum", 0) - 1)
-                    def_team.team_attributes["momentum"] = min(10, def_team.team_attributes.get("momentum", 0) + 1)
-                    is_away_offense = off_team.team_id == self.game.away_team.team_id
-                    # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
-                    shot_spot = roles.get("shot_spot")
-                    if isinstance(shot_spot, dict) and "x" in shot_spot and "y" in shot_spot:
-                        sx = shot_spot["x"]
-                        sy = shot_spot["y"]
-                    else:
-                        shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
-                        sx = shooter_coords.get("x", 50)
-                        sy = shooter_coords.get("y", 25)
-                    self._block_spot = calculate_block_spot(sx, sy, is_away_offense)
-                    self._block_defender = defender
-
-        # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
-        # Fast Break: only allow charge/block when there is a shot defender defending the attempt (defender_count >= 1)
         charge_result = None
-        if shot_type == "attack":
-            run_charge_check = True
-            if roles.get("is_fast_break"):
-                run_charge_check = bool(defender) and (roles.get("defender_count", 0) >= 1)
-            if run_charge_check:
-                charge_result = calculate_charge(shooter, defender, off_team, def_team)
+
+        if rim_unguarded_99:
+            # Unguarded attempt in rim box: 99% make; skip defense, fouls, block recon, charge.
+            made = random.randint(1, 100) != 100
+            d_foul = False
+            foul_player = None
+            shot_score = 0
+            shot_score_pre_defense = 0
+        else:
+            # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
+            # Use shot_type instead of playcall for shot score calculation
+            # No contest → omit defensive scoring and shooting-foul rolls (still full offense / gravity).
+            shot_score, shot_score_pre_defense, d_foul, foul_player = self.calculate_shot_score(
+                shooter,
+                passer,
+                screener,
+                defender,
+                shot_type,
+                defense_call,
+                is_three,
+                is_paint,
+                second_defender,
+                shooter_location_str,
+                apply_defense=has_contest,
+            )
+            if forced_shot:
+                # Forced shots keep standard defender/defense scoring, then apply hard penalty.
+                shot_score -= 100
             
-            # Handle CHARGE: Return early with possession flip, no shot attempt
-            if charge_result == "CHARGE":
-                shooter_pos = get_player_position(off_lineup, shooter)
-                is_hco = self.game_state.get("offensive_state") == "HCO"
-                timing_contract = calc_skeleton_step_timing_contract(
-                    steps,
-                    resolution_step_index=shot_step_index,
-                    include_hco_step1_bringup=is_hco,
-                    prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
-                    phase_type="HCO" if is_hco else None,
-                )
-                time_elapsed = timing_contract["time_elapsed"]
-                
-                # Record foul on shooter (offensive foul)
-                shooter.record_stat("F")
-                off_team.team_fouls += 1
-                
-                # Set game state
-                self.game_state["foul_team"] = "OFFENSE"
-                self.game_state["offensive_state"] = "HCO"  # Next team will be on offense
-                
-                # Build result dict with all necessary fields (SS&S)
-                result = {
-                    "result_type": "CHARGE",
-                    "ball_handler": shooter,
-                    "shooter": shooter,
-                    "shooter_id": shooter.player_id,
-                    "shooter_pos": shooter_pos,
-                    "screener": screener,
-                    "passer": passer,
-                    "defender": defender,
-                    "text": "Charge!",
-                    "possession_flips": True,  # Offense loses possession
-                    "time_elapsed": time_elapsed,
-                    "events": [],
-                    "foul_player_id": shooter.player_id,
-                    "foul_team": "OFFENSE",
-                    "next_play_type": "SIDE_INBOUND",
-                    "offense_team_id": off_team.team_id,
-                    "defense_team_id": def_team.team_id,
-                    "step_clock_seconds": timing_contract["step_clock_seconds"],
-                    "resolution_step_index": timing_contract["resolution_step_index"],
-                    "executed_step_count": timing_contract["executed_step_count"],
-                }
-                return result
-            
-            # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)
-            elif charge_result == "BLOCKING_FOUL":
-                if defender:
-                    # Record foul on defender
-                    defender.record_stat("F")
-                    def_team.team_fouls += 1
-                    
-                    # Set foul team
-                    self.game_state["foul_team"] = "DEFENSE"
-                    
-                    # Check if player fouled out (5th foul)
-                    from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                    blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
-                    
-                    # Final Turn attack: blocking foul always awards exactly 2 FTs (no and-1, no 3 FTs for three)
-                    if self.game_state.get("final_turn") and shot_type == "attack":
-                        self.game_state["offensive_state"] = "FREE_THROW"
-                        self.game_state["free_throws"] = 2
-                        self.game_state["free_throws_remaining"] = 2
-                        self.game_state["one_and_one"] = False
-                        self.game_state["last_ball_handler"] = shooter
+            # ✅ MOTION OFFENSE: Apply attack penalty if applicable
+            motion_attack_penalty = roles.get("motion_attack_penalty", 0) or game_state.get("motion_attack_penalty", 0)
+            if motion_attack_penalty > 0:
+                shot_score -= motion_attack_penalty
+                # Clear penalty after use
+                game_state.pop("motion_attack_penalty", None)
+
+            # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y < x
+            block_spot = None
+            block_defender_used = None
+            if has_contest and shot_type in ("inside", "attack") and defender:
+                x = def_team.strategy_settings.get("aggression", 2)
+                y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
+                should_attempt_block_reconciliation = y < x
+                if not should_attempt_block_reconciliation:
+                    z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
+                    defense_fight = def_team.team_attributes.get("fight", 0)
+                    should_attempt_block_reconciliation = z < defense_fight
+                if should_attempt_block_reconciliation:
+                    # Block reconciliation: use shot_score_pre_defense vs defense_block_score
+                    shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
+                    logging.debug(
+                        "BLOCK_RECONCILIATION shooter coords: x=%s, y=%s (shooter_id=%s)",
+                        shooter_coords_recon.get("x"), shooter_coords_recon.get("y"),
+                        getattr(shooter, "player_id", None),
+                    )
+                    def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                    def_h = height_to_block_score(def_height_inches)
+                    def_scaled_height = (def_h * 10) + random.randint(-9, 9)
+                    def_attrs = defender.attributes
+                    defense_block_score = (
+                        def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
+                    ) * random.randint(1, 6)
+                    diff = shot_score_pre_defense - defense_block_score
+                    if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
+                        # Shooting foul from block: shooter_finish_score vs 250
+                        # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
+                        shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
+                        shoot_scaled = (shoot_h * 10) + random.randint(-9, 9)
+                        shoot_attrs = shooter.attributes
+                        shooter_finish_score = (
+                            shoot_attrs.get("ST", 0) * 0.4 + shoot_attrs.get("SC", 0) * 0.3
+                            + shoot_scaled * 0.2 + shoot_attrs.get("IQ", 0) * 0.1
+                        ) * random.randint(1, 6)
+                        made_from_foul = shooter_finish_score > 250
+                        # Reuse existing shooting-foul flow: set game_state, record foul, build result
+                        defender.record_stat("F")
+                        def_team.team_fouls += 1
+                        self.game_state["foul_team"] = "DEFENSE"
                         self.game_state["shooter"] = shooter
-                        next_play_type = "FREE_THROW"
-                    # Check bonus status (reuse logic from resolve_non_shooting_foul)
-                    elif def_team.team_fouls >= 10:
-                        # Double bonus (10+ fouls): 2 free throws
                         self.game_state["offensive_state"] = "FREE_THROW"
-                        self.game_state["free_throws"] = 2
-                        self.game_state["free_throws_remaining"] = 2
-                        self.game_state["one_and_one"] = False
-                        self.game_state["last_ball_handler"] = shooter
-                        self.game_state["shooter"] = shooter
-                        next_play_type = "FREE_THROW"
-                    elif def_team.team_fouls >= 5:
-                        # Bonus (5-9 fouls): 1 & 1 free throws
-                        self.game_state["offensive_state"] = "FREE_THROW"
-                        self.game_state["free_throws"] = 2  # Maximum possible
-                        self.game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
-                        self.game_state["one_and_one"] = True
-                        self.game_state["last_ball_handler"] = shooter
-                        self.game_state["shooter"] = shooter
-                        next_play_type = "FREE_THROW"
-                    else:
-                        # Less than 5 fouls: side inbound, no free throws
-                        self.game_state["offensive_state"] = "HCO"
-                        self.game_state["free_throws"] = 0
-                        self.game_state["free_throws_remaining"] = 0
-                        next_play_type = "SIP"
-                    
-                    # Early return: nullify shot attempt, return result for next turn
+                        if made_from_foul:
+                            self.game_state["free_throws"] = 1
+                            self.game_state["free_throws_remaining"] = 1
+                            self.game_state["one_and_one"] = False
+                        else:
+                            self.game_state["free_throws"] = 2
+                            self.game_state["free_throws_remaining"] = 2
+                            self.game_state["one_and_one"] = False
+                        from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+                        block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
+                        shooter.record_stat("FGA")
+                        if is_three:
+                            shooter.record_stat("3PTA")
+                        if made_from_foul:
+                            apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
+                            if pip_stat_eligible:
+                                shooter.record_stat("PIP", amount=3 if is_three else 2)
+                            text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(defender)} fouls him! AND-1 opportunity!"
+                        else:
+                            text = f"{get_name_safe(shooter)} misses. {get_name_safe(defender)} fouls him!"
+                        shooter_pos = get_player_position(off_lineup, shooter)
+                        # Keep turn timing aligned to skeleton progression for shot attempts.
+                        is_hco = self.game_state.get("offensive_state") == "HCO"
+                        timing_contract = calc_skeleton_step_timing_contract(
+                            steps,
+                            resolution_step_index=shot_step_index,
+                            include_hco_step1_bringup=is_hco,
+                            prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                            phase_type="HCO" if is_hco else None,
+                        )
+                        time_elapsed_ft = timing_contract["time_elapsed"]
+                        ft_remaining = 1 if made_from_foul else 2
+                        result = {
+                            "result_type": "MAKE" if made_from_foul else "MISS",
+                            "ball_handler": shooter, "shooter": shooter, "shooter_id": shooter.player_id,
+                            "shooter_pos": shooter_pos, "screener": screener, "passer": passer, "defender": defender,
+                            "text": text, "possession_flips": False, "time_elapsed": time_elapsed_ft, "events": [],
+                            "foul_player_id": defender.player_id, "foul_team": "DEFENSE",
+                            "next_play_type": "FREE_THROW", "free_throws_remaining": ft_remaining,
+                            "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
+                            "has_and_one": made_from_foul,
+                            "one_and_one": False,
+                            "step_clock_seconds": timing_contract["step_clock_seconds"],
+                            "resolution_step_index": timing_contract["resolution_step_index"],
+                            "executed_step_count": timing_contract["executed_step_count"],
+                        }
+                        if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
+                            result["fouled_out"] = True
+                            result["foul_out_player"] = {
+                                "player_id": block_recon_foul_out_info["foul_player_id"],
+                                "name": block_recon_foul_out_info["foul_player_name"],
+                                "photo": block_recon_foul_out_info["foul_player_photo"],
+                                "team": block_recon_foul_out_info["foul_player_team"],
+                            }
+                            result["foul_count"] = block_recon_foul_out_info["foul_count"]
+                            self.game_state["foul_out_context"] = {
+                                "foul_type": "DEFENSIVE",
+                                "is_shooting_foul": True,
+                                "is_bonus": False,
+                                "next_play_type": "FREE_THROW",
+                                "shooter": shooter,
+                            }
+                        return result
+                    elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
+                        # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
+                        defender.record_stat("BLK")
+                        off_team.team_attributes["momentum"] = max(0, off_team.team_attributes.get("momentum", 0) - 1)
+                        def_team.team_attributes["momentum"] = min(10, def_team.team_attributes.get("momentum", 0) + 1)
+                        is_away_offense = off_team.team_id == self.game.away_team.team_id
+                        # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
+                        shot_spot = roles.get("shot_spot")
+                        if isinstance(shot_spot, dict) and "x" in shot_spot and "y" in shot_spot:
+                            sx = shot_spot["x"]
+                            sy = shot_spot["y"]
+                        else:
+                            shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
+                            sx = shooter_coords.get("x", 50)
+                            sy = shooter_coords.get("y", 25)
+                        self._block_spot = calculate_block_spot(sx, sy, is_away_offense)
+                        self._block_defender = defender
+
+            # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
+            # Fast Break: only allow charge/block when there is a shot defender defending the attempt (defender_count >= 1)
+            if shot_type == "attack":
+                run_charge_check = True
+                if roles.get("is_fast_break"):
+                    run_charge_check = bool(defender) and (roles.get("defender_count", 0) >= 1)
+                if run_charge_check and has_contest:
+                    charge_result = calculate_charge(shooter, defender, off_team, def_team)
+
+                # Handle CHARGE: Return early with possession flip, no shot attempt
+                if charge_result == "CHARGE":
                     shooter_pos = get_player_position(off_lineup, shooter)
                     is_hco = self.game_state.get("offensive_state") == "HCO"
                     timing_contract = calc_skeleton_step_timing_contract(
@@ -628,52 +603,146 @@ class ShotManager:
                         phase_type="HCO" if is_hco else None,
                     )
                     time_elapsed = timing_contract["time_elapsed"]
-                    intended_shooter_pos = roles.get("intended_shooter_pos")
-                    intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
-                    intended_shooter_id = intended_shooter.player_id if intended_shooter else None
-                    
+
+                    # Record foul on shooter (offensive foul)
+                    shooter.record_stat("F")
+                    off_team.team_fouls += 1
+
+                    # Set game state
+                    self.game_state["foul_team"] = "OFFENSE"
+                    self.game_state["offensive_state"] = "HCO"  # Next team will be on offense
+
+                    # Build result dict with all necessary fields (SS&S)
                     result = {
-                        "result_type": "FOUL",
+                        "result_type": "CHARGE",
                         "ball_handler": shooter,
                         "shooter": shooter,
                         "shooter_id": shooter.player_id,
                         "shooter_pos": shooter_pos,
-                        "intended_shooter_pos": intended_shooter_pos,
-                        "intended_shooter_id": intended_shooter_id,
                         "screener": screener,
                         "passer": passer,
                         "defender": defender,
-                        "text": f"Blocking foul on {get_name_safe(defender)}!",
-                        "possession_flips": False,
+                        "text": "Charge!",
+                        "possession_flips": True,  # Offense loses possession
                         "time_elapsed": time_elapsed,
                         "events": [],
-                        "foul_player_id": defender.player_id,
-                        "foul_team": "DEFENSE",
-                        "next_play_type": next_play_type,
+                        "foul_player_id": shooter.player_id,
+                        "foul_team": "OFFENSE",
+                        "next_play_type": "SIDE_INBOUND",
                         "offense_team_id": off_team.team_id,
                         "defense_team_id": def_team.team_id,
                         "step_clock_seconds": timing_contract["step_clock_seconds"],
                         "resolution_step_index": timing_contract["resolution_step_index"],
                         "executed_step_count": timing_contract["executed_step_count"],
                     }
-                    if next_play_type == "FREE_THROW":
-                        result["free_throws_remaining"] = self.game_state.get("free_throws_remaining", 0)
-                        if self.game_state.get("one_and_one"):
-                            result["one_and_one"] = True
-                    if blocking_foul_out_info and blocking_foul_out_info.get("fouled_out"):
-                        result["fouled_out"] = True
-                        result["foul_out_player"] = {
-                            "player_id": blocking_foul_out_info["foul_player_id"],
-                            "name": blocking_foul_out_info["foul_player_name"],
-                            "photo": blocking_foul_out_info["foul_player_photo"],
-                            "team": blocking_foul_out_info["foul_player_team"],
-                        }
-                        result["foul_count"] = blocking_foul_out_info["foul_count"]
                     return result
 
-        made = shot_score >= shot_threshold
-        if getattr(self, "_block_spot", None):
-            made = False  # Block reconciliation decided block; use miss path with block spot
+                # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)
+                elif charge_result == "BLOCKING_FOUL":
+                    if defender:
+                        # Record foul on defender
+                        defender.record_stat("F")
+                        def_team.team_fouls += 1
+
+                        # Set foul team
+                        self.game_state["foul_team"] = "DEFENSE"
+
+                        # Check if player fouled out (5th foul)
+                        from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+                        blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
+
+                        # Final Turn attack: blocking foul always awards exactly 2 FTs (no and-1, no 3 FTs for three)
+                        if self.game_state.get("final_turn") and shot_type == "attack":
+                            self.game_state["offensive_state"] = "FREE_THROW"
+                            self.game_state["free_throws"] = 2
+                            self.game_state["free_throws_remaining"] = 2
+                            self.game_state["one_and_one"] = False
+                            self.game_state["last_ball_handler"] = shooter
+                            self.game_state["shooter"] = shooter
+                            next_play_type = "FREE_THROW"
+                        # Check bonus status (reuse logic from resolve_non_shooting_foul)
+                        elif def_team.team_fouls >= 10:
+                            # Double bonus (10+ fouls): 2 free throws
+                            self.game_state["offensive_state"] = "FREE_THROW"
+                            self.game_state["free_throws"] = 2
+                            self.game_state["free_throws_remaining"] = 2
+                            self.game_state["one_and_one"] = False
+                            self.game_state["last_ball_handler"] = shooter
+                            self.game_state["shooter"] = shooter
+                            next_play_type = "FREE_THROW"
+                        elif def_team.team_fouls >= 5:
+                            # Bonus (5-9 fouls): 1 & 1 free throws
+                            self.game_state["offensive_state"] = "FREE_THROW"
+                            self.game_state["free_throws"] = 2  # Maximum possible
+                            self.game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
+                            self.game_state["one_and_one"] = True
+                            self.game_state["last_ball_handler"] = shooter
+                            self.game_state["shooter"] = shooter
+                            next_play_type = "FREE_THROW"
+                        else:
+                            # Less than 5 fouls: side inbound, no free throws
+                            self.game_state["offensive_state"] = "HCO"
+                            self.game_state["free_throws"] = 0
+                            self.game_state["free_throws_remaining"] = 0
+                            next_play_type = "SIP"
+
+                        # Early return: nullify shot attempt, return result for next turn
+                        shooter_pos = get_player_position(off_lineup, shooter)
+                        is_hco = self.game_state.get("offensive_state") == "HCO"
+                        timing_contract = calc_skeleton_step_timing_contract(
+                            steps,
+                            resolution_step_index=shot_step_index,
+                            include_hco_step1_bringup=is_hco,
+                            prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
+                            phase_type="HCO" if is_hco else None,
+                        )
+                        time_elapsed = timing_contract["time_elapsed"]
+                        intended_shooter_pos = roles.get("intended_shooter_pos")
+                        intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
+                        intended_shooter_id = intended_shooter.player_id if intended_shooter else None
+
+                        result = {
+                            "result_type": "FOUL",
+                            "ball_handler": shooter,
+                            "shooter": shooter,
+                            "shooter_id": shooter.player_id,
+                            "shooter_pos": shooter_pos,
+                            "intended_shooter_pos": intended_shooter_pos,
+                            "intended_shooter_id": intended_shooter_id,
+                            "screener": screener,
+                            "passer": passer,
+                            "defender": defender,
+                            "text": f"Blocking foul on {get_name_safe(defender)}!",
+                            "possession_flips": False,
+                            "time_elapsed": time_elapsed,
+                            "events": [],
+                            "foul_player_id": defender.player_id,
+                            "foul_team": "DEFENSE",
+                            "next_play_type": next_play_type,
+                            "offense_team_id": off_team.team_id,
+                            "defense_team_id": def_team.team_id,
+                            "step_clock_seconds": timing_contract["step_clock_seconds"],
+                            "resolution_step_index": timing_contract["resolution_step_index"],
+                            "executed_step_count": timing_contract["executed_step_count"],
+                        }
+                        if next_play_type == "FREE_THROW":
+                            result["free_throws_remaining"] = self.game_state.get("free_throws_remaining", 0)
+                            if self.game_state.get("one_and_one"):
+                                result["one_and_one"] = True
+                        if blocking_foul_out_info and blocking_foul_out_info.get("fouled_out"):
+                            result["fouled_out"] = True
+                            result["foul_out_player"] = {
+                                "player_id": blocking_foul_out_info["foul_player_id"],
+                                "name": blocking_foul_out_info["foul_player_name"],
+                                "photo": blocking_foul_out_info["foul_player_photo"],
+                                "team": blocking_foul_out_info["foul_player_team"],
+                            }
+                            result["foul_count"] = blocking_foul_out_info["foul_count"]
+                        return result
+
+            made = shot_score >= shot_threshold
+            if getattr(self, "_block_spot", None):
+                made = False  # Block reconciliation decided block; use miss path with block spot
 
         # ✅ SHOOTING FOUL CALIBRATION: If there's a shooting foul, check if it forces a miss
         # Fouls are significant outliers that can force missed shots
@@ -1616,13 +1685,28 @@ class ShotManager:
         return result
 
     
-    def calculate_shot_score(self, shooter, passer, screener, defender, shot_type, defense_call, is_three, is_paint=False, second_defender=None, shooter_location=None):
+    def calculate_shot_score(
+        self,
+        shooter,
+        passer,
+        screener,
+        defender,
+        shot_type,
+        defense_call,
+        is_three,
+        is_paint=False,
+        second_defender=None,
+        shooter_location=None,
+        *,
+        apply_defense=True,
+    ):
         """
         Calculate shot score based on attributes, shot_type (inside/attack/outside), defense, gravity, etc.
         Also returns:
             - help_defender: if one triggered (always None now, help defense removed)
             - d_foul: whether a defensive foul occurred
             - foul_player: who committed the foul
+        When apply_defense is False (no defender in contest range): skip defense penalty, DEF_A, and shooting foul.
         """
 
         shot_score = 0
@@ -1647,88 +1731,91 @@ class ShotManager:
         # Pre-defense shot score (for block reconciliation: offensive component only)
         pre_defense_shot_score = shot_score
 
-        # Defensive impact - varies by shot type
-        # Calculate defense score for primary defender
-        defense_attrs = defender.attributes if defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
-        
-        if is_paint:
-            # Paint shots: ID-focused defense
-            defense_score = (
-                defense_attrs["ID"] * 0.6 +
-                defense_attrs["ST"] * 0.2 +
-                defense_attrs["IQ"] * 0.1 +
-                defense_attrs["CH"] * 0.1
-            ) * random.randint(1, 6)
-        elif is_three:
-            # Three-point shots: OD-focused defense
-            defense_score = (
-                defense_attrs["OD"] * 0.8 +
-                defense_attrs["IQ"] * 0.1 +
-                defense_attrs["CH"] * 0.1
-            ) * random.randint(1, 6)
-        else:
-            # Mid-range shots: balanced defense
-            defense_score = (
-                defense_attrs["OD"] * 0.3 +
-                defense_attrs["ID"] * 0.3 +
-                defense_attrs["AG"] * 0.1 +
-                defense_attrs["ST"] * 0.1 +
-                defense_attrs["IQ"] * 0.1 +
-                defense_attrs["CH"] * 0.1
-            ) * random.randint(1, 6)
-        
-        # Track defense score for statistics
-        self.defense_scores.append(defense_score)
+        if apply_defense:
+            # Defensive impact - varies by shot type
+            # Calculate defense score for primary defender
+            defense_attrs = defender.attributes if defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
 
-        # Check defensive foul with shot_type-specific thresholds
-        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, shot_type, shooter, shooter_location)
-
-        # Apply primary defender's defense score
-        if second_defender:
-            # Two defenders: apply both with 35% each
-            shot_score -= defense_score * 0.35
-            
-            # Calculate defense score for second defender
-            second_defense_attrs = second_defender.attributes if second_defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
-            
             if is_paint:
-                second_defense_score = (
-                    second_defense_attrs["ID"] * 0.6 +
-                    second_defense_attrs["ST"] * 0.2 +
-                    second_defense_attrs["IQ"] * 0.1 +
-                    second_defense_attrs["CH"] * 0.1
+                # Paint shots: ID-focused defense
+                defense_score = (
+                    defense_attrs["ID"] * 0.6 +
+                    defense_attrs["ST"] * 0.2 +
+                    defense_attrs["IQ"] * 0.1 +
+                    defense_attrs["CH"] * 0.1
                 ) * random.randint(1, 6)
             elif is_three:
-                second_defense_score = (
-                    second_defense_attrs["OD"] * 0.8 +
-                    second_defense_attrs["IQ"] * 0.1 +
-                    second_defense_attrs["CH"] * 0.1
+                # Three-point shots: OD-focused defense
+                defense_score = (
+                    defense_attrs["OD"] * 0.8 +
+                    defense_attrs["IQ"] * 0.1 +
+                    defense_attrs["CH"] * 0.1
                 ) * random.randint(1, 6)
             else:
-                second_defense_score = (
-                    second_defense_attrs["OD"] * 0.3 +
-                    second_defense_attrs["ID"] * 0.3 +
-                    second_defense_attrs["AG"] * 0.1 +
-                    second_defense_attrs["ST"] * 0.1 +
-                    second_defense_attrs["IQ"] * 0.1 +
-                    second_defense_attrs["CH"] * 0.1
+                # Mid-range shots: balanced defense
+                defense_score = (
+                    defense_attrs["OD"] * 0.3 +
+                    defense_attrs["ID"] * 0.3 +
+                    defense_attrs["AG"] * 0.1 +
+                    defense_attrs["ST"] * 0.1 +
+                    defense_attrs["IQ"] * 0.1 +
+                    defense_attrs["CH"] * 0.1
                 ) * random.randint(1, 6)
-            
-            # Track second defender's defense score
-            self.defense_scores.append(second_defense_score)
-            
-            # Apply second defender's defense score with 35%
-            shot_score -= second_defense_score * 0.35
-            
-            # Record defensive attempts for both defenders
+
+            # Track defense score for statistics
+            self.defense_scores.append(defense_score)
+
+            # Check defensive foul with shot_type-specific thresholds
+            d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, shot_type, shooter, shooter_location)
+
+            # Apply primary defender's defense score
             if second_defender:
-                second_defender.record_stat("DEF_A")
+                # Two defenders: apply both with 35% each
+                shot_score -= defense_score * 0.35
+
+                # Calculate defense score for second defender
+                second_defense_attrs = second_defender.attributes if second_defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
+
+                if is_paint:
+                    second_defense_score = (
+                        second_defense_attrs["ID"] * 0.6 +
+                        second_defense_attrs["ST"] * 0.2 +
+                        second_defense_attrs["IQ"] * 0.1 +
+                        second_defense_attrs["CH"] * 0.1
+                    ) * random.randint(1, 6)
+                elif is_three:
+                    second_defense_score = (
+                        second_defense_attrs["OD"] * 0.8 +
+                        second_defense_attrs["IQ"] * 0.1 +
+                        second_defense_attrs["CH"] * 0.1
+                    ) * random.randint(1, 6)
+                else:
+                    second_defense_score = (
+                        second_defense_attrs["OD"] * 0.3 +
+                        second_defense_attrs["ID"] * 0.3 +
+                        second_defense_attrs["AG"] * 0.1 +
+                        second_defense_attrs["ST"] * 0.1 +
+                        second_defense_attrs["IQ"] * 0.1 +
+                        second_defense_attrs["CH"] * 0.1
+                    ) * random.randint(1, 6)
+
+                # Track second defender's defense score
+                self.defense_scores.append(second_defense_score)
+
+                # Apply second defender's defense score with 35%
+                shot_score -= second_defense_score * 0.35
+
+                # Record defensive attempts for both defenders
+                if second_defender:
+                    second_defender.record_stat("DEF_A")
+            else:
+                # Single defender: apply 60% impact
+                shot_score -= defense_score * 0.6
+
+            if defender:
+                defender.record_stat("DEF_A")
         else:
-            # Single defender: apply 60% impact
-            shot_score -= defense_score * 0.6
-        
-        if defender:
-            defender.record_stat("DEF_A")
+            d_foul, foul_player = False, None
 
         # Defense scheme multiplier: Only Zone vs 3pt gets 1.1x (makes shot more likely to be successful)
         if defense_call == "Zone" and is_three:

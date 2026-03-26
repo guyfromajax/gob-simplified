@@ -36,6 +36,14 @@ from BackEnd.utils.shared import (
     determine_rebounder,
     apply_coords_from_animations_list,
 )
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_fast_break_pre_shot_snapshot,
+    build_free_throw_snapshot,
+    build_hco_pre_resolve_shot_snapshot,
+    build_phase_post_stopper_snapshot,
+    build_skeleton_pre_resolve_shot_snapshot,
+)
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 
@@ -1560,8 +1568,13 @@ def resolve_fast_break_logic(game: "GameManager"):
             shooter.coords = shot_spot
             roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
 
+        snap_roles = {**roles, "ball_handler": fb_roles.get("ball_handler")}
+        fb_snap = build_fast_break_pre_shot_snapshot(
+            game, off_lineup, def_lineup, snap_roles, "fb_logic_pre_shot"
+        )
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
+        attach_position_snapshots(turn_result, [fb_snap])
 
         # 🔍 [FB MISS DEBUG] Log Fast Break miss outcome and next-turn/possession state for debugging
         if turn_result.get("result_type") == "MISS":
@@ -1614,6 +1627,28 @@ def resolve_fast_break_logic(game: "GameManager"):
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
     apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
+
+    rt_fb = turn_result.get("result_type")
+    if rt_fb in ("STEAL", "DEAD BALL", "FOUL"):
+        fb_anims = turn_result.get("animations") or []
+        if fb_anims:
+            apply_coords_from_animations_list(game, fb_anims)
+        outcome_kind = "non_shooting_foul" if rt_fb == "FOUL" else "turnover"
+        attach_position_snapshots(
+            turn_result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    None,
+                    fb_roles,
+                    "FAST_BREAK",
+                    outcome_kind,
+                    f"fb_{outcome_kind}_post_stopper",
+                )
+            ],
+        )
 
     # ✅ SS&S: Backend is single source of truth for shot spot and defender placement on Fast Break shots
     # Expose so frontend uses these instead of recomputing (avoids mismatch and missing defender)
@@ -1717,6 +1752,8 @@ def resolve_free_throw_logic(game):
     )
     shooter_pos = get_player_position(off_lineup, shooter)
 
+    ft_snap = build_free_throw_snapshot(game, off_lineup, def_lineup, shooter)
+
     if makes_shot:
         apply_scoring(game, off_team, shooter, 1, ["FTM"])
         text += "and hits the free throw!"
@@ -1730,7 +1767,7 @@ def resolve_free_throw_logic(game):
                 # Made front end → unlock second FT
                 game_state["free_throws_remaining"] = 1
                 game_state["one_and_one"] = False
-                return {
+                ooo = {
                     "result_type": "FREE_THROW",
                     "ball_handler": shooter,
                     "shooter": shooter,
@@ -1748,6 +1785,8 @@ def resolve_free_throw_logic(game):
                     "free_throws_remaining": game_state["free_throws_remaining"],  # ✅ FIX: Include free_throws_remaining so frontend knows more FTs remain
                     "one_and_one": False,  # ✅ FIX: Include one_and_one flag (now False since second FT is unlocked)
                 }
+                attach_position_snapshots(ooo, [ft_snap])
+                return ooo
             else:
                 # Missed front end → dead ball, rebound
                 game_state["free_throws_remaining"] = 0
@@ -1851,6 +1890,7 @@ def resolve_free_throw_logic(game):
             if game_state.get("last_rebound") == "DREB":
                 result["next_play_type"] = game_state.get("offensive_state", "HCO")
 
+    attach_position_snapshots(result, [ft_snap])
     return result
 
 
@@ -3796,7 +3836,11 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
     game_state["final_turn"] = True
     try:
+        final_snap = build_skeleton_pre_resolve_shot_snapshot(
+            game, off_lineup, def_lineup, skeleton, roles, "FINAL_TURN", "final_turn_pre_resolve_shot"
+        )
         shot_result = game.shot_manager.resolve_shot(roles)
+        attach_position_snapshots(shot_result, [final_snap])
     finally:
         game_state.pop("final_turn", None)
     # Use time_elapsed = time_remaining for the turn so clock goes to 0 and quarter/game end triggers
@@ -4402,7 +4446,9 @@ def resolve_half_court_offense_logic(game):
                 def_lineup,
                 add_defenders=True
             )
-        
+        if animations:
+            apply_coords_from_animations_list(game, animations)
+
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system,
         # avoiding coordinate orientation issues and reusing existing calculations
@@ -4483,6 +4529,21 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["steps"] = roles["steps"]
             if serializable_roles:
                 turn_result["roles"] = serializable_roles
+            attach_position_snapshots(
+                turn_result,
+                [
+                    build_phase_post_stopper_snapshot(
+                        game,
+                        off_lineup,
+                        def_lineup,
+                        skeleton,
+                        roles,
+                        "HCO",
+                        "turnover",
+                        "hco_turnover_post_stopper",
+                    )
+                ],
+            )
             return turn_result
 
         elif event_type == "O_FOUL":
@@ -4526,6 +4587,21 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["steps"] = roles["steps"]
             if serializable_roles:
                 foul_result["roles"] = serializable_roles
+            attach_position_snapshots(
+                foul_result,
+                [
+                    build_phase_post_stopper_snapshot(
+                        game,
+                        off_lineup,
+                        def_lineup,
+                        skeleton,
+                        roles,
+                        "HCO",
+                        "non_shooting_foul",
+                        "hco_o_foul_post_stopper",
+                    )
+                ],
+            )
             return foul_result
 
         elif event_type == "D_FOUL":
@@ -4567,6 +4643,21 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["steps"] = roles["steps"]
             if serializable_roles:
                 foul_result["roles"] = serializable_roles
+            attach_position_snapshots(
+                foul_result,
+                [
+                    build_phase_post_stopper_snapshot(
+                        game,
+                        off_lineup,
+                        def_lineup,
+                        skeleton,
+                        roles,
+                        "HCO",
+                        "non_shooting_foul",
+                        "hco_d_foul_post_stopper",
+                    )
+                ],
+            )
             return foul_result
 
     # 3. Shot Result
@@ -4643,7 +4734,9 @@ def resolve_half_court_offense_logic(game):
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
     apply_coords_from_animations_list(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
+    hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
+    attach_position_snapshots(shot_result, [hco_snap])
     
     # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Real_Time_Clock_System.md)
     if "_shot_at_one_second_time_elapsed" in game_state:
@@ -5211,7 +5304,11 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        fcp_snap = build_skeleton_pre_resolve_shot_snapshot(
+            game, off_lineup, def_lineup, skeleton, shot_roles, "FCP", "fcp_pre_resolve_shot"
+        )
         shot_result = game.shot_manager.resolve_shot(shot_roles)
+        attach_position_snapshots(shot_result, [fcp_snap])
         
         # ✅ Handle AND-1 situations (MAKE with shooting foul)
         # Check for shooting foul on both MAKE and MISS
@@ -5463,6 +5560,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     else:
         logging.warning(f"⚠️ [FCP] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
         animations = []
+
+    if animations:
+        apply_coords_from_animations_list(game, animations)
     
     # Determine possession flip
     possession_flips = False
@@ -5568,6 +5668,39 @@ def resolve_full_court_press_logic(game: "GameManager"):
             "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None,
         }
         logging.info(f"✅ FOUL OUT (FCP): Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_pt}")
+
+    if result_type in ("DEAD BALL", "STEAL"):
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "FCP",
+                    "turnover",
+                    "fcp_turnover_post_stopper",
+                )
+            ],
+        )
+    elif result_type == "FOUL":
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "FCP",
+                    "non_shooting_foul",
+                    "fcp_non_shooting_foul_post_stopper",
+                )
+            ],
+        )
 
     return result
 
@@ -6387,7 +6520,11 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        hct_snap = build_skeleton_pre_resolve_shot_snapshot(
+            game, off_lineup, def_lineup, skeleton, shot_roles, "HCT", "hct_pre_resolve_shot"
+        )
         shot_result = game.shot_manager.resolve_shot(shot_roles)
+        attach_position_snapshots(shot_result, [hct_snap])
         
         # ✅ Handle AND-1 situations (MAKE with shooting foul)
         # Check for shooting foul on both MAKE and MISS
@@ -6620,6 +6757,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     else:
         logging.warning(f"⚠️ [HCT] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
         animations = []
+
+    if animations:
+        apply_coords_from_animations_list(game, animations)
     
     # Determine possession flip (same logic as FCP)
     possession_flips = False
@@ -6725,6 +6865,39 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None,
         }
         logging.info(f"✅ FOUL OUT (HCT): Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_pt}")
+
+    if result_type in ("DEAD BALL", "STEAL"):
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "HCT",
+                    "turnover",
+                    "hct_turnover_post_stopper",
+                )
+            ],
+        )
+    elif result_type == "FOUL":
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "HCT",
+                    "non_shooting_foul",
+                    "hct_non_shooting_foul_post_stopper",
+                )
+            ],
+        )
 
     # logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
     return result
