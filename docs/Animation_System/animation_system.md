@@ -2700,77 +2700,96 @@ Player animations already use the simplified approach:
 
 **Status:** Fully implemented and operational
 
-The animation system uses a unified distance-based duration calculation that ensures consistent speeds across all animations and respects game speed settings (Slow/Normal/Fast).
+The animation system uses a **universal speed management** model: player tween time is derived from **distance ÷ effective pixels per second**, not from fixed millisecond guesses. Global animation speed (Normal / Fast / Super Fast) scales those effective speeds so the UI presets stay meaningful.
 
-**Architecture:**
+#### Universal speed management (implementation)
 
-#### Core Functions
+**Module split**
 
-- **`getPlayerDuration(sprite, targetX, targetY, isTransition = false)`** (`turnAnimation.js`)
-  - Delegates to **`getPlayerMovementDurationMs()`** in `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` (single source of truth with `resolveMovementSpeedPxPerSec`).
-  - Calculates duration from **distance ÷ speed**, where speed is **AG-based** (`400 + AG` px/s before game-speed scale, ball-handler −5%) times **`window.__GAME_SPEED` / 450**.
-  - Formula: `duration = (distance / speed) * 1000` (ms), minimum 50ms. No fixed “450 px/s cap”; AG 50 at Normal preset ≈ 450 px/s before global scale.
-- **`tweenPlayerTo()`** (`ballTween.js`): if **`duration` is omitted**, it uses **`getPlayerMovementDurationMs`** so callers cannot accidentally fall back to a constant 300ms tween.
+| Module | Role |
+|--------|------|
+| `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` | **Single entry point** for player tween duration: `getGameSpeedPxPerSec()`, `resolveMovementSpeedPxPerSec()`, `getPlayerMovementDurationMs()`. |
+| `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js` | AG → base px/s before global scale: `agToSpeedPxPerSec()`, `getEffectiveAgilityForMovement()`, constants `MOVEMENT_SPEED_BASE` (400), `MOVEMENT_SPEED_SLOPE` (1), `BALL_HANDLER_SPEED_MULTIPLIER` (0.95). |
 
+**Player effective speed**
+
+1. **Base (before global game-speed scale):** `400 + AG` px/s (`agToSpeedPxPerSec`). If the sprite is the current ball handler (see below), multiply by **0.95**. Missing AG falls back to **50** (`DEFAULT_AG_WHEN_MISSING`).
+2. **Global scale:** multiply by `getGameSpeedPxPerSec() / 450`. `getGameSpeedPxPerSec()` reads `window.__GAME_SPEED` when set; otherwise **450** (Normal). The divisor **450** is the reference preset so “Normal” keeps AG 50 ≈ **450** px/s before BH penalty.
+3. **Duration:** `duration = (distance / effectiveSpeed) * 1000` ms, **minimum 50** ms (`MIN_DURATION_MS`).
+
+**Ball-handler detection for movement speed**
+
+- `playerMovementDuration.js` resolves BH via `BallControllerAdapter.getCurrentOwner(scene)` vs the sprite’s `playerId`, unless callers pass `opts.isBallHandler` explicitly.
+
+**Wrappers and call sites**
+
+- **`getPlayerDuration(...)`** and **`getPlayerDurationUncapped(...)`** (`turnAnimation.js`) both delegate to **`getPlayerMovementDurationMs()`** (same math today; use the exported name that matches the callsite intent).
+- **`tweenPlayerTo()`** (`ballTween.js`): if **`duration` is omitted**, it uses **`getPlayerMovementDurationMs`** for that player sprite so tweens do not default to a fixed **300** ms.
+- **`fastBreak.js`** and other flows that already import **`getPlayerDuration`** from `turnAnimation.js` use the same universal duration path for player movement.
+- **Ball** movement uses **`getBallDuration()`** / **`getBallSpeed()`** in `ballTween.js` (ball px/s from `window.__GAME_SPEED`, still distance-based, with its own min/max clamping)—separate from the AG-based player pipeline.
+
+#### Core Functions (quick reference)
+
+- **`getPlayerDuration(sprite, targetX, targetY, isTransition = false, opts)`** (`turnAnimation.js`)
+  - Delegates to **`getPlayerMovementDurationMs()`** in `playerMovementDuration.js`.
+- **`tweenPlayerTo()`** (`ballTween.js`): default **`duration`** → **`getPlayerMovementDurationMs`** when not provided.
 - **`getBallDuration(ballSprite, targetX, targetY)`** (`ballTween.js`)
-  - Calculates ball movement duration based on distance from current position to target
-  - Uses `getBallSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
-  - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
-  - Default speed: 450 pixels/second (Normal preset)
-  - Clamped between 50ms (minimum) and 1000ms (maximum)
+  - Distance ÷ **`getBallSpeed()`** (uses `window.__GAME_SPEED`), clamped between **50** ms and **1000** ms.
 
-#### Game Speed Integration
+#### Game speed integration
 
-**Speed Presets** (`gameSpeedManager.js`):
-- **Slow**: 350 pixels/second
-- **Normal**: 450 pixels/second (default)
-- **Fast**: 550 pixels/second
+**Speed presets** (`gameSpeedManager.js` + `court.html` speed dropdown): **Normal 450**, **Fast 550**, **Super Fast 1000** px/s (`window.__GAME_SPEED`).
 
-**How It Works**:
-1. User selects speed via UI buttons (Slow/Normal/Fast)
-2. `gameSpeedManager.setGameSpeed()` updates `window.__GAME_SPEED`
-3. `getPlayerSpeed()` and `getBallSpeed()` check `window.__GAME_SPEED` before falling back to defaults
-4. All duration calculations automatically use the current speed setting
+**How it works**
 
-#### Where It's Used
+1. User selects a preset; `setGameSpeed()` writes **`window.__GAME_SPEED`**.
+2. **Players:** `resolveMovementSpeedPxPerSec` combines AG + BH rule, then scales by `getGameSpeedPxPerSec() / 450`.
+3. **Ball:** `getBallSpeed()` reads `window.__GAME_SPEED` for pass / ball tweens that use `getBallDuration`.
 
-**Player Animations**:
+#### Where it's used
+
+**Player animations**
+
 - ✅ HCO turn animations (`ShotAnimationSystem.animatePlayerMovement()`)
 - ✅ Transition animations (IP→HCO, DREB→HCO)
 - ✅ Inbound pass setup animations
 - ✅ Opening tip player movements
 - ✅ Free throw player movements
-- ✅ Fast break player movements
+- ✅ Fast break player movements (via `getPlayerDuration` / shared duration helpers)
 
-**Ball Animations**:
+**Ball animations**
+
 - ✅ Pass animations (`passDetection.js`)
 - ✅ Opening tip ball movements
-- ✅ All ball tweens via `getBallDuration()`
+- ✅ Ball tweens via `getBallDuration()` / explicit durations where passes supply distance-based speed
 
 #### Benefits
 
-- ✅ **Consistent Speeds**: All animations use the same distance-based calculation
-- ✅ **Game Speed Support**: Slow/Normal/Fast buttons work across all animations
-- ✅ **Smooth Transitions**: Distance-based calculation ensures smooth movement regardless of timestamp gaps
-- ✅ **No More "Stuck in Mud"**: Replaced slow timestamp-based calculations with responsive distance-based ones
-- ✅ **Unified System**: Single source of truth for duration calculations
+- ✅ **Consistent speeds**: One AG + game-speed story for player movement duration
+- ✅ **Preset-aligned scaling**: Normal keeps 450 as the reference px/s for the global multiplier
+- ✅ **Smooth motion**: Distance-based duration avoids timestamp-multiplier “stuck in mud” behavior
+- ✅ **No silent 300 ms player tweens**: `tweenPlayerTo` defaults through `getPlayerMovementDurationMs` when duration is omitted
 
-#### Migration History
+#### Migration history
 
-**Before (Bug 3 - Fixed January 2025)**:
+**Before (Bug 3 — fixed January 2025)**
+
 - `ShotAnimationSystem` used timestamp-based calculation: `(nextStep.timestamp - step.timestamp) * 3`
 - Hardcoded speeds in `passDetection.js` and `openingTip.js`
-- Game speed buttons had no effect
+- Game speed had little or no effect on many paths
 - Inconsistent speeds between HCO and transitions
 
-**After (Fixed January 2025)**:
-- All animations use `getPlayerDuration()` or `getBallDuration()`
-- Game speed settings respected everywhere
-- Consistent speeds across all animation types
+**After**
 
-**See:**
-- `docs/PHASE_2.5_BUG_LIST.md` - Bug 3 fix details
-- `docs/To Do/animation_speed_edge_cases.md` - Remaining edge cases
+- Player movement duration goes through **`getPlayerMovementDurationMs`** / **`getPlayerDuration`**
+- Ball movement uses **`getBallDuration()`** where applicable
+- **`window.__GAME_SPEED`** drives the global scale for both pipelines
+
+**See also**
+
+- `docs/To Do/AG_Implementation.md` — AG ↔ movement mapping
+- `docs/PHASE_2.5_BUG_LIST.md` — Bug 3 fix context
+- `docs/To Do/animation_speed_edge_cases.md` — remaining edge cases
 
 ---
 

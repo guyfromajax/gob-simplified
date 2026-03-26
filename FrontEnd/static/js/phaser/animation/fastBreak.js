@@ -8,6 +8,7 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
 import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
+import { pauseTweensOfPlayerSprites } from "../utils/playerSpriteTweenPause.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import {
@@ -311,6 +312,8 @@ async function animateRimRunnerOutletDeniedBeat(
 
   const defenseTeam = passerSprite.team === "home" ? "away" : "home";
   const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  // Freeze ongoing burst tweens (RR, other_players, etc.) during callout + hold — same universal px/s, no motion on screen.
+  pauseTweensOfPlayerSprites(scene, playerSprites);
   if (defSprite) {
     const stopperInfo = scene.playerInfo?.[defId];
     const stopperTeamId = defSprite.team_id;
@@ -857,6 +860,8 @@ export async function runFastBreakSequence({
 /**
  * Rim Runner: simultaneous setup tweens (RR sprint, outlet contest defender, role players),
  * then outlet pass only after the outlet receiver's tween completes (others may still be moving).
+ *
+ * Each burst target uses one tween at universal speed (`getPlayerDuration` = distance ÷ AG×game-speed px/s).
  */
 async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height) {
   const phase = turnData.roles?.rim_runner_burst_phase;
