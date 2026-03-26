@@ -1,8 +1,45 @@
 # Animation System Overview
 
-> **Last Updated:** January 2025
+> **Last Updated:** March 2026
 
 This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
+
+---
+
+## Canonical Current-State (March 2026)
+
+> If any legacy section below conflicts with this section, this section is the source of truth.
+
+### Runtime Routing Authority
+
+- `AnimationEngine.determineHandler()` is the canonical entry router.
+- `fast_break === true` (or `"true"`) routes to `handleFastBreak()` -> `runFastBreakSequence()`.
+- Non-fast-break animated turns route through `handleDefault()` -> `playTurnAnimation()`.
+- `result_type`-specific handlers (`FOUL`, `TURNOVER`, `TIMEOUT`, `OPENING_TIP`, etc.) are registered in `AnimationEngine.initializeDefaultHandlers()`.
+
+### Universal Movement and Speed Authority
+
+- **Player locomotion duration**: `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` (`getPlayerMovementDurationMs`) is the shared duration authority.
+- **Speed model**: AG-based base speed from `playerMovementSpeed.js` (`400 + AG`, ball-handler multiplier `0.95`), then scaled by game-speed preset via `window.__GAME_SPEED / 450`.
+- **Default player tween behavior**: `ballTween.tweenPlayerTo()` uses `getPlayerMovementDurationMs` when duration is omitted.
+- **Game speed presets in production UI**: `Normal=450`, `Fast=550`, `Super Fast=1000` (`gameSpeedManager.js` + `court.html`).
+
+### Fast Break Motion Authority (Current Hybrid Model)
+
+- Fast break flow is orchestrated in `fastBreak.js` (burst, outlet, shot/stop resolution).
+- For FB shot-phase helper movement (get-back/rebounder/contest support), client now **prefers backend animation endpoints** via `getAnimationEndGridForPlayer(turnData, playerId)` in `utils/animationEndFromTurn.js`.
+- When `turn.animations` endpoint data is missing for a role, fallback logic in `fastBreak.js` is still used (deterministic/random target generation depending on role).
+- Rim Runner outlet-denied beat freezes active player tweens during the denial callout via `utils/playerSpriteTweenPause.js`.
+
+### Announcement Freeze Policy (Current)
+
+- There is **no global automatic “pause all player movement for every announcement” rule** inside `announcements.js`.
+- Freeze behavior is currently **path-specific** (example: RR outlet-denied beat) and separate from timeout-level `scene.tweens.pauseAll()` behavior.
+
+### Known Non-Universal Areas (Important)
+
+- Some animation paths still use bespoke orchestration and role-specific fallback positioning (especially in fast break branches).
+- Therefore, universal speed math is shared, but full universal **placement/orchestration authority** is still partially hybrid in production.
 
 ---
 
@@ -115,8 +152,10 @@ Every turn result from the backend contains data organized into **three distinct
 - `animations[]` - Array of per-player movement tracks
   - Each animation contains:
     - `playerId` - Player identifier
+    - `start` / `end` - Start and destination grid coords (HOME orientation)
     - `movement[]` - Array of movement steps
-      - Each step: `coords` (x, y), `action`, `timestamp`, `has_ball`
+      - Each step uses: `coords` (x, y), `action`, `timestamp`
+    - `duration` and `hasBallAtStep[]` may be present by builder path
   - May be empty array `[]` if no animation (e.g., some free throws, turnovers)
 
 **Conditional:**
@@ -174,6 +213,8 @@ Every turn result from the backend contains data organized into **three distinct
 
 ## SS&S Core Systems (December 2024)
 
+> **Legacy snapshot note:** This section captures December 2024 SS&S rollout intent and migration rationale. For current production behavior and conflict resolution, use **Canonical Current-State (March 2026)** above.
+
 ### Possession Management System ✅ **SS&S**
 
 **Single Source of Truth:** Each turn's `offense_team_id` field
@@ -199,6 +240,8 @@ Every turn result from the backend contains data organized into **three distinct
 ---
 
 ### Announcement System ✅ **SS&S**
+
+> **Legacy scope note:** This subsection documents timing taxonomy (`start` vs `end`) and idempotency patterns. It does **not** imply global player tween freeze for every announcement. Current freeze behavior is path-specific (see Canonical section).
 
 **Timing-Based Separation:**
 
@@ -2681,6 +2724,8 @@ Whenever a turn updates the scoreboard, the debug logger records the delta in `A
 ---
 
 ### Player Animation System
+
+> **Historical + current overlap note:** This section mixes still-valid movement architecture with migration-era cleanup notes. If any implementation detail conflicts with current files, prioritize **Canonical Current-State (March 2026)** and direct code references.
 
 **Status:** Already using WIP_GOB approach
 

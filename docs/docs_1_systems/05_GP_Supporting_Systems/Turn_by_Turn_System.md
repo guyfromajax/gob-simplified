@@ -1,5 +1,20 @@
 # Turn-by-Turn System ✅ **COMPLETE** (February 2025)
 
+## Canonical Turn Types
+
+Use this list as the canonical turn-type set across backend/frontend docs.
+
+- `HCO`
+- `FCP`
+- `HCT`
+- `FAST_BREAK`
+- `OREB`
+- `OPENING_TIP`
+- `BASELINE_INBOUND` (**BIP**)
+- `SIDE_INBOUND` (**SIP**)
+- `FREE_THROW`
+- `TIMEOUT`
+
 ## Base Constants
 
 **Purpose:** The turn-by-turn system processes gameplay one turn at a time, allowing for real-time animation and user interaction. Each turn is fetched from the backend, animated, and then the next turn is requested.
