@@ -171,6 +171,27 @@ Validate whether this plan can deliver a truly universal animation system (not s
 
 ## 8) Immediate Next Work Session Inputs
 
+### Decision Lock (Approved)
+
+1. **Fallback Threshold Policy (Layer A):** **Controlled**
+   - Fallbacks are allowed only up to defined per-turn thresholds; beyond threshold, treat as contract invalid in dev/CI gates.
+
+2. **Announcement Freeze Policy (Layer C):** **Class-based**
+   - Freeze applies by announcement class (not all announcements globally, and not ad-hoc per path).
+
+3. **Guardrail Enforcement (Phase 3):** **Runtime + Static + Review**
+   - Runtime warnings for bypassed movement authority.
+   - Static lint/checks for disallowed direct tween patterns outside allowlist.
+   - PR checklist requiring movement-authority and duration-authority compliance.
+
+4. **FastBreak -> HCO Handoff Contract:** **Hybrid temporary (C)**
+   - Frontend smoothing allowed short-term.
+   - Backend handoff contract is required by milestone date (no permanent FE-only patch).
+
+5. **Phase 3 Roadmap Protection:** **Release gate**
+   - Phase 3 is mandatory for completion; no “done” status without active/passing guardrails.
+
+
 Before additional code changes, decide:
 
 1. Which turn types must require backend endpoint authority now (starting set).
@@ -377,3 +398,197 @@ This is a migration state, not a hard engine constraint.
 - **Universal core:** feasible and recommended.
 - **Siloed logic:** should be reduced to explicit, documented invariants only.
 - **Target model:** shared movement engine + turn-type role semantics (not turn-type animation engines).
+
+
+---
+
+## 11) Fast Break Phase 1 Contract Checklist
+
+Use this as the first implementation gate before additional Fast Break behavior tuning.
+
+### A) Required Movement Authority Fields (by branch)
+
+For each role listed below, the turn must provide either:
+- `turn.animations[playerId].end` (preferred), or
+- explicit role coordinates field(s) defined by contract.
+
+If neither exists, the move is fallback-driven and must be counted.
+
+#### Branch: RR hold-up / no lane pass (`rim_runner_hco_settle`, `rim_runner_no_lane_pass`)
+
+Required roles:
+- Ball handler (outlet receiver / passer role resolution)
+- Rim runner
+- Get-back defenders
+- Primary defender / stopper (when present)
+
+Required authority data:
+- BH settle endpoint
+- Non-BH drift/settle endpoints (or explicit deterministic policy contract)
+
+#### Branch: RR outlet denied (`rim_runner_outlet_failed`)
+
+Required roles:
+- Outlet passer
+- Outlet receiver
+- Outlet defender
+- Other moving players in denied beat
+
+Required authority data:
+- Outlet defender destination
+- Receiver cut destination
+- Other-player post-denial movement destinations (or deterministic contract)
+
+#### Branch: RR lane pass -> shot (`MAKE`/`MISS`/`BLOCK`)
+
+Required roles:
+- Shooter
+- Defender(s): primary + stopper/trail if present
+- Get-back defenders
+- Rebounders
+
+Required authority data:
+- `shot_spot`
+- `defender_spot` (or role-level endpoints in `animations`)
+- Get-back/rebounder endpoints
+
+#### Branch: RR interception (`STEAL`) / bat OOB (`DEAD BALL`)
+
+Required roles:
+- Victim / stealer / rim runner / involved defenders
+- Any helper movers participating in transition/handoff
+
+Required authority data:
+- Interception lane/touch endpoints
+- OOB interaction endpoints and reset destinations
+
+#### Branch: Generic fast break shot / stop
+
+Required roles:
+- Ball handler
+- Primary defender
+- Supporting movers (get-back/rebounders)
+
+Required authority data:
+- Shot/stop endpoints for all participating movers
+
+---
+
+### B) Fallback Thresholds (Decision Lock: Controlled)
+
+Define and enforce per-turn thresholds in dev/CI:
+
+- **Phase 1 (baseline + migration):**
+  - Fast Break total fallback rate target: `< 15%`
+  - Hard fail threshold: `>= 25%`
+- **Phase 2+ (steady-state target):**
+  - Fast Break total fallback rate target: `< 5%`
+  - Hard fail threshold: `>= 10%`
+- Clamp-as-destination events target: `0` for non-invariant branches
+- FastBreak -> HCO snap events target: `0`
+
+Fallback event definition (count as fallback):
+- Player destination generated from FE random/heuristic policy because required authority endpoint was missing.
+
+---
+
+### C) Telemetry Requirements (Phase 1 visibility)
+
+Log per Fast Break turn:
+- branch kind
+- required roles present/missing
+- fallback count and player IDs
+- clamp destination count and player IDs
+- transition snap flag
+
+Suggested event keys:
+- `fb_contract_missing_endpoint`
+- `fb_fallback_used`
+- `fb_clamp_destination`
+- `fb_transition_snap`
+
+#### Telemetry Payload Schema (v1)
+
+Use a shared payload envelope for all four events, then event-specific fields.
+
+**Shared envelope fields (all events):**
+- `event`: string (one of the four keys)
+- `turnIndex`: number
+- `turnId`: string | number | null
+- `resultType`: string
+- `branchKind`: string (e.g., `rr_hold_up`, `rr_outlet_denied`, `rr_lane_shot`, `rr_interception`, `rr_bat_oob`, `generic_fb_shot_stop`)
+- `offenseTeamId`: string | number | null
+- `gameClock`: string | null (e.g., `"3:42"`)
+- `quarter`: number | null
+- `timestampMs`: number (Date.now)
+
+**1) `fb_contract_missing_endpoint`**
+- `playerId`: string | number
+- `role`: string (e.g., `ball_handler`, `rim_runner`, `getback_defender`, `stopper`, `rebounder`, `outlet_receiver`, `outlet_defender`)
+- `requiredEndpointType`: string (`animations_end` | `role_coord`)
+- `availableAuthority`: object
+  - `hasAnimations`: boolean
+  - `hasPlayerAnimation`: boolean
+  - `hasAnimEnd`: boolean
+  - `hasRoleCoord`: boolean
+- `reason`: string
+
+**2) `fb_fallback_used`**
+- `playerId`: string | number
+- `role`: string
+- `fallbackPolicy`: string (e.g., `random_band`, `heuristic_lane`, `ag_horizontal_drift`)
+- `missingAuthority`: array of strings
+- `target`: `{ x: number, y: number }`
+- `source`: `{ x: number, y: number }`
+
+**3) `fb_clamp_destination`**
+- `playerId`: string | number
+- `role`: string
+- `sourceX`: number
+- `proposedEndX`: number
+- `clampedEndX`: number
+- `clampEdge`: string (`min_x` | `max_x`)
+- `phaseDurationMs`: number | null
+- `speedPxPerSec`: number | null
+
+**4) `fb_transition_snap`**
+- `playerId`: string | number
+- `role`: string
+- `fromTurnType`: string (`FAST_BREAK`)
+- `toTurnType`: string (usually `HCO`)
+- `preTransition`: `{ x: number, y: number }`
+- `postTransition`: `{ x: number, y: number }`
+- `deltaPx`: number
+- `deltaGridApprox`: `{ x: number, y: number }`
+
+**Aggregation counters per turn (for threshold checks):**
+- `fbFallbackCount`
+- `fbRequiredRoleCount`
+- `fbFallbackRate` = `fbFallbackCount / fbRequiredRoleCount`
+- `fbClampCount`
+- `fbSnapCount`
+
+---
+
+### D) Baseline Audit Capture Table (first pass)
+
+Populate this table for sampled turns before Phase 2 tuning:
+
+| Branch | Sample Count | Endpoint Completeness % | Fallback Rate % | Clamp Events | Snap Events | Notes |
+|---|---:|---:|---:|---:|---:|---|
+| RR hold-up / no pass |  |  |  |  |  |  |
+| RR outlet denied |  |  |  |  |  |  |
+| RR lane pass -> shot |  |  |  |  |  |  |
+| RR interception |  |  |  |  |  |  |
+| RR bat OOB |  |  |  |  |  |  |
+| Generic FB shot/stop |  |  |  |  |  |  |
+
+---
+
+### E) Exit Criteria for Phase 1 (Fast Break)
+
+Phase 1 is complete only when:
+1. Required authority fields are defined for every Fast Break branch.
+2. Telemetry is emitting for missing endpoints/fallbacks/clamps/snaps.
+3. Baseline table is populated with real sample data.
+4. Controlled fallback thresholds are explicitly filled and approved.
