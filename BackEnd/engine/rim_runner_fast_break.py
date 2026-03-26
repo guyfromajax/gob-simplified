@@ -94,6 +94,35 @@ def _y_toward_25(py: float, max_step: int = 6) -> float:
     return float(max(1, min(49, int(round(py + step)))))
 
 
+def _y_toward_rr_clamped(py: float, rr_y: float, max_step: int = 6) -> float:
+    """Move y up to ``max_step`` toward rim runner y without crossing past ``rr_y``."""
+    dy = float(rr_y) - float(py)
+    if abs(dy) < 1e-6:
+        return float(py)
+    direction = 1.0 if dy > 0 else -1.0
+    step = min(float(max_step), abs(dy))
+    ny = py + direction * step
+    if direction > 0:
+        ny = min(ny, float(rr_y))
+    else:
+        ny = max(ny, float(rr_y))
+    return float(max(1, min(49, round(ny))))
+
+
+def _defender_x_toward_basket(
+    px: float, x_dir: int, steps: int, basket_x: float
+) -> float:
+    """Move defender ``steps`` grid spots toward the attacking basket; do not cross ``basket_x``."""
+    raw = float(px) + float(x_dir) * float(steps)
+    if x_dir > 0:
+        capped = min(raw, float(basket_x))
+    elif x_dir < 0:
+        capped = max(raw, float(basket_x))
+    else:
+        capped = raw
+    return float(max(4, min(97, round(capped))))
+
+
 def resolve_rim_runner_player(
     off_lineup: Dict[str, Any],
     game_state: dict,
@@ -340,6 +369,14 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     od_id_s = str(od_id) if od_id is not None else None
     rr_id_s = str(rr_id) if rr_id is not None else ""
 
+    fb_eff = int(off_team.team_attributes.get("fb_efficiency", 0) or 0)
+    fb_opp = int(def_team.team_attributes.get("fb_opp_modifier", 0) or 0)
+    fb_eff = max(-10, min(10, fb_eff))
+    fb_opp = max(-10, min(10, fb_opp))
+
+    basket_x = _basket_x_for_offense(is_away_offense)
+    getback_set = {str(x) for x in (most_recent or {}).get("offense_getback") or []}
+
     other_moves: List[Dict[str, Any]] = []
     for pl in list(off_lineup.values()) + list(def_lineup.values()):
         if not pl:
@@ -349,10 +386,23 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             continue
         px = _player_x(pl)
         py = _player_y(pl)
-        nx = max(4, min(97, int(round(px + x_dir * random.randint(1, 4)))))
         if pid in off_ids:
+            nx = max(4, min(97, int(round(px + x_dir * random.randint(1, 4)))))
             ny = float(py)
+        elif pid in getback_set:
+            nx = _defender_x_toward_basket(px, x_dir, 15, basket_x)
+            ny = _y_toward_rr_clamped(py, float(rr_new_y), max_step=6)
         else:
+            attrs = getattr(pl, "attributes", {}) or {}
+            iq = float(attrs.get("IQ", 0) or 0)
+            ag = float(attrs.get("AG", 0) or 0)
+            roll_adj = random.randint(1, 100) - fb_opp
+            check = 0.5 * iq + 0.5 * ag
+            if check > roll_adj:
+                dx = random.randint(15, 20)
+            else:
+                dx = random.randint(8, 12)
+            nx = _defender_x_toward_basket(px, x_dir, dx, basket_x)
             ny = float(_y_toward_25(py))
         other_moves.append(
             {"player_id": getattr(pl, "player_id", None), "to_x": float(nx), "to_y": float(ny)}
@@ -403,11 +453,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         outlet_defense_score = outlet_def_base * random.randint(1, 6)
     else:
         outlet_defense_score = 0.0
-
-    fb_eff = int(off_team.team_attributes.get("fb_efficiency", 0) or 0)
-    fb_opp = int(def_team.team_attributes.get("fb_opp_modifier", 0) or 0)
-    fb_eff = max(-10, min(10, fb_eff))
-    fb_opp = max(-10, min(10, fb_opp))
 
     outlet_ok = (
         (1.5 * outlet_offense_score) + (3 * fb_eff)
