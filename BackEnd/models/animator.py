@@ -162,6 +162,9 @@ class Animator:
             if getback_player_ids
             else set()
         )
+        # Shared player pools used by contract guardrails and rebounder routing.
+        all_offensive_players = list(offense_team.lineup.values())
+        all_defensive_players = list(defense_team.lineup.values())
 
         # Ball handler path
         # ✅ NEW LOGIC: Calculate ball handler's final position (used for both defensive stop and shot)
@@ -324,10 +327,6 @@ class Animator:
         # Get outlet passer ID - they move forward 7 x-coords toward basket
         outlet_passer_id = fb_roles.get("outlet_passer")
         outlet_passer_id_set = {outlet_passer_id} if outlet_passer_id else set()
-        
-        # Get all players from both teams
-        all_offensive_players = list(offense_team.lineup.values())
-        all_defensive_players = list(defense_team.lineup.values())
         
         # Get release player IDs (they're already animated as ball handler)
         release_player_ids = set()
