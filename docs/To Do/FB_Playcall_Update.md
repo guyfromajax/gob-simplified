@@ -12,6 +12,8 @@ This document describes how to resolve **which DREB fast-break play** (Covert Re
 | `BackEnd/engine/rim_runner_fast_break.py` | Still reads `last_release_player` in the “else” outlet branch (“Covert release receiver or fallback PG”). |
 | `BackEnd/engine/fast_break_trigger.py` | `DEFENSE_RELEASE_CHANCES`; legacy `can_trigger_from_dreb` ties `can_trigger` to non-empty release list. |
 
+**Animation SS&S (fast-break shot attempt)** — Implemented: the Phaser FB path prefers **`turn.animations[].end`** (HOME grid) per `playerId` so client tweens match the sim animator (`BackEnd/models/animator.py`). Helper: `FrontEnd/static/js/phaser/utils/animationEndFromTurn.js` (`getAnimationEndGridForPlayer`). Used in `fastBreak.js` for get-back defenders, rebounders (when not skipped), and contest defenders when `defender_spot` is absent / alongside stopper path — **fallback** remains the previous random bands / `fastBreakShotDefenderGridVsShooter` if `animations` is missing or incomplete.
+
 **Problem summary**
 
 1. **Play key is chosen one turn late** vs **release player is chosen on the shot** → Rim Runner inherits Covert-shaped release state.  

@@ -9,6 +9,7 @@ import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
 import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
 import { pauseTweensOfPlayerSprites } from "../utils/playerSpriteTweenPause.js";
+import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import {
@@ -1336,7 +1337,9 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   let stopperPromise = null;
   
   if (stopperSprite) {
-    const stopperSpot = fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
+    const stopperSpot =
+      getAnimationEndGridForPlayer(turnData, stopperId) ??
+      fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
     const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
     const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
     stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
@@ -1367,7 +1370,9 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49),
       };
     } else {
-      defenderSpot = fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 1);
+      defenderSpot =
+        getAnimationEndGridForPlayer(turnData, defenderId) ??
+        fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 1);
     }
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
@@ -1668,7 +1673,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49)
       };
     } else {
-      defenderSpot = fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
+      defenderSpot =
+        getAnimationEndGridForPlayer(turnData, defenderId) ??
+        fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
     }
 
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
@@ -2439,8 +2446,9 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 
 /**
  * Animate rebounders (players who stayed near rim for shot attempt) to their target positions
- * - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
- * - Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
+ * - Prefer `turn.animations[].end` per player when present (SS&S with sim).
+ * - Defensive Stop fallback: x=40-60, y=starting_y ± 6 (clamped 1-49)
+ * - Shot Attempt fallback: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
  * 
  * @param {Phaser.Scene} scene - Phaser scene
  * @param {Object} playerSprites - Dictionary of player sprites
@@ -2496,8 +2504,10 @@ function animateRebounders(
     const startingY = startingGrid.y;
     
     let targetSpot;
-    
-    if (isDefensiveStop) {
+    const animEnd = getAnimationEndGridForPlayer(turnData, id);
+    if (animEnd) {
+      targetSpot = animEnd;
+    } else if (isDefensiveStop) {
       // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
       targetSpot = {
         x: Phaser.Math.Between(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
@@ -2508,13 +2518,17 @@ function animateRebounders(
       // Home basket (x=91): 5-20 spots less = 71-86
       // Away basket (x=9): 5-20 spots more = 14-29
       const distanceFromBasket = Phaser.Math.Between(5, 20);
-      const targetX = isHomeOffense 
-        ? basket.x - distanceFromBasket  // Home: move left (toward center court)
-        : basket.x + distanceFromBasket;  // Away: move right (toward center court)
-      
+      const targetX = isHomeOffense
+        ? basket.x - distanceFromBasket // Home: move left (toward center court)
+        : basket.x + distanceFromBasket; // Away: move right (toward center court)
+
       targetSpot = {
         x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
-        y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE), 1, 49)
+        y: Phaser.Math.Clamp(
+          basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE),
+          1,
+          49
+        ),
       };
     }
     
@@ -2583,7 +2597,7 @@ function resolveFastBreakOffenseIsHome(playerSprites, ballHandlerId, turnData, s
 
 /**
  * Helper: Move all non-involved players to their positions
- * - Get-back players: retreat band toward the **attacking** rim (same as shot animation), Y: 15–35
+ * - Get-back players: prefer `turn.animations[].end` (SS&S with sim); else retreat band toward rim, Y: 15–35
  * - Outlet passer & other trail players: same targets/tweens as animateRebounders (incl. early stop)
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
  * - Rebounders stop early when defensive stop is made (ball handler and stopper reach their spots)
@@ -2641,11 +2655,12 @@ async function moveOtherPlayersToStandardPositions(
       const { minX, maxX } = getGetBackRetreatXRange(isHomeOffense);
       const lo = Math.min(minX, maxX);
       const hi = Math.max(minX, maxX);
-      const targetSpot = {
+      const animEnd = getAnimationEndGridForPlayer(turnData, id);
+      const targetSpot = animEnd ?? {
         x: Phaser.Math.Between(lo, hi),
-        y: Phaser.Math.Between(15, 35)
+        y: Phaser.Math.Between(15, 35),
       };
-      
+
       const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
       
