@@ -24,7 +24,7 @@ _startup_error = None
 try:
     from fastapi import Depends, FastAPI, HTTPException, Response
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, HTMLResponse
+    from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
     from BackEnd.constants import POSITION_LIST
@@ -248,6 +248,59 @@ try:
     # In production, Netlify serves static files
     environment = os.getenv("ENVIRONMENT", "development")
     if environment == "development":
+        @app.middleware("http")
+        async def local_static_html_redirect(request: Request, call_next):
+            """
+            Local dev convenience: frontend uses root static paths
+            (e.g. /set-lineup.html, /mode-select.css, /js/..., /images/...),
+            while FastAPI serves static files at /static/*.
+            Redirect those requests to /static/* in development only.
+            """
+            path = request.url.path or ""
+            method = (request.method or "").upper()
+            if method not in {"GET", "HEAD"}:
+                return await call_next(request)
+            if path.startswith("/static/") or path.startswith("/api/") or path.startswith("/health"):
+                return await call_next(request)
+
+            static_dirs = (
+                "/js/",
+                "/images/",
+                "/sounds/",
+                "/team-roster/",
+                "/styles/",
+            )
+            static_exts = (
+                ".html",
+                ".css",
+                ".js",
+                ".mjs",
+                ".map",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".webp",
+                ".svg",
+                ".ico",
+                ".wav",
+                ".mp3",
+                ".json",
+                ".woff",
+                ".woff2",
+                ".ttf",
+            )
+            if (
+                path.startswith(static_dirs)
+                or path.endswith(static_exts)
+            ):
+                query = request.url.query
+                target = f"/static{path}"
+                if query:
+                    target = f"{target}?{query}"
+                return RedirectResponse(url=target, status_code=307)
+            return await call_next(request)
+
         app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
         print("✅ Static files mounted (development mode)")
     
@@ -4910,9 +4963,22 @@ try:
             _out = [None]
             def _wrapped():
                 _out[0] = get_team_roster(team_identifier, team_id, tournament_id, franchise_id, response, profile=False)
-            profile_summary = run_profiled(_wrapped, top_n=60)
-            result = _out[0]
-            result["profile_summary"] = profile_summary
+            try:
+                profile_summary = run_profiled(_wrapped, top_n=60)
+                result = _out[0]
+                result["profile_summary"] = profile_summary
+            except ValueError as exc:
+                # Local/dev safety: if another profiler is active, serve roster normally
+                # instead of failing the request.
+                result = get_team_roster(
+                    team_identifier,
+                    team_id,
+                    tournament_id,
+                    franchise_id,
+                    response,
+                    profile=False,
+                )
+                result["profile_error"] = str(exc)
             return result
         endpoint_start = time.time()
         # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data

@@ -280,6 +280,24 @@ function finalizeFbTelemetry(scene) {
   scene.__fbTelemetry = null;
 }
 
+async function awaitWithTimeout(promise, timeoutMs, label) {
+  const ms = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 2500;
+  let timer = null;
+  try {
+    const timeoutPromise = new Promise((resolve) => {
+      timer = setTimeout(() => resolve("__timeout__"), ms);
+    });
+    const result = await Promise.race([promise, timeoutPromise]);
+    if (result === "__timeout__") {
+      console.warn(`[FB animation] timeout while awaiting ${label}`, { timeoutMs: ms });
+      return false;
+    }
+    return true;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * Rim Runner lane pass (BH / outlet receiver → rim runner), spec ~6 grid toward basket from RR post-burst.
  * Runs after burst/outlet when the sim attempted the lane pass (not hold-up, not outlet denied).
@@ -414,6 +432,9 @@ function rimRunnerAgHorizontalDriftPromises(
 ) {
   const skip = excludeIds instanceof Set ? excludeIds : new Set();
   const promises = [];
+  const edgeInsetGrid = Math.max(0, Number(animationConfig.fastBreak?.agDriftEdgeInsetGrid ?? 2));
+  const minDriftX = 4 + edgeInsetGrid;
+  const maxDriftX = 97 - edgeInsetGrid;
   for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
     if (!sprite) continue;
     const pid = sid(pidRaw);
@@ -423,10 +444,19 @@ function rimRunnerAgHorizontalDriftPromises(
     }
     const g = rimRunnerSpriteGrid(sprite, width, height);
     const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
-    const proposedEndX = g.x + stride * towardBasket;
-    const endX = Phaser.Math.Clamp(proposedEndX, 4, 97);
+    const direction = towardBasket >= 0 ? 1 : -1;
+    const startX = Phaser.Math.Clamp(g.x, 4, 97);
+    const strideAbs = Math.abs(stride);
+    const boundedStartX = Phaser.Math.Clamp(startX, minDriftX, maxDriftX);
+    const maxStrideToward =
+      direction > 0
+        ? Math.max(0, maxDriftX - boundedStartX)
+        : Math.max(0, boundedStartX - minDriftX);
+    const usedStride = Math.min(strideAbs, maxStrideToward) * direction;
+    const proposedEndX = startX + stride * direction;
+    const endX = Phaser.Math.Clamp(boundedStartX + usedStride, 4, 97);
     const endY = Phaser.Math.Clamp(g.y, 1, 49);
-    if (Math.abs(endX - proposedEndX) > 0.001) {
+    if (Math.abs(strideAbs - Math.abs(usedStride)) > 0.001) {
       incrementFbCounter(scene, "fbClampCount", 1);
       const speedPxPerSec = phaseDurationMs > 0
         ? ((Math.abs(stride) * width) / 100) / (phaseDurationMs / 1000)
@@ -434,10 +464,11 @@ function rimRunnerAgHorizontalDriftPromises(
       emitFbTelemetry(scene, "fb_clamp_destination", {
         playerId: pid,
         role: "ag_drift",
-        sourceX: g.x,
+        sourceX: startX,
         proposedEndX,
         clampedEndX: endX,
-        clampEdge: proposedEndX < 4 ? "min_x" : "max_x",
+        clampEdge: direction > 0 ? "max_x" : "min_x",
+        edgeInsetGrid,
         phaseDurationMs,
         speedPxPerSec,
       });
@@ -656,7 +687,11 @@ async function animateRimRunnerOutletDeniedBeat(
     easing: "Linear",
   });
 
-  await Promise.all([recvPromise, ...driftPromises]);
+  await awaitWithTimeout(
+    Promise.all([recvPromise, ...driftPromises]),
+    phaseDurationMs + 2000,
+    "rim_runner_outlet_denied_drift_phase"
+  );
 
   setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
   for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
@@ -758,7 +793,11 @@ async function animateRimRunnerHoldUpLeadIn(
     easing: "Linear",
   });
 
-  await Promise.all([bhPromise, ...driftPromises]);
+  await awaitWithTimeout(
+    Promise.all([bhPromise, ...driftPromises]),
+    phaseDurationMs + 2000,
+    "rim_runner_hold_up_drift_phase"
+  );
 
   setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
   for (const [pid, sprite] of Object.entries(playerSprites)) {
@@ -1254,7 +1293,11 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     // Outlet denied stops burst tweens on non-outlet actors so horizontal drift can run; those
     // tweens reject on stop — use allSettled so the FB sequence still finishes.
     if (outletDenied) {
-      await Promise.allSettled(secondary);
+      await awaitWithTimeout(
+        Promise.allSettled(secondary),
+        3000,
+        "rim_runner_burst_secondary_settle"
+      );
     } else {
       await Promise.all(secondary);
     }

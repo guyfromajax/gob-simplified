@@ -73,7 +73,7 @@ The Announcement System provides visual feedback for game events using timing-ba
   - Uses `showAndOneAnnouncement()` for two-row announcement with shooter and fouler headshots
   - Both player images display `#jersey lastName` directly beneath the headshot when that data is available
   - Fallback: Single-row announcement if player data missing
-- **"Shooting Foul!"** - Detected when `result === "MISS"` and (`next_play_type === 'FREE_THROW'` or `free_throws_remaining > 0`)
+- **"Shooting Foul!"** - Detected on shot-result turns (`result_type === "MISS"` with shooting-foul context from the shot pipeline)
   - Always displays announcement even if player sprite/info is missing (fallback pattern)
   - Dark yellow text with silver border
 
@@ -95,8 +95,9 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Foul Announcements:**
 - **"Charge!"** - Triggered when `result_type === 'CHARGE'` (offensive foul on drive). Routed via gameAnnouncements.js; AnimationEngine routes CHARGE to handleDefault (skeleton animation, then announcement).
 - **"BLOCKING FOUL!"** - Triggered when `result_type === 'FOUL'`, `foul_team === 'DEFENSE'`, and text contains "blocking foul" (non-shooting defensive foul on drive).
-- **"OFFENSIVE FOUL!"** / **"DEFENSIVE FOUL!"** - Other non-shooting fouls (foul_team OFFENSE or DEFENSE, not blocking).
+- **"OFFENSIVE FOUL!"** / **"DEFENSIVE FOUL!"** - Other FOUL turns (foul_team OFFENSE or DEFENSE, not blocking), including **bonus fouls** that send play to FREE_THROW.
 - Shows fouling player's headshot. Skips if shooting foul (already handled in shot result announcements).
+- **Important distinction:** `result_type === 'FOUL'` that routes to `next_play_type === 'FREE_THROW'` (bonus) is still announced as FOUL. True shooting fouls are announced in shot-result handlers (`MAKE/MISS` paths such as `ballManager.js`, `ShotAnimationSystem.js`, `fastBreak.js`).
 
 **Block Announcements:**
 - **"BLOCK!"** - Announced in `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (when ball has reached block spot), **before** the rebound is announced, so order is always Block → Rebound. Shows blocker's headshot. Routed via `announceGameEvent('BLOCK', ...)` in `gameAnnouncements.js`. Fallback: `finalizeTurnAfterAnimation` announces BLOCK only if `!turn._blockAnnounced`.

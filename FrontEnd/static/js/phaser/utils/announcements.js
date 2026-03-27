@@ -7,6 +7,7 @@
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import gameStore from '../../state/gameStore.js';
 import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
+import { isBonusFreeThrowFoulTurn } from './foulAnnouncementClassifier.js';
 
 let currentAnnouncement = null;
 
@@ -314,53 +315,49 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     }
     
     if (turnData.result_type === 'FOUL') {
-      // ✅ FIX: Skip shooting fouls - they're already announced in ballManager.js
-      // Shooting fouls result in free throws, so check for FREE_THROW next_play_type or free_throws_remaining
-      // This is more reliable than text parsing which can fail
-      const hasFreeThrowsRemaining = (turnData.free_throws_remaining ?? 0) > 0;
-      const nextPlayTypeIsFreeThrow = turnData.next_play_type === 'FREE_THROW';
-      const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
-      
-      if (!isShootingFoul) {
-        // Non-shooting fouls: "Quick Foul!" for situational Force Foul, else "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"
-        const foulTeam = turnData.foul_team || 'OFFENSE'; // Default to offense if not specified
-        const isQuickFoul = !!turnData.quick_foul;
+      // FOUL turns should always announce foul type, including bonus fouls that lead to free throws.
+      // True shooting fouls are emitted as shot result turns (MAKE/MISS) and are announced there.
+      const isBonusFoul = isBonusFreeThrowFoulTurn(turnData);
+      const foulTeam = turnData.foul_team || 'OFFENSE'; // Default to offense if not specified
+      const isQuickFoul = !!turnData.quick_foul;
 
-        // Extract foul player data for headshot display
-        let playerData = null;
-        if (scene && turnData.foul_player_id) {
-          const foulPlayerId = turnData.foul_player_id;
-          const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
-          const foulPlayerTeamId = foulPlayerSprite?.team_id;
-          
-          // Handle both new nested structure (object) and old flat structure (string)
-          const homeTeamField = scene.simData?.home_team;
-          const awayTeamField = scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-
-          playerData = {
-            playerId: foulPlayerId,
-            photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName,
-            secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
-          };
-        }
-
-        if (foulTeam === 'OFFENSE') {
-          // Offensive foul - show in defense team color (they benefited)
-          showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
-        } else {
-          // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
-          const defensiveFoulText = isQuickFoul ? "Quick Foul!" : "DEFENSIVE FOUL!";
-          showAnnouncement(defensiveFoulText, offenseTeam, playerData);
-        }
+      // Extract foul player data for headshot display
+      let playerData = null;
+      if (scene && turnData.foul_player_id) {
+        const foulPlayerId = turnData.foul_player_id;
+        const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+        const foulPlayerTeamId = foulPlayerSprite?.team_id;
         
-        // Trigger visual effect on fouling player
-        if (scene && turnData.foul_player_id) {
-          triggerVisualEffect(scene, turnData.foul_player_id, 'foul');
-        }
+        // Handle both new nested structure (object) and old flat structure (string)
+        const homeTeamField = scene.simData?.home_team;
+        const awayTeamField = scene.simData?.away_team;
+        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+
+        playerData = {
+          playerId: foulPlayerId,
+          photo: foulPlayerSprite?.photo || null,
+          teamName: foulPlayerTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
+        };
+      }
+
+      if (foulTeam === 'OFFENSE') {
+        // Offensive foul - show in defense team color (they benefited)
+        showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
+      } else {
+        // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
+        // Bonus fouls (FOUL -> FREE_THROW) stay in this path and should not be reclassified as shooting fouls.
+        let defensiveFoulText = "DEFENSIVE FOUL!";
+        if (isQuickFoul) defensiveFoulText = "Quick Foul!";
+        if (isBonusFoul && !isQuickFoul) defensiveFoulText = "DEFENSIVE FOUL!";
+        showAnnouncement(defensiveFoulText, offenseTeam, playerData);
+      }
+      
+      // Trigger visual effect on fouling player
+      if (scene && turnData.foul_player_id) {
+        triggerVisualEffect(scene, turnData.foul_player_id, 'foul');
       }
       return;
     }

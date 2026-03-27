@@ -13,6 +13,7 @@ import { updateStrategyBars } from "../utils/strategyBars.js";
 import { updatePlaycallCenter } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { syncSpriteAttributesFromPlayerEnergy } from "../utils/syncPlayerSpriteAttributes.js";
+import { isBonusFreeThrowFoulTurn } from "../utils/foulAnnouncementClassifier.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
 /**
@@ -251,25 +252,17 @@ export async function finalizeTurnAfterAnimation({
       foulerId: turn.foul_player_id || turn.shooter_id 
     });
   } else if (turn.result_type === 'FOUL') {
-    // ✅ FIX: Skip shooting fouls - they're already announced in ballManager.js
-    // Shooting fouls result in free throws, so check for FREE_THROW next_play_type or free_throws_remaining
-    const hasFreeThrowsRemaining = (turn.free_throws_remaining ?? 0) > 0;
-    const nextPlayTypeIsFreeThrow = turn.next_play_type === 'FREE_THROW';
-    const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
-    
-    if (!isShootingFoul) {
-      // Blocking foul: defensive foul on drive (early return from resolve_shot sends FOUL + text "Blocking foul on X!")
-      const isBlockingFoul = turn.foul_team === 'DEFENSE' && turn.text?.toLowerCase().includes('blocking foul');
-      if (isBlockingFoul) {
-        announceGameEvent('BLOCKING_FOUL', turn, scene, { foulerId: turn.foul_player_id || turn.defenderId });
-      } else {
-        // Other non-shooting fouls: "OFFENSIVE FOUL!" or "DEFENSIVE FOUL!"
-        const foulTeam = turn.foul_team || 'OFFENSE';
-        const eventType = foulTeam === 'OFFENSE' ? 'FOUL_OFFENSIVE' : 'FOUL_DEFENSIVE';
-        announceGameEvent(eventType, turn, scene, { foulerId: turn.foul_player_id });
-      }
+    // FOUL turns should always announce foul type, including bonus fouls that lead to free throws.
+    // True shooting fouls are emitted as shot result turns (MAKE/MISS) and are announced there.
+    const isBonusFoul = isBonusFreeThrowFoulTurn(turn);
+    const isBlockingFoul = turn.foul_team === 'DEFENSE' && turn.text?.toLowerCase().includes('blocking foul');
+    if (isBlockingFoul) {
+      announceGameEvent('BLOCKING_FOUL', turn, scene, { foulerId: turn.foul_player_id || turn.defenderId });
+    } else {
+      const foulTeam = turn.foul_team || 'OFFENSE';
+      const eventType = foulTeam === 'OFFENSE' ? 'FOUL_OFFENSIVE' : 'FOUL_DEFENSIVE';
+      announceGameEvent(eventType, turn, scene, { foulerId: turn.foul_player_id, isBonusFoul });
     }
-    // Note: Shooting fouls on misses are announced in ballManager.js with "Shooting Foul!"
   } else if (turn.result_type === 'BLOCK' && !turn._blockAnnounced) {
     // Block: announce "BLOCK!" with blocker image (only if not already announced in ShotAnimationSystem)
     announceGameEvent('BLOCK', turn, scene, { blockerId: turn.blocker_id || turn.defenderId });

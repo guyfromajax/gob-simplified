@@ -210,8 +210,8 @@ function getSession(scene) {
 }
 
 export function createFbTelemetryDebugListener(scene) {
-  if (!isEnabled()) return null;
   installGlobalHelpers();
+  if (!isEnabled()) return null;
   const thresholds = resolveThresholds();
 
   return function onAnimTelemetry(payload = {}) {
