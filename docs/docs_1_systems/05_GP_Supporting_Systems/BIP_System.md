@@ -52,7 +52,7 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 
 ### Inbound pass and clock start (BIP → FCP/HCT)
 
-**Behavior:** For FCP/HCT, the inbound pass runs during BIP (same as HCO). The frontend runs the full inbound sequence in `runInboundSetup()` — positions plus SF → PG pass — with no early return for FCP/HCT. The backend trims the FCP/HCT skeleton to start at step 1 when building the turn, so the first animated step is post-receive. **Game and shot clocks start when that first step runs** (i.e. after the receiver has the ball), matching BIP→HCO and SIP.
+**Behavior:** For FCP/HCT, the inbound pass runs during BIP (same as HCO). The frontend runs the full inbound sequence in `runInboundSetup()` — positions plus SF → PG pass — with no early return for FCP/HCT. The backend trims FCP/HCT skeletons to the first post-inbound step when building the next turn (supports step-0-pass and step-1-pass legacy shapes). **Game and shot clocks start when that first post-inbound step runs** (i.e. after the receiver has the ball), matching BIP→HCO and SIP.
 
 **Location:** `turnAnimation.js` `runInboundSetup()` (inbound pass runs for all next-turn types); `BackEnd/engine/phase_resolution.py` (skeleton trimmed to `steps[1:]` for FCP/HCT shot and non-shot paths).
 
@@ -231,7 +231,7 @@ For Q2, Q3, and Q4:
 ### Key Functions
 
 **Backend:**
-- `turn_manager.py` `setup_baseline_inbound()`: Creates BASELINE_INBOUND turn data
+- `turn_manager.py` `setup_baseline_inbound()`: Creates BASELINE_INBOUND turn data (includes `turn_type` + `current_turn` markers)
 - `phase_resolution.py` `get_skeleton_for_turn()`: Retrieves FCP/HCT skeleton
 - `phase_resolution.py` `apply_opposite_side_logic()`: Applies `opp` field logic
 

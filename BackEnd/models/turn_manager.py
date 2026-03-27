@@ -386,6 +386,7 @@ class TurnManager:
             "dDestinations": d_dest,
             "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # for situational Force Foul (pass receiver)
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
+            "turn_type": "BASELINE_INBOUND",  # Back-compat marker for post-BIP pressure slicing.
             "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
             "quarter": self.game.quarter,
             "next_play_type": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ Explicit routing

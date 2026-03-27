@@ -240,8 +240,8 @@ def _get_fcp_hct_post_inbound_start_index(skeleton, game):
     Determine where FCP/HCT should start after an inbound pass.
 
     Default behavior remains "skip step 0" (legacy behavior). When this turn
-    directly follows BASELINE_INBOUND, dynamically skip all leading steps where
-    SF is still positioned at inbound_left.
+    directly follows BASELINE_INBOUND, dynamically skip all leading
+    inbound-equivalent setup/pass steps so BIP remains the single inbound owner.
     """
     steps = (skeleton or {}).get("steps") or []
     if not steps:
@@ -250,20 +250,46 @@ def _get_fcp_hct_post_inbound_start_index(skeleton, game):
     default_start_index = 1 if len(steps) > 1 else 0
 
     prev_turn = game.turns[-1] if getattr(game, "turns", None) else {}
-    if prev_turn.get("turn_type") != "BASELINE_INBOUND":
+    prev_turn_type = (
+        prev_turn.get("turn_type")
+        or prev_turn.get("current_turn")
+        or prev_turn.get("result_type")
+        or ""
+    )
+    if str(prev_turn_type).upper() != "BASELINE_INBOUND":
         return default_start_index
 
-    for i, step in enumerate(steps):
+    def _normalize_action(pos_actions, pos):
+        action = (pos_actions.get(pos, {}) or {}).get("action")
+        return str(action or "").strip().lower()
+
+    def _is_inbound_equivalent_step(step):
         pos_actions = step.get("pos_actions") or {}
-        sf_action = pos_actions.get("SF")
-        if not isinstance(sf_action, dict):
-            return i
+        sf_action_info = pos_actions.get("SF") or {}
+        sf_location = (sf_action_info.get("location") or sf_action_info.get("spot") or "").strip().lower()
+        if sf_location not in {"inbound_left", "inbound_right"}:
+            return False
 
-        sf_location = (sf_action.get("location") or sf_action.get("spot") or "").strip().lower()
-        if sf_location != "inbound_left":
-            return i
+        sf_action = _normalize_action(pos_actions, "SF")
+        pg_action = _normalize_action(pos_actions, "PG")
 
-    return default_start_index
+        # Canonical inbound release in many skeletons.
+        if sf_action == "pass" and pg_action == "receive":
+            return True
+
+        # Pre-release inbound staging in some versions (step 0 hold, step 1 pass).
+        if sf_action in {"handle_ball", "stationary", "get_open"}:
+            return True
+
+        return False
+
+    start_index = 0
+    while start_index < len(steps) and _is_inbound_equivalent_step(steps[start_index]):
+        start_index += 1
+
+    # Keep legacy safety floor and never trim all steps.
+    start_index = max(start_index, default_start_index)
+    return min(start_index, len(steps) - 1)
 
 
 def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_pos, defender, off_team, def_team, game):
