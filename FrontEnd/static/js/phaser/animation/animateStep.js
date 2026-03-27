@@ -30,6 +30,7 @@ import {
   clearBallHolder,
   getBallHolderId,
 } from "./ballAnimationSimple.js";
+import { startArrivalHeartbeat, stopArrivalHeartbeat } from "./arrivalHeartbeat.js";
 
 export const PLAYER_TWEEN_DEBUG = false;
 
@@ -47,6 +48,11 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
   }
 
   if (scene.skipToEnd) return Promise.resolve();
+  try {
+    stopArrivalHeartbeat(scene, sprite);
+  } catch (_) {
+    // Heartbeat is visual-only; never interrupt turn animation.
+  }
   return new Promise((resolve) => {
     let tween = null;
     let tweenCompleted = false;
@@ -176,6 +182,17 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     if (isReceiving) {
       clearBallHolder(scene);  // Clear state so ball isn't included in receiver's tween
     }
+
+    const maybeStartHeartbeat = () => {
+      if (scene?.skipToEnd) return;
+      if (scene?.passInFlight) return;
+      if (currentAction === 'pass') return;
+      try {
+        startArrivalHeartbeat(scene, sprite, { turnData });
+      } catch (_) {
+        // Heartbeat is visual-only; never interrupt turn animation.
+      }
+    };
     
     // ✅ WIP_GOB APPROACH: Use getPlayerTweenTargets() for ALL movements (including passes)
     // This matches WIP_GOB: targets are calculated based on ball holder state at creation time
@@ -262,6 +279,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       }
       tweenCompleted = true;
       clearTimeout(timeoutId);
+      maybeStartHeartbeat();
       emitSummary('complete');
       resolve();
       return;
@@ -417,6 +435,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         } catch (error) {
           console.error('animateStep: Error in startPromise', { error, playerId: sprite?.playerId });
         }
+        maybeStartHeartbeat();
         emitSummary('complete');
         resolve();
       },
