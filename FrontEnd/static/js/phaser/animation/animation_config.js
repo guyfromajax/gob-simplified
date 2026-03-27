@@ -85,6 +85,9 @@ const defaults = {
   finalTurn: {
     holdClockOutMs: 1800,
     holdFinalShotMs: 3000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
+    // Late-pass window for Final Turn shot feel: ball handler holds until this clock band.
+    latePassTargetSecMin: 5.7,
+    latePassTargetSecMax: 6.3,
     alignment: { ease: 'Linear' },
     moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
   },

@@ -668,6 +668,53 @@ export class AnimationEngine {
     } catch (e) {}
   }
 
+  _parseClockTextToSeconds(clockText) {
+    if (typeof clockText !== 'string') return null;
+    const parts = clockText.trim().split(':');
+    if (parts.length !== 2) return null;
+    const minutes = Number(parts[0]);
+    const seconds = Number(parts[1]);
+    if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
+    return Math.max(0, Math.floor(minutes * 60 + seconds));
+  }
+
+  async _holdFinalTurnBallUntilLatePassWindow(turnData) {
+    if (this.scene?.skipToEnd) return;
+    const animationConfig = (await import('./animation_config.js')).default;
+    const minTarget = Number(animationConfig?.finalTurn?.latePassTargetSecMin ?? 5.7);
+    const maxTarget = Number(animationConfig?.finalTurn?.latePassTargetSecMax ?? 6.3);
+    const targetMin = Math.min(minTarget, maxTarget);
+    const targetMax = Math.max(minTarget, maxTarget);
+    const targetRemainingSec = targetMin + Math.random() * (targetMax - targetMin);
+
+    const contractStart = Number(turnData?.clock_start ?? turnData?.clockStart);
+    const contractEnd = Number(turnData?.clock_end ?? turnData?.clockEnd);
+    const gameSecondsToCount = Number.isFinite(contractStart) && Number.isFinite(contractEnd)
+      ? Math.max(0, contractStart - contractEnd)
+      : 0;
+    const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
+
+    const liveClockSec = Number(this.scene?.gameClock?.getState?.()?.timeRemaining);
+    const fallbackClockFromText = this._parseClockTextToSeconds(turnData?.clock ?? turnData?.game_clock);
+    const currentRemainingSec = Number.isFinite(liveClockSec)
+      ? liveClockSec
+      : (Number.isFinite(contractStart) ? contractStart : fallbackClockFromText);
+
+    // Edge case requested: if already under the late-pass threshold, pass immediately.
+    if (!Number.isFinite(currentRemainingSec) || currentRemainingSec <= targetRemainingSec) {
+      return;
+    }
+    if (durationMs <= 0 || gameSecondsToCount <= 0) {
+      return;
+    }
+
+    const gameSecondsToWait = Math.max(0, currentRemainingSec - targetRemainingSec);
+    const waitMs = Math.max(0, Math.round((gameSecondsToWait / gameSecondsToCount) * durationMs));
+    if (waitMs <= 0) return;
+
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+  }
+
   /**
    * Phase 4: FINAL_HOLD — no shot, run clock out (short delay), then complete.
    * Quarter/game end is triggered by the API when quarter_complete is true.
@@ -693,6 +740,7 @@ export class AnimationEngine {
       ballSprite: context.ballSprite,
       turnData
     });
+    await this._holdFinalTurnBallUntilLatePassWindow(turnData);
     if (this.shotSystem) {
       await this.shotSystem.processShot(turnData);
     } else {
