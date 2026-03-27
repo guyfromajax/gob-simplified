@@ -23,6 +23,7 @@ import {
   animateBallToPosition,
 } from "./ballAnimationSimple.js";
 import { getPlayerMovementDurationMs } from "../utils/playerMovementDuration.js";
+import { startArrivalHeartbeat, stopArrivalHeartbeat } from "./arrivalHeartbeat.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -143,6 +144,7 @@ export function detachBall(scene, ballSprite) {
  */
 export function tweenPlayerTo(scene, sprite, target, opts = {}) {
   if (!scene || !sprite || !target) return Promise.resolve();
+  stopArrivalHeartbeat(scene, sprite);
   const { easing = 'Linear' } = opts;
   const duration =
     opts.duration != null
@@ -217,7 +219,13 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
           ballSprite.setVisible(true);
         }
       },
-      onComplete: () => finalize('complete')
+      onComplete: () => {
+        startArrivalHeartbeat(scene, sprite, {
+          turnData: opts.turnData ?? scene.currentTurnData ?? null,
+          role: opts.role ?? null,
+        });
+        finalize('complete');
+      }
     });
     tween?.once?.('stop', () => finalize('stop', new Error('tween stopped')));
   });
