@@ -8,6 +8,10 @@ import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '
 import gameStore from '../../state/gameStore.js';
 import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
 import { isBonusFreeThrowFoulTurn } from './foulAnnouncementClassifier.js';
+import {
+  pickOffensiveFoulAnnouncementText,
+  pickDefensiveFoulAnnouncementText,
+} from './foulAnnouncementLanguage.js';
 
 let currentAnnouncement = null;
 
@@ -320,6 +324,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       const isBonusFoul = isBonusFreeThrowFoulTurn(turnData);
       const foulTeam = turnData.foul_team || 'OFFENSE'; // Default to offense if not specified
       const isQuickFoul = !!turnData.quick_foul;
+      const isBlockingFoul = foulTeam === 'DEFENSE' && turnData.text?.toLowerCase().includes('blocking foul');
 
       // Extract foul player data for headshot display
       let playerData = null;
@@ -343,15 +348,17 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
-      if (foulTeam === 'OFFENSE') {
+      if (isBlockingFoul) {
+        showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
+      } else if (foulTeam === 'OFFENSE') {
         // Offensive foul - show in defense team color (they benefited)
-        showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
+        showAnnouncement(pickOffensiveFoulAnnouncementText(turnData), defenseTeam, playerData);
       } else {
         // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
         // Bonus fouls (FOUL -> FREE_THROW) stay in this path and should not be reclassified as shooting fouls.
-        let defensiveFoulText = "DEFENSIVE FOUL!";
+        let defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
         if (isQuickFoul) defensiveFoulText = "Quick Foul!";
-        if (isBonusFoul && !isQuickFoul) defensiveFoulText = "DEFENSIVE FOUL!";
+        if (isBonusFoul && !isQuickFoul) defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
         showAnnouncement(defensiveFoulText, offenseTeam, playerData);
       }
       

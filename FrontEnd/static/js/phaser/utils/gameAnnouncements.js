@@ -12,6 +12,10 @@
 
 import { showAnnouncement, showAndOneAnnouncement } from './announcements.js';
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
+import {
+  pickOffensiveFoulAnnouncementText,
+  pickDefensiveFoulAnnouncementText,
+} from './foulAnnouncementLanguage.js';
 import gameStore from '../../state/gameStore.js';
 import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
 
@@ -321,7 +325,8 @@ function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) 
     }
   }
 
-  showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
+  const foulText = pickOffensiveFoulAnnouncementText(turnData);
+  showAnnouncement(foulText, defenseTeam, playerData);
 
   // Trigger visual effect
   if (scene && foulerId) {
@@ -345,7 +350,8 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
     }
   }
 
-  showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
+  const foulText = pickDefensiveFoulAnnouncementText(turnData);
+  showAnnouncement(foulText, offenseTeam, playerData);
 
   // Trigger visual effect
   if (scene && foulerId) {
