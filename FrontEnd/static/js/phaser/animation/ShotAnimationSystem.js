@@ -835,7 +835,7 @@ export class ShotAnimationSystem {
         const clampedReboundTarget = clampGridCoords(
           { x: targetGridX, y: targetGridY },
           turnData,
-          { action: "shot_get_back_rebound_window", playerId: id }
+          { action: "shot_get_back_rebound_window", playerId }
         );
         targetGridX = clampedReboundTarget.x;
         targetGridY = clampedReboundTarget.y;

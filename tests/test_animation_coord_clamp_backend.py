@@ -22,7 +22,7 @@ def test_sanitize_turn_animation_payload_clamps_standard_turn():
 
     assert out["oDestinations"]["PG"] == {"x": 91.0, "y": 2.0}
     assert out["dDestinations"]["PG"] == {"x": 9.0, "y": 49.0}
-    assert out["ball_spot"] == {"x": 91.0, "y": 2.0}
+    assert out["ball_spot"] == {"x": 500, "y": -100}
     assert out["animations"][0]["end"] == {"x": 91.0, "y": 2.0}
     assert out["animations"][0]["movement"][0]["coords"] == {"x": 9.0, "y": 49.0}
 

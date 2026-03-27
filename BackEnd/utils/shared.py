@@ -1920,8 +1920,8 @@ def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]]
             for k, v in block.items()
         }
 
-    if isinstance(payload.get("ball_spot"), dict):
-        payload["ball_spot"] = clamp_animation_grid_coords(payload["ball_spot"], result_type, context=context)
+    # Player-only clamp policy: leave ball payload coordinates untouched.
+    # Ball motion/spot fields are consumed by dedicated ball animation logic.
 
     payload["animations"] = _sanitize_animation_rows(payload.get("animations"), result_type)
 
