@@ -4400,6 +4400,20 @@ try:
                 gm.quarter += 1
                 gm.game_state["quarter"] = gm.quarter  # ✅ FIX: Ensure game_state is updated
                 logging.info(f"✅ Advanced to quarter {gm.quarter}")
+
+                # ✅ PLAYCALL CENTER RESET: Clear all user-facing PC overrides at quarter transition.
+                # Quarter transitions should start with no carried tactical overrides.
+                for team in (gm.home_team, gm.away_team):
+                    calls = getattr(team, "strategy_calls", None)
+                    if not isinstance(calls, dict):
+                        continue
+                    calls["offense_call"] = None
+                    calls["defense_call"] = None
+                    calls["tempo_override"] = None
+                    calls["aggression_override"] = None
+                    calls["press_trap_override"] = None
+                gm.game_state["user_defense_override"] = None
+                logging.info("✅ QUARTER BREAK: Cleared Playcall Center overrides (offense/defense/tempo/aggression/press_trap)")
                 
                 # ✅ MAN DEFENSE MATCHUPS: Reset to defaults at start of quarter break
                 from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
