@@ -20,11 +20,11 @@ def test_sanitize_turn_animation_payload_clamps_standard_turn():
 
     out = sanitize_turn_animation_payload(turn)
 
-    assert out["oDestinations"]["PG"] == {"x": 91.0, "y": 2.0}
-    assert out["dDestinations"]["PG"] == {"x": 9.0, "y": 49.0}
+    assert out["oDestinations"]["PG"] == {"x": 95.0, "y": 2.0}
+    assert out["dDestinations"]["PG"] == {"x": 5.0, "y": 49.0}
     assert out["ball_spot"] == {"x": 500, "y": -100}
-    assert out["animations"][0]["end"] == {"x": 91.0, "y": 2.0}
-    assert out["animations"][0]["movement"][0]["coords"] == {"x": 9.0, "y": 49.0}
+    assert out["animations"][0]["end"] == {"x": 95.0, "y": 2.0}
+    assert out["animations"][0]["movement"][0]["coords"] == {"x": 5.0, "y": 49.0}
 
 
 def test_sanitize_turn_animation_payload_keeps_exempt_turn_unclamped():
@@ -53,5 +53,5 @@ def test_sanitize_turn_animation_payload_handles_batch_turns():
 
     out = sanitize_turn_animation_payload(turn)
 
-    assert out["batch_turns"][0]["oDestinations"]["PG"] == {"x": 91.0, "y": 2.0}
+    assert out["batch_turns"][0]["oDestinations"]["PG"] == {"x": 95.0, "y": 2.0}
     assert out["batch_turns"][1]["oDestinations"]["PG"] == {"x": 2, "y": 52}

@@ -1823,8 +1823,8 @@ def getAwayTeamCoords(coordsDict):
 
 
 ANIMATION_CLAMP_BOUNDS: Dict[str, float] = {
-    "min_x": 9.0,
-    "max_x": 91.0,
+    "min_x": 5.0,
+    "max_x": 95.0,
     "min_y": 2.0,
     "max_y": 49.0,
 }

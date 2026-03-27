@@ -1,6 +1,6 @@
 export const CLAMP_BOUNDS = Object.freeze({
-  minX: 9,
-  maxX: 91,
+  minX: 5,
+  maxX: 95,
   minY: 2,
   maxY: 49,
 });
