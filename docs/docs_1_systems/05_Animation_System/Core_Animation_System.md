@@ -118,6 +118,33 @@ Specialized Handlers (execution)
 
 Backend sends positions in a single convention (e.g. home-side) where applicable (e.g. Final Turn alignment, HCO string spots). The frontend derives “away offense” (e.g. `offenseTeamId !== homeTeamId`) and applies one flip to both offense and defense when true. This keeps the rule consistent across turn types (HCO entry, Final Turn setup, etc.) without special cases.
 
+## Universal Court Clamp Policy
+
+**Status:** ✅ Production (frontend Phase 1 + backend response sanitation)
+
+Animation-facing player coordinates use one canonical grid clamp policy:
+
+- **x bounds:** `9..91` (between basket x spots)
+- **y bounds:** `2..49`
+
+### Exemptions
+
+The clamp is intentionally skipped for turn types that need out-of-bounds lanes:
+
+- `SIDE_INBOUND` (SIP)
+- `BASELINE_INBOUND` (BIP)
+- `TIMEOUT` (reserved future sideline movement)
+
+### Implementation Contract
+
+- **Frontend clamp source of truth:** `FrontEnd/static/js/phaser/animation/courtClamp.js`
+  - `clampGridCoords()`
+  - `isClampExempt()`
+- **Backend response sanitation:** `BackEnd/utils/shared.py`
+  - `sanitize_turn_animation_payload()`
+  - Applied at `/api/simulate-turn` response boundary (including timeout and batch turn payloads)
+- **Rule:** clamp in grid-space before/at payload consumption; avoid ad-hoc `Math.min/Math.max` clamp variants in feature code.
+
 ## State Tracking System
 
 **Status:** ✅ **CORE COMPONENT** - Fundamental architectural pattern

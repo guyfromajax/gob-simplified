@@ -22,6 +22,7 @@ import { animateStep } from './animateStep.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
 import animationConfig from './animation_config.js';
+import { clampGridCoords } from './courtClamp.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -831,8 +832,13 @@ export class ShotAnimationSystem {
         }
         // Else: y is exactly 25 or 26, keep it the same (rare)
         
-        // Clamp X to court between the two rims (prevent players moving out of bounds on HCO shot attempts)
-        targetGridX = Math.max(9, Math.min(91, targetGridX));
+        const clampedReboundTarget = clampGridCoords(
+          { x: targetGridX, y: targetGridY },
+          turnData,
+          { action: "shot_get_back_rebound_window", playerId: id }
+        );
+        targetGridX = clampedReboundTarget.x;
+        targetGridY = clampedReboundTarget.y;
         
         // Convert target grid back to pixels
         const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
@@ -1306,13 +1312,13 @@ export class ShotAnimationSystem {
       const offsetY = Phaser.Math.Between(-6, 6);
       const offsetX = Phaser.Math.Between(-4, 4);
       
-      // Apply offsets and clamp to bounds
-      let targetGridX = bounceGridX + offsetX;
-      let targetGridY = bounceGridY + offsetY;
-      
-      // Clamp to court bounds between rims on X (9-91) and full court on Y (0-50)
-      targetGridX = Math.max(9, Math.min(91, targetGridX));
-      targetGridY = Math.max(0, Math.min(50, targetGridY));
+      const clampedCollapseTarget = clampGridCoords(
+        { x: bounceGridX + offsetX, y: bounceGridY + offsetY },
+        turnData,
+        { action: "shot_rebound_collapse", playerId }
+      );
+      const targetGridX = clampedCollapseTarget.x;
+      const targetGridY = clampedCollapseTarget.y;
       
       const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
       
@@ -1350,29 +1356,25 @@ export class ShotAnimationSystem {
       const angle = Math.random() * 2 * Math.PI;
       const distance = Math.random() * maxDistance;
       
-      const targetGridX = bounceGridX + Math.cos(angle) * distance;
-      const targetGridY = bounceGridY + Math.sin(angle) * distance;
+      const clampedTargetGrid = clampGridCoords({
+        x: bounceGridX + Math.cos(angle) * distance,
+        y: bounceGridY + Math.sin(angle) * distance
+      });
       
       // Convert back to pixel coordinates
-      const targetX = targetGridX * (this.scene.game.config.width / 100);
-      const targetY = targetGridY * (this.scene.game.config.height / 100);
-      
-      // Ensure target is within court bounds
-      const courtWidth = this.scene.game.config.width;
-      const courtHeight = this.scene.game.config.height;
-      const clampedX = Math.max(20, Math.min(courtWidth - 20, targetX));
-      const clampedY = Math.max(20, Math.min(courtHeight - 20, targetY));
+      const targetX = clampedTargetGrid.x * (this.scene.game.config.width / 100);
+      const targetY = clampedTargetGrid.y * (this.scene.game.config.height / 100);
       
       // ✅ REMOVED: Player moving to rebound spot logging (cluttering console)
       
       // ✅ FIX: Use distance-based duration for consistent speed
-      const duration = getPlayerDuration(playerSprite, clampedX, clampedY);
+      const duration = getPlayerDuration(playerSprite, targetX, targetY);
       
       // Animate player movement
       const tween = this.scene.tweens.add({
         targets: playerSprite,
-        x: clampedX,
-        y: clampedY,
+        x: targetX,
+        y: targetY,
         duration,
         ease: 'Linear', // Match other player movements
         onComplete: () => {

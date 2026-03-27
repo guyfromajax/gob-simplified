@@ -1,6 +1,7 @@
 import math
 import random
 import logging
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
@@ -1819,6 +1820,121 @@ def getAwayTeamCoords(coordsDict):
            xSpot = 100 - coordsX
            coordsDict[position] = {"x": xSpot, "y": ySpot}
        return coordsDict
+
+
+ANIMATION_CLAMP_BOUNDS: Dict[str, float] = {
+    "min_x": 9.0,
+    "max_x": 91.0,
+    "min_y": 2.0,
+    "max_y": 49.0,
+}
+
+ANIMATION_CLAMP_EXEMPT_RESULT_TYPES = frozenset({
+    "SIDE_INBOUND",
+    "BASELINE_INBOUND",
+    "TIMEOUT",
+})
+
+
+def is_animation_clamp_exempt(result_type: Optional[str], context: Optional[Dict[str, Any]] = None) -> bool:
+    """Return True when a turn payload should skip backend animation coordinate clamping."""
+    if isinstance(context, dict) and context.get("force_exempt") is True:
+        return True
+    return result_type in ANIMATION_CLAMP_EXEMPT_RESULT_TYPES
+
+
+def _clamp_animation_coord_value(value: Any, lower: float, upper: float) -> Any:
+    if not isinstance(value, (int, float)) or not math.isfinite(value):
+        return value
+    return min(upper, max(lower, float(value)))
+
+
+def clamp_animation_grid_coords(
+    coords: Optional[Dict[str, Any]],
+    result_type: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Clamp one grid coordinate pair to canonical animation bounds."""
+    if not isinstance(coords, dict):
+        return coords
+    if is_animation_clamp_exempt(result_type, context):
+        return dict(coords)
+    return {
+        **coords,
+        "x": _clamp_animation_coord_value(coords.get("x"), ANIMATION_CLAMP_BOUNDS["min_x"], ANIMATION_CLAMP_BOUNDS["max_x"]),
+        "y": _clamp_animation_coord_value(coords.get("y"), ANIMATION_CLAMP_BOUNDS["min_y"], ANIMATION_CLAMP_BOUNDS["max_y"]),
+    }
+
+
+def _sanitize_animation_rows(rows: Any, result_type: Optional[str]) -> Any:
+    if not isinstance(rows, list):
+        return rows
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        end = row.get("end")
+        if isinstance(end, dict):
+            row["end"] = clamp_animation_grid_coords(end, result_type)
+        movement = row.get("movement")
+        if isinstance(movement, list):
+            for step in movement:
+                if not isinstance(step, dict):
+                    continue
+                coords = step.get("coords")
+                if isinstance(coords, dict):
+                    step["coords"] = clamp_animation_grid_coords(coords, result_type)
+    return rows
+
+
+def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+    """
+    Return a sanitized copy of a turn payload where animation-facing coordinates are clamped.
+
+    Clamp policy:
+      - x: 9..91
+      - y: 2..49
+    Exempt result types:
+      - SIDE_INBOUND
+      - BASELINE_INBOUND
+      - TIMEOUT
+    """
+    if not isinstance(turn, dict):
+        return turn
+
+    payload = deepcopy(turn)
+    result_type = payload.get("result_type")
+
+    if result_type == "BATCH" and isinstance(payload.get("batch_turns"), list):
+        payload["batch_turns"] = [
+            sanitize_turn_animation_payload(t, context=context) if isinstance(t, dict) else t
+            for t in payload["batch_turns"]
+        ]
+        return payload
+
+    for key in ("oDestinations", "dDestinations", "offense_getback_coords", "defense_release_coords"):
+        block = payload.get(key)
+        if not isinstance(block, dict):
+            continue
+        payload[key] = {
+            k: clamp_animation_grid_coords(v, result_type, context=context) if isinstance(v, dict) else v
+            for k, v in block.items()
+        }
+
+    if isinstance(payload.get("ball_spot"), dict):
+        payload["ball_spot"] = clamp_animation_grid_coords(payload["ball_spot"], result_type, context=context)
+
+    payload["animations"] = _sanitize_animation_rows(payload.get("animations"), result_type)
+
+    final_turn_meta = payload.get("final_turn_meta")
+    if isinstance(final_turn_meta, dict):
+        coords_by_step = final_turn_meta.get("ball_handler_coords_by_step")
+        if isinstance(coords_by_step, list):
+            final_turn_meta["ball_handler_coords_by_step"] = [
+                clamp_animation_grid_coords(c, result_type, context=context) if isinstance(c, dict) else c
+                for c in coords_by_step
+            ]
+
+    return payload
 
 
 # Turn payload keys: player_id -> {x, y} in HOME grid. Later keys override earlier for same id.

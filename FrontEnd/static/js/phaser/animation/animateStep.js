@@ -1,4 +1,5 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { clampGridCoords } from "./courtClamp.js";
 
 /**
  * Animates a single step of a player's movement.
@@ -106,17 +107,13 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     }, timeoutMs);
     // Use nextStep.coords if available (for movement target), otherwise step.coords
     const targetStep = nextStep || step;
-    const isInboundSpot = targetStep.coords.x <= 5 || targetStep.coords.x >= 95;
-    const shouldClampXToRims =
-      !isInboundSpot &&
-      turnData?.result_type !== "SIDE_INBOUND" &&
-      turnData?.result_type !== "BASELINE_INBOUND";
-    const targetGridX = shouldClampXToRims
-      ? Math.max(9, Math.min(91, targetStep.coords.x))
-      : targetStep.coords.x;
+    const targetGrid = clampGridCoords(targetStep.coords, turnData, {
+      action: targetStep.action ?? null,
+      playerId: sprite?.playerId ?? null,
+    });
     const { x: targetX, y: targetY } = gridToPixels(
-      targetGridX,
-      targetStep.coords.y,
+      targetGrid.x,
+      targetGrid.y,
       scene.game.config.width,
       scene.game.config.height
     );

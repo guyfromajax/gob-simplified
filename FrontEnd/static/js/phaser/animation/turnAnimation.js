@@ -19,6 +19,7 @@ import { runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
+import { clampGridCoords } from "./courtClamp.js";
 import { DEBUG } from "../utils/debug.js";
 import {
   DebugFlags,
@@ -1597,11 +1598,14 @@ async function runInboundSetup({
         // Randomize x-coord by ±10 from base for more organic feel
         const xOffset = Phaser.Math.Between(-10, 10);
         const targetXGrid = baseX + xOffset;
-        // Clamp to valid court bounds (1-99)
-        const clampedXGrid = Phaser.Math.Clamp(targetXGrid, 1, 99);
+        const clampedTarget = clampGridCoords(
+          { x: targetXGrid, y: 25 },
+          turnData,
+          { action: "retreat_to_midcourt", playerId: id }
+        );
         const targetX = gridToPixels(
-          clampedXGrid,
-          25,
+          clampedTarget.x,
+          clampedTarget.y,
           width,
           height
         ).x;

@@ -6,6 +6,7 @@
 
 import { ShotAnimationSystem } from '../ShotAnimationSystem.js';
 import { AnimationStates } from '../SimplifiedStateMachine.js';
+import { CLAMP_BOUNDS } from '../courtClamp.js';
 
 // Mock dependencies
 jest.mock('../SimplifiedStateMachine.js');
@@ -365,6 +366,34 @@ describe('ShotAnimationSystem', () => {
       // Bounces should be different (random)
       expect(bounce1.x).not.toBe(bounce2.x);
       expect(bounce1.y).not.toBe(bounce2.y);
+    });
+  });
+
+  describe('Clamp policy integration', () => {
+    test('animatePlayerToReboundSpot keeps target inside canonical clamp bounds', async () => {
+      const playerSprite = mockPlayerSprites.player1;
+      const width = mockScene.game.config.width;
+      const height = mockScene.game.config.height;
+      let capturedTweenConfig = null;
+
+      mockScene.tweens.add.mockImplementationOnce((config) => {
+        capturedTweenConfig = config;
+        if (typeof config.onComplete === 'function') config.onComplete();
+        return { stop: jest.fn() };
+      });
+
+      await shotSystem.animatePlayerToReboundSpot(
+        playerSprite,
+        { x: 0, y: 0 },
+        CLAMP_BOUNDS.maxX + 30,
+        CLAMP_BOUNDS.maxY + 30
+      );
+
+      expect(capturedTweenConfig).toBeTruthy();
+      expect(capturedTweenConfig.x).toBeGreaterThanOrEqual((CLAMP_BOUNDS.minX / 100) * width);
+      expect(capturedTweenConfig.x).toBeLessThanOrEqual((CLAMP_BOUNDS.maxX / 100) * width);
+      expect(capturedTweenConfig.y).toBeGreaterThanOrEqual((CLAMP_BOUNDS.minY / 100) * height);
+      expect(capturedTweenConfig.y).toBeLessThanOrEqual((CLAMP_BOUNDS.maxY / 100) * height);
     });
   });
 

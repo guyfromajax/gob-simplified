@@ -49,6 +49,7 @@ try:
         format_height,
         format_player_display_name,
         deserialize_computer_timeouts,
+        sanitize_turn_animation_payload,
     )
     from BackEnd.utils import stat_updater
     from pydantic import BaseModel
@@ -1208,7 +1209,7 @@ try:
         # Return consistent response format (same for both user and computer)
         # Use saved data (db_summary) to ensure response matches what was saved to DB
         response = {
-            "turn": timeout_turn,
+            "turn": sanitize_turn_animation_payload(timeout_turn),
             "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
             "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
             "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
@@ -4136,7 +4137,7 @@ try:
                 gm.turns.pop()
                 return JSONResponse(
                     content={
-                        "turn": timeout_turn,
+                        "turn": sanitize_turn_animation_payload(timeout_turn),
                         "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
                         "time_remaining": gm.game_state["time_remaining"],
                         "clock": gm.game_state.get("clock", "8:00"),
@@ -4227,7 +4228,7 @@ try:
                         # Return timeout turn without save (fallback)
                         if timeout_turn:
                             fallback = {
-                                "turn": timeout_turn,
+                                "turn": sanitize_turn_animation_payload(timeout_turn),
                                 "time_remaining": gm.game_state.get("time_remaining", 480),
                                 "clock": gm.game_state.get("clock", "8:00"),
                                 "quarter_complete": False,
@@ -4466,7 +4467,7 @@ try:
             ) if isinstance(_src, dict) else (None, None, None, None, None)
             # Return turn data + metadata
             response_data = {
-                "turn": latest_turn,
+                "turn": sanitize_turn_animation_payload(latest_turn),
                 "clock_start": _contract[0],
                 "clock_end": _contract[1],
                 "shot_clock_start": _contract[2],
