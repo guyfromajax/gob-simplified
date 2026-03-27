@@ -91,6 +91,14 @@ const defaults = {
     alignment: { ease: 'Linear' },
     moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
   },
+  heartbeat: {
+    enabled: true,
+    // Non-positional heartbeat. Keep gameplay x/y fully untouched.
+    scaleDelta: 0.02,
+    angleDeltaDeg: 1.2,
+    minHalfCycleMs: 170, // NG=0.01 (fatigued) -> faster pulse
+    maxHalfCycleMs: 520, // NG=1.00 (fresh) -> slower pulse
+  },
   possession: {
     msPerTick: 1,
     minFrameDurationMs: 120,
@@ -133,6 +141,7 @@ export const animationConfig = {
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
   finalTurn: { ...defaults.finalTurn, ...(overrides.finalTurn || {}) },
+  heartbeat: { ...defaults.heartbeat, ...(overrides.heartbeat || {}) },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
     minFrameDurationMs:

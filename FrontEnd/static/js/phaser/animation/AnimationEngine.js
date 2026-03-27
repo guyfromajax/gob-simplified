@@ -18,6 +18,7 @@ import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 import HCOAnimationSystem from './HCOAnimationSystem.js';
 import gameStore from '../../state/gameStore.js';
+import { stopAllArrivalHeartbeats } from './arrivalHeartbeat.js';
 
 export class AnimationEngine {
   constructor(scene) {
@@ -90,6 +91,7 @@ export class AnimationEngine {
     // }
 
     this.isProcessing = true;
+    stopAllArrivalHeartbeats(this.scene);
 
     try {
       // Processing (log removed)
@@ -110,6 +112,7 @@ export class AnimationEngine {
       });
       throw error;
     } finally {
+      stopAllArrivalHeartbeats(this.scene);
       this.isProcessing = false;
     }
   }
