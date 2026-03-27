@@ -220,11 +220,9 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
         }
       },
       onComplete: () => {
-        if (!scene?.passInFlight) {
-          startArrivalHeartbeat(scene, sprite, {
-            turnData: opts.turnData ?? scene.currentTurnData ?? null,
-          });
-        }
+        startArrivalHeartbeat(scene, sprite, {
+          turnData: opts.turnData ?? scene.currentTurnData ?? null,
+        });
         finalize('complete');
       }
     });

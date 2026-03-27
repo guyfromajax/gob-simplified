@@ -94,8 +94,8 @@ const defaults = {
   heartbeat: {
     enabled: true,
     // Non-positional heartbeat. Keep gameplay x/y fully untouched.
-    scaleDelta: 0.02,
-    angleDeltaDeg: 1.2,
+    scaleDelta: 0.045,
+    angleDeltaDeg: 2.8,
     minHalfCycleMs: 170, // NG=0.01 (fatigued) -> faster pulse
     maxHalfCycleMs: 520, // NG=1.00 (fresh) -> slower pulse
   },

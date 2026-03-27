@@ -112,7 +112,6 @@ export class AnimationEngine {
       });
       throw error;
     } finally {
-      stopAllArrivalHeartbeats(this.scene);
       this.isProcessing = false;
     }
   }
