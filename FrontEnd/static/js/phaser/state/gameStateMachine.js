@@ -110,6 +110,7 @@ export function safeTransition(
   debugPayload = {}
 ) {
   if (!machine) return;
+  if (machine.state === next) return;
   const missing = required.filter(
     (key) => ctx[key] === undefined || ctx[key] === null
   );

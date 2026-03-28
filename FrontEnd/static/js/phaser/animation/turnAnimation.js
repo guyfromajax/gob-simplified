@@ -1082,15 +1082,16 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       animationDebugLog(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
     }
     
-    if (playersMoved === 0 || playersMoved === 1) {
+    const scheduledPlayers = promises.length;
+    if (scheduledPlayers <= 1 && Object.keys(playerSprites).length > 2) {
       console.warn('⚠️ [OUTLET STEP] Few players animated:', {
         totalPlayers: Object.keys(playerSprites).length,
-        playersAnimated: playersMoved,
+        playersAnimated: scheduledPlayers,
         playersSkipped,
         playersSkippedReasons
       });
     }
-    animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
+    animationDebugLog(`Total players moved for HCO: ${scheduledPlayers}`);
   } else {
     animationDebugLog('Not HCO or FAST_BREAK scenario, nextPlayType:', nextPlayType);
   }

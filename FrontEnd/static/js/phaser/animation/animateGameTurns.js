@@ -533,8 +533,13 @@ export async function animateGameTurns({ //hasBallAtStep
   };
   scene.events?.on?.('possessionChange', handlePossessionFlip);
   const handleFbTelemetry = createFbTelemetryDebugListener(scene);
+  if (scene?.__fbTelemetryDebugHandler) {
+    scene.events?.off?.("animTelemetry", scene.__fbTelemetryDebugHandler);
+    scene.__fbTelemetryDebugHandler = null;
+  }
   if (handleFbTelemetry) {
     scene.events?.on?.("animTelemetry", handleFbTelemetry);
+    scene.__fbTelemetryDebugHandler = handleFbTelemetry;
   }
 
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
@@ -543,8 +548,9 @@ export async function animateGameTurns({ //hasBallAtStep
   // ✅ Force Foul: Expose current batch so router can pass nextTurn to BIP/SIP (same-turn defender move)
   scene._currentTurnBatch = turns;
 
-  for (let i = 0; i < turns.length; i++) {
-    const turn = turns[i];
+  try {
+    for (let i = 0; i < turns.length; i++) {
+      const turn = turns[i];
     
     // ✅ DEBUG: Log state at start of each turn (to trace state persistence)
     if (i > 0 && (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK")) {
@@ -1252,11 +1258,13 @@ export async function animateGameTurns({ //hasBallAtStep
     if ((DEBUG_FLOW || debugEnabled) && i === turns.length - 1) {
       logVerbose('🔚 animateGameTurns last turn complete');
     }
+    }
+  } finally {
+    scene.events?.off?.('possessionChange', handlePossessionFlip);
+    if (scene?.__fbTelemetryDebugHandler) {
+      scene.events?.off?.("animTelemetry", scene.__fbTelemetryDebugHandler);
+      scene.__fbTelemetryDebugHandler = null;
+    }
+    flushFbTelemetryDebugSummary(scene);
   }
-
-  scene.events?.off?.('possessionChange', handlePossessionFlip);
-  if (handleFbTelemetry) {
-    scene.events?.off?.("animTelemetry", handleFbTelemetry);
-  }
-  flushFbTelemetryDebugSummary(scene);
 }

@@ -211,10 +211,10 @@ function getSession(scene) {
 
 export function createFbTelemetryDebugListener(scene) {
   installGlobalHelpers();
-  if (!isEnabled()) return null;
-  const thresholds = resolveThresholds();
 
   return function onAnimTelemetry(payload = {}) {
+    if (!isEnabled()) return;
+    const thresholds = resolveThresholds();
     const event = payload?.event;
     if (!event || typeof event !== "string") return;
     if (!event.startsWith("fb_")) return;

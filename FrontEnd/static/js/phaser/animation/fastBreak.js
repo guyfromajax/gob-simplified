@@ -296,7 +296,10 @@ async function awaitWithTimeout(promise, timeoutMs, label) {
     });
     const result = await Promise.race([promise, timeoutPromise]);
     if (result === "__timeout__") {
-      console.warn(`[FB animation] timeout while awaiting ${label}`, { timeoutMs: ms });
+      const expectedSettleTimeout = label === "rim_runner_burst_secondary_settle";
+      if (!expectedSettleTimeout || isAnimationDebugEnabled()) {
+        console.warn(`[FB animation] timeout while awaiting ${label}`, { timeoutMs: ms });
+      }
       return false;
     }
     return true;
@@ -555,6 +558,79 @@ function findOffensePgPlayerId(scene, playerSprites, offenseTeamId) {
     if (pos === "PG") return String(id);
   }
   return null;
+}
+
+function resolvePlayerSpriteById(playerSprites, rawId) {
+  if (!playerSprites || rawId == null) return { id: null, sprite: null };
+  const sid = String(rawId);
+  if (playerSprites[sid]) return { id: sid, sprite: playerSprites[sid] };
+  if (playerSprites[rawId]) return { id: rawId, sprite: playerSprites[rawId] };
+  const num = Number(rawId);
+  if (Number.isFinite(num) && playerSprites[num]) return { id: num, sprite: playerSprites[num] };
+  return { id: sid, sprite: null };
+}
+
+function appendUniqueIdCandidate(list, seen, rawId, source) {
+  if (rawId == null) return;
+  const sid = String(rawId).trim();
+  if (!sid || seen.has(sid)) return;
+  seen.add(sid);
+  list.push({ rawId, sid, source });
+}
+
+function collectFastBreakDefenderCandidates(turnData) {
+  const list = [];
+  const seen = new Set();
+  appendUniqueIdCandidate(list, seen, turnData?.defender_id, "turnData.defender_id");
+  appendUniqueIdCandidate(list, seen, turnData?.defenderId, "turnData.defenderId");
+
+  const defenderObj = turnData?.defender ?? turnData?.roles?.defender;
+  if (defenderObj && typeof defenderObj === "object") {
+    appendUniqueIdCandidate(list, seen, defenderObj.player_id, "defender.player_id");
+    appendUniqueIdCandidate(list, seen, defenderObj.playerId, "defender.playerId");
+  } else {
+    appendUniqueIdCandidate(list, seen, defenderObj, "defender");
+  }
+
+  if (Array.isArray(turnData?.roles?.defense)) {
+    turnData.roles.defense.forEach((d, i) => {
+      if (d && typeof d === "object") {
+        appendUniqueIdCandidate(list, seen, d.player_id, `roles.defense[${i}].player_id`);
+        appendUniqueIdCandidate(list, seen, d.playerId, `roles.defense[${i}].playerId`);
+      } else {
+        appendUniqueIdCandidate(list, seen, d, `roles.defense[${i}]`);
+      }
+    });
+  }
+
+  return list;
+}
+
+function resolveFastBreakDefenderSprite(playerSprites, turnData, { excludeIds = [] } = {}) {
+  const excluded = new Set(
+    (excludeIds || [])
+      .filter((id) => id != null)
+      .map((id) => String(id))
+  );
+  const candidates = collectFastBreakDefenderCandidates(turnData);
+  for (const candidate of candidates) {
+    if (excluded.has(candidate.sid)) continue;
+    const ref = resolvePlayerSpriteById(playerSprites, candidate.rawId);
+    if (ref?.sprite) {
+      return {
+        id: ref.id,
+        sprite: ref.sprite,
+        source: candidate.source,
+        candidates: candidates.map((c) => ({ id: c.sid, source: c.source })),
+      };
+    }
+  }
+  return {
+    id: candidates[0]?.sid ?? null,
+    sprite: null,
+    source: null,
+    candidates: candidates.map((c) => ({ id: c.sid, source: c.source })),
+  };
 }
 
 /**
@@ -1130,32 +1206,21 @@ export async function runFastBreakSequence({
   const branchKind = deriveFbBranchKind(turnData, phase2Kind);
   initFbTelemetryContext(scene, { turnData, turnIndex, branchKind });
 
-  if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
-    await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
-  }
-
-  if (phase2Kind === "fast_break_shot") {
-    if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
-      await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
-    } else {
-      await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+  try {
+    if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
+      await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
     }
-  } else if (phase2Kind === "fast_break_shot_foul") {
-    await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
-  } else if (phase2Kind === "rim_runner_steal") {
-    await animateRimRunnerInterception(
-      scene,
-      turnData,
-      playerSprites,
-      ballSprite,
-      width,
-      height
-    );
-  } else if (phase2Kind === "rim_runner_bat_oob") {
-    await animateRimRunnerBatOob(scene, turnData, playerSprites, ballSprite, width, height);
-  } else if (phase2Kind === "rim_runner_hco_settle") {
-    if (!turnData.rim_runner_outlet_failed) {
-      await animateRimRunnerHoldUpLeadIn(
+
+    if (phase2Kind === "fast_break_shot") {
+      if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
+        await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
+      } else {
+        await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+      }
+    } else if (phase2Kind === "fast_break_shot_foul") {
+      await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
+    } else if (phase2Kind === "rim_runner_steal") {
+      await animateRimRunnerInterception(
         scene,
         turnData,
         playerSprites,
@@ -1163,26 +1228,39 @@ export async function runFastBreakSequence({
         width,
         height
       );
-    }
-    if (turnData.rim_runner_outlet_failed) {
-      await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+    } else if (phase2Kind === "rim_runner_bat_oob") {
+      await animateRimRunnerBatOob(scene, turnData, playerSprites, ballSprite, width, height);
+    } else if (phase2Kind === "rim_runner_hco_settle") {
+      if (!turnData.rim_runner_outlet_failed) {
+        await animateRimRunnerHoldUpLeadIn(
+          scene,
+          turnData,
+          playerSprites,
+          ballSprite,
+          width,
+          height
+        );
+      }
+      if (turnData.rim_runner_outlet_failed) {
+        await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+      } else {
+        await finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites);
+      }
     } else {
-      await finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites);
+      await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
     }
-  } else {
-    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
-  }
-  
-  if (scene.skipToEnd) {
+    
+    if (scene.skipToEnd) {
+      return;
+    }
+    
+    // ============================================================================
+    // PHASE 3: CLEANUP & STATE TRANSITIONS
+    // ============================================================================
+    scene.events?.emit("fb:end");
+  } finally {
     finalizeFbTelemetry(scene);
-    return;
   }
-  
-  // ============================================================================
-  // PHASE 3: CLEANUP & STATE TRANSITIONS
-  // ============================================================================
-  scene.events?.emit("fb:end");
-  finalizeFbTelemetry(scene);
 }
 
 /**
@@ -1624,8 +1702,14 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   // ✅ FIX: Import showAnnouncement/showAndOneAnnouncement at the start of the function (AND-1 / shooting foul in Fast Break path)
   const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
   
-  const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || turnData.roles?.ball_handler?.player_id || getCurrentOwner(scene);
-  const shooterSprite = playerSprites[shooterId];
+  const shooterRawId =
+    turnData.roles?.shooter?.player_id ||
+    turnData.shooter_id ||
+    turnData.roles?.ball_handler?.player_id ||
+    getCurrentOwner(scene);
+  const shooterRef = resolvePlayerSpriteById(playerSprites, shooterRawId);
+  const shooterId = shooterRef.id;
+  const shooterSprite = shooterRef.sprite;
   
   if (!shooterSprite) return;
   
@@ -1663,8 +1747,9 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   promises.push(shooterPromise);
   
   // Move stopper to stopper position (between ball handler start and basket)
-  const stopperId = turnData.stopper_id;
-  const stopperSprite = stopperId ? playerSprites[stopperId] : null;
+  const stopperRef = resolvePlayerSpriteById(playerSprites, turnData.stopper_id);
+  const stopperId = stopperRef.id;
+  const stopperSprite = stopperRef.sprite;
   let stopperPromise = null;
   
   if (stopperSprite) {
@@ -1700,14 +1785,12 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     promises.push(stopperPromise);
   }
   
-  // Move primary defender (if different from stopper)
-  let defenderId = turnData.defenderId || turnData.roles?.defender?.player_id;
-  if (!defenderId && turnData.roles?.defense && turnData.roles.defense[0]) {
-    const defenderData = turnData.roles.defense[0];
-    defenderId = typeof defenderData === 'string' ? defenderData : (defenderData.player_id || defenderData.playerId);
-  }
-  
-  const defenderSprite = defenderId && defenderId !== stopperId ? playerSprites[defenderId] : null;
+  // Move primary defender (if different from stopper/shooter)
+  const defenderRef = resolveFastBreakDefenderSprite(playerSprites, turnData, {
+    excludeIds: [stopperId, shooterId],
+  });
+  const defenderId = defenderRef.id;
+  const defenderSprite = defenderRef.sprite;
   
   if (defenderSprite) {
     let defenderSpot;
@@ -1753,6 +1836,15 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         easing: "Linear"
       })
     );
+  } else if (defenderId) {
+    console.warn("🏀 FB Shot (with stopper) - No trail defender sprite found!", {
+      defenderId,
+      source: defenderRef.source,
+      candidates: defenderRef.candidates,
+      stopperId,
+      shooterId,
+      availableSprites: Object.keys(playerSprites),
+    });
   }
   
   // Move all other players to standard positions
@@ -1898,11 +1990,14 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       return;
     }
     
-    const rebounderSprite = playerSprites[rebounderId];
+    const rebounderRef = resolvePlayerSpriteById(playerSprites, rebounderId);
+    const rebounderSprite = rebounderRef.sprite;
+    const rebounderIdResolved = rebounderRef.id;
     
     if (!rebounderSprite) {
       console.error('⚠️ [FAST BREAK MISS WITH STOPPER] Rebounder sprite not found', {
         rebounderId,
+        rebounderIdResolved,
         availableSprites: Object.keys(playerSprites)
       });
       // Return early - rebound will be handled by next turn
@@ -1961,7 +2056,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       ballSprite,
       playerSprites,
       animations: [],
-      rebounderId,
+      rebounderId: rebounderIdResolved ?? rebounderId,
       ballSpot: miss.grid,
       shooterId,
       turnData: turnData
@@ -1983,8 +2078,10 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
 }
 
 async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, options = {}) {
-  const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || getCurrentOwner(scene);
-  const shooterSprite = playerSprites[shooterId];
+  const shooterRawId = turnData.roles?.shooter?.player_id || turnData.shooter_id || getCurrentOwner(scene);
+  const shooterRef = resolvePlayerSpriteById(playerSprites, shooterRawId);
+  const shooterId = shooterRef.id;
+  const shooterSprite = shooterRef.sprite;
   
   if (!shooterSprite) return;
   
@@ -2023,17 +2120,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   });
   promises.push(shooterPromise);
   
-  // ✅ SS&S: Defender id from backend (defender_id or defenderId), then fallback to roles
-  let defenderId = turnData.defender_id ?? turnData.defenderId;
-  if (!defenderId) {
-    const defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
-    if (defenderData) {
-      if (typeof defenderData === "string") defenderId = defenderData;
-      else defenderId = defenderData.player_id ?? defenderData.playerId;
-    }
-  }
-
-  const defenderSprite = defenderId ? playerSprites[defenderId] : null;
+  // ✅ SS&S: Resolve defender from all supported payload shapes.
+  const defenderRef = resolveFastBreakDefenderSprite(playerSprites, turnData, {
+    excludeIds: [shooterId],
+  });
+  let defenderId = defenderRef.id;
+  const defenderSprite = defenderRef.sprite;
 
   if (defenderSprite) {
     // ✅ SS&S: Use backend defender_spot when present (grid coords, HOME orientation); else fallback to spot between shooter and basket
@@ -2080,6 +2172,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   } else if (defenderId) {
     console.warn("🏀 FB Shot - No defender sprite found!", {
       defenderId,
+      source: defenderRef.source,
+      candidates: defenderRef.candidates,
       turnDataDefenderId: turnData.defender_id ?? turnData.defenderId,
       availableSprites: Object.keys(playerSprites)
     });
@@ -2145,7 +2239,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // Handle outcome
   if (turnData.result_type === "MAKE") {
     // Show announcement with shooter headshot (AND-1 handled here; ballManager path not used for Fast Break)
-    const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
+    const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
     const shooterInfo = scene.playerInfo?.[shooterId];
     const shooterTeamId = shooterSprite?.team_id;
     
@@ -2240,7 +2334,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const rebounderId = turnData.rebounderId || turnData.rebounder_id || turnData.rebounder_player_id || turnData.roles?.rebounder?.player_id;
 
     if (rebounderId) {
-      const rebounderSprite = playerSprites[rebounderId];
+      const rebounderRef = resolvePlayerSpriteById(playerSprites, rebounderId);
+      const rebounderSprite = rebounderRef.sprite;
+      const rebounderIdResolved = rebounderRef.id;
       if (rebounderSprite) {
         if (rebounderTweens.length > 0) {
           let monitoringActive = true;
@@ -2265,7 +2361,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
           ballSprite,
           playerSprites,
           animations: [],
-          rebounderId,
+          rebounderId: rebounderIdResolved ?? rebounderId,
           ballSpot: miss.grid,
           shooterId,
           turnData: missTurnForGetback
@@ -2276,7 +2372,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
             scene,
             ballSprite,
             playerSprites,
-            rebounderId,
+            rebounderId: rebounderIdResolved ?? rebounderId,
             nextPlayType: turnData.next_play_type || "HCO",
             turnData
           });
@@ -2356,11 +2452,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       return;
     }
     
-    const rebounderSprite = playerSprites[rebounderId];
+    const rebounderRef = resolvePlayerSpriteById(playerSprites, rebounderId);
+    const rebounderSprite = rebounderRef.sprite;
+    const rebounderIdResolved = rebounderRef.id;
     
     if (!rebounderSprite) {
       console.error('⚠️ [FAST BREAK MISS] Rebounder sprite not found', {
         rebounderId,
+        rebounderIdResolved,
         availableSprites: Object.keys(playerSprites)
       });
       // Return early - rebound will be handled by next turn
@@ -2409,7 +2508,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       ballSprite,
       playerSprites,
       animations: [],
-      rebounderId,
+      rebounderId: rebounderIdResolved ?? rebounderId,
       ballSpot: miss.grid,
       shooterId,
       turnData: missTurnForGetback // ✅ FIX: Pass previous HCO MISS turn (has offense_getback) so get-back players can be excluded
@@ -2422,7 +2521,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         scene,
         ballSprite,
         playerSprites,
-        rebounderId,
+        rebounderId: rebounderIdResolved ?? rebounderId,
         nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
         turnData: turnData // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
         // runDefensiveReboundSetup will find offense_getback from previous turn if needed
