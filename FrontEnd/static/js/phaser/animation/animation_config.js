@@ -97,8 +97,8 @@ const defaults = {
     jitterPx: 0.2,
     // BPM mapping:
     // NG=1.00 -> minBpm, NG=0.01 -> maxBpm
-    minBpm: 116,
-    maxBpm: 1160,
+    minBpm: 75,
+    maxBpm: 750,
   },
   possession: {
     msPerTick: 1,

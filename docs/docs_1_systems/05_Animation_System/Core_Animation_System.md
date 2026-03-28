@@ -151,7 +151,7 @@ The clamp is intentionally skipped for turn types that need out-of-bounds lanes:
 
 Heartbeat is applied consistently to active player sprites as a visual micro-movement layer, with tempo scaled by `NG`.
 
-- **NG tempo contract:** `NG=1.00 -> 116 BPM`, `NG=0.01 -> 1160 BPM`
+- **NG tempo contract:** `NG=1.00 -> 75 BPM`, `NG=0.01 -> 750 BPM`
 - **Mapping:** linear interpolation in BPM space between the above anchors
 - **Cycle timing:** `halfCycleMs = 30000 / BPM` (full cycle = `60000 / BPM`)
 - **Visual movement:** render-space drift only (no gameplay coordinate ownership changes)

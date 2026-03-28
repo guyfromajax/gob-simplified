@@ -43,8 +43,8 @@ function resolveRole(scene, sprite) {
 }
 
 function resolveHeartbeatBpm(ng, cfg) {
-  const minBpm = Number.isFinite(cfg?.minBpm) ? cfg.minBpm : 116;
-  const maxBpm = Number.isFinite(cfg?.maxBpm) ? cfg.maxBpm : 1160;
+  const minBpm = Number.isFinite(cfg?.minBpm) ? cfg.minBpm : 75;
+  const maxBpm = Number.isFinite(cfg?.maxBpm) ? cfg.maxBpm : 750;
   const clampedMin = Math.max(1, minBpm);
   const clampedMax = Math.max(clampedMin, maxBpm);
   const normalizedNg = (ng - 0.01) / 0.99; // 0 at NG=0.01, 1 at NG=1.0
