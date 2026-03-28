@@ -18,6 +18,7 @@ import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 import HCOAnimationSystem from './HCOAnimationSystem.js';
 import gameStore from '../../state/gameStore.js';
+import { ensureConsistentHeartbeat, stopAllArrivalHeartbeats } from './arrivalHeartbeat.js';
 
 export class AnimationEngine {
   constructor(scene) {
@@ -90,6 +91,7 @@ export class AnimationEngine {
     // }
 
     this.isProcessing = true;
+    ensureConsistentHeartbeat(this.scene, context.playerSprites || this.playerSprites || this.scene?.playerSprites || null);
 
     try {
       // Processing (log removed)
@@ -110,6 +112,7 @@ export class AnimationEngine {
       });
       throw error;
     } finally {
+      // Keep heartbeat running consistently across turns; only full-cleanup on teardown.
       this.isProcessing = false;
     }
   }
@@ -1120,6 +1123,9 @@ export class AnimationEngine {
     this.ballController = ballController;
     this.stateMachine = stateMachine;
     this.playerSprites = playerSprites;
+    ensureConsistentHeartbeat(this.scene, this.playerSprites);
+    this.scene?.events?.once?.('shutdown', () => stopAllArrivalHeartbeats(this.scene));
+    this.scene?.events?.once?.('destroy', () => stopAllArrivalHeartbeats(this.scene));
     
     // Initialize animation systems (stateMachine is optional)
     if (this.ballController && this.playerSprites) {
