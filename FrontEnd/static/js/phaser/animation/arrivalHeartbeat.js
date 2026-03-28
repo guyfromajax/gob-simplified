@@ -52,10 +52,78 @@ function safeStopTween(tween) {
   }
 }
 
-function restoreOrigin(sprite, state) {
-  if (!sprite || sprite.active === false || sprite.destroyed || !state) return;
-  if (Number.isFinite(state.displayOriginX)) sprite.displayOriginX = state.displayOriginX;
-  if (Number.isFinite(state.displayOriginY)) sprite.displayOriginY = state.displayOriginY;
+function isWritableProperty(target, prop) {
+  if (!target) return false;
+  let current = target;
+  while (current) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, prop);
+    if (descriptor) {
+      if (descriptor.set) return true;
+      if (descriptor.writable === true) return true;
+      return false;
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  return prop in target;
+}
+
+function resolveHeartbeatTarget(sprite) {
+  // Sprite-like objects: use display origin when writable.
+  if (
+    isWritableProperty(sprite, "displayOriginX") &&
+    isWritableProperty(sprite, "displayOriginY")
+  ) {
+    return {
+      target: sprite,
+      mode: "origin",
+      xProp: "displayOriginX",
+      yProp: "displayOriginY",
+      baseX: Number(sprite.displayOriginX),
+      baseY: Number(sprite.displayOriginY),
+    };
+  }
+
+  // Container-like objects: use the first render child's local x/y.
+  const firstChild =
+    Array.isArray(sprite?.list) && sprite.list.length > 0 ? sprite.list[0] : null;
+  if (
+    firstChild &&
+    isWritableProperty(firstChild, "x") &&
+    isWritableProperty(firstChild, "y")
+  ) {
+    return {
+      target: firstChild,
+      mode: "child_local",
+      xProp: "x",
+      yProp: "y",
+      baseX: Number(firstChild.x),
+      baseY: Number(firstChild.y),
+    };
+  }
+
+  // Last-resort fallback (non-movement visual pulse).
+  if (
+    isWritableProperty(sprite, "scaleX") &&
+    isWritableProperty(sprite, "scaleY")
+  ) {
+    return {
+      target: sprite,
+      mode: "scale",
+      xProp: "scaleX",
+      yProp: "scaleY",
+      baseX: Number(sprite.scaleX),
+      baseY: Number(sprite.scaleY),
+    };
+  }
+  return null;
+}
+
+function restoreTargetState(entry) {
+  const target = entry?.target;
+  const state = entry?.baseState;
+  if (!target || !state) return;
+  if (Number.isFinite(state.x)) target[entry.xProp] = state.x;
+  if (Number.isFinite(state.y)) target[entry.yProp] = state.y;
 }
 
 function isEntryLive(entry, sprite) {
@@ -93,7 +161,7 @@ export function ensureConsistentHeartbeat(scene, sprites = null) {
       if (isEntryLive(existing, sprite)) continue;
       if (existing) {
         safeStopTween(existing.tween);
-        restoreOrigin(existing.sprite, existing.baseState);
+        restoreTargetState(existing);
         store.delete(key);
       }
 
@@ -106,29 +174,49 @@ export function ensureConsistentHeartbeat(scene, sprites = null) {
       const dx = delta * dir.x;
       const dy = delta * dir.y;
 
+      const resolved = resolveHeartbeatTarget(sprite);
+      if (!resolved) continue;
+
       const baseState = {
-        displayOriginX: Number(sprite.displayOriginX),
-        displayOriginY: Number(sprite.displayOriginY),
+        x: resolved.baseX,
+        y: resolved.baseY,
       };
 
+      const tweenProps = {};
+      if (resolved.mode === "scale") {
+        // Keep fallback subtle and centered around current shape.
+        tweenProps[resolved.xProp] = baseState.x * (1 + (delta * 0.015));
+        tweenProps[resolved.yProp] = baseState.y * (1 - (delta * 0.015));
+      } else {
+        tweenProps[resolved.xProp] = baseState.x + dx;
+        tweenProps[resolved.yProp] = baseState.y + dy;
+      }
+
       const tween = scene.tweens.add({
-        targets: sprite,
-        displayOriginX: baseState.displayOriginX + dx,
-        displayOriginY: baseState.displayOriginY + dy,
+        targets: resolved.target,
+        ...tweenProps,
         duration: halfCycleMs,
         ease: "Sine.easeInOut",
         yoyo: true,
         repeat: -1,
       });
 
-      store.set(key, { sprite, tween, baseState });
+      store.set(key, {
+        sprite,
+        target: resolved.target,
+        mode: resolved.mode,
+        xProp: resolved.xProp,
+        yProp: resolved.yProp,
+        tween,
+        baseState,
+      });
     }
 
     // Cleanup entries for sprites no longer present.
     for (const [key, entry] of store.entries()) {
       if (liveKeys.has(key)) continue;
       safeStopTween(entry?.tween);
-      restoreOrigin(entry?.sprite, entry?.baseState);
+      restoreTargetState(entry);
       store.delete(key);
     }
   } catch (_) {
@@ -142,7 +230,7 @@ export function stopAllArrivalHeartbeats(scene) {
     if (!store) return;
     for (const entry of store.values()) {
       safeStopTween(entry?.tween);
-      restoreOrigin(entry?.sprite, entry?.baseState);
+      restoreTargetState(entry);
     }
     store.clear();
   } catch (_) {
