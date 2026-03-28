@@ -2,13 +2,14 @@
  * Read per-player end coordinates from turn.animations (sim animator output, HOME grid).
  * Used by fast break (and similar) so the client tweens to the same spot the backend chose.
  */
+import { CLAMP_BOUNDS } from "../animation/courtClamp.js";
 
 function clampGridX(x) {
-  return Math.max(4, Math.min(97, x));
+  return Math.max(CLAMP_BOUNDS.minX, Math.min(CLAMP_BOUNDS.maxX, x));
 }
 
 function clampGridY(y) {
-  return Math.max(1, Math.min(49, y));
+  return Math.max(CLAMP_BOUNDS.minY, Math.min(CLAMP_BOUNDS.maxY, y));
 }
 
 /**

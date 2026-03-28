@@ -26,6 +26,7 @@ import {
   animationDebugWarn,
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
+import { CLAMP_BOUNDS } from "./courtClamp.js";
 
 /**
  * ✅ PHASE 3.3: Removed wrapper function
@@ -167,7 +168,11 @@ export async function bounceFromRim(
     rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
     
   // Ensure bounce stays in bounds
-  const clampedBounceX = Phaser.Math.Clamp(bounceGridX, 4, 97);
+  const clampedBounceX = Phaser.Math.Clamp(
+    bounceGridX,
+    CLAMP_BOUNDS.minX,
+    CLAMP_BOUNDS.maxX
+  );
   const clampedBounceY = Phaser.Math.Clamp(bounceGridY, 1, 50);
   
   const bounce = gridToPixels(

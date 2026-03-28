@@ -6,6 +6,7 @@
  * 
  * All coordinates are in HOME orientation (basket at x=91 for home, x=9 for away).
  */
+import { CLAMP_BOUNDS } from "../animation/courtClamp.js";
 
 /**
  * When false, skips the **"Fast Break!"** entry banners (turn start / FAST_BREAK context).
@@ -37,11 +38,11 @@ export function fastBreakShotDefenderGridVsShooter(bhX, bhY, isHomeOffense, stac
   const towardBasket = isHomeOffense ? 1 : -1;
   const xSteps = SHOT_DEFENDER_X_OFFSET + Math.max(0, stackIndex);
   let x = bhX + towardBasket * xSteps;
-  x = Math.max(4, Math.min(97, x));
+  x = Math.max(CLAMP_BOUNDS.minX, Math.min(CLAMP_BOUNDS.maxX, x));
   const yOff =
     -SHOT_DEFENDER_Y_RANGE +
     Math.floor(Math.random() * (2 * SHOT_DEFENDER_Y_RANGE + 1));
-  let y = Math.max(1, Math.min(49, bhY + yOff));
+  let y = Math.max(CLAMP_BOUNDS.minY, Math.min(CLAMP_BOUNDS.maxY, bhY + yOff));
   return { x, y };
 }
 

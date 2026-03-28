@@ -12,6 +12,7 @@ import { pauseTweensOfPlayerSprites } from "../utils/playerSpriteTweenPause.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
+import { CLAMP_BOUNDS } from "./courtClamp.js";
 import {
   REBOUNDER_X_MIN,
   REBOUNDER_X_MAX,
@@ -24,6 +25,12 @@ import {
   STEAL_ENTRY_Y_MAX,
   fastBreakShotDefenderGridVsShooter,
 } from "../constants/fastBreakConstants.js";
+
+
+const GRID_MIN_X = CLAMP_BOUNDS.minX;
+const GRID_MAX_X = CLAMP_BOUNDS.maxX;
+const GRID_MIN_Y = CLAMP_BOUNDS.minY;
+const GRID_MAX_Y = CLAMP_BOUNDS.maxY;
 
 /**
  * Phase 2 resolution kind for fast break turns — mirrors Rim Runner payload contract
@@ -352,8 +359,8 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
       : phase?.rr_to?.y ?? 25;
 
   const catchGrid = {
-    x: Phaser.Math.Clamp(rrGridX + 6 * towardBasket, 4, 97),
-    y: Phaser.Math.Clamp(rrGridY, 1, 49),
+    x: Phaser.Math.Clamp(rrGridX + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(rrGridY, GRID_MIN_Y, GRID_MAX_Y),
   };
   const catchPx = gridToPixels(catchGrid.x, catchGrid.y, width, height);
 
@@ -397,8 +404,8 @@ function rimRunnerSpriteGrid(sprite, width, height) {
   }
   if (!sprite) return { x: 50, y: 25 };
   return {
-    x: Phaser.Math.Clamp((sprite.x / width) * 100, 4, 97),
-    y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, 1, 49),
+    x: Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y),
   };
 }
 
@@ -445,7 +452,7 @@ function rimRunnerAgHorizontalDriftPromises(
     const g = rimRunnerSpriteGrid(sprite, width, height);
     const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
     const direction = towardBasket >= 0 ? 1 : -1;
-    const startX = Phaser.Math.Clamp(g.x, 4, 97);
+    const startX = Phaser.Math.Clamp(g.x, GRID_MIN_X, GRID_MAX_X);
     const strideAbs = Math.abs(stride);
     const boundedStartX = Phaser.Math.Clamp(startX, minDriftX, maxDriftX);
     const maxStrideToward =
@@ -454,8 +461,8 @@ function rimRunnerAgHorizontalDriftPromises(
         : Math.max(0, boundedStartX - minDriftX);
     const usedStride = Math.min(strideAbs, maxStrideToward) * direction;
     const proposedEndX = startX + stride * direction;
-    const endX = Phaser.Math.Clamp(boundedStartX + usedStride, 4, 97);
-    const endY = Phaser.Math.Clamp(g.y, 1, 49);
+    const endX = Phaser.Math.Clamp(boundedStartX + usedStride, GRID_MIN_X, GRID_MAX_X);
+    const endY = Phaser.Math.Clamp(g.y, GRID_MIN_Y, GRID_MAX_Y);
     if (Math.abs(strideAbs - Math.abs(usedStride)) > 0.001) {
       incrementFbCounter(scene, "fbClampCount", 1);
       const speedPxPerSec = phaseDurationMs > 0
@@ -602,8 +609,8 @@ async function animateRimRunnerOutletDeniedBeat(
 
   const pg = rimRunnerSpriteGrid(passerSprite, width, height);
   const defenderTarget = {
-    x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, 4, 97),
-    y: Phaser.Math.Clamp(pg.y, 1, 49),
+    x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(pg.y, GRID_MIN_Y, GRID_MAX_Y),
   };
 
   if (defSprite && scene.tweens) {
@@ -651,8 +658,8 @@ async function animateRimRunnerOutletDeniedBeat(
   });
 
   const recvTarget = {
-    x: Phaser.Math.Clamp(pg.x, 4, 97),
-    y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, 1, 49),
+    x: Phaser.Math.Clamp(pg.x, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, GRID_MIN_Y, GRID_MAX_Y),
   };
 
   const rawPasserFallback = turnData.roles?.outlet_passer;
@@ -698,8 +705,8 @@ async function animateRimRunnerOutletDeniedBeat(
     if (!sprite) continue;
     const pid = sid(pidRaw);
     if (pid === passerId || pid === recvId || pid === defId) continue;
-    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, 4, 97);
-    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, 1, 49);
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y);
     setRimRunnerSpriteGrid(sprite, gx, gy);
   }
 
@@ -769,8 +776,8 @@ async function animateRimRunnerHoldUpLeadIn(
 
   const bhg = rimRunnerSpriteGrid(bh, width, height);
   const settleBh = {
-    x: Phaser.Math.Clamp(bhg.x + 6 * towardBasket, 4, 97),
-    y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, 1, 49),
+    x: Phaser.Math.Clamp(bhg.x + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, GRID_MIN_Y, GRID_MAX_Y),
   };
   const bhTargetPx = gridToPixels(settleBh.x, settleBh.y, width, height);
   const phaseDurationMs = clampRrAgSharedPhaseDurationMs(
@@ -802,8 +809,8 @@ async function animateRimRunnerHoldUpLeadIn(
   setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
   for (const [pid, sprite] of Object.entries(playerSprites)) {
     if (sid(pid) === bhId || !sprite) continue;
-    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, 4, 97);
-    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, 1, 49);
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y);
     setRimRunnerSpriteGrid(sprite, gx, gy);
   }
 
@@ -852,15 +859,15 @@ async function animateRimRunnerInterception(
     rr && typeof rr.gridY === "number"
       ? rr.gridY
       : phase?.rr_to?.y ?? 25;
-  const catchGx = Phaser.Math.Clamp(rrGx + 6 * towardBasket, 4, 97);
-  const catchGy = Phaser.Math.Clamp(rrGy, 1, 49);
+  const catchGx = Phaser.Math.Clamp(rrGx + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const catchGy = Phaser.Math.Clamp(rrGy, GRID_MIN_Y, GRID_MAX_Y);
 
   const vg = rimRunnerSpriteGrid(victim, width, height);
-  const laneX = Phaser.Math.Clamp((vg.x + catchGx) / 2 + 2 * towardBasket, 4, 97);
-  const laneY = Phaser.Math.Clamp((vg.y + catchGy) / 2, 1, 49);
+  const laneX = Phaser.Math.Clamp((vg.x + catchGx) / 2 + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const laneY = Phaser.Math.Clamp((vg.y + catchGy) / 2, GRID_MIN_Y, GRID_MAX_Y);
   const lanePx = gridToPixels(laneX, laneY, width, height);
 
-  const partialGx = Phaser.Math.Clamp(rrGx + 3 * towardBasket, 4, 97);
+  const partialGx = Phaser.Math.Clamp(rrGx + 3 * towardBasket, GRID_MIN_X, GRID_MAX_X);
   const partialPx = gridToPixels(partialGx, catchGy, width, height);
 
   const tw = [
@@ -962,15 +969,15 @@ async function animateRimRunnerBatOob(
   const towardBasket = away ? -1 : 1;
   const bg = rimRunnerSpriteGrid(bh, width, height);
   const rg = rr ? rimRunnerSpriteGrid(rr, width, height) : { x: phase?.rr_to?.x ?? bg.x, y: phase?.rr_to?.y ?? bg.y };
-  const catchGx = Phaser.Math.Clamp(rg.x + 6 * towardBasket, 4, 97);
-  const catchGy = Phaser.Math.Clamp(rg.y, 1, 49);
-  const laneX = Phaser.Math.Clamp((bg.x + catchGx) / 2 + towardBasket, 4, 97);
-  const laneY = Phaser.Math.Clamp((bg.y + catchGy) / 2, 1, 49);
+  const catchGx = Phaser.Math.Clamp(rg.x + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const catchGy = Phaser.Math.Clamp(rg.y, GRID_MIN_Y, GRID_MAX_Y);
+  const laneX = Phaser.Math.Clamp((bg.x + catchGx) / 2 + towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const laneY = Phaser.Math.Clamp((bg.y + catchGy) / 2, GRID_MIN_Y, GRID_MAX_Y);
 
   const movers = [];
   if (rr) {
     const pc = gridToPixels(
-      Phaser.Math.Clamp(rg.x + 4 * towardBasket, 4, 97),
+      Phaser.Math.Clamp(rg.x + 4 * towardBasket, GRID_MIN_X, GRID_MAX_X),
       catchGy,
       width,
       height
@@ -1003,8 +1010,8 @@ async function animateRimRunnerBatOob(
   const defG = defSp ? rimRunnerSpriteGrid(defSp, width, height) : bg;
   const oobY = defG.y > 24 ? 1 : 51;
   const oobGrid = {
-    x: Phaser.Math.Clamp(defG.x, 4, 97),
-    y: Phaser.Math.Clamp(oobY, 1, 49),
+    x: Phaser.Math.Clamp(defG.x, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(oobY, GRID_MIN_Y, GRID_MAX_Y),
   };
   const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
 
@@ -1628,8 +1635,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   let shotSpot;
   if (turnData.shot_spot && typeof turnData.shot_spot.x === "number" && typeof turnData.shot_spot.y === "number") {
     shotSpot = {
-      x: Phaser.Math.Clamp(turnData.shot_spot.x, 4, 97),
-      y: Phaser.Math.Clamp(turnData.shot_spot.y, 1, 49),
+      x: Phaser.Math.Clamp(turnData.shot_spot.x, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(turnData.shot_spot.y, GRID_MIN_Y, GRID_MAX_Y),
     };
   } else {
     shotSpot = {
@@ -1638,8 +1645,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         : basket.x + Phaser.Math.Between(2, 6),
       y: basket.y + Phaser.Math.Between(-6, 6),
     };
-    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
-    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, GRID_MIN_X, GRID_MAX_X);
+    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, GRID_MIN_Y, GRID_MAX_Y);
   }
   
   const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
@@ -1710,8 +1717,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       typeof turnData.defender_spot.y === "number"
     ) {
       defenderSpot = {
-        x: Phaser.Math.Clamp(turnData.defender_spot.x, 4, 97),
-        y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49),
+        x: Phaser.Math.Clamp(turnData.defender_spot.x, GRID_MIN_X, GRID_MAX_X),
+        y: Phaser.Math.Clamp(turnData.defender_spot.y, GRID_MIN_Y, GRID_MAX_Y),
       };
     } else {
       const defenderAnimEnd = getAnimationEndGridForPlayer(turnData, defenderId);
@@ -1989,16 +1996,16 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   let shotSpot;
   if (turnData.shot_spot && typeof turnData.shot_spot.x === "number" && typeof turnData.shot_spot.y === "number") {
     shotSpot = {
-      x: Phaser.Math.Clamp(turnData.shot_spot.x, 4, 97),
-      y: Phaser.Math.Clamp(turnData.shot_spot.y, 1, 49)
+      x: Phaser.Math.Clamp(turnData.shot_spot.x, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(turnData.shot_spot.y, GRID_MIN_Y, GRID_MAX_Y)
     };
   } else {
     shotSpot = {
       x: isHomeOffense ? basket.x - Phaser.Math.Between(2, 6) : basket.x + Phaser.Math.Between(2, 6),
       y: basket.y + Phaser.Math.Between(-6, 6)
     };
-    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
-    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, GRID_MIN_X, GRID_MAX_X);
+    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, GRID_MIN_Y, GRID_MAX_Y);
   }
 
   const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
@@ -2033,8 +2040,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     let defenderSpot;
     if (turnData.defender_spot && typeof turnData.defender_spot.x === "number" && typeof turnData.defender_spot.y === "number") {
       defenderSpot = {
-        x: Phaser.Math.Clamp(turnData.defender_spot.x, 4, 97),
-        y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49)
+        x: Phaser.Math.Clamp(turnData.defender_spot.x, GRID_MIN_X, GRID_MAX_X),
+        y: Phaser.Math.Clamp(turnData.defender_spot.y, GRID_MIN_Y, GRID_MAX_Y)
       };
     } else {
       const defenderAnimEnd = getAnimationEndGridForPlayer(turnData, defenderId);
@@ -2519,7 +2526,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
               x: isHomeOffense ? topKey.x + 2 : topKey.x - 2,
               y: topKey.y
             };
-            stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+            stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, GRID_MIN_X, GRID_MAX_X);
             const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
             const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
             promises.push(
@@ -2692,7 +2699,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         x: isHomeOffense ? topKey.x + 2 : topKey.x - 2,  // 2 spots in front, directly between ball handler and basket
         y: topKey.y  // Same Y as ball handler (directly in front)
       };
-      stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+      stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, GRID_MIN_X, GRID_MAX_X);
       
       const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
       const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
@@ -2896,7 +2903,7 @@ function animateRebounders(
       // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
       targetSpot = {
         x: Phaser.Math.Between(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
-        y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), 1, 49)
+        y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), GRID_MIN_Y, GRID_MAX_Y)
       };
     } else {
       // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
@@ -2908,11 +2915,11 @@ function animateRebounders(
         : basket.x + distanceFromBasket; // Away: move right (toward center court)
 
       targetSpot = {
-        x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
+        x: Phaser.Math.Clamp(targetX, GRID_MIN_X, GRID_MAX_X), // Clamp to court bounds
         y: Phaser.Math.Clamp(
           basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE),
-          1,
-          49
+          GRID_MIN_Y,
+          GRID_MAX_Y
         ),
       };
     }
@@ -2974,11 +2981,11 @@ function getGetBackRetreatXRange(isHomeOffense) {
   if (isHomeOffense) {
     return {
       minX: 50,
-      maxX: Phaser.Math.Clamp(basket.x - 2, 4, 97),
+      maxX: Phaser.Math.Clamp(basket.x - 2, GRID_MIN_X, GRID_MAX_X),
     };
   }
   return {
-    minX: Phaser.Math.Clamp(basket.x + 2, 4, 97),
+    minX: Phaser.Math.Clamp(basket.x + 2, GRID_MIN_X, GRID_MAX_X),
     maxX: 50,
   };
 }

@@ -22,7 +22,7 @@ test("clamps coords", () => {
   const turn = {
     animations: [{ playerId: "a", end: { x: 1, y: 99 } }],
   };
-  assert.deepEqual(getAnimationEndGridForPlayer(turn, "a"), { x: 4, y: 49 });
+  assert.deepEqual(getAnimationEndGridForPlayer(turn, "a"), { x: 5, y: 49 });
 });
 
 test("falls back to last movement coords", () => {
