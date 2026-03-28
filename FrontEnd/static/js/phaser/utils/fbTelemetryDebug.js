@@ -152,8 +152,11 @@ function installGlobalHelpers() {
   }
   if (typeof globalScope.showFbStrictConfig !== "function") {
     globalScope.showFbStrictConfig = () => {
-      const defaults = ["rr_outlet_denied", "rr_hold_up", "generic_fb_shot_stop"];
+      const defaults = ["rr_lane_shot", "rr_outlet_denied", "rr_hold_up", "generic_fb_shot_stop"];
       const modeRaw = globalScope.FB_STRICT_CONTRACT;
+      const isLocalHost =
+        globalScope?.location?.hostname === "localhost" ||
+        globalScope?.location?.hostname === "127.0.0.1";
       const mode =
         modeRaw === "throw" || modeRaw === "warn" || modeRaw === "off"
           ? modeRaw
@@ -161,7 +164,9 @@ function installGlobalHelpers() {
             ? "warn"
             : modeRaw === false
               ? "off"
-              : "(auto)";
+              : isLocalHost || Boolean(globalScope.DEBUG_FB_TELEMETRY) || Boolean(globalScope.DEBUG_ANIM)
+                ? "warn (auto)"
+                : "off (auto)";
       const branchesRaw = globalScope.FB_STRICT_BRANCHES;
       let branches = defaults;
       if (Array.isArray(branchesRaw)) {

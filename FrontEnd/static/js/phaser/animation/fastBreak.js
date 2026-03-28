@@ -113,21 +113,37 @@ function getFbContractGlobalScope() {
   );
 }
 
+const FB_STRICT_DEFAULT_BRANCHES = [
+  "rr_lane_shot",
+  "rr_outlet_denied",
+  "rr_hold_up",
+  "generic_fb_shot_stop",
+];
+
+function isLocalDevFbContractDefault(scope) {
+  const host = scope?.location?.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
 function resolveFbStrictContractMode() {
   const scope = getFbContractGlobalScope();
   const raw = scope?.FB_STRICT_CONTRACT;
   if (raw === "throw") return "throw";
   if (raw === "warn" || raw === true) return "warn";
   if (raw === "off" || raw === false) return "off";
-  // Dev-default for strict branch checks while debugging.
-  if (scope?.DEBUG_FB_TELEMETRY === true || isAnimationDebugEnabled()) {
+  // Dev-default for strict branch checks while debugging/local iteration.
+  if (
+    scope?.DEBUG_FB_TELEMETRY === true ||
+    isAnimationDebugEnabled() ||
+    isLocalDevFbContractDefault(scope)
+  ) {
     return "warn";
   }
   return "off";
 }
 
 function resolveFbStrictBranches() {
-  const defaults = ["rr_outlet_denied", "rr_hold_up", "generic_fb_shot_stop"];
+  const defaults = FB_STRICT_DEFAULT_BRANCHES;
   const scope = getFbContractGlobalScope();
   const raw = scope?.FB_STRICT_BRANCHES;
   if (Array.isArray(raw)) {
