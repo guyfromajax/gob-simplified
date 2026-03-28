@@ -42,6 +42,15 @@ function resolveRole(scene, sprite) {
   return "offense";
 }
 
+function resolveHeartbeatBpm(ng, cfg) {
+  const minBpm = Number.isFinite(cfg?.minBpm) ? cfg.minBpm : 116;
+  const maxBpm = Number.isFinite(cfg?.maxBpm) ? cfg.maxBpm : 1160;
+  const clampedMin = Math.max(1, minBpm);
+  const clampedMax = Math.max(clampedMin, maxBpm);
+  const normalizedNg = (ng - 0.01) / 0.99; // 0 at NG=0.01, 1 at NG=1.0
+  return clampedMax + (clampedMin - clampedMax) * normalizedNg;
+}
+
 function safeStopTween(tween) {
   try {
     if (!tween) return;
@@ -146,8 +155,6 @@ export function ensureConsistentHeartbeat(scene, sprites = null) {
 
     const store = getStore(scene);
     const amplitudePx = Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 1.2;
-    const minHalfMs = Number.isFinite(cfg.minHalfCycleMs) ? cfg.minHalfCycleMs : 170;
-    const maxHalfMs = Number.isFinite(cfg.maxHalfCycleMs) ? cfg.maxHalfCycleMs : 520;
     const jitterPx = Number.isFinite(cfg.jitterPx) ? cfg.jitterPx : 0.2;
 
     const liveKeys = new Set();
@@ -166,7 +173,8 @@ export function ensureConsistentHeartbeat(scene, sprites = null) {
       }
 
       const ng = resolveNg(scene, sprite);
-      const halfCycleMs = Math.round(minHalfMs + (maxHalfMs - minHalfMs) * ng);
+      const bpm = resolveHeartbeatBpm(ng, cfg);
+      const halfCycleMs = Math.max(20, Math.round(30000 / bpm));
       const role = resolveRole(scene, sprite);
       const dir = role === "defense" ? { x: -1, y: 1 } : { x: 1, y: 1 };
       const jitter = (Math.random() * jitterPx * 2) - jitterPx;

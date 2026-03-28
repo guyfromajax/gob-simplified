@@ -145,6 +145,30 @@ The clamp is intentionally skipped for turn types that need out-of-bounds lanes:
   - Applied at `/api/simulate-turn` response boundary (including timeout and batch turn payloads)
 - **Rule:** clamp in grid-space before/at payload consumption; avoid ad-hoc `Math.min/Math.max` clamp variants in feature code.
 
+## Consistent Heartbeat System
+
+**Status:** ✅ Production (render-only visual layer)
+
+Heartbeat is applied consistently to active player sprites as a visual micro-movement layer, with tempo scaled by `NG`.
+
+- **NG tempo contract:** `NG=1.00 -> 116 BPM`, `NG=0.01 -> 1160 BPM`
+- **Mapping:** linear interpolation in BPM space between the above anchors
+- **Cycle timing:** `halfCycleMs = 30000 / BPM` (full cycle = `60000 / BPM`)
+- **Visual movement:** render-space drift only (no gameplay coordinate ownership changes)
+- **Safety:** type-safe target selection for sprite/container-backed players; heartbeat never mutates authoritative gameplay `x/y` used by movement systems
+
+### Implementation Points
+
+- `FrontEnd/static/js/phaser/animation/arrivalHeartbeat.js`
+  - `ensureConsistentHeartbeat()` starts/maintains heartbeat across active player sprites
+  - resolves compatible tween target properties per render object type
+  - restores visual target state safely on cleanup
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js`
+  - heartbeat refresh at turn processing entry
+  - teardown cleanup on scene shutdown/destroy
+- `FrontEnd/static/js/phaser/animation/animation_config.js`
+  - heartbeat config: `minBpm`, `maxBpm`, `amplitudePx`, `jitterPx`
+
 ## State Tracking System
 
 **Status:** ✅ **CORE COMPONENT** - Fundamental architectural pattern

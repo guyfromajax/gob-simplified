@@ -95,8 +95,10 @@ const defaults = {
     enabled: true,
     amplitudePx: 1.4, // Render-space drift in pixels (does not touch gameplay x/y)
     jitterPx: 0.2,
-    minHalfCycleMs: 170, // NG=0.01 (fatigued) -> faster heartbeat
-    maxHalfCycleMs: 520, // NG=1.00 (fresh) -> slower heartbeat
+    // BPM mapping:
+    // NG=1.00 -> minBpm, NG=0.01 -> maxBpm
+    minBpm: 116,
+    maxBpm: 1160,
   },
   possession: {
     msPerTick: 1,
