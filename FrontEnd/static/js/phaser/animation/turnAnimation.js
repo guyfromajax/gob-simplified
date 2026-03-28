@@ -20,6 +20,7 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
 import { clampGridCoords } from "./courtClamp.js";
+import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import { DEBUG } from "../utils/debug.js";
 import {
   DebugFlags,
@@ -71,6 +72,33 @@ function getBallSpeed() {
     return window.__GAME_SPEED;
   }
   return DEFAULT_BALL_SPEED;
+}
+
+function resolveSpriteById(playerSprites, rawId) {
+  if (!playerSprites || rawId == null) return { id: null, sprite: null };
+  const sid = String(rawId);
+  if (playerSprites[sid]) return { id: sid, sprite: playerSprites[sid] };
+  if (playerSprites[rawId]) return { id: rawId, sprite: playerSprites[rawId] };
+  const n = Number(rawId);
+  if (Number.isFinite(n) && playerSprites[n]) return { id: n, sprite: playerSprites[n] };
+  return { id: sid, sprite: null };
+}
+
+function getDrebTelemetryScope() {
+  return (
+    (typeof window !== "undefined" && window) ||
+    (typeof globalThis !== "undefined" && globalThis) ||
+    null
+  );
+}
+
+function resolveDrebStrictMode() {
+  const scope = getDrebTelemetryScope();
+  const raw = scope?.DREB_STRICT_CONTRACT;
+  if (raw === "throw") return "throw";
+  if (raw === "warn" || raw === true) return "warn";
+  if (raw === "off" || raw === false) return "off";
+  return "off";
 }
 
 /**
@@ -781,14 +809,53 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   }
   
   const getBackList = missTurnForGetback?.offense_getback || [];
+  const getBackSet = new Set(getBackList.map((id) => String(id)));
   
   // runDefensiveReboundSetup called
   
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
 
-  const rebounderSprite = playerSprites[rebounderId];
+  const rebounderRef = resolveSpriteById(playerSprites, rebounderId);
+  const rebounderSprite = rebounderRef.sprite;
+  rebounderId = rebounderRef.id;
   if (!rebounderSprite) return;
+  const drebTelemetry = {
+    branchKind: "dreb_hco_setup",
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    turnIndex: scene?.currentTurn ?? null,
+    resultType: turnData?.result_type ?? null,
+    gameClock: scene?.simData?.clock ?? null,
+    quarter: turnData?.quarter ?? scene?.quarter ?? null,
+    required: 0,
+    fallback: 0,
+    strictWarnings: 0,
+    strictThrows: 0,
+  };
+  const emitDrebTelemetry = (event, payload = {}) => {
+    scene?.events?.emit?.("animTelemetry", {
+      event,
+      branchKind: drebTelemetry.branchKind,
+      turnId: drebTelemetry.turnId,
+      turnIndex: drebTelemetry.turnIndex,
+      resultType: drebTelemetry.resultType,
+      gameClock: drebTelemetry.gameClock,
+      quarter: drebTelemetry.quarter,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  };
+  const enforceDrebStrict = ({ playerId, role, reason }) => {
+    const mode = resolveDrebStrictMode();
+    if (mode === "off") return;
+    const msg = `[DREB contract] missing required endpoint (branch=dreb_hco_setup, playerId=${playerId ?? "?"}, role=${role ?? "?"}, reason=${reason ?? "unknown"})`;
+    if (mode === "throw") {
+      drebTelemetry.strictThrows += 1;
+      throw new Error(msg);
+    }
+    drebTelemetry.strictWarnings += 1;
+    console.warn(msg, { playerId, role, reason, turnId: drebTelemetry.turnId, turnIndex: drebTelemetry.turnIndex });
+  };
 
   scene.possessionFlipInProgress = true;
   
@@ -828,11 +895,31 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // we don't have outlet_receiver data, so we find the PG
   let outletReceiverId = null;
   let outletReceiverSprite = null;
+
+  // Prefer backend authority for outlet receiver when present.
+  const receiverCandidates = [
+    turnData?.outlet_receiver_id,
+    turnData?.outletReceiverId,
+    turnData?.outlet_receiver,
+    turnData?.roles?.outlet_receiver,
+    turnData?.roles?.ball_handler_id,
+    turnData?.roles?.ball_handler?.player_id,
+    turnData?.ball_handler,
+  ];
+  for (const cid of receiverCandidates) {
+    const ref = resolveSpriteById(playerSprites, cid);
+    if (ref.id && ref.sprite && String(ref.id) !== String(rebounderId)) {
+      outletReceiverId = ref.id;
+      outletReceiverSprite = ref.sprite;
+      break;
+    }
+  }
   
   // For HCO, always find the PG
   // CRITICAL: This must find the PG for the outlet pass to execute
   // First try scene.playerInfo (preferred, has position data)
   for (const [id, info] of Object.entries(scene.playerInfo || {})) {
+    if (outletReceiverId) break;
     if (info.pos === "PG" && info.team === rebounderSprite.team) {
       outletReceiverId = id;
       outletReceiverSprite = playerSprites[id];
@@ -853,7 +940,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     // Look for a sprite on the rebounder's team that might be the PG
     // We'll use the first player on the rebounder's team as a fallback
     for (const [id, sprite] of Object.entries(playerSprites)) {
-      if (sprite.team === rebounderSprite.team && id !== rebounderId) {
+      if (sprite.team === rebounderSprite.team && String(id) !== String(rebounderId)) {
         // Check if sprite has position info
         if (sprite.pos === "PG" || sprite.position === "PG") {
           outletReceiverId = id;
@@ -867,7 +954,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     // If still not found, use the first non-rebounder player on the rebounder's team as a last resort
     if (!outletReceiverId) {
       for (const [id, sprite] of Object.entries(playerSprites)) {
-        if (sprite.team === rebounderSprite.team && id !== rebounderId) {
+        if (sprite.team === rebounderSprite.team && String(id) !== String(rebounderId)) {
           outletReceiverId = id;
           outletReceiverSprite = sprite;
           console.warn('🏀 [DREB OUTLET] Using fallback: first non-rebounder player as outlet receiver', { outletReceiverId: id });
@@ -914,22 +1001,46 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // Set up outlet receiver movement and outlet pass for HCO ONLY
   // FAST_BREAK has its own outlet pass in the fast break sequence (animateOutletPhase in fastBreak.js)
   // These two outlet steps are MUTUALLY EXCLUSIVE - never run together
-  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite && nextPlayType === "HCO") {
+  if (outletReceiverId && String(outletReceiverId) !== String(rebounderId) && outletReceiverSprite && nextPlayType === "HCO") {
     
-    // Move PG near the rebounder for outlet pass
-    const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
-    outletTarget = {
-      x: Phaser.Math.Clamp(
-        rebGridX + sign * Phaser.Math.Between(3, 6),
-        4,
-        97
-      ),
-      y: Phaser.Math.Clamp(
-        rebGridY + Phaser.Math.Between(-6, 6),
-        1,
-        50
-      ),
-    };
+    // SS&S: prefer backend animation end for receiver when available.
+    drebTelemetry.required += 1;
+    const receiverAnimEnd = getAnimationEndGridForPlayer(turnData, outletReceiverId);
+    if (receiverAnimEnd) {
+      outletTarget = receiverAnimEnd;
+    } else {
+      drebTelemetry.fallback += 1;
+      emitDrebTelemetry("dreb_fallback_used", {
+        playerId: outletReceiverId,
+        role: "outlet_receiver",
+        fallbackPolicy: "receiver_near_rebounder",
+        reason: "missing_outlet_receiver_animation_end",
+      });
+      emitDrebTelemetry("dreb_contract_missing_endpoint", {
+        playerId: outletReceiverId,
+        role: "outlet_receiver",
+        requiredEndpointType: "animations_end",
+        reason: "missing_outlet_receiver_animation_end",
+      });
+      enforceDrebStrict({
+        playerId: outletReceiverId,
+        role: "outlet_receiver",
+        reason: "missing_outlet_receiver_animation_end",
+      });
+      const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
+      outletTarget = {
+        x: Phaser.Math.Clamp(
+          rebGridX + sign * Phaser.Math.Between(3, 6),
+          4,
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          rebGridY + Phaser.Math.Between(-6, 6),
+          1,
+          50
+        ),
+      };
+    }
     outletContext = {
       newOffenseTeam,
       newOffenseBasket,
@@ -1008,18 +1119,14 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     };
     
     for (const [id, sprite] of Object.entries(playerSprites)) {
-      const info = scene.playerInfo?.[id];
-      const isGetBackPlayer = getBackList.includes(id);
+      const isGetBackPlayer = getBackSet.has(String(id));
       
       // Collect skip reasons for debugging
       let skipReason = null;
-      if (!info) {
-        skipReason = 'noInfo';
-        playersSkippedReasons.noInfo++;
-      } else if (id === rebounderId) {
+      if (String(id) === String(rebounderId)) {
         skipReason = 'isRebounder';
         playersSkippedReasons.isRebounder++;
-      } else if (id === outletReceiverId) {
+      } else if (String(id) === String(outletReceiverId)) {
         skipReason = 'isOutletReceiver';
         playersSkippedReasons.isOutletReceiver++;
       } else if (isGetBackPlayer) {
@@ -1038,7 +1145,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         continue;
       }
       
-      // Calculate movement toward new offense basket
+      // SS&S: prefer backend animation end for this transition player.
+      drebTelemetry.required += 1;
+      const animEnd = getAnimationEndGridForPlayer(turnData, id);
       const currentGridX = (sprite.x / width) * 100;
       const currentGridY = 50 - (sprite.y / height) * 50;
       
@@ -1050,7 +1159,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // If new offense team is away (basket at x=11), all players move left (decrease x)
       const direction = newOffenseTeam === "home" ? 1 : -1;
       
-      const targetGrid = {
+      const targetGrid = animEnd || {
         x: Phaser.Math.Clamp(
           currentGridX + direction * distance,
           9,  // Stay between rims
@@ -1062,6 +1171,15 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
           40   // Keep players well inside court
         ),
       };
+      if (!animEnd) {
+        drebTelemetry.fallback += 1;
+        emitDrebTelemetry("dreb_fallback_used", {
+          playerId: id,
+          role: "transition_player",
+          fallbackPolicy: "advance_toward_new_offense_basket",
+          reason: "missing_transition_player_animation_end",
+        });
+      }
       
       const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
       // Use distance-based duration for consistent speed (same as HCO step movements)
@@ -1104,7 +1222,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // For FCP/HCT: No outlet pass - players go directly to press positions
   // CRITICAL: This outlet pass step is required for smooth DREB -> HCO transitions
   // The outlet pass MUST execute if we have an outletReceiverId, even if receiver movement was skipped
-  if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
+  if (nextPlayType === "HCO" && outletReceiverId && String(outletReceiverId) !== String(rebounderId)) {
     // If outletReceiverSprite is missing, try to get it from playerSprites
     if (!outletReceiverSprite && outletReceiverId) {
       outletReceiverSprite = playerSprites[outletReceiverId];
@@ -1245,6 +1363,15 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   if (typeof scene.startNextHalfCourtOffense === "function") {
     scene.startNextHalfCourtOffense();
   }
+  emitDrebTelemetry("dreb_telemetry_summary", {
+    fbFallbackCount: drebTelemetry.fallback,
+    fbRequiredRoleCount: drebTelemetry.required,
+    fbFallbackRate: drebTelemetry.required > 0 ? drebTelemetry.fallback / drebTelemetry.required : 0,
+    fbClampCount: 0,
+    fbSnapCount: 0,
+    drebStrictWarnings: drebTelemetry.strictWarnings,
+    drebStrictThrows: drebTelemetry.strictThrows,
+  });
 }
 
 /**

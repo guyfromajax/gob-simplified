@@ -224,12 +224,12 @@ export function createFbTelemetryDebugListener(scene) {
     const thresholds = resolveThresholds();
     const event = payload?.event;
     if (!event || typeof event !== "string") return;
-    if (!event.startsWith("fb_")) return;
+    if (!event.startsWith("fb_") && !event.startsWith("dreb_")) return;
 
     const session = getSession(scene);
     session.eventsSeen += 1;
 
-    if (event !== "fb_telemetry_summary") return;
+    if (event !== "fb_telemetry_summary" && event !== "dreb_telemetry_summary") return;
 
     session.summaries += 1;
     const branch = payload.branchKind || "unknown";
