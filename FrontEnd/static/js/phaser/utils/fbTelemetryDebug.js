@@ -164,9 +164,11 @@ function installGlobalHelpers() {
             ? "warn"
             : modeRaw === false
               ? "off"
-              : isLocalHost || Boolean(globalScope.DEBUG_FB_TELEMETRY) || Boolean(globalScope.DEBUG_ANIM)
-                ? "warn (auto)"
-                : "off (auto)";
+              : isLocalHost
+                ? "throw (auto)"
+                : Boolean(globalScope.DEBUG_FB_TELEMETRY) || Boolean(globalScope.DEBUG_ANIM)
+                  ? "warn (auto)"
+                  : "off (auto)";
       const branchesRaw = globalScope.FB_STRICT_BRANCHES;
       let branches = defaults;
       if (Array.isArray(branchesRaw)) {

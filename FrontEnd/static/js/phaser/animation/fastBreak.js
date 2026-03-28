@@ -131,12 +131,12 @@ function resolveFbStrictContractMode() {
   if (raw === "throw") return "throw";
   if (raw === "warn" || raw === true) return "warn";
   if (raw === "off" || raw === false) return "off";
-  // Dev-default for strict branch checks while debugging/local iteration.
-  if (
-    scope?.DEBUG_FB_TELEMETRY === true ||
-    isAnimationDebugEnabled() ||
-    isLocalDevFbContractDefault(scope)
-  ) {
+  // Local default is strict throw-mode for fail-fast contract checks.
+  if (isLocalDevFbContractDefault(scope)) {
+    return "throw";
+  }
+  // Non-local debug sessions default to warnings.
+  if (scope?.DEBUG_FB_TELEMETRY === true || isAnimationDebugEnabled()) {
     return "warn";
   }
   return "off";
