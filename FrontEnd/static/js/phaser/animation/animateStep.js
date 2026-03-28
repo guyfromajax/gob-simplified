@@ -181,6 +181,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     const maybeStartHeartbeat = () => {
       if (scene?.skipToEnd) return;
+      if (scene?.passInFlight) return;
       if (currentAction === 'pass') return;
       startArrivalHeartbeat(scene, sprite, { turnData });
     };
