@@ -254,7 +254,7 @@ export async function runPass(scene, cfg = {}) {
     const lastId = getLastKnownOwner(scene);
     const lastSprite = lastId != null ? scene.playerSprites?.[lastId] : null;
     if (lastSprite) {
-      attachBallToPlayerAdapter(scene, ballSprite, lastSprite);
+      attachBallToPlayerAdapter(scene, ballSprite, lastSprite, { allowDuringPossessionFlip: true });
     }
     scene.__activePass.reject?.(new Error('pass cancelled'));
     scene.__activePass = null;
@@ -350,7 +350,7 @@ export async function runPass(scene, cfg = {}) {
       if (PASS_DEBUG) animationDebugLog('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
 
       if (fromSprite) {
-        attachBallToPlayerAdapter(scene, ballSprite, fromSprite);
+        attachBallToPlayerAdapter(scene, ballSprite, fromSprite, { allowDuringPossessionFlip: true });
         if (startCoords) {
           ballSprite.setPosition(startCoords.x, startCoords.y);
         }
@@ -486,7 +486,7 @@ export async function runPass(scene, cfg = {}) {
       const lastId = getLastKnownOwner(scene);
       const lastSprite = lastId != null ? scene.playerSprites?.[lastId] : null;
       if (lastSprite) {
-        attachBallToPlayerAdapter(scene, ballSprite, lastSprite);
+        attachBallToPlayerAdapter(scene, ballSprite, lastSprite, { allowDuringPossessionFlip: true });
       }
       emitSummary('error', { error: err?.message });
       rejectFn(err);

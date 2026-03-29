@@ -169,6 +169,39 @@ class ShotManager:
         logging.debug(f"🔍 [SHOT LOCATION] No shoot action found for {shooter_pos} in any step")
         return (None, None)
 
+    def _resolve_dreb_outlet_receiver(self, rebound_team, rebounder_id):
+        """Select deterministic outlet receiver for DREB->halfcourt transition."""
+        if rebound_team is None:
+            return None
+        lineup = getattr(rebound_team, "lineup", {}) or {}
+        rebounder_id_str = str(rebounder_id) if rebounder_id is not None else None
+        # Contract-first deterministic preference order.
+        for pos in ("PG", "SG", "SF", "PF", "C"):
+            player = lineup.get(pos)
+            player_id = getattr(player, "player_id", None) if player else None
+            if player_id is None:
+                continue
+            if rebounder_id_str is not None and str(player_id) == rebounder_id_str:
+                continue
+            return player_id
+        return None
+
+    def _build_dreb_outlet_pass_contract(self, rebound_team, rebounder_id):
+        """Build explicit outlet-pass contract consumed by frontend DREB setup."""
+        passer_id = rebounder_id
+        if passer_id is None:
+            last_rebounder = self.game_state.get("last_rebounder")
+            passer_id = getattr(last_rebounder, "player_id", None) if last_rebounder else None
+        receiver_id = self._resolve_dreb_outlet_receiver(rebound_team, passer_id)
+        if passer_id is None or receiver_id is None:
+            return None
+        return {
+            "passer_id": passer_id,
+            "receiver_id": receiver_id,
+            "required": True,
+            "contract_source": "shot_manager_dreb_halfcourt",
+        }
+
     def is_three_point_shot(self, shooter, roles):
         """
         Determine if a shot is a three-pointer based on the shooter's spot.
@@ -1681,6 +1714,26 @@ class ShotManager:
             # This ensures frontend can detect shooting fouls on misses reliably
             if d_foul and self.game_state.get("free_throws_remaining", 0) > 0:
                 result["free_throws_remaining"] = self.game_state["free_throws_remaining"]
+
+        next_play_type = str(result.get("next_play_type") or "").upper()
+        rebound_type = str(result.get("rebound_type") or "").upper()
+        if rebound_type == "DREB" and next_play_type in {"HCO", "HCT", "FCP"}:
+            contract = self._build_dreb_outlet_pass_contract(
+                rebound_team=def_team,
+                rebounder_id=result.get("rebounderId"),
+            )
+            if contract:
+                result["dreb_outlet_pass"] = contract
+                roles_payload = result.get("roles") if isinstance(result.get("roles"), dict) else {}
+                roles_payload["outlet_passer"] = contract["passer_id"]
+                roles_payload["outlet_receiver"] = contract["receiver_id"]
+                result["roles"] = roles_payload
+            else:
+                logging.warning(
+                    "⚠️ [DREB OUTLET CONTRACT] missing outlet contract for DREB half-court transition (rebounderId=%s, next_play_type=%s)",
+                    result.get("rebounderId"),
+                    next_play_type,
+                )
 
         return result
 

@@ -117,6 +117,7 @@ Every turn result from the backend contains data organized into **three distinct
 - `ball_handler`, `passer`, `screener`, `defender` - Participant names
 - `points`, `scoring_team` - Scoring data (if made)
 - `next_play_type` - "BASELINE_INBOUND", "HCO", "FAST_BREAK", "FREE_THROW", etc.
+- `dreb_outlet_pass` - `{passer_id, receiver_id}` outlet contract for `MISS/BLOCK -> DREB -> {HCO|HCT|FCP}` transitions
 - `next_defensive_setup` - "FCP", "HCT", "HCO", None
 - `free_throws_remaining`, `has_and_one` - Free throw data (if foul)
 - `intended_shooter_pos`, `intended_shooter_id` - For audible/hot read popup

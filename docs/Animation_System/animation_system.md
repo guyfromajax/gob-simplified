@@ -40,6 +40,8 @@ This document provides an overview of the front-end animation stack for **GOB**,
 
 - Some animation paths still use bespoke orchestration and role-specific fallback positioning (especially in fast break branches).
 - Therefore, universal speed math is shared, but full universal **placement/orchestration authority** is still partially hybrid in production.
+- DREB -> HCO outlet setup now prefers backend `animations[].end` targets and emits DREB contract telemetry (`dreb_*` events), but missing `outlet_receiver` endpoint currently degrades to warn+fallback (even under local throw mode) to avoid aborting live turn flow while backend contract coverage is being completed.
+- For `MISS/BLOCK -> DREB -> {HCO|HCT|FCP}` transitions, outlet pass now uses explicit backend contract payload `dreb_outlet_pass{passer_id, receiver_id}` and does **not** use synthetic fallback; missing contract is treated as strict branch failure.
 
 ---
 
