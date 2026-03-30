@@ -8,6 +8,8 @@
 4. **Physically plausible movement:** Movement speed respects AG plus configured speed ranges; no branch can bypass this and create unrealistic "Superman" movement.
 5. **Standardized animation payload contract:** Every turn emits a consistent animation data shape for frontend consumption (including required endpoints/events).
 6. **Explicit completion semantics per turn type:** Each turn type declares `advance_trigger`, `visual_settle_trigger`, and `failure_policy`.
+  - In this context, "semaantics means what event counts as completion (name + contract meaning), and what state transition that completion authorizes.
+  - Turn declares a completion contract, and each step/phase (execution unit) declares a local completion contract, with turn completion derived from the final unit’s completion + transition-out contract.
 
 **Shared Definitions**
 - `advance_trigger`: The authoritative event that allows turn logic to progress to the next turn.
@@ -217,7 +219,7 @@ The implementation sequence is intentionally branch-by-branch, but the architect
 This is an additive migration, not per-branch one-offs. Each slice removes unique logic and increases shared behavior under one movement contract.
 
 **Current rollout map (completed -> next):**
-- Fast Break family (RR + generic FB shot/stop) -> completed
+- Fast Break family (RR + generic FB shot/stop) -> Phase 1 contract/telemetry framework completed; branch hardening and threshold calibration in progress
 - DREB -> outlet -> HCO setup path -> stabilizing (in progress; completion-contract hardening active)
 - HCO shot/rebound family (non-FB) -> next
 - SIDE_INBOUND / BASELINE_INBOUND / OREB / pressure flows -> follow
@@ -234,6 +236,16 @@ For each canonical turn type, explicitly lock:
 - `failure_policy` (`degrade`, `warn`, `throw`)
 - `clock_anchor` (which moment consumes turn clock budget)
 - `owner_authority_at_end` (who sets final ball ownership state)
+
+`clock_anchor` legend (v0):
+- `transition budget`: turn-boundary handoff window between `from_turn` and `to_turn` (no hidden extra hold).
+- `inbound turn budget`: clock allocation for inbound setup + inbound pass completion.
+- `FB phase budget` / `OREB phase budget`: clock allocation for named phases inside those turn families.
+- `step_clock_seconds[n]`: backend-provided per-step clock budget for skeleton turns (`HCO`/`FCP`/`HCT`).
+- `remaining turn budget`: post-step budget consumed by terminal resolution (shot/foul/turnover/rebound outcome).
+- `tip phase budget`: opening-tip jump/control allocation.
+- `timeout contract budget`: non-gameplay pause/resume control window for timeout barrier semantics.
+- `resume setup budget`: timeout-exit setup allocation before next gameplay turn resumes.
 
 Minimum matrix rows:
 - `HCO`
@@ -399,7 +411,12 @@ This section defines intra-turn execution units and completion semantics for eac
   - backend end-of-turn coords
   - frontend end-of-turn coords
   - delta (`grid`, `px`)
-- Define pass/fail tolerance per phase family (strict for inbounds/outlet, moderate for transition-heavy branches).
+- Balanced provisional tolerance bands (v0; calibrate after baseline audit):
+  - **Strict (inbound/outlet phases):** pass if `deltaPx <= 12`; fail if `> 12`
+  - **Moderate (skeleton step + controlled branch phases):** pass if `deltaPx <= 18`; fail if `> 18`
+  - **Transition-heavy phases (FB/OREB handoffs):** pass if `deltaPx <= 24`; fail if `> 24`
+  - **Absolute fail-safe cap (all families):** fail if `deltaPx > 30` regardless of phase family
+- These v0 values are intentionally balanced defaults and must be confirmed/recalibrated from sampled telemetry before CI hard-fail enforcement.
 - If tolerance is exceeded:
   - emit telemetry event
   - mark branch run as contract-invalid in dev/CI
