@@ -8,13 +8,23 @@
 4. **Physically plausible movement:** Movement speed respects AG plus configured speed ranges; no branch can bypass this and create unrealistic "Superman" movement.
 5. **Standardized animation payload contract:** Every turn emits a consistent animation data shape for frontend consumption (including required endpoints/events).
 6. **Explicit completion semantics per turn type:** Each turn type declares `advance_trigger`, `visual_settle_trigger`, and `failure_policy`.
-  - In this context, "semaantics means what event counts as completion (name + contract meaning), and what state transition that completion authorizes.
+  - In this context, "semantics" means what event counts as completion (name + contract meaning), and what state transition that completion authorizes.
   - Turn declares a completion contract, and each step/phase (execution unit) declares a local completion contract, with turn completion derived from the final unit’s completion + transition-out contract.
 
 **Shared Definitions**
 - `advance_trigger`: The authoritative event that allows turn logic to progress to the next turn.
 - `visual_settle_trigger`: The event that marks the animation phase as visually complete for the current turn.
 - `failure_policy`: The branch-specific rule for contract/timing failures (`degrade`, `warn`, or `throw`) and what recovery behavior is allowed.
+
+**Non-Negotiable Runtime Invariants**
+- Backend and frontend must maintain a valid position for the ball and all 10 active players at every execution-unit boundary.
+- No execution unit may complete without resolved ball-owner authority.
+- No silent teleport: position deltas above tolerance must emit contract-failure telemetry.
+- Movement must respect AG-based speed and configured locomotion limits on all paths.
+- Transition handoffs must preserve spatial continuity within declared tolerance bands.
+- Completion semantics are event-authorized; timeout-only completion is not valid for strict units.
+- Any fallback must be explicit, counted, thresholded, and branch-scoped.
+- On invariant violation, apply the declared unit `failure_policy` (`degrade`, `warn`, or `throw`).
 
 ## Current State Snapshot (Today)
 
@@ -92,10 +102,7 @@ Validate whether this plan can deliver a truly universal animation system (not s
 
 ### Open Product/Architecture Questions Requiring Decision
 
-1. Should announcement freeze be global by class/type, or remain path-specific?
-2. Which turn types require backend endpoint authority immediately (phase 1 contract)?
-3. Which timing constants remain invariants vs temporary migration fallbacks?
-4. What is the acceptable fallback threshold before a turn is considered contract-invalid?
+None at this time. Product/architecture decisions are currently locked; remaining items are implementation/calibration tasks.
 
 ---
 
@@ -453,6 +460,22 @@ Decision lock is complete. Before additional code changes, execute:
 2. Confirm or recalibrate provisional Phase 1 fallback thresholds using audit results.
 3. Validate `fb_transition_snap` detection with the v0 rule (`deltaPx > 12`) and record outcomes.
 4. Start the locked next slice (`hco.lead_in.from_dreb_outlet`) and validate against Acceptance Gates.
+
+### 8.1 Unit-by-Unit Cadence Loop (Execution Standard)
+
+Apply this loop for every execution unit in Section 6.4:
+
+1. **Select one unit** (single `unit_id` scope only).
+2. **Implement unit contract** (`advance_trigger`, `visual_settle_trigger`, `failure_policy`, `clock_anchor`, `owner_authority_at_end`).
+3. **Run deterministic validation** (lint/tests/contract assertions/telemetry checks for that unit).
+4. **Run prototype validation** (visual motion realism + ownership continuity + handoff behavior).
+5. **Mark unit status** (`complete` or `needs_patch`) with notes.
+6. **Patch once if needed**, then re-run steps 3-5.
+7. **Promote and proceed** to the next unit only after unit is marked `complete`.
+
+Checkpoint cadence:
+- **Turn checkpoint:** after all units in a turn family are complete, run turn-level regression.
+- **Handoff checkpoint:** after coupled families (e.g., `FAST_BREAK -> HCO`) are complete, run boundary/handoff regression.
 
 
 ---
