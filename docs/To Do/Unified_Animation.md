@@ -7,11 +7,13 @@
 3. **Continuous positional continuity:** Player and ball positions are well-defined at each step/phase boundary and across turn boundaries.
 4. **Physically plausible movement:** Movement speed respects AG plus configured speed ranges; no branch can bypass this and create unrealistic "Superman" movement.
 5. **Standardized animation payload contract:** Every turn emits a consistent animation data shape for frontend consumption (including required endpoints/events).
-6. **Explicit completion semantics per turn type:** Each turn type declares `advance_trigger`, `visual_settle_trigger`, and `failure_policy`.
+6. **Explicit completion semantics per turn type:** Each turn type declares `execution_mode`, `advance_trigger`, `visual_settle_trigger`, and `failure_policy`.
+7. **Perfect end-state sync across runtime layers:** Backend movement/decision authority, game-clock expiration, and frontend sprite/ball animation must resolve from one coherent contract per unit, with no conflicting timing or position authorities.
   - In this context, "semantics" means what event counts as completion (name + contract meaning), and what state transition that completion authorizes.
   - Turn declares a completion contract, and each step/phase (execution unit) declares a local completion contract, with turn completion derived from the final unit’s completion + transition-out contract.
 
 **Shared Definitions**
+- `execution_mode`: `skeleton` units complete on deterministic step geometry (final offensive mover settled unless explicitly shot-terminating); `dynamic_event` units complete on declared event receipt.
 - `advance_trigger`: The authoritative event that allows turn logic to progress to the next turn.
 - `visual_settle_trigger`: The event that marks the animation phase as visually complete for the current turn.
 - `failure_policy`: The branch-specific rule for contract/timing failures (`degrade`, `warn`, or `throw`) and what recovery behavior is allowed.
@@ -28,29 +30,54 @@
 
 ## Current State Snapshot (Today)
 
-- **Objective status:** Objectives are locked and include explicit completion semantics per turn type.
+- **Objective status:** Objectives are locked and now explicitly require perfect end-state sync between backend movement logic, clock expiration, and frontend animation execution.
 - **Transition source of truth:** `docs/GP_Core_Docs/GP_TRANSITION_SYSTEM.md` is canonical for turn-to-turn routing and possession transitions.
+- **UESS system source of truth:** `docs/docs_1_systems/00_General_Systems/UESS_System.md` holds locked UESS contract cards and cross-layer sync policy.
 - **Execution semantics source of truth:** `6.4 Canonical Execution-Unit Matrices (Draft v0)` defines intra-turn units and completion semantics for all canonical turn families.
 - **Architecture status:** Universal movement/clock intent is defined; implementation remains hybrid in several branches.
-- **Critical stabilization status:** `DREB -> outlet -> HCO` is stabilizing/in progress, not complete.
+- **Authority model status:** Current hybrid authority (backend contract + frontend heuristic fallback) is temporary migration mode, not target architecture.
+- **Critical stabilization status:** `DREB -> outlet -> HCO` lead-in slice is in progress (functionally stabilized; full end-state sync closure pending).
 - **Known risk themes:** mixed authority (backend contract vs frontend fallback), timeout-based completion fallbacks, and boundary handoff inconsistencies.
 - **Intentional constraint:** migration remains incremental and contract-first; no broad rewrite.
+- **Target authority end-state:** backend contract is the single primary authority for movement/ownership/transition semantics; frontend fallback is explicit degraded mode only and retired from strict units as contract coverage reaches thresholds.
+
+### Current Local Implementation Snapshot (April 2026)
+
+- `dreb_outlet_pass.receiver_target` is now emitted by backend shot/rebound flow as the unit-specific receiver movement authority for `hco.lead_in.from_dreb_outlet`.
+- HCO skeleton-step runtime enforcement has landed locally for `hco.step[n].movement` and `hco.step[n].pass`:
+  - shared completion validator: `FrontEnd/static/js/phaser/animation/unitCompletionContract.js`
+  - strictness runtime flag: `window.HCO_STEP_MOVEMENT_STRICT_CONTRACT = "throw" | "warn" | "off"`
+  - movement tolerance override: `window.UESS_HCO_STEP_MOVEMENT_TOLERANCE_PX`
+  - step budget override: `window.UESS_HCO_STEP_MOVEMENT_MAX_GAME_SECONDS`
+- HCO elapsed observe telemetry is wired at unit boundaries (`lead_in`, `step_movement`, `step_pass`, `resolution`, `transition_out`) and emits `hco_uess_elapsed_observe`.
+- Clock-authority observe rollout is implemented end-to-end:
+  - frontend request propagation via `uess_clock_authority_mode`
+  - backend `clock_event_ledger` generation + observe reconciliation payload
+  - frontend parity telemetry + summary thresholds + local debug buffers/helpers
+- Fast Break entry announcements are enabled by default again, with runtime override support via `window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS`.
+- Rim Runner fast-break outcomes now attach decision metadata (`Good Decision` / `Bad Decision`) for announcement/UI presentation.
 
 ## Next Implementation Slice (Locked)
 
-- **Slice ID:** `hco.lead_in.from_dreb_outlet`
-- **Why this slice:** highest current player-facing instability and strongest dependency for HCO continuity.
+- **Slice ID:** `hco.step[n].movement`
+- **Why this slice:** first skeleton-mode unit after DREB lead-in completion; validates deterministic mover-completion semantics under clock-coupled step execution.
 - **Contract target:**
-  - `advance_trigger`: outlet pass received
-  - `visual_settle_trigger`: outlet movement + pass settled
-  - `failure_policy`: throw
-  - `clock_anchor`: transition budget only (no hidden extra delay)
-  - `owner_authority_at_end`: outlet receiver
+  - `execution_mode`: skeleton
+  - `advance_trigger`: required movers reach step-n targets
+  - `visual_settle_trigger`: required step-n tweens complete
+  - `failure_policy`: warn -> throw
+  - `movement_authority`: step-level backend movement contract (`turn.animations` step targets)
+  - `clock_anchor`: `step_clock_seconds[n]`
+  - `owner_authority_at_end`: per-step owner contract
 - **Definition of done:**
-  - No synthetic fallback in strict branch path
-  - No timeout-only completion in this unit
-  - No possession/ball-owner ambiguity at handoff into HCO
+  - Required movers resolve from step contract (no silent role drops)
+  - Step completion uses mover-settle contract (not timeout-only completion)
+  - AG-based duration/speed limits are respected on all movers
   - Passes Acceptance Gates + Spatial-Truth Validation for this slice
+
+**Implementation status:** local runtime contract checks and telemetry are landed for step movement/pass validation; remaining work is acceptance-gate cleanup, live validation, and promotion from provisional strict rollout to trusted slice completion.
+
+**Active stabilization slice:** `hco.lead_in.from_dreb_outlet` -> **in progress** (deterministic + prototype validation passed; full end-state sync criteria still open).
 
 ## Reviewer Reading Order (External)
 
@@ -175,7 +202,8 @@ None at this time. Product/architecture decisions are currently locked; remainin
 
 - Primary: backend-provided per-player endpoint (`turn.animations[]` / explicit role coords).
 - Secondary (fallback): deterministic frontend policy only when authority data is missing.
-- Requirement: fallback usage must be logged and measurable.
+- Requirement: fallback usage must be logged, measurable, thresholded, and explicitly treated as degraded mode (not co-equal authority).
+- Retirement rule: strict units graduate to backend-only authority once baseline telemetry confirms contract completeness and fallback rates meet approved thresholds.
 
 ### Layer B: Kinematics Authority
 
@@ -198,12 +226,16 @@ None at this time. Product/architecture decisions are currently locked; remainin
   - `roles{}` (optional but standardized role keys when present)
   - `completion_contract{}` (required per turn type; defines completion semantics)
 - `completion_contract{}` required fields:
+  - `execution_mode` (`skeleton` | `dynamic_event`)
   - `advance_trigger`
   - `visual_settle_trigger`
   - `failure_policy`
   - `clock_anchor`
   - `max_wait_game_seconds`
-- Branch-specific additions (example: `dreb_outlet_pass`) are allowed, but only as additive fields under this universal envelope.
+- Branch-specific additions are allowed, but only as additive fields under this universal envelope.
+- Current strict DREB outlet contract shape:
+  - `dreb_outlet_pass{ passer_id, receiver_id, receiver_target{x,y}, required, contract_source }`
+  - `receiver_target` is unit-specific movement authority for `hco.lead_in.from_dreb_outlet` (do not substitute generic shot-turn `animations[].end` as primary authority).
 
 ---
 
@@ -238,6 +270,7 @@ This is an additive migration, not per-branch one-offs. Each slice removes uniqu
 ### 6.2 Turn Completion Matrix (required before implementation passes)
 
 For each canonical turn type, explicitly lock:
+- `execution_mode` (`skeleton` | `dynamic_event`)
 - `advance_trigger`
 - `visual_settle_trigger`
 - `failure_policy` (`degrade`, `warn`, `throw`)
@@ -282,102 +315,102 @@ This section defines intra-turn execution units and completion semantics for eac
 
 #### HCO
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `hco.lead_in.from_dreb_outlet` | lead_in_phase | prior turn ends with DREB and next is HCO/HCT/FCP | outlet pass received | outlet movement + pass settled | throw | transition budget | outlet receiver |
-| `hco.lead_in.from_sip_or_bip` | lead_in_phase | prior turn is SIP/BIP into HCO | inbound pass received | inbound setup + pass settled | warn -> throw | inbound turn budget | inbound receiver / BH |
-| `hco.step[n].movement` | skeleton_step | each HCO skeleton step | required movers reach step-n targets | required step-n tweens complete | warn/throw | `step_clock_seconds[n]` | per-step owner contract |
-| `hco.step[n].pass` | skeleton_step | step-n includes pass action | pass received | ball flight + receiver settle | throw | same step budget | pass receiver |
-| `hco.resolution` | branch_phase | shot/foul/turnover/dead-ball point | result committed | resolution visuals settled | throw | remaining turn budget | result-dependent |
-| `hco.out.to_*` | transition_out_phase | any HCO exit route | route committed (`next_play_type`) | end-of-turn visuals settled | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `hco.lead_in.from_dreb_outlet` | lead_in_phase | prior turn ends with DREB and next is HCO/HCT/FCP | dynamic_event | outlet pass received | outlet movement + pass settled | throw | transition budget | outlet receiver |
+| `hco.lead_in.from_sip_or_bip` | lead_in_phase | prior turn is SIP/BIP into HCO | dynamic_event | inbound pass received | inbound setup + pass settled | warn -> throw | inbound turn budget | inbound receiver / BH |
+| `hco.step[n].movement` | skeleton_step | each HCO skeleton step | skeleton | required movers reach step-n targets | required step-n tweens complete | warn/throw | `step_clock_seconds[n]` | per-step owner contract |
+| `hco.step[n].pass` | skeleton_step | step-n includes pass action | skeleton | pass received | ball flight + receiver settle | throw | same step budget | pass receiver |
+| `hco.resolution` | branch_phase | shot/foul/turnover/dead-ball point | dynamic_event | result committed | resolution visuals settled | throw | remaining turn budget | result-dependent |
+| `hco.out.to_*` | transition_out_phase | any HCO exit route | dynamic_event | route committed (`next_play_type`) | end-of-turn visuals settled | throw | boundary handoff | route-specific owner |
 
 #### FAST_BREAK
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `fb.lead_in.from_hco_steal` | lead_in_phase | HCO steal routes to FAST_BREAK | FB route committed + entry owner resolved | steal handoff visuals settled | throw | transition budget | stealer / entry BH |
-| `fb.lead_in.from_dreb_release` | lead_in_phase | DREB routes to FAST_BREAK | DREB committed + FB route committed | rebound secure + release setup settled | throw | transition budget | rebounder / outlet passer |
-| `fb.phase.entry_burst` | branch_phase | initial FB acceleration and spacing | required movers reach burst targets | burst tweens settled | warn -> throw | FB phase budget | entry BH |
-| `fb.phase.outlet` | branch_phase | outlet subphase exists | outlet pass received | passer/receiver movement + pass settled | throw | FB phase budget | outlet receiver |
-| `fb.phase.defensive_stop` | branch_phase | stop branch selected | stop result committed | stop visuals settled | throw | FB phase budget | stopped BH or defender context |
-| `fb.phase.shot_attempt` | branch_phase | shot branch selected | shot release/result committed | shot visuals settled | throw | FB phase budget | result-dependent |
-| `fb.phase.rebound_resolution` | branch_phase | FB miss/block rebound path | rebound outcome committed | rebound attach + settle complete | throw | FB phase budget | rebounder |
-| `fb.out.to_*` | transition_out_phase | any FB exit route | route committed | final FB settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `fb.lead_in.from_hco_steal` | lead_in_phase | HCO steal routes to FAST_BREAK | dynamic_event | FB route committed + entry owner resolved | steal handoff visuals settled | throw | transition budget | stealer / entry BH |
+| `fb.lead_in.from_dreb_release` | lead_in_phase | DREB routes to FAST_BREAK | dynamic_event | DREB committed + FB route committed | rebound secure + release setup settled | throw | transition budget | rebounder / outlet passer |
+| `fb.phase.entry_burst` | branch_phase | initial FB acceleration and spacing | dynamic_event | required movers reach burst targets | burst tweens settled | warn -> throw | FB phase budget | entry BH |
+| `fb.phase.outlet` | branch_phase | outlet subphase exists | dynamic_event | outlet pass received | passer/receiver movement + pass settled | throw | FB phase budget | outlet receiver |
+| `fb.phase.defensive_stop` | branch_phase | stop branch selected | dynamic_event | stop result committed | stop visuals settled | throw | FB phase budget | stopped BH or defender context |
+| `fb.phase.shot_attempt` | branch_phase | shot branch selected | dynamic_event | shot release/result committed | shot visuals settled | throw | FB phase budget | result-dependent |
+| `fb.phase.rebound_resolution` | branch_phase | FB miss/block rebound path | dynamic_event | rebound outcome committed | rebound attach + settle complete | throw | FB phase budget | rebounder |
+| `fb.out.to_*` | transition_out_phase | any FB exit route | dynamic_event | route committed | final FB settle complete | throw | boundary handoff | route-specific owner |
 
 #### OREB
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `oreb.lead_in.from_miss` | lead_in_phase | HCO/FB miss routes to OREB | OREB committed | rebound secure + attach settled | throw | transition budget | OREB rebounder |
-| `oreb.phase.hold` | branch_phase | short stabilization before decision | hold boundary reached | no active attach/tween conflicts | warn -> throw | OREB phase budget | rebounder |
-| `oreb.phase.decision` | branch_phase | choose kickout vs putback | decision event committed | decision prep visuals settled | throw | OREB phase budget | rebounder |
-| `oreb.phase.kickout_pass` | branch_phase | kickout branch pass | pass received | ball flight + receiver settle | throw | OREB phase budget | kickout receiver |
-| `oreb.phase.putback_attempt` | branch_phase | putback branch | shot release/result committed | putback visuals settled | throw | OREB phase budget | result-dependent |
-| `oreb.phase.putback_rebound_resolution` | branch_phase | putback miss/block rebound path | rebound outcome committed | rebound settle complete | throw | OREB phase budget | rebounder |
-| `oreb.out.to_*` | transition_out_phase | any OREB exit route | route committed | OREB final settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `oreb.lead_in.from_miss` | lead_in_phase | HCO/FB miss routes to OREB | dynamic_event | OREB committed | rebound secure + attach settled | throw | transition budget | OREB rebounder |
+| `oreb.phase.hold` | branch_phase | short stabilization before decision | dynamic_event | hold boundary reached | no active attach/tween conflicts | warn -> throw | OREB phase budget | rebounder |
+| `oreb.phase.decision` | branch_phase | choose kickout vs putback | dynamic_event | decision event committed | decision prep visuals settled | throw | OREB phase budget | rebounder |
+| `oreb.phase.kickout_pass` | branch_phase | kickout branch pass | dynamic_event | pass received | ball flight + receiver settle | throw | OREB phase budget | kickout receiver |
+| `oreb.phase.putback_attempt` | branch_phase | putback branch | dynamic_event | shot release/result committed | putback visuals settled | throw | OREB phase budget | result-dependent |
+| `oreb.phase.putback_rebound_resolution` | branch_phase | putback miss/block rebound path | dynamic_event | rebound outcome committed | rebound settle complete | throw | OREB phase budget | rebounder |
+| `oreb.out.to_*` | transition_out_phase | any OREB exit route | dynamic_event | route committed | OREB final settle complete | throw | boundary handoff | route-specific owner |
 
 #### SIDE_INBOUND (SIP)
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `sip.lead_in.entry` | lead_in_phase | route enters SIP | SIP route committed + inbounder resolved | setup settled | throw | transition budget | SIP inbounder |
-| `sip.phase.setup_positions` | branch_phase | place inbound actors | required setup movers reached targets | setup tweens settled | warn -> throw | SIP phase budget | inbounder |
-| `sip.phase.pass` | branch_phase | inbound pass executes | pass received | ball flight + receiver settle | throw | SIP phase budget | SIP receiver |
-| `sip.out.to_*` | transition_out_phase | SIP exits to HCO/FCP/HCT | route committed | SIP final settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `sip.lead_in.entry` | lead_in_phase | route enters SIP | dynamic_event | SIP route committed + inbounder resolved | setup settled | throw | transition budget | SIP inbounder |
+| `sip.phase.setup_positions` | branch_phase | place inbound actors | dynamic_event | required setup movers reached targets | setup tweens settled | warn -> throw | SIP phase budget | inbounder |
+| `sip.phase.pass` | branch_phase | inbound pass executes | dynamic_event | pass received | ball flight + receiver settle | throw | SIP phase budget | SIP receiver |
+| `sip.out.to_*` | transition_out_phase | SIP exits to HCO/FCP/HCT | dynamic_event | route committed | SIP final settle complete | throw | boundary handoff | route-specific owner |
 
 #### BASELINE_INBOUND (BIP)
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `bip.lead_in.entry` | lead_in_phase | route enters BIP after make | BIP route committed + inbounder resolved | baseline setup settled | throw | transition budget | BIP inbounder |
-| `bip.phase.setup_positions` | branch_phase | half-court reset to inbound geometry | required setup movers reached targets | setup tweens settled | warn -> throw | BIP phase budget | inbounder |
-| `bip.phase.pass` | branch_phase | inbound pass executes | pass received | ball flight + receiver settle | throw | BIP phase budget | BIP receiver |
-| `bip.out.to_*` | transition_out_phase | BIP exits to HCO/FCP/HCT | route committed | BIP final settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `bip.lead_in.entry` | lead_in_phase | route enters BIP after make | dynamic_event | BIP route committed + inbounder resolved | baseline setup settled | throw | transition budget | BIP inbounder |
+| `bip.phase.setup_positions` | branch_phase | half-court reset to inbound geometry | dynamic_event | required setup movers reached targets | setup tweens settled | warn -> throw | BIP phase budget | inbounder |
+| `bip.phase.pass` | branch_phase | inbound pass executes | dynamic_event | pass received | ball flight + receiver settle | throw | BIP phase budget | BIP receiver |
+| `bip.out.to_*` | transition_out_phase | BIP exits to HCO/FCP/HCT | dynamic_event | route committed | BIP final settle complete | throw | boundary handoff | route-specific owner |
 
 #### FREE_THROW
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `ft.lead_in.entry` | lead_in_phase | route enters FT | FT route committed + shooter resolved | lane setup settled | throw | transition budget | FT shooter |
-| `ft.phase.attempt[n]` | branch_phase | each FT attempt | shot release/result committed | ball/rim/announcement settled | throw | FT attempt budget | result-dependent |
-| `ft.phase.sequence_control` | branch_phase | multi-shot context | remaining-attempt decision committed | sequence state settled | warn | FT sequence budget | FT shooter |
-| `ft.out.to_*` | transition_out_phase | FT exits to FT/BIP/OREB/HCO/FB/SIP | route committed | FT final settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `ft.lead_in.entry` | lead_in_phase | route enters FT | dynamic_event | FT route committed + shooter resolved | lane setup settled | throw | transition budget | FT shooter |
+| `ft.phase.attempt[n]` | branch_phase | each FT attempt | dynamic_event | shot release/result committed | ball/rim/announcement settled | throw | FT attempt budget | result-dependent |
+| `ft.phase.sequence_control` | branch_phase | multi-shot context | dynamic_event | remaining-attempt decision committed | sequence state settled | warn | FT sequence budget | FT shooter |
+| `ft.out.to_*` | transition_out_phase | FT exits to FT/BIP/OREB/HCO/FB/SIP | dynamic_event | route committed | FT final settle complete | throw | boundary handoff | route-specific owner |
 
 #### FCP
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `fcp.lead_in.entry` | lead_in_phase | route enters FCP | FCP route committed + pressure setup owner resolved | pressure setup settled | throw | transition budget | FCP entry BH |
-| `fcp.step[n].skeleton` | skeleton_step | each FCP skeleton step | step-n contract event committed | step-n tweens settled | warn -> throw | `step_clock_seconds[n]` | per-step owner contract |
-| `fcp.step[n].pass` | skeleton_step | pass on step-n | pass received | pass settle complete | throw | same step budget | pass receiver |
-| `fcp.resolution` | branch_phase | foul/turnover/shot result | result committed | resolution visuals settled | throw | remaining turn budget | result-dependent |
-| `fcp.out.to_*` | transition_out_phase | any FCP exit route | route committed | FCP boundary settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `fcp.lead_in.entry` | lead_in_phase | route enters FCP | dynamic_event | FCP route committed + pressure setup owner resolved | pressure setup settled | throw | transition budget | FCP entry BH |
+| `fcp.step[n].skeleton` | skeleton_step | each FCP skeleton step | skeleton | step-n contract event committed | step-n tweens settled | warn -> throw | `step_clock_seconds[n]` | per-step owner contract |
+| `fcp.step[n].pass` | skeleton_step | pass on step-n | skeleton | pass received | pass settle complete | throw | same step budget | pass receiver |
+| `fcp.resolution` | branch_phase | foul/turnover/shot result | dynamic_event | result committed | resolution visuals settled | throw | remaining turn budget | result-dependent |
+| `fcp.out.to_*` | transition_out_phase | any FCP exit route | dynamic_event | route committed | FCP boundary settle complete | throw | boundary handoff | route-specific owner |
 
 #### HCT
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `hct.lead_in.entry` | lead_in_phase | route enters HCT | HCT route committed + trap setup owner resolved | trap setup settled | throw | transition budget | HCT entry BH |
-| `hct.step[n].skeleton` | skeleton_step | each HCT skeleton step | step-n contract event committed | step-n tweens settled | warn -> throw | `step_clock_seconds[n]` | per-step owner contract |
-| `hct.step[n].pass` | skeleton_step | pass on step-n | pass received | pass settle complete | throw | same step budget | pass receiver |
-| `hct.resolution` | branch_phase | foul/turnover/shot result | result committed | resolution visuals settled | throw | remaining turn budget | result-dependent |
-| `hct.out.to_*` | transition_out_phase | any HCT exit route | route committed | HCT boundary settle complete | throw | boundary handoff | route-specific owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `hct.lead_in.entry` | lead_in_phase | route enters HCT | dynamic_event | HCT route committed + trap setup owner resolved | trap setup settled | throw | transition budget | HCT entry BH |
+| `hct.step[n].skeleton` | skeleton_step | each HCT skeleton step | skeleton | step-n contract event committed | step-n tweens settled | warn -> throw | `step_clock_seconds[n]` | per-step owner contract |
+| `hct.step[n].pass` | skeleton_step | pass on step-n | skeleton | pass received | pass settle complete | throw | same step budget | pass receiver |
+| `hct.resolution` | branch_phase | foul/turnover/shot result | dynamic_event | result committed | resolution visuals settled | throw | remaining turn budget | result-dependent |
+| `hct.out.to_*` | transition_out_phase | any HCT exit route | dynamic_event | route committed | HCT boundary settle complete | throw | boundary handoff | route-specific owner |
 
 #### OPENING_TIP
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `tip.phase.jump` | branch_phase | tipoff launch and contest | tip outcome committed | jump visuals settled | throw | tip phase budget | tip winner |
-| `tip.phase.control` | branch_phase | first control to handler | possession control committed | control pass/attach settled | throw | tip phase budget | initial ball handler |
-| `tip.out.to_hco` | transition_out_phase | standard tip completion | HCO route committed | tip boundary settle complete | throw | boundary handoff | HCO entry BH |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `tip.phase.jump` | branch_phase | tipoff launch and contest | dynamic_event | tip outcome committed | jump visuals settled | throw | tip phase budget | tip winner |
+| `tip.phase.control` | branch_phase | first control to handler | dynamic_event | possession control committed | control pass/attach settled | throw | tip phase budget | initial ball handler |
+| `tip.out.to_hco` | transition_out_phase | standard tip completion | dynamic_event | HCO route committed | tip boundary settle complete | throw | boundary handoff | HCO entry BH |
 
 #### TIMEOUT
 
-| unit_id | unit_type | when it applies | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
-|---|---|---|---|---|---|---|---|
-| `timeout.phase.pause_barrier` | branch_phase | timeout initiated | timeout state committed | active tweens/flows paused to barrier | throw | timeout contract budget | unchanged |
-| `timeout.phase.resume_prepare` | branch_phase | timeout ending | resume route/context committed | resume setup settled | warn -> throw | resume setup budget | unchanged |
-| `timeout.out.to_next` | transition_out_phase | return to pending route | pending route committed | timeout exit settle complete | throw | boundary handoff | next-turn contract owner |
+| unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
+|---|---|---|---|---|---|---|---|---|
+| `timeout.phase.pause_barrier` | branch_phase | timeout initiated | dynamic_event | timeout state committed | active tweens/flows paused to barrier | throw | timeout contract budget | unchanged |
+| `timeout.phase.resume_prepare` | branch_phase | timeout ending | dynamic_event | resume route/context committed | resume setup settled | warn -> throw | resume setup budget | unchanged |
+| `timeout.out.to_next` | transition_out_phase | return to pending route | dynamic_event | pending route committed | timeout exit settle complete | throw | boundary handoff | next-turn contract owner |
 
 ### Phase 1 - Contract and visibility
 
@@ -459,14 +492,14 @@ Decision lock is complete. Before additional code changes, execute:
 1. Run the Fast Break baseline telemetry audit (Section 11.D) and populate the capture table.
 2. Confirm or recalibrate provisional Phase 1 fallback thresholds using audit results.
 3. Validate `fb_transition_snap` detection with the v0 rule (`deltaPx > 12`) and record outcomes.
-4. Start the locked next slice (`hco.lead_in.from_dreb_outlet`) and validate against Acceptance Gates.
+4. Start the locked next slice (`hco.step[n].movement`) and validate against Acceptance Gates.
 
 ### 8.1 Unit-by-Unit Cadence Loop (Execution Standard)
 
 Apply this loop for every execution unit in Section 6.4:
 
 1. **Select one unit** (single `unit_id` scope only).
-2. **Implement unit contract** (`advance_trigger`, `visual_settle_trigger`, `failure_policy`, `clock_anchor`, `owner_authority_at_end`).
+2. **Implement unit contract** (`execution_mode`, `advance_trigger`, `visual_settle_trigger`, `failure_policy`, `clock_anchor`, `owner_authority_at_end`).
 3. **Run deterministic validation** (lint/tests/contract assertions/telemetry checks for that unit).
 4. **Run prototype validation** (visual motion realism + ownership continuity + handoff behavior).
 5. **Mark unit status** (`complete` or `needs_patch`) with notes.
@@ -884,3 +917,21 @@ Phase 1 is complete only when:
 2. Telemetry is emitting for missing endpoints/fallbacks/clamps/snaps.
 3. Baseline table is populated with real sample data.
 4. Controlled fallback thresholds are calibrated from baseline audit and approved.
+
+---
+
+## Cleanup List (Active)
+
+- [ ] **HCO/FCP/HCT player classification warning** (`owner`: animation workstream lead, `phase`: HCO hardening follow-up, `priority`: P1): investigate and eliminate `Expected 5 offensive and 5 defensive players` warnings (seen around OREB/putback and mixed transition contexts); ensure classification input set is stable before strict unit checks.
+- [ ] **Clock continuity warning** (`owner`: animation workstream lead + game clock owner, `phase`: HCO/OREB boundary stabilization, `priority`: P1): investigate `Ignoring non-monotonic clock update` scoreboard warnings; confirm whether this is display-order only or indicates real turn clock handoff inconsistency.
+- [ ] **SIDE_INBOUND fallback dependency** (`owner`: inbound/transition owner, `phase`: SIP/BIP/HCO pass authority cleanup, `priority`: P2): reduce/remove reliance on `Using fallback hardcoded SF→PG pass` by sourcing inbound pass roles from authoritative payload wherever available.
+- [ ] **Debug log severity cleanup** (`owner`: frontend animation owner, `phase`: telemetry/log hygiene, `priority`: P3): convert non-actionable diagnostic `console.warn` lines (e.g., frontend steal entry/setup traces) to debug-level logs to keep runtime warning signal high.
+
+## Known HCO Turn Issues
+
+- [ ] **HCO resolution hard overrun with invalid elapsed clock** (`severity`: Critical, `priority`: P0): observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on `DEAD BALL` path. This indicates timer baseline/state contamination (not normal jitter). **Mitigation applied (Option A):** turn-boundary guards now use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`); validate in live runs before closing.
+- [ ] **DREB->HCO strict contract degradation still triggered in mixed OREB/putback flows** (`severity`: High, `priority`: P1): observed `missing_outlet_receiver_animation_end` followed by synthetic pass fallback (`Using synthetic passInfo for non-strict branch`), indicating incomplete backend endpoint coverage on some rebound-derived transitions.
+- [ ] **HCO/FCP/HCT player classification mismatch in OREB/putback contexts** (`severity`: High, `priority`: P1): repeated warning `Expected 5 offensive and 5 defensive players`; likely destabilizes ownership/step gating on adjacent turns.
+- [ ] **Clock continuity drift around putback/inbound boundaries** (`severity`: High, `priority`: P1): repeated `Ignoring non-monotonic clock update` warnings; may be display-order only, but currently treated as timing-integrity risk until proven otherwise.
+- [ ] **SIDE_INBOUND fallback pass authority still active** (`severity`: Medium, `priority`: P2): `Using fallback hardcoded SF→PG pass` persists; increases variance in SIP->HCO entry behavior and should be retired.
+- [ ] **Ownership attach gating noise during possession flips** (`severity`: Medium, `priority`: P2): frequent `BallControllerAdapter: Skipping attach due to possessionFlipInProgress`; likely expected in some windows but should be reviewed against teleport/ownership-snap incidents.

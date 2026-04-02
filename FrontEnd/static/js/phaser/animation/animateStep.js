@@ -530,7 +530,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       }
       
       // Log if we had to manually start it (especially for receive actions which are problematic)
-      if (!tweenStarted || step.action === 'receive' || step.action === 'guard_ball') {
+      if (!tweenStarted || step.action === 'receive') {
         console.warn('animateStep: Tween not playing after creation/play()', {
           playerId: sprite?.playerId,
           action: step.action,
@@ -552,11 +552,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       }
     }
     
-    // For receive/guard_ball actions specifically, add a safety check after a short delay
-    // These actions are prone to getting stuck, so we monitor them more closely
-    if (step.action === 'receive' || step.action === 'guard_ball') {
-      const isDrebOutletStrictWindow =
-        step.action === "guard_ball" && scene?.__drebOutletWindowActive === true;
+    // Watchdog checks:
+    // - keep for receive steps
+    // - only enforce for guard_ball during strict DREB outlet window
+    const isDrebOutletStrictWindow =
+      step.action === "guard_ball" && scene?.__drebOutletWindowActive === true;
+    if (step.action === 'receive' || isDrebOutletStrictWindow) {
       let checkCount = 0;
       const maxChecks = 10; // Check 10 times over 1 second
       const checkInterval = scene.time.addEvent({

@@ -42,6 +42,7 @@ export class AnimationRouter {
     
     // Initialize the system
     this.initialize();
+    this.installClockReconGlobalHelpers();
     
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: Initialized with all components');
@@ -71,6 +72,72 @@ export class AnimationRouter {
 
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: System initialized successfully');
+    }
+  }
+
+  installClockReconGlobalHelpers() {
+    const scope = (typeof window !== "undefined" && window) || globalThis;
+    if (!scope || scope.__clockReconHelpersInstalled) return;
+    scope.__clockReconHelpersInstalled = true;
+
+    const asNumber = (v, fallback, min = 0) => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < min) return fallback;
+      return n;
+    };
+
+    if (typeof scope.showClockReconConfig !== "function") {
+      scope.showClockReconConfig = () => {
+        const config = {
+          mode: String(scope.UESS_CLOCK_AUTHORITY_MODE ?? "observe"),
+          toleranceSeconds: asNumber(scope.UESS_CLOCK_RECON_TOLERANCE_SECONDS, 0.1, 0),
+          summaryEvery: Math.floor(
+            asNumber(scope.UESS_CLOCK_RECON_SUMMARY_EVERY, 10, 1)
+          ),
+          warnGate: {
+            minRows: Math.floor(
+              asNumber(scope.UESS_CLOCK_RECON_WARN_MIN_ROWS, 50, 1)
+            ),
+            outOfToleranceRateMax: asNumber(
+              scope.UESS_CLOCK_RECON_WARN_OUT_OF_TOLERANCE_RATE_MAX,
+              0.02,
+              0
+            ),
+            averageAbsDeltaSecondsMax: asNumber(
+              scope.UESS_CLOCK_RECON_WARN_AVG_ABS_DELTA_SECONDS_MAX,
+              0.25,
+              0
+            ),
+            maxAbsDeltaSecondsMax: asNumber(
+              scope.UESS_CLOCK_RECON_WARN_MAX_ABS_DELTA_SECONDS_MAX,
+              1.0,
+              0
+            ),
+          },
+          latestSummary: scope.__CLOCK_RECON_SUMMARY_LAST__ ?? null,
+        };
+        console.log("[CLOCK RECON CONFIG]", config);
+        return config;
+      };
+    }
+
+    if (typeof scope.getClockReconSummaryLatest !== "function") {
+      scope.getClockReconSummaryLatest = (n = 5) => {
+        const count = Math.max(0, Math.floor(Number(n) || 0));
+        const list = Array.isArray(scope.__CLOCK_RECON_SUMMARY_BUFFER__)
+          ? scope.__CLOCK_RECON_SUMMARY_BUFFER__
+          : [];
+        return list.slice(-count);
+      };
+    }
+
+    if (typeof scope.clearClockReconBuffers !== "function") {
+      scope.clearClockReconBuffers = () => {
+        scope.__CLOCK_RECON_LAST__ = undefined;
+        scope.__CLOCK_RECON_SUMMARY_LAST__ = undefined;
+        scope.__CLOCK_RECON_BUFFER__ = [];
+        scope.__CLOCK_RECON_SUMMARY_BUFFER__ = [];
+      };
     }
   }
 
@@ -138,6 +205,12 @@ export class AnimationRouter {
       const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
       const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
       const shotSecondsToCount = Number.isFinite(shotClockStart) && Number.isFinite(shotClockEnd) ? shotClockStart - shotClockEnd : 0;
+      const clockEventLedger = Array.isArray(turnData?.clock_event_ledger)
+        ? turnData.clock_event_ledger
+        : [];
+      const clockAuthorityMode = String(
+        turnData?.uess_clock_authority_mode ?? ""
+      ).toLowerCase();
       // Sync diagnostics: compare backend real-time estimate to game time (1:1 would be game_seconds * 1000)
       const expectedRealMsIf1To1 = gameSecondsToCount * 1000;
       const ratioRealToGame = expectedRealMsIf1To1 > 0 ? (durationMs / expectedRealMsIf1To1) : null;
@@ -156,6 +229,15 @@ export class AnimationRouter {
         expected_real_ms_if_1_to_1: expectedRealMsIf1To1,
         ratio_real_to_game: ratioRealToGame != null ? `${(ratioRealToGame * 100).toFixed(0)}%` : null,
         keys: typeof turnData === 'object' ? Object.keys(turnData).filter(k => k.includes('clock') || k === 'real_time_elapsed_ms') : [],
+      });
+      this.emitClockObserveParityTelemetry(turnData, {
+        clockStart,
+        clockEnd,
+        shotClockStart,
+        shotClockEnd,
+        durationMs,
+        clockEventLedger,
+        clockAuthorityMode,
       });
 
       if (this.scene._clockInterpolationTween) {
@@ -419,6 +501,292 @@ export class AnimationRouter {
       hasBallController: !!this.ballController,
       hasAnimationEngine: !!this.animationEngine
     };
+  }
+
+  deriveClockElapsedFromLedger(clockEventLedger = []) {
+    if (!Array.isArray(clockEventLedger)) return 0;
+    let elapsed = 0;
+    for (const row of clockEventLedger) {
+      if (!row || row.event_type !== "game_clock_stop") continue;
+      const before = Number(row.game_clock_before);
+      const after = Number(row.game_clock_after);
+      if (!Number.isFinite(before) || !Number.isFinite(after)) continue;
+      elapsed += Math.max(0, before - after);
+    }
+    return elapsed;
+  }
+
+  resolveClockReconToleranceSeconds(turnData) {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const globalRaw = Number(scope?.UESS_CLOCK_RECON_TOLERANCE_SECONDS);
+    if (Number.isFinite(globalRaw) && globalRaw >= 0) return globalRaw;
+    const turnRaw = Number(turnData?.uess_clock_reconciliation?.tolerance_seconds);
+    if (Number.isFinite(turnRaw) && turnRaw >= 0) return turnRaw;
+    return 0.1;
+  }
+
+  resolveClockAuthorityMode(turnData, contextMode = null) {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const normalize = (raw) => {
+      const v = String(raw ?? "").trim().toLowerCase();
+      if (v === "observe" || v === "warn" || v === "throw" || v === "off") {
+        return v;
+      }
+      return null;
+    };
+    const globalMode = normalize(scope?.UESS_CLOCK_AUTHORITY_MODE);
+    if (globalMode) return globalMode;
+    const ctxMode = normalize(contextMode);
+    if (ctxMode) return ctxMode;
+    const turnMode = normalize(
+      turnData?.uess_clock_authority_mode ??
+      turnData?.uess_clock_reconciliation?.mode
+    );
+    if (turnMode) return turnMode;
+    return "observe";
+  }
+
+  resolveClockReconSummaryEvery() {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const raw = Number(scope?.UESS_CLOCK_RECON_SUMMARY_EVERY);
+    if (Number.isFinite(raw) && raw >= 1) return Math.floor(raw);
+    return 10;
+  }
+
+  resolveClockReconWarnThresholds() {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const asNumber = (v, fallback, min = 0) => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < min) return fallback;
+      return n;
+    };
+    return {
+      minRows: Math.floor(
+        asNumber(scope?.UESS_CLOCK_RECON_WARN_MIN_ROWS, 50, 1)
+      ),
+      outOfToleranceRateMax: asNumber(
+        scope?.UESS_CLOCK_RECON_WARN_OUT_OF_TOLERANCE_RATE_MAX,
+        0.02,
+        0
+      ),
+      averageAbsDeltaSecondsMax: asNumber(
+        scope?.UESS_CLOCK_RECON_WARN_AVG_ABS_DELTA_SECONDS_MAX,
+        0.25,
+        0
+      ),
+      maxAbsDeltaSecondsMax: asNumber(
+        scope?.UESS_CLOCK_RECON_WARN_MAX_ABS_DELTA_SECONDS_MAX,
+        1.0,
+        0
+      ),
+    };
+  }
+
+  getClockReconSession() {
+    if (!this.scene.__clockReconSession) {
+      this.scene.__clockReconSession = {
+        rows: 0,
+        withTolerance: 0,
+        outOfTolerance: 0,
+        missingCompare: 0,
+        absDeltaSum: 0,
+        maxAbsDelta: 0,
+        byResultType: {},
+      };
+    }
+    return this.scene.__clockReconSession;
+  }
+
+  emitClockReconSummaryIfNeeded(basePayload = {}) {
+    const session = this.getClockReconSession();
+    const every = this.resolveClockReconSummaryEvery();
+    if (session.rows === 0 || session.rows % every !== 0) return;
+    const avgAbsDelta =
+      session.rows > 0 ? session.absDeltaSum / session.rows : 0;
+    const thresholds = this.resolveClockReconWarnThresholds();
+    const outOfToleranceRate =
+      session.rows > 0 ? session.outOfTolerance / session.rows : 0;
+    const hasEnoughRows = session.rows >= thresholds.minRows;
+    const meetsWarnPromotionGate =
+      hasEnoughRows &&
+      outOfToleranceRate <= thresholds.outOfToleranceRateMax &&
+      avgAbsDelta <= thresholds.averageAbsDeltaSecondsMax &&
+      session.maxAbsDelta <= thresholds.maxAbsDeltaSecondsMax;
+    const summary = {
+      event: "clock_contract_reconciliation_summary",
+      branchKind: "clock_contract",
+      timestampMs: Date.now(),
+      mode: basePayload.mode ?? "observe",
+      rows: session.rows,
+      withTolerance: session.withTolerance,
+      outOfTolerance: session.outOfTolerance,
+      missingCompare: session.missingCompare,
+      withToleranceRate:
+        session.rows > 0 ? session.withTolerance / session.rows : 0,
+      outOfToleranceRate,
+      averageAbsDeltaSeconds: Number(avgAbsDelta.toFixed(3)),
+      maxAbsDeltaSeconds: Number(session.maxAbsDelta.toFixed(3)),
+      thresholds,
+      hasEnoughRows,
+      meetsWarnPromotionGate,
+      byResultType: { ...session.byResultType },
+    };
+    try {
+      const scope = (typeof window !== "undefined" && window) || globalThis;
+      scope.__CLOCK_RECON_SUMMARY_LAST__ = summary;
+      if (!Array.isArray(scope.__CLOCK_RECON_SUMMARY_BUFFER__)) {
+        scope.__CLOCK_RECON_SUMMARY_BUFFER__ = [];
+      }
+      scope.__CLOCK_RECON_SUMMARY_BUFFER__.push(summary);
+      if (scope.__CLOCK_RECON_SUMMARY_BUFFER__.length > 50) {
+        scope.__CLOCK_RECON_SUMMARY_BUFFER__.splice(
+          0,
+          scope.__CLOCK_RECON_SUMMARY_BUFFER__.length - 50
+        );
+      }
+    } catch (_) {
+      // no-op
+    }
+    const emit = this.scene?.events?.emit;
+    if (typeof emit === "function") {
+      emit.call(this.scene.events, "animTelemetry", summary);
+      if (!summary.meetsWarnPromotionGate) {
+        emit.call(this.scene.events, "animTelemetry", {
+          ...summary,
+          event: "clock_contract_reconciliation_threshold_breach",
+        });
+      }
+    }
+  }
+
+  emitClockObserveParityTelemetry(turnData, context = {}) {
+    const emit = this.scene?.events?.emit;
+    if (typeof emit !== "function") return;
+    const mode = this.resolveClockAuthorityMode(
+      turnData,
+      context.clockAuthorityMode
+    );
+    if (mode === "off") return;
+    const clockEventLedger = Array.isArray(context.clockEventLedger)
+      ? context.clockEventLedger
+      : Array.isArray(turnData?.clock_event_ledger)
+        ? turnData.clock_event_ledger
+        : [];
+    const hasClockContract =
+      Number.isFinite(context.clockStart) && Number.isFinite(context.clockEnd);
+    const feElapsedFromLedger = this.deriveClockElapsedFromLedger(clockEventLedger);
+    const feElapsed = clockEventLedger.length > 0
+      ? feElapsedFromLedger
+      : hasClockContract
+        ? Math.max(0, Number(context.clockStart) - Number(context.clockEnd))
+        : 0;
+    const beElapsed = Number(turnData?.uess_clock_elapsed_game_seconds);
+    const legacyElapsed = Number(
+      turnData?.uess_clock_elapsed_legacy_game_seconds ??
+      turnData?.time_elapsed ??
+      turnData?.timeElapsed ??
+      0
+    );
+    const toleranceSeconds = this.resolveClockReconToleranceSeconds(turnData);
+    const deltaSeconds =
+      Number.isFinite(beElapsed) ? feElapsed - beElapsed : null;
+    const withinTolerance =
+      Number.isFinite(deltaSeconds)
+        ? Math.abs(deltaSeconds) <= toleranceSeconds
+        : null;
+    const basePayload = {
+      event: "clock_contract_event_applied",
+      branchKind: "clock_contract",
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: turnData?.index ?? this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      mode,
+      clockEventCount: clockEventLedger.length,
+      feElapsedGameSeconds: Number(feElapsed),
+      beElapsedGameSeconds: Number.isFinite(beElapsed) ? Number(beElapsed) : null,
+      legacyElapsedGameSeconds: Number.isFinite(legacyElapsed)
+        ? Number(legacyElapsed)
+        : null,
+      deltaSeconds: Number.isFinite(deltaSeconds) ? Number(deltaSeconds) : null,
+      toleranceSeconds: Number(toleranceSeconds),
+      withinTolerance,
+      feElapsedSource: clockEventLedger.length > 0 ? "clock_event_ledger" : "clock_contract",
+      clockStart: Number.isFinite(context.clockStart) ? Number(context.clockStart) : null,
+      clockEnd: Number.isFinite(context.clockEnd) ? Number(context.clockEnd) : null,
+      shotClockStart: Number.isFinite(context.shotClockStart)
+        ? Number(context.shotClockStart)
+        : null,
+      shotClockEnd: Number.isFinite(context.shotClockEnd)
+        ? Number(context.shotClockEnd)
+        : null,
+      realTimeElapsedMs: Number.isFinite(context.durationMs)
+        ? Number(context.durationMs)
+        : null,
+    };
+    const session = this.getClockReconSession();
+    session.rows += 1;
+    if (basePayload.withinTolerance === true) session.withTolerance += 1;
+    else if (basePayload.withinTolerance === false) session.outOfTolerance += 1;
+    else session.missingCompare += 1;
+    const absDelta = Math.abs(Number(basePayload.deltaSeconds));
+    if (Number.isFinite(absDelta)) {
+      session.absDeltaSum += absDelta;
+      session.maxAbsDelta = Math.max(session.maxAbsDelta, absDelta);
+    }
+    const rt = String(basePayload.resultType || "UNKNOWN");
+    session.byResultType[rt] = (session.byResultType[rt] || 0) + 1;
+
+    // Lightweight runtime mirror for local validation without event listeners.
+    // This is observe/debug only and has no gameplay effect.
+    const scope = (typeof window !== "undefined" && window) || globalThis;
+    try {
+      scope.__CLOCK_RECON_LAST__ = { ...basePayload };
+      if (!Array.isArray(scope.__CLOCK_RECON_BUFFER__)) {
+        scope.__CLOCK_RECON_BUFFER__ = [];
+      }
+      scope.__CLOCK_RECON_BUFFER__.push({ ...basePayload });
+      if (scope.__CLOCK_RECON_BUFFER__.length > 50) {
+        scope.__CLOCK_RECON_BUFFER__.splice(0, scope.__CLOCK_RECON_BUFFER__.length - 50);
+      }
+    } catch (_) {
+      // no-op: debug mirror should never break animation flow
+    }
+
+    emit.call(this.scene.events, "animTelemetry", basePayload);
+
+    if (withinTolerance === true) {
+      emit.call(this.scene.events, "animTelemetry", {
+        ...basePayload,
+        event: "clock_contract_reconciliation_pass",
+      });
+    } else if (withinTolerance === false) {
+      emit.call(this.scene.events, "animTelemetry", {
+        ...basePayload,
+        event: "clock_contract_reconciliation_fail",
+      });
+      if (mode === "warn") {
+        console.warn(
+          "[CLOCK CONTRACT] reconciliation fail",
+          {
+            resultType: basePayload.resultType,
+            turnId: basePayload.turnId,
+            turnIndex: basePayload.turnIndex,
+            feElapsed: basePayload.feElapsedGameSeconds,
+            beElapsed: basePayload.beElapsedGameSeconds,
+            deltaSeconds: basePayload.deltaSeconds,
+            toleranceSeconds: basePayload.toleranceSeconds,
+          }
+        );
+      } else if (mode === "throw") {
+        throw new Error(
+          `[CLOCK contract] reconciliation fail (result=${basePayload.resultType ?? "?"}, turn=${basePayload.turnId ?? "?"}, feElapsed=${basePayload.feElapsedGameSeconds}, beElapsed=${basePayload.beElapsedGameSeconds}, delta=${basePayload.deltaSeconds}, tolerance=${basePayload.toleranceSeconds})`
+        );
+      }
+    }
+    this.emitClockReconSummaryIfNeeded(basePayload);
   }
 
   /**

@@ -353,6 +353,18 @@ function shouldAnimateRimRunnerLanePass(turnData, phase2Kind) {
   return true;
 }
 
+function getRimRunnerDecisionPillMeta(turnData) {
+  const explicitGood = turnData?.rim_runner_decision_good;
+  const passAttempted = Boolean(turnData?.rim_runner_pass_attempted);
+  const fbOpen = Boolean(turnData?.rim_runner_fb_open);
+  const isGoodDecision =
+    typeof explicitGood === "boolean" ? explicitGood : passAttempted === fbOpen;
+  return {
+    decisionPillText: isGoodDecision ? "Good Decision" : "Bad Decision",
+    decisionPillTone: isGoodDecision ? "good" : "bad",
+  };
+}
+
 async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height) {
   const roles = turnData.roles || {};
   const phase = roles.rim_runner_burst_phase;
@@ -364,6 +376,25 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
   const passerSprite = playerSprites[passerId];
   const rrSprite = playerSprites[rrId];
   if (!passerSprite || !rrSprite) return;
+
+  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const offenseSide = passerSprite.team === "home" ? "home" : "away";
+  const passerTeamId = passerSprite.team_id;
+  const homeTeamField = scene.simData?.home_team;
+  const awayTeamField = scene.simData?.away_team;
+  const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+  const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+  const passerTeamName = passerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+  const passerInfo = scene.playerInfo?.[passerId];
+  const passerPlayerData = passerInfo
+    ? {
+        playerId: passerId,
+        photo: passerSprite.photo || null,
+        teamName: passerTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, passerTeamId),
+      }
+    : null;
+  showAnnouncement("Fast Break!", offenseSide, passerPlayerData, getRimRunnerDecisionPillMeta(turnData));
 
   const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
   const towardBasket = away ? -1 : 1;
@@ -859,7 +890,8 @@ async function animateRimRunnerHoldUpLeadIn(
           secondaryColor: getSecondaryColorForTeam(scene, bhTeamId),
         }
       : null;
-    showAnnouncement("No Pass!", offenseSide, bhPlayerData);
+    const decisionMeta = getRimRunnerDecisionPillMeta(turnData);
+    showAnnouncement("No Fast Break", offenseSide, bhPlayerData, decisionMeta);
   }
 
   attachBallToPlayer(scene, ballSprite, bh);
@@ -1396,7 +1428,7 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     if (outletDenied) {
       await awaitWithTimeout(
         Promise.allSettled(secondary),
-        3000,
+        100,
         "rim_runner_burst_secondary_settle"
       );
     } else {

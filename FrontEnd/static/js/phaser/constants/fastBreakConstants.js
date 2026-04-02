@@ -11,9 +11,18 @@ import { CLAMP_BOUNDS } from "../animation/courtClamp.js";
 /**
  * When false, skips the **"Fast Break!"** entry banners (turn start / FAST_BREAK context).
  * Makes, misses, rebounds, fouls, "Fast Break Score!", "Great Stop!", etc. are unchanged.
- * Set to `true` after tuning to restore entry announcements.
+ * Runtime override:
+ *   window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = false // disable
+ *   window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = true  // enable
  */
-export const ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = false;
+export const ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = true;
+
+export function isFastBreakEntryAnnouncementsEnabled() {
+  if (typeof window !== "undefined" && typeof window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS !== "undefined") {
+    return Boolean(window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS);
+  }
+  return ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS;
+}
 
 // Ball Handler Movement (Defensive Stop / Shot Attempt)
 export const BALL_HANDLER_MOVE_X_MIN = 5;

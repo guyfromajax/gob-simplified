@@ -17,7 +17,7 @@ import {
   pickDefensiveFoulAnnouncementText,
 } from './foulAnnouncementLanguage.js';
 import gameStore from '../../state/gameStore.js';
-import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
+import { isFastBreakEntryAnnouncementsEnabled } from '../constants/fastBreakConstants.js';
 
 function getSecondaryColorForTeam(scene, teamId) {
   if (!scene?.simData || teamId == null) return '#333333';
@@ -118,7 +118,7 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
 
     // ========== FAST BREAK ==========
     case 'FAST_BREAK':
-      if (ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS) {
+      if (isFastBreakEntryAnnouncementsEnabled()) {
         showAnnouncement("Fast Break!", offenseTeam);
       }
       break;

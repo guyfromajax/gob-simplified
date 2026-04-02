@@ -71,6 +71,20 @@ def _attacking_basket_xy(off_team, game):
         return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
     return float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"])
 
+def _animation_transition_basket_xy(team, game):
+    """
+    Transition/animation basket orientation in HOME court coordinates.
+
+    This matches frontend deriveOffenseContext():
+    - home offense -> HOME_RIM (x≈91)
+    - away offense -> AWAY_RIM (x≈9)
+    """
+    from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+
+    if team.team_id == game.home_team.team_id:
+        return float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"])
+    return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
+
 
 def _defender_in_contest_range(sx, sy, def_lineup):
     """True if any defensive lineup player lies within the contest bounding box around the shooter."""
@@ -186,6 +200,43 @@ class ShotManager:
             return player_id
         return None
 
+    def _resolve_lineup_player_by_id(self, team, player_id):
+        """Return lineup player object by player_id (string-safe), else None."""
+        if team is None or player_id is None:
+            return None
+        lineup = getattr(team, "lineup", {}) or {}
+        sid = str(player_id)
+        for player in lineup.values():
+            pid = getattr(player, "player_id", None) if player else None
+            if pid is not None and str(pid) == sid:
+                return player
+        return None
+
+    def _build_dreb_outlet_receiver_target(self, rebound_team, rebounder_id):
+        """
+        Build unit-specific receive target for DREB->halfcourt outlet.
+
+        This target is not the generic shot-turn animation end. It is a dedicated
+        receive spot near the rebounder, biased toward the new attacking basket.
+        """
+        rebounder = self._resolve_lineup_player_by_id(rebound_team, rebounder_id)
+        if rebounder is None:
+            return None
+        rebounder_coords = getattr(rebounder, "coords", None) or {}
+        reb_x = float(rebounder_coords.get("x", 50))
+        reb_y = float(rebounder_coords.get("y", 25))
+        # Use transition animation basket orientation (matches frontend).
+        basket_x, _basket_y = _animation_transition_basket_xy(rebound_team, self.game)
+        sign = 1 if basket_x > reb_x else -1
+
+        target_x = max(4.0, min(97.0, reb_x + sign * random.randint(3, 6)))
+        target_y = max(1.0, min(50.0, reb_y + random.randint(-6, 6)))
+        return {
+            "x": round(target_x, 2),
+            "y": round(target_y, 2),
+            "source": "shot_manager_dreb_outlet_receiver_target",
+        }
+
     def _build_dreb_outlet_pass_contract(self, rebound_team, rebounder_id):
         """Build explicit outlet-pass contract consumed by frontend DREB setup."""
         passer_id = rebounder_id
@@ -195,9 +246,11 @@ class ShotManager:
         receiver_id = self._resolve_dreb_outlet_receiver(rebound_team, passer_id)
         if passer_id is None or receiver_id is None:
             return None
+        receiver_target = self._build_dreb_outlet_receiver_target(rebound_team, passer_id)
         return {
             "passer_id": passer_id,
             "receiver_id": receiver_id,
+            "receiver_target": receiver_target,
             "required": True,
             "contract_source": "shot_manager_dreb_halfcourt",
         }

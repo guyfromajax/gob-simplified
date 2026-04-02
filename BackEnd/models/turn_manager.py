@@ -5,6 +5,7 @@ from BackEnd.models.animator import Animator
 import random
 import json
 import logging
+import uuid
 from BackEnd.db import players_collection, teams_collection, plays_collection
 from BackEnd.models.player import Player, player_to_dict
 
@@ -150,6 +151,22 @@ class TurnManager:
         result["shot_clock_reset"] = bool(sc_reset)
         result["clock_contract_source"] = source
         result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
+        clock_authority_mode = str(
+            game_state.get("uess_clock_authority_mode", "observe") or "observe"
+        ).lower()
+        result["uess_clock_authority_mode"] = clock_authority_mode
+        result["clock_event_ledger"] = self._build_clock_event_ledger(
+            result=result,
+            clock_start=clock_start,
+            clock_end=clock_end,
+            shot_clock_start=shot_clock_start,
+            shot_clock_end=sc_end,
+            shot_clock_reset=bool(sc_reset),
+        )
+        self._attach_clock_elapsed_observe_reconciliation(
+            result=result,
+            game_state=game_state,
+        )
         logging.debug(
             "⏱️ [CLOCK CONTRACT] type=%s source=%s "
             "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",
@@ -162,6 +179,151 @@ class TurnManager:
             sc_end,
             sc_reset,
         )
+
+    def _get_clock_reconciliation_tolerance_seconds(self, game_state: dict) -> float:
+        raw = game_state.get("uess_clock_recon_tolerance_seconds", 0.10)
+        try:
+            tol = float(raw)
+        except (TypeError, ValueError):
+            tol = 0.10
+        return max(0.0, tol)
+
+    def _derive_elapsed_from_clock_event_ledger(self, events: list[dict]) -> int:
+        if not isinstance(events, list):
+            return 0
+        derived_elapsed = 0
+        for row in events:
+            if not isinstance(row, dict):
+                continue
+            if row.get("event_type") != "game_clock_stop":
+                continue
+            try:
+                before = int(row.get("game_clock_before", 0) or 0)
+                after = int(row.get("game_clock_after", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            derived_elapsed += max(0, before - after)
+        return int(derived_elapsed)
+
+    def _attach_clock_elapsed_observe_reconciliation(
+        self,
+        *,
+        result: dict,
+        game_state: dict,
+    ) -> None:
+        """Observe-mode compare: ledger-derived elapsed vs legacy turn time_elapsed."""
+        legacy_elapsed = int(result.get("time_elapsed", 0) or 0)
+        ledger_elapsed = self._derive_elapsed_from_clock_event_ledger(
+            result.get("clock_event_ledger", [])
+        )
+        delta_seconds = ledger_elapsed - legacy_elapsed
+        tolerance = self._get_clock_reconciliation_tolerance_seconds(game_state)
+        within_tolerance = abs(delta_seconds) <= tolerance
+
+        result["uess_clock_elapsed_game_seconds"] = int(ledger_elapsed)
+        result["uess_clock_elapsed_legacy_game_seconds"] = int(legacy_elapsed)
+        result["uess_clock_elapsed_delta_seconds"] = int(delta_seconds)
+        result["uess_clock_elapsed_observe_within_tolerance"] = bool(within_tolerance)
+        result["uess_clock_reconciliation"] = {
+            "mode": "observe",
+            "ledger_elapsed_game_seconds": int(ledger_elapsed),
+            "legacy_elapsed_game_seconds": int(legacy_elapsed),
+            "delta_seconds": int(delta_seconds),
+            "tolerance_seconds": float(tolerance),
+            "within_tolerance": bool(within_tolerance),
+        }
+
+    def _clock_stop_reason(self, result: dict) -> str:
+        result_type = str(result.get("result_type") or "").upper()
+        if result_type == "TIMEOUT":
+            return "timeout"
+        if result_type == "FOUL":
+            return "foul"
+        if result_type in {"DEAD BALL", "TURNOVER", "CHARGE"}:
+            return "dead_ball_turnover"
+        if result_type == "MAKE":
+            return "made_basket"
+        return "turn_boundary"
+
+    def _shot_clock_stop_reason(self, result: dict) -> str:
+        result_type = str(result.get("result_type") or "").upper()
+        if result_type in {"MAKE", "MISS", "BLOCK"}:
+            return "shot_detach"
+        if result_type == "FOUL":
+            return "foul"
+        if result_type in {"DEAD BALL", "TURNOVER", "CHARGE"}:
+            return "dead_ball_turnover"
+        return "turn_boundary"
+
+    def _build_clock_event_ledger(
+        self,
+        *,
+        result: dict,
+        clock_start: int,
+        clock_end: int,
+        shot_clock_start: int,
+        shot_clock_end: int,
+        shot_clock_reset: bool,
+    ) -> list[dict]:
+        """Build observe-mode clock event ledger rows for this turn."""
+        turn_id = result.get("turn_count") or result.get("id")
+        game_elapsed = max(0, int(clock_start) - int(clock_end))
+        shot_elapsed = max(0, int(shot_clock_start) - int(shot_clock_end))
+        events: list[dict] = []
+
+        def append_event(event_type: str, reason: str, ts_game_seconds: int) -> None:
+            events.append(
+                {
+                    "event_id": f"clk-{uuid.uuid4().hex[:12]}",
+                    "turn_id": turn_id,
+                    "event_type": event_type,
+                    "reason": reason,
+                    "game_clock_before": int(clock_start),
+                    "game_clock_after": int(clock_end),
+                    "shot_clock_before": int(shot_clock_start),
+                    "shot_clock_after": int(shot_clock_end),
+                    "timestamp_game_seconds": int(ts_game_seconds),
+                }
+            )
+
+        if game_elapsed > 0:
+            append_event("game_clock_start", "live_ball_window", int(clock_start))
+            append_event("game_clock_stop", self._clock_stop_reason(result), int(clock_end))
+        else:
+            append_event("game_clock_stop", self._clock_stop_reason(result), int(clock_start))
+
+        if shot_elapsed > 0:
+            append_event("shot_clock_start", "live_possession_window", int(shot_clock_start))
+            append_event(
+                "shot_clock_stop",
+                self._shot_clock_stop_reason(result),
+                int(shot_clock_end),
+            )
+        else:
+            append_event(
+                "shot_clock_stop",
+                self._shot_clock_stop_reason(result),
+                int(shot_clock_start),
+            )
+
+        if shot_clock_reset:
+            append_event("shot_clock_reset", "turn_policy_reset", int(clock_end))
+
+        if int(clock_end) <= 0:
+            append_event("period_end", "game_clock_zero", 0)
+
+        if int(result.get("points", 0) or 0) > 0 or str(result.get("result_type") or "").upper() == "MAKE":
+            append_event("basket_counted", "scoring_result", int(clock_end))
+
+        possession_team_id = (
+            result.get("possession_team_id")
+            or result.get("offense_team_id")
+            or self.game.game_state.get("offense_team")
+        )
+        append_event("possession_committed", "turn_close", int(clock_end))
+        events[-1]["possession_team_id"] = possession_team_id
+
+        return events
 
     def setup_side_inbound(self):
         """

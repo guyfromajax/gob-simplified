@@ -21,6 +21,8 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
 import { clampGridCoords } from "./courtClamp.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
+import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
+import { resolveDrebOutletReceiverTarget } from "./drebOutletTargetResolver.js";
 import { DEBUG } from "../utils/debug.js";
 import {
   DebugFlags,
@@ -98,7 +100,7 @@ function resolveDrebStrictMode() {
   if (raw === "throw") return "throw";
   if (raw === "warn" || raw === true) return "warn";
   if (raw === "off" || raw === false) return "off";
-  return "off";
+  return "throw";
 }
 
 /**
@@ -786,7 +788,25 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
 }
 
 // Setup positions after a defensive rebound before new half-court offense or fast break
-async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO", turnData = null }) {
+async function runDefensiveReboundSetup({
+  scene,
+  ballSprite,
+  playerSprites,
+  rebounderId,
+  nextPlayType = "HCO",
+  turnData = null,
+  authorityTurnData = null,
+}) {
+  // Split contexts:
+  // - authorityTurn: contract/role/result source for strict DREB outlet enforcement
+  // - turnData: movement/get-back source (kept for backward compatibility)
+  const currentIndex = scene?.currentTurn || 0;
+  const authorityTurn =
+    authorityTurnData ||
+    turnData ||
+    scene?.simData?.turns?.[currentIndex] ||
+    null;
+
   // Get the offense_getback list from the MISS turn that led to this DREB
   // For Fast Break MISS → DREB, the offense_getback is from the previous HCO MISS turn
   // For regular HCO MISS → DREB, the offense_getback is from the current MISS turn
@@ -795,7 +815,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   let missTurnForGetback = turnData;
   if (!missTurnForGetback || !missTurnForGetback.offense_getback) {
     // Try previous turn if current turn doesn't have offense_getback (Fast Break case)
-    const currentIndex = scene.currentTurn || 0;
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
     if ((previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") && previousTurn.offense_getback) {
       missTurnForGetback = previousTurn;
@@ -822,11 +841,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   if (!rebounderSprite) return;
   const drebTelemetry = {
     branchKind: "dreb_hco_setup",
-    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
     turnIndex: scene?.currentTurn ?? null,
-    resultType: turnData?.result_type ?? null,
+    resultType: authorityTurn?.result_type ?? null,
     gameClock: scene?.simData?.clock ?? null,
-    quarter: turnData?.quarter ?? scene?.quarter ?? null,
+    quarter: authorityTurn?.quarter ?? scene?.quarter ?? null,
     required: 0,
     fallback: 0,
     strictWarnings: 0,
@@ -862,6 +881,20 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       turnIndex: drebTelemetry.turnIndex,
       downgradedFromThrow: mode === "throw" && !allowThrow,
     });
+  };
+  const drebOutletCompletionContract = {
+    unit_id: "hco.lead_in.from_dreb_outlet",
+    execution_mode: "dynamic_event",
+    advance_trigger: "outlet pass received",
+    visual_settle_trigger: "outlet movement + pass settled",
+    failure_policy: "throw",
+  };
+  const unitStartMs = Date.now();
+  const drebOutletObserved = {
+    authorizingEventReceived: false,
+    visualSettled: false,
+    finalOffensiveMoverSettled: false,
+    shotTerminated: false,
   };
 
   scene.possessionFlipInProgress = true;
@@ -899,48 +932,75 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   const rebGridX = (rebounderSprite.x / width) * 100;
   const rebGridY = 50 - (rebounderSprite.y / height) * 50;
+  const getFallbackOutletTarget = () => {
+    const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
+    return {
+      x: Phaser.Math.Clamp(
+        rebGridX + sign * Phaser.Math.Between(3, 6),
+        4,
+        97
+      ),
+      y: Phaser.Math.Clamp(
+        rebGridY + Phaser.Math.Between(-6, 6),
+        1,
+        50
+      ),
+    };
+  };
 
   // Find the outlet pass receiver
   // For fast breaks that came from a previous turn (not a separate fast break turn),
   // we don't have outlet_receiver data, so we find the PG
   let outletReceiverId = null;
   let outletReceiverSprite = null;
+  const isValidOutletReceiverRef = (ref) =>
+    !!ref?.id &&
+    !!ref?.sprite &&
+    String(ref.id) !== String(rebounderId) &&
+    String(ref.sprite.team) === String(rebounderSprite.team);
 
   // Prefer backend authority for outlet receiver when present.
   const receiverCandidates = [
-    turnData?.outlet_receiver_id,
-    turnData?.outletReceiverId,
-    turnData?.outlet_receiver,
-    turnData?.roles?.outlet_receiver,
-    turnData?.roles?.ball_handler_id,
-    turnData?.roles?.ball_handler?.player_id,
-    turnData?.ball_handler,
+    authorityTurn?.outlet_receiver_id,
+    authorityTurn?.outletReceiverId,
+    authorityTurn?.outlet_receiver,
+    authorityTurn?.roles?.outlet_receiver,
+    authorityTurn?.roles?.ball_handler_id,
+    authorityTurn?.roles?.ball_handler?.player_id,
+    authorityTurn?.ball_handler,
   ];
   for (const cid of receiverCandidates) {
     const ref = resolveSpriteById(playerSprites, cid);
-    if (ref.id && ref.sprite && String(ref.id) !== String(rebounderId)) {
+    if (isValidOutletReceiverRef(ref)) {
       outletReceiverId = ref.id;
       outletReceiverSprite = ref.sprite;
       break;
     }
   }
   const drebOutletPassContract =
-    turnData?.dreb_outlet_pass && typeof turnData.dreb_outlet_pass === "object"
-      ? turnData.dreb_outlet_pass
+    authorityTurn?.dreb_outlet_pass && typeof authorityTurn.dreb_outlet_pass === "object"
+      ? authorityTurn.dreb_outlet_pass
       : null;
   const contractPasserId =
     drebOutletPassContract?.passer_id ?? drebOutletPassContract?.passerId ?? null;
   const contractReceiverId =
     drebOutletPassContract?.receiver_id ?? drebOutletPassContract?.receiverId ?? null;
+  const contractReceiverTarget = drebOutletPassContract?.receiver_target ?? drebOutletPassContract?.receiverTarget ?? null;
   if (contractReceiverId != null) {
     const contractReceiverRef = resolveSpriteById(playerSprites, contractReceiverId);
-    if (
-      contractReceiverRef.id &&
-      contractReceiverRef.sprite &&
-      String(contractReceiverRef.id) !== String(rebounderId)
-    ) {
+    if (isValidOutletReceiverRef(contractReceiverRef)) {
       outletReceiverId = contractReceiverRef.id;
       outletReceiverSprite = contractReceiverRef.sprite;
+    } else {
+      emitDrebTelemetry("dreb_contract_missing_endpoint", {
+        playerId: rebounderId,
+        role: "outlet_receiver",
+        requiredEndpointType: "dreb_outlet_pass",
+        reason: "contract_receiver_invalid_or_wrong_team",
+        contractReceiverId,
+        rebounderTeam: rebounderSprite.team,
+        contractReceiverTeam: contractReceiverRef?.sprite?.team ?? null,
+      });
     }
   }
   
@@ -951,9 +1011,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     if (outletReceiverId) break;
     if (info.pos === "PG" && info.team === rebounderSprite.team) {
       const pgRef = resolveSpriteById(playerSprites, id);
-      outletReceiverId = pgRef.id ?? id;
-      outletReceiverSprite = pgRef.sprite;
-      break;
+      if (isValidOutletReceiverRef(pgRef)) {
+        outletReceiverId = pgRef.id ?? id;
+        outletReceiverSprite = pgRef.sprite;
+        break;
+      }
     }
   }
   
@@ -973,10 +1035,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       if (sprite.team === rebounderSprite.team && String(id) !== String(rebounderId)) {
         // Check if sprite has position info
         if (sprite.pos === "PG" || sprite.position === "PG") {
-          outletReceiverId = id;
-          outletReceiverSprite = sprite;
-          console.log('🏀 [DREB OUTLET] Found PG via fallback lookup', { outletReceiverId: id });
-          break;
+          const pgRef = resolveSpriteById(playerSprites, id);
+          if (isValidOutletReceiverRef(pgRef)) {
+            outletReceiverId = pgRef.id ?? id;
+            outletReceiverSprite = pgRef.sprite;
+            console.log('🏀 [DREB OUTLET] Found PG via fallback lookup', { outletReceiverId: id });
+            break;
+          }
         }
       }
     }
@@ -985,10 +1050,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     if (!outletReceiverId) {
       for (const [id, sprite] of Object.entries(playerSprites)) {
         if (sprite.team === rebounderSprite.team && String(id) !== String(rebounderId)) {
-          outletReceiverId = id;
-          outletReceiverSprite = sprite;
-          console.warn('🏀 [DREB OUTLET] Using fallback: first non-rebounder player as outlet receiver', { outletReceiverId: id });
-          break;
+          const fallbackRef = resolveSpriteById(playerSprites, id);
+          if (isValidOutletReceiverRef(fallbackRef)) {
+            outletReceiverId = fallbackRef.id ?? id;
+            outletReceiverSprite = fallbackRef.sprite;
+            console.warn('🏀 [DREB OUTLET] Using fallback: first non-rebounder player as outlet receiver', { outletReceiverId: id });
+            break;
+          }
         }
       }
     }
@@ -1029,9 +1097,39 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     nextPlayType === "HCO" || nextPlayType === "HCT" || nextPlayType === "FCP";
   const requiresDrebOutletPassContract =
     isHalfCourtSetup &&
-    (turnData?.result_type === "MISS" || turnData?.result_type === "BLOCK") &&
-    String(turnData?.rebound_type || "").toUpperCase() === "DREB";
+    (authorityTurn?.result_type === "MISS" || authorityTurn?.result_type === "BLOCK") &&
+    String(authorityTurn?.rebound_type || "").toUpperCase() === "DREB";
+  const drebOutletBudgetGameSeconds = (() => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_DREB_OUTLET_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 8;
+  })();
+  const handoffTolerancePx = (() => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_DREB_OUTLET_HANDOFF_TOLERANCE_PX);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 12;
+  })();
+  const receiverTargetAuthorityMode = requiresDrebOutletPassContract
+    ? "contract_receiver_target_only"
+    : "mixed_legacy";
+  const transitionTargetAuthorityMode = requiresDrebOutletPassContract
+    ? "transition_policy_only"
+    : "animations_end_then_fallback";
+  const applyGetBackExclusion = !requiresDrebOutletPassContract;
+  console.log("🏀 [DREB OUTLET DEBUG] authority mode", {
+    turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
+    resultType: authorityTurn?.result_type ?? null,
+    reboundType: authorityTurn?.rebound_type ?? null,
+    nextPlayType,
+    strictBranch: requiresDrebOutletPassContract,
+    receiverTargetAuthorityMode,
+    transitionTargetAuthorityMode,
+    applyGetBackExclusion,
+  });
   let outletTarget = null;
+  let outletTargetSource = "unset";
   let outletContext = null;
 
   // Set up outlet receiver movement and outlet pass for HCO ONLY
@@ -1042,41 +1140,65 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     // SS&S: prefer backend animation end for receiver when available.
     drebTelemetry.required += 1;
     const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
-    const receiverAnimEnd = getAnimationEndGridForPlayer(turnData, outletReceiverId);
-    if (receiverAnimEnd) {
-      outletTarget = receiverAnimEnd;
+    const receiverAnimEndFromAuthority = getAnimationEndGridForPlayer(authorityTurn, outletReceiverId);
+    const receiverAnimEndFromTurnData = getAnimationEndGridForPlayer(turnData, outletReceiverId);
+    const currentReceiverGrid = {
+      x: (outletReceiverSprite.x / width) * 100,
+      y: 50 - (outletReceiverSprite.y / height) * 50,
+    };
+    const receiverTargetResolution = resolveDrebOutletReceiverTarget({
+      requiresDrebOutletPassContract,
+      contractReceiverTarget,
+      authorityAnimEnd: receiverAnimEndFromAuthority,
+      turnDataAnimEnd: receiverAnimEndFromTurnData,
+      currentReceiverGrid,
+      meaningfulDeltaThreshold: 1,
+    });
+    if (receiverTargetResolution.target) {
+      outletTarget = receiverTargetResolution.target;
+      outletTargetSource = receiverTargetResolution.source || "unknown";
+      if (
+        requiresDrebOutletPassContract &&
+        receiverTargetResolution.reason === "contract_receiver_target_no_op"
+      ) {
+        emitDrebTelemetry("dreb_contract_receiver_target_no_op", {
+          playerId: outletReceiverId,
+          role: "outlet_receiver",
+          requiredEndpointType: "dreb_outlet_pass.receiver_target",
+          reason: receiverTargetResolution.reason,
+        });
+      }
     } else {
       drebTelemetry.fallback += 1;
+      const resolutionReason =
+        receiverTargetResolution.reason || "missing_outlet_receiver_animation_end";
       emitDrebTelemetry("dreb_fallback_used", {
         playerId: outletReceiverId,
         role: "outlet_receiver",
         fallbackPolicy: "receiver_near_rebounder",
-        reason: "missing_outlet_receiver_animation_end",
+        reason: resolutionReason,
       });
       emitDrebTelemetry("dreb_contract_missing_endpoint", {
         playerId: outletReceiverId,
         role: "outlet_receiver",
-        requiredEndpointType: "animations_end",
-        reason: "missing_outlet_receiver_animation_end",
+        requiredEndpointType: requiresDrebOutletPassContract
+          ? "dreb_outlet_pass.receiver_target"
+          : "animations_end",
+        reason: resolutionReason,
       });
       enforceDrebStrict({
         playerId: outletReceiverId,
         role: "outlet_receiver",
-        reason: "missing_outlet_receiver_animation_end",
+        reason: resolutionReason,
         allowThrow: false,
       });
-      outletTarget = {
-        x: Phaser.Math.Clamp(
-          rebGridX + sign * Phaser.Math.Between(3, 6),
-          4,
-          97
-        ),
-        y: Phaser.Math.Clamp(
-          rebGridY + Phaser.Math.Between(-6, 6),
-          1,
-          50
-        ),
-      };
+      if (requiresDrebOutletPassContract) {
+        throw new Error(
+          `[DREB contract] strict outlet receiver target required (branch=dreb_hco_setup, reason=${resolutionReason}, receiverId=${outletReceiverId ?? "?"})`
+        );
+      }
+      outletTarget = getFallbackOutletTarget();
+      outletTargetSource = "fallback.receiver_near_rebounder";
     }
     outletContext = {
       newOffenseTeam,
@@ -1088,6 +1210,35 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     // Use distance-based duration for consistent speed (same as HCO step movements)
     // isTransition=true allows longer durations for transition movements
     const outletDuration = getPlayerDuration(outletReceiverSprite, outletPx.x, outletPx.y, true);
+    const outletDeltaGrid = Phaser.Math.Distance.Between(
+      currentReceiverGrid.x,
+      currentReceiverGrid.y,
+      outletTarget.x,
+      outletTarget.y
+    );
+    console.log("🏀 [DREB OUTLET DEBUG] receiver movement plan", {
+      turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
+      resultType: authorityTurn?.result_type ?? null,
+      reboundType: authorityTurn?.rebound_type ?? null,
+      nextPlayType,
+      strictBranch: requiresDrebOutletPassContract,
+      rebounderId,
+      outletReceiverId,
+      source: outletTargetSource,
+      receiverStartGrid: {
+        x: Number(currentReceiverGrid.x.toFixed(2)),
+        y: Number(currentReceiverGrid.y.toFixed(2)),
+      },
+      outletTargetGrid: {
+        x: Number(outletTarget.x.toFixed(2)),
+        y: Number(outletTarget.y.toFixed(2)),
+      },
+      outletDeltaGrid: Number(outletDeltaGrid.toFixed(2)),
+      outletDurationMs: Math.round(outletDuration),
+      contractReceiverId: contractReceiverId ?? null,
+      contractPasserId: contractPasserId ?? null,
+      contractReceiverTarget: contractReceiverTarget ?? null,
+    });
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
         duration: outletDuration,
@@ -1148,6 +1299,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     
     let playersMoved = 0;
     let playersSkipped = 0;
+    let transitionPlayersFromAnimEnd = 0;
+    let transitionPlayersFromFallback = 0;
     let playersSkippedReasons = {
       noInfo: 0,
       isRebounder: 0,
@@ -1156,7 +1309,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     };
     
     for (const [id, sprite] of Object.entries(playerSprites)) {
-      const isGetBackPlayer = getBackSet.has(String(id));
+      const isGetBackPlayer = applyGetBackExclusion && getBackSet.has(String(id));
       
       // Collect skip reasons for debugging
       let skipReason = null;
@@ -1184,7 +1337,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       
       // SS&S: prefer backend animation end for this transition player.
       drebTelemetry.required += 1;
-      const animEnd = getAnimationEndGridForPlayer(turnData, id);
+      const animEnd =
+        transitionTargetAuthorityMode === "animations_end_then_fallback"
+          ? getAnimationEndGridForPlayer(turnData, id)
+          : null;
       const currentGridX = (sprite.x / width) * 100;
       const currentGridY = 50 - (sprite.y / height) * 50;
       
@@ -1209,13 +1365,19 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         ),
       };
       if (!animEnd) {
+        transitionPlayersFromFallback += 1;
         drebTelemetry.fallback += 1;
         emitDrebTelemetry("dreb_fallback_used", {
           playerId: id,
           role: "transition_player",
           fallbackPolicy: "advance_toward_new_offense_basket",
-          reason: "missing_transition_player_animation_end",
+          reason:
+            transitionTargetAuthorityMode === "transition_policy_only"
+              ? "transition_policy_only_mode"
+              : "missing_transition_player_animation_end",
         });
+      } else {
+        transitionPlayersFromAnimEnd += 1;
       }
       
       const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
@@ -1246,12 +1408,24 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         playersSkippedReasons
       });
     }
+    console.log("🏀 [DREB OUTLET DEBUG] transition movement summary", {
+      turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
+      strictBranch: requiresDrebOutletPassContract,
+      transitionTargetAuthorityMode,
+      applyGetBackExclusion,
+      scheduledPlayers,
+      transitionPlayersFromAnimEnd,
+      transitionPlayersFromFallback,
+      playersSkipped,
+      playersSkippedReasons,
+    });
     animationDebugLog(`Total players moved for HCO: ${scheduledPlayers}`);
   } else {
     animationDebugLog('Not HCO or FAST_BREAK scenario, nextPlayType:', nextPlayType);
   }
 
   await Promise.all(promises);
+  drebOutletObserved.visualSettled = true;
 
   // Do outlet pass for HCO ONLY
   // FAST_BREAK outlet pass is handled separately in fastBreak.js (animateOutletPhase)
@@ -1277,6 +1451,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         x: (outletReceiverSprite.x / width) * 100,
         y: 50 - (outletReceiverSprite.y / height) * 50
       };
+      outletTargetSource = "receiver.current_position";
       console.log('🏀 runDefensiveReboundSetup: Using receiver current position as outlet target', outletTarget);
     } else if (!outletTarget) {
       // If we still don't have outletTarget and no sprite, log a warning but proceed anyway
@@ -1307,7 +1482,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       from: rebounderId,
       to: outletReceiverId,
       nextPlayType,
-      outletTarget: outletTarget ? `(${outletTarget.x}, ${outletTarget.y})` : 'null (will use receiver current position)'
+      outletTarget: outletTarget ? `(${outletTarget.x}, ${outletTarget.y})` : 'null (will use receiver current position)',
+      outletTargetSource,
+      strictBranch: requiresDrebOutletPassContract,
+      authorityTurnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
+      authorityResultType: authorityTurn?.result_type ?? null,
     });
     if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
     if (DebugFlags?.OUTLET) animationDebugLog('Starting outlet pass animation...');
@@ -1319,18 +1498,29 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     if (requiresDrebOutletPassContract) {
       const missingPasser = !contractPasserId;
       const missingReceiver = !contractReceiverId;
+      const missingReceiverTarget =
+        !contractReceiverTarget ||
+        !Number.isFinite(Number(contractReceiverTarget?.x)) ||
+        !Number.isFinite(Number(contractReceiverTarget?.y));
       const contractPasserMismatch =
         contractPasserId != null && String(contractPasserId) !== String(rebounderId);
       const contractReceiverRef = resolveSpriteById(playerSprites, contractReceiverId);
       const missingReceiverSprite = !contractReceiverRef.sprite;
-      if (missingPasser || missingReceiver || contractPasserMismatch || missingReceiverSprite) {
+      const contractReceiverWrongTeam =
+        !!contractReceiverRef.sprite &&
+        String(contractReceiverRef.sprite.team) !== String(rebounderSprite.team);
+      if (missingPasser || missingReceiver || missingReceiverTarget || contractPasserMismatch || missingReceiverSprite || contractReceiverWrongTeam) {
         const reason = missingPasser
           ? "missing_contract_passer"
           : missingReceiver
             ? "missing_contract_receiver"
+            : missingReceiverTarget
+              ? "missing_contract_receiver_target"
             : contractPasserMismatch
               ? "contract_passer_mismatch_rebounder"
-              : "missing_contract_receiver_sprite";
+              : missingReceiverSprite
+                ? "missing_contract_receiver_sprite"
+                : "contract_receiver_wrong_team";
         emitDrebTelemetry("dreb_contract_missing_endpoint", {
           playerId: rebounderId,
           role: "outlet_pass",
@@ -1352,11 +1542,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       };
       console.log('🏀 [DREB OUTLET] Using backend outlet pass contract', passInfo);
     } else {
-      if (turnData?.animations && Array.isArray(turnData.animations) && turnData.animations.length > 0) {
+      if (authorityTurn?.animations && Array.isArray(authorityTurn.animations) && authorityTurn.animations.length > 0) {
         // Check if there's a pass action in the animation data
-        const maxSteps = Math.max(...turnData.animations.map(anim => anim.movement?.length || 0));
+        const maxSteps = Math.max(...authorityTurn.animations.map(anim => anim.movement?.length || 0));
         if (maxSteps > 0) {
-          passInfo = detectPassAtStep(turnData.animations, maxSteps - 1);
+          passInfo = detectPassAtStep(authorityTurn.animations, maxSteps - 1);
         }
       }
       if (passInfo) {
@@ -1379,11 +1569,32 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         passInfo,
         playerSprites
       });
+      drebOutletObserved.authorizingEventReceived = true;
     } finally {
       scene.__drebOutletWindowActive = false;
     }
     
     // Update ball ownership after pass completes
+    if (requiresDrebOutletPassContract && outletReceiverSprite && outletTarget) {
+      const outletTargetPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
+      const handoffDeltaPx = Phaser.Math.Distance.Between(
+        outletReceiverSprite.x,
+        outletReceiverSprite.y,
+        outletTargetPx.x,
+        outletTargetPx.y
+      );
+      if (handoffDeltaPx > handoffTolerancePx) {
+        emitDrebTelemetry("dreb_handoff_tolerance_breach", {
+          playerId: outletReceiverId,
+          tolerancePx: handoffTolerancePx,
+          handoffDeltaPx: Number(handoffDeltaPx.toFixed(2)),
+          outletTargetSource,
+        });
+        throw new Error(
+          `[DREB contract] handoff tolerance breach (branch=dreb_hco_setup, playerId=${outletReceiverId ?? "?"}, deltaPx=${handoffDeltaPx.toFixed(2)}, tolerancePx=${handoffTolerancePx})`
+        );
+      }
+    }
     setPendingOwner(scene, outletReceiverId);
     setCurrentOwner(scene, outletReceiverId);
     outletLog.completedAt = Date.now();
@@ -1417,6 +1628,34 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
                 'Unknown reason'
       });
     }
+  }
+
+  if (requiresDrebOutletPassContract) {
+    const elapsedMs = Date.now() - unitStartMs;
+    const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    if (elapsedGameSeconds > drebOutletBudgetGameSeconds) {
+      emitDrebTelemetry("dreb_clock_overrun", {
+        elapsedMs,
+        elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+        maxWaitGameSeconds: drebOutletBudgetGameSeconds,
+      });
+      throw new Error(
+        `[DREB contract] transition budget overrun (branch=dreb_hco_setup, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${drebOutletBudgetGameSeconds})`
+      );
+    }
+    enforceUnitCompletionContract({
+      contract: drebOutletCompletionContract,
+      observed: drebOutletObserved,
+      context: {
+        branchKind: drebTelemetry.branchKind,
+        turnId: drebTelemetry.turnId,
+        turnIndex: drebTelemetry.turnIndex,
+        resultType: drebTelemetry.resultType,
+      },
+      emitTelemetry: emitDrebTelemetry,
+      logger: console,
+    });
   }
 
   if (scene.stateMachine?.is(States.OutletSetup)) {
@@ -2317,6 +2556,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   initializeBallHolderState(scene);
 
   const fromInbound = scene._previousTurnWasInbound === true;
+  const inboundLeadInSource = fromInbound
+    ? String(scene._previousInboundTurnType || "").toUpperCase()
+    : "";
   const fromOpeningTip = scene._previousTurnWasOpeningTip === true;
 
   scene.passInFlight = false;
@@ -2476,6 +2718,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Clear inbound and opening tip flags after applying pre-step setup
   if (scene._previousTurnWasInbound) {
     scene._previousTurnWasInbound = false;
+    scene._previousInboundTurnType = null;
   }
   if (scene._previousTurnWasOpeningTip) {
     scene._previousTurnWasOpeningTip = false;
@@ -2495,6 +2738,571 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       return Math.max(50, Math.round(stepSeconds * clockSecondMs));
     }
     return fallbackDurationMs;
+  };
+  const emitHcoStepTelemetry = (event, payload = {}) => {
+    scene?.events?.emit?.("animTelemetry", {
+      event,
+      branchKind: "hco_step_movement",
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  };
+  const resolveHcoStepStrictMode = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = scope?.HCO_STEP_MOVEMENT_STRICT_CONTRACT;
+    if (raw === "throw") return "throw";
+    if (raw === "off" || raw === false) return "off";
+    return "throw";
+  };
+  const hcoStepStrictMode = resolveHcoStepStrictMode();
+  const getHcoStepTolerancePx = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_HCO_STEP_MOVEMENT_TOLERANCE_PX);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 18;
+  };
+  const getHcoStepFallbackBudgetGameSeconds = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_HCO_STEP_MOVEMENT_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 8;
+  };
+  const getHcoStepClockJitterSlackSeconds = (budgetSeconds) => {
+    const scope = getDrebTelemetryScope();
+    const rawAbs = Number(scope?.UESS_HCO_STEP_CLOCK_JITTER_ABS_SECONDS);
+    const rawRatio = Number(scope?.UESS_HCO_STEP_CLOCK_JITTER_RATIO);
+    const absSlack = Number.isFinite(rawAbs) && rawAbs >= 0 ? rawAbs : 0.4;
+    const ratioSlack =
+      Number.isFinite(rawRatio) && rawRatio >= 0
+        ? budgetSeconds * rawRatio
+        : budgetSeconds * 0.35;
+    return Math.max(absSlack, ratioSlack);
+  };
+  const getHcoStepPassClockJitterSlackSeconds = (budgetSeconds) => {
+    const scope = getDrebTelemetryScope();
+    const rawAbs = Number(scope?.UESS_HCO_STEP_PASS_CLOCK_JITTER_ABS_SECONDS);
+    const rawRatio = Number(scope?.UESS_HCO_STEP_PASS_CLOCK_JITTER_RATIO);
+    const absSlack = Number.isFinite(rawAbs) && rawAbs >= 0 ? rawAbs : 1.0;
+    const ratioSlack =
+      Number.isFinite(rawRatio) && rawRatio >= 0
+        ? budgetSeconds * rawRatio
+        : budgetSeconds * 1.0;
+    return Math.max(absSlack, ratioSlack);
+  };
+  const isHCOSkeletonTurn =
+    String(turnData?.current_turn || "").toUpperCase() === "HCO" ||
+    (!isFCPHCT &&
+      !turnData?.fast_break &&
+      (turnData?.result_type === "MAKE" ||
+        turnData?.result_type === "MISS" ||
+        turnData?.result_type === "BLOCK"));
+  const isHcoLeadInFromInbound =
+    isHCOSkeletonTurn &&
+    fromInbound &&
+    (inboundLeadInSource === "BASELINE_INBOUND" || inboundLeadInSource === "SIDE_INBOUND");
+  const hcoStepMovementContract = {
+    unit_id: "hco.step[n].movement",
+    execution_mode: "skeleton",
+    advance_trigger: "required movers reach step-n targets",
+    visual_settle_trigger: "required step-n tweens complete",
+    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+  };
+  const hcoStepPassContract = {
+    unit_id: "hco.step[n].pass",
+    execution_mode: "skeleton",
+    advance_trigger: "pass received",
+    visual_settle_trigger: "ball flight + receiver settle",
+    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+  };
+  const resolveHcoLeadInInboundStrictMode = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = scope?.HCO_LEAD_IN_FROM_INBOUND_STRICT_CONTRACT;
+    if (raw === "throw") return "throw";
+    if (raw === "warn" || raw === true) return "warn";
+    if (raw === "off" || raw === false) return "off";
+    // Rollout default for this unit: warn before throw.
+    return "warn";
+  };
+  const hcoLeadInInboundStrictMode = resolveHcoLeadInInboundStrictMode();
+  const getHcoLeadInInboundBudgetGameSeconds = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_HCO_LEAD_IN_FROM_INBOUND_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 8;
+  };
+  const hcoLeadInFromInboundContract = {
+    unit_id: "hco.lead_in.from_sip_or_bip",
+    execution_mode: "dynamic_event",
+    advance_trigger: "inbound pass received",
+    visual_settle_trigger: "inbound setup + pass settled",
+    failure_policy: hcoLeadInInboundStrictMode === "throw" ? "throw" : "warn",
+  };
+  const hcoResolutionContract = {
+    unit_id: "hco.resolution",
+    execution_mode: "dynamic_event",
+    advance_trigger: "result committed",
+    visual_settle_trigger: "resolution visuals settled",
+    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+  };
+  const hcoOutContract = {
+    unit_id: "hco.out.to_*",
+    execution_mode: "dynamic_event",
+    advance_trigger: "route committed",
+    visual_settle_trigger: "boundary handoff settled",
+    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+  };
+  const resolutionResultType = String(turnData?.result_type || "").toUpperCase();
+  const turnStartMs = Date.now();
+  const getTurnContractElapsedMs = () => {
+    const raw = Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs);
+    if (Number.isFinite(raw) && raw >= 0) return raw;
+    return null;
+  };
+  const getHcoTurnElapsedGuardSlackMs = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_HCO_TURN_ELAPSED_GUARD_SLACK_MS);
+    if (Number.isFinite(raw) && raw >= 0) return raw;
+    return 1500;
+  };
+  const getGuardedTurnElapsedMs = () => {
+    const wallElapsedMs = Math.max(0, Date.now() - turnStartMs);
+    const contractElapsedMs = getTurnContractElapsedMs();
+    if (contractElapsedMs == null) {
+      return {
+        elapsedMs: wallElapsedMs,
+        wallElapsedMs,
+        contractElapsedMs: null,
+        elapsedCapMs: null,
+        elapsedClamped: false,
+      };
+    }
+    const elapsedCapMs = contractElapsedMs + getHcoTurnElapsedGuardSlackMs();
+    const elapsedMs = Math.min(wallElapsedMs, elapsedCapMs);
+    return {
+      elapsedMs,
+      wallElapsedMs,
+      contractElapsedMs,
+      elapsedCapMs,
+      elapsedClamped: wallElapsedMs > elapsedCapMs,
+    };
+  };
+  const resolveHcoElapsedAuthorityMode = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = String(scope?.UESS_HCO_ELAPSED_AUTHORITY ?? "observe")
+      .trim()
+      .toLowerCase();
+    if (raw === "off") return "off";
+    if (raw === "observe") return "observe";
+    // Forward-compatible: unknown values currently degrade to observe.
+    return "observe";
+  };
+  const hcoElapsedAuthorityMode = resolveHcoElapsedAuthorityMode();
+  const shouldTrackHcoElapsed =
+    isHCOSkeletonTurn && hcoElapsedAuthorityMode !== "off";
+  const hcoElapsedUnitsMs = {
+    lead_in: 0,
+    step_movement: 0,
+    step_pass: 0,
+    resolution: 0,
+    transition_out: 0,
+  };
+  let hcoElapsedLastCheckpointMs = shouldTrackHcoElapsed
+    ? getGuardedTurnElapsedMs().elapsedMs
+    : 0;
+  const captureHcoUnitElapsed = (unitKey) => {
+    if (
+      !shouldTrackHcoElapsed ||
+      !Object.prototype.hasOwnProperty.call(hcoElapsedUnitsMs, unitKey)
+    ) {
+      return 0;
+    }
+    const checkpoint = getGuardedTurnElapsedMs();
+    const deltaMs = Math.max(
+      0,
+      Number(checkpoint.elapsedMs) - Number(hcoElapsedLastCheckpointMs)
+    );
+    hcoElapsedLastCheckpointMs = Number(checkpoint.elapsedMs);
+    hcoElapsedUnitsMs[unitKey] += deltaMs;
+    return deltaMs;
+  };
+  const emitHcoElapsedObserveTelemetry = (meta = {}) => {
+    if (!shouldTrackHcoElapsed || hcoElapsedAuthorityMode !== "observe") return;
+    const totalMs = Object.values(hcoElapsedUnitsMs).reduce(
+      (sum, ms) => sum + (Number(ms) || 0),
+      0
+    );
+    const toGameSeconds = (ms) => Number((ms / clockSecondMs).toFixed(3));
+    const unitElapsedGameSeconds = {
+      lead_in: toGameSeconds(hcoElapsedUnitsMs.lead_in),
+      step_movement: toGameSeconds(hcoElapsedUnitsMs.step_movement),
+      step_pass: toGameSeconds(hcoElapsedUnitsMs.step_pass),
+      resolution: toGameSeconds(hcoElapsedUnitsMs.resolution),
+      transition_out: toGameSeconds(hcoElapsedUnitsMs.transition_out),
+    };
+    const totalGameSeconds = toGameSeconds(totalMs);
+    turnData.hco_uess_elapsed_game_seconds = totalGameSeconds;
+    scene?.events?.emit?.("animTelemetry", {
+      event: "hco_uess_elapsed_observe",
+      branchKind: "hco_turn_elapsed",
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      authorityMode: hcoElapsedAuthorityMode,
+      hco_uess_elapsed_game_seconds: totalGameSeconds,
+      hco_uess_elapsed_ms: Math.round(totalMs),
+      hco_uess_elapsed_unit_breakdown_game_seconds: unitElapsedGameSeconds,
+      hco_uess_elapsed_unit_breakdown_ms: {
+        lead_in: Math.round(hcoElapsedUnitsMs.lead_in),
+        step_movement: Math.round(hcoElapsedUnitsMs.step_movement),
+        step_pass: Math.round(hcoElapsedUnitsMs.step_pass),
+        resolution: Math.round(hcoElapsedUnitsMs.resolution),
+        transition_out: Math.round(hcoElapsedUnitsMs.transition_out),
+      },
+      ...meta,
+    });
+  };
+  const hasPlayerSpriteForId = (rawId) => {
+    if (rawId == null) return false;
+    if (playerSprites?.[rawId]) return true;
+    const want = String(rawId);
+    for (const [id, sprite] of Object.entries(playerSprites || {})) {
+      if (String(id) === want) return true;
+      if (String(sprite?.playerId ?? "") === want) return true;
+    }
+    return false;
+  };
+  let hcoLeadInFromInboundValidated = false;
+  const validateHcoLeadInFromInbound = (context = {}) => {
+    if (!isHcoLeadInFromInbound || hcoLeadInInboundStrictMode === "off" || hcoLeadInFromInboundValidated) {
+      return;
+    }
+    const emitHcoLeadInTelemetry = (event, payload = {}) => {
+      scene?.events?.emit?.("animTelemetry", {
+        event,
+        branchKind: "hco_lead_in_from_sip_or_bip",
+        turnId: turnData?.turn_count ?? turnData?.id ?? null,
+        turnIndex: scene?.currentTurn ?? null,
+        resultType: turnData?.result_type ?? null,
+        gameClock: scene?.simData?.clock ?? null,
+        quarter: turnData?.quarter ?? scene?.quarter ?? null,
+        timestampMs: Date.now(),
+        ...payload,
+      });
+    };
+    const currentOwnerId = getCurrentOwner(scene);
+    const pendingOwnerId = getPendingOwner(scene);
+    const hasCurrentOwner = currentOwnerId != null && String(currentOwnerId).length > 0;
+    const hasPendingOwner = pendingOwnerId != null && String(pendingOwnerId).length > 0;
+    const ownerMissing = !hasCurrentOwner && !hasPendingOwner;
+    const ownerInvalid =
+      (hasCurrentOwner && !hasPlayerSpriteForId(currentOwnerId)) ||
+      (hasPendingOwner && !hasPlayerSpriteForId(pendingOwnerId));
+    const passInFlightAtLeadIn = scene?.passInFlight === true;
+    const elapsedTiming = getGuardedTurnElapsedMs();
+    const elapsedMs = elapsedTiming.elapsedMs;
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const maxWaitGameSeconds = getHcoLeadInInboundBudgetGameSeconds();
+    const overrun = elapsedGameSeconds > maxWaitGameSeconds;
+    const leadInContext = {
+      inboundSource: inboundLeadInSource || null,
+      currentOwnerId: currentOwnerId ?? null,
+      pendingOwnerId: pendingOwnerId ?? null,
+      ownerMissing,
+      ownerInvalid,
+      passInFlightAtLeadIn,
+      elapsedMs,
+      wallElapsedMs: elapsedTiming.wallElapsedMs,
+      contractElapsedMs: elapsedTiming.contractElapsedMs,
+      elapsedCapMs: elapsedTiming.elapsedCapMs,
+      elapsedClamped: elapsedTiming.elapsedClamped,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      maxWaitGameSeconds,
+      ...context,
+    };
+    if (ownerMissing) emitHcoLeadInTelemetry("hco_lead_in_inbound_owner_missing", leadInContext);
+    if (ownerInvalid) emitHcoLeadInTelemetry("hco_lead_in_inbound_owner_invalid", leadInContext);
+    if (passInFlightAtLeadIn) {
+      emitHcoLeadInTelemetry("hco_lead_in_inbound_pass_in_flight", leadInContext);
+    }
+    if (overrun) emitHcoLeadInTelemetry("hco_lead_in_inbound_clock_overrun", leadInContext);
+    enforceUnitCompletionContract({
+      contract: hcoLeadInFromInboundContract,
+      observed: {
+        authorizingEventReceived: fromInbound,
+        visualSettled: !ownerMissing && !ownerInvalid && !passInFlightAtLeadIn,
+      },
+      context: leadInContext,
+      emitTelemetry: emitHcoLeadInTelemetry,
+      logger: console,
+    });
+    if (hcoLeadInInboundStrictMode === "throw") {
+      if (ownerMissing) {
+        throw new Error(
+          `[HCO lead-in inbound contract] missing owner after inbound handoff (source=${inboundLeadInSource || "unknown"})`
+        );
+      }
+      if (ownerInvalid) {
+        throw new Error(
+          `[HCO lead-in inbound contract] invalid owner reference after inbound handoff (source=${inboundLeadInSource || "unknown"})`
+        );
+      }
+      if (passInFlightAtLeadIn) {
+        throw new Error(
+          `[HCO lead-in inbound contract] pass still in flight at HCO lead-in boundary (source=${inboundLeadInSource || "unknown"})`
+        );
+      }
+      if (overrun) {
+        throw new Error(
+          `[HCO lead-in inbound contract] lead-in budget overrun (source=${inboundLeadInSource || "unknown"}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+        );
+      }
+    }
+    hcoLeadInFromInboundValidated = true;
+  };
+  const getHcoResolutionExtraBudgetSeconds = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_HCO_RESOLUTION_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw >= 0) return raw;
+    return 2;
+  };
+  const getHcoResolutionClockSlackSeconds = (declaredBudgetSeconds) => {
+    const scope = getDrebTelemetryScope();
+    const rawAbs = Number(scope?.UESS_HCO_RESOLUTION_CLOCK_JITTER_ABS_SECONDS);
+    const rawRatio = Number(scope?.UESS_HCO_RESOLUTION_CLOCK_JITTER_RATIO);
+    const absSlack = Number.isFinite(rawAbs) && rawAbs >= 0 ? rawAbs : 1.5;
+    const ratioSlack =
+      Number.isFinite(rawRatio) && rawRatio >= 0
+        ? declaredBudgetSeconds * rawRatio
+        : declaredBudgetSeconds * 0.5;
+    return Math.max(absSlack, ratioSlack);
+  };
+  const getHcoOutExtraBudgetSeconds = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_HCO_OUT_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw >= 0) return raw;
+    return 2;
+  };
+  const getHcoOutClockSlackSeconds = (declaredBudgetSeconds) => {
+    const scope = getDrebTelemetryScope();
+    const rawAbs = Number(scope?.UESS_HCO_OUT_CLOCK_JITTER_ABS_SECONDS);
+    const rawRatio = Number(scope?.UESS_HCO_OUT_CLOCK_JITTER_RATIO);
+    const absSlack = Number.isFinite(rawAbs) && rawAbs >= 0 ? rawAbs : 1.5;
+    const ratioSlack =
+      Number.isFinite(rawRatio) && rawRatio >= 0
+        ? declaredBudgetSeconds * rawRatio
+        : declaredBudgetSeconds * 0.5;
+    return Math.max(absSlack, ratioSlack);
+  };
+  const isHcoResolutionTurn =
+    isHCOSkeletonTurn &&
+    ["MAKE", "MISS", "BLOCK", "FOUL", "CHARGE", "DEAD BALL", "TURNOVER"].includes(
+      resolutionResultType
+    );
+  const hasCanonicalTurnBatchContext =
+    Array.isArray(simData?.turns) && simData.turns.length > 0;
+  const isSyntheticPutbackExecution =
+    String(turnData?.shot_type || "").toLowerCase() === "putback";
+  const shouldValidateHcoOut =
+    isHcoResolutionTurn &&
+    hasCanonicalTurnBatchContext &&
+    !isSyntheticPutbackExecution;
+  let hcoResolutionValidated = false;
+  const validateHcoResolution = (context = {}) => {
+    if (!isHcoResolutionTurn || hcoStepStrictMode === "off" || hcoResolutionValidated) return;
+    const currentOwnerId = getCurrentOwner(scene);
+    const pendingOwnerId = getPendingOwner(scene);
+    const hasCurrentOwner = currentOwnerId != null && String(currentOwnerId).length > 0;
+    const hasPendingOwner = pendingOwnerId != null && String(pendingOwnerId).length > 0;
+    const rebounderId =
+      turnData?.rebounder_player_id ??
+      turnData?.rebounderId ??
+      turnData?.rebounder_id ??
+      null;
+    const shouldHaveOwnerAtResolution =
+      ["MISS", "BLOCK", "STEAL", "OREB", "PUTBACK_MISS", "PUTBACK_MAKE"].includes(
+        resolutionResultType
+      ) || rebounderId != null;
+    const ownerMissing = shouldHaveOwnerAtResolution && !hasCurrentOwner && !hasPendingOwner;
+    const ownerInvalid =
+      (hasCurrentOwner && !hasPlayerSpriteForId(currentOwnerId)) ||
+      (hasPendingOwner && !hasPlayerSpriteForId(pendingOwnerId));
+    const passInFlightAtResolution = scene?.passInFlight === true;
+    const elapsedTiming = getGuardedTurnElapsedMs();
+    const elapsedMs = elapsedTiming.elapsedMs;
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const declaredTurnBudgetSeconds = Array.isArray(stepClockSeconds)
+      ? stepClockSeconds.reduce((sum, sec) => sum + (Number(sec) || 0), 0)
+      : null;
+    const extraBudgetSeconds = getHcoResolutionExtraBudgetSeconds();
+    const hardFailThresholdSeconds =
+      declaredTurnBudgetSeconds == null
+        ? null
+        : declaredTurnBudgetSeconds +
+          extraBudgetSeconds +
+          getHcoResolutionClockSlackSeconds(declaredTurnBudgetSeconds);
+    const resolutionContext = {
+      resultType: turnData?.result_type ?? null,
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: scene?.currentTurn ?? null,
+      currentOwnerId: currentOwnerId ?? null,
+      pendingOwnerId: pendingOwnerId ?? null,
+      shouldHaveOwnerAtResolution,
+      ownerMissing,
+      ownerInvalid,
+      passInFlightAtResolution,
+      elapsedMs,
+      wallElapsedMs: elapsedTiming.wallElapsedMs,
+      contractElapsedMs: elapsedTiming.contractElapsedMs,
+      elapsedCapMs: elapsedTiming.elapsedCapMs,
+      elapsedClamped: elapsedTiming.elapsedClamped,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      declaredTurnBudgetSeconds,
+      resolutionExtraBudgetSeconds: extraBudgetSeconds,
+      hardFailThresholdSeconds:
+        hardFailThresholdSeconds == null
+          ? null
+          : Number(hardFailThresholdSeconds.toFixed(2)),
+      ...context,
+    };
+    if (ownerMissing) {
+      emitHcoStepTelemetry("hco_resolution_owner_missing", resolutionContext);
+      throw new Error(
+        `[HCO resolution contract] missing owner at resolution (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
+      );
+    }
+    if (ownerInvalid) {
+      emitHcoStepTelemetry("hco_resolution_owner_invalid", resolutionContext);
+      throw new Error(
+        `[HCO resolution contract] invalid owner reference at resolution (result=${resolutionResultType}, owner=${currentOwnerId ?? "null"}, pending=${pendingOwnerId ?? "null"})`
+      );
+    }
+    if (passInFlightAtResolution) {
+      emitHcoStepTelemetry("hco_resolution_pass_in_flight", resolutionContext);
+      throw new Error(
+        `[HCO resolution contract] pass still in flight at resolution (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
+      );
+    }
+    if (hardFailThresholdSeconds != null && elapsedGameSeconds > hardFailThresholdSeconds) {
+      emitHcoStepTelemetry("hco_resolution_clock_overrun", resolutionContext);
+      throw new Error(
+        `[HCO resolution contract] clock overrun (result=${resolutionResultType}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+      );
+    }
+    if (declaredTurnBudgetSeconds != null && elapsedGameSeconds > declaredTurnBudgetSeconds) {
+      emitHcoStepTelemetry("hco_resolution_clock_soft_overrun", resolutionContext);
+    }
+    enforceUnitCompletionContract({
+      contract: hcoResolutionContract,
+      observed: {
+        authorizingEventReceived: true,
+        visualSettled: true,
+      },
+      context: resolutionContext,
+      emitTelemetry: emitHcoStepTelemetry,
+      logger: console,
+    });
+    captureHcoUnitElapsed("resolution");
+    hcoResolutionValidated = true;
+  };
+  let hcoOutValidated = false;
+  const validateHcoTransitionOut = (context = {}) => {
+    if (!shouldValidateHcoOut || hcoStepStrictMode === "off" || hcoOutValidated) return;
+    const route = String(turnData?.next_play_type || turnData?.next_turn || "").toUpperCase();
+    const quarterEndsAfter = turnData?.quarter_ends_after === true;
+    const routeMissing = !quarterEndsAfter && !route;
+    const currentOwnerId = getCurrentOwner(scene);
+    const pendingOwnerId = getPendingOwner(scene);
+    const hasCurrentOwner = currentOwnerId != null && String(currentOwnerId).length > 0;
+    const hasPendingOwner = pendingOwnerId != null && String(pendingOwnerId).length > 0;
+    const liveBallRoutes = new Set(["HCO", "HCT", "FCP", "FAST_BREAK", "OREB"]);
+    const requiresOwnerAtHandoff = liveBallRoutes.has(route);
+    const ownerMissing = requiresOwnerAtHandoff && !hasCurrentOwner && !hasPendingOwner;
+    const ownerInvalid =
+      (hasCurrentOwner && !hasPlayerSpriteForId(currentOwnerId)) ||
+      (hasPendingOwner && !hasPlayerSpriteForId(pendingOwnerId));
+    const elapsedTiming = getGuardedTurnElapsedMs();
+    const elapsedMs = elapsedTiming.elapsedMs;
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const declaredTurnBudgetSeconds = Array.isArray(stepClockSeconds)
+      ? stepClockSeconds.reduce((sum, sec) => sum + (Number(sec) || 0), 0)
+      : null;
+    const extraBudgetSeconds = getHcoOutExtraBudgetSeconds();
+    const hardFailThresholdSeconds =
+      declaredTurnBudgetSeconds == null
+        ? null
+        : declaredTurnBudgetSeconds +
+          extraBudgetSeconds +
+          getHcoOutClockSlackSeconds(declaredTurnBudgetSeconds);
+    const outContext = {
+      route: route || null,
+      quarterEndsAfter,
+      routeMissing,
+      currentOwnerId: currentOwnerId ?? null,
+      pendingOwnerId: pendingOwnerId ?? null,
+      requiresOwnerAtHandoff,
+      ownerMissing,
+      ownerInvalid,
+      elapsedMs,
+      wallElapsedMs: elapsedTiming.wallElapsedMs,
+      contractElapsedMs: elapsedTiming.contractElapsedMs,
+      elapsedCapMs: elapsedTiming.elapsedCapMs,
+      elapsedClamped: elapsedTiming.elapsedClamped,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      declaredTurnBudgetSeconds,
+      outExtraBudgetSeconds: extraBudgetSeconds,
+      hardFailThresholdSeconds:
+        hardFailThresholdSeconds == null
+          ? null
+          : Number(hardFailThresholdSeconds.toFixed(2)),
+      ...context,
+    };
+    if (routeMissing) {
+      emitHcoStepTelemetry("hco_out_route_missing", outContext);
+      throw new Error(
+        `[HCO out contract] missing committed route (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
+      );
+    }
+    if (ownerMissing) {
+      emitHcoStepTelemetry("hco_out_owner_missing", outContext);
+      throw new Error(
+        `[HCO out contract] missing owner for live-ball handoff (route=${route}, turn=${turnData?.turn_count ?? "?"})`
+      );
+    }
+    if (ownerInvalid) {
+      emitHcoStepTelemetry("hco_out_owner_invalid", outContext);
+      throw new Error(
+        `[HCO out contract] invalid owner reference at handoff (route=${route}, owner=${currentOwnerId ?? "null"}, pending=${pendingOwnerId ?? "null"})`
+      );
+    }
+    if (hardFailThresholdSeconds != null && elapsedGameSeconds > hardFailThresholdSeconds) {
+      emitHcoStepTelemetry("hco_out_clock_overrun", outContext);
+      throw new Error(
+        `[HCO out contract] clock overrun (route=${route || "quarter_end"}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+      );
+    }
+    if (declaredTurnBudgetSeconds != null && elapsedGameSeconds > declaredTurnBudgetSeconds) {
+      emitHcoStepTelemetry("hco_out_clock_soft_overrun", outContext);
+    }
+    enforceUnitCompletionContract({
+      contract: hcoOutContract,
+      observed: {
+        authorizingEventReceived: !routeMissing || quarterEndsAfter,
+        visualSettled: true,
+      },
+      context: outContext,
+      emitTelemetry: emitHcoStepTelemetry,
+      logger: console,
+    });
+    captureHcoUnitElapsed("transition_out");
+    hcoOutValidated = true;
   };
 
   // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
@@ -2599,6 +3407,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }
+  validateHcoLeadInFromInbound({ phase: "post_setup_tween" });
+  captureHcoUnitElapsed("lead_in");
 
   // Step loop animates transitions using (prev -> curr), so it must start at 1.
   // Starting at 0 makes prev undefined and can short-circuit skeleton playback.
@@ -2633,6 +3443,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     
     const passInfo = detectPassAtStep(turnData.animations, stepIndex);
     const passHappeningAtThisStep = !!passInfo;
+    const stepStartMs = Date.now();
     
     // 🔍 DEBUG: Log step processing for step 16 (3-2 Motion bug)
     if (stepIndex === 16) {
@@ -2699,6 +3510,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // ✅ SS&S: Use pre-classified player roles (determined at turn start)
     // No need to re-resolve offenseTeamId or re-classify players per step
     const offensivePromises = [];
+    const requiredOffensiveMoverIds = [];
+    const requiredOffensiveMoverTargetPx = new Map();
     const defensiveStarters = []; // defer starting defensive tweens when a pass exists
     let passerPromise = null;
     let shotInfo = null;
@@ -2774,6 +3587,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       
       if (isOffensivePlayer) {
         offensivePromises.push(promise);
+        requiredOffensiveMoverIds.push(anim.playerId);
+        requiredOffensiveMoverTargetPx.set(String(anim.playerId), {
+          x: targetX,
+          y: targetY,
+          targetGridX: nextStep.coords?.x ?? null,
+          targetGridY: nextStep.coords?.y ?? null,
+        });
         // Track passer's promise separately so we can wait for it before starting pass
         if (passInfo && anim.playerId === passInfo.passerId) {
           passerPromise = promise;
@@ -2804,15 +3624,120 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
     // Phase 1 — Offense-gated: passer hits spot before pass; no-pass step advances when all
     // offense reach their spots. Defensive tweens run in parallel and do not gate the step.
+    let requiredOffensiveMoverCount = 0;
+    let finalOffensiveMoverSettled = false;
+    let requiredMoverIdsForGate = [];
     if (passInfo && passerPromise) {
       await passerPromise;
+      requiredOffensiveMoverCount = 1;
+      finalOffensiveMoverSettled = true;
+      requiredMoverIdsForGate = passInfo?.passerId ? [passInfo.passerId] : [];
     } else if (offensivePromises.length > 0) {
       await Promise.all(offensivePromises);
+      requiredOffensiveMoverCount = offensivePromises.length;
+      finalOffensiveMoverSettled = true;
+      requiredMoverIdsForGate = [...new Set(requiredOffensiveMoverIds)];
+    } else {
+      requiredOffensiveMoverCount = 0;
+      finalOffensiveMoverSettled = false;
+      requiredMoverIdsForGate = [];
     }
+
+    if (isHCOSkeletonTurn && hcoStepStrictMode !== "off") {
+      const tolerancePx = getHcoStepTolerancePx();
+      let maxRequiredMoverDeltaPx = 0;
+      const requiredMoverDeltaRows = [];
+      for (const moverId of requiredMoverIdsForGate) {
+        const target = requiredOffensiveMoverTargetPx.get(String(moverId));
+        const sprite = playerSprites?.[moverId];
+        if (!target || !sprite) continue;
+        const deltaPx = Phaser.Math.Distance.Between(
+          sprite.x,
+          sprite.y,
+          target.x,
+          target.y
+        );
+        maxRequiredMoverDeltaPx = Math.max(maxRequiredMoverDeltaPx, deltaPx);
+        requiredMoverDeltaRows.push({
+          playerId: moverId,
+          deltaPx: Number(deltaPx.toFixed(2)),
+          targetGridX: target.targetGridX,
+          targetGridY: target.targetGridY,
+        });
+      }
+      const stepBudgetSecondsRaw = Number(stepClockSeconds?.[stepIndex]);
+      const stepBudgetGameSeconds =
+        Number.isFinite(stepBudgetSecondsRaw) && stepBudgetSecondsRaw > 0
+          ? stepBudgetSecondsRaw
+          : getHcoStepFallbackBudgetGameSeconds();
+      const elapsedMs = Date.now() - stepStartMs;
+      const elapsedGameSeconds = elapsedMs / clockSecondMs;
+      const jitterSlackSeconds = getHcoStepClockJitterSlackSeconds(stepBudgetGameSeconds);
+      const hardFailThresholdSeconds = stepBudgetGameSeconds + jitterSlackSeconds;
+      const budgetOverrunSeconds = elapsedGameSeconds - stepBudgetGameSeconds;
+      const observed = {
+        finalOffensiveMoverSettled,
+        visualSettled: finalOffensiveMoverSettled,
+        shotTerminated: false,
+      };
+      const context = {
+        stepIndex,
+        hasPassAtStep: Boolean(passInfo),
+        requiredOffensiveMoverCount,
+        offensivePromiseCount: offensivePromises.length,
+        passerId: passInfo?.passerId ?? null,
+        requiredMoverIdsForGate,
+        tolerancePx,
+        maxRequiredMoverDeltaPx: Number(maxRequiredMoverDeltaPx.toFixed(2)),
+        elapsedMs,
+        elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+        maxWaitGameSeconds: stepBudgetGameSeconds,
+        jitterSlackSeconds: Number(jitterSlackSeconds.toFixed(3)),
+        hardFailThresholdSeconds: Number(hardFailThresholdSeconds.toFixed(3)),
+        budgetOverrunSeconds: Number(Math.max(0, budgetOverrunSeconds).toFixed(3)),
+      };
+      if (requiredOffensiveMoverCount === 0) {
+        emitHcoStepTelemetry("hco_step_movement_no_required_movers", context);
+      }
+      if (requiredMoverIdsForGate.length > 0 && maxRequiredMoverDeltaPx > tolerancePx) {
+        emitHcoStepTelemetry("hco_step_movement_tolerance_breach", {
+          ...context,
+          requiredMoverDeltaRows,
+        });
+        throw new Error(
+          `[HCO step contract] tolerance breach (step=${stepIndex}, maxDeltaPx=${maxRequiredMoverDeltaPx.toFixed(2)}, tolerancePx=${tolerancePx})`
+        );
+      }
+      if (elapsedGameSeconds > stepBudgetGameSeconds) {
+        emitHcoStepTelemetry("hco_step_movement_clock_soft_overrun", {
+          ...context,
+          requiredMoverDeltaRows,
+        });
+      }
+      const deferClockHardFailToPassUnit = Boolean(passInfo);
+      if (elapsedGameSeconds > hardFailThresholdSeconds && !deferClockHardFailToPassUnit) {
+        emitHcoStepTelemetry("hco_step_movement_clock_overrun", {
+          ...context,
+          requiredMoverDeltaRows,
+        });
+        throw new Error(
+          `[HCO step contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+        );
+      }
+      enforceUnitCompletionContract({
+        contract: hcoStepMovementContract,
+        observed,
+        context,
+        emitTelemetry: emitHcoStepTelemetry,
+        logger: console,
+      });
+    }
+    captureHcoUnitElapsed("step_movement");
 
     // Phase 2 — Pass animation only (defense may run alongside; we do not await defense).
     if (passInfo) {
       const { handlePassAnimation } = await import("./passDetection.js");
+      const passStartMs = Date.now();
       if (defensiveStarters.length > 0) {
         defensivePromiseArray = defensiveStarters.map((start) => start());
       }
@@ -2822,6 +3747,102 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         playerSprites,
       });
       await passPromise;
+      if (isHCOSkeletonTurn && hcoStepStrictMode !== "off") {
+        const receiverId = String(passInfo?.receiverId ?? "");
+        const receiverSprite = receiverId ? playerSprites?.[receiverId] : null;
+        const receiverTarget = receiverId
+          ? requiredOffensiveMoverTargetPx.get(receiverId)
+          : null;
+        const tolerancePx = getHcoStepTolerancePx();
+        const stepBudgetSecondsRaw = Number(stepClockSeconds?.[stepIndex]);
+        const stepBudgetGameSeconds =
+          Number.isFinite(stepBudgetSecondsRaw) && stepBudgetSecondsRaw > 0
+            ? stepBudgetSecondsRaw
+            : getHcoStepFallbackBudgetGameSeconds();
+        const jitterSlackSeconds = getHcoStepPassClockJitterSlackSeconds(stepBudgetGameSeconds);
+        const hardFailThresholdSeconds = stepBudgetGameSeconds + jitterSlackSeconds;
+        const stepElapsedMs = Date.now() - stepStartMs;
+        const stepElapsedGameSeconds = stepElapsedMs / clockSecondMs;
+        const passElapsedMs = Date.now() - passStartMs;
+        const passElapsedGameSeconds = passElapsedMs / clockSecondMs;
+        const receiverDeltaPx =
+          receiverSprite && receiverTarget
+            ? Phaser.Math.Distance.Between(
+                receiverSprite.x,
+                receiverSprite.y,
+                receiverTarget.x,
+                receiverTarget.y
+              )
+            : null;
+        const receiverSettled =
+          receiverDeltaPx != null && Number.isFinite(receiverDeltaPx)
+            ? receiverDeltaPx <= tolerancePx
+            : false;
+        const ownerAtEnd = getCurrentOwner(scene);
+        const pendingOwnerAtEnd = getPendingOwner(scene);
+        const ownerMatchesReceiver =
+          receiverId.length > 0 &&
+          (String(ownerAtEnd ?? "") === receiverId ||
+            String(pendingOwnerAtEnd ?? "") === receiverId);
+        const passContext = {
+          stepIndex,
+          passStep: true,
+          passerId: passInfo?.passerId ?? null,
+          receiverId: passInfo?.receiverId ?? null,
+          ownerAtEnd: ownerAtEnd ?? null,
+          pendingOwnerAtEnd: pendingOwnerAtEnd ?? null,
+          ownerMatchesReceiver,
+          receiverDeltaPx:
+            receiverDeltaPx == null ? null : Number(receiverDeltaPx.toFixed(2)),
+          tolerancePx,
+          passElapsedMs,
+          passElapsedGameSeconds: Number(passElapsedGameSeconds.toFixed(2)),
+          elapsedMs: stepElapsedMs,
+          elapsedGameSeconds: Number(stepElapsedGameSeconds.toFixed(2)),
+          maxWaitGameSeconds: stepBudgetGameSeconds,
+          jitterSlackSeconds: Number(jitterSlackSeconds.toFixed(3)),
+          hardFailThresholdSeconds: Number(hardFailThresholdSeconds.toFixed(3)),
+        };
+        if (!receiverSprite || !receiverTarget) {
+          emitHcoStepTelemetry("hco_step_pass_missing_receiver_target", passContext);
+          throw new Error(
+            `[HCO step pass contract] missing receiver settle target (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"})`
+          );
+        }
+        if (!receiverSettled) {
+          emitHcoStepTelemetry("hco_step_pass_receiver_settle_breach", passContext);
+          throw new Error(
+            `[HCO step pass contract] receiver settle breach (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"}, deltaPx=${receiverDeltaPx.toFixed(2)}, tolerancePx=${tolerancePx})`
+          );
+        }
+        if (!ownerMatchesReceiver) {
+          emitHcoStepTelemetry("hco_step_pass_owner_mismatch", passContext);
+          throw new Error(
+            `[HCO step pass contract] owner mismatch at pass end (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"}, owner=${ownerAtEnd ?? "null"}, pendingOwner=${pendingOwnerAtEnd ?? "null"})`
+          );
+        }
+        if (stepElapsedGameSeconds > stepBudgetGameSeconds) {
+          emitHcoStepTelemetry("hco_step_pass_clock_soft_overrun", passContext);
+        }
+        if (stepElapsedGameSeconds > hardFailThresholdSeconds) {
+          emitHcoStepTelemetry("hco_step_pass_clock_overrun", passContext);
+          throw new Error(
+            `[HCO step pass contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${stepElapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+          );
+        }
+        enforceUnitCompletionContract({
+          contract: hcoStepPassContract,
+          observed: {
+            finalOffensiveMoverSettled: receiverSettled,
+            visualSettled: receiverSettled,
+            shotTerminated: false,
+          },
+          context: passContext,
+          emitTelemetry: emitHcoStepTelemetry,
+          logger: console,
+        });
+      }
+      captureHcoUnitElapsed("step_pass");
     }
 
     // Phase 3 — After a pass, ensure every offensive player (including passer) reached this step.
@@ -3031,7 +4052,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
               playerSprites,
               rebounderId,
               nextPlayType: turnData.next_play_type || "HCO",
-              turnData: missTurn // Pass the MISS turn so we can get offense_getback list
+              turnData: missTurn, // get-back source
+              authorityTurnData: turnData, // strict outlet contract source
             });
           } else {
             const pause = animationConfig.offensiveRebound.pauseMs;
@@ -3083,7 +4105,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                         playerSprites,
                         rebounderId,
                         nextPlayType: turnData.next_play_type || "HCO",
-                        turnData: missTurn
+                        turnData: missTurn,
+                        authorityTurnData: turnData,
                       });
                     }
                   }
@@ -3104,6 +4127,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           }
         }
       }
+      validateHcoResolution({
+        stepIndex: shotInfo?.stepIndex ?? stepIndex,
+        branch: "shot_resolution",
+      });
       break;
     }
   }
@@ -3193,7 +4220,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                         playerSprites,
                         rebounderId,
                         nextPlayType: turnData.next_play_type || "HCO",
-                        turnData: missTurn
+                        turnData: missTurn,
+                        authorityTurnData: turnData,
                       });
                     }
                   }
@@ -3212,6 +4240,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
   }
+  validateHcoResolution({
+    branch: "turn_end",
+  });
+  validateHcoTransitionOut({
+    branch: "turn_end",
+    resultType: turnData?.result_type ?? null,
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    turnIndex: scene?.currentTurn ?? null,
+  });
+  emitHcoElapsedObserveTelemetry({
+    branch: "turn_end",
+    strictMode: hcoStepStrictMode,
+  });
 }
 
 /**

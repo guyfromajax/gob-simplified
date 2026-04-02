@@ -6,7 +6,7 @@
 
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import gameStore from '../../state/gameStore.js';
-import { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } from '../constants/fastBreakConstants.js';
+import { isFastBreakEntryAnnouncementsEnabled } from '../constants/fastBreakConstants.js';
 import { isBonusFreeThrowFoulTurn } from './foulAnnouncementClassifier.js';
 import {
   pickOffensiveFoulAnnouncementText,
@@ -198,8 +198,9 @@ function createHeadshotElement(playerData, scale = 1.0) {
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
  * @param {string} team - 'home', 'away', 'defense', or 'neutral' (unused by strip; kept for API)
  * @param {Object} playerData - Optional player data { playerId, photo, teamName } to show headshot
+ * @param {Object|null} meta - Optional metadata { decisionPillText, decisionPillTone: 'good'|'bad' }
  */
-export function showAnnouncement(text, team = 'home', playerData = null) {
+export function showAnnouncement(text, team = 'home', playerData = null, meta = null) {
   const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
   const player = rosterPlayer || playerData;
   const photoUrl = playerData && (playerData.photo || playerData.playerId)
@@ -213,6 +214,8 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     jersey: jerseyVal ? `#${jerseyVal}` : '',
     lastName: getPlayerLastName(player) || '',
     position: getPlayerPosition(player) || '',
+    decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
+    decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
   };
   const isFoulAnnouncement = text && (text.includes('FOUL') || text.includes('Foul'));
   const isDeadBallTurnoverAnnouncement = text && text.includes('Turnover') && text !== 'STEAL!';
@@ -261,7 +264,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
   
   if (timing === 'start') {
     // Announcements at turn start
-    if (turnData.fast_break && ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS) {
+    if (turnData.fast_break && isFastBreakEntryAnnouncementsEnabled()) {
       showAnnouncement("Fast Break!", offenseTeam);
       // Don't return - may have more announcements at end
     }

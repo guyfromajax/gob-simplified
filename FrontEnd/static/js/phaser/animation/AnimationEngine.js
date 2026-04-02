@@ -296,6 +296,9 @@ export class AnimationEngine {
         turnData: turnData
       });
     }
+    // Mark inbound source so next HCO lead-in can validate source-scoped contract.
+    this.scene._previousTurnWasInbound = true;
+    this.scene._previousInboundTurnType = 'SIDE_INBOUND';
   }
 
   async handleBaselineInbound(turnData, context) {
@@ -402,6 +405,7 @@ export class AnimationEngine {
     
     // ✅ PHASE 2.6: Mark that previous turn was inbound so HCO pre-step setup can use uncapped durations
     this.scene._previousTurnWasInbound = true;
+    this.scene._previousInboundTurnType = 'BASELINE_INBOUND';
     
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }
@@ -812,9 +816,9 @@ export class AnimationEngine {
     
     // ✅ PHASE 2.6: Display text (moved from animateGameTurns.js)
     const { appendToTextScroll } = await import('../utils/textScroll.js');
-    const { ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS } = await import('../constants/fastBreakConstants.js');
+    const { isFastBreakEntryAnnouncementsEnabled } = await import('../constants/fastBreakConstants.js');
     const fbStopFallback =
-      turnData.fast_break && ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS
+      turnData.fast_break && isFastBreakEntryAnnouncementsEnabled()
         ? "Fast Break! Defense stops the break!"
         : "Defense stops the break!";
     appendToTextScroll(turnData.text || fbStopFallback);
@@ -854,15 +858,41 @@ export class AnimationEngine {
       
       // ✅ FIX: Attach ball to stealer after skeleton animation completes
       // This ensures ball is attached before next turn (HCO or Fast Break) starts
-      const stealerRaw =
-        turnData.stealerId ||
-        turnData.stealer_id ||
-        turnData.roles?.ball_handler_id ||
-        turnData.events?.find(e => e.event_type === "STEAL")?.stealerId ||
-        turnData.events?.find(e => e.event_type === "STEAL")?.stealer_id;
-      
-      if (stealerRaw) {
-        const stealerSprite = context.playerSprites[stealerRaw];
+      const resolveSpriteById = (rawId) => {
+        if (rawId == null) return null;
+        if (context.playerSprites?.[rawId]) return context.playerSprites[rawId];
+        const want = String(rawId);
+        for (const [id, sprite] of Object.entries(context.playerSprites || {})) {
+          if (String(id) === want) return sprite;
+          if (String(sprite?.playerId ?? "") === want) return sprite;
+        }
+        return null;
+      };
+      const stealEvent =
+        turnData.events?.find((e) => String(e?.event_type || "").toUpperCase() === "STEAL") || null;
+      const stealerCandidates = [
+        turnData.stealerId,
+        turnData.stealer_id,
+        turnData.roles?.ball_handler_id,
+        turnData.roles?.ball_handler?.player_id,
+        stealEvent?.stealerId,
+        stealEvent?.stealer_id,
+      ].filter((v) => v != null);
+      let stealerRaw = stealerCandidates[0] ?? null;
+      let stealerSprite = stealerRaw != null ? resolveSpriteById(stealerRaw) : null;
+      if (!stealerSprite && Array.isArray(turnData.animations) && turnData.animations.length > 0) {
+        const maxStep = Math.max(0, ...turnData.animations.map((a) => a?.movement?.length || 0)) - 1;
+        const inferred = turnData.animations.find((a) => {
+          if (!a) return false;
+          if (Array.isArray(a.hasBallAtStep) && a.hasBallAtStep[maxStep] === true) return true;
+          const lastAction = a?.movement?.[maxStep]?.action;
+          return lastAction === "steal" || lastAction === "handle";
+        });
+        stealerRaw = inferred?.playerId ?? stealerRaw;
+        stealerSprite = stealerRaw != null ? resolveSpriteById(stealerRaw) : null;
+      }
+
+      if (stealerRaw && stealerSprite) {
         if (stealerSprite) {
           const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
           attachBallToPlayer(this.scene, context.ballSprite, stealerSprite, {
@@ -883,7 +913,9 @@ export class AnimationEngine {
             stealerId: turnData.stealerId,
             stealer_id: turnData.stealer_id,
             ball_handler_id: turnData.roles?.ball_handler_id,
-            events: turnData.events
+            ball_handler_player_id: turnData.roles?.ball_handler?.player_id,
+            events: turnData.events,
+            inferredFromAnimations: stealerRaw ?? null,
           }
         });
       }

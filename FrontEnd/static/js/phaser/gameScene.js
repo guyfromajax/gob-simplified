@@ -2116,6 +2116,13 @@ export function createGameScene(Phaser) {
       // Part 2 (Preload): helper and state defined early so we can preload during initial turns (opening tip → first HCO).
       const simMode = this.mode || 'single';
       const fetchTurnData = async (offenseOverride, defenseOverride) => {
+        const resolveClockAuthorityMode = () => {
+          const raw = String(window?.UESS_CLOCK_AUTHORITY_MODE ?? "").trim().toLowerCase();
+          if (raw === "observe" || raw === "warn" || raw === "throw" || raw === "off") {
+            return raw;
+          }
+          return null;
+        };
         const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2123,7 +2130,8 @@ export function createGameScene(Phaser) {
             game_id: gameId,
             offense_override: offenseOverride ?? null,
             defense_override: defenseOverride ?? null,
-            mode: simMode
+            mode: simMode,
+            uess_clock_authority_mode: resolveClockAuthorityMode(),
           })
         });
         if (!response.ok) {
@@ -2150,6 +2158,40 @@ export function createGameScene(Phaser) {
           throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
         }
         return await response.json();
+      };
+
+      const mirrorClockReconDebug = (turnPayload) => {
+        try {
+          const scope = typeof window !== 'undefined' ? window : globalThis;
+          if (!turnPayload || typeof turnPayload !== 'object') return;
+          const rows =
+            turnPayload.result_type === 'BATCH' && Array.isArray(turnPayload.batch_turns)
+              ? turnPayload.batch_turns
+              : [turnPayload];
+          for (const row of rows) {
+            if (!row || typeof row !== 'object') continue;
+            const snapshot = {
+              resultType: row.result_type ?? null,
+              mode: row.uess_clock_authority_mode ?? row.uess_clock_reconciliation?.mode ?? null,
+              ledgerCount: Array.isArray(row.clock_event_ledger) ? row.clock_event_ledger.length : 0,
+              ledgerElapsed: row.uess_clock_elapsed_game_seconds ?? null,
+              legacyElapsed: row.uess_clock_elapsed_legacy_game_seconds ?? row.time_elapsed ?? null,
+              delta: row.uess_clock_elapsed_delta_seconds ?? null,
+              withinTolerance: row.uess_clock_elapsed_observe_within_tolerance ?? row.uess_clock_reconciliation?.within_tolerance ?? null,
+              timestampMs: Date.now(),
+            };
+            scope.__CLOCK_RECON_LAST__ = snapshot;
+            if (!Array.isArray(scope.__CLOCK_RECON_BUFFER__)) {
+              scope.__CLOCK_RECON_BUFFER__ = [];
+            }
+            scope.__CLOCK_RECON_BUFFER__.push(snapshot);
+            if (scope.__CLOCK_RECON_BUFFER__.length > 100) {
+              scope.__CLOCK_RECON_BUFFER__.splice(0, scope.__CLOCK_RECON_BUFFER__.length - 100);
+            }
+          }
+        } catch (_) {
+          // Debug mirror must never impact gameplay loop.
+        }
       };
 
       let preloadedTurnPromise = null;
@@ -2244,6 +2286,7 @@ export function createGameScene(Phaser) {
           
           // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
+          mirrorClockReconDebug(turn);
           // Guarantee clock contract on turn so AnimationRouter always has clock_start/shot_clock_start (API now sends at top level)
           const clockContractKeys = [
             ['clock_start', 'clockStart'],

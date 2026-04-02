@@ -32,6 +32,18 @@ from BackEnd.engine.phase_resolution import (
 logger = logging.getLogger(__name__)
 
 
+def _apply_rr_decision_metadata(payload: Dict[str, Any], *, pass_attempted: bool, fb_open: bool) -> None:
+    """
+    Attach Rim Runner read-decision metadata for frontend announcement/UI.
+    Good decision rule: pass_attempted == fb_open.
+    """
+    good_decision = bool(pass_attempted) == bool(fb_open)
+    payload["rim_runner_pass_attempted"] = bool(pass_attempted)
+    payload["rim_runner_fb_open"] = bool(fb_open)
+    payload["rim_runner_decision_good"] = good_decision
+    payload["rim_runner_decision_label"] = "Good Decision" if good_decision else "Bad Decision"
+
+
 def _find_most_recent_shot_turn(game: Any, max_turns: int = 10) -> Optional[dict]:
     if not getattr(game, "turns", None):
         return None
@@ -563,9 +575,10 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "fast_break_play": fb_play_key,
             "rim_runner_fb_open": fb_open,
             "rim_runner_correct_read": correct_read,
-            # Outlet receiver (ball handler) chose not to pass to the Rim Runner — frontend announces "No Pass!"
+            # Outlet receiver (ball handler) chose not to pass to the Rim Runner.
             "rim_runner_no_lane_pass": True,
         }
+        _apply_rr_decision_metadata(result, pass_attempted=False, fb_open=fb_open)
         _record_fast_break_stats(fb_roles, result, game)
         apply_fast_break_cg_time(result, shot_attempted=False)
         return result
@@ -619,6 +632,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         turn_result["fast_break"] = True
         turn_result["fast_break_play"] = fb_play_key
         turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
+        _apply_rr_decision_metadata(turn_result, pass_attempted=True, fb_open=fb_open)
 
         if turn_result.get("result_type") == "MAKE":
             off_team.scouting_data["offense"]["Fast_Break_Success"] = (
@@ -669,6 +683,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         turn_result["fast_break"] = True
         turn_result["fast_break_play"] = fb_play_key
         turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
+        _apply_rr_decision_metadata(turn_result, pass_attempted=True, fb_open=fb_open)
         _record_fast_break_stats(fb_roles, turn_result, game)
         apply_fast_break_cg_time(turn_result, shot_attempted=True)
         return turn_result
@@ -698,6 +713,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         tr["fast_break_play"] = fb_play_key
         tr["roles"] = fb_roles
         tr["rim_runner_interception"] = True
+        _apply_rr_decision_metadata(tr, pass_attempted=True, fb_open=fb_open)
         rr_anims = Animator(game).capture_fast_break_animation(fb_roles, False, None)
         tr["animations"] = rr_anims
         if rr_anims:
@@ -739,6 +755,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "roles": fb_roles,
             "animations": bat_anims,
         }
+        _apply_rr_decision_metadata(result, pass_attempted=True, fb_open=fb_open)
         if bat_anims:
             apply_coords_from_animations_list(game, bat_anims)
         attach_position_snapshots(
@@ -796,6 +813,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     turn_result["fast_break"] = True
     turn_result["fast_break_play"] = fb_play_key
     turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
+    _apply_rr_decision_metadata(turn_result, pass_attempted=True, fb_open=fb_open)
     if turn_result.get("result_type") == "MAKE":
         off_team.scouting_data["offense"]["Fast_Break_Success"] = (
             off_team.scouting_data["offense"].get("Fast_Break_Success", 0) + 1

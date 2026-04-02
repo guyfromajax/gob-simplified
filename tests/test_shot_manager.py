@@ -194,3 +194,52 @@ def test_kickout_reset_event_payload(monkeypatch):
     assert {"event_type", "rebounderId", "pgId", "pass", "timeElapsed"} <= set(event.keys())
 
 
+def _assign_mock_player_ids(game):
+    """Assign deterministic player_ids to mock lineups for contract tests."""
+    # Ensure teams have distinct IDs in mock mode (team docs can be missing in tests).
+    game.home_team.team_id = "home_team_id"
+    game.away_team.team_id = "away_team_id"
+    for team_prefix, lineup in (("home", game.home_team.lineup), ("away", game.away_team.lineup)):
+        for pos, player in lineup.items():
+            player.player_id = f"{team_prefix}_{pos.lower()}"
+
+
+def test_dreb_outlet_contract_includes_receiver_target():
+    game = build_mock_game()
+    _assign_mock_player_ids(game)
+    shot_manager = ShotManager(game)
+
+    rebound_team = game.home_team
+    rebounder = rebound_team.lineup["C"]
+    rebounder.coords = {"x": 40, "y": 25}
+
+    contract = shot_manager._build_dreb_outlet_pass_contract(rebound_team, rebounder.player_id)
+
+    assert isinstance(contract, dict)
+    assert contract["passer_id"] == rebounder.player_id
+    assert contract["receiver_id"] != rebounder.player_id
+    assert isinstance(contract.get("receiver_target"), dict)
+    assert {"x", "y", "source"} <= set(contract["receiver_target"].keys())
+
+
+def test_dreb_outlet_receiver_target_direction_matches_transition_orientation(monkeypatch):
+    game = build_mock_game()
+    _assign_mock_player_ids(game)
+    shot_manager = ShotManager(game)
+
+    # Deterministic offsets: +4 x-units from rebounder in chosen sign direction; y unchanged.
+    monkeypatch.setattr("BackEnd.models.shot_manager.random.randint", lambda a, b: 4 if a == 3 and b == 6 else 0)
+
+    # Home transition offense should bias toward HOME_RIM (x high).
+    home_rebounder = game.home_team.lineup["C"]
+    home_rebounder.coords = {"x": 40, "y": 25}
+    home_target = shot_manager._build_dreb_outlet_receiver_target(game.home_team, home_rebounder.player_id)
+    assert home_target["x"] > home_rebounder.coords["x"]
+
+    # Away transition offense should bias toward AWAY_RIM (x low).
+    away_rebounder = game.away_team.lineup["C"]
+    away_rebounder.coords = {"x": 60, "y": 25}
+    away_target = shot_manager._build_dreb_outlet_receiver_target(game.away_team, away_rebounder.player_id)
+    assert away_target["x"] < away_rebounder.coords["x"]
+
+

@@ -2,7 +2,7 @@ import { playTurnAnimation } from "./turnAnimation.js";
 // ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
 // import { runSideInboundSetup } from "./turnAnimation.js"; // ✅ Now handled by AnimationEngine.handleSideInbound()
 import { onAction } from "./onAction.js";
-import { AnimationRouter } from "./AnimationRouter.js";
+import { AnimationRouter } from "./AnimationRouter.js?v=clock-observe-telemetry-2";
 import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 // ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
@@ -287,7 +287,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
           playerSprites,
           rebounderId: turnData.rebounderId,
           nextPlayType: turnData.next_play_type || "HCO",
-          turnData: missTurn // Pass the MISS turn with offense_getback
+          turnData: missTurn, // get-back source
+          authorityTurnData: turnData, // strict outlet contract source
         });
       }
       // If another OREB, it will be handled by the next OREB turn

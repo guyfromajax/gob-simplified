@@ -427,6 +427,8 @@ try:
         # Optional user overrides for this specific turn
         offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
         defense_override: str | None = None  # e.g., "Zone", "Man"
+        # Optional UESS clock authority override for this request/session
+        uess_clock_authority_mode: str | None = None  # "observe" | "warn" | "throw" | "off"
     
     
     class CallTimeoutRequest(BaseModel):
@@ -4076,6 +4078,18 @@ try:
         if body.defense_override:
             gm.game_state["user_defense_override"] = body.defense_override
             logging.info(f"🎮 User defense override: {body.defense_override}")
+
+        # Optional: propagate frontend UESS clock mode to backend game_state for unified behavior.
+        if body.uess_clock_authority_mode:
+            raw_mode = str(body.uess_clock_authority_mode).strip().lower()
+            if raw_mode in {"observe", "warn", "throw", "off"}:
+                gm.game_state["uess_clock_authority_mode"] = raw_mode
+                logging.info(f"⏱️ UESS clock authority mode override: {raw_mode}")
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_clock_authority_mode ignored: %s",
+                    body.uess_clock_authority_mode,
+                )
         
         pending_terminal_ft = _has_pending_terminal_free_throw(gm)
 
