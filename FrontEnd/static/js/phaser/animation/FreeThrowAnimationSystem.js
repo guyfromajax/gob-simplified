@@ -20,6 +20,7 @@ import { DebugFlags } from '../utils/debugFlags.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import animationConfig from './animation_config.js';
+import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -50,6 +51,103 @@ export class FreeThrowAnimationSystem {
     this.totalAttempts = 0;
     
     // ✅ REMOVED: Free throw initialization logging (cluttering console)
+  }
+
+  resolveFtContractMode() {
+    const raw = String(
+      (typeof window !== 'undefined' ? window.UESS_FT_CONTRACT_MODE : null) ?? 'observe'
+    )
+      .trim()
+      .toLowerCase();
+    if (raw === 'off' || raw === 'observe' || raw === 'warn' || raw === 'throw') return raw;
+    return 'observe';
+  }
+
+  getFtBudgetGameSeconds(kind = 'attempt') {
+    const scope = typeof window !== 'undefined' ? window : globalThis;
+    const raw =
+      kind === 'attempt'
+        ? Number(scope?.UESS_FT_ATTEMPT_MAX_GAME_SECONDS)
+        : Number(scope?.UESS_FT_SEQUENCE_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return kind === 'attempt' ? 3 : 2;
+  }
+
+  emitFtContractTelemetry(turnData, event, payload = {}) {
+    this.scene?.events?.emit?.('animTelemetry', {
+      event,
+      branchKind: 'ft_phase_contract',
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  }
+
+  enforceFtUnitContract({
+    turnData,
+    unitId,
+    advanceTrigger,
+    visualSettleTrigger,
+    authorizingEventReceived,
+    visualSettled,
+    unitStartMs,
+    maxWaitGameSeconds,
+    context = {},
+  }) {
+    const mode = this.resolveFtContractMode();
+    if (mode === 'off') return;
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 350;
+    const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const overrun =
+      Number.isFinite(maxWaitGameSeconds) &&
+      maxWaitGameSeconds > 0 &&
+      elapsedGameSeconds > maxWaitGameSeconds;
+    const contractContext = {
+      elapsedMs,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      maxWaitGameSeconds,
+      overrun,
+      ...context,
+    };
+    if (overrun) {
+      this.emitFtContractTelemetry(turnData, 'ft_phase_clock_overrun', {
+        unitId,
+        ...contractContext,
+      });
+    }
+    const logger =
+      mode === 'observe'
+        ? {
+            warn: () => {},
+          }
+        : console;
+    enforceUnitCompletionContract({
+      contract: {
+        unit_id: unitId,
+        execution_mode: 'dynamic_event',
+        advance_trigger: advanceTrigger,
+        visual_settle_trigger: visualSettleTrigger,
+        failure_policy: mode === 'throw' ? 'throw' : 'warn',
+      },
+      observed: {
+        authorizingEventReceived: authorizingEventReceived === true,
+        visualSettled: visualSettled === true && !overrun,
+      },
+      context: contractContext,
+      emitTelemetry: (event, payload = {}) =>
+        this.emitFtContractTelemetry(turnData, event, payload),
+      logger,
+    });
+    if (mode === 'throw' && overrun) {
+      throw new Error(
+        `[FT contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+      );
+    }
   }
 
   /**
@@ -92,6 +190,23 @@ export class FreeThrowAnimationSystem {
       // Determine free throw context
       const ftContext = this.determineFreeThrowContext(adaptedTurnData);
 
+      // FT entry contract: route is in FT family and shooter is resolved.
+      this.enforceFtUnitContract({
+        turnData: adaptedTurnData,
+        unitId: 'ft.lead_in.entry',
+        advanceTrigger: 'FT route committed + shooter resolved',
+        visualSettleTrigger: 'lane setup settled',
+        authorizingEventReceived: adaptedTurnData?.result_type === 'FREE_THROW' && !!shooterSprite,
+        visualSettled: !!shooterSprite,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getFtBudgetGameSeconds('sequence'),
+        context: {
+          phase: 'lead_in_entry',
+          shooterId: adaptedTurnData?.shooter_id ?? adaptedTurnData?.player_id ?? null,
+          resultType: adaptedTurnData?.result_type ?? null,
+        },
+      });
+
       // Execute free throw sequence
       await this.executeFreeThrowSequence(shooterSprite, adaptedTurnData, ftContext);
 
@@ -110,6 +225,7 @@ export class FreeThrowAnimationSystem {
    * Execute the complete free throw sequence
    */
   async executeFreeThrowSequence(shooterSprite, turnData, ftContext) {
+    const attemptStartMs = Date.now();
     // 1. Setup free throw positioning
     await this.setupFreeThrowPositioning(shooterSprite, turnData);
 
@@ -121,6 +237,79 @@ export class FreeThrowAnimationSystem {
       await this.handleMadeFreeThrow(turnData, ftContext);
     } else {
       await this.handleMissedFreeThrow(turnData, ftContext);
+    }
+    this.enforceFtUnitContract({
+      turnData,
+      unitId: 'ft.phase.attempt[n]',
+      advanceTrigger: 'shot release/result committed',
+      visualSettleTrigger: 'ball/rim/announcement settled',
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: attemptStartMs,
+      maxWaitGameSeconds: this.getFtBudgetGameSeconds('attempt'),
+      context: {
+        attempt: ftContext?.attempt ?? null,
+        total: ftContext?.total ?? null,
+        isFinal: ftContext?.isFinal === true,
+        actualResult: turnData?.actual_result ?? null,
+      },
+    });
+
+    const sequenceStartMs = Date.now();
+    const hasAuthoritativeRemaining = turnData?.free_throws_remaining !== undefined;
+    const expectedIsFinal = hasAuthoritativeRemaining
+      ? Number(turnData.free_throws_remaining) === 0
+      : Number(ftContext?.attempt ?? 1) >= Number(ftContext?.total ?? 1);
+    const sequenceConsistent = Boolean(ftContext?.isFinal) === expectedIsFinal;
+    this.enforceFtUnitContract({
+      turnData,
+      unitId: 'ft.phase.sequence_control',
+      advanceTrigger: 'remaining-attempt decision committed',
+      visualSettleTrigger: 'sequence state settled',
+      authorizingEventReceived: true,
+      visualSettled: sequenceConsistent,
+      unitStartMs: sequenceStartMs,
+      maxWaitGameSeconds: this.getFtBudgetGameSeconds('sequence'),
+      context: {
+        attempt: ftContext?.attempt ?? null,
+        total: ftContext?.total ?? null,
+        isFinal: ftContext?.isFinal === true,
+        expectedIsFinal,
+        freeThrowsRemaining:
+          turnData?.free_throws_remaining !== undefined
+            ? Number(turnData.free_throws_remaining)
+            : null,
+      },
+    });
+    if (this.resolveFtContractMode() === 'throw' && !sequenceConsistent) {
+      throw new Error(
+        `[FT contract] sequence mismatch (attempt=${ftContext?.attempt ?? "?"}, total=${ftContext?.total ?? "?"}, isFinal=${String(ftContext?.isFinal)}, expectedIsFinal=${String(expectedIsFinal)})`
+      );
+    }
+
+    // FT transition-out contract applies only on final attempt in sequence.
+    if (ftContext?.isFinal === true) {
+      const outStartMs = Date.now();
+      const route = String(turnData?.next_play_type || turnData?.next_turn || '').toUpperCase();
+      this.enforceFtUnitContract({
+        turnData,
+        unitId: 'ft.out.to_*',
+        advanceTrigger: 'route committed',
+        visualSettleTrigger: 'FT final settle complete',
+        authorizingEventReceived: route.length > 0,
+        visualSettled: true,
+        unitStartMs: outStartMs,
+        maxWaitGameSeconds: this.getFtBudgetGameSeconds('sequence'),
+        context: {
+          phase: 'transition_out',
+          route: route || null,
+          reboundType: turnData?.rebound_type ?? null,
+          actualResult: turnData?.actual_result ?? null,
+        },
+      });
+      if (this.resolveFtContractMode() === 'throw' && route.length === 0) {
+        throw new Error('[FT contract] missing committed route at sequence exit');
+      }
     }
   }
 

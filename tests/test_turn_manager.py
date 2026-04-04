@@ -203,7 +203,7 @@ def test_clock_event_ledger_attached_with_required_fields():
     }
     game.turn_manager.update_clock_and_possession(result)
 
-    assert result["uess_clock_authority_mode"] == "observe"
+    assert result["uess_clock_authority_mode"] == "warn"
     ledger = result.get("clock_event_ledger")
     assert isinstance(ledger, list)
     assert len(ledger) > 0
@@ -228,7 +228,7 @@ def test_clock_event_ledger_attached_with_required_fields():
     assert result["uess_clock_elapsed_observe_within_tolerance"] is True
     recon = result.get("uess_clock_reconciliation")
     assert isinstance(recon, dict)
-    assert recon.get("mode") == "observe"
+    assert recon.get("mode") == "warn"
     assert recon.get("within_tolerance") is True
 
 
@@ -266,3 +266,68 @@ def test_clock_elapsed_observe_respects_tolerance_override():
     recon = result.get("uess_clock_reconciliation") or {}
     assert recon.get("tolerance_seconds") == 0.0
     assert recon.get("within_tolerance") is True
+
+
+def test_clock_reconciliation_warn_mode_does_not_raise_on_mismatch():
+    game = build_mock_game()
+    _init_min_for_players(game)
+    game.game_state["uess_clock_authority_mode"] = "warn"
+    game.game_state["uess_clock_recon_tolerance_seconds"] = 0
+    game.game_state["time_remaining"] = 600
+    game.game_state["shot_clock_remaining"] = 30
+    game.turn_manager._derive_elapsed_from_clock_event_ledger = lambda _events: 0
+    result = {
+        "result_type": "MISS",
+        "time_elapsed": 9,
+        "current_turn": "HCO",
+        "turn_count": 44,
+        "offense_team_id": game.offense_team.team_id,
+    }
+    game.turn_manager.update_clock_and_possession(result)
+    recon = result.get("uess_clock_reconciliation") or {}
+    assert recon.get("mode") == "warn"
+    assert recon.get("within_tolerance") is False
+    assert result.get("uess_clock_authority_mode") == "warn"
+
+
+def test_clock_reconciliation_throw_mode_raises_on_mismatch():
+    game = build_mock_game()
+    _init_min_for_players(game)
+    game.game_state["uess_clock_authority_mode"] = "throw"
+    game.game_state["uess_clock_recon_tolerance_seconds"] = 0
+    game.game_state["time_remaining"] = 600
+    game.game_state["shot_clock_remaining"] = 30
+    game.turn_manager._derive_elapsed_from_clock_event_ledger = lambda _events: 0
+    result = {
+        "result_type": "MISS",
+        "time_elapsed": 9,
+        "current_turn": "HCO",
+        "turn_count": 45,
+        "offense_team_id": game.offense_team.team_id,
+    }
+    try:
+        game.turn_manager.update_clock_and_possession(result)
+        assert False, "Expected ValueError in throw mode on reconciliation mismatch"
+    except ValueError as exc:
+        assert "backend reconciliation fail" in str(exc)
+
+
+def test_clock_reconciliation_off_mode_no_raise_on_mismatch():
+    game = build_mock_game()
+    _init_min_for_players(game)
+    game.game_state["uess_clock_authority_mode"] = "off"
+    game.game_state["uess_clock_recon_tolerance_seconds"] = 0
+    game.game_state["time_remaining"] = 600
+    game.game_state["shot_clock_remaining"] = 30
+    game.turn_manager._derive_elapsed_from_clock_event_ledger = lambda _events: 0
+    result = {
+        "result_type": "MISS",
+        "time_elapsed": 9,
+        "current_turn": "HCO",
+        "turn_count": 46,
+        "offense_team_id": game.offense_team.team_id,
+    }
+    game.turn_manager.update_clock_and_possession(result)
+    recon = result.get("uess_clock_reconciliation") or {}
+    assert recon.get("mode") == "off"
+    assert recon.get("within_tolerance") is False

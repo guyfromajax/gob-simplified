@@ -103,6 +103,176 @@ function resolveDrebStrictMode() {
   return "throw";
 }
 
+function resolveInboundContractMode() {
+  const scope = getDrebTelemetryScope();
+  const raw = String(scope?.UESS_INBOUND_CONTRACT_MODE ?? "warn")
+    .trim()
+    .toLowerCase();
+  if (raw === "off" || raw === "observe" || raw === "warn" || raw === "throw") {
+    return raw;
+  }
+  return "warn";
+}
+
+function getInboundBudgetGameSeconds(kind = "pass", resultType = "SIDE_INBOUND") {
+  const scope = getDrebTelemetryScope();
+  const normalizedKind = kind === "setup" ? "setup" : "pass";
+  const normalizedResultType = String(resultType || "SIDE_INBOUND").toUpperCase();
+  const isBaseline = normalizedResultType === "BASELINE_INBOUND";
+  const specificKey =
+    normalizedKind === "setup"
+      ? isBaseline
+        ? "UESS_BASELINE_INBOUND_SETUP_MAX_GAME_SECONDS"
+        : "UESS_SIDE_INBOUND_SETUP_MAX_GAME_SECONDS"
+      : isBaseline
+      ? "UESS_BASELINE_INBOUND_PASS_MAX_GAME_SECONDS"
+      : "UESS_SIDE_INBOUND_PASS_MAX_GAME_SECONDS";
+  const genericKey =
+    normalizedKind === "setup"
+      ? "UESS_INBOUND_SETUP_MAX_GAME_SECONDS"
+      : "UESS_INBOUND_PASS_MAX_GAME_SECONDS";
+  const defaultValue = normalizedKind === "setup" ? 4 : 2;
+  const specific = Number(scope?.[specificKey]);
+  if (Number.isFinite(specific) && specific >= 0) return specific;
+  const generic = Number(scope?.[genericKey]);
+  if (Number.isFinite(generic) && generic >= 0) return generic;
+  return defaultValue;
+}
+
+function hasPlayerSpriteForId(playerSprites, rawId) {
+  if (rawId == null || !playerSprites) return false;
+  if (playerSprites?.[rawId]) return true;
+  const want = String(rawId);
+  for (const [id, sprite] of Object.entries(playerSprites || {})) {
+    if (String(id) === want) return true;
+    if (String(sprite?.playerId ?? "") === want) return true;
+  }
+  return false;
+}
+
+function emitInboundContractTelemetry(scene, turnData, event, payload = {}) {
+  scene?.events?.emit?.("animTelemetry", {
+    event,
+    branchKind: "inbound_unit_contract",
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    turnIndex: scene?.currentTurn ?? null,
+    resultType: turnData?.result_type ?? null,
+    gameClock: scene?.simData?.clock ?? null,
+    quarter: turnData?.quarter ?? scene?.quarter ?? null,
+    timestampMs: Date.now(),
+    ...payload,
+  });
+}
+
+function validateInboundUnitCompletionContract({
+  scene,
+  turnData,
+  playerSprites,
+  unitId,
+  advanceTrigger,
+  visualSettleTrigger,
+  unitStartMs,
+  maxWaitGameSeconds,
+  authorizingEventReceived,
+  requireOwner = false,
+  requirePassNotInFlight = false,
+  context = {},
+}) {
+  const mode = resolveInboundContractMode();
+  if (mode === "off") {
+    return { ok: true, mode, skipped: true };
+  }
+
+  const emitTelemetry = (event, payload = {}) =>
+    emitInboundContractTelemetry(scene, turnData, event, payload);
+
+  const currentOwnerId = getCurrentOwner(scene);
+  const pendingOwnerId = getPendingOwner(scene);
+  const hasCurrentOwner = currentOwnerId != null && String(currentOwnerId).length > 0;
+  const hasPendingOwner = pendingOwnerId != null && String(pendingOwnerId).length > 0;
+  const ownerMissing = requireOwner && !hasCurrentOwner && !hasPendingOwner;
+  const ownerInvalid =
+    requireOwner &&
+    ((hasCurrentOwner && !hasPlayerSpriteForId(playerSprites, currentOwnerId)) ||
+      (hasPendingOwner && !hasPlayerSpriteForId(playerSprites, pendingOwnerId)));
+  const passInFlightAtBoundary = requirePassNotInFlight && scene?.passInFlight === true;
+  const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const elapsedGameSeconds = elapsedMs / clockSecondMs;
+  const overrun =
+    Number.isFinite(maxWaitGameSeconds) &&
+    maxWaitGameSeconds >= 0 &&
+    elapsedGameSeconds > maxWaitGameSeconds;
+  const visualSettled =
+    !ownerMissing && !ownerInvalid && !passInFlightAtBoundary && !overrun;
+
+  const summaryContext = {
+    unitId,
+    currentOwnerId: currentOwnerId ?? null,
+    pendingOwnerId: pendingOwnerId ?? null,
+    ownerMissing,
+    ownerInvalid,
+    passInFlightAtBoundary,
+    elapsedMs,
+    elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+    maxWaitGameSeconds,
+    ...context,
+  };
+
+  if (ownerMissing) emitTelemetry("inbound_contract_owner_missing", summaryContext);
+  if (ownerInvalid) emitTelemetry("inbound_contract_owner_invalid", summaryContext);
+  if (passInFlightAtBoundary) emitTelemetry("inbound_contract_pass_in_flight", summaryContext);
+  if (overrun) emitTelemetry("inbound_contract_clock_overrun", summaryContext);
+
+  const logger =
+    mode === "observe"
+      ? {
+          warn: () => {},
+        }
+      : console;
+  enforceUnitCompletionContract({
+    contract: {
+      unit_id: unitId,
+      execution_mode: "dynamic_event",
+      advance_trigger: advanceTrigger,
+      visual_settle_trigger: visualSettleTrigger,
+      failure_policy: mode === "throw" ? "throw" : "warn",
+    },
+    observed: {
+      authorizingEventReceived: authorizingEventReceived === true,
+      visualSettled,
+    },
+    context: summaryContext,
+    emitTelemetry,
+    logger,
+  });
+
+  if (mode === "throw") {
+    if (ownerMissing) {
+      throw new Error(
+        `[inbound contract] missing owner at unit boundary (unit=${unitId}, result=${turnData?.result_type ?? "?"})`
+      );
+    }
+    if (ownerInvalid) {
+      throw new Error(
+        `[inbound contract] invalid owner at unit boundary (unit=${unitId}, result=${turnData?.result_type ?? "?"})`
+      );
+    }
+    if (passInFlightAtBoundary) {
+      throw new Error(
+        `[inbound contract] pass still in flight at unit boundary (unit=${unitId}, result=${turnData?.result_type ?? "?"})`
+      );
+    }
+    if (overrun) {
+      throw new Error(
+        `[inbound contract] clock overrun (unit=${unitId}, result=${turnData?.result_type ?? "?"}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${Number(maxWaitGameSeconds)})`
+      );
+    }
+  }
+
+  return { ok: visualSettled, mode, visualSettled };
+}
+
 /**
  * Grid X distance (0–100 court scale) covered in durationMs at AG-based px/s when
  * 100 grid units span `width` pixels (matches gridToPixels).
@@ -571,6 +741,8 @@ async function runRimRunnerHoldUpSetupTween({
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData, context = null }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow)) return;
+  const sideInboundSetupStartMs = Date.now();
+  const sideInboundLeadInStartMs = Date.now();
 
   scene.isInboundSetup = true;
   
@@ -652,6 +824,25 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
   const promises = [];
   const sfSprite = offenseSprites["SF"];
   const sfId = offenseIds["SF"];
+  validateInboundUnitCompletionContract({
+    scene,
+    turnData,
+    playerSprites,
+    unitId: "sip.lead_in.entry",
+    advanceTrigger: "SIP route committed + inbounder resolved",
+    visualSettleTrigger: "setup settled",
+    unitStartMs: sideInboundLeadInStartMs,
+    maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "SIDE_INBOUND"),
+    authorizingEventReceived: true,
+    requireOwner: false,
+    requirePassNotInFlight: false,
+    context: {
+      inboundType: "SIDE_INBOUND",
+      phase: "lead_in_entry",
+      inbounderId: sfId ?? null,
+      inbounderResolved: Boolean(sfSprite),
+    },
+  });
   
   const addTween = (sprite, coords, pos) => {
     if (!sprite || !coords) return;
@@ -698,6 +889,23 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
   Object.entries(dDestinations).forEach(([pos, coords]) => addTween(defenseSprites[pos], coords, pos));
 
   await Promise.all(promises);
+  validateInboundUnitCompletionContract({
+    scene,
+    turnData,
+    playerSprites,
+    unitId: "sip.phase.setup_positions",
+    advanceTrigger: "required setup movers reached targets",
+    visualSettleTrigger: "setup tweens settled",
+    unitStartMs: sideInboundSetupStartMs,
+    maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "SIDE_INBOUND"),
+    authorizingEventReceived: true,
+    requireOwner: false,
+    requirePassNotInFlight: false,
+    context: {
+      inboundType: "SIDE_INBOUND",
+      phase: "setup_positions",
+    },
+  });
   
   // ✅ TIMEOUT: Removed 2-second pause - timeout button is now always live
 
@@ -720,6 +928,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
   const pgSprite = offenseSprites["PG"];
   const pgId = offenseIds["PG"];
   
+  const sideInboundPassStartMs = Date.now();
+  let sideInboundPassDelivered = false;
   if (sfSprite) {
     // ✅ Ball attachment already happened when SF reached the spot (in tween onComplete)
     // Only attach here as a safety fallback if attachment didn't happen
@@ -764,7 +974,26 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
         }
       }
       await Promise.all([passPromise, defenderPromise]);
+      sideInboundPassDelivered = true;
     }
+
+    validateInboundUnitCompletionContract({
+      scene,
+      turnData,
+      playerSprites,
+      unitId: "sip.phase.pass",
+      advanceTrigger: "pass received",
+      visualSettleTrigger: "ball flight + receiver settle",
+      unitStartMs: sideInboundPassStartMs,
+      maxWaitGameSeconds: getInboundBudgetGameSeconds("pass", "SIDE_INBOUND"),
+      authorizingEventReceived: sideInboundPassDelivered,
+      requireOwner: true,
+      requirePassNotInFlight: true,
+      context: {
+        inboundType: "SIDE_INBOUND",
+        phase: "pass",
+      },
+    });
 
     animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
@@ -781,6 +1010,45 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
         },
         ["stepIndex"]
       );
+    validateInboundUnitCompletionContract({
+      scene,
+      turnData,
+      playerSprites,
+      unitId: "sip.out.to_*",
+      advanceTrigger: "route committed",
+      visualSettleTrigger: "SIP final settle complete",
+      unitStartMs: sideInboundPassStartMs,
+      maxWaitGameSeconds: getInboundBudgetGameSeconds("pass", "SIDE_INBOUND"),
+      authorizingEventReceived: true,
+      requireOwner: false,
+      requirePassNotInFlight: false,
+      context: {
+        inboundType: "SIDE_INBOUND",
+        phase: "transition_out",
+        route: String(turnData?.next_play_type || context?.nextTurn?.current_turn || "HCO"),
+        stateIsHalfCourt: scene.stateMachine?.is(States.HalfCourt) === true,
+      },
+    });
+  }
+  if (!sfSprite) {
+    validateInboundUnitCompletionContract({
+      scene,
+      turnData,
+      playerSprites,
+      unitId: "sip.phase.pass",
+      advanceTrigger: "pass received",
+      visualSettleTrigger: "ball flight + receiver settle",
+      unitStartMs: sideInboundPassStartMs,
+      maxWaitGameSeconds: getInboundBudgetGameSeconds("pass", "SIDE_INBOUND"),
+      authorizingEventReceived: false,
+      requireOwner: true,
+      requirePassNotInFlight: true,
+      context: {
+        inboundType: "SIDE_INBOUND",
+        phase: "pass",
+        reason: "missing_sf_inbounder",
+      },
+    });
   }
   scene.isInboundSetup = false;
   scene.passInFlight = false;
@@ -1865,6 +2133,8 @@ async function runInboundSetup({
   turnData = null,       // ✅ NEW: Optional turnData for dynamic pass detection
   context = null        // ✅ Force Foul: nextTurn so we can animate defender move in same turn
 }) {
+  const baselineInboundSetupStartMs = Date.now();
+  const baselineInboundLeadInStartMs = Date.now();
   // ✅ CRITICAL: ALWAYS set scene.offenseTeamId to match newOffenseSide BEFORE doing anything else
   // This ensures that any code that reads scene.offenseTeamId will get the correct value
   const expectedOffenseTeamId = newOffenseSide === "home" ? homeTeamId : awayTeamId;
@@ -2175,9 +2445,46 @@ async function runInboundSetup({
   }
 
   if (!sfSprite || !pgSprite) {
+    validateInboundUnitCompletionContract({
+      scene,
+      turnData,
+      playerSprites,
+      unitId: "bip.lead_in.entry",
+      advanceTrigger: "BIP route committed + inbounder resolved",
+      visualSettleTrigger: "baseline setup settled",
+      unitStartMs: baselineInboundLeadInStartMs,
+      maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "BASELINE_INBOUND"),
+      authorizingEventReceived: false,
+      requireOwner: false,
+      requirePassNotInFlight: false,
+      context: {
+        inboundType: "BASELINE_INBOUND",
+        phase: "lead_in_entry",
+        inbounderResolved: false,
+      },
+    });
     scene.isInboundSetup = false;
     return;
   }
+  validateInboundUnitCompletionContract({
+    scene,
+    turnData,
+    playerSprites,
+    unitId: "bip.lead_in.entry",
+    advanceTrigger: "BIP route committed + inbounder resolved",
+    visualSettleTrigger: "baseline setup settled",
+    unitStartMs: baselineInboundLeadInStartMs,
+    maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "BASELINE_INBOUND"),
+    authorizingEventReceived: true,
+    requireOwner: false,
+    requirePassNotInFlight: false,
+    context: {
+      inboundType: "BASELINE_INBOUND",
+      phase: "lead_in_entry",
+      inbounderId: sfId ?? null,
+      inbounderResolved: true,
+    },
+  });
   animationDebugLog(
     `[inbound][score][${newOffenseSide}] sf:${sfId} pg:${pgId} sg:${sgId} pf:${pfId} c:${cId}`
   );
@@ -2429,6 +2736,23 @@ async function runInboundSetup({
     pfTween,
     cTween
   ]);
+  validateInboundUnitCompletionContract({
+    scene,
+    turnData,
+    playerSprites,
+    unitId: "bip.phase.setup_positions",
+    advanceTrigger: "required setup movers reached targets",
+    visualSettleTrigger: "setup tweens settled",
+    unitStartMs: baselineInboundSetupStartMs,
+    maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "BASELINE_INBOUND"),
+    authorizingEventReceived: true,
+    requireOwner: false,
+    requirePassNotInFlight: false,
+    context: {
+      inboundType: "BASELINE_INBOUND",
+      phase: "setup_positions",
+    },
+  });
   
   // ✅ TIMEOUT: Removed 2-second pause - timeout button is now always live
 
@@ -2478,6 +2802,7 @@ async function runInboundSetup({
   // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
   const nextTurn = context?.nextTurn;
   const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+  const baselineInboundPassStartMs = Date.now();
   const passPromise = passInfo
     ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
        handlePassAnimation({ scene, passInfo, playerSprites }))
@@ -2494,6 +2819,25 @@ async function runInboundSetup({
     }
   }
   await Promise.all([passPromise, defenderPromise]);
+  validateInboundUnitCompletionContract({
+    scene,
+    turnData,
+    playerSprites,
+    unitId: "bip.phase.pass",
+    advanceTrigger: "pass received",
+    visualSettleTrigger: "ball flight + receiver settle",
+    unitStartMs: baselineInboundPassStartMs,
+    maxWaitGameSeconds: getInboundBudgetGameSeconds("pass", "BASELINE_INBOUND"),
+    authorizingEventReceived: true,
+    requireOwner: true,
+    requirePassNotInFlight: true,
+    context: {
+      inboundType: "BASELINE_INBOUND",
+      phase: "pass",
+      skipRetreat: !!skipRetreat,
+      pressureType: pressureType ?? null,
+    },
+  });
 
   animationDebugLog(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
@@ -2509,6 +2853,25 @@ async function runInboundSetup({
       },
       ["stepIndex"]
     );
+  validateInboundUnitCompletionContract({
+    scene,
+    turnData,
+    playerSprites,
+    unitId: "bip.out.to_*",
+    advanceTrigger: "route committed",
+    visualSettleTrigger: "BIP final settle complete",
+    unitStartMs: baselineInboundPassStartMs,
+    maxWaitGameSeconds: getInboundBudgetGameSeconds("pass", "BASELINE_INBOUND"),
+    authorizingEventReceived: true,
+    requireOwner: false,
+    requirePassNotInFlight: false,
+    context: {
+      inboundType: "BASELINE_INBOUND",
+      phase: "transition_out",
+      route: String(turnData?.next_play_type || context?.nextTurn?.current_turn || "HCO"),
+      stateIsHalfCourt: scene.stateMachine?.is(States.HalfCourt) === true,
+    },
+  });
 
   scene.isInboundSetup = false;
   scene.passInFlight = false;
@@ -2739,13 +3102,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
     return fallbackDurationMs;
   };
+  const currentTurnType = String(turnData?.current_turn || "").toUpperCase();
+  const isPressureSkeletonTurn = currentTurnType === "FCP" || currentTurnType === "HCT";
   const emitHcoStepTelemetry = (event, payload = {}) => {
+    const eventName = isPressureSkeletonTurn
+      ? String(event || "").replace(/^hco_/, "pressure_")
+      : event;
     scene?.events?.emit?.("animTelemetry", {
-      event,
-      branchKind: "hco_step_movement",
+      event: eventName,
+      branchKind: isPressureSkeletonTurn ? "pressure_step_movement" : "hco_step_movement",
       turnId: turnData?.turn_count ?? turnData?.id ?? null,
       turnIndex: scene?.currentTurn ?? null,
       resultType: turnData?.result_type ?? null,
+      currentTurn: currentTurnType || null,
       gameClock: scene?.simData?.clock ?? null,
       quarter: turnData?.quarter ?? scene?.quarter ?? null,
       timestampMs: Date.now(),
@@ -2760,6 +3129,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     return "throw";
   };
   const hcoStepStrictMode = resolveHcoStepStrictMode();
+  const resolvePressureStepContractMode = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = String(scope?.UESS_PRESSURE_STEP_CONTRACT_MODE ?? "warn")
+      .trim()
+      .toLowerCase();
+    if (raw === "off" || raw === "warn" || raw === "throw") return raw;
+    return "warn";
+  };
+  const pressureStepContractMode = resolvePressureStepContractMode();
   const getHcoStepTolerancePx = () => {
     const scope = getDrebTelemetryScope();
     const raw = Number(scope?.UESS_HCO_STEP_MOVEMENT_TOLERANCE_PX);
@@ -2794,30 +3172,74 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         : budgetSeconds * 1.0;
     return Math.max(absSlack, ratioSlack);
   };
+  const getPressureStepTolerancePx = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_PRESSURE_STEP_MOVEMENT_TOLERANCE_PX);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 18;
+  };
+  const getPressureStepFallbackBudgetGameSeconds = () => {
+    const scope = getDrebTelemetryScope();
+    const raw = Number(scope?.UESS_PRESSURE_STEP_MOVEMENT_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return 8;
+  };
+  const getPressureStepClockJitterSlackSeconds = (budgetSeconds) => {
+    const scope = getDrebTelemetryScope();
+    const rawAbs = Number(scope?.UESS_PRESSURE_STEP_CLOCK_JITTER_ABS_SECONDS);
+    const rawRatio = Number(scope?.UESS_PRESSURE_STEP_CLOCK_JITTER_RATIO);
+    const absSlack = Number.isFinite(rawAbs) && rawAbs >= 0 ? rawAbs : 0.4;
+    const ratioSlack =
+      Number.isFinite(rawRatio) && rawRatio >= 0
+        ? budgetSeconds * rawRatio
+        : budgetSeconds * 0.35;
+    return Math.max(absSlack, ratioSlack);
+  };
+  const getPressureStepPassClockJitterSlackSeconds = (budgetSeconds) => {
+    const scope = getDrebTelemetryScope();
+    const rawAbs = Number(scope?.UESS_PRESSURE_STEP_PASS_CLOCK_JITTER_ABS_SECONDS);
+    const rawRatio = Number(scope?.UESS_PRESSURE_STEP_PASS_CLOCK_JITTER_RATIO);
+    const absSlack = Number.isFinite(rawAbs) && rawAbs >= 0 ? rawAbs : 1.0;
+    const ratioSlack =
+      Number.isFinite(rawRatio) && rawRatio >= 0
+        ? budgetSeconds * rawRatio
+        : budgetSeconds * 1.0;
+    return Math.max(absSlack, ratioSlack);
+  };
   const isHCOSkeletonTurn =
-    String(turnData?.current_turn || "").toUpperCase() === "HCO" ||
+    currentTurnType === "HCO" ||
     (!isFCPHCT &&
       !turnData?.fast_break &&
       (turnData?.result_type === "MAKE" ||
         turnData?.result_type === "MISS" ||
         turnData?.result_type === "BLOCK"));
+  const isContractSkeletonTurn = isHCOSkeletonTurn || isPressureSkeletonTurn;
+  const stepStrictMode = isPressureSkeletonTurn
+    ? pressureStepContractMode
+    : hcoStepStrictMode;
+  const contractUnitPrefix = isPressureSkeletonTurn
+    ? currentTurnType === "HCT"
+      ? "hct"
+      : "fcp"
+    : "hco";
+  const contractLabel = contractUnitPrefix.toUpperCase();
   const isHcoLeadInFromInbound =
     isHCOSkeletonTurn &&
     fromInbound &&
     (inboundLeadInSource === "BASELINE_INBOUND" || inboundLeadInSource === "SIDE_INBOUND");
   const hcoStepMovementContract = {
-    unit_id: "hco.step[n].movement",
+    unit_id: `${contractUnitPrefix}.step[n].movement`,
     execution_mode: "skeleton",
     advance_trigger: "required movers reach step-n targets",
     visual_settle_trigger: "required step-n tweens complete",
-    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+    failure_policy: stepStrictMode === "throw" ? "throw" : "warn",
   };
   const hcoStepPassContract = {
-    unit_id: "hco.step[n].pass",
+    unit_id: `${contractUnitPrefix}.step[n].pass`,
     execution_mode: "skeleton",
     advance_trigger: "pass received",
     visual_settle_trigger: "ball flight + receiver settle",
-    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+    failure_policy: stepStrictMode === "throw" ? "throw" : "warn",
   };
   const resolveHcoLeadInInboundStrictMode = () => {
     const scope = getDrebTelemetryScope();
@@ -2843,20 +3265,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     failure_policy: hcoLeadInInboundStrictMode === "throw" ? "throw" : "warn",
   };
   const hcoResolutionContract = {
-    unit_id: "hco.resolution",
+    unit_id: `${contractUnitPrefix}.resolution`,
     execution_mode: "dynamic_event",
     advance_trigger: "result committed",
     visual_settle_trigger: "resolution visuals settled",
-    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+    failure_policy: stepStrictMode === "throw" ? "throw" : "warn",
   };
   const hcoOutContract = {
-    unit_id: "hco.out.to_*",
+    unit_id: `${contractUnitPrefix}.out.to_*`,
     execution_mode: "dynamic_event",
     advance_trigger: "route committed",
     visual_settle_trigger: "boundary handoff settled",
-    failure_policy: hcoStepStrictMode === "throw" ? "throw" : "warn",
+    failure_policy: stepStrictMode === "throw" ? "throw" : "warn",
   };
   const resolutionResultType = String(turnData?.result_type || "").toUpperCase();
+  const skeletonContractResultTypes = new Set([
+    "MAKE",
+    "MISS",
+    "BLOCK",
+    "FOUL",
+    "STEAL",
+  ]);
+  const isStepContractTurn =
+    isContractSkeletonTurn && skeletonContractResultTypes.has(resolutionResultType);
   const turnStartMs = Date.now();
   const getTurnContractElapsedMs = () => {
     const raw = Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs);
@@ -3101,22 +3532,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         : declaredBudgetSeconds * 0.5;
     return Math.max(absSlack, ratioSlack);
   };
-  const isHcoResolutionTurn =
-    isHCOSkeletonTurn &&
-    ["MAKE", "MISS", "BLOCK", "FOUL", "CHARGE", "DEAD BALL", "TURNOVER"].includes(
-      resolutionResultType
-    );
+  const isResolutionContractTurn = isStepContractTurn;
   const hasCanonicalTurnBatchContext =
     Array.isArray(simData?.turns) && simData.turns.length > 0;
   const isSyntheticPutbackExecution =
     String(turnData?.shot_type || "").toLowerCase() === "putback";
   const shouldValidateHcoOut =
-    isHcoResolutionTurn &&
+    isResolutionContractTurn &&
     hasCanonicalTurnBatchContext &&
     !isSyntheticPutbackExecution;
   let hcoResolutionValidated = false;
   const validateHcoResolution = (context = {}) => {
-    if (!isHcoResolutionTurn || hcoStepStrictMode === "off" || hcoResolutionValidated) return;
+    if (!isResolutionContractTurn || stepStrictMode === "off" || hcoResolutionValidated) return;
     const currentOwnerId = getCurrentOwner(scene);
     const pendingOwnerId = getPendingOwner(scene);
     const hasCurrentOwner = currentOwnerId != null && String(currentOwnerId).length > 0;
@@ -3175,25 +3602,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (ownerMissing) {
       emitHcoStepTelemetry("hco_resolution_owner_missing", resolutionContext);
       throw new Error(
-        `[HCO resolution contract] missing owner at resolution (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
+        `[${contractLabel} resolution contract] missing owner at resolution (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
       );
     }
     if (ownerInvalid) {
       emitHcoStepTelemetry("hco_resolution_owner_invalid", resolutionContext);
       throw new Error(
-        `[HCO resolution contract] invalid owner reference at resolution (result=${resolutionResultType}, owner=${currentOwnerId ?? "null"}, pending=${pendingOwnerId ?? "null"})`
+        `[${contractLabel} resolution contract] invalid owner reference at resolution (result=${resolutionResultType}, owner=${currentOwnerId ?? "null"}, pending=${pendingOwnerId ?? "null"})`
       );
     }
     if (passInFlightAtResolution) {
       emitHcoStepTelemetry("hco_resolution_pass_in_flight", resolutionContext);
       throw new Error(
-        `[HCO resolution contract] pass still in flight at resolution (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
+        `[${contractLabel} resolution contract] pass still in flight at resolution (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
       );
     }
     if (hardFailThresholdSeconds != null && elapsedGameSeconds > hardFailThresholdSeconds) {
       emitHcoStepTelemetry("hco_resolution_clock_overrun", resolutionContext);
       throw new Error(
-        `[HCO resolution contract] clock overrun (result=${resolutionResultType}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+        `[${contractLabel} resolution contract] clock overrun (result=${resolutionResultType}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
       );
     }
     if (declaredTurnBudgetSeconds != null && elapsedGameSeconds > declaredTurnBudgetSeconds) {
@@ -3267,25 +3694,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (routeMissing) {
       emitHcoStepTelemetry("hco_out_route_missing", outContext);
       throw new Error(
-        `[HCO out contract] missing committed route (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
+        `[${contractLabel} out contract] missing committed route (result=${resolutionResultType}, turn=${turnData?.turn_count ?? "?"})`
       );
     }
     if (ownerMissing) {
       emitHcoStepTelemetry("hco_out_owner_missing", outContext);
       throw new Error(
-        `[HCO out contract] missing owner for live-ball handoff (route=${route}, turn=${turnData?.turn_count ?? "?"})`
+        `[${contractLabel} out contract] missing owner for live-ball handoff (route=${route}, turn=${turnData?.turn_count ?? "?"})`
       );
     }
     if (ownerInvalid) {
       emitHcoStepTelemetry("hco_out_owner_invalid", outContext);
       throw new Error(
-        `[HCO out contract] invalid owner reference at handoff (route=${route}, owner=${currentOwnerId ?? "null"}, pending=${pendingOwnerId ?? "null"})`
+        `[${contractLabel} out contract] invalid owner reference at handoff (route=${route}, owner=${currentOwnerId ?? "null"}, pending=${pendingOwnerId ?? "null"})`
       );
     }
     if (hardFailThresholdSeconds != null && elapsedGameSeconds > hardFailThresholdSeconds) {
       emitHcoStepTelemetry("hco_out_clock_overrun", outContext);
       throw new Error(
-        `[HCO out contract] clock overrun (route=${route || "quarter_end"}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+        `[${contractLabel} out contract] clock overrun (route=${route || "quarter_end"}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
       );
     }
     if (declaredTurnBudgetSeconds != null && elapsedGameSeconds > declaredTurnBudgetSeconds) {
@@ -3643,8 +4070,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       requiredMoverIdsForGate = [];
     }
 
-    if (isHCOSkeletonTurn && hcoStepStrictMode !== "off") {
-      const tolerancePx = getHcoStepTolerancePx();
+    if (isStepContractTurn && stepStrictMode !== "off") {
+      const tolerancePx = isPressureSkeletonTurn
+        ? getPressureStepTolerancePx()
+        : getHcoStepTolerancePx();
       let maxRequiredMoverDeltaPx = 0;
       const requiredMoverDeltaRows = [];
       for (const moverId of requiredMoverIdsForGate) {
@@ -3669,10 +4098,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const stepBudgetGameSeconds =
         Number.isFinite(stepBudgetSecondsRaw) && stepBudgetSecondsRaw > 0
           ? stepBudgetSecondsRaw
+          : isPressureSkeletonTurn
+          ? getPressureStepFallbackBudgetGameSeconds()
           : getHcoStepFallbackBudgetGameSeconds();
       const elapsedMs = Date.now() - stepStartMs;
       const elapsedGameSeconds = elapsedMs / clockSecondMs;
-      const jitterSlackSeconds = getHcoStepClockJitterSlackSeconds(stepBudgetGameSeconds);
+      const jitterSlackSeconds = isPressureSkeletonTurn
+        ? getPressureStepClockJitterSlackSeconds(stepBudgetGameSeconds)
+        : getHcoStepClockJitterSlackSeconds(stepBudgetGameSeconds);
       const hardFailThresholdSeconds = stepBudgetGameSeconds + jitterSlackSeconds;
       const budgetOverrunSeconds = elapsedGameSeconds - stepBudgetGameSeconds;
       const observed = {
@@ -3681,6 +4114,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         shotTerminated: false,
       };
       const context = {
+        contractFamily: contractUnitPrefix,
         stepIndex,
         hasPassAtStep: Boolean(passInfo),
         requiredOffensiveMoverCount,
@@ -3705,7 +4139,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           requiredMoverDeltaRows,
         });
         throw new Error(
-          `[HCO step contract] tolerance breach (step=${stepIndex}, maxDeltaPx=${maxRequiredMoverDeltaPx.toFixed(2)}, tolerancePx=${tolerancePx})`
+          `[${contractLabel} step contract] tolerance breach (step=${stepIndex}, maxDeltaPx=${maxRequiredMoverDeltaPx.toFixed(2)}, tolerancePx=${tolerancePx})`
         );
       }
       if (elapsedGameSeconds > stepBudgetGameSeconds) {
@@ -3721,7 +4155,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           requiredMoverDeltaRows,
         });
         throw new Error(
-          `[HCO step contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+          `[${contractLabel} step contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
         );
       }
       enforceUnitCompletionContract({
@@ -3747,19 +4181,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         playerSprites,
       });
       await passPromise;
-      if (isHCOSkeletonTurn && hcoStepStrictMode !== "off") {
+      if (isStepContractTurn && stepStrictMode !== "off") {
         const receiverId = String(passInfo?.receiverId ?? "");
         const receiverSprite = receiverId ? playerSprites?.[receiverId] : null;
         const receiverTarget = receiverId
           ? requiredOffensiveMoverTargetPx.get(receiverId)
           : null;
-        const tolerancePx = getHcoStepTolerancePx();
+        const tolerancePx = isPressureSkeletonTurn
+          ? getPressureStepTolerancePx()
+          : getHcoStepTolerancePx();
         const stepBudgetSecondsRaw = Number(stepClockSeconds?.[stepIndex]);
         const stepBudgetGameSeconds =
           Number.isFinite(stepBudgetSecondsRaw) && stepBudgetSecondsRaw > 0
             ? stepBudgetSecondsRaw
+            : isPressureSkeletonTurn
+            ? getPressureStepFallbackBudgetGameSeconds()
             : getHcoStepFallbackBudgetGameSeconds();
-        const jitterSlackSeconds = getHcoStepPassClockJitterSlackSeconds(stepBudgetGameSeconds);
+        const jitterSlackSeconds = isPressureSkeletonTurn
+          ? getPressureStepPassClockJitterSlackSeconds(stepBudgetGameSeconds)
+          : getHcoStepPassClockJitterSlackSeconds(stepBudgetGameSeconds);
         const hardFailThresholdSeconds = stepBudgetGameSeconds + jitterSlackSeconds;
         const stepElapsedMs = Date.now() - stepStartMs;
         const stepElapsedGameSeconds = stepElapsedMs / clockSecondMs;
@@ -3785,6 +4225,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           (String(ownerAtEnd ?? "") === receiverId ||
             String(pendingOwnerAtEnd ?? "") === receiverId);
         const passContext = {
+          contractFamily: contractUnitPrefix,
           stepIndex,
           passStep: true,
           passerId: passInfo?.passerId ?? null,
@@ -3806,19 +4247,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         if (!receiverSprite || !receiverTarget) {
           emitHcoStepTelemetry("hco_step_pass_missing_receiver_target", passContext);
           throw new Error(
-            `[HCO step pass contract] missing receiver settle target (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"})`
+            `[${contractLabel} step pass contract] missing receiver settle target (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"})`
           );
         }
         if (!receiverSettled) {
           emitHcoStepTelemetry("hco_step_pass_receiver_settle_breach", passContext);
           throw new Error(
-            `[HCO step pass contract] receiver settle breach (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"}, deltaPx=${receiverDeltaPx.toFixed(2)}, tolerancePx=${tolerancePx})`
+            `[${contractLabel} step pass contract] receiver settle breach (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"}, deltaPx=${receiverDeltaPx.toFixed(2)}, tolerancePx=${tolerancePx})`
           );
         }
         if (!ownerMatchesReceiver) {
           emitHcoStepTelemetry("hco_step_pass_owner_mismatch", passContext);
           throw new Error(
-            `[HCO step pass contract] owner mismatch at pass end (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"}, owner=${ownerAtEnd ?? "null"}, pendingOwner=${pendingOwnerAtEnd ?? "null"})`
+            `[${contractLabel} step pass contract] owner mismatch at pass end (step=${stepIndex}, receiverId=${passInfo?.receiverId ?? "?"}, owner=${ownerAtEnd ?? "null"}, pendingOwner=${pendingOwnerAtEnd ?? "null"})`
           );
         }
         if (stepElapsedGameSeconds > stepBudgetGameSeconds) {
@@ -3827,7 +4268,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         if (stepElapsedGameSeconds > hardFailThresholdSeconds) {
           emitHcoStepTelemetry("hco_step_pass_clock_overrun", passContext);
           throw new Error(
-            `[HCO step pass contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${stepElapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
+            `[${contractLabel} step pass contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${stepElapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`
           );
         }
         enforceUnitCompletionContract({

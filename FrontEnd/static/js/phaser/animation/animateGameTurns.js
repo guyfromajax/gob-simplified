@@ -15,6 +15,7 @@ import { animateStep } from "./animateStep.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
+import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 // ✅ PHASE 2.6 COMPLETE: These are now handled by AnimationRouter via turnPreparation.js
 // import { updatePlaycallDisplay } from "../utils/playcallDisplay.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 // import { updateStrategyBars } from "../utils/strategyBars.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
@@ -49,6 +50,104 @@ const NON_STANDARD_RESULTS = new Set([
   "OPENING_TIP",
 ]);
 
+function resolveOrebContractMode() {
+  const raw = String(
+    (typeof window !== "undefined" ? window.UESS_OREB_CONTRACT_MODE : null) ?? "observe"
+  )
+    .trim()
+    .toLowerCase();
+  if (raw === "off" || raw === "observe" || raw === "warn" || raw === "throw") return raw;
+  return "observe";
+}
+
+function getOrebBudgetGameSeconds(kind = "decision") {
+  const scope = typeof window !== "undefined" ? window : globalThis;
+  const generic =
+    kind === "decision"
+      ? Number(scope?.UESS_OREB_DECISION_MAX_GAME_SECONDS)
+      : Number(scope?.UESS_OREB_ACTION_MAX_GAME_SECONDS);
+  if (Number.isFinite(generic) && generic > 0) return generic;
+  return kind === "decision" ? 2 : 3;
+}
+
+function emitOrebContractTelemetry(scene, turnData, event, payload = {}) {
+  scene?.events?.emit?.("animTelemetry", {
+    event,
+    branchKind: "oreb_phase_contract",
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    turnIndex: scene?.currentTurn ?? null,
+    resultType: turnData?.result_type ?? null,
+    gameClock: scene?.simData?.clock ?? null,
+    quarter: turnData?.quarter ?? scene?.quarter ?? null,
+    timestampMs: Date.now(),
+    ...payload,
+  });
+}
+
+function enforceOrebUnitContract({
+  scene,
+  turnData,
+  unitId,
+  advanceTrigger,
+  visualSettleTrigger,
+  authorizingEventReceived,
+  visualSettled,
+  unitStartMs,
+  maxWaitGameSeconds,
+  context = {},
+}) {
+  const mode = resolveOrebContractMode();
+  if (mode === "off") return;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+  const elapsedGameSeconds = elapsedMs / clockSecondMs;
+  const overrun =
+    Number.isFinite(maxWaitGameSeconds) &&
+    maxWaitGameSeconds > 0 &&
+    elapsedGameSeconds > maxWaitGameSeconds;
+  const contractContext = {
+    elapsedMs,
+    elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+    maxWaitGameSeconds,
+    overrun,
+    ...context,
+  };
+  if (overrun) {
+    emitOrebContractTelemetry(scene, turnData, "oreb_phase_clock_overrun", {
+      unitId,
+      ...contractContext,
+    });
+  }
+  const logger =
+    mode === "observe"
+      ? {
+          warn: () => {},
+        }
+      : console;
+  enforceUnitCompletionContract({
+    contract: {
+      unit_id: unitId,
+      execution_mode: "dynamic_event",
+      advance_trigger: advanceTrigger,
+      visual_settle_trigger: visualSettleTrigger,
+      failure_policy: mode === "throw" ? "throw" : "warn",
+    },
+    observed: {
+      authorizingEventReceived: authorizingEventReceived === true,
+      visualSettled: visualSettled === true && !overrun,
+    },
+    context: contractContext,
+    emitTelemetry: (event, payload = {}) =>
+      emitOrebContractTelemetry(scene, turnData, event, payload),
+    logger,
+  });
+  if (mode === "throw" && overrun) {
+    throw new Error(
+      `[OREB contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+    );
+  }
+}
+
 // PossessionRunner removed - using standard animation path only
 
 /**
@@ -72,6 +171,23 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
   
   
   if (!rebounderSprite) return;
+
+  const leadInStartMs = Date.now();
+  enforceOrebUnitContract({
+    scene,
+    turnData,
+    unitId: "oreb.lead_in.from_miss",
+    advanceTrigger: "OREB committed",
+    visualSettleTrigger: "rebound secure + attach settled",
+    authorizingEventReceived: true,
+    visualSettled: true,
+    unitStartMs: leadInStartMs,
+    maxWaitGameSeconds: getOrebBudgetGameSeconds("decision"),
+    context: {
+      resultType: turnData?.result_type ?? null,
+      rebounderId,
+    },
+  });
   
   if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
     // Animate putback attempt using shootBall
@@ -145,11 +261,28 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     }
 
     // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
-    const orebHoldSeconds = turnData.oreb_hold_seconds;
-    if (typeof orebHoldSeconds === 'number' && orebHoldSeconds > 0 && scene.time) {
+    const holdStartMs = Date.now();
+    const orebHoldSeconds = Number(turnData.oreb_hold_seconds);
+    const hasHoldWindow = Number.isFinite(orebHoldSeconds) && orebHoldSeconds > 0;
+    if (hasHoldWindow && scene.time) {
       const holdMs = orebHoldSeconds * 350;
       await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
     }
+    enforceOrebUnitContract({
+      scene,
+      turnData,
+      unitId: "oreb.phase.hold",
+      advanceTrigger: "hold boundary reached",
+      visualSettleTrigger: "no active attach/tween conflicts",
+      authorizingEventReceived: true,
+      visualSettled: scene?.passInFlight !== true,
+      unitStartMs: holdStartMs,
+      maxWaitGameSeconds: getOrebBudgetGameSeconds("decision"),
+      context: {
+        holdSeconds: hasHoldWindow ? orebHoldSeconds : 0,
+        holdApplied: hasHoldWindow && !!scene?.time,
+      },
+    });
 
     const shotResult = await shootBall({
       scene,
@@ -247,6 +380,22 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         preserveBallPosition: true, // Ball is already at bounce spot from shootBall - don't reposition
         turnData: turnData // Pass turnData so get-back players can be excluded
       });
+
+      enforceOrebUnitContract({
+        scene,
+        turnData,
+        unitId: "oreb.phase.putback_rebound_resolution",
+        advanceTrigger: "rebound outcome committed",
+        visualSettleTrigger: "rebound settle complete",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: getOrebBudgetGameSeconds("action"),
+        context: {
+          reboundType: turnData?.rebound_type ?? null,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
       
       
       // If DREB, set up next play (outlet pass for HCO only)
@@ -293,6 +442,22 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       }
       // If another OREB, it will be handled by the next OREB turn
     }
+    const outRoute = String(turnData?.next_play_type || "").toUpperCase();
+    enforceOrebUnitContract({
+      scene,
+      turnData,
+      unitId: "oreb.out.to_*",
+      advanceTrigger: "route committed",
+      visualSettleTrigger: "OREB final settle complete",
+      authorizingEventReceived: outRoute.length > 0,
+      visualSettled: true,
+      unitStartMs: Date.now(),
+      maxWaitGameSeconds: getOrebBudgetGameSeconds("action"),
+      context: {
+        route: outRoute || null,
+        sourceResultType: turnData?.result_type ?? null,
+      },
+    });
   } else if (turnData.result_type === "OREB_KICKOUT") {
     // Handle kickout with outlet animation step
     await handleOrebKickout(scene, {
@@ -300,6 +465,22 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       ballSprite,
       rebounderId,
       turnData
+    });
+    const outRoute = String(turnData?.next_play_type || "").toUpperCase();
+    enforceOrebUnitContract({
+      scene,
+      turnData,
+      unitId: "oreb.out.to_*",
+      advanceTrigger: "route committed",
+      visualSettleTrigger: "OREB final settle complete",
+      authorizingEventReceived: outRoute.length > 0,
+      visualSettled: true,
+      unitStartMs: Date.now(),
+      maxWaitGameSeconds: getOrebBudgetGameSeconds("action"),
+      context: {
+        route: outRoute || null,
+        sourceResultType: turnData?.result_type ?? null,
+      },
     });
   }
 }
@@ -321,11 +502,29 @@ async function handleOrebKickout(scene, { playerSprites, ballSprite, rebounderId
   }
 
   // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
-  const orebHoldSeconds = turnData.oreb_hold_seconds;
-  if (typeof orebHoldSeconds === 'number' && orebHoldSeconds > 0 && scene.time) {
+  const holdStartMs = Date.now();
+  const orebHoldSeconds = Number(turnData.oreb_hold_seconds);
+  const hasHoldWindow = Number.isFinite(orebHoldSeconds) && orebHoldSeconds > 0;
+  if (hasHoldWindow && scene.time) {
     const holdMs = orebHoldSeconds * 350;
     await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
   }
+  enforceOrebUnitContract({
+    scene,
+    turnData,
+    unitId: "oreb.phase.hold",
+    advanceTrigger: "hold boundary reached",
+    visualSettleTrigger: "no active attach/tween conflicts",
+    authorizingEventReceived: true,
+    visualSettled: scene?.passInFlight !== true,
+    unitStartMs: holdStartMs,
+    maxWaitGameSeconds: getOrebBudgetGameSeconds("decision"),
+    context: {
+      holdSeconds: hasHoldWindow ? orebHoldSeconds : 0,
+      holdApplied: hasHoldWindow && !!scene?.time,
+      branch: "oreb_kickout",
+    },
+  });
 
   // Step 1: Run outlet positioning animation (PG and rebounder move to outlet spots)
   await runOffensiveReboundKickoutSetup({

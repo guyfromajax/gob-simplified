@@ -29,6 +29,7 @@ try:
     from fastapi import Request
     from BackEnd.constants import POSITION_LIST
     import uuid
+    import math
     from BackEnd.main import run_simulation, simulate_quarter
     from BackEnd.models.game_manager import GameManager
     # ✅ PERFORMANCE: Removed debug print statements
@@ -429,6 +430,12 @@ try:
         defense_override: str | None = None  # e.g., "Zone", "Man"
         # Optional UESS clock authority override for this request/session
         uess_clock_authority_mode: str | None = None  # "observe" | "warn" | "throw" | "off"
+        # Optional UESS elapsed authority override for this request/session
+        uess_clock_elapsed_authority: str | None = None  # "legacy" | "ledger"
+        # Optional UESS ownership contract mode override for this request/session
+        uess_ownership_contract_mode: str | None = None  # "off" | "observe" | "warn"
+        # Optional UESS reconciliation tolerance override for this request/session
+        uess_clock_recon_tolerance_seconds: float | None = None
     
     
     class CallTimeoutRequest(BaseModel):
@@ -4090,6 +4097,42 @@ try:
                     "⚠️ Invalid uess_clock_authority_mode ignored: %s",
                     body.uess_clock_authority_mode,
                 )
+
+        if body.uess_clock_elapsed_authority:
+            raw_elapsed_authority = str(body.uess_clock_elapsed_authority).strip().lower()
+            if raw_elapsed_authority in {"legacy", "ledger"}:
+                gm.game_state["uess_clock_elapsed_authority"] = raw_elapsed_authority
+                logging.info("⏱️ UESS clock elapsed authority override: %s", raw_elapsed_authority)
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_clock_elapsed_authority ignored: %s",
+                    body.uess_clock_elapsed_authority,
+                )
+
+        if body.uess_ownership_contract_mode:
+            raw_ownership_mode = str(body.uess_ownership_contract_mode).strip().lower()
+            if raw_ownership_mode in {"off", "observe", "warn"}:
+                gm.game_state["uess_ownership_contract_mode"] = raw_ownership_mode
+                logging.info("⏱️ UESS ownership contract mode override: %s", raw_ownership_mode)
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_ownership_contract_mode ignored: %s",
+                    body.uess_ownership_contract_mode,
+                )
+
+        if body.uess_clock_recon_tolerance_seconds is not None:
+            try:
+                tol = float(body.uess_clock_recon_tolerance_seconds)
+            except (TypeError, ValueError):
+                tol = None
+            if tol is not None and math.isfinite(tol) and tol >= 0:
+                gm.game_state["uess_clock_recon_tolerance_seconds"] = tol
+                logging.info("⏱️ UESS clock recon tolerance override: %.3f", tol)
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_clock_recon_tolerance_seconds ignored: %s",
+                    body.uess_clock_recon_tolerance_seconds,
+                )
         
         pending_terminal_ft = _has_pending_terminal_free_throw(gm)
 
@@ -4315,10 +4358,36 @@ try:
             else:
                 # Multiple turns created (e.g., HCO miss → OREB turn)
                 # Return them as a batch for the frontend to animate sequentially
+                first_turn = new_turns[0] if new_turns and isinstance(new_turns[0], dict) else {}
+                first_ownership_contract = (
+                    first_turn.get("uess_ownership_contract")
+                    if isinstance(first_turn.get("uess_ownership_contract"), dict)
+                    else None
+                )
+                first_ownership_mode = (
+                    first_turn.get("uess_ownership_contract_mode")
+                    or (first_ownership_contract.get("mode") if isinstance(first_ownership_contract, dict) else None)
+                )
                 latest_turn = {
                     "result_type": "BATCH",
                     "batch_turns": new_turns,
-                    "text": " → ".join(t.get("text", "") for t in new_turns)
+                    "text": " → ".join(t.get("text", "") for t in new_turns),
+                    # Mirror first sub-turn contract at wrapper level for shape completeness.
+                    "clock_start": first_turn.get("clock_start"),
+                    "clock_end": first_turn.get("clock_end"),
+                    "shot_clock_start": first_turn.get("shot_clock_start"),
+                    "shot_clock_end": first_turn.get("shot_clock_end"),
+                    "real_time_elapsed_ms": first_turn.get("real_time_elapsed_ms"),
+                    "clock_event_ledger": first_turn.get("clock_event_ledger"),
+                    "uess_clock_authority_mode": first_turn.get("uess_clock_authority_mode"),
+                    "uess_clock_elapsed_authority": first_turn.get("uess_clock_elapsed_authority"),
+                    "uess_clock_elapsed_game_seconds": first_turn.get("uess_clock_elapsed_game_seconds"),
+                    "uess_clock_elapsed_legacy_game_seconds": first_turn.get("uess_clock_elapsed_legacy_game_seconds"),
+                    "uess_clock_elapsed_delta_seconds": first_turn.get("uess_clock_elapsed_delta_seconds"),
+                    "uess_clock_elapsed_observe_within_tolerance": first_turn.get("uess_clock_elapsed_observe_within_tolerance"),
+                    "uess_clock_reconciliation": first_turn.get("uess_clock_reconciliation"),
+                    "uess_ownership_contract_mode": first_ownership_mode,
+                    "uess_ownership_contract": first_ownership_contract,
                 }
             
             # ✅ FOUL_OUT RESUME: Persist timeout state via same path as user/computer timeout so return-to-court finds it

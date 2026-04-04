@@ -12,6 +12,7 @@ import { pauseTweensOfPlayerSprites } from "../utils/playerSpriteTweenPause.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
+import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
 import {
   REBOUNDER_X_MIN,
@@ -216,6 +217,90 @@ function emitFbTelemetry(scene, event, payload = {}) {
   scene.events?.emit?.("animTelemetry", row);
   if (isAnimationDebugEnabled()) {
     animationDebugLog("FB telemetry", row);
+  }
+}
+
+function resolveFbUnitContractMode() {
+  const scope = getFbContractGlobalScope();
+  const raw = String(scope?.UESS_FB_CONTRACT_MODE ?? "observe")
+    .trim()
+    .toLowerCase();
+  if (raw === "off" || raw === "observe" || raw === "warn" || raw === "throw") return raw;
+  return "observe";
+}
+
+function getFbUnitBudgetGameSeconds(kind = "phase") {
+  const scope = getFbContractGlobalScope();
+  const rawLeadIn = Number(scope?.UESS_FB_LEAD_IN_MAX_GAME_SECONDS);
+  const rawPhase = Number(scope?.UESS_FB_PHASE_MAX_GAME_SECONDS);
+  const rawOut = Number(scope?.UESS_FB_OUT_MAX_GAME_SECONDS);
+  if (kind === "lead_in" && Number.isFinite(rawLeadIn) && rawLeadIn > 0) return rawLeadIn;
+  if (kind === "out" && Number.isFinite(rawOut) && rawOut > 0) return rawOut;
+  if (Number.isFinite(rawPhase) && rawPhase > 0) return rawPhase;
+  if (kind === "lead_in") return 4;
+  if (kind === "out") return 2;
+  return 6;
+}
+
+function enforceFbUnitContract({
+  scene,
+  turnData,
+  unitId,
+  advanceTrigger,
+  visualSettleTrigger,
+  authorizingEventReceived,
+  visualSettled,
+  unitStartMs,
+  budgetKind = "phase",
+  context = {},
+}) {
+  const mode = resolveFbUnitContractMode();
+  if (mode === "off") return;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+  const elapsedGameSeconds = elapsedMs / clockSecondMs;
+  const maxWaitGameSeconds = getFbUnitBudgetGameSeconds(budgetKind);
+  const overrun =
+    Number.isFinite(maxWaitGameSeconds) &&
+    maxWaitGameSeconds > 0 &&
+    elapsedGameSeconds > maxWaitGameSeconds;
+  const contractContext = {
+    unitId,
+    elapsedMs,
+    elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+    maxWaitGameSeconds,
+    overrun,
+    ...context,
+  };
+  if (overrun) {
+    emitFbTelemetry(scene, "fb_phase_clock_overrun", contractContext);
+  }
+  const logger =
+    mode === "observe"
+      ? {
+          warn: () => {},
+        }
+      : console;
+  enforceUnitCompletionContract({
+    contract: {
+      unit_id: unitId,
+      execution_mode: "dynamic_event",
+      advance_trigger: advanceTrigger,
+      visual_settle_trigger: visualSettleTrigger,
+      failure_policy: mode === "throw" ? "throw" : "warn",
+    },
+    observed: {
+      authorizingEventReceived: authorizingEventReceived === true,
+      visualSettled: visualSettled === true && !overrun,
+    },
+    context: contractContext,
+    emitTelemetry: (event, payload = {}) => emitFbTelemetry(scene, event, payload),
+    logger,
+  });
+  if (mode === "throw" && overrun) {
+    throw new Error(
+      `[FB contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+    );
   }
 }
 
@@ -1191,6 +1276,8 @@ export async function runFastBreakSequence({
   const hasRimRunnerBurst = Boolean(turnData.roles?.rim_runner_burst_phase);
   const hasStandardOutlet =
     turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver;
+  let leadInUnit = null;
+  const leadInStartMs = Date.now();
 
   // ✅ Check current state before transitioning - avoid invalid transitions
   // For defensive stops after HCO, we're already in HalfCourt, so transition to FastBreak directly
@@ -1216,11 +1303,39 @@ export async function runFastBreakSequence({
   // ============================================================================
   if (hasRimRunnerBurst) {
     await animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height);
+    leadInUnit = turnData.roles?.is_steal_entry
+      ? "fb.lead_in.from_hco_steal"
+      : "fb.lead_in.from_dreb_release";
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: "fb.phase.entry_burst",
+      advanceTrigger: "required movers reach burst targets",
+      visualSettleTrigger: "burst tweens settled",
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      budgetKind: "phase",
+      context: { phase: "entry_burst" },
+    });
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
   } else if (hasStandardOutlet) {
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
+    leadInUnit = "fb.lead_in.from_dreb_release";
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: "fb.phase.outlet",
+      advanceTrigger: "outlet pass received",
+      visualSettleTrigger: "passer/receiver movement + pass settled",
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      budgetKind: "phase",
+      context: { phase: "outlet" },
+    });
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
@@ -1230,11 +1345,26 @@ export async function runFastBreakSequence({
     // ============================================================================
     // Check is_steal_entry flag OR if there's no outlet pass (steal-initiated)
     await animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height);
+    leadInUnit = "fb.lead_in.from_hco_steal";
     
     // Transition to FastBreak state after steal entry
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
+  }
+  if (leadInUnit) {
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: leadInUnit,
+      advanceTrigger: "FB route committed + entry owner resolved",
+      visualSettleTrigger: "entry handoff visuals settled",
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      budgetKind: "lead_in",
+      context: { phase: "lead_in", leadInUnit },
+    });
   }
   
   if (scene.skipToEnd) {
@@ -1255,6 +1385,7 @@ export async function runFastBreakSequence({
   initFbTelemetryContext(scene, { turnData, turnIndex, branchKind });
 
   try {
+    const resolutionStartMs = Date.now();
     if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
       await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
     }
@@ -1265,8 +1396,32 @@ export async function runFastBreakSequence({
       } else {
         await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
       }
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.shot_attempt",
+        advanceTrigger: "shot release/result committed",
+        visualSettleTrigger: "shot visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
     } else if (phase2Kind === "fast_break_shot_foul") {
       await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.shot_attempt",
+        advanceTrigger: "shot release/result committed",
+        visualSettleTrigger: "shot visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
     } else if (phase2Kind === "rim_runner_steal") {
       await animateRimRunnerInterception(
         scene,
@@ -1276,8 +1431,32 @@ export async function runFastBreakSequence({
         width,
         height
       );
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "stop result committed",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
     } else if (phase2Kind === "rim_runner_bat_oob") {
       await animateRimRunnerBatOob(scene, turnData, playerSprites, ballSprite, width, height);
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "stop result committed",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
     } else if (phase2Kind === "rim_runner_hco_settle") {
       if (!turnData.rim_runner_outlet_failed) {
         await animateRimRunnerHoldUpLeadIn(
@@ -1294,8 +1473,50 @@ export async function runFastBreakSequence({
       } else {
         await finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites);
       }
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "stop result committed",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
     } else {
       await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "stop result committed",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    }
+    if (
+      (phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul") &&
+      (String(turnData?.result_type || "").toUpperCase() === "MISS" ||
+        String(turnData?.result_type || "").toUpperCase() === "BLOCK")
+    ) {
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.rebound_resolution",
+        advanceTrigger: "rebound outcome committed",
+        visualSettleTrigger: "rebound attach + settle complete",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind, reboundType: turnData?.rebound_type ?? null },
+      });
     }
     
     if (scene.skipToEnd) {
@@ -1305,6 +1526,20 @@ export async function runFastBreakSequence({
     // ============================================================================
     // PHASE 3: CLEANUP & STATE TRANSITIONS
     // ============================================================================
+    const outStartMs = Date.now();
+    const route = String(turnData?.next_play_type || turnData?.next_turn || "").toUpperCase();
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: "fb.out.to_*",
+      advanceTrigger: "route committed",
+      visualSettleTrigger: "final FB settle complete",
+      authorizingEventReceived: !!route || turnData?.quarter_ends_after === true,
+      visualSettled: true,
+      unitStartMs: outStartMs,
+      budgetKind: "out",
+      context: { route: route || null, quarterEndsAfter: turnData?.quarter_ends_after === true },
+    });
     scene.events?.emit("fb:end");
   } finally {
     finalizeFbTelemetry(scene);

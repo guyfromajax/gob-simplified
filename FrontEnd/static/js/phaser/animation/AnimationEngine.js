@@ -17,6 +17,7 @@ import ReboundAnimationSystem from './ReboundAnimationSystem.js';
 import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 import HCOAnimationSystem from './HCOAnimationSystem.js';
+import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import gameStore from '../../state/gameStore.js';
 import { ensureConsistentHeartbeat, stopAllArrivalHeartbeats } from './arrivalHeartbeat.js';
 
@@ -38,6 +39,200 @@ export class AnimationEngine {
     
     // Initialize default handlers
     this.initializeDefaultHandlers();
+  }
+
+  resolveTimeoutContractMode() {
+    const raw = String(
+      (typeof window !== 'undefined' ? window.UESS_TIMEOUT_CONTRACT_MODE : null) ?? 'warn'
+    )
+      .trim()
+      .toLowerCase();
+    if (raw === 'off' || raw === 'observe' || raw === 'warn' || raw === 'throw') return raw;
+    return 'warn';
+  }
+
+  getTimeoutBudgetGameSeconds(kind = 'pause') {
+    const scope = typeof window !== 'undefined' ? window : globalThis;
+    const raw =
+      kind === 'pause'
+        ? Number(scope?.UESS_TIMEOUT_PAUSE_BARRIER_MAX_GAME_SECONDS)
+        : Number(scope?.UESS_TIMEOUT_RESUME_PREP_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return kind === 'pause' ? 1 : 6;
+  }
+
+  emitTimeoutContractTelemetry(turnData, event, payload = {}) {
+    this.scene?.events?.emit?.('animTelemetry', {
+      event,
+      branchKind: 'timeout_phase_contract',
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  }
+
+  enforceTimeoutUnitContract({
+    turnData,
+    unitId,
+    advanceTrigger,
+    visualSettleTrigger,
+    authorizingEventReceived,
+    visualSettled,
+    unitStartMs,
+    maxWaitGameSeconds,
+    context = {},
+  }) {
+    const mode = this.resolveTimeoutContractMode();
+    if (mode === 'off') return;
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 350;
+    const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const overrun =
+      Number.isFinite(maxWaitGameSeconds) &&
+      maxWaitGameSeconds > 0 &&
+      elapsedGameSeconds > maxWaitGameSeconds;
+    const contractContext = {
+      elapsedMs,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      maxWaitGameSeconds,
+      overrun,
+      ...context,
+    };
+    if (overrun) {
+      this.emitTimeoutContractTelemetry(turnData, 'timeout_phase_clock_overrun', {
+        unitId,
+        ...contractContext,
+      });
+    }
+    const logger =
+      mode === 'observe'
+        ? {
+            warn: () => {},
+          }
+        : console;
+    enforceUnitCompletionContract({
+      contract: {
+        unit_id: unitId,
+        execution_mode: 'dynamic_event',
+        advance_trigger: advanceTrigger,
+        visual_settle_trigger: visualSettleTrigger,
+        failure_policy: mode === 'throw' ? 'throw' : 'warn',
+      },
+      observed: {
+        authorizingEventReceived: authorizingEventReceived === true,
+        visualSettled: visualSettled === true && !overrun,
+      },
+      context: contractContext,
+      emitTelemetry: (event, payload = {}) =>
+        this.emitTimeoutContractTelemetry(turnData, event, payload),
+      logger,
+    });
+    if (mode === 'throw' && overrun) {
+      throw new Error(
+        `[TIMEOUT contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+      );
+    }
+  }
+
+  resolveTipContractMode() {
+    const raw = String(
+      (typeof window !== 'undefined' ? window.UESS_TIP_CONTRACT_MODE : null) ?? 'observe'
+    )
+      .trim()
+      .toLowerCase();
+    if (raw === 'off' || raw === 'observe' || raw === 'warn' || raw === 'throw') return raw;
+    return 'observe';
+  }
+
+  getTipBudgetGameSeconds(kind = 'jump') {
+    const scope = typeof window !== 'undefined' ? window : globalThis;
+    const raw =
+      kind === 'jump'
+        ? Number(scope?.UESS_TIP_JUMP_MAX_GAME_SECONDS)
+        : Number(scope?.UESS_TIP_CONTROL_MAX_GAME_SECONDS);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+    return kind === 'jump' ? 2 : 2;
+  }
+
+  emitTipContractTelemetry(turnData, event, payload = {}) {
+    this.scene?.events?.emit?.('animTelemetry', {
+      event,
+      branchKind: 'tip_phase_contract',
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  }
+
+  enforceTipUnitContract({
+    turnData,
+    unitId,
+    advanceTrigger,
+    visualSettleTrigger,
+    authorizingEventReceived,
+    visualSettled,
+    unitStartMs,
+    maxWaitGameSeconds,
+    context = {},
+  }) {
+    const mode = this.resolveTipContractMode();
+    if (mode === 'off') return;
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 350;
+    const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const overrun =
+      Number.isFinite(maxWaitGameSeconds) &&
+      maxWaitGameSeconds > 0 &&
+      elapsedGameSeconds > maxWaitGameSeconds;
+    const contractContext = {
+      elapsedMs,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      maxWaitGameSeconds,
+      overrun,
+      ...context,
+    };
+    if (overrun) {
+      this.emitTipContractTelemetry(turnData, 'tip_phase_clock_overrun', {
+        unitId,
+        ...contractContext,
+      });
+    }
+    const logger =
+      mode === 'observe'
+        ? {
+            warn: () => {},
+          }
+        : console;
+    enforceUnitCompletionContract({
+      contract: {
+        unit_id: unitId,
+        execution_mode: 'dynamic_event',
+        advance_trigger: advanceTrigger,
+        visual_settle_trigger: visualSettleTrigger,
+        failure_policy: mode === 'throw' ? 'throw' : 'warn',
+      },
+      observed: {
+        authorizingEventReceived: authorizingEventReceived === true,
+        visualSettled: visualSettled === true && !overrun,
+      },
+      context: contractContext,
+      emitTelemetry: (event, payload = {}) =>
+        this.emitTipContractTelemetry(turnData, event, payload),
+      logger,
+    });
+    if (mode === 'throw' && overrun) {
+      throw new Error(
+        `[TIP contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+      );
+    }
   }
 
   /**
@@ -471,6 +666,34 @@ export class AnimationEngine {
   }
 
   async handleTimeout(turnData, context) {
+    const timeoutStartMs = Date.now();
+    const enforceTimeoutOut = ({
+      route,
+      routeCommitted,
+      visualSettled = true,
+      contextExtra = {},
+    } = {}) => {
+      this.enforceTimeoutUnitContract({
+        turnData,
+        unitId: 'timeout.out.to_next',
+        advanceTrigger: 'pending route committed',
+        visualSettleTrigger: 'timeout exit settle complete',
+        authorizingEventReceived: routeCommitted === true,
+        visualSettled: visualSettled === true,
+        unitStartMs: timeoutStartMs,
+        maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('resume'),
+        context: {
+          timeoutReason: turnData?.timeout_reason ?? null,
+          route: route ?? null,
+          ...contextExtra,
+        },
+      });
+      if (this.resolveTimeoutContractMode() === 'throw' && routeCommitted !== true) {
+        throw new Error(
+          `[TIMEOUT contract] missing committed out route (reason=${turnData?.timeout_reason ?? "unknown"})`
+        );
+      }
+    };
     console.log('⏸️ AnimationEngine: Handling timeout', {
       timeout_reason: turnData.timeout_reason,
       foul_out_player: turnData.foul_out_player,
@@ -478,12 +701,32 @@ export class AnimationEngine {
     });
     
     // ✅ TIMEOUT: Pause all tweens immediately when timeout is called
+    let pauseBarrierSatisfied = true;
     if (this.scene.tweens) {
-      this.scene.tweens.pauseAll();
+      try {
+        this.scene.tweens.pauseAll();
+      } catch (_) {
+        pauseBarrierSatisfied = false;
+      }
       console.log('⏸️ AnimationEngine: Paused all tweens for timeout');
     }
     // ✅ TIMEOUT: Set a flag to stop the main animation loop
     this.scene.timeoutCalled = true;
+    this.enforceTimeoutUnitContract({
+      turnData,
+      unitId: 'timeout.phase.pause_barrier',
+      advanceTrigger: 'timeout state committed',
+      visualSettleTrigger: 'active tweens/flows paused to barrier',
+      authorizingEventReceived: true,
+      visualSettled: pauseBarrierSatisfied && this.scene.timeoutCalled === true,
+      unitStartMs: timeoutStartMs,
+      maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('pause'),
+      context: {
+        timeoutReason: turnData?.timeout_reason ?? null,
+        timeoutCalled: this.scene.timeoutCalled === true,
+        pauseBarrierSatisfied,
+      },
+    });
     
     // Append timeout text to text scroll
     if (turnData.text && this.scene.events) {
@@ -498,6 +741,25 @@ export class AnimationEngine {
     // 4. AnimationEngine.handleTimeout() is called for the timeout turn
     // 5. We skip navigation here because user timeout navigation is handled by the popup button click
     if (turnData.timeout_reason === 'USER') {
+      this.enforceTimeoutUnitContract({
+        turnData,
+        unitId: 'timeout.phase.resume_prepare',
+        advanceTrigger: 'resume route/context committed',
+        visualSettleTrigger: 'resume setup settled',
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: timeoutStartMs,
+        maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('resume'),
+        context: {
+          timeoutReason: 'USER',
+          route: 'user_popup_managed',
+        },
+      });
+      enforceTimeoutOut({
+        route: 'user_popup_managed',
+        routeCommitted: true,
+        contextExtra: { gameIdPresent: true },
+      });
       console.log('⏸️ USER TIMEOUT: Skipping navigation - already handled by timeoutButtonManager');
       return; // Don't navigate - showUserTimeoutPopup already handled it
     }
@@ -525,8 +787,10 @@ export class AnimationEngine {
         }
       }
       if (gameId) {
+        let foulOutPopupAttempted = false;
         try {
           const { showFoulOutPopup } = await import('../utils/foulOutPopup.js');
+          foulOutPopupAttempted = true;
           const responseData = turnData._responseData || {};
           const clock = responseData.clock || turnData.clock || this.scene.simData?.clock;
           const mode = this.scene.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
@@ -558,8 +822,49 @@ export class AnimationEngine {
         } catch (err) {
           console.error('❌ FOUL OUT: Failed to show foul-out popup:', err);
         }
+        this.enforceTimeoutUnitContract({
+          turnData,
+          unitId: 'timeout.phase.resume_prepare',
+          advanceTrigger: 'resume route/context committed',
+          visualSettleTrigger: 'resume setup settled',
+          authorizingEventReceived: foulOutPopupAttempted,
+          visualSettled: true,
+          unitStartMs: timeoutStartMs,
+          maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('resume'),
+          context: {
+            timeoutReason: 'FOUL_OUT',
+            route: 'foul_out_popup',
+            gameIdPresent: true,
+          },
+        });
+        enforceTimeoutOut({
+          route: 'foul_out_popup',
+          routeCommitted: true,
+          contextExtra: { gameIdPresent: true },
+        });
       } else {
         console.error('❌ FOUL OUT: Cannot show popup - game_id missing for navigation.');
+        this.enforceTimeoutUnitContract({
+          turnData,
+          unitId: 'timeout.phase.resume_prepare',
+          advanceTrigger: 'resume route/context committed',
+          visualSettleTrigger: 'resume setup settled',
+          authorizingEventReceived: false,
+          visualSettled: false,
+          unitStartMs: timeoutStartMs,
+          maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('resume'),
+          context: {
+            timeoutReason: 'FOUL_OUT',
+            route: 'foul_out_popup',
+            gameIdPresent: false,
+          },
+        });
+        enforceTimeoutOut({
+          route: 'foul_out_popup',
+          routeCommitted: false,
+          visualSettled: false,
+          contextExtra: { gameIdPresent: false },
+        });
       }
       return;
     }
@@ -568,8 +873,10 @@ export class AnimationEngine {
     const gameId = this.scene.gameId || this.scene.simData?.game_id;
     if (gameId) {
       // Import and call computer-timeout popup flow
+      let computerPopupAttempted = false;
       try {
         const { showComputerTimeoutPopup } = await import('../utils/timeoutButtonManager.js');
+        computerPopupAttempted = true;
         // ✅ UNIFIED: Extract clock/time_remaining from API response (same as user timeout)
         // The response from /api/simulate-turn includes clock and time_remaining
         // For computer timeouts, this is stored in turnData._responseData (set in gameScene.js)
@@ -609,12 +916,54 @@ export class AnimationEngine {
         // Fallback: Show alert and let user navigate manually
         alert(`${turnData.timeout_calling_team?.name || 'Team'} called a timeout. Please return to the game.`);
       }
+      this.enforceTimeoutUnitContract({
+        turnData,
+        unitId: 'timeout.phase.resume_prepare',
+        advanceTrigger: 'resume route/context committed',
+        visualSettleTrigger: 'resume setup settled',
+        authorizingEventReceived: computerPopupAttempted,
+        visualSettled: true,
+        unitStartMs: timeoutStartMs,
+        maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('resume'),
+        context: {
+          timeoutReason: turnData?.timeout_reason ?? 'COMPUTER',
+          route: 'computer_timeout_popup',
+          gameIdPresent: true,
+        },
+      });
+      enforceTimeoutOut({
+        route: 'computer_timeout_popup',
+        routeCommitted: true,
+        contextExtra: { gameIdPresent: true },
+      });
     } else {
       console.error('❌ COMPUTER TIMEOUT: Cannot determine game_id for navigation');
+      this.enforceTimeoutUnitContract({
+        turnData,
+        unitId: 'timeout.phase.resume_prepare',
+        advanceTrigger: 'resume route/context committed',
+        visualSettleTrigger: 'resume setup settled',
+        authorizingEventReceived: false,
+        visualSettled: false,
+        unitStartMs: timeoutStartMs,
+        maxWaitGameSeconds: this.getTimeoutBudgetGameSeconds('resume'),
+        context: {
+          timeoutReason: turnData?.timeout_reason ?? 'COMPUTER',
+          route: 'computer_timeout_popup',
+          gameIdPresent: false,
+        },
+      });
+      enforceTimeoutOut({
+        route: 'computer_timeout_popup',
+        routeCommitted: false,
+        visualSettled: false,
+        contextExtra: { gameIdPresent: false },
+      });
     }
   }
 
   async handleOpeningTip(turnData, context) {
+    const tipJumpStartMs = Date.now();
     // Opening tip handler (log removed)
     
     // ✅ PHASE 2.6: Validate opening tip timing (moved from animateGameTurns.js)
@@ -644,17 +993,65 @@ export class AnimationEngine {
         onComplete: resolve
       });
     });
+    this.enforceTipUnitContract({
+      turnData,
+      unitId: 'tip.phase.jump',
+      advanceTrigger: 'tip outcome committed',
+      visualSettleTrigger: 'jump visuals settled',
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: tipJumpStartMs,
+      maxWaitGameSeconds: this.getTipBudgetGameSeconds('jump'),
+      context: {
+        phase: 'jump',
+        quarter: turnQuarter,
+        turnIndex,
+      },
+    });
     
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { States, safeTransition } = await import('../state/gameStateMachine.js');
     const { getCurrentOwner, getPendingOwner } = await import('./BallControllerAdapter.js');
+    const tipControlStartMs = Date.now();
+    const currentOwnerId = getCurrentOwner(this.scene);
+    const pendingOwnerId = getPendingOwner(this.scene);
+    const hasOwner = !!(currentOwnerId || pendingOwnerId);
+    this.enforceTipUnitContract({
+      turnData,
+      unitId: 'tip.phase.control',
+      advanceTrigger: 'possession control committed',
+      visualSettleTrigger: 'control pass/attach settled',
+      authorizingEventReceived: hasOwner,
+      visualSettled: hasOwner,
+      unitStartMs: tipControlStartMs,
+      maxWaitGameSeconds: this.getTipBudgetGameSeconds('control'),
+      context: {
+        phase: 'control',
+        currentOwnerId: currentOwnerId ?? null,
+        pendingOwnerId: pendingOwnerId ?? null,
+      },
+    });
     if (this.scene.stateMachine && !this.scene.stateMachine.is(States.HalfCourt)) {
       safeTransition(this.scene.stateMachine, States.HalfCourt, {
         reason: 'opening_tip_complete',
-        currentOwnerId: getCurrentOwner(this.scene),
-        pendingOwnerId: getPendingOwner(this.scene)
+        currentOwnerId,
+        pendingOwnerId
       });
     }
+    this.enforceTipUnitContract({
+      turnData,
+      unitId: 'tip.out.to_hco',
+      advanceTrigger: 'hco route committed',
+      visualSettleTrigger: 'tip boundary settle complete',
+      authorizingEventReceived: this.scene?.stateMachine?.is(States.HalfCourt) === true,
+      visualSettled: this.scene?.stateMachine?.is(States.HalfCourt) === true,
+      unitStartMs: tipControlStartMs,
+      maxWaitGameSeconds: this.getTipBudgetGameSeconds('control'),
+      context: {
+        phase: 'transition_out',
+        nextStateIsHalfCourt: this.scene?.stateMachine?.is(States.HalfCourt) === true,
+      },
+    });
     
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }

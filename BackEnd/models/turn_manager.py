@@ -130,6 +130,24 @@ class TurnManager:
 
         return movement_ms + fixed_ms
 
+    def _resolve_clock_authority_mode(self, game_state: dict) -> str:
+        raw_mode = str(game_state.get("uess_clock_authority_mode", "warn") or "warn").strip().lower()
+        if raw_mode in {"observe", "warn", "throw", "off"}:
+            return raw_mode
+        return "warn"
+
+    def _resolve_clock_elapsed_authority(self, game_state: dict) -> str:
+        raw_mode = str(game_state.get("uess_clock_elapsed_authority", "ledger") or "ledger").strip().lower()
+        if raw_mode in {"legacy", "ledger"}:
+            return raw_mode
+        return "ledger"
+
+    def _resolve_ownership_contract_mode(self, game_state: dict) -> str:
+        raw_mode = str(game_state.get("uess_ownership_contract_mode", "warn") or "warn").strip().lower()
+        if raw_mode in {"off", "observe", "warn"}:
+            return raw_mode
+        return "warn"
+
     def _attach_clock_contract(
         self,
         result: dict,
@@ -141,7 +159,8 @@ class TurnManager:
         """Attach authoritative clock contract fields to a turn result dict."""
         clock_end = int(game_state.get("time_remaining", 0))
         sc_end = int(game_state.get("shot_clock_remaining", 30))
-        sc_reset = sc_end > shot_clock_start or (
+        sc_reset_reason = result.get("shot_clock_reset_reason")
+        sc_reset = bool(sc_reset_reason) or sc_end > shot_clock_start or (
             sc_end == 30 and clock_start != clock_end
         )
         result["clock_start"] = clock_start
@@ -149,12 +168,14 @@ class TurnManager:
         result["shot_clock_start"] = shot_clock_start
         result["shot_clock_end"] = sc_end
         result["shot_clock_reset"] = bool(sc_reset)
+        if sc_reset_reason:
+            result["shot_clock_reset_reason"] = str(sc_reset_reason)
         result["clock_contract_source"] = source
         result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
-        clock_authority_mode = str(
-            game_state.get("uess_clock_authority_mode", "observe") or "observe"
-        ).lower()
+        clock_authority_mode = self._resolve_clock_authority_mode(game_state)
+        elapsed_authority = self._resolve_clock_elapsed_authority(game_state)
         result["uess_clock_authority_mode"] = clock_authority_mode
+        result["uess_clock_elapsed_authority"] = elapsed_authority
         result["clock_event_ledger"] = self._build_clock_event_ledger(
             result=result,
             clock_start=clock_start,
@@ -166,6 +187,8 @@ class TurnManager:
         self._attach_clock_elapsed_observe_reconciliation(
             result=result,
             game_state=game_state,
+            mode=clock_authority_mode,
+            elapsed_authority=elapsed_authority,
         )
         logging.debug(
             "⏱️ [CLOCK CONTRACT] type=%s source=%s "
@@ -210,8 +233,10 @@ class TurnManager:
         *,
         result: dict,
         game_state: dict,
+        mode: str = "observe",
+        elapsed_authority: str = "legacy",
     ) -> None:
-        """Observe-mode compare: ledger-derived elapsed vs legacy turn time_elapsed."""
+        """Clock reconciliation compare with mode-based backend enforcement."""
         legacy_elapsed = int(result.get("time_elapsed", 0) or 0)
         ledger_elapsed = self._derive_elapsed_from_clock_event_ledger(
             result.get("clock_event_ledger", [])
@@ -219,19 +244,44 @@ class TurnManager:
         delta_seconds = ledger_elapsed - legacy_elapsed
         tolerance = self._get_clock_reconciliation_tolerance_seconds(game_state)
         within_tolerance = abs(delta_seconds) <= tolerance
+        normalized_mode = mode if mode in {"observe", "warn", "throw", "off"} else "observe"
+        normalized_elapsed_authority = (
+            elapsed_authority if elapsed_authority in {"legacy", "ledger"} else "legacy"
+        )
+
+        if normalized_elapsed_authority == "ledger":
+            result["time_elapsed"] = int(ledger_elapsed)
 
         result["uess_clock_elapsed_game_seconds"] = int(ledger_elapsed)
         result["uess_clock_elapsed_legacy_game_seconds"] = int(legacy_elapsed)
         result["uess_clock_elapsed_delta_seconds"] = int(delta_seconds)
         result["uess_clock_elapsed_observe_within_tolerance"] = bool(within_tolerance)
         result["uess_clock_reconciliation"] = {
-            "mode": "observe",
+            "mode": normalized_mode,
+            "elapsed_authority": normalized_elapsed_authority,
             "ledger_elapsed_game_seconds": int(ledger_elapsed),
             "legacy_elapsed_game_seconds": int(legacy_elapsed),
             "delta_seconds": int(delta_seconds),
             "tolerance_seconds": float(tolerance),
             "within_tolerance": bool(within_tolerance),
         }
+
+        if within_tolerance or normalized_mode in {"observe", "off"}:
+            return
+
+        message = (
+            "[CLOCK CONTRACT] backend reconciliation fail "
+            f"(mode={normalized_mode}, result={result.get('result_type')}, "
+            f"ledgerElapsed={ledger_elapsed}, legacyElapsed={legacy_elapsed}, "
+            f"deltaSeconds={delta_seconds}, toleranceSeconds={tolerance})"
+        )
+
+        if normalized_mode == "warn":
+            logging.warning("⚠️ %s", message)
+            return
+
+        if normalized_mode == "throw":
+            raise ValueError(message)
 
     def _clock_stop_reason(self, result: dict) -> str:
         result_type = str(result.get("result_type") or "").upper()
@@ -307,7 +357,11 @@ class TurnManager:
             )
 
         if shot_clock_reset:
-            append_event("shot_clock_reset", "turn_policy_reset", int(clock_end))
+            append_event(
+                "shot_clock_reset",
+                str(result.get("shot_clock_reset_reason") or "turn_policy_reset"),
+                int(clock_end),
+            )
 
         if int(clock_end) <= 0:
             append_event("period_end", "game_clock_zero", 0)
@@ -324,6 +378,77 @@ class TurnManager:
         events[-1]["possession_team_id"] = possession_team_id
 
         return events
+
+    def _attach_uess_ownership_contract(self, result: dict) -> None:
+        """Attach observational ownership/pass-lifecycle contract fields."""
+        steps = result.get("steps")
+        owner_by_step = result.get("ball_owner_by_step")
+        applicable = isinstance(steps, list) and len(steps) > 0 and isinstance(owner_by_step, list)
+
+        pass_events = []
+        if isinstance(steps, list):
+            for step_index, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    continue
+                for event in step.get("events", []) or []:
+                    if not isinstance(event, dict):
+                        continue
+                    if str(event.get("type") or "").lower().strip() != "pass":
+                        continue
+                    passer = event.get("by")
+                    receiver = event.get("to")
+                    pass_events.append(
+                        {
+                            "step_index": int(step_index),
+                            "passer_pos": passer if isinstance(passer, str) else None,
+                            "receiver_pos": receiver if isinstance(receiver, str) else None,
+                        }
+                    )
+
+        owner_seq = owner_by_step if isinstance(owner_by_step, list) else []
+        terminal_owner = None
+        for owner in reversed(owner_seq):
+            if isinstance(owner, str) and owner.strip():
+                terminal_owner = owner
+                break
+
+        valid_receipt_count = 0
+        for row in pass_events:
+            receiver = row.get("receiver_pos")
+            step_index = int(row.get("step_index") or 0)
+            if not isinstance(receiver, str) or not receiver:
+                continue
+            if any(owner_seq[idx] == receiver for idx in range(step_index, len(owner_seq))):
+                valid_receipt_count += 1
+
+        pass_count = len(pass_events)
+        game_state = getattr(getattr(self, "game", None), "game_state", {}) or {}
+        ownership_mode = self._resolve_ownership_contract_mode(game_state)
+        result["uess_ownership_contract_mode"] = ownership_mode
+        contract = {
+            "applicable": bool(applicable),
+            "mode": ownership_mode,
+            "pass_event_count": int(pass_count),
+            "pass_receipt_valid_count": int(valid_receipt_count),
+            "pass_lifecycle_valid": bool(pass_count == 0 or valid_receipt_count == pass_count),
+            "terminal_owner_pos": terminal_owner,
+            "next_play_type": result.get("next_play_type"),
+            "result_type": result.get("result_type"),
+        }
+        if pass_count > 0:
+            contract["pass_events"] = pass_events
+        result["uess_ownership_contract"] = contract
+
+        if ownership_mode == "warn" and contract["applicable"] and not contract["pass_lifecycle_valid"]:
+            logging.warning(
+                "⚠️ [UESS ownership contract] pass lifecycle invalid (result=%s, next=%s, "
+                "passEventCount=%s, validReceiptCount=%s, terminalOwner=%s)",
+                result.get("result_type"),
+                result.get("next_play_type"),
+                contract["pass_event_count"],
+                contract["pass_receipt_valid_count"],
+                contract["terminal_owner_pos"],
+            )
 
     def setup_side_inbound(self):
         """
@@ -3535,6 +3660,40 @@ class TurnManager:
             te = turn_result.get("time_elapsed", 0)
             return int(te or 0) == 0 and rt in {"SIDE_INBOUND", "BASELINE_INBOUND"}
 
+        def _is_shot_attempt(turn_result):
+            return turn_result.get("result_type") in {"MAKE", "MISS", "BLOCK"} or (
+                turn_result.get("result_type") == "FOUL"
+                and (
+                    int(turn_result.get("free_throws_remaining", 0) or 0) > 0
+                    or turn_result.get("next_play_type") == "FREE_THROW"
+                )
+            )
+
+        def _shot_detach_elapsed_seconds(turn_result, fallback_elapsed):
+            """
+            Resolve the live-possession seconds consumed before shot detach.
+
+            When step timing exists, shot detach occurs at resolution_step_index, so the
+            shot clock should burn only the executed step time through that boundary while
+            the game clock may continue running through the remainder of the turn.
+            """
+            raw_steps = turn_result.get("step_clock_seconds")
+            if not isinstance(raw_steps, list) or not raw_steps:
+                return int(fallback_elapsed)
+            try:
+                step_clock_seconds = [max(0, int(sec or 0)) for sec in raw_steps]
+            except (TypeError, ValueError):
+                return int(fallback_elapsed)
+
+            max_index = len(step_clock_seconds) - 1
+            raw_index = turn_result.get("resolution_step_index")
+            try:
+                resolution_step_index = int(raw_index)
+            except (TypeError, ValueError):
+                resolution_step_index = max_index
+            resolution_step_index = max(0, min(max_index, resolution_step_index))
+            return int(sum(step_clock_seconds[: resolution_step_index + 1]))
+
         def _should_reset_shot_clock(turn_result):
             rt = turn_result.get("result_type")
             foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
@@ -3560,6 +3719,14 @@ class TurnManager:
                 return True
             return False
 
+        def _current_turn_shot_clock_reset_reason(turn_result):
+            rt = str(turn_result.get("result_type") or "").upper()
+            if rt == "SIDE_INBOUND":
+                return "inbound_received"
+            if rt == "BASELINE_INBOUND":
+                return "inbound_received"
+            return None
+
         game_remaining_before = int(self.game.game_state.get("time_remaining", 0) or 0)
         shot_remaining_before = int(
             self.game.game_state.get(
@@ -3568,28 +3735,20 @@ class TurnManager:
             ) or 0
         )
 
-        # 🕒 Reduce clock by time_elapsed with legal cap enforcement.
-        time_elapsed = int(result.get("time_elapsed", 0) or 0)
+        raw_time_elapsed = int(result.get("time_elapsed", 0) or 0)
         impact_turn = not _is_no_impact_turn(result)
         if impact_turn:
-            legal_cap = max(0, min(game_remaining_before, shot_remaining_before))
-            if time_elapsed > legal_cap:
-                time_elapsed = legal_cap
+            effective_game_elapsed = max(0, min(raw_time_elapsed, game_remaining_before))
         else:
-            time_elapsed = 0
+            effective_game_elapsed = 0
 
-        # Shot attempt: add 1 game second to game clock only (rim-hold time); shot clock does not get the +1.
-        is_shot_attempt = result.get("result_type") in ("MAKE", "MISS", "BLOCK") or (
-            result.get("result_type") == "FOUL"
-            and (int(result.get("free_throws_remaining", 0) or 0) > 0
-                 or result.get("next_play_type") == "FREE_THROW")
-        )
-        if impact_turn and is_shot_attempt:
-            effective_game_elapsed = min(time_elapsed + 1, legal_cap) if impact_turn else time_elapsed
-            shot_elapsed = time_elapsed
+        if not impact_turn:
+            shot_elapsed = 0
+        elif _is_shot_attempt(result):
+            shot_elapsed = _shot_detach_elapsed_seconds(result, effective_game_elapsed)
         else:
-            effective_game_elapsed = time_elapsed
-            shot_elapsed = time_elapsed
+            shot_elapsed = effective_game_elapsed
+        shot_elapsed = max(0, min(int(shot_elapsed), shot_remaining_before, effective_game_elapsed))
 
         result["time_elapsed"] = effective_game_elapsed
         self.game.game_state["time_remaining"] -= effective_game_elapsed
@@ -3599,15 +3758,23 @@ class TurnManager:
             self.game.game_state["time_remaining"] = 0
 
         clock_end = int(self.game.game_state.get("time_remaining", 0))
-        game_seconds_elapsed = _cc_clock_start - clock_end
 
-        # Shot clock: same as game clock except on shot attempts (shot_elapsed = time_elapsed, game = time_elapsed + 1).
+        # Universal clock authority:
+        # - game clock burns only live-ball elapsed for this turn
+        # - shot clock burns until detach/stop event, then remains stopped
+        # - clock-dead turns preserve the visible shot clock value for this turn
+        current_turn_shot_clock_reset_reason = _current_turn_shot_clock_reset_reason(result)
+
         if impact_turn:
             raw_shot_end = max(0, _cc_sc_start - shot_elapsed)
-        else:
+        elif current_turn_shot_clock_reset_reason:
             raw_shot_end = min(30, clock_end)
+        else:
+            raw_shot_end = _cc_sc_start
 
         self.game.game_state["shot_clock_remaining"] = raw_shot_end
+        if current_turn_shot_clock_reset_reason:
+            result["shot_clock_reset_reason"] = current_turn_shot_clock_reset_reason
 
         # Shot clock violations are now resolved via the stopper system (phase_resolution) before we get here;
         # we no longer overwrite the result when raw_shot_end == 0.
@@ -3634,6 +3801,7 @@ class TurnManager:
             game_state=self.game.game_state,
             source=f"ucp:{result.get('result_type', 'UNKNOWN')}",
         )
+        self._attach_uess_ownership_contract(result)
 
         # Reset only affects NEXT turn: set shot_clock_remaining=30 so next turn's _cc_sc_start is 30.
         if _should_reset_shot_clock(result):

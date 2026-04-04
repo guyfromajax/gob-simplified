@@ -23,6 +23,7 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
 import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
+import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -60,6 +61,103 @@ export class ShotAnimationSystem {
     
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Initialized');
+    }
+  }
+
+  resolveOrebContractMode() {
+    const raw = String(
+      (typeof window !== 'undefined' ? window.UESS_OREB_CONTRACT_MODE : null) ?? 'observe'
+    )
+      .trim()
+      .toLowerCase();
+    if (raw === 'off' || raw === 'observe' || raw === 'warn' || raw === 'throw') return raw;
+    return 'observe';
+  }
+
+  getOrebBudgetGameSeconds(kind = 'decision') {
+    const scope = typeof window !== 'undefined' ? window : globalThis;
+    const generic =
+      kind === 'decision'
+        ? Number(scope?.UESS_OREB_DECISION_MAX_GAME_SECONDS)
+        : Number(scope?.UESS_OREB_ACTION_MAX_GAME_SECONDS);
+    if (Number.isFinite(generic) && generic > 0) return generic;
+    return kind === 'decision' ? 2 : 3;
+  }
+
+  emitOrebContractTelemetry(turnData, event, payload = {}) {
+    this.scene?.events?.emit?.('animTelemetry', {
+      event,
+      branchKind: 'oreb_phase_contract',
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  }
+
+  enforceOrebUnitContract({
+    turnData,
+    unitId,
+    advanceTrigger,
+    visualSettleTrigger,
+    authorizingEventReceived,
+    visualSettled,
+    unitStartMs,
+    maxWaitGameSeconds,
+    context = {},
+  }) {
+    const mode = this.resolveOrebContractMode();
+    if (mode === 'off') return;
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 350;
+    const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const overrun =
+      Number.isFinite(maxWaitGameSeconds) &&
+      maxWaitGameSeconds > 0 &&
+      elapsedGameSeconds > maxWaitGameSeconds;
+    const contractContext = {
+      elapsedMs,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      maxWaitGameSeconds,
+      overrun,
+      ...context,
+    };
+    if (overrun) {
+      this.emitOrebContractTelemetry(turnData, 'oreb_phase_clock_overrun', {
+        unitId,
+        ...contractContext,
+      });
+    }
+    const logger =
+      mode === 'observe'
+        ? {
+            warn: () => {},
+          }
+        : console;
+    enforceUnitCompletionContract({
+      contract: {
+        unit_id: unitId,
+        execution_mode: 'dynamic_event',
+        advance_trigger: advanceTrigger,
+        visual_settle_trigger: visualSettleTrigger,
+        failure_policy: mode === 'throw' ? 'throw' : 'warn',
+      },
+      observed: {
+        authorizingEventReceived: authorizingEventReceived === true,
+        visualSettled: visualSettled === true && !overrun,
+      },
+      context: contractContext,
+      emitTelemetry: (event, payload = {}) =>
+        this.emitOrebContractTelemetry(turnData, event, payload),
+      logger,
+    });
+    if (mode === 'throw' && overrun) {
+      throw new Error(
+        `[OREB contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+      );
     }
   }
 
@@ -1255,6 +1353,20 @@ export class ShotAnimationSystem {
       // ✅ REVERTED: Back to embedded DREB handling (standalone step approach didn't fix animation sync issue)
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.lead_in.from_miss',
+        advanceTrigger: 'OREB committed',
+        visualSettleTrigger: 'rebound secure + attach settled',
+        authorizingEventReceived: true,
+        visualSettled: !!rebounderSprite,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('decision'),
+        context: {
+          reboundType: turnData?.rebound_type ?? null,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
       await this.handleOffensiveRebound(rebounderSprite, turnData);
     } else {
       // ✅ REMOVED: Unknown rebound type logging (cluttering console)
@@ -1490,11 +1602,123 @@ export class ShotAnimationSystem {
     
     // ✅ REMOVED: Offensive rebound logging (cluttering console)
     
+    const holdStartMs = Date.now();
+    const orebHoldSeconds = Number(turnData?.oreb_hold_seconds);
+    const hasHoldWindow = Number.isFinite(orebHoldSeconds) && orebHoldSeconds > 0;
+    if (hasHoldWindow && this.scene?.time) {
+      const holdMs = Math.max(0, orebHoldSeconds * 350);
+      await new Promise((resolve) => this.scene.time.delayedCall(holdMs, resolve));
+    }
+    this.enforceOrebUnitContract({
+      turnData,
+      unitId: 'oreb.phase.hold',
+      advanceTrigger: 'hold boundary reached',
+      visualSettleTrigger: 'no active attach/tween conflicts',
+      authorizingEventReceived: true,
+      visualSettled: this.scene?.passInFlight !== true,
+      unitStartMs: holdStartMs,
+      maxWaitGameSeconds: this.getOrebBudgetGameSeconds('decision'),
+      context: {
+        holdSeconds: hasHoldWindow ? orebHoldSeconds : 0,
+        holdApplied: hasHoldWindow && !!this.scene?.time,
+      },
+    });
+
+    const decisionStartMs = Date.now();
+    const hasKickoutEvent =
+      Array.isArray(turnData?.events) &&
+      turnData.events.some((event) => event?.event_type === 'KICKOUT_RESET');
+    const isPutbackAttempt = this.isPutbackAttempt(turnData);
+    const decisionType = isPutbackAttempt ? 'putback' : hasKickoutEvent ? 'kickout' : 'forced_putback';
+    this.enforceOrebUnitContract({
+      turnData,
+      unitId: 'oreb.phase.decision',
+      advanceTrigger: 'decision event committed',
+      visualSettleTrigger: 'decision prep visuals settled',
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: decisionStartMs,
+      maxWaitGameSeconds: this.getOrebBudgetGameSeconds('decision'),
+      context: {
+        decisionType,
+        hasKickoutEvent,
+        isPutbackAttempt,
+      },
+    });
+
+    const actionStartMs = Date.now();
+    if (decisionType === 'kickout') {
+      await this.executeKickoutPass(rebounderSprite, turnData);
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.phase.kickout_pass',
+        advanceTrigger: 'pass received',
+        visualSettleTrigger: 'ball flight + receiver settle',
+        authorizingEventReceived: hasKickoutEvent,
+        visualSettled: true,
+        unitStartMs: actionStartMs,
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          decisionType,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
+      const route = String(turnData?.next_play_type || 'HCO').toUpperCase();
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.out.to_*',
+        advanceTrigger: 'route committed',
+        visualSettleTrigger: 'OREB final settle complete',
+        authorizingEventReceived: route.length > 0,
+        visualSettled: true,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          route,
+          branch: 'kickout',
+        },
+      });
+      return;
+    }
     try {
-      // TEMPORARY: Force all offensive rebounds to be putback attempts for testing
+      // Current branch behavior remains unchanged: forced putback path.
       await this.executePutbackAttempt(rebounderSprite, turnData);
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.phase.putback_attempt',
+        advanceTrigger: 'shot release/result committed',
+        visualSettleTrigger: 'putback visuals settled',
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: actionStartMs,
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          decisionType,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
+      const route = String(turnData?.next_play_type || 'HCO').toUpperCase();
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.out.to_*',
+        advanceTrigger: 'route committed',
+        visualSettleTrigger: 'OREB final settle complete',
+        authorizingEventReceived: route.length > 0,
+        visualSettled: true,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          route,
+          branch: 'putback',
+        },
+      });
     } catch (error) {
       console.error('🎬 ShotAnimationSystem: executePutbackAttempt failed', error);
+      this.emitOrebContractTelemetry(turnData, 'oreb_phase_putback_failed', {
+        decisionType,
+        rebounderId: turnData?.rebounderId ?? null,
+        error: error?.message ?? String(error),
+      });
       throw error;
     }
     

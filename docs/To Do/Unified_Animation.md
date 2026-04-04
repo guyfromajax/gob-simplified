@@ -412,6 +412,73 @@ This section defines intra-turn execution units and completion semantics for eac
 | `timeout.phase.resume_prepare` | branch_phase | timeout ending | dynamic_event | resume route/context committed | resume setup settled | warn -> throw | resume setup budget | unchanged |
 | `timeout.out.to_next` | transition_out_phase | return to pending route | dynamic_event | pending route committed | timeout exit settle complete | throw | boundary handoff | next-turn contract owner |
 
+### 6.5 Advance Trigger Lock Pass (Wave 1)
+
+Purpose: lock trigger semantics against concrete runtime checks, then isolate remaining gaps as targeted follow-ups (no broad rewrites).
+
+Lock criteria:
+
+1. Trigger wording is explicit and unambiguous in Section 6.4.
+2. Runtime check exists for both `advance_trigger` and `visual_settle_trigger` (or documented as pending).
+3. Failure policy mode is wired (`off/observe/warn/throw` or `warn/throw` as defined by family rollout).
+4. Any uncovered units are explicitly listed in "Pending lock" (not implicit).
+
+Wave 1 lock status (current):
+
+- **LOCKED (runtime-wired):**
+  - `hco.lead_in.from_dreb_outlet`
+  - `hco.lead_in.from_sip_or_bip`
+  - `hco.step[n].movement`
+  - `hco.step[n].pass`
+  - `hco.resolution`
+  - `hco.out.to_*`
+  - `sip.phase.setup_positions`
+  - `sip.phase.pass`
+  - `sip.lead_in.entry`
+  - `sip.out.to_*`
+  - `bip.lead_in.entry`
+  - `bip.phase.setup_positions`
+  - `bip.phase.pass`
+  - `bip.out.to_*`
+  - `fcp.step[n].movement` + `fcp.step[n].pass`
+  - `fcp.resolution` + `fcp.out.to_*`
+  - `hct.step[n].movement` + `hct.step[n].pass`
+  - `hct.resolution` + `hct.out.to_*`
+  - `oreb.phase.decision`
+  - `oreb.phase.kickout_pass`
+  - `oreb.phase.putback_attempt`
+  - `oreb.lead_in.from_miss`
+  - `oreb.phase.hold`
+  - `oreb.phase.putback_rebound_resolution`
+  - `oreb.out.to_*`
+  - `ft.lead_in.entry`
+  - `ft.phase.attempt[n]`
+  - `ft.phase.sequence_control`
+  - `ft.out.to_*`
+  - `timeout.phase.pause_barrier`
+  - `timeout.phase.resume_prepare`
+  - `timeout.out.to_next`
+  - `tip.phase.jump`
+  - `tip.phase.control`
+  - `tip.out.to_hco`
+  - FAST_BREAK family trigger-lock runtime parity:
+    - `fb.lead_in.from_hco_steal`
+    - `fb.lead_in.from_dreb_release`
+    - `fb.phase.entry_burst`
+    - `fb.phase.outlet`
+    - `fb.phase.shot_attempt`
+    - `fb.phase.defensive_stop`
+    - `fb.phase.rebound_resolution`
+    - `fb.out.to_*`
+
+- **PENDING LOCK (defined in matrix, runtime parity still to finish):**
+  - none
+
+Wave 1 completion note:
+
+- Trigger semantics are now locked for the runtime-wired units above.
+- No remaining Wave 1 trigger-lock rows are pending; follow-up work is now polish/tuning rather than missing unit wiring.
+
 ### Phase 1 - Contract and visibility
 
 - Define required movement authority fields per turn type.
@@ -930,6 +997,7 @@ Phase 1 is complete only when:
 ## Known HCO Turn Issues
 
 - [ ] **HCO resolution hard overrun with invalid elapsed clock** (`severity`: Critical, `priority`: P0): observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on `DEAD BALL` path. This indicates timer baseline/state contamination (not normal jitter). **Mitigation applied (Option A):** turn-boundary guards now use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`); validate in live runs before closing.
+- [ ] **HCO step-pass hard overrun with invalid elapsed clock in BATCH/DEAD BALL sub-turns** (`severity`: Critical, `priority`: P0): observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6` on `DEAD BALL` batch sub-turn processing. Magnitude indicates elapsed baseline contamination/leak (not jitter). Track as separate from resolution-path overrun; likely same timer-source class but distinct enforcement site (`step pass` guard).
 - [ ] **DREB->HCO strict contract degradation still triggered in mixed OREB/putback flows** (`severity`: High, `priority`: P1): observed `missing_outlet_receiver_animation_end` followed by synthetic pass fallback (`Using synthetic passInfo for non-strict branch`), indicating incomplete backend endpoint coverage on some rebound-derived transitions.
 - [ ] **HCO/FCP/HCT player classification mismatch in OREB/putback contexts** (`severity`: High, `priority`: P1): repeated warning `Expected 5 offensive and 5 defensive players`; likely destabilizes ownership/step gating on adjacent turns.
 - [ ] **Clock continuity drift around putback/inbound boundaries** (`severity`: High, `priority`: P1): repeated `Ignoring non-monotonic clock update` warnings; may be display-order only, but currently treated as timing-integrity risk until proven otherwise.

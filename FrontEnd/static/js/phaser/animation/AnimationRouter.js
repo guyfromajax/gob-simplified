@@ -96,7 +96,7 @@ export class AnimationRouter {
           ),
           warnGate: {
             minRows: Math.floor(
-              asNumber(scope.UESS_CLOCK_RECON_WARN_MIN_ROWS, 50, 1)
+              asNumber(scope.UESS_CLOCK_RECON_WARN_MIN_ROWS, 40, 1)
             ),
             outOfToleranceRateMax: asNumber(
               scope.UESS_CLOCK_RECON_WARN_OUT_OF_TOLERANCE_RATE_MAX,
@@ -139,6 +139,40 @@ export class AnimationRouter {
         scope.__CLOCK_RECON_SUMMARY_BUFFER__ = [];
       };
     }
+  }
+
+  _clearClockInterpolationTracking() {
+    if (!this.scene) return;
+    this.scene._clockInterpolationTween = null;
+    this.scene._clockInterpolationPromise = null;
+    this.scene._clockInterpolationResolve = null;
+  }
+
+  _resolveClockInterpolationTracking() {
+    if (!this.scene) return;
+    const resolve = this.scene._clockInterpolationResolve;
+    this._clearClockInterpolationTracking();
+    if (typeof resolve === "function") {
+      try {
+        resolve();
+      } catch (_) {
+        // no-op
+      }
+    }
+  }
+
+  async waitForClockInterpolationSettle(maxWaitMs = 0) {
+    const p = this.scene?._clockInterpolationPromise;
+    if (!p || typeof p.then !== "function") return;
+    const timeoutMs = Math.max(0, Number(maxWaitMs) || 0);
+    if (timeoutMs <= 0) {
+      await p;
+      return;
+    }
+    await Promise.race([
+      p,
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
   }
 
   /**
@@ -242,7 +276,7 @@ export class AnimationRouter {
 
       if (this.scene._clockInterpolationTween) {
         this.scene._clockInterpolationTween.remove();
-        this.scene._clockInterpolationTween = null;
+        this._resolveClockInterpolationTracking();
       }
 
       // Turn start: same condition for both — when game clock has contract, sync both (shot uses shot keys, clamp 30)
@@ -266,6 +300,9 @@ export class AnimationRouter {
         const useTwoPhase = gameSecondsToCount > 0 && shotSecondsToCount < gameSecondsToCount;
         const ratio = useTwoPhase ? shotSecondsToCount / gameSecondsToCount : 1;
         const progressObj = { p: 0 };
+        this.scene._clockInterpolationPromise = new Promise((resolve) => {
+          this.scene._clockInterpolationResolve = resolve;
+        });
         this.scene._clockInterpolationTween = this.scene.tweens.add({
           targets: progressObj,
           p: 1,
@@ -293,9 +330,7 @@ export class AnimationRouter {
             shotClock.syncWithBackend(Math.max(0, Math.min(30, shotSeconds)));
           },
           onComplete: () => {
-            if (this.scene._clockInterpolationTween) {
-              this.scene._clockInterpolationTween = null;
-            }
+            this._resolveClockInterpolationTracking();
           },
         });
       }
@@ -389,6 +424,11 @@ export class AnimationRouter {
         // Calling engine (log removed)
       }
       await this.animationEngine.processTurn(turnData, context);
+      // Universal continuity guard: do not advance next turn until
+      // this turn's clock interpolation window has settled.
+      await this.waitForClockInterpolationSettle(
+        Math.max(0, Number(durationMs) || 0) + 150
+      );
       if (!shouldLog) {
         // Completed (log removed)
       }
@@ -411,7 +451,7 @@ export class AnimationRouter {
       // PHASE2: Stop bounded clock interpolation so final snap (updateScoreboard) is authoritative
       if (this.scene?._clockInterpolationTween) {
         this.scene._clockInterpolationTween.remove();
-        this.scene._clockInterpolationTween = null;
+        this._resolveClockInterpolationTracking();
       }
       // ✅ PHASE 2.3: Call finalizeTurnAfterAnimation in finally block (always runs)
       try {
@@ -562,7 +602,7 @@ export class AnimationRouter {
     };
     return {
       minRows: Math.floor(
-        asNumber(scope?.UESS_CLOCK_RECON_WARN_MIN_ROWS, 50, 1)
+        asNumber(scope?.UESS_CLOCK_RECON_WARN_MIN_ROWS, 40, 1)
       ),
       outOfToleranceRateMax: asNumber(
         scope?.UESS_CLOCK_RECON_WARN_OUT_OF_TOLERANCE_RATE_MAX,
@@ -672,14 +712,9 @@ export class AnimationRouter {
       : Array.isArray(turnData?.clock_event_ledger)
         ? turnData.clock_event_ledger
         : [];
-    const hasClockContract =
-      Number.isFinite(context.clockStart) && Number.isFinite(context.clockEnd);
+    const hasValidLedger = clockEventLedger.length > 0;
     const feElapsedFromLedger = this.deriveClockElapsedFromLedger(clockEventLedger);
-    const feElapsed = clockEventLedger.length > 0
-      ? feElapsedFromLedger
-      : hasClockContract
-        ? Math.max(0, Number(context.clockStart) - Number(context.clockEnd))
-        : 0;
+    const feElapsed = hasValidLedger ? feElapsedFromLedger : null;
     const beElapsed = Number(turnData?.uess_clock_elapsed_game_seconds);
     const legacyElapsed = Number(
       turnData?.uess_clock_elapsed_legacy_game_seconds ??
@@ -689,7 +724,7 @@ export class AnimationRouter {
     );
     const toleranceSeconds = this.resolveClockReconToleranceSeconds(turnData);
     const deltaSeconds =
-      Number.isFinite(beElapsed) ? feElapsed - beElapsed : null;
+      Number.isFinite(beElapsed) && Number.isFinite(feElapsed) ? feElapsed - beElapsed : null;
     const withinTolerance =
       Number.isFinite(deltaSeconds)
         ? Math.abs(deltaSeconds) <= toleranceSeconds
@@ -705,7 +740,7 @@ export class AnimationRouter {
       timestampMs: Date.now(),
       mode,
       clockEventCount: clockEventLedger.length,
-      feElapsedGameSeconds: Number(feElapsed),
+      feElapsedGameSeconds: Number.isFinite(feElapsed) ? Number(feElapsed) : null,
       beElapsedGameSeconds: Number.isFinite(beElapsed) ? Number(beElapsed) : null,
       legacyElapsedGameSeconds: Number.isFinite(legacyElapsed)
         ? Number(legacyElapsed)
@@ -713,7 +748,8 @@ export class AnimationRouter {
       deltaSeconds: Number.isFinite(deltaSeconds) ? Number(deltaSeconds) : null,
       toleranceSeconds: Number(toleranceSeconds),
       withinTolerance,
-      feElapsedSource: clockEventLedger.length > 0 ? "clock_event_ledger" : "clock_contract",
+      feElapsedSource: hasValidLedger ? "clock_event_ledger" : "missing_clock_event_ledger",
+      missingClockEventLedger: !hasValidLedger,
       clockStart: Number.isFinite(context.clockStart) ? Number(context.clockStart) : null,
       clockEnd: Number.isFinite(context.clockEnd) ? Number(context.clockEnd) : null,
       shotClockStart: Number.isFinite(context.shotClockStart)
@@ -756,6 +792,24 @@ export class AnimationRouter {
     }
 
     emit.call(this.scene.events, "animTelemetry", basePayload);
+
+    if (!hasValidLedger) {
+      emit.call(this.scene.events, "animTelemetry", {
+        ...basePayload,
+        event: "clock_contract_missing_ledger",
+      });
+      if (mode === "warn") {
+        console.warn("[CLOCK CONTRACT] missing clock_event_ledger", {
+          resultType: basePayload.resultType,
+          turnId: basePayload.turnId,
+          turnIndex: basePayload.turnIndex,
+        });
+      } else if (mode === "throw") {
+        throw new Error(
+          `[CLOCK contract] missing clock_event_ledger (result=${basePayload.resultType ?? "?"}, turn=${basePayload.turnId ?? "?"})`
+        );
+      }
+    }
 
     if (withinTolerance === true) {
       emit.call(this.scene.events, "animTelemetry", {

@@ -56,6 +56,54 @@ function resolveCourtImagePath(teamNameOrSlug) {
   });
 }
 
+function installOwnershipContractGlobalHelpers() {
+  const scope = typeof window !== 'undefined' ? window : globalThis;
+  if (!scope || scope.__ownershipContractHelpersInstalled) return;
+  scope.__ownershipContractHelpersInstalled = true;
+
+  const resolveOwnershipWarnThresholds = () => ({
+    minRows: Math.max(1, Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MIN_ROWS ?? 40) || 40)),
+    invalidApplicableRateMax: Math.max(
+      0,
+      Number(scope.UESS_OWNERSHIP_WARN_INVALID_APPLICABLE_RATE_MAX ?? 0.02) || 0.02
+    ),
+    missingContractRowsMax: Math.max(
+      0,
+      Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MISSING_CONTRACT_ROWS_MAX ?? 0) || 0)
+    ),
+  });
+
+  scope.showOwnershipContractConfig = () => {
+    const summaryEvery = Math.max(
+      1,
+      Math.floor(Number(scope.UESS_OWNERSHIP_SUMMARY_EVERY ?? 10) || 10)
+    );
+    const thresholds = resolveOwnershipWarnThresholds();
+    const config = {
+      mode: String(scope.UESS_OWNERSHIP_CONTRACT_MODE ?? "warn"),
+      summaryEvery,
+      thresholds,
+      latestSummary: scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ ?? null,
+    };
+    console.log("[OWNERSHIP CONTRACT CONFIG]", config);
+    return config;
+  };
+  scope.getOwnershipContractSummaryLatest = (n = 5) => {
+    const count = Math.max(0, Math.floor(Number(n) || 0));
+    const list = Array.isArray(scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__)
+      ? scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__
+      : [];
+    return list.slice(-count);
+  };
+  scope.clearOwnershipContractBuffers = () => {
+    scope.__OWNERSHIP_CONTRACT_LAST__ = undefined;
+    scope.__OWNERSHIP_CONTRACT_BUFFER__ = [];
+    scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ = undefined;
+    scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__ = [];
+    scope.__OWNERSHIP_CONTRACT_SESSION__ = undefined;
+  };
+}
+
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
     constructor() {
@@ -68,6 +116,7 @@ export function createGameScene(Phaser) {
       this.possessionManager = null; // Will be initialized in create()
       this.gameClock = null;
       this.shotClock = null;
+      installOwnershipContractGlobalHelpers();
     }
 
     init(data) {
@@ -2123,6 +2172,27 @@ export function createGameScene(Phaser) {
           }
           return null;
         };
+        const resolveClockElapsedAuthority = () => {
+          const raw = String(window?.UESS_CLOCK_ELAPSED_AUTHORITY ?? "").trim().toLowerCase();
+          if (raw === "legacy" || raw === "ledger") {
+            return raw;
+          }
+          return null;
+        };
+        const resolveOwnershipContractMode = () => {
+          const raw = String(window?.UESS_OWNERSHIP_CONTRACT_MODE ?? "").trim().toLowerCase();
+          if (raw === "off" || raw === "observe" || raw === "warn") {
+            return raw;
+          }
+          return null;
+        };
+        const resolveClockReconToleranceSeconds = () => {
+          const raw = window?.UESS_CLOCK_RECON_TOLERANCE_SECONDS;
+          if (raw === null || typeof raw === "undefined" || raw === "") return null;
+          const parsed = Number(raw);
+          if (!Number.isFinite(parsed) || parsed < 0) return null;
+          return parsed;
+        };
         const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2132,6 +2202,9 @@ export function createGameScene(Phaser) {
             defense_override: defenseOverride ?? null,
             mode: simMode,
             uess_clock_authority_mode: resolveClockAuthorityMode(),
+            uess_clock_elapsed_authority: resolveClockElapsedAuthority(),
+            uess_ownership_contract_mode: resolveOwnershipContractMode(),
+            uess_clock_recon_tolerance_seconds: resolveClockReconToleranceSeconds(),
           })
         });
         if (!response.ok) {
@@ -2162,17 +2235,40 @@ export function createGameScene(Phaser) {
 
       const mirrorClockReconDebug = (turnPayload) => {
         try {
+          installOwnershipContractGlobalHelpers();
           const scope = typeof window !== 'undefined' ? window : globalThis;
           if (!turnPayload || typeof turnPayload !== 'object') return;
+          const requestedOwnershipMode = resolveOwnershipContractMode();
+          const firstBatchTurn =
+            turnPayload.result_type === 'BATCH' && Array.isArray(turnPayload.batch_turns)
+              ? turnPayload.batch_turns.find((row) => row && typeof row === 'object') ?? null
+              : null;
+
+          const defaultOwnershipMode =
+            turnPayload.uess_ownership_contract_mode ??
+            turnPayload.uess_ownership_contract?.mode ??
+            firstBatchTurn?.uess_ownership_contract_mode ??
+            firstBatchTurn?.uess_ownership_contract?.mode ??
+            requestedOwnershipMode ??
+            null;
           const rows =
             turnPayload.result_type === 'BATCH' && Array.isArray(turnPayload.batch_turns)
               ? turnPayload.batch_turns
               : [turnPayload];
           for (const row of rows) {
             if (!row || typeof row !== 'object') continue;
+            const ownershipMode =
+              row.uess_ownership_contract_mode ??
+              row.uess_ownership_contract?.mode ??
+              defaultOwnershipMode ??
+              requestedOwnershipMode ??
+              null;
             const snapshot = {
               resultType: row.result_type ?? null,
               mode: row.uess_clock_authority_mode ?? row.uess_clock_reconciliation?.mode ?? null,
+              elapsedAuthority:
+                row.uess_clock_elapsed_authority ?? row.uess_clock_reconciliation?.elapsed_authority ?? null,
+              ownershipMode: ownershipMode ?? null,
               ledgerCount: Array.isArray(row.clock_event_ledger) ? row.clock_event_ledger.length : 0,
               ledgerElapsed: row.uess_clock_elapsed_game_seconds ?? null,
               legacyElapsed: row.uess_clock_elapsed_legacy_game_seconds ?? row.time_elapsed ?? null,
@@ -2187,6 +2283,128 @@ export function createGameScene(Phaser) {
             scope.__CLOCK_RECON_BUFFER__.push(snapshot);
             if (scope.__CLOCK_RECON_BUFFER__.length > 100) {
               scope.__CLOCK_RECON_BUFFER__.splice(0, scope.__CLOCK_RECON_BUFFER__.length - 100);
+            }
+
+            const ownershipContract = row.uess_ownership_contract;
+            const ownershipSnapshot = {
+              resultType: row.result_type ?? null,
+              mode: ownershipMode ?? null,
+              applicable:
+                typeof ownershipContract?.applicable === "boolean"
+                  ? ownershipContract.applicable
+                  : null,
+              passLifecycleValid:
+                typeof ownershipContract?.pass_lifecycle_valid === "boolean"
+                  ? ownershipContract.pass_lifecycle_valid
+                  : null,
+              passEventCount: Number(ownershipContract?.pass_event_count ?? 0) || 0,
+              validReceiptCount: Number(ownershipContract?.pass_receipt_valid_count ?? 0) || 0,
+              terminalOwnerPos: ownershipContract?.terminal_owner_pos ?? null,
+              timestampMs: Date.now(),
+            };
+            scope.__OWNERSHIP_CONTRACT_LAST__ = ownershipSnapshot;
+            if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_BUFFER__)) {
+              scope.__OWNERSHIP_CONTRACT_BUFFER__ = [];
+            }
+            scope.__OWNERSHIP_CONTRACT_BUFFER__.push(ownershipSnapshot);
+            if (scope.__OWNERSHIP_CONTRACT_BUFFER__.length > 100) {
+              scope.__OWNERSHIP_CONTRACT_BUFFER__.splice(
+                0,
+                scope.__OWNERSHIP_CONTRACT_BUFFER__.length - 100
+              );
+            }
+
+            const summaryEvery = Math.max(
+              1,
+              Math.floor(Number(scope.UESS_OWNERSHIP_SUMMARY_EVERY ?? 10) || 10)
+            );
+            if (!scope.__OWNERSHIP_CONTRACT_SESSION__) {
+              scope.__OWNERSHIP_CONTRACT_SESSION__ = {
+                rows: 0,
+                applicableRows: 0,
+                invalidRows: 0,
+                missingContractRows: 0,
+              };
+            }
+            const session = scope.__OWNERSHIP_CONTRACT_SESSION__;
+            session.rows += 1;
+            if (ownershipSnapshot.applicable === true) {
+              session.applicableRows += 1;
+              if (ownershipSnapshot.passLifecycleValid === false) {
+                session.invalidRows += 1;
+              }
+            } else if (ownershipSnapshot.applicable === null) {
+              session.missingContractRows += 1;
+            }
+
+            if (session.rows % summaryEvery === 0) {
+              const applicableRows = session.applicableRows;
+              const invalidRows = session.invalidRows;
+              const invalidApplicableRate =
+                applicableRows > 0 ? Number((invalidRows / applicableRows).toFixed(4)) : 0;
+              const thresholds = {
+                minRows: Math.max(
+                  1,
+                  Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MIN_ROWS ?? 40) || 40)
+                ),
+                invalidApplicableRateMax: Math.max(
+                  0,
+                  Number(scope.UESS_OWNERSHIP_WARN_INVALID_APPLICABLE_RATE_MAX ?? 0.02) || 0.02
+                ),
+                missingContractRowsMax: Math.max(
+                  0,
+                  Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MISSING_CONTRACT_ROWS_MAX ?? 0) || 0)
+                ),
+              };
+              const hasEnoughRows = session.rows >= thresholds.minRows;
+              const meetsWarnPromotionGate =
+                hasEnoughRows &&
+                invalidApplicableRate <= thresholds.invalidApplicableRateMax &&
+                session.missingContractRows <= thresholds.missingContractRowsMax;
+              const summary = {
+                event: "ownership_contract_summary",
+                mode: String(ownershipSnapshot.mode ?? "warn"),
+                rows: session.rows,
+                applicableRows,
+                invalidRows,
+                invalidApplicableRate,
+                missingContractRows: session.missingContractRows,
+                thresholds,
+                hasEnoughRows,
+                meetsWarnPromotionGate,
+                timestampMs: Date.now(),
+              };
+              scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ = summary;
+              if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__)) {
+                scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__ = [];
+              }
+              scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.push(summary);
+              if (scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length > 50) {
+                scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.splice(
+                  0,
+                  scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length - 50
+                );
+              }
+              if (!meetsWarnPromotionGate) {
+                const breach = {
+                  event: "ownership_contract_threshold_breach",
+                  mode: summary.mode,
+                  rows: summary.rows,
+                  invalidApplicableRate: summary.invalidApplicableRate,
+                  missingContractRows: summary.missingContractRows,
+                  thresholds: summary.thresholds,
+                  hasEnoughRows: summary.hasEnoughRows,
+                  meetsWarnPromotionGate: summary.meetsWarnPromotionGate,
+                  timestampMs: Date.now(),
+                };
+                scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.push(breach);
+                if (scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length > 50) {
+                  scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.splice(
+                    0,
+                    scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length - 50
+                  );
+                }
+              }
             }
           }
         } catch (_) {
