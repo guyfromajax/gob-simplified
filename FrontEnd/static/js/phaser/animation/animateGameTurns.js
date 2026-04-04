@@ -148,6 +148,58 @@ function enforceOrebUnitContract({
   }
 }
 
+function getOrebUndeclaredHoldBudgetMs() {
+  const scope = typeof window !== "undefined" ? window : globalThis;
+  const raw = Number(scope?.UESS_OREB_UNDECLARED_HOLD_BUDGET_MS);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  return 900;
+}
+
+function createOrebIdleWatchdog(scene, turnData, unitId, options = {}) {
+  const allowedInterrupts = Array.isArray(options.allowedInterrupts)
+    ? options.allowedInterrupts
+    : [];
+  const stallBudgetMs =
+    Number(options.stallBudgetMs) > 0
+      ? Number(options.stallBudgetMs)
+      : getOrebUndeclaredHoldBudgetMs();
+  const activeInterrupts = new Set();
+  let lastProgressAtMs = Date.now();
+  let violationEmitted = false;
+  const markProgress = () => {
+    lastProgressAtMs = Date.now();
+  };
+  const setInterrupt = (interruptName, active) => {
+    const key = String(interruptName || "").trim();
+    if (!key) return;
+    if (active) activeInterrupts.add(key);
+    else activeInterrupts.delete(key);
+    markProgress();
+  };
+  const onUpdate = () => {
+    if (violationEmitted || activeInterrupts.size > 0) return;
+    const idleMs = Date.now() - lastProgressAtMs;
+    if (idleMs <= stallBudgetMs) return;
+    violationEmitted = true;
+    emitOrebContractTelemetry(scene, turnData, "oreb_undeclared_hold_violation", {
+      unitId,
+      violationType: "idle_without_declared_interrupt",
+      idleMs: Number(idleMs.toFixed(1)),
+      stallBudgetMs,
+      allowedInterrupts,
+      activeInterrupts: Array.from(activeInterrupts),
+    });
+  };
+  scene?.events?.on?.("update", onUpdate);
+  return {
+    markProgress,
+    setInterrupt,
+    stop: () => {
+      scene?.events?.off?.("update", onUpdate);
+    },
+  };
+}
+
 // PossessionRunner removed - using standard animation path only
 
 /**
@@ -171,23 +223,38 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
   
   
   if (!rebounderSprite) return;
-
-  const leadInStartMs = Date.now();
-  enforceOrebUnitContract({
+  const orebIdleWatchdog = createOrebIdleWatchdog(
     scene,
     turnData,
-    unitId: "oreb.lead_in.from_miss",
-    advanceTrigger: "OREB committed",
-    visualSettleTrigger: "rebound secure + attach settled",
-    authorizingEventReceived: true,
-    visualSettled: true,
-    unitStartMs: leadInStartMs,
-    maxWaitGameSeconds: getOrebBudgetGameSeconds("decision"),
-    context: {
-      resultType: turnData?.result_type ?? null,
-      rebounderId,
-    },
-  });
+    "oreb.out.to_*",
+    {
+      allowedInterrupts: [
+        "declared_hold",
+        "shot_release_or_flight",
+        "rebound_secure",
+        "pass_in_flight",
+        "route_transition",
+      ],
+    }
+  );
+
+  try {
+    const leadInStartMs = Date.now();
+    enforceOrebUnitContract({
+      scene,
+      turnData,
+      unitId: "oreb.lead_in.from_miss",
+      advanceTrigger: "OREB committed",
+      visualSettleTrigger: "rebound secure + attach settled",
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      maxWaitGameSeconds: getOrebBudgetGameSeconds("decision"),
+      context: {
+        resultType: turnData?.result_type ?? null,
+        rebounderId,
+      },
+    });
   
   if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
     // Animate putback attempt using shootBall
@@ -266,8 +333,20 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     const hasHoldWindow = Number.isFinite(orebHoldSeconds) && orebHoldSeconds > 0;
     if (hasHoldWindow && scene.time) {
       const holdMs = orebHoldSeconds * 350;
+      const holdStartedAt = Date.now();
+      orebIdleWatchdog.setInterrupt("declared_hold", true);
       await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
+      orebIdleWatchdog.setInterrupt("declared_hold", false);
+      const holdElapsedMs = Date.now() - holdStartedAt;
+      if (holdElapsedMs > holdMs + 250) {
+        emitOrebContractTelemetry(scene, turnData, "oreb_declared_hold_overrun", {
+          unitId: "oreb.phase.hold",
+          holdBudgetMs: Math.round(holdMs),
+          holdElapsedMs: Math.round(holdElapsedMs),
+        });
+      }
     }
+    orebIdleWatchdog.markProgress();
     enforceOrebUnitContract({
       scene,
       turnData,
@@ -284,6 +363,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       },
     });
 
+    orebIdleWatchdog.setInterrupt("shot_release_or_flight", true);
     const shotResult = await shootBall({
       scene,
       ballSprite,
@@ -297,6 +377,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       turnIndex: scene.currentTurn,
       turnData: turnData
     });
+    orebIdleWatchdog.setInterrupt("shot_release_or_flight", false);
+    orebIdleWatchdog.markProgress();
     
     // CRITICAL: Keep _putbackInProgress true until AFTER the rebound animation
     // This prevents runDefensiveReboundSetup from attaching the ball during the putback shot animation
@@ -339,6 +421,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
       const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
       
+      orebIdleWatchdog.setInterrupt("route_transition", true);
       await runInboundSetup({
         scene,
         ballSprite,
@@ -349,6 +432,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         skipRetreat,
         pressureType,
       });
+      orebIdleWatchdog.setInterrupt("route_transition", false);
+      orebIdleWatchdog.markProgress();
     }
     // Handle putback miss with rebound
     else if (turnData.rebound_type) {
@@ -369,6 +454,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       // This is NOT the same as the putback shooter (rebounderId variable above)
       const nextRebounderId = turnData.rebounderId;
       
+      orebIdleWatchdog.setInterrupt("rebound_secure", true);
       await animateRebound({
         scene,
         ballSprite,
@@ -380,6 +466,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         preserveBallPosition: true, // Ball is already at bounce spot from shootBall - don't reposition
         turnData: turnData // Pass turnData so get-back players can be excluded
       });
+      orebIdleWatchdog.setInterrupt("rebound_secure", false);
+      orebIdleWatchdog.markProgress();
 
       enforceOrebUnitContract({
         scene,
@@ -430,6 +518,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         // The putback shot animation is complete, BallController state already cleared by onPutbackEnd()
         
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+        orebIdleWatchdog.setInterrupt("route_transition", true);
         await runDefensiveReboundSetup({
           scene,
           ballSprite,
@@ -439,6 +528,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
           turnData: missTurn, // get-back source
           authorityTurnData: turnData, // strict outlet contract source
         });
+        orebIdleWatchdog.setInterrupt("route_transition", false);
+        orebIdleWatchdog.markProgress();
       }
       // If another OREB, it will be handled by the next OREB turn
     }
@@ -460,12 +551,15 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     });
   } else if (turnData.result_type === "OREB_KICKOUT") {
     // Handle kickout with outlet animation step
+    orebIdleWatchdog.setInterrupt("route_transition", true);
     await handleOrebKickout(scene, {
       playerSprites,
       ballSprite,
       rebounderId,
       turnData
     });
+    orebIdleWatchdog.setInterrupt("route_transition", false);
+    orebIdleWatchdog.markProgress();
     const outRoute = String(turnData?.next_play_type || "").toUpperCase();
     enforceOrebUnitContract({
       scene,
@@ -482,6 +576,9 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         sourceResultType: turnData?.result_type ?? null,
       },
     });
+  }
+  } finally {
+    orebIdleWatchdog.stop();
   }
 }
 

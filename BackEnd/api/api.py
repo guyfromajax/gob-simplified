@@ -433,7 +433,7 @@ try:
         # Optional UESS elapsed authority override for this request/session
         uess_clock_elapsed_authority: str | None = None  # "legacy" | "ledger"
         # Optional UESS ownership contract mode override for this request/session
-        uess_ownership_contract_mode: str | None = None  # "off" | "observe" | "warn"
+        uess_ownership_contract_mode: str | None = None  # "off" | "observe" | "warn" | "throw"
         # Optional UESS reconciliation tolerance override for this request/session
         uess_clock_recon_tolerance_seconds: float | None = None
     
@@ -4111,7 +4111,7 @@ try:
 
         if body.uess_ownership_contract_mode:
             raw_ownership_mode = str(body.uess_ownership_contract_mode).strip().lower()
-            if raw_ownership_mode in {"off", "observe", "warn"}:
+            if raw_ownership_mode in {"off", "observe", "warn", "throw"}:
                 gm.game_state["uess_ownership_contract_mode"] = raw_ownership_mode
                 logging.info("⏱️ UESS ownership contract mode override: %s", raw_ownership_mode)
             else:

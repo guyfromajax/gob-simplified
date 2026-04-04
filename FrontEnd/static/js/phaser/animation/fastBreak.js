@@ -1353,12 +1353,20 @@ export async function runFastBreakSequence({
     }
   }
   if (leadInUnit) {
+    const leadInAdvanceTrigger =
+      leadInUnit === "fb.lead_in.from_hco_steal"
+        ? "FB route committed + entry owner resolved"
+        : "DREB committed + FB route committed";
+    const leadInVisualSettleTrigger =
+      leadInUnit === "fb.lead_in.from_hco_steal"
+        ? "steal handoff visuals settled"
+        : "rebound secure + release setup settled";
     enforceFbUnitContract({
       scene,
       turnData,
       unitId: leadInUnit,
-      advanceTrigger: "FB route committed + entry owner resolved",
-      visualSettleTrigger: "entry handoff visuals settled",
+      advanceTrigger: leadInAdvanceTrigger,
+      visualSettleTrigger: leadInVisualSettleTrigger,
       authorizingEventReceived: true,
       visualSettled: true,
       unitStartMs: leadInStartMs,

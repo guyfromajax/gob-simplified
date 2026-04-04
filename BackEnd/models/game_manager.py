@@ -410,6 +410,11 @@ class GameManager:
                 ),
             )
             turn_result.setdefault("quarter", self.game_state.get("quarter", self.quarter))
+            if (
+                not isinstance(turn_result.get("uess_ownership_contract"), dict)
+                or "uess_ownership_contract_mode" not in turn_result
+            ):
+                self.turn_manager._attach_uess_ownership_contract(turn_result)
 
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))

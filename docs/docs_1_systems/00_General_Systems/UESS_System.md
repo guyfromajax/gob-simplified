@@ -14,29 +14,66 @@ Status key:
 - `launch_ready`: approved for prototype launch in current scope.
 - `proceed_with_polish`: functionally stable; non-blocking polish remains.
 - `in_progress`: implemented or partially implemented, but not yet locked for launch.
+- `deferred_rework`: intentionally paused because a near-term redesign is planned.
 
 Current status (as of 2026-03-26; consolidated prototype passes: `contractErrors=0`, `clockReconRows>=30`):
 
 - `clock_authority_contract`: `launch_ready`
   - notes: launch decision recorded; polish backlog remains non-blocking.
-- `ownership_pass_lifecycle_contract`: `proceed_with_polish`
-  - notes: backend/API coverage is strong; runtime observability ergonomics remain polish.
-- `inbound_unit_completion_contract` (`sip`/`bip`): `proceed_with_polish`
-  - notes: contract wiring is in place; telemetry tap reliability is tracked as tooling polish.
-- `hco_core_units` (`lead_in`, `step_movement`, `step_pass`, `resolution`, `out`): `proceed_with_polish`
-  - notes: strict-path coverage is broad; known edge-case hard-overrun remains tracked in backlog.
+- `ownership_pass_lifecycle_contract`: `launch_ready`
+  - notes: ingestion and payload-completeness gaps are resolved (`missingContractRows=0` in runtime validation); continue routine sampling to satisfy default promotion threshold (`minRows=40`) in normal QA flow.
+- `inbound_unit_completion_contract` (`sip`/`bip`): `launch_ready`
+  - notes: advance-trigger lock parity is complete and runtime gates are validated in consolidated non-pressure pass.
+- `hco_core_units` (`lead_in`, `step_movement`, `step_pass`, `resolution`, `out`): `launch_ready`
+  - notes: trigger-lock parity is complete and runtime gates are validated; pressure-coupled hardening remains on deferred track.
 - `pressure_units` (`fcp`/`hct` step + resolution + out): `proceed_with_polish`
-  - notes: parity wiring validated in consolidated warn-mode pass; keep runtime sampling in normal dev flow.
-- `fast_break_phase_contract`: `proceed_with_polish`
-  - notes: Wave 2 trigger-lock runtime parity is wired (`fb.lead_in/*`, `fb.phase/*`, `fb.out.to_*`); keep branch-level polish/backlog tracking.
-- `oreb_phase_contract`: `proceed_with_polish`
-  - notes: decision/action contracts are active with mode gating; keep branch-behavior cleanup in polish backlog.
-- `free_throw_phase_contract`: `proceed_with_polish`
-  - notes: attempt + sequence-control contracts are active; continue monitoring multi-FT edge flows.
-- `timeout_phase_contract`: `proceed_with_polish`
-  - notes: pause/resume barrier contracts are active; maintain popup/navigation UX polish items separately.
-- `opening_tip_phase_contract`: `proceed_with_polish`
-  - notes: jump/control/transition contracts are active; keep lightweight runtime sampling in standard QA.
+  - notes: rework phases 1-3 are implemented; lead-in/step/resolution/out controls are active with staged promotion helpers. Full-throw profile passed initial runtime sampling (both families observed, no warns), with extended sampling still pending default row-depth thresholds.
+- `fast_break_phase_contract`: `launch_ready`
+  - notes: Wave 2 trigger-lock parity is complete and runtime-validated in consolidated non-pressure pass.
+- `oreb_phase_contract`: `launch_ready`
+  - notes: lead-in/decision/action/out contract wiring is complete and runtime-validated for non-pressure launch scope.
+- `free_throw_phase_contract`: `launch_ready`
+  - notes: attempt + sequence-control contracts are stable for launch; continue normal QA sampling.
+- `timeout_phase_contract`: `launch_ready`
+  - notes: pause/resume barrier contracts are stable for launch; timeout UX polish remains non-blocking.
+- `opening_tip_phase_contract`: `launch_ready`
+  - notes: jump/control/transition contracts are stable for launch in current prototype scope.
+
+## Immediate Next Step
+
+- Active track: complete extended pressure sampling under full-throw profile and then promote `pressure_units` to `launch_ready`.
+- Parallel track: maintain routine QA sampling on already launch-ready non-pressure families and triage only new regressions.
+
+## Advance-Trigger Lock Pass (Non-Pressure)
+
+Status: `complete` (contract row -> runtime check parity locked).
+
+Locked in this pass:
+
+- `inbound_unit_completion_contract` (`sip`/`bip`)
+- `oreb_phase_contract`
+- `fast_break_phase_contract`
+- `hco_core_units`
+
+Deferred from this pass:
+
+- `pressure_units` (`fcp`/`hct`) due to planned redesign.
+
+## Consolidated Runtime Pass (Non-Pressure)
+
+Status: `complete` (validated in runtime sampling sweep).
+
+Validated gate snapshot:
+
+- `clock_gate: true`
+- `ownership_gate: true`
+- `ownership_missing: 0`
+- `runtime_errors: 0`
+
+Notes:
+
+- Gate verification used temporary reduced minimum row thresholds (`minRows=20`) for rapid confidence checks.
+- Default threshold sampling (`minRows=40`) remains part of routine QA and does not block this launch-readiness decision.
 
 ## UESS Contract Fields (Universal)
 
@@ -59,6 +96,56 @@ When policies overlap, resolve in this order:
 3. Unit transition budgets (guardrails and diagnostics)
 
 This prevents conflict between gameplay clock semantics and per-unit timing budgets.
+
+## Destination-First Movement Invariant (Locked)
+
+This invariant is now the default movement policy for all UESS execution units.
+
+### Core rule
+
+- Required movers must continuously progress toward a declared destination once the unit starts.
+- Movement pause/redirect is allowed only when a declared interrupt is active.
+- Any hold must be declared by the unit contract (reason + budget + affected movers).
+
+### Declared interrupt set (default allow-list)
+
+- `pass_in_flight`
+- `shot_release_or_flight`
+- `rebound_secure`
+- `timeout_pause_barrier`
+- `dead_ball_or_whistle_stop`
+- `period_end`
+
+Notes:
+
+- Family/unit cards may add explicit interrupts only if they are documented in that unit's contract row.
+- Undeclared waits (implicit `setTimeout`/tween settle delays without interrupt context) are contract violations.
+
+### Required contract fields for destination-first units
+
+- `required_movers` (player IDs or roles)
+- `destinations_by_mover` (resolved at unit start)
+- `allowed_interrupts`
+- `max_wait_game_seconds`
+- `failure_policy`
+
+### Runtime acceptance checks (must pass)
+
+1. **Destination availability**: every required mover has a resolved destination at unit start.
+2. **Continuous progress**: while no interrupt is active, mover delta-to-target must be monotonically non-increasing within tolerance.
+3. **Interrupt validity**: any pause window has an active interrupt in `allowed_interrupts`.
+4. **Hold declaration**: any hold duration is emitted with `hold_reason`, `hold_start_ms`, `hold_budget_ms`.
+5. **Completion gate**: unit exits only when movers settle OR a declared terminal interrupt ends the unit.
+6. **Budget gate**: elapsed unit time cannot exceed `max_wait_game_seconds` without explicit policy action (`warn|throw`).
+7. **Transition continuity**: out-transition must not introduce a non-interrupt pause between ownership handoff and next unit entry.
+
+### Rollout policy
+
+- Forward-only rule: all newly wired/modified units must comply immediately.
+- Retrofit priority:
+  1. `hco.lead_in.from_dreb_outlet` boundary
+  2. `oreb.*` putback/kickout boundaries
+  3. remaining batch/sub-turn transition boundaries
 
 ## Local Dev Strictness Policy
 
@@ -203,7 +290,7 @@ Required continuity examples:
 - Frontend propagates `window.UESS_CLOCK_ELAPSED_AUTHORITY` to backend on each `/api/simulate-turn` request via `uess_clock_elapsed_authority`, and backend applies it to `game_state.uess_clock_elapsed_authority` when valid.
 - `window.UESS_CLOCK_RECON_TOLERANCE_SECONDS = <number>`
 - Frontend propagates `window.UESS_CLOCK_RECON_TOLERANCE_SECONDS` to backend on each `/api/simulate-turn` request via `uess_clock_recon_tolerance_seconds`, and backend applies it to `game_state.uess_clock_recon_tolerance_seconds` when valid/non-negative.
-- Backend ownership contract mode: `game_state.uess_ownership_contract_mode = "off" | "observe" | "warn"` (default: `warn`).
+- Backend ownership contract mode: `game_state.uess_ownership_contract_mode = "off" | "observe" | "warn" | "throw"` (default: `warn`).
 - Frontend can override ownership mode per turn via `window.UESS_OWNERSHIP_CONTRACT_MODE`, propagated as `uess_ownership_contract_mode` on `/api/simulate-turn`.
 - Turn payload exposes both `uess_ownership_contract_mode` (top-level) and `uess_ownership_contract.mode` (contract-level) for parity/debug clarity.
 - Runtime ownership debug mirrors/helpers:
@@ -239,6 +326,7 @@ Required continuity examples:
 - `window.UESS_OREB_CONTRACT_MODE = "off" | "observe" | "warn" | "throw"` (default: `observe`)
 - `window.UESS_OREB_DECISION_MAX_GAME_SECONDS = <number>` (default: `2`)
 - `window.UESS_OREB_ACTION_MAX_GAME_SECONDS = <number>` (default: `3`)
+- `window.UESS_OREB_UNDECLARED_HOLD_BUDGET_MS = <number>` (default: `900`)
 - `window.UESS_FT_CONTRACT_MODE = "off" | "observe" | "warn" | "throw"` (default: `observe`)
 - `window.UESS_FT_ATTEMPT_MAX_GAME_SECONDS = <number>` (default: `3`)
 - `window.UESS_FT_SEQUENCE_MAX_GAME_SECONDS = <number>` (default: `2`)
@@ -252,6 +340,8 @@ Required continuity examples:
 - `window.UESS_FB_LEAD_IN_MAX_GAME_SECONDS = <number>` (default: `4`)
 - `window.UESS_FB_PHASE_MAX_GAME_SECONDS = <number>` (default: `6`)
 - `window.UESS_FB_OUT_MAX_GAME_SECONDS = <number>` (default: `2`)
+- `window.UESS_BATCH_BOUNDARY_UNDECLARED_HOLD_BUDGET_MS = <number>` (default: `1200`)
+- `window.UESS_CLOCK_NON_MONOTONIC_SLACK_SECONDS = <number>` (default: `1`) for expected inbound/putback boundary snaps in scoreboard sync.
 
 Debug helpers currently installed in local runtime:
 
@@ -347,6 +437,19 @@ At minimum, runtime emits:
 - `inbound_contract_pass_in_flight`
 - `inbound_contract_clock_overrun`
 
+Advance-trigger lock parity (runtime-verified):
+
+| Unit | `advance_trigger` (locked) | `visual_settle_trigger` (locked) | Runtime parity |
+| --- | --- | --- | --- |
+| `sip.lead_in.entry` | `SIP route committed + inbounder resolved` | `setup settled` | `locked` |
+| `sip.phase.setup_positions` | `required setup movers reached targets` | `setup tweens settled` | `locked` |
+| `sip.phase.pass` | `pass received` | `ball flight + receiver settle` | `locked` |
+| `sip.out.to_*` | `route committed` | `SIP final settle complete` | `locked` |
+| `bip.lead_in.entry` | `BIP route committed + inbounder resolved` | `baseline setup settled` | `locked` |
+| `bip.phase.setup_positions` | `required setup movers reached targets` | `setup tweens settled` | `locked` |
+| `bip.phase.pass` | `pass received` | `ball flight + receiver settle` | `locked` |
+| `bip.out.to_*` | `route committed` | `BIP final settle complete` | `locked` |
+
 ## Pressure Skeleton Step Contract (FCP/HCT Families)
 
 Runtime now applies unit-completion step validation to pressure skeleton families:
@@ -361,6 +464,81 @@ Telemetry is emitted under pressure branch/event labels:
 - `branchKind: "pressure_step_movement"`
 - `pressure_step_movement_*` and `pressure_step_pass_*` event families
 - shared completion contract events (`unit_completion_contract_validated`, `unit_completion_contract_violation`)
+
+## Pressure Rework Phase 0 (Spec Kickoff)
+
+Status: `planned` (design lock before runtime rewrite).
+
+Objective:
+
+- Rebuild pressure-family (`fcp`/`hct`) execution units as first-class contracts instead of inheriting HCO assumptions.
+
+Unit cards to lock before implementation:
+
+| Unit | `execution_mode` | `advance_trigger` (draft lock) | `visual_settle_trigger` (draft lock) | `failure_policy` (target) | `clock_anchor` |
+| --- | --- | --- | --- | --- | --- |
+| `fcp.lead_in.entry` | `dynamic_event` | `FCP route committed + entry owner resolved` | `press entry handoff settled` | `warn -> throw` | `transition budget` |
+| `hct.lead_in.entry` | `dynamic_event` | `HCT route committed + entry owner resolved` | `trap entry handoff settled` | `warn -> throw` | `transition budget` |
+| `fcp.step[n].movement` | `skeleton` | `required movers reach step-n targets` | `required step-n tweens complete` | `warn -> throw` | `step_clock_seconds[n]` |
+| `hct.step[n].movement` | `skeleton` | `required movers reach step-n targets` | `required step-n tweens complete` | `warn -> throw` | `step_clock_seconds[n]` |
+| `fcp.step[n].pass` | `skeleton` | `pass received` | `ball flight + receiver settle` | `throw` | `step_clock_seconds[n]` |
+| `hct.step[n].pass` | `skeleton` | `pass received` | `ball flight + receiver settle` | `throw` | `step_clock_seconds[n]` |
+| `fcp.resolution` | `dynamic_event` | `result committed` | `resolution visuals settled` | `throw` | `remaining turn budget` |
+| `hct.resolution` | `dynamic_event` | `result committed` | `resolution visuals settled` | `throw` | `remaining turn budget` |
+| `fcp.out.to_*` | `dynamic_event` | `route committed` | `FCP boundary settle complete` | `throw` | `boundary handoff` |
+| `hct.out.to_*` | `dynamic_event` | `route committed` | `HCT boundary settle complete` | `throw` | `boundary handoff` |
+
+Design constraints (locked for rewrite):
+
+- Pressure step tolerance/budget enforcement must be pressure-owned (no shared fallback constants from HCO).
+- Step pass hard-fail logic must key off pressure unit contracts only, with explicit route and owner handoff checks.
+- Entry path must support BIP/SIP/steal starts without hidden setup assumptions.
+
+Rollout flags (phase-gated):
+
+- `window.UESS_PRESSURE_REWORK_PHASE = "off" | "phase1_scaffold" | "phase2_split"` (default: `off`)
+- `window.UESS_PRESSURE_REWORK_PHASE = "off" | "phase1_scaffold" | "phase2_split" | "phase3_lead_in"` (default: `off`)
+- `window.UESS_PRESSURE_REWORK_STEP_MOVEMENT_TOLERANCE_PX = <number>` (phase 2 override)
+- `window.UESS_PRESSURE_REWORK_STEP_MIN_GAME_SECONDS = <number>` (phase 2/3 minimum per-step budget floor; default: `2`)
+- `window.UESS_PRESSURE_REWORK_STEP_MOVEMENT_MAX_GAME_SECONDS = <number>` (phase 2 override)
+- `window.UESS_PRESSURE_REWORK_STEP_CLOCK_JITTER_ABS_SECONDS = <number>` (phase 2 override)
+- `window.UESS_PRESSURE_REWORK_STEP_CLOCK_JITTER_RATIO = <number>` (phase 2 override)
+- `window.UESS_PRESSURE_REWORK_STEP_PASS_RECEIVER_TOLERANCE_PX = <number>` (phase 2/3 pass-settle override)
+- `window.UESS_PRESSURE_REWORK_STEP_PASS_CLOCK_JITTER_ABS_SECONDS = <number>` (phase 2 override)
+- `window.UESS_PRESSURE_REWORK_STEP_PASS_CLOCK_JITTER_RATIO = <number>` (phase 2 override)
+- `window.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "off" | "warn" | "throw"` (phase 2/3 pressure-step mode override; default: inherit `UESS_PRESSURE_STEP_CONTRACT_MODE`)
+- `window.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "off" | "warn" | "throw"` (phase 2/3 resolution mode override; default: inherit pressure-step mode)
+- `window.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "off" | "warn" | "throw"` (phase 2/3 transition-out mode override; default: inherit pressure-step mode)
+- `window.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE = "off" | "warn"` (phase 3 lead-in validator path; default: `off`, warn-only)
+- `window.UESS_PRESSURE_REWORK_SUMMARY_EVERY = <number>` (summary cadence; default: `5` pressure rows)
+- `window.UESS_PRESSURE_REWORK_WARN_MIN_ROWS = <number>` (promotion gate minimum rows; default: `10`)
+- `window.UESS_PRESSURE_REWORK_WARN_ROWS_MAX = <number>` (promotion gate max warn rows; default: `0`)
+- `window.UESS_PRESSURE_REWORK_WARN_RATE_MAX = <number>` (promotion gate max warn rate; default: `0.02`)
+
+Phase 2/3 movement hardening defaults (used when pressure-rework overrides are not set):
+
+- step movement tolerance: `22px`
+- step pass receiver-settle tolerance: `24px`
+- step movement fallback budget: `9` game seconds
+- movement jitter slack: `max(0.6s, 45% of step budget)`
+- pass jitter slack: `max(1.2s, 110% of step budget)`
+
+Pressure rework promotion gate (warn -> throw):
+
+- Runtime emits `pressure_rework_summary` with:
+  - `rows`, `warnRows`, `warnRate`
+  - `leadInEvalRows`, `movementPolicyRows`, `passPolicyRows`
+  - `resolutionWarnRows`, `outWarnRows`
+  - `thresholds`, `hasEnoughRows`, `meetsWarnPromotionGate`
+- Promotion readiness target:
+  - `rows >= UESS_PRESSURE_REWORK_WARN_MIN_ROWS`
+  - `warnRows <= UESS_PRESSURE_REWORK_WARN_ROWS_MAX`
+  - `warnRate <= UESS_PRESSURE_REWORK_WARN_RATE_MAX`
+
+Runtime helpers:
+
+- `showPressureReworkPromotionReadiness()` -> prints the latest summary gate status.
+- `applyPressureReworkPromotionProfile("warn" | "pilot_throw" | "full_throw")` -> applies staged pressure contract modes with a single command.
 
 ## OREB Phase Contract (Lead-In + Decision + Action + Out)
 
@@ -380,6 +558,33 @@ Telemetry branch: `oreb_phase_contract`, including:
 - `unit_completion_contract_violation`
 - `oreb_phase_clock_overrun`
 - `oreb_phase_putback_failed`
+- `oreb_undeclared_hold_violation`
+- `oreb_declared_hold_overrun`
+
+Advance-trigger lock parity (runtime-verified):
+
+| Unit | `advance_trigger` (locked) | `visual_settle_trigger` (locked) | Runtime parity |
+| --- | --- | --- | --- |
+| `oreb.lead_in.from_miss` | `OREB committed` | `rebound secure + attach settled` | `locked` |
+| `oreb.phase.hold` | `hold boundary reached` | `no active attach/tween conflicts` | `locked` |
+| `oreb.phase.decision` | `decision event committed` | `decision prep visuals settled` | `locked` |
+| `oreb.phase.kickout_pass` | `pass received` | `ball flight + receiver settle` | `locked` |
+| `oreb.phase.putback_attempt` | `shot release/result committed` | `putback visuals settled` | `locked` |
+| `oreb.phase.putback_rebound_resolution` | `rebound outcome committed` | `rebound settle complete` | `locked` |
+| `oreb.out.to_*` | `route committed` | `OREB final settle complete` | `locked` |
+
+## Batch/Sub-Turn Transition Boundary Guard
+
+Runtime now emits boundary guard telemetry in `gameScene.simulateTurnByTurn` for hidden waits across turn boundaries:
+
+- `branchKind: "batch_transition_boundary"`
+- `batch_boundary_undeclared_hold_violation`
+- `batch_subturn_boundary_gap_overrun`
+
+Policy:
+
+- Turn runtime should remain within contract elapsed + boundary hold budget unless an allowed boundary interrupt is active (`dead_ball_or_whistle_stop`, `timeout_pause_barrier`, `period_end`).
+- Gaps between batch sub-turns should not exceed the boundary hold budget without an allowed interrupt context.
 
 ## Free Throw Phase Contract
 
@@ -442,6 +647,45 @@ Telemetry includes:
 - `unit_completion_contract_validated`
 - `unit_completion_contract_violation`
 - `fb_phase_clock_overrun`
+
+Advance-trigger lock parity (runtime-verified):
+
+| Unit | `advance_trigger` (locked) | `visual_settle_trigger` (locked) | Runtime parity |
+| --- | --- | --- | --- |
+| `fb.lead_in.from_hco_steal` | `FB route committed + entry owner resolved` | `steal handoff visuals settled` | `locked` |
+| `fb.lead_in.from_dreb_release` | `DREB committed + FB route committed` | `rebound secure + release setup settled` | `locked` |
+| `fb.phase.entry_burst` | `required movers reach burst targets` | `burst tweens settled` | `locked` |
+| `fb.phase.outlet` | `outlet pass received` | `passer/receiver movement + pass settled` | `locked` |
+| `fb.phase.defensive_stop` | `stop result committed` | `stop visuals settled` | `locked` |
+| `fb.phase.shot_attempt` | `shot release/result committed` | `shot visuals settled` | `locked` |
+| `fb.phase.rebound_resolution` | `rebound outcome committed` | `rebound attach + settle complete` | `locked` |
+| `fb.out.to_*` | `route committed` | `final FB settle complete` | `locked` |
+
+## HCO Core Unit-Completion Contract
+
+Runtime now emits/enforces unit-completion contracts for HCO core flow in `turnAnimation.js`:
+
+- `hco.lead_in.from_dreb_outlet`
+- `hco.lead_in.from_sip_or_bip`
+- `hco.step[n].movement`
+- `hco.step[n].pass`
+- `hco.resolution`
+- `hco.out.to_*`
+
+Advance-trigger lock parity (runtime-verified):
+
+| Unit | `advance_trigger` (locked) | `visual_settle_trigger` (locked) | Runtime parity |
+| --- | --- | --- | --- |
+| `hco.lead_in.from_dreb_outlet` | `outlet pass received` | `outlet movement + pass settled` | `locked` |
+| `hco.lead_in.from_sip_or_bip` | `inbound pass received` | `inbound setup + pass settled` | `locked` |
+| `hco.step[n].movement` | `required movers reach step-n targets` | `required step-n tweens complete` | `locked` |
+| `hco.step[n].pass` | `pass received` | `ball flight + receiver settle` | `locked` |
+| `hco.resolution` | `result committed` | `resolution visuals settled` | `locked` |
+| `hco.out.to_*` | `route committed` | `end-of-turn visuals settled` | `locked` |
+
+Scope note:
+
+- Runtime currently gates `hco.step[n].*`, `hco.resolution`, and `hco.out.to_*` enforcement to canonical skeleton-result turns (`MAKE`, `MISS`, `BLOCK`, `FOUL`, `STEAL`) to avoid false positives on non-skeleton wrapper results.
 
 ## Clock Sync Launch Status
 

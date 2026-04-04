@@ -144,7 +144,7 @@ class TurnManager:
 
     def _resolve_ownership_contract_mode(self, game_state: dict) -> str:
         raw_mode = str(game_state.get("uess_ownership_contract_mode", "warn") or "warn").strip().lower()
-        if raw_mode in {"off", "observe", "warn"}:
+        if raw_mode in {"off", "observe", "warn", "throw"}:
             return raw_mode
         return "warn"
 
@@ -439,7 +439,15 @@ class TurnManager:
             contract["pass_events"] = pass_events
         result["uess_ownership_contract"] = contract
 
-        if ownership_mode == "warn" and contract["applicable"] and not contract["pass_lifecycle_valid"]:
+        if ownership_mode in {"warn", "throw"} and contract["applicable"] and not contract["pass_lifecycle_valid"]:
+            message = (
+                "[UESS ownership contract] pass lifecycle invalid "
+                f"(mode={ownership_mode}, result={result.get('result_type')}, next={result.get('next_play_type')}, "
+                f"passEventCount={contract['pass_event_count']}, validReceiptCount={contract['pass_receipt_valid_count']}, "
+                f"terminalOwner={contract['terminal_owner_pos']})"
+            )
+            if ownership_mode == "throw":
+                raise ValueError(message)
             logging.warning(
                 "⚠️ [UESS ownership contract] pass lifecycle invalid (result=%s, next=%s, "
                 "passEventCount=%s, validReceiptCount=%s, terminalOwner=%s)",

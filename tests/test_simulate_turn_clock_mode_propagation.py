@@ -306,6 +306,27 @@ def test_simulate_turn_propagates_ownership_contract_mode(monkeypatch):
     assert turn["uess_ownership_contract"]["mode"] == "observe"
 
 
+def test_simulate_turn_propagates_ownership_contract_mode_throw(monkeypatch):
+    gm = _ClockModeDummyGM()
+    monkeypatch.setattr(api, "ongoing_games", {"gid-own-mode-throw-prop": gm})
+
+    response = client.post(
+        "/api/simulate-turn",
+        json={
+            "game_id": "gid-own-mode-throw-prop",
+            "uess_ownership_contract_mode": "throw",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    turn = body["turn"]
+
+    assert gm.game_state["uess_ownership_contract_mode"] == "throw"
+    assert turn["uess_ownership_contract_mode"] == "throw"
+    assert turn["uess_ownership_contract"]["mode"] == "throw"
+
+
 def test_simulate_turn_ignores_invalid_ownership_contract_mode(monkeypatch):
     gm = _ClockModeDummyGM()
     gm.game_state["uess_ownership_contract_mode"] = "warn"

@@ -495,8 +495,14 @@ export class ShotAnimationSystem {
     }
     
     // ✅ VALIDATION: Ensure we have exactly 5 offensive and 5 defensive players
-    if (offensiveCount !== 5 || defensiveCount !== 5) {
+    // only on full-roster turns. Embedded helper/synthetic paths may not include
+    // all 10 animations and should not trigger false positives.
+    const expectedFullRosterClassification =
+      Array.isArray(turnData?.animations) && turnData.animations.length >= 10;
+    if (expectedFullRosterClassification && (offensiveCount !== 5 || defensiveCount !== 5)) {
       console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
+        resultType: turnData?.result_type ?? null,
+        animationCount: turnData?.animations?.length ?? 0,
         offensiveCount,
         defensiveCount
       });
@@ -1511,8 +1517,28 @@ export class ShotAnimationSystem {
     //   fullTurnData: turnData // Log full object to see what's actually present
     // });
     
-    // ✅ PRIORITY 2 FIX: Validate next_play_type is present (no fallback - must be correct)
+    // ✅ PRIORITY 2 FIX: Validate next_play_type is present for normal turns.
+    // Final/terminal shot turns can legally omit a next route at quarter boundary.
+    const isTerminalTurnContext =
+      turnData?.is_final_turn_of_quarter === true ||
+      turnData?.final_turn === true ||
+      turnData?.quarter_complete === true;
+    const gameClockZero =
+      Number(turnData?.clock_end ?? turnData?.time_remaining ?? 1) <= 0;
+    const shouldAllowMissingNextPlayType = isTerminalTurnContext && gameClockZero;
+
     if (!turnData.next_play_type) {
+      if (shouldAllowMissingNextPlayType) {
+        // Quarter-end terminal route: no inbound/outlet follow-up should be executed.
+        if (this.stateMachine) {
+          this.stateMachine.transition(AnimationStates.POSSESSION, {
+            reason: 'rebound_terminal_turn',
+            rebounder_id: turnData.rebounderId,
+            quarter_complete: true,
+          });
+        }
+        return;
+      }
       // Diagnostic: Check if next_play_type is on the next turn (shouldn't be, but let's check)
       const currentTurnIndex = this.scene.currentTurn || 0;
       const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];

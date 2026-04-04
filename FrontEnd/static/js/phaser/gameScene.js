@@ -104,6 +104,128 @@ function installOwnershipContractGlobalHelpers() {
   };
 }
 
+function installPressureReworkGlobalHelpers() {
+  const scope = typeof window !== 'undefined' ? window : globalThis;
+  if (!scope || scope.__pressureReworkHelpersInstalled) return;
+  scope.__pressureReworkHelpersInstalled = true;
+
+  const resolvePressureReworkWarnThresholds = () => ({
+    minRows: Math.max(
+      1,
+      Math.floor(Number(scope.UESS_PRESSURE_REWORK_WARN_MIN_ROWS ?? 10) || 10)
+    ),
+    warnRowsMax: Math.max(
+      0,
+      Math.floor(Number(scope.UESS_PRESSURE_REWORK_WARN_ROWS_MAX ?? 0) || 0)
+    ),
+    warnRateMax: Math.max(
+      0,
+      Number(scope.UESS_PRESSURE_REWORK_WARN_RATE_MAX ?? 0.02) || 0.02
+    ),
+  });
+
+  scope.showPressureReworkConfig = () => {
+    const phase = String(scope.UESS_PRESSURE_REWORK_PHASE ?? "off");
+    const leadInContractMode = String(scope.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE ?? "off");
+    const stepContractMode = String(scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE ?? "inherit_legacy");
+    const resolutionContractMode = String(scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE ?? "inherit_step_mode");
+    const outContractMode = String(scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE ?? "inherit_step_mode");
+    const summaryEvery = Math.max(
+      1,
+      Math.floor(Number(scope.UESS_PRESSURE_REWORK_SUMMARY_EVERY ?? 5) || 5)
+    );
+    const thresholds = resolvePressureReworkWarnThresholds();
+    const buffer = Array.isArray(scope.__PRESSURE_REWORK_BUFFER__)
+      ? scope.__PRESSURE_REWORK_BUFFER__
+      : [];
+    const enabledPhases = new Set(["phase1_scaffold", "phase2_split", "phase3_lead_in"]);
+    const config = {
+      phase,
+      enabled: enabledPhases.has(phase),
+      leadInContractMode,
+      stepContractMode,
+      resolutionContractMode,
+      outContractMode,
+      summaryEvery,
+      thresholds,
+      bufferRows: buffer.length,
+      latestSummary: scope.__PRESSURE_REWORK_SUMMARY_LAST__ ?? null,
+      lastEvent: scope.__PRESSURE_REWORK_LAST__ ?? null,
+    };
+    console.log("[PRESSURE REWORK CONFIG]", config);
+    return config;
+  };
+  scope.getPressureReworkLatest = (n = 5) => {
+    const count = Math.max(0, Math.floor(Number(n) || 0));
+    const buffer = Array.isArray(scope.__PRESSURE_REWORK_BUFFER__)
+      ? scope.__PRESSURE_REWORK_BUFFER__
+      : [];
+    return buffer.slice(-count);
+  };
+  scope.clearPressureReworkBuffer = () => {
+    scope.__PRESSURE_REWORK_LAST__ = undefined;
+    scope.__PRESSURE_REWORK_BUFFER__ = [];
+    scope.__PRESSURE_REWORK_SUMMARY_LAST__ = undefined;
+    scope.__PRESSURE_REWORK_SUMMARY_BUFFER__ = [];
+    scope.__PRESSURE_REWORK_SESSION__ = undefined;
+  };
+  scope.getPressureReworkSummaryLatest = (n = 5) => {
+    const count = Math.max(0, Math.floor(Number(n) || 0));
+    const list = Array.isArray(scope.__PRESSURE_REWORK_SUMMARY_BUFFER__)
+      ? scope.__PRESSURE_REWORK_SUMMARY_BUFFER__
+      : [];
+    return list.slice(-count);
+  };
+  scope.showPressureReworkPromotionReadiness = () => {
+    const summary = scope.__PRESSURE_REWORK_SUMMARY_LAST__ || null;
+    const readiness = {
+      phase: String(scope.UESS_PRESSURE_REWORK_PHASE ?? "off"),
+      summaryPresent: Boolean(summary),
+      rows: summary?.rows ?? 0,
+      warnRows: summary?.warnRows ?? 0,
+      warnRate: summary?.warnRate ?? 0,
+      hasEnoughRows: summary?.hasEnoughRows ?? false,
+      meetsWarnPromotionGate: summary?.meetsWarnPromotionGate ?? false,
+      thresholds: summary?.thresholds ?? resolvePressureReworkWarnThresholds(),
+    };
+    console.log("[PRESSURE REWORK READINESS]", readiness);
+    return readiness;
+  };
+  scope.applyPressureReworkPromotionProfile = (profile = "warn") => {
+    const p = String(profile || "").trim().toLowerCase();
+    // Shared baseline for pressure rework.
+    scope.UESS_PRESSURE_REWORK_PHASE = "phase3_lead_in";
+    scope.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE = "warn";
+    scope.UESS_PRESSURE_REWORK_SUMMARY_EVERY = 1;
+    if (p === "full_throw") {
+      scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "throw";
+      scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "throw";
+      scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "throw";
+    } else if (p === "pilot_throw") {
+      scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "throw";
+      scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "warn";
+      scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "warn";
+    } else {
+      // Default/invalid profile falls back to warn-only rollout.
+      scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "warn";
+      scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "warn";
+      scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "warn";
+      profile = "warn";
+    }
+    const applied = {
+      profile: p === "pilot_throw" || p === "full_throw" ? p : "warn",
+      phase: scope.UESS_PRESSURE_REWORK_PHASE,
+      leadInContractMode: scope.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE,
+      stepContractMode: scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE,
+      resolutionContractMode: scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE,
+      outContractMode: scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE,
+      summaryEvery: scope.UESS_PRESSURE_REWORK_SUMMARY_EVERY,
+    };
+    console.log("[PRESSURE REWORK PROFILE APPLIED]", applied);
+    return applied;
+  };
+}
+
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
     constructor() {
@@ -117,6 +239,7 @@ export function createGameScene(Phaser) {
       this.gameClock = null;
       this.shotClock = null;
       installOwnershipContractGlobalHelpers();
+      installPressureReworkGlobalHelpers();
     }
 
     init(data) {
@@ -1552,12 +1675,41 @@ export function createGameScene(Phaser) {
           const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
           const incomingQuarter = (typeof turn.quarter === 'number') ? turn.quarter : liveQuarter;
           const allowIncrease = incomingQuarter > liveQuarter;
-          if (currentClockSec == null || allowIncrease || incomingGameSec <= currentClockSec) {
+          const nonMonotonicSlackSeconds = Math.max(
+            0,
+            Number(window?.UESS_CLOCK_NON_MONOTONIC_SLACK_SECONDS ?? 1) || 1
+          );
+          const inboundOrBoundaryTypes = new Set([
+            'FREE_THROW',
+            'SIDE_INBOUND',
+            'BASELINE_INBOUND',
+            'TIMEOUT',
+            'PUTBACK_MAKE',
+            'PUTBACK_MISS',
+            'OREB_KICKOUT',
+          ]);
+          const resultTypeKey = String(turn?.result_type || '').toUpperCase();
+          const increaseDeltaSeconds =
+            currentClockSec == null ? 0 : Number(incomingGameSec) - Number(currentClockSec);
+          const allowBoundarySlackIncrease =
+            increaseDeltaSeconds > 0 &&
+            increaseDeltaSeconds <= nonMonotonicSlackSeconds &&
+            inboundOrBoundaryTypes.has(resultTypeKey);
+
+          if (
+            currentClockSec == null ||
+            allowIncrease ||
+            incomingGameSec <= currentClockSec ||
+            allowBoundarySlackIncrease
+          ) {
             this.gameClock.syncWithBackend(incomingGameSec);
           } else {
             console.warn('⏱️ Ignoring non-monotonic clock update', {
               currentClockSec,
               incomingClockSec: incomingGameSec,
+              increaseDeltaSeconds,
+              nonMonotonicSlackSeconds,
+              allowBoundarySlackIncrease,
               liveQuarter,
               incomingQuarter,
               result_type: turn.result_type
@@ -2181,7 +2333,7 @@ export function createGameScene(Phaser) {
         };
         const resolveOwnershipContractMode = () => {
           const raw = String(window?.UESS_OWNERSHIP_CONTRACT_MODE ?? "").trim().toLowerCase();
-          if (raw === "off" || raw === "observe" || raw === "warn") {
+          if (raw === "off" || raw === "observe" || raw === "warn" || raw === "throw") {
             return raw;
           }
           return null;
@@ -2412,6 +2564,82 @@ export function createGameScene(Phaser) {
         }
       };
 
+      const getBatchBoundaryHoldBudgetMs = () => {
+        const scope = typeof window !== "undefined" ? window : globalThis;
+        const raw = Number(scope?.UESS_BATCH_BOUNDARY_UNDECLARED_HOLD_BUDGET_MS);
+        if (Number.isFinite(raw) && raw > 0) return raw;
+        return 1200;
+      };
+
+      const isBoundaryInterruptResultType = (resultType) => {
+        const key = String(resultType || "").toUpperCase();
+        return (
+          key === "TIMEOUT" ||
+          key === "DEAD BALL" ||
+          key === "FOUL" ||
+          key === "CHARGE" ||
+          key === "TURNOVER" ||
+          key === "PERIOD_END"
+        );
+      };
+
+      const emitBatchBoundaryTelemetry = (event, payload = {}) => {
+        const scope = typeof window !== "undefined" ? window : globalThis;
+        const row = {
+          event,
+          branchKind: "batch_transition_boundary",
+          timestampMs: Date.now(),
+          ...payload,
+        };
+        this.events?.emit?.("animTelemetry", row);
+        scope.__BATCH_BOUNDARY_LAST__ = row;
+        if (!Array.isArray(scope.__BATCH_BOUNDARY_BUFFER__)) {
+          scope.__BATCH_BOUNDARY_BUFFER__ = [];
+        }
+        scope.__BATCH_BOUNDARY_BUFFER__.push(row);
+        if (scope.__BATCH_BOUNDARY_BUFFER__.length > 100) {
+          scope.__BATCH_BOUNDARY_BUFFER__.splice(
+            0,
+            scope.__BATCH_BOUNDARY_BUFFER__.length - 100
+          );
+        }
+      };
+
+      const validateBatchBoundaryDuration = ({
+        turnLike,
+        elapsedMs,
+        contextType,
+        turnIndex,
+        batchIndex = null,
+      }) => {
+        const expectedMs = Math.max(
+          0,
+          Number(turnLike?.real_time_elapsed_ms ?? turnLike?.realTimeElapsedMs ?? 0) || 0
+        );
+        const overrunMs = Math.max(0, Number(elapsedMs) - expectedMs);
+        const holdBudgetMs = getBatchBoundaryHoldBudgetMs();
+        const resultType = String(turnLike?.result_type ?? "");
+        const interruptResult = isBoundaryInterruptResultType(resultType);
+        if (!interruptResult && overrunMs > holdBudgetMs) {
+          emitBatchBoundaryTelemetry("batch_boundary_undeclared_hold_violation", {
+            violationType: "turn_duration_exceeds_contract_elapsed_without_interrupt",
+            resultType: resultType || null,
+            contextType,
+            turnIndex: Number.isFinite(turnIndex) ? turnIndex : null,
+            batchIndex: Number.isFinite(batchIndex) ? batchIndex : null,
+            elapsedMs: Math.round(elapsedMs),
+            expectedElapsedMs: Math.round(expectedMs),
+            overrunMs: Math.round(overrunMs),
+            holdBudgetMs,
+            allowedInterrupts: [
+              "dead_ball_or_whistle_stop",
+              "timeout_pause_barrier",
+              "period_end",
+            ],
+          });
+        }
+      };
+
       let preloadedTurnPromise = null;
 
       // Animate initial turns first (opening tip, quarter start inbound, etc.)
@@ -2581,11 +2809,35 @@ export function createGameScene(Phaser) {
             // ✅ REMOVED: Batch turn logging (cluttering console)
             
             // Animate each turn in the batch (try/catch so timeout sub-turn still runs if foul sub-turn errors)
-            for (const subTurn of turn.batch_turns) {
+            let previousSubTurnEndAtMs = Date.now();
+            for (let subTurnIndex = 0; subTurnIndex < turn.batch_turns.length; subTurnIndex++) {
+              const subTurn = turn.batch_turns[subTurnIndex];
               turnCount++;
               subTurn.index = turnCount;
               mergeClockContract(subTurn, turnData);
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
+              const subTurnStartAtMs = Date.now();
+              const boundaryGapMs = subTurnStartAtMs - previousSubTurnEndAtMs;
+              const holdBudgetMs = getBatchBoundaryHoldBudgetMs();
+              const previousResultType =
+                subTurnIndex > 0
+                  ? String(turn.batch_turns[subTurnIndex - 1]?.result_type || "")
+                  : null;
+              if (
+                subTurnIndex > 0 &&
+                !isBoundaryInterruptResultType(previousResultType) &&
+                boundaryGapMs > holdBudgetMs
+              ) {
+                emitBatchBoundaryTelemetry("batch_subturn_boundary_gap_overrun", {
+                  violationType: "gap_between_subturns_without_interrupt",
+                  previousResultType: previousResultType || null,
+                  nextResultType: String(subTurn?.result_type || "") || null,
+                  turnIndex: turnCount,
+                  batchIndex: subTurnIndex,
+                  gapMs: Math.round(boundaryGapMs),
+                  holdBudgetMs,
+                });
+              }
               
               // Display debug info in text scroll
               if (subTurn.debug_turn_start) {
@@ -2611,10 +2863,19 @@ export function createGameScene(Phaser) {
                   ballSprite: this.ballSprite,
                   onUpdate: updateScoreboard
                 });
+                const subTurnElapsedMs = Date.now() - subTurnStartAtMs;
+                validateBatchBoundaryDuration({
+                  turnLike: subTurn,
+                  elapsedMs: subTurnElapsedMs,
+                  contextType: "batch_subturn",
+                  turnIndex: turnCount,
+                  batchIndex: subTurnIndex,
+                });
               } catch (batchSubErr) {
                 console.error(`❌ BATCH sub-turn (${subTurn.result_type}) animation error; continuing to next sub-turn:`, batchSubErr);
                 // Continue so timeout sub-turn (e.g. foul-out) still runs
               }
+              previousSubTurnEndAtMs = Date.now();
               
               // Update finalTurn to be the last sub-turn in the batch
               finalTurn = subTurn;
@@ -2646,6 +2907,7 @@ export function createGameScene(Phaser) {
             // Normal single turn
             turnCount++;
             turn.index = turnCount;
+            const singleTurnStartAtMs = Date.now();
             
             console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
             
@@ -2678,6 +2940,13 @@ export function createGameScene(Phaser) {
               playerSprites: this.playerSprites,
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
+            });
+            const singleTurnElapsedMs = Date.now() - singleTurnStartAtMs;
+            validateBatchBoundaryDuration({
+              turnLike: turn,
+              elapsedMs: singleTurnElapsedMs,
+              contextType: "single_turn",
+              turnIndex: turnCount,
             });
             if (turn.is_final_turn_of_quarter) {
               console.log('✅ [FINAL TURN DEBUG] Animation of final turn completed', {

@@ -787,6 +787,135 @@ export class AnimationRouter {
       if (scope.__CLOCK_RECON_BUFFER__.length > 50) {
         scope.__CLOCK_RECON_BUFFER__.splice(0, scope.__CLOCK_RECON_BUFFER__.length - 50);
       }
+
+      // Ownership contract mirror/session summary is maintained here as well so
+      // it is emitted from the same always-on path as clock reconciliation.
+      // For BATCH wrappers, evaluate ownership per sub-turn row and skip wrapper-only rows.
+      const ownershipRows =
+        turnData?.result_type === "BATCH" && Array.isArray(turnData?.batch_turns)
+          ? turnData.batch_turns
+          : [turnData];
+      const defaultOwnershipMode =
+        turnData?.uess_ownership_contract_mode ??
+        turnData?.uess_ownership_contract?.mode ??
+        scope?.UESS_OWNERSHIP_CONTRACT_MODE ??
+        "warn";
+
+      for (const ownershipRow of ownershipRows) {
+        if (!ownershipRow || typeof ownershipRow !== "object") continue;
+        const ownershipContract = ownershipRow?.uess_ownership_contract;
+        if (
+          !ownershipContract &&
+          String(ownershipRow?.result_type || "").toUpperCase() === "BATCH"
+        ) {
+          continue;
+        }
+        const resolvedOwnershipMode =
+          ownershipRow?.uess_ownership_contract_mode ??
+          ownershipContract?.mode ??
+          defaultOwnershipMode ??
+          "warn";
+        const ownershipSnapshot = {
+          resultType: ownershipRow?.result_type ?? null,
+          mode: String(resolvedOwnershipMode ?? "warn"),
+          applicable:
+            typeof ownershipContract?.applicable === "boolean"
+              ? ownershipContract.applicable
+              : null,
+          passLifecycleValid:
+            typeof ownershipContract?.pass_lifecycle_valid === "boolean"
+              ? ownershipContract.pass_lifecycle_valid
+              : null,
+          passEventCount: Number(ownershipContract?.pass_event_count ?? 0) || 0,
+          validReceiptCount: Number(ownershipContract?.pass_receipt_valid_count ?? 0) || 0,
+          terminalOwnerPos: ownershipContract?.terminal_owner_pos ?? null,
+          timestampMs: Date.now(),
+        };
+        scope.__OWNERSHIP_CONTRACT_LAST__ = ownershipSnapshot;
+        if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_BUFFER__)) {
+          scope.__OWNERSHIP_CONTRACT_BUFFER__ = [];
+        }
+        scope.__OWNERSHIP_CONTRACT_BUFFER__.push(ownershipSnapshot);
+        if (scope.__OWNERSHIP_CONTRACT_BUFFER__.length > 100) {
+          scope.__OWNERSHIP_CONTRACT_BUFFER__.splice(
+            0,
+            scope.__OWNERSHIP_CONTRACT_BUFFER__.length - 100
+          );
+        }
+
+        const ownershipSummaryEvery = Math.max(
+          1,
+          Math.floor(Number(scope.UESS_OWNERSHIP_SUMMARY_EVERY ?? 10) || 10)
+        );
+        if (!scope.__OWNERSHIP_CONTRACT_SESSION__) {
+          scope.__OWNERSHIP_CONTRACT_SESSION__ = {
+            rows: 0,
+            applicableRows: 0,
+            invalidRows: 0,
+            missingContractRows: 0,
+          };
+        }
+        const ownershipSession = scope.__OWNERSHIP_CONTRACT_SESSION__;
+        ownershipSession.rows += 1;
+        if (ownershipSnapshot.applicable === true) {
+          ownershipSession.applicableRows += 1;
+          if (ownershipSnapshot.passLifecycleValid === false) {
+            ownershipSession.invalidRows += 1;
+          }
+        } else if (ownershipSnapshot.applicable === null) {
+          ownershipSession.missingContractRows += 1;
+        }
+
+        if (ownershipSession.rows % ownershipSummaryEvery === 0) {
+          const applicableRows = ownershipSession.applicableRows;
+          const invalidRows = ownershipSession.invalidRows;
+          const invalidApplicableRate =
+            applicableRows > 0 ? Number((invalidRows / applicableRows).toFixed(4)) : 0;
+          const thresholds = {
+            minRows: Math.max(
+              1,
+              Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MIN_ROWS ?? 40) || 40)
+            ),
+            invalidApplicableRateMax: Math.max(
+              0,
+              Number(scope.UESS_OWNERSHIP_WARN_INVALID_APPLICABLE_RATE_MAX ?? 0.02) || 0.02
+            ),
+            missingContractRowsMax: Math.max(
+              0,
+              Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MISSING_CONTRACT_ROWS_MAX ?? 0) || 0)
+            ),
+          };
+          const hasEnoughRows = ownershipSession.rows >= thresholds.minRows;
+          const meetsWarnPromotionGate =
+            hasEnoughRows &&
+            invalidApplicableRate <= thresholds.invalidApplicableRateMax &&
+            ownershipSession.missingContractRows <= thresholds.missingContractRowsMax;
+          const summary = {
+            event: "ownership_contract_summary",
+            mode: ownershipSnapshot.mode,
+            rows: ownershipSession.rows,
+            applicableRows,
+            invalidRows,
+            invalidApplicableRate,
+            missingContractRows: ownershipSession.missingContractRows,
+            thresholds,
+            hasEnoughRows,
+            meetsWarnPromotionGate,
+            timestampMs: Date.now(),
+          };
+          scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ = summary;
+          if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__)) {
+            scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__ = [];
+          }
+          scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.push(summary);
+          if (scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length > 50) {
+            scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.splice(
+              0,
+              scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length - 50
+            );
+          }
+        }
+      }
     } catch (_) {
       // no-op: debug mirror should never break animation flow
     }

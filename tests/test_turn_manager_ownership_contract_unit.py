@@ -103,6 +103,27 @@ def test_ownership_contract_observe_mode_suppresses_warning(caplog):
     assert not any("UESS ownership contract" in rec.message for rec in caplog.records)
 
 
+def test_ownership_contract_throw_mode_raises_on_invalid_lifecycle():
+    tm = _make_tm()
+    tm.game = type("G", (), {"game_state": {"uess_ownership_contract_mode": "throw"}})()
+    result = {
+        "result_type": "HCO",
+        "next_play_type": "HCO",
+        "steps": [{"events": [{"type": "pass", "by": "PG", "to": "SG"}]}],
+        "ball_owner_by_step": ["PG"],
+    }
+
+    try:
+        tm._attach_uess_ownership_contract(result)
+        raised = False
+    except ValueError as exc:
+        raised = True
+        assert "UESS ownership contract" in str(exc)
+        assert "pass lifecycle invalid" in str(exc)
+
+    assert raised is True
+
+
 def test_ownership_contract_tracks_multiple_passes_and_partial_receipts():
     tm = _make_tm()
     result = {

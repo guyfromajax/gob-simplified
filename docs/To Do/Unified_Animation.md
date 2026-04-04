@@ -479,6 +479,30 @@ Wave 1 completion note:
 - Trigger semantics are now locked for the runtime-wired units above.
 - No remaining Wave 1 trigger-lock rows are pending; follow-up work is now polish/tuning rather than missing unit wiring.
 
+### 6.6 Destination-First Invariant Pass (New Baseline)
+
+Purpose: eliminate hidden pauses by making continuous movement-to-destination the default runtime behavior.
+
+Policy:
+
+1. Required movers must progress toward their unit destination continuously unless an allowed interrupt is active.
+2. Allowed interrupts are explicit per unit (`pass_in_flight`, `shot_release_or_flight`, `rebound_secure`, `timeout_pause_barrier`, `dead_ball_or_whistle_stop`, `period_end`).
+3. Any hold must be declared in the unit contract (`hold_reason`, `hold_budget_ms`, affected movers).
+4. Undeclared waits/timeouts are treated as contract violations.
+
+Execution order (forward-only):
+
+1. Apply to all newly modified units immediately (no exceptions).
+2. Retrofit highest-risk boundaries first:
+   - `hco.lead_in.from_dreb_outlet`
+   - `oreb.*` putback/kickout boundaries
+   - batch/sub-turn transition boundaries
+3. Add runtime acceptance checks:
+   - destination availability at unit start
+   - continuous-progress watchdog while no interrupt is active
+   - undeclared-hold violation emission
+   - unit-budget overrun enforcement by mode
+
 ### Phase 1 - Contract and visibility
 
 - Define required movement authority fields per turn type.
