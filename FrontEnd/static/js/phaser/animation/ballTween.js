@@ -144,13 +144,32 @@ export function detachBall(scene, ballSprite) {
 export function tweenPlayerTo(scene, sprite, target, opts = {}) {
   if (!scene || !sprite || !target) return Promise.resolve();
   const { easing = 'Linear' } = opts;
+  const universalDuration = getPlayerMovementDurationMs(sprite, target.x, target.y, {
+    scene,
+    isBallHandler: opts.isBallHandler,
+  });
+  const requestedDuration =
+    opts.duration != null && Number.isFinite(Number(opts.duration))
+      ? Number(opts.duration)
+      : null;
+  const allowFixedDuration = opts.allowFixedDuration === true;
+  const enforceSpeedFloor =
+    (typeof window !== 'undefined'
+      ? window.UESS_ENFORCE_PLAYER_SPEED_FLOOR
+      : globalThis?.UESS_ENFORCE_PLAYER_SPEED_FLOOR) !== false;
+  // Universal speed policy: player travel should never be faster than AG/distance duration.
+  // Explicit exceptions can opt out with opts.allowFixedDuration=true.
   const duration =
-    opts.duration != null
-      ? opts.duration
-      : getPlayerMovementDurationMs(sprite, target.x, target.y, {
-          scene,
-          isBallHandler: opts.isBallHandler,
-        });
+    requestedDuration == null
+      ? universalDuration
+      : (!allowFixedDuration && enforceSpeedFloor
+          ? Math.max(requestedDuration, universalDuration)
+          : requestedDuration);
+  const durationClampedByPolicy =
+    requestedDuration != null &&
+    !allowFixedDuration &&
+    enforceSpeedFloor &&
+    duration > requestedDuration;
 
   return new Promise((resolve, reject) => {
     const startPosition = { x: sprite.x, y: sprite.y };
@@ -169,6 +188,10 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
           status,
           playerId: sprite?.playerId ?? null,
           duration,
+          requestedDuration,
+          universalDuration,
+          durationClampedByPolicy,
+          allowFixedDuration,
           easing,
           plannedDistance,
           actualDistance,
@@ -182,6 +205,16 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
           final: { x: sprite.x, y: sprite.y },
         };
         animationDebugLog('ANIM tween summary', summary);
+        if (durationClampedByPolicy) {
+          animationDebugWarn('ANIM speed policy clamp', {
+            playerId: sprite?.playerId ?? null,
+            requestedDuration,
+            universalDuration,
+            usedDuration: duration,
+            start: startPosition,
+            target,
+          });
+        }
         const tolerance = 2;
         if (actualDistance - plannedDistance > tolerance) {
           animationDebugWarn('ANIM teleport suspicion', {

@@ -20,7 +20,6 @@ import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 // import { updatePlaycallDisplay } from "../utils/playcallDisplay.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 // import { updateStrategyBars } from "../utils/strategyBars.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 // import { updatePlaycallCenter } from "../ui/playcallCenter.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
-import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js"; // ✅ RESTORED: Needed for outlet passes (sets scene.currentTurn before routing)
 import { announceFromTurnData } from "../utils/announcements.js";
 import {
   animationDebugLog,
@@ -864,16 +863,11 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Removed verbose turn processing log
     
-    // ✅ RESTORED: prepareTurnForAnimation must be called BEFORE routing to ensure scene.currentTurn is set
-    // This is critical for outlet passes which happen during embedded rebounds in shot turns
-    // AnimationRouter also calls prepareTurnForAnimation, but it's idempotent (safe to call twice)
-    // The early call ensures scene.currentTurn is set before any embedded rebound handling
-    const { possessionId } = await prepareTurnForAnimation({
-      turn,
-      scene,
-      turnIndex: i,
-      homeTeamId: scene.simData?.home_team_id
-    });
+    // Keep turn index available for any embedded paths that read scene.currentTurn early.
+    scene.currentTurn = i;
+    turn.index = i;
+    const possessionId =
+      turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     
     const animations = turn.animations || [];
     const shouldLogLegacySteps =

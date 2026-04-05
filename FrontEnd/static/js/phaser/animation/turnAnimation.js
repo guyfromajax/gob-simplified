@@ -5289,7 +5289,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
               authorityTurnData: turnData, // strict outlet contract source
             });
           } else {
-            const pause = animationConfig.offensiveRebound.pauseMs;
+            const pauseCap = Math.max(
+              0,
+              Number(
+                (typeof window !== "undefined"
+                  ? window.UESS_OFFENSIVE_REBOUND_PAUSE_CAP_MS
+                  : globalThis?.UESS_OFFENSIVE_REBOUND_PAUSE_CAP_MS) ?? 300
+              ) || 300
+            );
+            const pause = Math.min(
+              Math.max(0, Number(animationConfig.offensiveRebound.pauseMs) || 0),
+              pauseCap
+            );
             await new Promise((res) =>
               scene.time?.delayedCall
                 ? scene.time.delayedCall(pause, res)

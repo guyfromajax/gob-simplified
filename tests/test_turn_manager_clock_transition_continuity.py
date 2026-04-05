@@ -65,7 +65,7 @@ def test_fast_break_make_then_baseline_inbound_continuity():
     assert bip_turn["clock_end"] == 295
     assert bip_turn["shot_clock_start"] == 30
     assert bip_turn["shot_clock_end"] == 30
-    assert bip_turn["shot_clock_reset_reason"] == "inbound_received"
+    assert bip_turn.get("shot_clock_reset_reason") in (None, "")
 
 
 def test_hco_miss_oreb_then_putback_make_continuity():
@@ -129,4 +129,4 @@ def test_dead_ball_then_side_inbound_continuity():
     assert side_inbound["clock_end"] == 257
     assert side_inbound["shot_clock_start"] == 30
     assert side_inbound["shot_clock_end"] == 30
-    assert side_inbound["shot_clock_reset_reason"] == "inbound_received"
+    assert side_inbound.get("shot_clock_reset_reason") in (None, "")

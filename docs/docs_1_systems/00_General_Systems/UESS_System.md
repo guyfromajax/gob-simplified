@@ -217,19 +217,24 @@ Game clock:
 - Stops immediately on timeout.
 - Stops immediately at quarter end.
 - Stops on made basket.
-- Does not run during timeout turns, free throw turns, BIP/SIP setup turns, or opening tip setup.
+- Does not run during timeout turns, free throw turns, SIP turns, or opening tip setup.
+- For made field goals (`MAKE`, `PUTBACK_MAKE`): clock may continue during the following BIP turn only when quarter `time_remaining > 60s`.
 - Starts when:
   - inbound receiver receives BIP/SIP pass,
   - a player controls opening tip,
   - rebounder controls rebound after missed free throw.
+  - post-make BIP run-through policy is enabled (`time_remaining > 60s`), in which case BIP may consume game-clock time during the inbound turn.
 
 Shot clock:
 
 - Stops when a shot detaches from the shooter sprite.
 - Stops at shot clock zero.
 - Stops immediately on dead-ball turnover or foul.
-- Resets to `30` and starts on all BIP/SIP receive events.
-- Resets to `30` and starts when rebounder controls ball after missed FG or missed FT.
+- Resets to `30` only on policy reset triggers:
+  - possession change,
+  - non-shooting defensive foul where next turn is SIP (`SIDE_INBOUND`) and possession does not change,
+  - OREB possession renewal.
+- Explicit carryover cases (no reset): OREB kickout continuation to HCO, and FCP/HCT to HCO without possession change.
 - Explicitly allowed state: game clock running while shot clock is stopped during shot flight before rebound control.
 
 End-of-quarter basket validity:
@@ -240,7 +245,8 @@ End-of-quarter basket validity:
 
 Made-basket dead-ball window shot clock policy:
 
-- On made basket, shot clock resets to `30` during dead-ball window and remains stopped until inbound receive.
+- On made basket, shot clock resets to `30` for the next possession via possession-change policy.
+- Post-make BIP run-through exception: if quarter `time_remaining > 60s`, BIP can consume game-clock time while the shot clock remains at the reset value for the next possession contract.
 
 ### Event Precedence (Deterministic)
 
@@ -696,10 +702,55 @@ Scope note:
   - Event-ledger-based FE/BE elapsed parity and tolerance enforcement.
   - Mode propagation (`observe|warn|throw|off`) and reconciliation telemetry rollups.
   - Ledger-authority elapsed default (`ledger`) and continuity guard across turn boundaries.
+  - Turn-boundary settle policy now uses a short tail wait cap (default 120ms; override via `window.UESS_CLOCK_SETTLE_CAP_MS`) to avoid dead-air pauses when movement finishes before clock interpolation.
+  - Optional boundary-wait telemetry is available behind `window.UESS_TURN_BOUNDARY_WAIT_DEBUG = true` (`animTelemetry` event `turn_boundary_clock_settle_wait` with `waitedMs`, `branch`, `settleCapMs`).
+  - Console helpers for runtime sampling: `showTurnBoundaryWaitSummary(n)`, `getTurnBoundaryWaitLatest(n)`, `clearTurnBoundaryWaitBuffer()`.
+  - Player travel speed floor is now enforced in `tweenPlayerTo`: fixed durations cannot run faster than AG/distance universal duration unless explicitly exempted.
 - **Known polish backlog (non-blocking):**
   - Intermittent transition presentation polish on select rebound-derived HCO sequences.
   - Debug helper ergonomics/initialization reliability in fresh browser sessions.
   - Remaining warning cleanup and logging severity normalization tracked in implementation backlog.
+
+### Turn-Boundary Wait Profiling (Recommended)
+
+Use this quick runtime sequence when validating transition smoothness after animation changes:
+
+1. In browser console:
+   - `window.UESS_TURN_BOUNDARY_WAIT_DEBUG = true`
+   - `window.UESS_CLOCK_SETTLE_CAP_MS = 120` (optional; omit to use default)
+   - `clearTurnBoundaryWaitBuffer()`
+2. Run one full quarter at your target speed preset (Normal, Fast, or Super Fast).
+3. In console:
+   - `showTurnBoundaryWaitSummary(80)`
+4. Review:
+   - `p95WaitMs` should stay close to the settle cap and avoid large spikes.
+   - `maxWaitMs` outliers indicate branch-specific stalls worth tracing (`branch` field in rows).
+   - If `event === "turn_boundary_active_tween_leak"`, boundary progressed with still-active motion tweens (needs branch-level cleanup).
+   - If `event === "turn_boundary_force_stop_applied"`, router forced remaining transition tweens to stop to preserve turn-boundary determinism.
+
+Boundary tween drain guard (post-clock-settle):
+- `window.UESS_BOUNDARY_TWEEN_DRAIN_MAX_MS` (default `120`)
+- `window.UESS_BOUNDARY_TWEEN_DRAIN_POLL_MS` (default `20`)
+- Active tween leak checks exclude persistent arrival-heartbeat tweens (`arrivalHeartbeat`) so leak telemetry reflects transition motion only.
+- Leak event payload includes `leakTweenSample` (targets/progress/duration) for rapid branch triage.
+- Optional sample size override: `window.UESS_BOUNDARY_TWEEN_LEAK_SAMPLE_SIZE` (default `8`).
+
+### Universal Player Speed Floor
+
+- **Default behavior:** `tweenPlayerTo()` enforces a universal minimum duration for player travel based on AG/distance (`getPlayerMovementDurationMs`).
+- **Result:** callsites that pass short fixed durations are clamped so player motion cannot exceed universal travel speed.
+- **Global toggle:** set `window.UESS_ENFORCE_PLAYER_SPEED_FLOOR = false` only for temporary diagnostics.
+- **Per-call exemption:** `opts.allowFixedDuration = true` for explicitly approved cinematic/non-travel exceptions.
+
+### Rebound Stall Guards (OREB/DREB)
+
+- **Attach delay cap:** rebound secure -> attach hold now uses `min(config.attachDelayMs, cap)` where cap defaults to `180ms`.
+  - Override via `window.UESS_REBOUND_ATTACH_DELAY_CAP_MS`.
+- **Offensive rebound pause cap:** OREB pause now uses `min(config.offensiveRebound.pauseMs, cap)` where cap defaults to `300ms`.
+  - Override via `window.UESS_OFFENSIVE_REBOUND_PAUSE_CAP_MS`.
+- **Boundary cleanup:** non-rebounder rebound tweens are killed when rebounder secure resolves, preventing rebound-motion leakage into the next turn boundary.
+- **Fast break rebound monitor bound:** rebounder-catch monitoring in fast-break miss/block branches now uses a bounded monitor window (default `450ms`) and deterministic tween-stop fallback.
+  - Overrides: `window.UESS_FB_REBOUND_MONITOR_MAX_MS`, `window.UESS_FB_REBOUND_MONITOR_POLL_MS`, `window.UESS_FB_REBOUND_MONITOR_START_DELAY_MS`.
 
 ## Locked UESS Card: `hco.lead_in.from_dreb_outlet`
 
@@ -843,6 +894,7 @@ Implement one universal event-driven clock authority across all turn families so
 - Game clock continues during missed-shot flight unless a later explicit dead-ball event stops it.
 - Fouls during shot flight stop the game clock immediately.
 - BIP/SIP setup is clock-dead until inbound receive.
+- Post-make BIP may run game clock when quarter `time_remaining > 60s` (field-goal makes only).
 - Timeout resume requires a fresh explicit restart event; there is no implicit clock restart.
 
 ### Work Plan
@@ -874,17 +926,17 @@ Implement one universal event-driven clock authority across all turn families so
 
 3. Encode universal turn-family rules into ledger production.
    - BIP/SIP:
-     - game clock stopped during setup
-     - game clock starts on inbound receive
-     - shot clock resets to `30` and starts on inbound receive
+     - SIP remains clock-dead during setup/pass
+     - BIP is clock-dead by default; post-make BIP may run game clock when quarter `time_remaining > 60s`
+     - inbound events do not force shot-clock reset by themselves
    - HCO / OREB / FAST_BREAK / FCP / HCT shot attempts:
      - shot clock stops on shot detach
      - game clock continues during shot flight unless an explicit stop event occurs
    - Made basket:
      - game clock stops on made basket
-     - shot clock resets to `30` during dead-ball window and remains stopped until inbound receive
+     - shot clock reset is governed by reset policy (possession change), not by inbound receive
    - Missed FG / missed FT:
-     - shot clock resets to `30` and starts when rebounder controls the ball
+     - shot clock resets on OREB possession renewal; otherwise carryover follows possession rules
    - Fouls:
      - game clock stops immediately, including foul during shot flight
    - Timeout:

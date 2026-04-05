@@ -88,7 +88,9 @@ class TurnManager:
         fixed_ms = 0
 
         # Zero-elapsed turns: clock does not move
-        if result_type in ("FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"):
+        if result_type in ("FREE_THROW", "SIDE_INBOUND", "TIMEOUT"):
+            return 0
+        if result_type == "BASELINE_INBOUND" and game_time_elapsed <= 0:
             return 0
 
         if result_type == "DEFENSIVE_STOP":
@@ -3706,33 +3708,31 @@ class TurnManager:
             rt = turn_result.get("result_type")
             foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
             next_play_type = str(turn_result.get("next_play_type") or turn_result.get("next_turn") or "").upper()
-            current_turn = str(turn_result.get("current_turn") or "").upper()
             rebound_type = str(turn_result.get("rebound_type") or "").upper()
             possession_flips = bool(turn_result.get("possession_flips"))
-            if _is_no_impact_turn(turn_result):
-                return True
-            # Reset on any offensive rebound event, not just a literal "OREB" result_type.
-            # OREB flows commonly use result types like OREB_KICKOUT / PUTBACK_* with rebound_type="OREB".
-            if rebound_type == "OREB" or current_turn == "OREB" or rt == "OREB":
-                return True
-            if rt == "MAKE":
-                return True
-            if rt in {"STEAL", "DEAD BALL", "TURNOVER", "CHARGE"}:
-                return True
-            if rt == "FOUL" and foul_type == "OFFENSIVE":
-                return True
-            if rt == "FOUL" and foul_type == "DEFENSIVE" and next_play_type in {"SIDE_INBOUND", "SIP"}:
-                return True
+            free_throws_remaining = int(turn_result.get("free_throws_remaining", 0) or 0)
+            # Rule 1: possession change resets shot clock.
             if possession_flips and rt != "TIMEOUT":
+                return True
+            # Rule 2: non-shooting defensive foul into SIDE_INBOUND resets even without possession flip.
+            if (
+                rt == "FOUL"
+                and foul_type == "DEFENSIVE"
+                and next_play_type in {"SIDE_INBOUND", "SIP"}
+                and not possession_flips
+                and free_throws_remaining <= 0
+            ):
+                return True
+            # Rule 3: offensive rebound possession renewal resets.
+            # Apply on rebound capture outcomes (MISS/BLOCK/FREE_THROW with rebound_type=OREB)
+            # and literal OREB result types; avoid repeated resets on OREB continuation turns.
+            if rt == "OREB":
+                return True
+            if rebound_type == "OREB" and rt in {"MISS", "BLOCK", "FREE_THROW"}:
                 return True
             return False
 
         def _current_turn_shot_clock_reset_reason(turn_result):
-            rt = str(turn_result.get("result_type") or "").upper()
-            if rt == "SIDE_INBOUND":
-                return "inbound_received"
-            if rt == "BASELINE_INBOUND":
-                return "inbound_received"
             return None
 
         game_remaining_before = int(self.game.game_state.get("time_remaining", 0) or 0)

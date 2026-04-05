@@ -259,16 +259,15 @@ Every turn result from the backend contains data organized into **three distinct
 - "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!" - Foul types
 - "Rebound!" - Defensive rebound (ballManager.js, when ball reaches rebounder)
 
-**Idempotent Design:**
-- `prepareTurnForAnimation()` may be called multiple times (animateGameTurns + AnimationRouter)
-- Uses `turn._startAnnouncementsShown` and `turn._endAnnouncementsShown` flags
-- First call: Shows announcements, sets flag
-- Subsequent calls: Skips announcements (already shown)
+**Turn Preparation Flow:**
+- `prepareTurnForAnimation()` is executed once per routed turn in `AnimationRouter`.
+- `animateGameTurns` only sets lightweight turn-index context (`scene.currentTurn`, `turn.index`) before routing.
+- Announcement guards still use `turn._startAnnouncementsShown` and `turn._endAnnouncementsShown` to prevent duplicates.
 
 **Benefits:**
+- ✅ Lower turn-boundary overhead (no duplicated prep path)
 - ✅ No duplicate announcements (flags prevent)
 - ✅ Clear separation (context at start, result at end)
-- ✅ Works across all turn types
 
 **See:** `turnPreparation.js` - `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`  
 **See:** `announcements.js` - `announceFromTurnData()` function

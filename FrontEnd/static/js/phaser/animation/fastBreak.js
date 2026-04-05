@@ -220,6 +220,88 @@ function emitFbTelemetry(scene, event, payload = {}) {
   }
 }
 
+function startRebounderCatchMonitor({
+  scene,
+  rebounderTweens,
+  rebounderSprite,
+  ballGrid,
+  width,
+  height,
+}) {
+  if (!scene || !rebounderSprite || !Array.isArray(rebounderTweens) || rebounderTweens.length === 0) {
+    return () => {};
+  }
+  const scope = (typeof window !== "undefined" && window) || globalThis;
+  const maxMonitorMs = Math.max(
+    0,
+    Number(scope?.UESS_FB_REBOUND_MONITOR_MAX_MS ?? 450) || 450
+  );
+  const pollMs = Math.max(
+    10,
+    Number(scope?.UESS_FB_REBOUND_MONITOR_POLL_MS ?? 40) || 40
+  );
+  const startDelayMs = Math.max(
+    0,
+    Number(scope?.UESS_FB_REBOUND_MONITOR_START_DELAY_MS ?? 60) || 60
+  );
+  const ballBouncePx = gridToPixels(ballGrid.x, ballGrid.y, width, height);
+  const monitorStartMs = Date.now();
+  let monitoringActive = true;
+  let handle = null;
+  const stopAllRebounderTweens = () => {
+    rebounderTweens.forEach((tween) => {
+      if (tween && tween.isPlaying) {
+        tween.stop();
+      }
+    });
+  };
+  const schedule = (fn, ms) => {
+    if (scene.time?.delayedCall) {
+      handle = scene.time.delayedCall(ms, fn);
+    } else {
+      handle = setTimeout(fn, ms);
+    }
+  };
+  const clearScheduled = () => {
+    if (!handle) return;
+    if (scene.time?.delayedCall && typeof handle.remove === "function") {
+      handle.remove(false);
+    } else {
+      clearTimeout(handle);
+    }
+    handle = null;
+  };
+  const checkRebounderReached = () => {
+    if (!monitoringActive) return;
+    const elapsedMs = Date.now() - monitorStartMs;
+    if (elapsedMs >= maxMonitorMs) {
+      // Deterministic fallback: stop rebounder drifts so they cannot leak into next boundary.
+      stopAllRebounderTweens();
+      monitoringActive = false;
+      return;
+    }
+    const distanceToBall = Math.hypot(
+      rebounderSprite.x - ballBouncePx.x,
+      rebounderSprite.y - ballBouncePx.y
+    );
+    if (distanceToBall < 30) {
+      stopAllRebounderTweens();
+      monitoringActive = false;
+      return;
+    }
+    if (rebounderTweens.some((t) => t && t.isPlaying)) {
+      schedule(checkRebounderReached, pollMs);
+    } else {
+      monitoringActive = false;
+    }
+  };
+  schedule(checkRebounderReached, startDelayMs);
+  return () => {
+    monitoringActive = false;
+    clearScheduled();
+  };
+}
+
 function resolveFbUnitContractMode() {
   const scope = getFbContractGlobalScope();
   const raw = String(scope?.UESS_FB_CONTRACT_MODE ?? "observe")
@@ -2306,40 +2388,14 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
-    if (rebounderTweens.length > 0) {
-      let monitoringActive = true;
-      const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
-      
-      const checkRebounderReached = () => {
-        if (!monitoringActive) return;
-        
-        const distanceToBall = Math.hypot(
-          rebounderSprite.x - ballBouncePx.x,
-          rebounderSprite.y - ballBouncePx.y
-        );
-        
-        // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
-        if (distanceToBall < 30) {
-          monitoringActive = false;
-          rebounderTweens.forEach(tween => {
-            if (tween && tween.isPlaying) {
-              tween.stop();
-            }
-          });
-          return;
-        }
-        
-        // Continue checking until rebounder reaches ball or all tweens are stopped
-        if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) {
-          scene.time.delayedCall(50, checkRebounderReached);
-        } else {
-          monitoringActive = false;
-        }
-      };
-      
-      // Start monitoring after a short delay to let rebounder start moving
-      scene.time.delayedCall(100, checkRebounderReached);
-    }
+    const stopReboundMonitor = startRebounderCatchMonitor({
+      scene,
+      rebounderTweens,
+      rebounderSprite,
+      ballGrid: miss.grid,
+      width,
+      height,
+    });
     
     // Animate rebound
     await animateRebound({
@@ -2352,6 +2408,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       shooterId,
       turnData: turnData
     });
+    stopReboundMonitor();
     
     // ✅ FIX: Use runDefensiveReboundSetup for DREB (matching animateFastBreakShot pattern)
     if (turnData.rebound_type === "DREB") {
@@ -2629,24 +2686,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       const rebounderSprite = rebounderRef.sprite;
       const rebounderIdResolved = rebounderRef.id;
       if (rebounderSprite) {
-        if (rebounderTweens.length > 0) {
-          let monitoringActive = true;
-          const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
-          const checkRebounderReached = () => {
-            if (!monitoringActive) return;
-            const distanceToBall = Math.hypot(rebounderSprite.x - ballBouncePx.x, rebounderSprite.y - ballBouncePx.y);
-            if (distanceToBall < 30) {
-              monitoringActive = false;
-              rebounderTweens.forEach(tween => {
-                if (tween && tween.isPlaying) tween.stop();
-              });
-              return;
-            }
-            if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) scene.time.delayedCall(50, checkRebounderReached);
-            else monitoringActive = false;
-          };
-          scene.time.delayedCall(100, checkRebounderReached);
-        }
+        const stopReboundMonitor = startRebounderCatchMonitor({
+          scene,
+          rebounderTweens,
+          rebounderSprite,
+          ballGrid: miss.grid,
+          width,
+          height,
+        });
         await animateRebound({
           scene,
           ballSprite,
@@ -2657,6 +2704,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
           shooterId,
           turnData: missTurnForGetback
         });
+        stopReboundMonitor();
         if (turnData.rebound_type === "DREB") {
           const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
           await runDefensiveReboundSetup({
@@ -2759,40 +2807,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
-    if (rebounderTweens.length > 0) {
-      let monitoringActive = true;
-      const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
-      
-      const checkRebounderReached = () => {
-        if (!monitoringActive) return;
-        
-        const distanceToBall = Math.hypot(
-          rebounderSprite.x - ballBouncePx.x,
-          rebounderSprite.y - ballBouncePx.y
-        );
-        
-        // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
-        if (distanceToBall < 30) {
-          monitoringActive = false;
-          rebounderTweens.forEach(tween => {
-            if (tween && tween.isPlaying) {
-              tween.stop();
-            }
-          });
-          return;
-        }
-        
-        // Continue checking until rebounder reaches ball or all tweens are stopped
-        if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) {
-          scene.time.delayedCall(50, checkRebounderReached);
-        } else {
-          monitoringActive = false;
-        }
-      };
-      
-      // Start monitoring after a short delay to let rebounder start moving
-      scene.time.delayedCall(100, checkRebounderReached);
-    }
+    const stopReboundMonitor = startRebounderCatchMonitor({
+      scene,
+      rebounderTweens,
+      rebounderSprite,
+      ballGrid: miss.grid,
+      width,
+      height,
+    });
     
     await animateRebound({
       scene,
@@ -2804,6 +2826,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       shooterId,
       turnData: missTurnForGetback // ✅ FIX: Pass previous HCO MISS turn (has offense_getback) so get-back players can be excluded
     });
+    stopReboundMonitor();
     
     // Defensive rebound setup if needed
     if (turnData.rebound_type === "DREB") {

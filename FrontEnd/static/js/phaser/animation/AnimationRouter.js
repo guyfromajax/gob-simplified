@@ -139,6 +139,65 @@ export class AnimationRouter {
         scope.__CLOCK_RECON_SUMMARY_BUFFER__ = [];
       };
     }
+
+    if (typeof scope.getTurnBoundaryWaitLatest !== "function") {
+      scope.getTurnBoundaryWaitLatest = (n = 20) => {
+        const count = Math.max(0, Math.floor(Number(n) || 0));
+        const list = Array.isArray(scope.__TURN_BOUNDARY_WAIT_BUFFER__)
+          ? scope.__TURN_BOUNDARY_WAIT_BUFFER__
+          : [];
+        return list.slice(-count);
+      };
+    }
+
+    if (typeof scope.clearTurnBoundaryWaitBuffer !== "function") {
+      scope.clearTurnBoundaryWaitBuffer = () => {
+        scope.__TURN_BOUNDARY_WAIT_LAST__ = undefined;
+        scope.__TURN_BOUNDARY_WAIT_BUFFER__ = [];
+      };
+    }
+
+    if (typeof scope.showTurnBoundaryWaitSummary !== "function") {
+      scope.showTurnBoundaryWaitSummary = (n = 40) => {
+        const count = Math.max(0, Math.floor(Number(n) || 0));
+        const list = Array.isArray(scope.__TURN_BOUNDARY_WAIT_BUFFER__)
+          ? scope.__TURN_BOUNDARY_WAIT_BUFFER__
+          : [];
+        const rows = list.slice(-count);
+        const waits = rows
+          .map((r) => Number(r?.waitedMs))
+          .filter((v) => Number.isFinite(v) && v >= 0)
+          .sort((a, b) => a - b);
+        const total = waits.length;
+        const avg = total
+          ? waits.reduce((sum, v) => sum + v, 0) / total
+          : 0;
+        const percentile = (p) => {
+          if (!total) return 0;
+          const idx = Math.min(
+            total - 1,
+            Math.max(0, Math.ceil((p / 100) * total) - 1)
+          );
+          return waits[idx];
+        };
+        const byBranch = rows.reduce((acc, row) => {
+          const key = String(row?.branch || "unknown");
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        const summary = {
+          sampleSize: total,
+          avgWaitMs: Number(avg.toFixed(1)),
+          p50WaitMs: Number(percentile(50).toFixed(1)),
+          p95WaitMs: Number(percentile(95).toFixed(1)),
+          maxWaitMs: Number((waits[total - 1] || 0).toFixed(1)),
+          byBranch,
+        };
+        console.table(rows);
+        console.log("[TURN BOUNDARY WAIT SUMMARY]", summary);
+        return summary;
+      };
+    }
   }
 
   _clearClockInterpolationTracking() {
@@ -146,6 +205,8 @@ export class AnimationRouter {
     this.scene._clockInterpolationTween = null;
     this.scene._clockInterpolationPromise = null;
     this.scene._clockInterpolationResolve = null;
+    this.scene._clockInterpolationStartedAtMs = null;
+    this.scene._clockInterpolationDurationMs = null;
   }
 
   _resolveClockInterpolationTracking() {
@@ -161,18 +222,238 @@ export class AnimationRouter {
     }
   }
 
+  _isBoundaryWaitDebugEnabled() {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    return scope?.UESS_TURN_BOUNDARY_WAIT_DEBUG === true;
+  }
+
+  _emitBoundaryWaitTelemetry(turnData, payload = {}) {
+    if (!this._isBoundaryWaitDebugEnabled()) return;
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const row = {
+      event: "turn_boundary_clock_settle_wait",
+      branchKind: "clock_boundary_wait",
+      timestampMs: Date.now(),
+      resultType: turnData?.result_type ?? null,
+      turnIndex:
+        turnData?.index ?? turnData?.turnIndex ?? this.scene?.currentTurn ?? null,
+      ...payload,
+    };
+    this.scene?.events?.emit?.("animTelemetry", row);
+    scope.__TURN_BOUNDARY_WAIT_LAST__ = row;
+    if (!Array.isArray(scope.__TURN_BOUNDARY_WAIT_BUFFER__)) {
+      scope.__TURN_BOUNDARY_WAIT_BUFFER__ = [];
+    }
+    scope.__TURN_BOUNDARY_WAIT_BUFFER__.push(row);
+    if (scope.__TURN_BOUNDARY_WAIT_BUFFER__.length > 120) {
+      scope.__TURN_BOUNDARY_WAIT_BUFFER__.splice(
+        0,
+        scope.__TURN_BOUNDARY_WAIT_BUFFER__.length - 120
+      );
+    }
+  }
+
+  _collectActiveBoundaryTweens() {
+    if (!this.scene?.tweens?.getTweensOf) return [];
+    const heartbeatStore = this.scene?.__arrivalHeartbeatStore;
+    const ignoredTweens = new Set();
+    if (heartbeatStore && typeof heartbeatStore.values === "function") {
+      for (const entry of heartbeatStore.values()) {
+        if (entry?.tween) ignoredTweens.add(entry.tween);
+      }
+    }
+    const targets = [
+      ...Object.values(this.playerSprites || {}),
+      this.ballSprite,
+      this.scene?.ballShadowSprite,
+    ].filter(Boolean);
+    const isNonBoundaryVisualTween = (tween) => {
+      const allowedVisualKeys = new Set([
+        "displayOriginX",
+        "displayOriginY",
+        "scaleX",
+        "scaleY",
+      ]);
+      const data = Array.isArray(tween?.data) ? tween.data : [];
+      if (!data.length) return false;
+      const keys = data
+        .map((d) => String(d?.key ?? ""))
+        .filter((k) => k.length > 0);
+      if (!keys.length) return false;
+      // Heartbeat-like visual tweens only mutate origin/scale; they are intentionally
+      // long-lived and should never gate turn-boundary progression.
+      return keys.every((k) => allowedVisualKeys.has(k));
+    };
+    const seen = new Set();
+    const activeTweens = [];
+    for (const target of targets) {
+      const tweens = this.scene.tweens.getTweensOf(target) || [];
+      for (const tween of tweens) {
+        if (!tween || seen.has(tween)) continue;
+        if (ignoredTweens.has(tween)) continue;
+        if (tween.__uessBoundaryIgnore === true) continue;
+        if (isNonBoundaryVisualTween(tween)) continue;
+        seen.add(tween);
+        const isPlaying = typeof tween.isPlaying === "function"
+          ? tween.isPlaying()
+          : tween.isPlaying !== false;
+        if (isPlaying) activeTweens.push(tween);
+      }
+    }
+    return activeTweens;
+  }
+
+  _describeBoundaryTweens(maxItems = 10) {
+    const activeTweens = this._collectActiveBoundaryTweens();
+    const playerKeyBySprite = new Map();
+    for (const [id, sprite] of Object.entries(this.playerSprites || {})) {
+      if (sprite) playerKeyBySprite.set(sprite, String(id));
+    }
+    const describeTarget = (target) => {
+      if (!target) return "unknown_target";
+      if (playerKeyBySprite.has(target)) {
+        return `player:${playerKeyBySprite.get(target)}`;
+      }
+      if (target === this.ballSprite) return "ballSprite";
+      if (target === this.scene?.ballShadowSprite) return "ballShadowSprite";
+      return String(
+        target?.playerId ??
+          target?.name ??
+          target?.texture?.key ??
+          target?.type ??
+          "unknown_target"
+      );
+    };
+    return activeTweens.slice(0, Math.max(0, Number(maxItems) || 0)).map((tween) => {
+      const targets = Array.isArray(tween?.targets) ? tween.targets : [];
+      const tweenKeys = (Array.isArray(tween?.data) ? tween.data : [])
+        .map((d) => String(d?.key ?? ""))
+        .filter((k) => k.length > 0);
+      return {
+        targets: targets.map(describeTarget),
+        keys: tweenKeys,
+        progress:
+          typeof tween?.progress === "number"
+            ? Number(tween.progress.toFixed(3))
+            : null,
+        totalDuration:
+          Number.isFinite(Number(tween?.totalDuration))
+            ? Math.round(Number(tween.totalDuration))
+            : null,
+      };
+    });
+  }
+
+  _countActiveTweensForBoundary() {
+    return this._collectActiveBoundaryTweens().length;
+  }
+
+  _forceStopBoundaryTweens() {
+    const activeTweens = this._collectActiveBoundaryTweens();
+    let stopped = 0;
+    for (const tween of activeTweens) {
+      try {
+        if (typeof tween.stop === "function") {
+          tween.stop();
+          stopped += 1;
+        } else if (typeof tween.remove === "function") {
+          tween.remove();
+          stopped += 1;
+        }
+      } catch (_) {
+        // no-op; boundary guard is best-effort cleanup
+      }
+    }
+    return stopped;
+  }
+
+  async waitForBoundaryTweenDrain(maxWaitMs = 120, pollMs = 20) {
+    const timeoutMs = Math.max(0, Number(maxWaitMs) || 0);
+    const stepMs = Math.max(5, Number(pollMs) || 20);
+    if (!this.scene?.tweens?.getTweensOf || timeoutMs <= 0) {
+      return { waitedMs: 0, remainingTweens: this._countActiveTweensForBoundary() };
+    }
+    const start = Date.now();
+    let remaining = this._countActiveTweensForBoundary();
+    while (remaining > 0 && (Date.now() - start) < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
+      remaining = this._countActiveTweensForBoundary();
+    }
+    return {
+      waitedMs: Math.max(0, Date.now() - start),
+      remainingTweens: remaining,
+    };
+  }
+
   async waitForClockInterpolationSettle(maxWaitMs = 0) {
     const p = this.scene?._clockInterpolationPromise;
     if (!p || typeof p.then !== "function") return;
     const timeoutMs = Math.max(0, Number(maxWaitMs) || 0);
-    if (timeoutMs <= 0) {
-      await p;
-      return;
+    const settleCapMs = Math.max(
+      0,
+      Number(
+        (typeof window !== "undefined" && window.UESS_CLOCK_SETTLE_CAP_MS) ?? 120
+      ) || 120
+    );
+    const nowMs =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    const startedAtMs = Number(this.scene?._clockInterpolationStartedAtMs);
+    const durationMs = Number(this.scene?._clockInterpolationDurationMs);
+
+    // If interpolation still has a long runway, do not block turn boundaries.
+    if (
+      Number.isFinite(startedAtMs) &&
+      Number.isFinite(durationMs) &&
+      durationMs > 0
+    ) {
+      const elapsedMs = Math.max(0, nowMs - startedAtMs);
+      const remainingMs = Math.max(0, durationMs - elapsedMs);
+      if (remainingMs > settleCapMs) return;
+      const tailWaitMs = Math.min(timeoutMs || settleCapMs, remainingMs + 32);
+      if (tailWaitMs <= 0) return;
+      const waitStartMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      await Promise.race([
+        p,
+        new Promise((resolve) => setTimeout(resolve, tailWaitMs)),
+      ]);
+      const waitEndMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      return {
+        waitedMs: Math.max(0, waitEndMs - waitStartMs),
+        settleCapMs,
+        branch: "tail",
+      };
     }
+
+    // Fallback for cases without timing metadata.
+    const fallbackWaitMs = Math.min(timeoutMs || settleCapMs, settleCapMs);
+    if (fallbackWaitMs <= 0) {
+      return { waitedMs: 0, settleCapMs, branch: "none" };
+    }
+    const waitStartMs =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
     await Promise.race([
       p,
-      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+      new Promise((resolve) => setTimeout(resolve, fallbackWaitMs)),
     ]);
+    const waitEndMs =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    return {
+      waitedMs: Math.max(0, waitEndMs - waitStartMs),
+      settleCapMs,
+      branch: "fallback",
+    };
   }
 
   /**
@@ -300,9 +581,15 @@ export class AnimationRouter {
         const useTwoPhase = gameSecondsToCount > 0 && shotSecondsToCount < gameSecondsToCount;
         const ratio = useTwoPhase ? shotSecondsToCount / gameSecondsToCount : 1;
         const progressObj = { p: 0 };
+        const tweenStartMs =
+          typeof performance !== "undefined" && typeof performance.now === "function"
+            ? performance.now()
+            : Date.now();
         this.scene._clockInterpolationPromise = new Promise((resolve) => {
           this.scene._clockInterpolationResolve = resolve;
         });
+        this.scene._clockInterpolationStartedAtMs = tweenStartMs;
+        this.scene._clockInterpolationDurationMs = durationMs;
         this.scene._clockInterpolationTween = this.scene.tweens.add({
           targets: progressObj,
           p: 1,
@@ -426,9 +713,55 @@ export class AnimationRouter {
       await this.animationEngine.processTurn(turnData, context);
       // Universal continuity guard: do not advance next turn until
       // this turn's clock interpolation window has settled.
-      await this.waitForClockInterpolationSettle(
+      const boundaryWait = await this.waitForClockInterpolationSettle(
         Math.max(0, Number(durationMs) || 0) + 150
       );
+      if (boundaryWait) {
+        this._emitBoundaryWaitTelemetry(turnData, {
+          waitedMs: Math.round(boundaryWait.waitedMs ?? 0),
+          settleCapMs: boundaryWait.settleCapMs ?? null,
+          branch: boundaryWait.branch ?? null,
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
+      }
+      const tweenDrain = await this.waitForBoundaryTweenDrain(
+        Number(
+          (typeof window !== "undefined"
+            ? window.UESS_BOUNDARY_TWEEN_DRAIN_MAX_MS
+            : globalThis?.UESS_BOUNDARY_TWEEN_DRAIN_MAX_MS) ?? 120
+        ) || 120,
+        Number(
+          (typeof window !== "undefined"
+            ? window.UESS_BOUNDARY_TWEEN_DRAIN_POLL_MS
+            : globalThis?.UESS_BOUNDARY_TWEEN_DRAIN_POLL_MS) ?? 20
+        ) || 20
+      );
+      if (tweenDrain?.remainingTweens > 0) {
+        const leakTweenSample = this._describeBoundaryTweens(
+          Number(
+            (typeof window !== "undefined"
+              ? window.UESS_BOUNDARY_TWEEN_LEAK_SAMPLE_SIZE
+              : globalThis?.UESS_BOUNDARY_TWEEN_LEAK_SAMPLE_SIZE) ?? 8
+          ) || 8
+        );
+        this._emitBoundaryWaitTelemetry(turnData, {
+          event: "turn_boundary_active_tween_leak",
+          waitedMs: Math.round(tweenDrain.waitedMs ?? 0),
+          remainingTweens: tweenDrain.remainingTweens,
+          leakTweenSample,
+          branch: "tween_drain",
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
+        const stoppedCount = this._forceStopBoundaryTweens();
+        this._emitBoundaryWaitTelemetry(turnData, {
+          event: "turn_boundary_force_stop_applied",
+          waitedMs: 0,
+          remainingTweensAfterStop: this._countActiveTweensForBoundary(),
+          stoppedTweens: stoppedCount,
+          branch: "tween_drain_force_stop",
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
+      }
       if (!shouldLog) {
         // Completed (log removed)
       }

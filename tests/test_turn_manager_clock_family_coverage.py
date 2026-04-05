@@ -54,7 +54,7 @@ def test_timeout_clock_family_is_clock_dead_and_ledger_zero_elapsed():
 
 
 @pytest.mark.parametrize("result_type", ["SIDE_INBOUND", "BASELINE_INBOUND"])
-def test_inbound_clock_family_resets_shot_clock_and_keeps_zero_elapsed(result_type: str):
+def test_inbound_clock_family_keeps_shot_clock_when_no_reset_trigger(result_type: str):
     tm = _make_turn_manager(time_remaining=400, shot_clock_remaining=18, elapsed_authority="ledger")
     result = {"result_type": result_type, "time_elapsed": 4}
 
@@ -64,17 +64,33 @@ def test_inbound_clock_family_resets_shot_clock_and_keeps_zero_elapsed(result_ty
     assert result["clock_start"] == 400
     assert result["clock_end"] == 400
     assert result["shot_clock_start"] == 18
-    assert result["shot_clock_end"] == 30
-    assert result["shot_clock_reset"] is True
-    assert result["shot_clock_reset_reason"] == "inbound_received"
+    assert result["shot_clock_end"] == 18
+    assert result["shot_clock_reset"] is False
+    assert result.get("shot_clock_reset_reason") in (None, "")
     assert result["uess_clock_elapsed_game_seconds"] == 0
     assert result["uess_clock_elapsed_delta_seconds"] == 0
-    reset_rows = [
-        row for row in result.get("clock_event_ledger", [])
-        if row.get("event_type") == "shot_clock_reset"
-    ]
-    assert reset_rows, "expected shot_clock_reset ledger event"
-    assert reset_rows[-1].get("reason") == "inbound_received"
+
+
+def test_non_shooting_defensive_foul_to_side_inbound_resets_shot_clock_without_possession_change():
+    tm = _make_turn_manager(time_remaining=400, shot_clock_remaining=18, elapsed_authority="ledger")
+    result = {
+        "result_type": "FOUL",
+        "foul_type": "DEFENSIVE",
+        "next_play_type": "SIDE_INBOUND",
+        "free_throws_remaining": 0,
+        "possession_flips": False,
+        "time_elapsed": 2,
+    }
+
+    tm.update_clock_and_possession(result)
+
+    assert result["clock_start"] == 400
+    assert result["clock_end"] == 398
+    assert result["shot_clock_start"] == 18
+    assert result["shot_clock_end"] == 16
+    assert result["shot_clock_reset"] is False
+    # Reset applies to next-turn state per contract policy.
+    assert tm.game.game_state["shot_clock_remaining"] == 30
 
 
 def test_free_throw_clock_family_is_clock_dead_for_elapsed_authority():

@@ -553,6 +553,9 @@ export class AnimationEngine {
     // This ensures BIP animation finishes before the next turn (HCT/FCP) starts
     // Check passInFlight flag and wait for passEnd event if needed
     if (this.scene.passInFlight) {
+      const PASS_COMPLETION_POLL_MS = 25;
+      const PASS_COMPLETION_GRACE_MS = 16;
+      const PASS_COMPLETION_MAX_WAIT_MS = 600;
       // Wait for passInFlight to be cleared (indicates pass animation is complete)
       await new Promise((resolve) => {
         // If already cleared, resolve immediately
@@ -571,25 +574,25 @@ export class AnimationEngine {
         };
         
         const onPassEnd = () => {
-          // Give a small delay to ensure all pass cleanup is complete
+          // Allow a single frame for pass cleanup to settle.
           setTimeout(() => {
             checkPassComplete();
-          }, 50);
+          }, PASS_COMPLETION_GRACE_MS);
         };
         
         // Listen for passEnd event
         this.scene.events?.on('passEnd', onPassEnd);
         
         // Also poll periodically as a fallback (in case event doesn't fire)
-        const intervalId = setInterval(checkPassComplete, 50);
+        const intervalId = setInterval(checkPassComplete, PASS_COMPLETION_POLL_MS);
         
-        // Safety timeout - resolve after 2 seconds max
+        // Safety timeout - short bound to avoid introducing long boundary stalls.
         setTimeout(() => {
           this.scene.events?.off('passEnd', onPassEnd);
           clearInterval(intervalId);
           console.warn('⚠️ [BIP] Pass completion timeout - proceeding anyway');
           resolve();
-        }, 2000);
+        }, PASS_COMPLETION_MAX_WAIT_MS);
       });
     }
     

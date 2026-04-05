@@ -208,6 +208,7 @@ export function ensureConsistentHeartbeat(scene, sprites = null) {
         yoyo: true,
         repeat: -1,
       });
+      if (tween) tween.__uessBoundaryIgnore = true;
 
       store.set(key, {
         sprite,
