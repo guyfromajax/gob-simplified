@@ -64,19 +64,51 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 
 **Backend Setup:**
 - `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup=None`
-- Creates random baseline positions for offensive players (PG, SG, SF, PF, C)
-- PG is the inbounder (stays at inbound spot)
-- Defensive players retreat to midcourt
+- Emits explicit `oDestinations` / `dDestinations` for HCO-targeted BIP setup
+- **Offense SF (inbound passer):**
+  - Home offense: `x = 3`
+  - Away offense: `x = 97`
+  - Uses current PG `y` plus offense team chemistry to choose `y`:
+    - chemistry `> 15`: `y = 25-35` when current PG `y > 24`, else `y = 15-25`
+    - chemistry `< 16`: `y = 15-35`
+- **Offense PG:**
+  - Moves to `y = SF.y +/- 3`
+  - Moves `9-15` x-spots toward the offense basket from the SF inbound spot
+- **Other three offensive players:**
+  - Random destinations within `+/- 20` y-spots of the offense basket y
+  - `5-25` x-spots from the offense basket x
+- **Defense:**
+  - If `defense_execution > 5`: all 5 defenders target lane locations
+  - Else if `defense_execution > 0`: 4 defenders target lane locations
+  - Else: 2 defenders target lane locations
+  - Lane location range:
+    - `y = 19-32`
+    - Home offense: `x = 74-87`
+    - Away offense: flipped to away-side coordinates
+  - Non-lane defenders:
+    - `y = 10-30`
+    - Home offense: `x = 62-87`
+    - Away offense: flipped to away-side coordinates
 
 **Frontend Execution:**
 - `runInboundSetup()` called with `skipRetreat=false`
-- **Defensive players:** Animate to midcourt (x: 45 or 55) - retreat animation
-- **Offensive players:** Animate to random baseline positions from `oDestinations`
-- **Inbound pass:** SF → PG (hardcoded fallback, or dynamic from `turnData.animations`)
+- **Defensive players:** Animate to backend `dDestinations`
+- **Offensive players:** Animate to backend `oDestinations`
+- **BIP setup advance trigger:** SF and PG both reaching their setup destinations
+- **Boundary behavior at trigger:** all other setup movers are force-stopped at their live positions and the phase proceeds from that live state
+- **Inbound pass progression:**
+  - The ball remains at its live made-shot resolution spot
+  - SF first moves to that ball spot
+  - When SF reaches the ball spot, the ball attaches to the SF sprite
+  - SF then carries the ball to the inbound setup destination
+  - PG and the other setup movers reach their setup destinations in parallel
+  - Ball is passed from SF → PG
+  - Trigger event is the ball attaching to the PG sprite on pass receipt
+  - No extra post-pass hold is applied after PG receives the inbound; BIP hands off immediately toward HCO bring-up / setup continuation once the pass is complete
 
 **Key Code:**
-- `turnAnimation.js` lines 1031-1078: Defensive retreat animation
-- `turnAnimation.js` lines 1220-1224: Offensive player positioning (uses `inboundDest`)
+- `BackEnd/models/turn_manager.py` `setup_baseline_inbound()`: HCO-targeted `oDestinations` / `dDestinations`
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` `runInboundSetup()`: BIP setup tweening and inbound pass sequencing
 
 #### 2. BASELINE_INBOUND → HCT (Half Court Trap)
 
@@ -252,4 +284,3 @@ For Q2, Q3, and Q4:
 - `FrontEnd/static/js/phaser/animation/AnimationEngine.js` - `handleBaselineInbound()` method (lines 309-395)
 - `FrontEnd/static/js/phaser/animation/PassAnimationSystem.js` - `executeInboundSequence()` method
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runInboundSetup()` function (lines 1031-1225, FCP/HCT skip ~1849-1866)
-

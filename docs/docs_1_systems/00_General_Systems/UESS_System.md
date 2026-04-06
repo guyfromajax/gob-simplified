@@ -138,6 +138,7 @@ Notes:
 5. **Completion gate**: unit exits only when movers settle OR a declared terminal interrupt ends the unit.
 6. **Budget gate**: elapsed unit time cannot exceed `max_wait_game_seconds` without explicit policy action (`warn|throw`).
 7. **Transition continuity**: out-transition must not introduce a non-interrupt pause between ownership handoff and next unit entry.
+8. **Dynamic-event boundary rule**: when a dynamic-event unit's required movers satisfy the locked `advance_trigger`, remaining non-required mover tweens are force-stopped at live positions and the unit proceeds from that live state.
 
 ### Rollout policy
 
@@ -146,6 +147,107 @@ Notes:
   1. `hco.lead_in.from_dreb_outlet` boundary
   2. `oreb.*` putback/kickout boundaries
   3. remaining batch/sub-turn transition boundaries
+
+## Dynamic-Event Boundary Snapshot Contract (Universal)
+
+This contract applies to non-skeleton UESS execution units that advance on a dynamic event rather than full-step completion.
+
+### Purpose
+
+Allow a dynamic-event phase to advance as soon as its locked `advance_trigger` occurs while preserving exact carried state for all movers, including movers stopped short of their intended destinations.
+
+### Core Rule
+
+For dynamic-event units, non-required movers do not need to reach their declared destinations before the phase advances.
+
+When the locked `advance_trigger` occurs:
+
+- required movers must satisfy the trigger condition
+- all non-required mover tweens are stopped at the phase boundary
+- the system resolves a deterministic boundary snapshot for every mover
+- that boundary snapshot becomes the carried state for the next phase or turn
+
+### Boundary Authority
+
+- Backend remains authoritative for the boundary snapshot contract.
+- Frontend executes the phase and detects the exact trigger-fire moment in runtime.
+- Boundary positions are resolved from shared contract math, not from intended destinations.
+- Frontend sprite readback may be used for local visual stop control, but not as the canonical contract source when deterministic contract resolution is available.
+
+### Required Contract Fields
+
+Every dynamic-event unit must define:
+
+- `required_movers`
+- `start_coords_by_mover`
+- `target_coords_by_mover`
+- `movement_profile_by_mover`
+- `advance_trigger`
+- `allowed_interrupts`
+- `max_wait_game_seconds`
+- `ownership_at_phase_start`
+- `ownership_commit_event`
+
+### Movement Profile Rule
+
+`movement_profile_by_mover` must resolve to a deterministic movement rate for each mover.
+
+Required payload form:
+
+- exact numeric movement rate per mover
+
+Example:
+
+- `grid_units_per_game_second`
+
+### Boundary Resolution Rule
+
+At the exact boundary timestamp:
+
+- each required mover is validated against the locked trigger condition
+- each non-required mover boundary position is computed from:
+  - phase-start coordinates
+  - target coordinates
+  - movement rate
+  - elapsed phase time at trigger instant
+
+Resolution rules:
+
+- progress is clamped to destination
+- movers stopped before destination carry their resolved partial-progress coordinates forward
+- next phase/turn state must use resolved boundary coordinates, not intended destination coordinates
+
+### Trigger Timestamp Rule
+
+- Frontend records the exact runtime timestamp when the locked `advance_trigger` fires.
+- That timestamp is the boundary timestamp for the unit.
+- Backend and frontend must resolve the same boundary snapshot from the same contract inputs and boundary timestamp.
+
+### Frontend Boundary Behavior
+
+When the locked trigger occurs, frontend must:
+
+- stop all non-required mover tweens immediately
+- apply the resolved boundary snapshot to runtime sprite state
+- continue into the next phase/turn from that resolved state
+- prevent any stopped tween from leaking past the unit boundary
+
+### Backend Carry-Forward Rule
+
+Backend must treat the resolved boundary snapshot as the carried state for any next phase/turn that depends on prior live positions.
+
+Backend must not assume that non-required movers reached destination unless the boundary resolution explicitly places them there.
+
+### Universal Applicability
+
+This contract applies to all dynamic-event non-skeleton units, including:
+
+- `bip.phase.setup_positions`
+- `sip.phase.setup_positions`
+- `fb` dynamic phases
+- `oreb` dynamic phases
+
+Skeleton step families remain governed by skeleton completion rules unless explicitly migrated.
 
 ## Local Dev Strictness Policy
 
@@ -448,11 +550,11 @@ Advance-trigger lock parity (runtime-verified):
 | Unit | `advance_trigger` (locked) | `visual_settle_trigger` (locked) | Runtime parity |
 | --- | --- | --- | --- |
 | `sip.lead_in.entry` | `SIP route committed + inbounder resolved` | `setup settled` | `locked` |
-| `sip.phase.setup_positions` | `required setup movers reached targets` | `setup tweens settled` | `locked` |
+| `sip.phase.setup_positions` | `all ten players reach SIP setup destinations` | `setup tweens settled` | `locked` |
 | `sip.phase.pass` | `pass received` | `ball flight + receiver settle` | `locked` |
 | `sip.out.to_*` | `route committed` | `SIP final settle complete` | `locked` |
 | `bip.lead_in.entry` | `BIP route committed + inbounder resolved` | `baseline setup settled` | `locked` |
-| `bip.phase.setup_positions` | `required setup movers reached targets` | `setup tweens settled` | `locked` |
+| `bip.phase.setup_positions` | `SF and PG reached setup destinations` | `SF and PG setup tweens settled` | `locked` |
 | `bip.phase.pass` | `pass received` | `ball flight + receiver settle` | `locked` |
 | `bip.out.to_*` | `route committed` | `BIP final settle complete` | `locked` |
 

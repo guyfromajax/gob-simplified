@@ -33,25 +33,39 @@ export const BALL_HANDLER_MOVE_Y_RANGE = 3; // ±3 y-coords
 export const STOPPER_OFFSET_MIN = 1;
 export const STOPPER_OFFSET_MAX = 3;
 
-/** FB shot contest: toward rim in X vs shooter final, ±Y — matches `fast_break_shot_defender_end_coords` (Python). */
-export const SHOT_DEFENDER_X_OFFSET = 1;
+/** FB shot contest: two x-spots behind shooter relative to offense basket, ±Y — matches Python. */
+export const SHOT_DEFENDER_X_OFFSET = 2;
 export const SHOT_DEFENDER_Y_RANGE = 2;
+export const SECONDARY_SHOT_DEFENDER_Y_OFFSET = 3;
 
 /**
  * @param {number} bhX shooter final grid x (HOME)
  * @param {number} bhY shooter final grid y
  * @param {boolean} isHomeOffense
- * @param {number} [stackIndex=0] second contest defender uses 1 (one step further toward rim)
  */
-export function fastBreakShotDefenderGridVsShooter(bhX, bhY, isHomeOffense, stackIndex = 0) {
-  const towardBasket = isHomeOffense ? 1 : -1;
-  const xSteps = SHOT_DEFENDER_X_OFFSET + Math.max(0, stackIndex);
-  let x = bhX + towardBasket * xSteps;
+export function fastBreakShotDefenderGridVsShooter(bhX, bhY, isHomeOffense) {
+  const xDelta = isHomeOffense ? -SHOT_DEFENDER_X_OFFSET : SHOT_DEFENDER_X_OFFSET;
+  let x = bhX + xDelta;
   x = Math.max(CLAMP_BOUNDS.minX, Math.min(CLAMP_BOUNDS.maxX, x));
   const yOff =
     -SHOT_DEFENDER_Y_RANGE +
     Math.floor(Math.random() * (2 * SHOT_DEFENDER_Y_RANGE + 1));
   let y = Math.max(CLAMP_BOUNDS.minY, Math.min(CLAMP_BOUNDS.maxY, bhY + yOff));
+  return { x, y };
+}
+
+/**
+ * @param {number} primaryX primary defender grid x
+ * @param {number} primaryY primary defender grid y
+ * @param {number} sourceY secondary defender current grid y
+ */
+export function fastBreakSecondaryShotDefenderGrid(primaryX, primaryY, sourceY) {
+  const x = Math.max(CLAMP_BOUNDS.minX, Math.min(CLAMP_BOUNDS.maxX, primaryX));
+  const yDelta =
+    sourceY > primaryY
+      ? SECONDARY_SHOT_DEFENDER_Y_OFFSET
+      : -SECONDARY_SHOT_DEFENDER_Y_OFFSET;
+  const y = Math.max(CLAMP_BOUNDS.minY, Math.min(CLAMP_BOUNDS.maxY, primaryY + yDelta));
   return { x, y };
 }
 

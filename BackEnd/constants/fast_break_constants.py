@@ -24,33 +24,55 @@ FB_SHOT_SPOT_X_MAX = 6  # Max x-distance from rim (spots)
 FB_SHOT_SPOT_Y_RANGE = 6  # ±y from rim center
 
 # Defender Positioning (Shot Attempt)
-# Defender 1 x-coord toward basket from shooter: home offense +1, away offense -1. Y: ±2 from shooter
-SHOT_DEFENDER_X_OFFSET = 1  # Defender x = shooter x + 1 (home) or shooter x - 1 (away)
+# Primary shot defender sits two x-spots behind the shooter relative to the offense basket.
+# Home offense attacks right, so defender x = shooter x - 2.
+# Away offense attacks left, so defender x = shooter x + 2.
+SHOT_DEFENDER_X_OFFSET = 2
 SHOT_DEFENDER_Y_RANGE = 2  # Defender y within ±2 of shooter y
+SECONDARY_SHOT_DEFENDER_Y_OFFSET = 3
 
 
 def fast_break_shot_defender_end_coords(
-    bh_x: float,
-    bh_y: float,
+    shooter_x: float,
+    shooter_y: float,
     is_away_offense: bool,
-    *,
-    stack_index: int = 0,
 ) -> dict:
     """
-    Grid destination for a fast-break shot contest defender vs the shooter's final spot (HOME grid).
+    Grid destination for the primary fast-break shot contest defender vs the shooter's final spot (HOME grid).
 
-    Base rule (stack_index=0): SHOT_DEFENDER_X_OFFSET steps toward the attacking rim in X,
-    Y = shooter Y + uniform integer in [-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE].
-
-    When two defenders animate (e.g. beaten stopper + trail shot defender), use stack_index 0 and 1
-    so the second sits one step further toward the basket (same Y jitter rule).
+    Rule:
+    - Home offense: defender x = shooter x - SHOT_DEFENDER_X_OFFSET
+    - Away offense: defender x = shooter x + SHOT_DEFENDER_X_OFFSET
+    - Defender y = shooter y + uniform integer in [-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE]
     """
-    toward_basket = -1 if is_away_offense else 1
-    x_steps = SHOT_DEFENDER_X_OFFSET + max(0, int(stack_index))
-    defender_x = float(bh_x) + toward_basket * x_steps
+    x_delta = SHOT_DEFENDER_X_OFFSET if is_away_offense else -SHOT_DEFENDER_X_OFFSET
+    defender_x = float(shooter_x) + x_delta
     defender_x = int(max(4, min(97, round(defender_x))))
     defender_y_off = random.randint(-SHOT_DEFENDER_Y_RANGE, SHOT_DEFENDER_Y_RANGE)
-    defender_y = int(max(1, min(49, round(float(bh_y) + defender_y_off))))
+    defender_y = int(max(1, min(49, round(float(shooter_y) + defender_y_off))))
+    return {"x": defender_x, "y": defender_y}
+
+
+def fast_break_secondary_shot_defender_end_coords(
+    primary_defender_x: float,
+    primary_defender_y: float,
+    secondary_source_y: float,
+) -> dict:
+    """
+    Grid destination for the secondary fast-break shot defender (beat-stopper path).
+
+    Rule:
+    - same x as the primary shot defender
+    - y = primary defender y + 3 when the secondary defender starts below that y
+      otherwise y = primary defender y - 3
+    """
+    defender_x = int(max(4, min(97, round(float(primary_defender_x)))))
+    y_delta = (
+        SECONDARY_SHOT_DEFENDER_Y_OFFSET
+        if float(secondary_source_y) > float(primary_defender_y)
+        else -SECONDARY_SHOT_DEFENDER_Y_OFFSET
+    )
+    defender_y = int(max(1, min(49, round(float(primary_defender_y) + y_delta))))
     return {"x": defender_x, "y": defender_y}
 
 

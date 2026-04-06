@@ -20,6 +20,7 @@ from BackEnd.constants.fast_break_constants import (
     FB_SHOT_SPOT_X_MAX,
     FB_SHOT_SPOT_Y_RANGE,
     fast_break_shot_defender_end_coords,
+    fast_break_secondary_shot_defender_end_coords,
     REBOUNDER_X_MIN,
     REBOUNDER_X_MAX,
     REBOUNDER_Y_RANGE,
@@ -257,20 +258,31 @@ class Animator:
             shot_defender = fb_roles.get("defender")
 
             if ball_handler_beats_defender:
-                # FB shot after beating stopper: same contest grid vs shooter final as all FB shots
-                stack_next = 0
+                # FB shot after beating stopper: primary defender uses the unified shooter-relative
+                # shot contest spot; secondary defender shares x and gets a +/-3 y offset.
+                primary_defender_end = None
                 if stopper:
                     end = fast_break_shot_defender_end_coords(
-                        bh_stop_x, bh_stop_y, is_away_offense, stack_index=stack_next
+                        bh_stop_x, bh_stop_y, is_away_offense
                     )
                     build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
                     mark_player_animated(getattr(stopper, "player_id", None))
-                    stack_next = 1
+                    primary_defender_end = end
                 sd_pid = getattr(shot_defender, "player_id", None) if shot_defender else None
                 if shot_defender and sd_pid and sd_pid != stopper_id:
-                    end_sd = fast_break_shot_defender_end_coords(
-                        bh_stop_x, bh_stop_y, is_away_offense, stack_index=stack_next
-                    )
+                    if primary_defender_end is None:
+                        end_sd = fast_break_shot_defender_end_coords(
+                            bh_stop_x, bh_stop_y, is_away_offense
+                        )
+                    else:
+                        shot_defender_source_y = (
+                            (getattr(shot_defender, "coords", {}) or {}).get("y", 25)
+                        )
+                        end_sd = fast_break_secondary_shot_defender_end_coords(
+                            primary_defender_end["x"],
+                            primary_defender_end["y"],
+                            shot_defender_source_y,
+                        )
                     build_movement(shot_defender, end_sd, action=ACTIONS["GUARD_BALL"])
                     mark_player_animated(sd_pid)
 
@@ -306,7 +318,7 @@ class Animator:
                 bh_shot_x = fb_roles.get("_bh_final_x", bh_end["x"])
                 bh_shot_y = fb_roles.get("_bh_final_y", bh_end["y"])
                 defender_end = fast_break_shot_defender_end_coords(
-                    bh_shot_x, bh_shot_y, is_away_offense, stack_index=0
+                    bh_shot_x, bh_shot_y, is_away_offense
                 )
                 build_movement(shot_defender, defender_end, action=ACTIONS["GUARD_BALL"])
                 mark_player_animated(getattr(shot_defender, "player_id", None))

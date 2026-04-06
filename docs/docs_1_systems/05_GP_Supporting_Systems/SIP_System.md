@@ -74,6 +74,7 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
 **Offensive Players:**
 - Positions come from `turnData.oDestinations` (backend-provided)
 - All offensive players animate to their destinations using distance-based timing
+- SIP setup advance trigger is all ten players reaching their SIP setup destinations
 - SF is the inbounder (receives ball at inbound spot)
 - **Position Ranges (Home Orientation):**
   - PG: x=(50, 54), y=(37, 43)
@@ -105,7 +106,7 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
 - Falls back to hardcoded SF → PG pass if no pass detected
 
 **Pass Animation:**
-- Pass executes after all players reach their positions
+- Pass executes after all ten players reach their SIP setup destinations
 - Ball transfers from SF to PG
 - PG receives ball and next turn begins
 
@@ -147,4 +148,3 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
 - `FrontEnd/static/js/phaser/animation/AnimationEngine.js` - `handleSideInbound()` method
 - `FrontEnd/static/js/phaser/animation/PassAnimationSystem.js` - `executeInboundSequence()` method
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runSideInboundSetup()` function (lines 393-415)
-

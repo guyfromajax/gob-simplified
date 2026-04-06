@@ -354,7 +354,7 @@ This section defines intra-turn execution units and completion semantics for eac
 | unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
 |---|---|---|---|---|---|---|---|---|
 | `sip.lead_in.entry` | lead_in_phase | route enters SIP | dynamic_event | SIP route committed + inbounder resolved | setup settled | throw | transition budget | SIP inbounder |
-| `sip.phase.setup_positions` | branch_phase | place inbound actors | dynamic_event | required setup movers reached targets | setup tweens settled | warn -> throw | SIP phase budget | inbounder |
+| `sip.phase.setup_positions` | branch_phase | place inbound actors | dynamic_event | all ten players reach SIP setup destinations | setup tweens settled | warn -> throw | SIP phase budget | inbounder |
 | `sip.phase.pass` | branch_phase | inbound pass executes | dynamic_event | pass received | ball flight + receiver settle | throw | SIP phase budget | SIP receiver |
 | `sip.out.to_*` | transition_out_phase | SIP exits to HCO/FCP/HCT | dynamic_event | route committed | SIP final settle complete | throw | boundary handoff | route-specific owner |
 
@@ -363,7 +363,7 @@ This section defines intra-turn execution units and completion semantics for eac
 | unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
 |---|---|---|---|---|---|---|---|---|
 | `bip.lead_in.entry` | lead_in_phase | route enters BIP after make | dynamic_event | BIP route committed + inbounder resolved | baseline setup settled | throw | transition budget | BIP inbounder |
-| `bip.phase.setup_positions` | branch_phase | half-court reset to inbound geometry | dynamic_event | required setup movers reached targets | setup tweens settled | warn -> throw | BIP phase budget | inbounder |
+| `bip.phase.setup_positions` | branch_phase | half-court reset to inbound geometry | dynamic_event | SF and PG reached setup destinations | SF and PG setup tweens settled | warn -> throw | BIP phase budget | inbounder |
 | `bip.phase.pass` | branch_phase | inbound pass executes | dynamic_event | pass received | ball flight + receiver settle | throw | BIP phase budget | BIP receiver |
 | `bip.out.to_*` | transition_out_phase | BIP exits to HCO/FCP/HCT | dynamic_event | route committed | BIP final settle complete | throw | boundary handoff | route-specific owner |
 

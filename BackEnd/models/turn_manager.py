@@ -21,7 +21,9 @@ from BackEnd.constants import (
     POSITION_LIST,
     STRATEGY_CALL_DICTS,
     TEMPO_PASS_DICT,
-    MALLEABLE_ATTRS
+    MALLEABLE_ATTRS,
+    HOME_RIM_COORDS,
+    AWAY_RIM_COORDS,
 )
 from BackEnd.utils.shared import (
     weighted_random_from_dict,
@@ -612,30 +614,68 @@ class TurnManager:
             # Flip offensive coordinates if the away team has possession
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
         else:
-            # Use random baseline positions for normal HCO inbound (no pressure)
-            # inbound_spot_home already defined above
+            # HCO-only baseline inbound setup uses explicit BIP targets.
+            offense_attrs = offense_team.team_attributes or {}
+            defense_attrs = defense_team.team_attributes or {}
+            offense_chemistry = int(offense_attrs.get("team_chemistry", 15) or 15)
+            defense_execution = int(defense_attrs.get("defense_execution", 0) or 0)
 
-            # Destination ranges for other offensive players (home orientation).
-            home_ranges = {
-                "SG": {"x": (52, 56), "y": (22, 28)},
-                "SF": {"x": (54, 58), "y": (18, 32)},
-                "PF": {"x": (54, 58), "y": (30, 36)},
-                "C":  {"x": (54, 58), "y": (14, 20)},
+            offense_basket = HOME_RIM_COORDS if not is_away_offense else AWAY_RIM_COORDS
+            inbound_spot = {"x": 3, "y": 25} if not is_away_offense else {"x": 97, "y": 25}
+
+            current_pg = offense_team.lineup.get("PG")
+            current_pg_y = 25
+            if getattr(current_pg, "coords", None):
+                current_pg_y = int(current_pg.coords.get("y", 25) or 25)
+
+            if offense_chemistry > 15:
+                sf_y_range = (25, 35) if current_pg_y > 24 else (15, 25)
+            else:
+                sf_y_range = (15, 35)
+
+            sf_y = random.randint(*sf_y_range)
+            sf_x = inbound_spot["x"]
+
+            pg_x_offset = random.randint(9, 15)
+            pg_y_offset = random.randint(-3, 3)
+            pg_x = sf_x + pg_x_offset if not is_away_offense else sf_x - pg_x_offset
+            pg_y = max(1, min(49, sf_y + pg_y_offset))
+
+            def offense_half_court_target():
+                if not is_away_offense:
+                    x = random.randint(offense_basket["x"] - 25, offense_basket["x"] - 5)
+                else:
+                    x = random.randint(offense_basket["x"] + 5, offense_basket["x"] + 25)
+                y = random.randint(
+                    max(1, offense_basket["y"] - 20),
+                    min(49, offense_basket["y"] + 20),
+                )
+                return {"x": x, "y": y}
+
+            o_dest = {
+                "SF": {"x": sf_x, "y": sf_y},
+                "PG": {"x": pg_x, "y": pg_y},
+                "SG": offense_half_court_target(),
+                "PF": offense_half_court_target(),
+                "C": offense_half_court_target(),
             }
 
-            o_dest_home = {}
-            for pos, ranges in home_ranges.items():
-                o_dest_home[pos] = {
-                    "x": random.randint(*ranges["x"]),
-                    "y": random.randint(*ranges["y"]),
-                }
-                self.logger.log(f"destAssigned:{pos}")
+            lane_target_count = 5 if defense_execution > 5 else 4 if defense_execution > 0 else 2
+            defender_positions = [pos for pos in defense_team.lineup.keys() if pos in {"PG", "SG", "SF", "PF", "C"}]
+            lane_positions = set(random.sample(defender_positions, min(lane_target_count, len(defender_positions))))
 
-            # Inbounder (PG) stays at the inbound spot
-            o_dest_home["PG"] = inbound_spot_home.copy()
+            d_dest = {}
+            for pos in defender_positions:
+                if pos in lane_positions:
+                    x = random.randint(74, 87) if not is_away_offense else random.randint(14, 27)
+                    y = random.randint(19, 32)
+                else:
+                    x = random.randint(62, 87) if not is_away_offense else random.randint(14, 39)
+                    y = random.randint(10, 30)
+                d_dest[pos] = {"x": x, "y": y}
 
-            # Flip offensive coordinates if the away team has possession
-            o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+            bh_coords = o_dest["PG"]
+            inbound_spot_home = inbound_spot.copy()
 
         # Determine ball-handler (PG) coordinates in actual orientation
         bh_coords = o_dest["PG"]
@@ -643,42 +683,40 @@ class TurnManager:
         # --- Defensive positioning ---
         # PHASE 6: Use new unified defender coordinate system
         # get_defender_coords handles coordinate orientation automatically
-        self.logger.log("defenseUpdate:start")
-        d_dest = {}
-        for pos, defender in defense_team.lineup.items():
-            if pos == "PG":
-                # BH defender - get_defender_coords handles orientation automatically
-                d_coords = get_defender_coords(
-                    bh_coords,
-                    is_away_offense,
-                    aggression,
-                    "baseline_inbound",
-                    None,
-                    is_ball_handler=True
-                )
-                d_dest[pos] = d_coords
-            elif pos in o_dest:
-                o_coords = o_dest[pos]
-                # Non-BH defender - get_defender_coords handles orientation automatically
-                # Need to determine offensive player's spot (default to "key" for baseline inbound)
-                o_spot = "key"  # Default spot for baseline inbound
-                d_coords = get_defender_coords(
-                    o_coords,
-                    is_away_offense,
-                    aggression,
-                    o_spot,
-                    bh_coords,
-                    is_ball_handler=False,
-                    ball_spot="baseline_inbound"  # Ball handler's spot
-                )
-                d_dest[pos] = d_coords
-        self.logger.log("defenseUpdate:end")
+        if setup_locations:
+            self.logger.log("defenseUpdate:start")
+            d_dest = {}
+            for pos, defender in defense_team.lineup.items():
+                if pos == "PG":
+                    d_coords = get_defender_coords(
+                        bh_coords,
+                        is_away_offense,
+                        aggression,
+                        "baseline_inbound",
+                        None,
+                        is_ball_handler=True
+                    )
+                    d_dest[pos] = d_coords
+                elif pos in o_dest:
+                    o_coords = o_dest[pos]
+                    o_spot = "key"
+                    d_coords = get_defender_coords(
+                        o_coords,
+                        is_away_offense,
+                        aggression,
+                        o_spot,
+                        bh_coords,
+                        is_ball_handler=False,
+                        ball_spot="baseline_inbound"
+                    )
+                    d_dest[pos] = d_coords
+            self.logger.log("defenseUpdate:end")
 
         from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
         payload = {
             "result_type": "BASELINE_INBOUND",
             "time_elapsed": 0,
-            "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
+            "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if (setup_locations and is_away_offense) else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
             "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # for situational Force Foul (pass receiver)

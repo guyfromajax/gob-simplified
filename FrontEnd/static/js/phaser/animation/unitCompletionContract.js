@@ -72,3 +72,32 @@ export function enforceUnitCompletionContract({
   return { ok: false, errors };
 }
 
+/**
+ * Dynamic-event unit boundary helper.
+ *
+ * Required movers gate the unit. Once they satisfy the unit's advance trigger,
+ * all remaining non-required mover tweens are force-stopped at live positions so
+ * the phase can progress without waiting on decorative/non-gating motion.
+ */
+export async function advanceDynamicEventBoundary({
+  requiredPromises = [],
+  scene,
+  nonRequiredSprites = [],
+  onAdvance,
+  onStopSprite,
+}) {
+  await Promise.all(requiredPromises);
+  if (typeof onAdvance === "function") {
+    await onAdvance();
+  }
+
+  const seen = new Set();
+  for (const sprite of nonRequiredSprites) {
+    if (!sprite || seen.has(sprite)) continue;
+    seen.add(sprite);
+    if (typeof onStopSprite === "function") {
+      onStopSprite(sprite);
+    }
+    scene?.tweens?.killTweensOf?.(sprite);
+  }
+}

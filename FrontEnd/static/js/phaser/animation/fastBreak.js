@@ -14,7 +14,9 @@ import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import {
+import * as fastBreakConstants from "../constants/fastBreakConstants.js";
+
+const {
   REBOUNDER_X_MIN,
   REBOUNDER_X_MAX,
   REBOUNDER_Y_RANGE,
@@ -25,7 +27,19 @@ import {
   STEAL_ENTRY_Y_MIN,
   STEAL_ENTRY_Y_MAX,
   fastBreakShotDefenderGridVsShooter,
-} from "../constants/fastBreakConstants.js";
+} = fastBreakConstants;
+const fastBreakSecondaryShotDefenderGrid =
+  fastBreakConstants.fastBreakSecondaryShotDefenderGrid ??
+  function fallbackFastBreakSecondaryShotDefenderGrid(primaryX, primaryY, sourceY) {
+    return {
+      x: Phaser.Math.Clamp(primaryX, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(
+        primaryY + (sourceY > primaryY ? 3 : -3),
+        GRID_MIN_Y,
+        GRID_MAX_Y,
+      ),
+    };
+  };
 
 
 const GRID_MIN_X = CLAMP_BOUNDS.minX;
@@ -632,6 +646,27 @@ function setRimRunnerSpriteGrid(sprite, gx, gy) {
   sprite.gridY = gy;
 }
 
+function commitRrLiveSpriteGrid(playerSprites, width, height) {
+  for (const sprite of Object.values(playerSprites || {})) {
+    if (!sprite) continue;
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y);
+    setRimRunnerSpriteGrid(sprite, gx, gy);
+  }
+}
+
+function captureRrLiveSnapshot(playerSprites, width, height) {
+  const snapshot = {};
+  for (const [pid, sprite] of Object.entries(playerSprites || {})) {
+    if (!sprite) continue;
+    snapshot[String(pid)] = {
+      x: Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y),
+    };
+  }
+  return snapshot;
+}
+
 /** Shared wall time for RR AG-drift beats (outlet denied + hold-up); floors snap/warp from tiny primary moves. */
 function clampRrAgSharedPhaseDurationMs(ms) {
   const raw = Number(ms);
@@ -762,18 +797,6 @@ async function finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites = nul
   }
 }
 
-function findOffensePgPlayerId(scene, playerSprites, offenseTeamId) {
-  if (!offenseTeamId) return null;
-  for (const [id, sprite] of Object.entries(playerSprites)) {
-    if (!sprite) continue;
-    if (String(sprite.team_id) !== String(offenseTeamId)) continue;
-    const info = scene.playerInfo?.[id];
-    const pos = String(info?.pos ?? info?.position ?? "").toUpperCase();
-    if (pos === "PG") return String(id);
-  }
-  return null;
-}
-
 function resolvePlayerSpriteById(playerSprites, rawId) {
   if (!playerSprites || rawId == null) return { id: null, sprite: null };
   const sid = String(rawId);
@@ -848,26 +871,6 @@ function resolveFastBreakDefenderSprite(playerSprites, turnData, { excludeIds = 
 }
 
 /**
- * After RR hold-up: skip generic FB defensive stop / top-of-key. Next HCO uses normal step-0 setup;
- * if ball handler is not PG, `playTurnAnimation` runs an inbound pass when PG reaches step 0.
- */
-async function finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites) {
-  const roles = turnData.roles || {};
-  const sid = (id) => (id != null ? String(id) : null);
-  const bhId = sid(
-    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
-  );
-  const offenseTeamId = turnData.offense_team_id ?? scene.offenseTeamId;
-  const pgId = findOffensePgPlayerId(scene, playerSprites, offenseTeamId);
-  if (bhId && pgId && bhId !== pgId) {
-    scene._rimRunnerHoldUpInboundPass = { ballHandlerId: bhId, pgId, offenseTeamId };
-  } else {
-    scene._rimRunnerHoldUpInboundPass = null;
-  }
-  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
-}
-
-/**
  * Rim Runner outlet denied: defender two grid steps toward the pass direction (same as backend
  * `outlet_defender_to`), announcement + headshot, receiver cuts to passer x and y±6, then pass.
  *
@@ -888,7 +891,9 @@ async function animateRimRunnerOutletDeniedBeat(
   recvSprite
 ) {
   const sid = (id) => (id != null ? String(id) : null);
-  if (!passerSprite || !recvSprite) return;
+  if (!passerSprite || !recvSprite) {
+    return { branch: "outlet_denied", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
 
   const defId = sid(phase?.outlet_defender_id);
   const defSprite = defId ? playerSprites[defId] : null;
@@ -985,20 +990,19 @@ async function animateRimRunnerOutletDeniedBeat(
   });
 
   await awaitWithTimeout(
-    Promise.all([recvPromise, ...driftPromises]),
+    recvPromise,
     phaseDurationMs + 2000,
-    "rim_runner_outlet_denied_drift_phase"
+    "rim_runner_outlet_denied_receiver_cutback"
   );
 
   setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
   for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
-    if (!sprite) continue;
+    if (!sprite || !scene.tweens) continue;
     const pid = sid(pidRaw);
     if (pid === passerId || pid === recvId || pid === defId) continue;
-    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X);
-    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y);
-    setRimRunnerSpriteGrid(sprite, gx, gy);
+    scene.tweens.killTweensOf(sprite);
   }
+  commitRrLiveSpriteGrid(playerSprites, width, height);
 
   if (passerId && recvId && passerId !== recvId) {
     await runPass(scene, {
@@ -1016,11 +1020,15 @@ async function animateRimRunnerOutletDeniedBeat(
   } else {
     attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_dribble_out" });
   }
+
+  commitRrLiveSpriteGrid(playerSprites, width, height);
+  return { branch: "outlet_denied", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 }
 
 /**
- * RR hold-up (no lane pass): ball handler settles (+6 x, ±8 y); everyone else uses
- * `rimRunnerAgHorizontalDriftPromises` (same AG / shared-duration model as outlet denied).
+ * RR hold-up (no lane pass): the ball handler settle is the branch advance trigger.
+ * Everyone else drifts toward the offense basket only until the ball handler reaches
+ * that hold-up spot, then their drift is stopped and the branch hands off to HCO.
  */
 async function animateRimRunnerHoldUpLeadIn(
   scene,
@@ -1037,7 +1045,9 @@ async function animateRimRunnerHoldUpLeadIn(
     roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
   );
   const bh = playerSprites[bhId];
-  if (!bh) return;
+  if (!bh) {
+    return { branch: "hold_up", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
 
   if (turnData.rim_runner_no_lane_pass) {
     const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
@@ -1092,10 +1102,15 @@ async function animateRimRunnerHoldUpLeadIn(
   });
 
   await awaitWithTimeout(
-    Promise.all([bhPromise, ...driftPromises]),
+    bhPromise,
     phaseDurationMs + 2000,
-    "rim_runner_hold_up_drift_phase"
+    "rim_runner_hold_up_ball_handler_settle"
   );
+
+  for (const [pid, sprite] of Object.entries(playerSprites)) {
+    if (sid(pid) === bhId || !sprite || !scene.tweens) continue;
+    scene.tweens.killTweensOf(sprite);
+  }
 
   setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
   for (const [pid, sprite] of Object.entries(playerSprites)) {
@@ -1108,10 +1123,7 @@ async function animateRimRunnerHoldUpLeadIn(
   const raw = turnData.text || "";
   const msg = raw.toLowerCase().includes("holding") ? raw.replace(/^Fast Break! /, "") : "Holding up — settling.";
   appendToTextScroll(msg);
-  await new Promise((resolve) => {
-    if (scene.time?.delayedCall) scene.time.delayedCall(300, resolve);
-    else setTimeout(resolve, 300);
-  });
+  return { branch: "hold_up", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 }
 
 async function animateRimRunnerInterception(
@@ -1135,7 +1147,7 @@ async function animateRimRunnerInterception(
   const rr = rrId ? playerSprites[rrId] : null;
   if (!victim || !stealer) {
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
-    return;
+    return { branch: "interception", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   }
 
   attachBallToPlayer(scene, ballSprite, victim);
@@ -1218,6 +1230,7 @@ async function animateRimRunnerInterception(
   });
 
   await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+  return { branch: "interception", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 }
 
 async function animateRimRunnerBatOob(
@@ -1252,7 +1265,7 @@ async function animateRimRunnerBatOob(
 
   if (!bh) {
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
-    return;
+    return { branch: "bat_oob", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   }
 
   attachBallToPlayer(scene, ballSprite, bh);
@@ -1321,6 +1334,7 @@ async function animateRimRunnerBatOob(
   });
 
   await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+  return { branch: "bat_oob", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 }
 
 /**
@@ -1358,6 +1372,7 @@ export async function runFastBreakSequence({
   const hasRimRunnerBurst = Boolean(turnData.roles?.rim_runner_burst_phase);
   const hasStandardOutlet =
     turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver;
+  let rrBurstResult = null;
   let leadInUnit = null;
   const leadInStartMs = Date.now();
 
@@ -1384,7 +1399,14 @@ export async function runFastBreakSequence({
   // PHASE 1: Rim Runner burst + outlet (or standard Covert-style outlet)
   // ============================================================================
   if (hasRimRunnerBurst) {
-    await animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height);
+    rrBurstResult = await animateRimRunnerBurstPhase(
+      scene,
+      turnData,
+      playerSprites,
+      ballSprite,
+      width,
+      height
+    );
     leadInUnit = turnData.roles?.is_steal_entry
       ? "fb.lead_in.from_hco_steal"
       : "fb.lead_in.from_dreb_release";
@@ -1525,7 +1547,7 @@ export async function runFastBreakSequence({
         scene,
         turnData,
         unitId: "fb.phase.defensive_stop",
-        advanceTrigger: "stop result committed",
+        advanceTrigger: "ball attaches to intercepting player's sprite",
         visualSettleTrigger: "stop visuals settled",
         authorizingEventReceived: true,
         visualSettled: true,
@@ -1539,7 +1561,7 @@ export async function runFastBreakSequence({
         scene,
         turnData,
         unitId: "fb.phase.defensive_stop",
-        advanceTrigger: "stop result committed",
+        advanceTrigger: "ball reaches out-of-bounds destination",
         visualSettleTrigger: "stop visuals settled",
         authorizingEventReceived: true,
         visualSettled: true,
@@ -1548,7 +1570,29 @@ export async function runFastBreakSequence({
         context: { phase2Kind },
       });
     } else if (phase2Kind === "rim_runner_hco_settle") {
-      if (!turnData.rim_runner_outlet_failed) {
+      if (turnData.rim_runner_outlet_failed) {
+        await animateRimRunnerOutletDeniedBeat(
+          scene,
+          turnData,
+          playerSprites,
+          ballSprite,
+          width,
+          height,
+          rrBurstResult?.phase ?? turnData.roles?.rim_runner_burst_phase,
+          rrBurstResult?.passerSprite ??
+            playerSprites[
+              String(
+                turnData.roles?.rim_runner_burst_phase?.outlet_passer_id ??
+                  turnData.roles?.outlet_passer ??
+                  ""
+              )
+            ],
+          rrBurstResult?.recvSprite ??
+            playerSprites[
+              String(turnData.roles?.rim_runner_burst_phase?.outlet_receiver_id ?? "")
+            ]
+        );
+      } else {
         await animateRimRunnerHoldUpLeadIn(
           scene,
           turnData,
@@ -1558,11 +1602,7 @@ export async function runFastBreakSequence({
           height
         );
       }
-      if (turnData.rim_runner_outlet_failed) {
-        await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
-      } else {
-        await finalizeRimRunnerHoldUpToHco(scene, turnData, playerSprites);
-      }
+      await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
       enforceFbUnitContract({
         scene,
         turnData,
@@ -1644,12 +1684,14 @@ export async function runFastBreakSequence({
  */
 async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height) {
   const phase = turnData.roles?.rim_runner_burst_phase;
-  if (!phase) return;
+  if (!phase) return { branch: "none", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 
   const sid = (id) => (id != null ? String(id) : null);
   const rrSprite = playerSprites[sid(phase.rr_id)];
   const recvSprite = playerSprites[sid(phase.outlet_receiver_id)];
-  if (!rrSprite || !recvSprite) return;
+  if (!rrSprite || !recvSprite) {
+    return { branch: "none", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
 
   const secondary = [];
   const startTween = (sprite, grid) => {
@@ -1687,17 +1729,15 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
 
   const outletDenied = Boolean(turnData.rim_runner_outlet_failed);
   if (outletDenied) {
-    await animateRimRunnerOutletDeniedBeat(
-      scene,
-      turnData,
-      playerSprites,
-      ballSprite,
-      width,
-      height,
+    // RR burst only owns the fork into outlet-denied. Once receiver reaches the
+    // fork point, the dedicated denied branch becomes the sole owner.
+    return {
+      branch: "outlet_denied",
+      snapshot: captureRrLiveSnapshot(playerSprites, width, height),
       phase,
       passerSprite,
-      recvSprite
-    );
+      recvSprite,
+    };
   }
 
   const shouldPass = !outletDenied && !phase.skip_outlet_pass && passerSprite;
@@ -1748,18 +1788,40 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   }
 
   if (secondary.length) {
-    // Outlet denied stops burst tweens on non-outlet actors so horizontal drift can run; those
-    // tweens reject on stop — use allSettled so the FB sequence still finishes.
-    if (outletDenied) {
-      await awaitWithTimeout(
-        Promise.allSettled(secondary),
-        100,
-        "rim_runner_burst_secondary_settle"
+    await Promise.all(secondary);
+  }
+
+  // Commit burst endpoints into logical grid state before branch-specific follow-up
+  // uses `rimRunnerSpriteGrid(...)`. Without this, stale gridX/gridY from a prior
+  // sequence can skew RR lane-pass, interception, or bat-OOB geometry.
+  if (phase.rr_to && rrSprite) {
+    setRimRunnerSpriteGrid(rrSprite, phase.rr_to.x, phase.rr_to.y);
+  }
+  if (phase.receiver_to && recvSprite) {
+    setRimRunnerSpriteGrid(recvSprite, phase.receiver_to.x, phase.receiver_to.y);
+  }
+  if (phase.outlet_defender_id != null && phase.outlet_defender_to) {
+    const outletDefenderSprite = playerSprites[sid(phase.outlet_defender_id)];
+    if (outletDefenderSprite) {
+      setRimRunnerSpriteGrid(
+        outletDefenderSprite,
+        phase.outlet_defender_to.x,
+        phase.outlet_defender_to.y
       );
-    } else {
-      await Promise.all(secondary);
     }
   }
+  for (const row of phase.other_players || []) {
+    const sprite = playerSprites[sid(row.player_id)];
+    if (!sprite) continue;
+    setRimRunnerSpriteGrid(sprite, row.to_x, row.to_y);
+  }
+  return {
+    branch: "outlet_completed",
+    snapshot: captureRrLiveSnapshot(playerSprites, width, height),
+    phase,
+    passerSprite,
+    recvSprite,
+  };
 }
 
 /**
@@ -2069,7 +2131,7 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
  */
 /**
  * Animate Fast Break shot when ball handler beats defender (skill check won).
- * Stopper + trail defender use the same contest grid as other FB shots: ±1/±2 vs shooter final (stacked in X if both).
+ * Stopper + trail defender use the unified FB shot-contest spots derived from the shooter final.
  */
 async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height) {
   // ✅ FIX: Import showAnnouncement/showAndOneAnnouncement at the start of the function (AND-1 / shooting foul in Fast Break path)
@@ -2130,7 +2192,7 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     incrementFbCounter(scene, "fbRequiredRoleCount", 1);
     const stopperSpot =
       stopperAnimEnd ??
-      fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
+      fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense);
     if (!stopperAnimEnd) {
       const source = rimRunnerSpriteGrid(stopperSprite, width, height);
       reportMissingEndpoint(scene, turnData, {
@@ -2181,7 +2243,11 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       incrementFbCounter(scene, "fbRequiredRoleCount", 1);
       defenderSpot =
         defenderAnimEnd ??
-        fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 1);
+        fastBreakSecondaryShotDefenderGrid(
+          stopperSpot.x,
+          stopperSpot.y,
+          rimRunnerSpriteGrid(defenderSprite, width, height).y,
+        );
       if (!defenderAnimEnd) {
         const source = rimRunnerSpriteGrid(defenderSprite, width, height);
         reportMissingEndpoint(scene, turnData, {
@@ -2488,7 +2554,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       incrementFbCounter(scene, "fbRequiredRoleCount", 1);
       defenderSpot =
         defenderAnimEnd ??
-        fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense, 0);
+        fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense);
       if (!defenderAnimEnd) {
         const source = rimRunnerSpriteGrid(defenderSprite, width, height);
         reportMissingEndpoint(scene, turnData, {

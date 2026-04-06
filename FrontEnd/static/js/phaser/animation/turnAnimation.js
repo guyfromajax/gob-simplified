@@ -21,7 +21,7 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
 import { clampGridCoords } from "./courtClamp.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
-import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
+import * as unitCompletionContract from "./unitCompletionContract.js";
 import { resolveDrebOutletReceiverTarget } from "./drebOutletTargetResolver.js";
 import { DEBUG } from "../utils/debug.js";
 import {
@@ -62,6 +62,31 @@ import {
   resolveMovementSpeedPxPerSec,
   getPlayerMovementDurationMs,
 } from "../utils/playerMovementDuration.js";
+
+const { enforceUnitCompletionContract } = unitCompletionContract;
+const advanceDynamicEventBoundary =
+  unitCompletionContract.advanceDynamicEventBoundary ??
+  (async function fallbackAdvanceDynamicEventBoundary({
+    requiredPromises = [],
+    scene,
+    nonRequiredSprites = [],
+    onAdvance,
+    onStopSprite,
+  }) {
+    await Promise.all(requiredPromises);
+    if (typeof onAdvance === "function") {
+      await onAdvance();
+    }
+    const seen = new Set();
+    for (const sprite of nonRequiredSprites) {
+      if (!sprite || seen.has(sprite)) continue;
+      seen.add(sprite);
+      if (typeof onStopSprite === "function") {
+        onStopSprite(sprite);
+      }
+      scene?.tweens?.killTweensOf?.(sprite);
+    }
+  });
 
 const DEFAULT_BALL_SPEED = 450; // Default speed (Normal preset) — ball uses same preset as players
 
@@ -292,6 +317,22 @@ function getDurationFromDistance(currentX, currentY, targetX, targetY, speed) {
   const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
   const duration = (distance / speed) * 1000;
   return Math.max(50, duration);
+}
+
+function pixelsToGrid(pixelX, pixelY, width, height) {
+  return {
+    x: (pixelX / width) * 100,
+    y: 50 - (pixelY / height) * 50,
+  };
+}
+
+function captureLiveSpriteGrid(sprite, width, height) {
+  if (!sprite || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return;
+  }
+  const liveGrid = pixelsToGrid(sprite.x, sprite.y, width, height);
+  sprite.gridX = liveGrid.x;
+  sprite.gridY = liveGrid.y;
 }
 
 /**
@@ -608,136 +649,6 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
  * HCO step 0 after Rim Runner hold-up: everyone except ball handler tweens to step 0; when PG arrives,
  * pass from ball handler (still at hold-up end) to PG; then finish remaining setup tweens; then BH → step 0.
  */
-async function runRimRunnerHoldUpSetupTween({
-  scene,
-  ballSprite,
-  animations,
-  playerSprites,
-  currentBallOwnerRef,
-  turnData,
-  ballHandlerId,
-  pgId,
-}) {
-  if (scene.skipToEnd) return;
-  const bhIdStr = String(ballHandlerId);
-  const pgIdStr = String(pgId);
-  const stepIndex = 0;
-  const width = scene.game.config.width;
-  const height = scene.game.config.height;
-
-  const promises = [];
-  let pgPromise = null;
-
-  for (const anim of animations) {
-    if (scene.skipToEnd) break;
-    const idStr = String(anim.playerId);
-    if (idStr === bhIdStr) continue;
-    const sprite = playerSprites[anim.playerId];
-    const firstStep = anim.movement?.[stepIndex];
-    if (!sprite || !firstStep?.coords) continue;
-
-    const isInboundSpot = firstStep.coords.x <= 5 || firstStep.coords.x >= 95;
-    const shouldClampXToRims =
-      !isInboundSpot &&
-      turnData?.result_type !== "SIDE_INBOUND" &&
-      turnData?.result_type !== "BASELINE_INBOUND";
-    const targetGridX = shouldClampXToRims
-      ? Phaser.Math.Clamp(firstStep.coords.x, 9, 91)
-      : firstStep.coords.x;
-
-    const { x, y } = gridToPixels(
-      targetGridX,
-      firstStep.coords.y,
-      width,
-      height
-    );
-    const duration = getPlayerDuration(sprite, x, y);
-
-    const p = new Promise((resolve) => {
-      const tween = scene.tweens.add({
-        targets: [sprite],
-        x,
-        y,
-        duration,
-        ease: "Linear",
-        onUpdate: () => {
-          if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
-            ballSprite.setPosition(sprite.x, sprite.y);
-            ballSprite.setVisible(true);
-          }
-        },
-        onComplete: resolve,
-        onStop: resolve,
-      });
-      if (scene.skipToEnd) {
-        tween.stop();
-      }
-    });
-    promises.push(p);
-    if (idStr === pgIdStr) {
-      pgPromise = p;
-    }
-  }
-
-  if (pgPromise && playerSprites[bhIdStr] && playerSprites[pgIdStr]) {
-    await pgPromise;
-    attachBallToPlayer(scene, ballSprite, playerSprites[bhIdStr]);
-    await runPass(scene, {
-      fromId: bhIdStr,
-      toId: pgIdStr,
-      duration: 480,
-      easing: "Sine.easeInOut",
-    });
-    await new Promise((resolve) => {
-      if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);
-      else setTimeout(resolve, 50);
-    });
-    const { synchronizeBallState } = await import("./BallControllerAdapter.js");
-    synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
-    const pgSprite = playerSprites[pgIdStr];
-    if (pgSprite) {
-      attachBallToPlayer(scene, ballSprite, pgSprite);
-      currentBallOwnerRef.value = pgSprite;
-      setBallHolderId(scene, pgIdStr);
-    }
-  }
-
-  await Promise.all(promises);
-
-  const bhAnim = animations.find((a) => String(a.playerId) === bhIdStr);
-  const bhSprite = playerSprites[bhIdStr];
-  const bhFirst = bhAnim?.movement?.[stepIndex];
-  if (bhSprite && bhFirst?.coords) {
-    const isInboundSpot = bhFirst.coords.x <= 5 || bhFirst.coords.x >= 95;
-    const shouldClampXToRims =
-      !isInboundSpot &&
-      turnData?.result_type !== "SIDE_INBOUND" &&
-      turnData?.result_type !== "BASELINE_INBOUND";
-    const targetGridX = shouldClampXToRims
-      ? Phaser.Math.Clamp(bhFirst.coords.x, 9, 91)
-      : bhFirst.coords.x;
-    const { x, y } = gridToPixels(targetGridX, bhFirst.coords.y, width, height);
-    const duration = getPlayerDuration(bhSprite, x, y);
-    await new Promise((resolve) => {
-      scene.tweens.add({
-        targets: [bhSprite],
-        x,
-        y,
-        duration,
-        ease: "Linear",
-        onUpdate: () => {
-          if (currentBallOwnerRef?.value === bhSprite && ballSprite?.setPosition) {
-            ballSprite.setPosition(bhSprite.x, bhSprite.y);
-            ballSprite.setVisible(true);
-          }
-        },
-        onComplete: resolve,
-        onStop: resolve,
-      });
-    });
-  }
-}
-
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData, context = null }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow)) return;
@@ -894,7 +805,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
     turnData,
     playerSprites,
     unitId: "sip.phase.setup_positions",
-    advanceTrigger: "required setup movers reached targets",
+    advanceTrigger: "all ten players reach SIP setup destinations",
     visualSettleTrigger: "setup tweens settled",
     unitStartMs: sideInboundSetupStartMs,
     maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "SIDE_INBOUND"),
@@ -904,6 +815,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
     context: {
       inboundType: "SIDE_INBOUND",
       phase: "setup_positions",
+      requiredMovers: ["all_10_players"],
     },
   });
   
@@ -2410,7 +2322,8 @@ async function runInboundSetup({
   const scoringTeamKey = isAwayOffense ? "home" : "away";
   const inboundTeamId = isAwayOffense ? awayTeamId : homeTeamId;
   const scoringTeamId = isAwayOffense ? homeTeamId : awayTeamId;
-  const ballSpot = isAwayOffense ? { x: 98, y: 16 } : { x: 3, y: 16 };
+  const defaultBallSpot = isAwayOffense ? { x: 98, y: 16 } : { x: 3, y: 16 };
+  const ballSpot = turnData?.ball_spot ?? defaultBallSpot;
 
   const homeOffsetRanges = {
     PG: { x: [8, 12], y: [-2, 2] },
@@ -2492,8 +2405,61 @@ async function runInboundSetup({
   }
 
   // Retreat scoring team toward midcourt (unless FCP is next)
+  const usePayloadHcoSetup =
+    !skipRetreat &&
+    !pressureType &&
+    turnData?.next_play_type === "HCO" &&
+    turnData?.oDestinations &&
+    turnData?.dDestinations;
+
   const retreatPromises = [];
-  if (!skipRetreat) {
+  const retreatSprites = [];
+  if (usePayloadHcoSetup) {
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      const info = scene.playerInfo?.[id];
+      if (!info) continue;
+      const targetPos = turnData.dDestinations?.[info.pos];
+      if (
+        !targetPos ||
+        !(
+          sprite.team_id === scoringTeamId ||
+          (!scoringTeamId && sprite.team === scoringTeamKey)
+        )
+      ) {
+        continue;
+      }
+      const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
+      const duration = getPlayerDuration(sprite, targetPx.x, targetPx.y, false);
+      retreatSprites.push(sprite);
+      retreatPromises.push(
+        new Promise((resolve) => {
+          let timeoutId;
+          const tween = scene.tweens.add({
+            targets: sprite,
+            x: targetPx.x,
+            y: targetPx.y,
+            duration,
+            ease: "Linear",
+            onComplete: () => {
+              if (timeoutId) clearTimeout(timeoutId);
+              resolve();
+            },
+            onStop: () => {
+              if (timeoutId) clearTimeout(timeoutId);
+              resolve();
+            }
+          });
+          const timeoutMs = Math.max(duration * 2, 1000);
+          timeoutId = setTimeout(() => {
+            if (tween && tween.isPlaying && tween.isPlaying()) {
+              scene.tweens.killTweensOf(sprite);
+            }
+            resolve();
+          }, timeoutMs);
+        })
+      );
+    }
+  } else if (!skipRetreat) {
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
       if (!info) continue;
@@ -2520,6 +2486,7 @@ async function runInboundSetup({
         // Use distance-based duration for consistent speed (same as HCO step movements)
         // Use regular speed (not transition) for retreat - should match inbound setup speed
         const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y, false);
+        retreatSprites.push(sprite);
         retreatPromises.push(
           new Promise((resolve) => {
             let timeoutId;
@@ -2568,6 +2535,7 @@ async function runInboundSetup({
           // Use distance-based duration for consistent speed (same as HCO step movements)
           // isTransition=true allows longer durations for transition movements
           const fcpDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
+          retreatSprites.push(sprite);
           retreatPromises.push(
             new Promise((resolve) => {
               let timeoutId;
@@ -2685,8 +2653,6 @@ async function runInboundSetup({
     `[inbound][score][${newOffenseSide}] sf:${sfId} pg:${pgId} sg:${sgId} pf:${pfId} c:${cId}`
   );
 
-  const rimGrid = isAwayOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
   // ✅ SS&S: For FCP/HCT, use step 0 positions from backend-provided skeleton data
@@ -2747,11 +2713,22 @@ async function runInboundSetup({
   // We'll animate the inbound pass here, then skeleton starts from old step 1
 
   // Use skeleton positions if available, otherwise fall back to baseline inbound positions
-  const pgDest = useSkeletonPositions && skeletonPositions.PG ? skeletonPositions.PG : inboundDest.PG;
-  const sgDest = useSkeletonPositions && skeletonPositions.SG ? skeletonPositions.SG : inboundDest.SG;
-  const pfDest = useSkeletonPositions && skeletonPositions.PF ? skeletonPositions.PF : inboundDest.PF;
-  const cDest = useSkeletonPositions && skeletonPositions.C ? skeletonPositions.C : inboundDest.C;
-  const sfDest = useSkeletonPositions && skeletonPositions.SF ? skeletonPositions.SF : ballSpot;
+  const payloadOffenseTargets = usePayloadHcoSetup ? turnData.oDestinations : null;
+  const pgDest = useSkeletonPositions && skeletonPositions.PG
+    ? skeletonPositions.PG
+    : payloadOffenseTargets?.PG ?? inboundDest.PG;
+  const sgDest = useSkeletonPositions && skeletonPositions.SG
+    ? skeletonPositions.SG
+    : payloadOffenseTargets?.SG ?? inboundDest.SG;
+  const pfDest = useSkeletonPositions && skeletonPositions.PF
+    ? skeletonPositions.PF
+    : payloadOffenseTargets?.PF ?? inboundDest.PF;
+  const cDest = useSkeletonPositions && skeletonPositions.C
+    ? skeletonPositions.C
+    : payloadOffenseTargets?.C ?? inboundDest.C;
+  const sfDest = useSkeletonPositions && skeletonPositions.SF
+    ? skeletonPositions.SF
+    : payloadOffenseTargets?.SF ?? ballSpot;
 
   // 🔍 DEBUG: Log offensive player destinations (HCO only now - FCP/HCT returns above)
   // COMMENTED OUT: Verbose log - uncomment if needed for debugging
@@ -2786,45 +2763,68 @@ async function runInboundSetup({
     if (cSprite) scene.tweens.killTweensOf(cSprite);
   }
 
-  ballSprite.setPosition(rimPx.x, rimPx.y);
   ballSprite.setVisible(true);
   animationDebugLog(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  animationDebugLog(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  let ballTween;
-  // Use SF's destination for ball position (SF receives inbound pass)
-  const ballDestPx = useSkeletonPositions ? sfDestPx : spotPx;
-  if (animationConfig.enableBallTween) {
-    // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tweenBallTo()
-    // animateBallToPosition() gets ballSprite from scene.ballSprite internally
-    ballTween = animateBallToPosition(scene, ballDestPx, {
-      duration: 500,
-      easing: "Sine.easeInOut"
-    }).then(() => {
-      animationDebugLog(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-    });
-  } else {
-    ballSprite.setPosition(ballDestPx.x, ballDestPx.y);
-    animationDebugLog(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-    ballTween = Promise.resolve();
-  }
+  const ballPickupPx = {
+    x: Number.isFinite(Number(ballSprite?.x)) ? Number(ballSprite.x) : spotPx.x,
+    y: Number.isFinite(Number(ballSprite?.y)) ? Number(ballSprite.y) : spotPx.y,
+  };
 
   const sfTween = new Promise((resolve) => {
-    // Use distance-based duration for consistent speed (same as HCO step movements)
-    // Use regular speed (not transition) for inbound setup - should be faster
-    const sfDuration = getPlayerDuration(sfSprite, sfDestPx.x, sfDestPx.y, false);
+    const sfPickupDuration = getPlayerDuration(sfSprite, ballPickupPx.x, ballPickupPx.y, false);
     scene.tweens.add({
       targets: sfSprite,
-      x: sfDestPx.x,
-      y: sfDestPx.y,
-      duration: sfDuration,
-      ease: "Linear", // Match HCO step movements for consistent feel
+      x: ballPickupPx.x,
+      y: ballPickupPx.y,
+      duration: sfPickupDuration,
+      ease: "Linear",
       onComplete: () => {
-        animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        resolve();
+        attachBallToPlayer(scene, ballSprite, sfSprite);
+        const sfCarryDuration = getPlayerDuration(sfSprite, sfDestPx.x, sfDestPx.y, false);
+        scene.tweens.add({
+          targets: sfSprite,
+          x: sfDestPx.x,
+          y: sfDestPx.y,
+          duration: sfCarryDuration,
+          ease: "Linear",
+          onUpdate: () => {
+            if (ballSprite?.setPosition) {
+              ballSprite.setPosition(sfSprite.x, sfSprite.y);
+            }
+          },
+          onComplete: () => {
+            animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+            resolve();
+          },
+          onStop: () => {
+            animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+            resolve();
+          }
+        });
       },
       onStop: () => {
-        animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        resolve();
+        attachBallToPlayer(scene, ballSprite, sfSprite);
+        const sfCarryDuration = getPlayerDuration(sfSprite, sfDestPx.x, sfDestPx.y, false);
+        scene.tweens.add({
+          targets: sfSprite,
+          x: sfDestPx.x,
+          y: sfDestPx.y,
+          duration: sfCarryDuration,
+          ease: "Linear",
+          onUpdate: () => {
+            if (ballSprite?.setPosition) {
+              ballSprite.setPosition(sfSprite.x, sfSprite.y);
+            }
+          },
+          onComplete: () => {
+            animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+            resolve();
+          },
+          onStop: () => {
+            animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+            resolve();
+          }
+        });
       }
     });
   });
@@ -2923,31 +2923,36 @@ async function runInboundSetup({
       })
     : Promise.resolve();
 
-  await Promise.all([
-    ...retreatPromises,
-    ballTween,
-    sfTween,
-    pgTween,
-    sgTween,
-    pfTween,
-    cTween
-  ]);
-  validateInboundUnitCompletionContract({
+  await advanceDynamicEventBoundary({
+    requiredPromises: [sfTween, pgTween],
     scene,
-    turnData,
-    playerSprites,
-    unitId: "bip.phase.setup_positions",
-    advanceTrigger: "required setup movers reached targets",
-    visualSettleTrigger: "setup tweens settled",
-    unitStartMs: baselineInboundSetupStartMs,
-    maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "BASELINE_INBOUND"),
-    authorizingEventReceived: true,
-    requireOwner: false,
-    requirePassNotInFlight: false,
-    context: {
-      inboundType: "BASELINE_INBOUND",
-      phase: "setup_positions",
-    },
+    nonRequiredSprites: [
+      ...retreatSprites,
+      sgSprite,
+      pfSprite,
+      cSprite,
+    ].filter(Boolean),
+    settlePromises: [...retreatPromises, sgTween, pfTween, cTween],
+    onAdvance: () =>
+      validateInboundUnitCompletionContract({
+        scene,
+        turnData,
+        playerSprites,
+        unitId: "bip.phase.setup_positions",
+        advanceTrigger: "SF and PG reached setup destinations",
+        visualSettleTrigger: "SF and PG setup tweens settled",
+        unitStartMs: baselineInboundSetupStartMs,
+        maxWaitGameSeconds: getInboundBudgetGameSeconds("setup", "BASELINE_INBOUND"),
+        authorizingEventReceived: true,
+        requireOwner: false,
+        requirePassNotInFlight: false,
+        context: {
+          inboundType: "BASELINE_INBOUND",
+          phase: "setup_positions",
+          requiredMovers: ["SF", "PG"],
+        },
+      }),
+    onStopSprite: (sprite) => captureLiveSpriteGrid(sprite, width, height),
   });
   
   // ✅ TIMEOUT: Removed 2-second pause - timeout button is now always live
@@ -3196,41 +3201,31 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // If we are coming directly from an inbound or opening tip, the ball should already be attached
   // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
   if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
-    const rrHoldAttach = scene._rimRunnerHoldUpInboundPass;
-    if (rrHoldAttach?.ballHandlerId && rrHoldAttach?.pgId) {
-      const bhSprite = playerSprites[String(rrHoldAttach.ballHandlerId)];
-      if (bhSprite) {
-        attachBallToPlayer(scene, ballSprite, bhSprite);
-        currentBallOwnerRef.value = bhSprite;
-        setBallHolderId(scene, String(rrHoldAttach.ballHandlerId));
+    for (const anim of turnData.animations) {
+      if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
+      if (anim.hasBallAtStep?.[0]) {
+        step0OwnerSprite = playerSprites[anim.playerId];
+        break;
       }
-    } else {
-      for (const anim of turnData.animations) {
-        if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
-        if (anim.hasBallAtStep?.[0]) {
-          step0OwnerSprite = playerSprites[anim.playerId];
-          break;
-        }
-      }
+    }
 
-      if (step0OwnerSprite) {
-        const step0OwnerId = step0OwnerSprite.playerId;
-        const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
+    if (step0OwnerSprite) {
+      const step0OwnerId = step0OwnerSprite.playerId;
+      const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
 
-        if (isPutbackTurn) {
-          // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
-          const { getBallController } = await import('./BallControllerAdapter.js');
-          const ballController = getBallController();
-          // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
-          // This prevents the brief attachment flash before the putback shot
-        } else {
-          attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
-          currentBallOwnerRef.value = step0OwnerSprite;
+      if (isPutbackTurn) {
+        // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
+        const { getBallController } = await import('./BallControllerAdapter.js');
+        const ballController = getBallController();
+        // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
+        // This prevents the brief attachment flash before the putback shot
+      } else {
+        attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
+        currentBallOwnerRef.value = step0OwnerSprite;
 
-          // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
-          // This enables the new simple ball animation system to track ball holder
-          setBallHolderId(scene, step0OwnerId);
-        }
+        // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
+        // This enables the new simple ball animation system to track ball holder
+        setBallHolderId(scene, step0OwnerId);
       }
     }
   }
@@ -3250,18 +3245,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // animationDebugLog("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
   // animationDebugLog("turnData.animations[0].playerId", turnData.animations[0].playerId);
   // animationDebugLog("turnData.animations[0].movement", turnData.animations[0].movement);
-  const rrHoldInbound = scene._rimRunnerHoldUpInboundPass;
-  if (!(rrHoldInbound?.ballHandlerId && rrHoldInbound?.pgId)) {
-    updateBallOwnership({
-      scene,
-      ballSprite,
-      animations: turnData.animations,
-      playerSprites,
-      stepIndex: 0,
-      offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
-      currentBallOwnerRef,
-    });
-  }
+  updateBallOwnership({
+    scene,
+    ballSprite,
+    animations: turnData.animations,
+    playerSprites,
+    stepIndex: 0,
+    offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
+    currentBallOwnerRef,
+  });
 
   // Initial active player display update
   if (!scene.skipToEnd) {
@@ -4483,30 +4475,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // BIP (BASELINE_INBOUND) already positioned players at skeleton step 0 positions, so this is redundant
   // and can cause timing conflicts if the inbound pass animation is still completing
   if (!fromInbound || !isFCPHCT) {
-    const rrHold = scene._rimRunnerHoldUpInboundPass;
-    if (rrHold?.ballHandlerId && rrHold?.pgId) {
-      await runRimRunnerHoldUpSetupTween({
-        scene,
-        ballSprite,
-        animations: turnData.animations,
-        playerSprites,
-        currentBallOwnerRef,
-        turnData,
-        ballHandlerId: rrHold.ballHandlerId,
-        pgId: rrHold.pgId,
-      });
-      scene._rimRunnerHoldUpInboundPass = null;
-    } else {
-      await runSetupTween({
-        scene,
-        ballSprite,
-        animations: turnData.animations,
-        playerSprites,
-        currentBallOwnerRef,
-        turnData,
-        stepDurationMs: getContractStepDurationMs(0, null),
-      });
-    }
+    await runSetupTween({
+      scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites,
+      currentBallOwnerRef,
+      turnData,
+      stepDurationMs: getContractStepDurationMs(0, null),
+    });
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }
