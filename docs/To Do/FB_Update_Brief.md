@@ -10,20 +10,20 @@ The current logic we use will be referred to as the "Covert Release" fast break 
 There will be three fast break plays that run after a DREB FB Outlet:
 1. Covert Release (currently implemented)
 2. Rim Runner (will be implemented in the near future)
-3. 32 (will be implemented in the near future)
+3. Full Team (will be implemented in the near future)
 And we will continue to track stats for FBs after a steal as "After Steal".
 
 **Fast Break Stat Tracking**
-- **Implemented (backend):** `scouting_data["offense"]["fast_break_plays"]` with per-play **`A`/`S`** (`covert_release`, `rim_runner`, `thirty_two`, `after_steal`); increments align with **`Fast_Break_Entries`** / **`Fast_Break_Success`**. Turn field **`fast_break_play`**. Player offense: **`FB_A`/`FB_S` only** (`FB_F`/`FB_N` retired). **Box Score scouting lines** = follow-up UI.
+- **Implemented (backend):** `scouting_data["offense"]["fast_break_plays"]` with per-play **`A`/`S`** (`covert_release`, `rim_runner`, `full_team`, `after_steal`); increments align with **`Fast_Break_Entries`** / **`Fast_Break_Success`**. Turn field **`fast_break_play`**. Player offense: **`FB_A`/`FB_S` only** (`FB_F`/`FB_N` retired). **Box Score scouting lines** = follow-up UI.
 - We will continue to track all Fast Break stats for players and teams as we currently are
 - **Play-level splits (attempts / successes per play) are offense-only, team / scouting only** — defensive FB scouting stays **team-level only** (no per-play defense splits)
-- Field name **`thirty_two`** in code / data; label **"32"** in UI when we build that
+- Field name **`full_team`** in code / data; label **"Full Team"** in UI
 - Structure will be to track play-level stats in the scouting notes for each team, and then aggregate those play-level stats up to the team's overall Fast Break stats
-- **Box Score Scouting Notes (implemented):** Fast Breaks section after Defense Play Calls — **Total** + Covert Release / Rim Runner / 32 / After Steal (see `box-score.js`). Prior structure was:
+- **Box Score Scouting Notes (implemented):** Fast Breaks section after Defense Play Calls — **Total** + Covert Release / Rim Runner / Full Team / After Steal (see `box-score.js`). Prior structure was:
     "Fast Breaks: {FB_S}/{FB_A} {FB%}"
         "Covert Release: {S}/{A} {%}"
         "Rim Runner: {S}/{A} {%}"
-        "32: {S}/{A} {%}"
+        "Full Team: {S}/{A} {%}"
         "After Steal: {S}/{A} {%}"
 
 **Covert Release Details**
@@ -53,6 +53,4 @@ And we will continue to track stats for FBs after a steal as "After Steal".
     - A defender can attempt a stop if his x coordinate is equal to the outlet receiver's or closer to the basket (i.e. if home team is on offense for the fast break, his x must be `>=` the ball handler's; if away team is on offense for the fast break, his x must be `<=` the ball handler's), **and** the defender is within **±8** y coordinates of the ball handler.
     - Use the current calculation of `break_score` vs `stop_score` to determine the outcome of the FB stop attempt.
 7. Proceed with our current logic for both defensive stops and FB shot attempts.
-
-
 

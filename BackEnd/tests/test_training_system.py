@@ -179,6 +179,11 @@ def test_training_system():
             "4-1 Motion": 40,
             "5-0 Motion": 50
         },
+        "fast_break": {
+            "covert_release": 34,
+            "rim_runner": 33,
+            "full_team": 33
+        },
         "set_play_inside": {
             "Inside Play 1": 100
         },
@@ -360,4 +365,3 @@ def test_training_system():
 if __name__ == "__main__":
     exit_code = test_training_system()
     sys.exit(exit_code)
-

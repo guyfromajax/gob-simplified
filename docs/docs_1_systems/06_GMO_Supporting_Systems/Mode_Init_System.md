@@ -167,6 +167,7 @@ Ranges will be determined by each team's seed
   - Set Play Inside: Evenly distributed across all inside set plays
   - Set Play Attack: Evenly distributed across all attack set plays
   - Set Play Outside: Evenly distributed across all outside set plays
+  - Fast Break: Seeded to `covert_release = 50`, `rim_runner = 50`, `full_team = 0`
   - Zone Defense: Evenly distributed across all zone defenses ("2-3 Zone", "3-2 Zone", "1-3-1 Zone")
   - Man Defense: "Man" = 100% (only one man defense exists)
 - **Slot Assignments:** Empty (no plays assigned to priority slots 1-6)

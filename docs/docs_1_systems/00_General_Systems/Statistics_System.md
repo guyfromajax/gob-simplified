@@ -257,7 +257,7 @@ The Statistics System tracks comprehensive player-level and team-level statistic
   - `MAKE`, or
   - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
   - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
-- **`fast_break_plays`** (Offense): Per-play **attempts (`A`)** and **successes (`S`)** for `covert_release`, `rim_runner`, `thirty_two`, `after_steal`; same success rules as **`Fast_Break_Success`**, applied to the play bucket for that possession. **`Fast_Break_Entries`** / **`Fast_Break_Success`** are incremented in parallel (both aggregate and per-play rows). Defense has **no** per-play FB scouting.
+- **`fast_break_plays`** (Offense): Per-play **attempts (`A`)** and **successes (`S`)** for `covert_release`, `rim_runner`, `full_team`, `after_steal`; same success rules as **`Fast_Break_Success`**, applied to the play bucket for that possession. **`Fast_Break_Entries`** / **`Fast_Break_Success`** are incremented in parallel (both aggregate and per-play rows). Defense has **no** per-play FB scouting.
 - **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
 - **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
   - `DEFENSIVE_STOP`, or

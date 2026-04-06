@@ -2,9 +2,9 @@
 Fast break play identifiers (DREB → outlet) and steal bucket.
 
 - Code / persistence: snake_case keys below.
-- UI label for ``THIRTY_TWO`` is "32" (see Fast_Break_System / FB_Update_Brief).
+- UI label for ``FULL_TEAM`` is "Full Team" (see Fast_Break_System / FB_Update_Brief).
 
-``thirty_two`` uses the same resolution stub as Rim Runner until a dedicated 32 path exists.
+``full_team`` uses the same resolution stub as Rim Runner until a dedicated full-team path exists.
 DREB play key is chosen on the shot attempt (``shot_manager``) and passed via
 ``pending_dreb_fb_play_key``; ``play_key_for_fast_break_entry`` is only a fallback when pending is missing.
 ``after_steal`` is used for steal entry.
@@ -19,20 +19,15 @@ from typing import Any, Dict
 # Canonical keys (match scouting_data["offense"]["fast_break_plays"])
 COVERT_RELEASE = "covert_release"
 RIM_RUNNER = "rim_runner"
-THIRTY_TWO = "thirty_two"
+FULL_TEAM = "full_team"
 AFTER_STEAL = "after_steal"
 
 FAST_BREAK_PLAY_KEYS = (
     COVERT_RELEASE,
     RIM_RUNNER,
-    THIRTY_TWO,
+    FULL_TEAM,
     AFTER_STEAL,
 )
-
-# TODO: Remove when user FB play weights ship and Rim Runner / Covert split is configurable.
-# When True, every DREB→outlet fast break uses Rim Runner (no Covert release roll on the shot turn).
-TEMP_FORCE_RIM_RUNNER_DREB_FB = True
-
 
 def default_fast_break_plays() -> Dict[str, Dict[str, int]]:
     """Fresh A/S counters per play (offense scouting only)."""
@@ -65,8 +60,6 @@ def play_key_for_fast_break_entry(is_dreb_outlet: bool) -> str:
     """Which scouting bucket gets an attempt for this FB possession."""
     if not is_dreb_outlet:
         return AFTER_STEAL
-    if TEMP_FORCE_RIM_RUNNER_DREB_FB:
-        return RIM_RUNNER
-    # Until user FB play settings ship: 50/50 Rim Runner vs Covert Release on DREB outlet.
+    # Until user FB play settings drive this selection directly: 50/50 Rim Runner vs Covert Release on DREB outlet.
     # Normal path: key is pre-set on the shot turn as ``pending_dreb_fb_play_key``.
     return RIM_RUNNER if random.random() < 0.5 else COVERT_RELEASE

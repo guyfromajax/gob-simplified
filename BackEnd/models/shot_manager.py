@@ -45,7 +45,7 @@ from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
     COVERT_RELEASE,
     RIM_RUNNER,
-    THIRTY_TWO,
+    FULL_TEAM,
     play_key_for_fast_break_entry,
 )
 
@@ -901,7 +901,7 @@ class ShotManager:
         
         # DREB → Fast Break (HCO shots only): single roll on shot attempt using **rebounding team's**
         # `fast_breaks` (def_team here). No second roll for Covert — if eligible + Covert, pick release position.
-        # Play key from `play_key_for_fast_break_entry` — Rim Runner / 32: all crash.
+        # Play key from `play_key_for_fast_break_entry` — Rim Runner / Full Team: all crash.
         # `_shot_dreb_fb_play_key` → `pending_dreb_fb_play_key` on DREB miss.
         from BackEnd.engine import covert_release as cr
 
@@ -931,7 +931,7 @@ class ShotManager:
                     defense_rebounders = [
                         pos for pos in def_team.lineup.keys() if pos not in defense_release_list
                     ]
-                elif shot_fb_pk in (RIM_RUNNER, THIRTY_TWO):
+                elif shot_fb_pk in (RIM_RUNNER, FULL_TEAM):
                     defense_rebounders = list(def_team.lineup.keys())
                 else:
                     defense_rebounders = list(def_team.lineup.keys())

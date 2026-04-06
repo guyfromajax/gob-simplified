@@ -550,6 +550,11 @@ class PlaybooksUI {
         
         // Store saved playbook percentages for later use
         this.savedPlaybookPercentages = data.playbook_percentages || {};
+        this.fastBreakPercentages = this.savedPlaybookPercentages.fast_break || {
+          covert_release: 50,
+          rim_runner: 50,
+          full_team: 0
+        };
         console.log('🔍 [PLAYBOOKS LOAD] Loaded saved percentages from API:', this.savedPlaybookPercentages);
         console.log('🔍 [PLAYBOOKS LOAD] motion keys:', Object.keys(this.savedPlaybookPercentages.motion || {}));
         console.log('🔍 [PLAYBOOKS LOAD] set_play_inside keys:', Object.keys(this.savedPlaybookPercentages.set_play_inside || {}));
@@ -2395,6 +2400,7 @@ class PlaybooksUI {
         set_play_inside: {},
         set_play_attack: {},
         set_play_outside: {},
+        fast_break: { ...(this.fastBreakPercentages || {}) },
         zone_defense: {}
       };
       
