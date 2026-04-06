@@ -93,6 +93,38 @@ def test_non_shooting_defensive_foul_to_side_inbound_resets_shot_clock_without_p
     assert tm.game.game_state["shot_clock_remaining"] == 30
 
 
+@pytest.mark.parametrize(
+    "foul_team_key,foul_team_value,next_play_type",
+    [
+        ("foul_type", "DEFENSIVE", "SIDE_INBOUND"),
+        ("foul_team", "DEFENSE", "SIP"),
+    ],
+)
+def test_non_shooting_defensive_foul_aliases_reset_shot_clock_for_next_turn(
+    foul_team_key: str,
+    foul_team_value: str,
+    next_play_type: str,
+):
+    tm = _make_turn_manager(time_remaining=400, shot_clock_remaining=18, elapsed_authority="ledger")
+    result = {
+        "result_type": "FOUL",
+        foul_team_key: foul_team_value,
+        "next_play_type": next_play_type,
+        "free_throws_remaining": 0,
+        "possession_flips": False,
+        "time_elapsed": 2,
+    }
+
+    tm.update_clock_and_possession(result)
+
+    assert result["clock_start"] == 400
+    assert result["clock_end"] == 398
+    assert result["shot_clock_start"] == 18
+    assert result["shot_clock_end"] == 16
+    assert result["shot_clock_reset"] is False
+    assert tm.game.game_state["shot_clock_remaining"] == 30
+
+
 def test_free_throw_clock_family_is_clock_dead_for_elapsed_authority():
     tm = _make_turn_manager(time_remaining=360, shot_clock_remaining=12, elapsed_authority="ledger")
     result = {"result_type": "FREE_THROW", "time_elapsed": 3}

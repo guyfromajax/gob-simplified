@@ -37,7 +37,7 @@ Execution:
 Used for non-skeleton turns that travel significant court distance (`FAST_BREAK`).
 
 Clock calculation (per movement segment):
-- Fast Break movement uses **Challenged Open Floor (COF)** rate (18/18): `segment_seconds = sqrt(dx^2 + dy^2) / 18`. See **Movement rates** below.
+- Fast Break movement uses **Challenged Open Floor (COF)** rate (16/12): `segment_seconds = sqrt(dx^2 + dy^2) / 16`. See **Movement rates** below.
 - Turn elapsed = sum of all segment seconds (plus pass in-air where applicable). See **Movement rates** below.
 
 Execution:
@@ -200,8 +200,8 @@ Goal: ensure correctness, responsiveness, and stable UX.
 ## Acceptance Criteria
 - Every simulated turn has deterministic category-based `time_elapsed` logic applied on backend.
 - `Skeleton` and `CG` turns never exceed `30` seconds elapsed.
-- CG (Fast Break) calculation uses COF rate: `segment_seconds = sqrt(dx^2 + dy^2) / 18`; see Movement rates. Round-at-end and cap apply.
-- `INBOUND_PASS`, `SIDE_INBOUND_PASS`, and `FREE_THROW` always return `time_elapsed = 0`.
+- CG (Fast Break) calculation uses COF rate: `segment_seconds = sqrt(dx^2 + dy^2) / 16`; see Movement rates. Round-at-end and cap apply.
+- `SIDE_INBOUND_PASS` and `FREE_THROW` always return `time_elapsed = 0`; `INBOUND_PASS` (BIP) is `0` by default with the post-make (`MAKE`/`PUTBACK_MAKE`) `time_remaining > 60` exception.
 - Frontend countdown runs continuously during active play, pauses correctly, and syncs at turn boundaries.
 - No increase in backend/API call frequency.
 
@@ -241,7 +241,7 @@ Whenever the game clock is running, the shot clock runs, with one exception.
 Shot clock reset triggers (authoritative policy):
 
 - **Possession change** (except timeout turns).
-- **Non-shooting defensive foul** where next turn is `SIDE_INBOUND`/`SIP` and possession does not change.
+- **Non-shooting defensive foul** where next turn is `SIDE_INBOUND`/`SIP` and possession does not change (defensive aliases accepted: `DEFENSIVE`, `DEFENSE`, `D_FOUL` from `foul_type`/`foul_team`).
 - **OREB possession renewal** event.
 
 Inbound receive by itself does **not** reset shot clock.

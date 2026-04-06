@@ -232,7 +232,7 @@ Shot clock:
 - Stops immediately on dead-ball turnover or foul.
 - Resets to `30` only on policy reset triggers:
   - possession change,
-  - non-shooting defensive foul where next turn is SIP (`SIDE_INBOUND`) and possession does not change,
+  - non-shooting defensive foul where next turn is SIP (`SIDE_INBOUND`) and possession does not change (`foul_type` / `foul_team` aliases accepted: `DEFENSIVE`, `DEFENSE`, `D_FOUL`),
   - OREB possession renewal.
 - Explicit carryover cases (no reset): OREB kickout continuation to HCO, and FCP/HCT to HCO without possession change.
 - Explicitly allowed state: game clock running while shot clock is stopped during shot flight before rebound control.

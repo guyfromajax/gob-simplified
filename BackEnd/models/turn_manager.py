@@ -3706,7 +3706,8 @@ class TurnManager:
 
         def _should_reset_shot_clock(turn_result):
             rt = turn_result.get("result_type")
-            foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
+            raw_foul_team = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
+            is_defensive_foul = raw_foul_team in {"DEFENSIVE", "DEFENSE", "D_FOUL"}
             next_play_type = str(turn_result.get("next_play_type") or turn_result.get("next_turn") or "").upper()
             rebound_type = str(turn_result.get("rebound_type") or "").upper()
             possession_flips = bool(turn_result.get("possession_flips"))
@@ -3717,7 +3718,7 @@ class TurnManager:
             # Rule 2: non-shooting defensive foul into SIDE_INBOUND resets even without possession flip.
             if (
                 rt == "FOUL"
-                and foul_type == "DEFENSIVE"
+                and is_defensive_foul
                 and next_play_type in {"SIDE_INBOUND", "SIP"}
                 and not possession_flips
                 and free_throws_remaining <= 0
