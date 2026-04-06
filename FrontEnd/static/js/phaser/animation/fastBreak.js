@@ -667,6 +667,17 @@ function captureRrLiveSnapshot(playerSprites, width, height) {
   return snapshot;
 }
 
+function logRrDenied(scene, stage, payload = {}) {
+  const telemetry = getFbTelemetry(scene);
+  console.log(`[RR DENIED][${stage}]`, {
+    branchKind: telemetry?.branchKind ?? null,
+    turnId: telemetry?.turnId ?? null,
+    turnIndex: telemetry?.turnIndex ?? null,
+    resultType: telemetry?.resultType ?? null,
+    ...payload,
+  });
+}
+
 /** Shared wall time for RR AG-drift beats (outlet denied + hold-up); floors snap/warp from tiny primary moves. */
 function clampRrAgSharedPhaseDurationMs(ms) {
   const raw = Number(ms);
@@ -715,6 +726,16 @@ function rimRunnerAgHorizontalDriftPromises(
     const proposedEndX = startX + stride * direction;
     const endX = Phaser.Math.Clamp(boundedStartX + usedStride, GRID_MIN_X, GRID_MAX_X);
     const endY = Phaser.Math.Clamp(g.y, GRID_MIN_Y, GRID_MAX_Y);
+    if (getFbTelemetry(scene)?.branchKind === "rr_outlet_denied") {
+      logRrDenied(scene, "DRIFT PLAN", {
+        playerId: pid,
+        start: { x: startX, y: g.y },
+        stride,
+        proposedEndX,
+        end: { x: endX, y: endY },
+        phaseDurationMs,
+      });
+    }
     if (Math.abs(strideAbs - Math.abs(usedStride)) > 0.001) {
       incrementFbCounter(scene, "fbClampCount", 1);
       const speedPxPerSec = phaseDurationMs > 0
@@ -756,6 +777,11 @@ async function finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites = nul
         .filter(([, s]) => !!s)
         .map(([pid, s]) => [String(pid), { x: Number(s.x), y: Number(s.y) }])
     );
+    if (turnData.rim_runner_outlet_failed) {
+      logRrDenied(scene, "HCO HANDOFF", {
+        preSnapshot: pre,
+      });
+    }
   }
 
   if (
@@ -787,6 +813,14 @@ async function finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites = nul
             y: (-dy / (scene.game.config.height || 1)) * 50,
           },
         });
+      }
+      if (turnData.rim_runner_outlet_failed) {
+        const post = Object.fromEntries(
+          Object.entries(playerSprites)
+            .filter(([, s]) => !!s)
+            .map(([pid, s]) => [String(pid), { x: Number(s.x), y: Number(s.y) }])
+        );
+        logRrDenied(scene, "HCO HANDOFF POST", { postSnapshot: post });
       }
     };
     if (scene.time?.delayedCall) {
@@ -897,6 +931,15 @@ async function animateRimRunnerOutletDeniedBeat(
 
   const defId = sid(phase?.outlet_defender_id);
   const defSprite = defId ? playerSprites[defId] : null;
+  const rawPasserFallback = turnData.roles?.outlet_passer;
+  const passerId =
+    sid(phase?.outlet_passer_id) ??
+    sid(
+      rawPasserFallback != null && typeof rawPasserFallback === "object"
+        ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
+        : rawPasserFallback
+    );
+  const recvId = sid(phase?.outlet_receiver_id);
   const away = Boolean(phase?.is_away_offense);
   const towardBasket = away ? -1 : 1;
 
@@ -907,6 +950,15 @@ async function animateRimRunnerOutletDeniedBeat(
     x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X),
     y: Phaser.Math.Clamp(pg.y, GRID_MIN_Y, GRID_MAX_Y),
   };
+  logRrDenied(scene, "ENTRY", {
+    passerId,
+    receiverId: recvId,
+    defenderId: defId,
+    passerGrid: pg,
+    receiverGrid: rimRunnerSpriteGrid(recvSprite, width, height),
+    defenderGrid: defSprite ? rimRunnerSpriteGrid(defSprite, width, height) : null,
+    defenderTarget,
+  });
 
   if (defSprite && scene.tweens) {
     scene.tweens.killTweensOf(defSprite);
@@ -957,22 +1009,16 @@ async function animateRimRunnerOutletDeniedBeat(
     y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, GRID_MIN_Y, GRID_MAX_Y),
   };
 
-  const rawPasserFallback = turnData.roles?.outlet_passer;
-  const passerId =
-    sid(phase?.outlet_passer_id) ??
-    sid(
-      rawPasserFallback != null && typeof rawPasserFallback === "object"
-        ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
-        : rawPasserFallback
-    );
-  const recvId = sid(phase?.outlet_receiver_id);
-
   const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
   const phaseDurationMs = clampRrAgSharedPhaseDurationMs(
     getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true)
   );
 
   const driftExclude = new Set([passerId, recvId, defId].filter(Boolean));
+  logRrDenied(scene, "ENTRY", {
+    driftExclude: Array.from(driftExclude),
+    driftMoverCount: Object.keys(playerSprites || {}).filter((pid) => !driftExclude.has(String(pid))).length,
+  });
   const driftPromises = rimRunnerAgHorizontalDriftPromises(
     scene,
     playerSprites,
@@ -994,6 +1040,12 @@ async function animateRimRunnerOutletDeniedBeat(
     phaseDurationMs + 2000,
     "rim_runner_outlet_denied_receiver_cutback"
   );
+  logRrDenied(scene, "TRIGGER", {
+    trigger: "receiver_cutback_reached",
+    receiverTarget: recvTarget,
+    receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+    snapshotAtTrigger: captureRrLiveSnapshot(playerSprites, width, height),
+  });
 
   setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
   for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
@@ -1005,6 +1057,10 @@ async function animateRimRunnerOutletDeniedBeat(
   commitRrLiveSpriteGrid(playerSprites, width, height);
 
   if (passerId && recvId && passerId !== recvId) {
+    logRrDenied(scene, "PASS START", {
+      fromId: passerId,
+      toId: recvId,
+    });
     await runPass(scene, {
       fromId: passerId,
       toId: recvId,
@@ -1017,12 +1073,25 @@ async function animateRimRunnerOutletDeniedBeat(
     const { synchronizeBallState } = await import("./BallControllerAdapter.js");
     synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
     attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_pass" });
+    logRrDenied(scene, "PASS END", {
+      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
+    });
   } else {
     attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_dribble_out" });
+    logRrDenied(scene, "PASS END", {
+      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      mode: "dribble_out",
+      snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
+    });
   }
 
   commitRrLiveSpriteGrid(playerSprites, width, height);
-  return { branch: "outlet_denied", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  const finalSnapshot = captureRrLiveSnapshot(playerSprites, width, height);
+  logRrDenied(scene, "FINAL SNAPSHOT", {
+    snapshot: finalSnapshot,
+  });
+  return { branch: "outlet_denied", snapshot: finalSnapshot };
 }
 
 /**
@@ -1495,6 +1564,15 @@ export async function runFastBreakSequence({
   const phase2Kind = classifyFastBreakPhase2(turnData, { isBlockingFoul });
   const branchKind = deriveFbBranchKind(turnData, phase2Kind);
   initFbTelemetryContext(scene, { turnData, turnIndex, branchKind });
+  if (branchKind === "rr_outlet_denied") {
+    logRrDenied(scene, "ROUTE", {
+      phase2Kind,
+      branchKind,
+      rim_runner_outlet_failed: Boolean(turnData.rim_runner_outlet_failed),
+      fast_break_play: turnData.fast_break_play ?? null,
+      resultType: turnData.result_type ?? null,
+    });
+  }
 
   try {
     const resolutionStartMs = Date.now();
@@ -1731,6 +1809,12 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   if (outletDenied) {
     // RR burst only owns the fork into outlet-denied. Once receiver reaches the
     // fork point, the dedicated denied branch becomes the sole owner.
+    logRrDenied(scene, "BURST FORK", {
+      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      rrLive: rimRunnerSpriteGrid(rrSprite, width, height),
+      outletDefenderId: sid(phase.outlet_defender_id),
+      snapshot: captureRrLiveSnapshot(playerSprites, width, height),
+    });
     return {
       branch: "outlet_denied",
       snapshot: captureRrLiveSnapshot(playerSprites, width, height),
@@ -2160,9 +2244,9 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   } else {
     shotSpot = {
       x: isHomeOffense
-        ? basket.x - Phaser.Math.Between(2, 6)
-        : basket.x + Phaser.Math.Between(2, 6),
-      y: basket.y + Phaser.Math.Between(-6, 6),
+        ? basket.x - Phaser.Math.Between(1, 4)
+        : basket.x + Phaser.Math.Between(1, 4),
+      y: basket.y + Phaser.Math.Between(-3, 3),
     };
     shotSpot.x = Phaser.Math.Clamp(shotSpot.x, GRID_MIN_X, GRID_MAX_X);
     shotSpot.y = Phaser.Math.Clamp(shotSpot.y, GRID_MIN_Y, GRID_MAX_Y);
@@ -2512,8 +2596,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     };
   } else {
     shotSpot = {
-      x: isHomeOffense ? basket.x - Phaser.Math.Between(2, 6) : basket.x + Phaser.Math.Between(2, 6),
-      y: basket.y + Phaser.Math.Between(-6, 6)
+      x: isHomeOffense ? basket.x - Phaser.Math.Between(1, 4) : basket.x + Phaser.Math.Between(1, 4),
+      y: basket.y + Phaser.Math.Between(-3, 3)
     };
     shotSpot.x = Phaser.Math.Clamp(shotSpot.x, GRID_MIN_X, GRID_MAX_X);
     shotSpot.y = Phaser.Math.Clamp(shotSpot.y, GRID_MIN_Y, GRID_MAX_Y);

@@ -19,9 +19,9 @@ STOPPER_OFFSET_MIN = 1
 STOPPER_OFFSET_MAX = 3
 
 # Shot Spot (when ball handler beats defender: shoot from near rim, not confrontation spot)
-FB_SHOT_SPOT_X_MIN = 2  # Min x-distance from rim (spots)
-FB_SHOT_SPOT_X_MAX = 6  # Max x-distance from rim (spots)
-FB_SHOT_SPOT_Y_RANGE = 6  # ±y from rim center
+FB_SHOT_SPOT_X_MIN = 1  # Min x-distance from rim (spots)
+FB_SHOT_SPOT_X_MAX = 4  # Max x-distance from rim (spots)
+FB_SHOT_SPOT_Y_RANGE = 3  # ±y from rim center
 
 # Defender Positioning (Shot Attempt)
 # Primary shot defender sits two x-spots behind the shooter relative to the offense basket.
