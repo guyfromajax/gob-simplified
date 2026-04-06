@@ -1102,6 +1102,19 @@ async function runDefensiveReboundSetup({
         String(turnData?.rebound_type || "").toUpperCase() === "DREB" &&
         nextPlayType === "HCO")
     );
+  const logDrebHandoff = (label, payload = {}) => {
+    console.log(`[DREB HANDOFF][${label}]`, {
+      turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
+      turnIndex: scene?.currentTurn ?? null,
+      authorityResultType: authorityTurn?.result_type ?? null,
+      authorityReboundType: authorityTurn?.rebound_type ?? null,
+      authorityFastBreak: !!authorityTurn?.fast_break,
+      nextPlayType,
+      isFastBreakMissDrebToHco,
+      suppressFastBreakReceiverAuthority,
+      ...payload,
+    });
+  };
   
   // runDefensiveReboundSetup called
   
@@ -1363,12 +1376,29 @@ async function runDefensiveReboundSetup({
   const contractReceiverId =
     drebOutletPassContract?.receiver_id ?? drebOutletPassContract?.receiverId ?? null;
   const contractReceiverTarget = drebOutletPassContract?.receiver_target ?? drebOutletPassContract?.receiverTarget ?? null;
+  logDrebHandoff("AUTHORITY", {
+    rebounderId,
+    receiverCandidates,
+    hasDrebOutletPassContract: !!drebOutletPassContract,
+    contractPasserId,
+    contractReceiverId,
+    contractReceiverTarget,
+  });
   if (contractReceiverId != null) {
     const contractReceiverRef = resolveSpriteById(playerSprites, contractReceiverId);
     if (isValidOutletReceiverRef(contractReceiverRef)) {
       outletReceiverId = contractReceiverRef.id;
       outletReceiverSprite = contractReceiverRef.sprite;
+      logDrebHandoff("CONTRACT RECEIVER APPLIED", {
+        contractReceiverId,
+        contractReceiverTeam: contractReceiverRef?.sprite?.team ?? null,
+      });
     } else {
+      logDrebHandoff("CONTRACT RECEIVER REJECTED", {
+        contractReceiverId,
+        rebounderTeam: rebounderSprite.team,
+        contractReceiverTeam: contractReceiverRef?.sprite?.team ?? null,
+      });
       emitDrebTelemetry("dreb_contract_missing_endpoint", {
         playerId: rebounderId,
         role: "outlet_receiver",
@@ -1455,6 +1485,12 @@ async function runDefensiveReboundSetup({
       team: info.team
     }))
   });
+  logDrebHandoff("RECEIVER LOOKUP", {
+    rebounderId,
+    outletReceiverId,
+    outletReceiverTeam: outletReceiverSprite?.team ?? null,
+    rebounderTeam: rebounderSprite.team,
+  });
   
   // Debug logging for outlet pass setup
   if (DebugFlags?.OUTLET) {
@@ -1540,6 +1576,16 @@ async function runDefensiveReboundSetup({
     if (receiverTargetResolution.target) {
       outletTarget = receiverTargetResolution.target;
       outletTargetSource = receiverTargetResolution.source || "unknown";
+      logDrebHandoff("RECEIVER TARGET RESOLVED", {
+        outletReceiverId,
+        outletTarget,
+        outletTargetSource,
+        resolutionReason: receiverTargetResolution.reason ?? null,
+        currentReceiverGrid,
+        receiverAnimEndFromAuthority,
+        receiverAnimEndFromTurnData,
+        contractReceiverTarget,
+      });
       if (
         requiresDrebOutletPassContract &&
         receiverTargetResolution.reason === "contract_receiver_target_no_op"
@@ -1582,6 +1628,16 @@ async function runDefensiveReboundSetup({
       }
       outletTarget = getFallbackOutletTarget();
       outletTargetSource = "fallback.receiver_near_rebounder";
+      logDrebHandoff("RECEIVER TARGET FALLBACK", {
+        outletReceiverId,
+        outletTarget,
+        outletTargetSource,
+        fallbackReason: resolutionReason,
+        currentReceiverGrid,
+        receiverAnimEndFromAuthority,
+        receiverAnimEndFromTurnData,
+        contractReceiverTarget,
+      });
     }
     outletContext = {
       newOffenseTeam,
@@ -1622,6 +1678,16 @@ async function runDefensiveReboundSetup({
       contractReceiverId: contractReceiverId ?? null,
       contractPasserId: contractPasserId ?? null,
       contractReceiverTarget: contractReceiverTarget ?? null,
+    });
+    logDrebHandoff("PASS PLAN", {
+      rebounderId,
+      outletReceiverId,
+      outletTarget,
+      outletTargetSource,
+      contractPasserId,
+      contractReceiverId,
+      contractReceiverTarget,
+      receiverTargetAuthorityMode,
     });
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
@@ -1876,6 +1942,13 @@ async function runDefensiveReboundSetup({
       authorityTurnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
       authorityResultType: authorityTurn?.result_type ?? null,
     });
+    logDrebHandoff("PASS START", {
+      fromId: rebounderId,
+      toId: outletReceiverId,
+      outletTarget,
+      outletTargetSource,
+      strictBranch: requiresDrebOutletPassContract,
+    });
     if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
     if (DebugFlags?.OUTLET) animationDebugLog('Starting outlet pass animation...');
     
@@ -1991,6 +2064,19 @@ async function runDefensiveReboundSetup({
     console.log('🏀 runDefensiveReboundSetup: Outlet pass completed', {
       from: rebounderId,
       to: outletReceiverId
+    });
+    logDrebHandoff("PASS END", {
+      fromId: rebounderId,
+      toId: outletReceiverId,
+      ballOwner: getCurrentOwner(scene),
+      outletTarget,
+      outletTargetSource,
+      receiverLiveGrid: outletReceiverSprite
+        ? {
+            x: Number((((outletReceiverSprite.x / width) * 100)).toFixed(2)),
+            y: Number(((50 - (outletReceiverSprite.y / height) * 50)).toFixed(2)),
+          }
+        : null,
     });
     if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
     if (DebugFlags?.OUTLET) animationDebugLog('Outlet pass completed!');
