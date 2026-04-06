@@ -58,7 +58,10 @@ Define the V1 Rim Runner Fast Break flow as a clear step-by-step process.
 - If the outlet is denied, the denial sequence is played.
 - Branch owner: `rr.phase.outlet_denied`.
 - The outlet receiver cuts back toward the passer while the other players continue their transition movement.
+- The outlet passer identity must resolve deterministically for this branch.
+- Outlet passer, outlet receiver, and outlet defender are excluded from drift during the denied sequence.
 - The outlet receiver then receives the outlet pass at the cut-back spot.
+- The denied branch must execute an actual outlet-pass receive at that cut-back spot; it must not degrade into a generic dribble-out fallback because the passer identity was lost.
 - Once that denied-pass receive happens, the branch owns the live player positions; the parent burst phase must not re-apply the original burst destinations afterward.
 - Play then settles into `HCO`.
 - Current behavior remains an RR non-shot stop result.

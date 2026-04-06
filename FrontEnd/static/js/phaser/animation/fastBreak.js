@@ -925,6 +925,13 @@ async function animateRimRunnerOutletDeniedBeat(
   recvSprite
 ) {
   const sid = (id) => (id != null ? String(id) : null);
+  const spriteIdFor = (targetSprite) => {
+    if (!targetSprite) return null;
+    for (const [pid, sprite] of Object.entries(playerSprites || {})) {
+      if (sprite === targetSprite) return sid(pid);
+    }
+    return null;
+  };
   if (!passerSprite || !recvSprite) {
     return { branch: "outlet_denied", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   }
@@ -932,13 +939,31 @@ async function animateRimRunnerOutletDeniedBeat(
   const defId = sid(phase?.outlet_defender_id);
   const defSprite = defId ? playerSprites[defId] : null;
   const rawPasserFallback = turnData.roles?.outlet_passer;
-  const passerId =
+  let passerId =
     sid(phase?.outlet_passer_id) ??
     sid(
       rawPasserFallback != null && typeof rawPasserFallback === "object"
         ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
         : rawPasserFallback
     );
+  if (!passerId) {
+    passerId = spriteIdFor(passerSprite);
+    if (passerId) {
+      logRrDenied(scene, "PASSER RECOVERY", {
+        mode: "sprite_match",
+        passerId,
+      });
+    }
+  }
+  if (!passerId) {
+    passerId = sid(getCurrentOwner(scene));
+    if (passerId) {
+      logRrDenied(scene, "PASSER RECOVERY", {
+        mode: "ball_owner",
+        passerId,
+      });
+    }
+  }
   const recvId = sid(phase?.outlet_receiver_id);
   const away = Boolean(phase?.is_away_offense);
   const towardBasket = away ? -1 : 1;
@@ -1078,10 +1103,14 @@ async function animateRimRunnerOutletDeniedBeat(
       snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
     });
   } else {
-    attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_dribble_out" });
+    attachBallToPlayer(scene, ballSprite, recvSprite, {
+      reason: "rim_runner_outlet_denied_pass_recovery_failed",
+    });
     logRrDenied(scene, "PASS END", {
       receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
-      mode: "dribble_out",
+      mode: "pass_recovery_failed",
+      passerId,
+      receiverId: recvId,
       snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
     });
   }
