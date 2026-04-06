@@ -1061,6 +1061,7 @@ async function runDefensiveReboundSetup({
   nextPlayType = "HCO",
   turnData = null,
   authorityTurnData = null,
+  suppressFastBreakReceiverAuthority = false,
 }) {
   // Split contexts:
   // - authorityTurn: contract/role/result source for strict DREB outlet enforcement
@@ -1094,6 +1095,13 @@ async function runDefensiveReboundSetup({
   
   const getBackList = missTurnForGetback?.offense_getback || [];
   const getBackSet = new Set(getBackList.map((id) => String(id)));
+  const isFastBreakMissDrebToHco =
+    Boolean(
+      suppressFastBreakReceiverAuthority ||
+      (turnData?.fast_break &&
+        String(turnData?.rebound_type || "").toUpperCase() === "DREB" &&
+        nextPlayType === "HCO")
+    );
   
   // runDefensiveReboundSetup called
   
@@ -1327,15 +1335,17 @@ async function runDefensiveReboundSetup({
     String(ref.sprite.team) === String(rebounderSprite.team);
 
   // Prefer backend authority for outlet receiver when present.
-  const receiverCandidates = [
-    authorityTurn?.outlet_receiver_id,
-    authorityTurn?.outletReceiverId,
-    authorityTurn?.outlet_receiver,
-    authorityTurn?.roles?.outlet_receiver,
-    authorityTurn?.roles?.ball_handler_id,
-    authorityTurn?.roles?.ball_handler?.player_id,
-    authorityTurn?.ball_handler,
-  ];
+  const receiverCandidates = isFastBreakMissDrebToHco
+    ? []
+    : [
+        authorityTurn?.outlet_receiver_id,
+        authorityTurn?.outletReceiverId,
+        authorityTurn?.outlet_receiver,
+        authorityTurn?.roles?.outlet_receiver,
+        authorityTurn?.roles?.ball_handler_id,
+        authorityTurn?.roles?.ball_handler?.player_id,
+        authorityTurn?.ball_handler,
+      ];
   for (const cid of receiverCandidates) {
     const ref = resolveSpriteById(playerSprites, cid);
     if (isValidOutletReceiverRef(ref)) {
@@ -1434,6 +1444,7 @@ async function runDefensiveReboundSetup({
     rebounderId,
     rebounderTeam: rebounderSprite.team,
     nextPlayType,
+    isFastBreakMissDrebToHco,
     outletReceiverId,
     hasOutletReceiverSprite: !!outletReceiverSprite,
     playerInfoCount: Object.keys(scene.playerInfo || {}).length,
@@ -1481,8 +1492,10 @@ async function runDefensiveReboundSetup({
   })();
   const receiverTargetAuthorityMode = requiresDrebOutletPassContract
     ? "contract_receiver_target_only"
-    : "mixed_legacy";
-  const transitionTargetAuthorityMode = requiresDrebOutletPassContract
+    : isFastBreakMissDrebToHco
+      ? "transition_policy_only"
+      : "mixed_legacy";
+  const transitionTargetAuthorityMode = (requiresDrebOutletPassContract || isFastBreakMissDrebToHco)
     ? "transition_policy_only"
     : "animations_end_then_fallback";
   const applyGetBackExclusion = !requiresDrebOutletPassContract;
@@ -1508,7 +1521,9 @@ async function runDefensiveReboundSetup({
     // SS&S: prefer backend animation end for receiver when available.
     drebTelemetry.required += 1;
     const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
-    const receiverAnimEndFromAuthority = getAnimationEndGridForPlayer(authorityTurn, outletReceiverId);
+    const receiverAnimEndFromAuthority = isFastBreakMissDrebToHco
+      ? null
+      : getAnimationEndGridForPlayer(authorityTurn, outletReceiverId);
     const receiverAnimEndFromTurnData = getAnimationEndGridForPlayer(turnData, outletReceiverId);
     const currentReceiverGrid = {
       x: (outletReceiverSprite.x / width) * 100,

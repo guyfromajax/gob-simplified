@@ -145,6 +145,7 @@ Every turn result from the backend contains data organized into **three distinct
 **Fast Break Results:**
 - `fast_break` - true flag
 - `roles` - {outlet_passer, outlet_receiver} - Fast break roles
+- **Fast Break miss → DREB → HCO handoff rule:** when a Fast Break shot misses and the defense secures a `DREB`, backend forces `next_play_type = "HCO"` and the frontend must transition into the standard `DREB -> HCO` outlet path. The outlet receiver for that handoff must **not** be inherited from the prior Fast Break shot roles / ball handler. Instead, the handoff resolves the receiver using the standard DREB outlet policy (PG-first, then same-team non-rebounder fallback) unless a dedicated `dreb_outlet_pass` contract is present.
 
 **FCP/HCT Results:**
 - `fcp_foul` / `hct_foul` - Pressure foul flags
@@ -354,4 +355,3 @@ All resolution result values have a **minimum value of 2**. There are no maximum
 - `docs/GP_Core_Docs/TURN_SYSTEM.md` - Complete turn data structure and execution patterns reference
 - `docs/UNIFIED_DATA_STRUCTURE_ANALYSIS.md` - Analysis of data structure patterns
 - `docs/docs_1_systems/05_GP_Supporting_Systems/HCO_Turn_Resolution_System.md` - Detailed HCO resolution logic
-

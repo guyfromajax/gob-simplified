@@ -2569,7 +2569,8 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         playerSprites,
         rebounderId,
         nextPlayType: turnData.next_play_type || "HCO",
-        turnData: turnData
+        turnData: turnData,
+        suppressFastBreakReceiverAuthority: true,
       });
     }
   }
@@ -2863,7 +2864,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
             playerSprites,
             rebounderId: rebounderIdResolved ?? rebounderId,
             nextPlayType: turnData.next_play_type || "HCO",
-            turnData
+            turnData,
+            suppressFastBreakReceiverAuthority: true,
           });
         }
       }
@@ -2987,7 +2989,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         playerSprites,
         rebounderId: rebounderIdResolved ?? rebounderId,
         nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
-        turnData: turnData // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
+        turnData: turnData, // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
+        suppressFastBreakReceiverAuthority: true,
         // runDefensiveReboundSetup will find offense_getback from previous turn if needed
       });
     }
