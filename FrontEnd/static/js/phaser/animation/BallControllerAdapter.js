@@ -62,6 +62,8 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     return;
   }
   
+  const allowDuringPossessionFlip =
+    opts?.allowDuringPossessionFlip === true || scene?.__drebOutletWindowActive === true;
   const targetPlayerId = playerSprite?.playerId;
   const isPutbackAttempt = opts?.debugInfo?.reason === 'putback_attempt';
   // Note: _putbackInProgress is never set anymore (Phase 4 cleanup), but kept for backward compatibility
@@ -83,7 +85,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   // BallController.attachToPlayer() handles all state checks internally
 
   // Handle possession flip in progress (old system behavior)
-  if (scene.possessionFlipInProgress) {
+  if (scene.possessionFlipInProgress && !allowDuringPossessionFlip) {
     console.log('BallControllerAdapter: Skipping attach due to possessionFlipInProgress');
     return;
   }
@@ -106,6 +108,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   const targetTeamId = playerSprite.team_id;
   if (
     scene.possessionFlipInProgress &&
+    !allowDuringPossessionFlip &&
     scene.offenseTeamId != null &&
     String(targetTeamId) !== String(scene.offenseTeamId)
   ) {

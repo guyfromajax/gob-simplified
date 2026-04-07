@@ -4,6 +4,7 @@ from BackEnd.db import teams_collection
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
+from BackEnd.constants.fast_break_play_types import default_fast_break_plays
 
 # ✅ PERFORMANCE: Cache plays collection to avoid reloading during GameManager initialization
 # This dramatically speeds up GameManager creation (from ~16s to <1s)
@@ -36,6 +37,8 @@ def _create_scouting_data_template_base():
         "offense": {
             "Fast_Break_Entries": 0,
             "Fast_Break_Success": 0,
+            # Per-play fast break (offense only); aggregates also in Fast_Break_* above
+            "fast_break_plays": default_fast_break_plays(),
             # Motion / Set buckets and cumulative (attempts/success)
             "Playcalls": {
                 "Motion": {

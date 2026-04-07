@@ -86,7 +86,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     }
   }
 
-  // Sync stack button .selected state only when the call belongs to the user's team
+  // Sync stack button .selected state only for Press/Trap override.
+  // Tempo/Aggression highlights are user-intent driven in court.html handlers.
   const stackZone = document.getElementById('pcc-stacks-zone');
   if (stackZone) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -98,20 +99,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     const isUserOnDefense = userTeamSide && offId && homeId &&
       ((userTeamSide === 'home' && offId !== homeId) || (userTeamSide === 'away' && offId === homeId));
 
-    if (isUserOnOffense && (turnData.offense_tempo_call || turnData.tempo_call)) {
-      const tempo = (turnData.offense_tempo_call || turnData.tempo_call || '').toLowerCase();
-      stackZone.querySelectorAll('.pcc-stack.tempo .pcc-stack-btn').forEach(btn => {
-        const v = btn.id === 'tempo-fast' ? 'fast' : btn.id === 'tempo-slow' ? 'slow' : 'normal';
-        btn.classList.toggle('selected', v === tempo);
-      });
-    }
-    if (isUserOnDefense && (turnData.defense_aggression_call || turnData.aggression)) {
-      const aggr = (turnData.defense_aggression_call || turnData.aggression || '').toLowerCase();
-      stackZone.querySelectorAll('.pcc-stack.aggression .pcc-stack-btn').forEach(btn => {
-        const v = btn.id === 'aggr-passive' ? 'passive' : btn.id === 'aggr-aggressive' ? 'aggressive' : 'normal';
-        btn.classList.toggle('selected', v === aggr);
-      });
-    }
     if (isUserOnDefense && turnData.press_trap_override != null) {
       const pt = (turnData.press_trap_override || '').toLowerCase();
       stackZone.querySelectorAll('.pcc-stack.press-trap .pcc-stack-btn').forEach(btn => {

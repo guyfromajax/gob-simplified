@@ -5,6 +5,7 @@ from BackEnd.models.animator import Animator
 import random
 import json
 import logging
+import uuid
 from BackEnd.db import players_collection, teams_collection, plays_collection
 from BackEnd.models.player import Player, player_to_dict
 
@@ -20,7 +21,9 @@ from BackEnd.constants import (
     POSITION_LIST,
     STRATEGY_CALL_DICTS,
     TEMPO_PASS_DICT,
-    MALLEABLE_ATTRS
+    MALLEABLE_ATTRS,
+    HOME_RIM_COORDS,
+    AWAY_RIM_COORDS,
 )
 from BackEnd.utils.shared import (
     weighted_random_from_dict,
@@ -29,10 +32,13 @@ from BackEnd.utils.shared import (
     get_foul_and_turnover_positions,
     get_name_safe,
     get_player_position,
-    update_player_coords_from_animations,
     serialize_lineup,
     getAwayTeamCoords,
     calc_pass_segment_seconds,
+)
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_phase_post_stopper_snapshot,
 )
 from BackEnd.utils.shared_defense import (
     get_defender_coords
@@ -84,7 +90,9 @@ class TurnManager:
         fixed_ms = 0
 
         # Zero-elapsed turns: clock does not move
-        if result_type in ("FREE_THROW", "SIDE_INBOUND", "BASELINE_INBOUND", "TIMEOUT"):
+        if result_type in ("FREE_THROW", "SIDE_INBOUND", "TIMEOUT"):
+            return 0
+        if result_type == "BASELINE_INBOUND" and game_time_elapsed <= 0:
             return 0
 
         if result_type == "DEFENSIVE_STOP":
@@ -126,6 +134,24 @@ class TurnManager:
 
         return movement_ms + fixed_ms
 
+    def _resolve_clock_authority_mode(self, game_state: dict) -> str:
+        raw_mode = str(game_state.get("uess_clock_authority_mode", "warn") or "warn").strip().lower()
+        if raw_mode in {"observe", "warn", "throw", "off"}:
+            return raw_mode
+        return "warn"
+
+    def _resolve_clock_elapsed_authority(self, game_state: dict) -> str:
+        raw_mode = str(game_state.get("uess_clock_elapsed_authority", "ledger") or "ledger").strip().lower()
+        if raw_mode in {"legacy", "ledger"}:
+            return raw_mode
+        return "ledger"
+
+    def _resolve_ownership_contract_mode(self, game_state: dict) -> str:
+        raw_mode = str(game_state.get("uess_ownership_contract_mode", "warn") or "warn").strip().lower()
+        if raw_mode in {"off", "observe", "warn", "throw"}:
+            return raw_mode
+        return "warn"
+
     def _attach_clock_contract(
         self,
         result: dict,
@@ -137,7 +163,8 @@ class TurnManager:
         """Attach authoritative clock contract fields to a turn result dict."""
         clock_end = int(game_state.get("time_remaining", 0))
         sc_end = int(game_state.get("shot_clock_remaining", 30))
-        sc_reset = sc_end > shot_clock_start or (
+        sc_reset_reason = result.get("shot_clock_reset_reason")
+        sc_reset = bool(sc_reset_reason) or sc_end > shot_clock_start or (
             sc_end == 30 and clock_start != clock_end
         )
         result["clock_start"] = clock_start
@@ -145,8 +172,28 @@ class TurnManager:
         result["shot_clock_start"] = shot_clock_start
         result["shot_clock_end"] = sc_end
         result["shot_clock_reset"] = bool(sc_reset)
+        if sc_reset_reason:
+            result["shot_clock_reset_reason"] = str(sc_reset_reason)
         result["clock_contract_source"] = source
         result["real_time_elapsed_ms"] = self._compute_real_time_elapsed_ms(result)
+        clock_authority_mode = self._resolve_clock_authority_mode(game_state)
+        elapsed_authority = self._resolve_clock_elapsed_authority(game_state)
+        result["uess_clock_authority_mode"] = clock_authority_mode
+        result["uess_clock_elapsed_authority"] = elapsed_authority
+        result["clock_event_ledger"] = self._build_clock_event_ledger(
+            result=result,
+            clock_start=clock_start,
+            clock_end=clock_end,
+            shot_clock_start=shot_clock_start,
+            shot_clock_end=sc_end,
+            shot_clock_reset=bool(sc_reset),
+        )
+        self._attach_clock_elapsed_observe_reconciliation(
+            result=result,
+            game_state=game_state,
+            mode=clock_authority_mode,
+            elapsed_authority=elapsed_authority,
+        )
         logging.debug(
             "⏱️ [CLOCK CONTRACT] type=%s source=%s "
             "clock=%d→%d elapsed=%d sc=%d→%d reset=%s",
@@ -159,6 +206,261 @@ class TurnManager:
             sc_end,
             sc_reset,
         )
+
+    def _get_clock_reconciliation_tolerance_seconds(self, game_state: dict) -> float:
+        raw = game_state.get("uess_clock_recon_tolerance_seconds", 0.10)
+        try:
+            tol = float(raw)
+        except (TypeError, ValueError):
+            tol = 0.10
+        return max(0.0, tol)
+
+    def _derive_elapsed_from_clock_event_ledger(self, events: list[dict]) -> int:
+        if not isinstance(events, list):
+            return 0
+        derived_elapsed = 0
+        for row in events:
+            if not isinstance(row, dict):
+                continue
+            if row.get("event_type") != "game_clock_stop":
+                continue
+            try:
+                before = int(row.get("game_clock_before", 0) or 0)
+                after = int(row.get("game_clock_after", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            derived_elapsed += max(0, before - after)
+        return int(derived_elapsed)
+
+    def _attach_clock_elapsed_observe_reconciliation(
+        self,
+        *,
+        result: dict,
+        game_state: dict,
+        mode: str = "observe",
+        elapsed_authority: str = "legacy",
+    ) -> None:
+        """Clock reconciliation compare with mode-based backend enforcement."""
+        legacy_elapsed = int(result.get("time_elapsed", 0) or 0)
+        ledger_elapsed = self._derive_elapsed_from_clock_event_ledger(
+            result.get("clock_event_ledger", [])
+        )
+        delta_seconds = ledger_elapsed - legacy_elapsed
+        tolerance = self._get_clock_reconciliation_tolerance_seconds(game_state)
+        within_tolerance = abs(delta_seconds) <= tolerance
+        normalized_mode = mode if mode in {"observe", "warn", "throw", "off"} else "observe"
+        normalized_elapsed_authority = (
+            elapsed_authority if elapsed_authority in {"legacy", "ledger"} else "legacy"
+        )
+
+        if normalized_elapsed_authority == "ledger":
+            result["time_elapsed"] = int(ledger_elapsed)
+
+        result["uess_clock_elapsed_game_seconds"] = int(ledger_elapsed)
+        result["uess_clock_elapsed_legacy_game_seconds"] = int(legacy_elapsed)
+        result["uess_clock_elapsed_delta_seconds"] = int(delta_seconds)
+        result["uess_clock_elapsed_observe_within_tolerance"] = bool(within_tolerance)
+        result["uess_clock_reconciliation"] = {
+            "mode": normalized_mode,
+            "elapsed_authority": normalized_elapsed_authority,
+            "ledger_elapsed_game_seconds": int(ledger_elapsed),
+            "legacy_elapsed_game_seconds": int(legacy_elapsed),
+            "delta_seconds": int(delta_seconds),
+            "tolerance_seconds": float(tolerance),
+            "within_tolerance": bool(within_tolerance),
+        }
+
+        if within_tolerance or normalized_mode in {"observe", "off"}:
+            return
+
+        message = (
+            "[CLOCK CONTRACT] backend reconciliation fail "
+            f"(mode={normalized_mode}, result={result.get('result_type')}, "
+            f"ledgerElapsed={ledger_elapsed}, legacyElapsed={legacy_elapsed}, "
+            f"deltaSeconds={delta_seconds}, toleranceSeconds={tolerance})"
+        )
+
+        if normalized_mode == "warn":
+            logging.warning("⚠️ %s", message)
+            return
+
+        if normalized_mode == "throw":
+            raise ValueError(message)
+
+    def _clock_stop_reason(self, result: dict) -> str:
+        result_type = str(result.get("result_type") or "").upper()
+        if result_type == "TIMEOUT":
+            return "timeout"
+        if result_type == "FOUL":
+            return "foul"
+        if result_type in {"DEAD BALL", "TURNOVER", "CHARGE"}:
+            return "dead_ball_turnover"
+        if result_type == "MAKE":
+            return "made_basket"
+        return "turn_boundary"
+
+    def _shot_clock_stop_reason(self, result: dict) -> str:
+        result_type = str(result.get("result_type") or "").upper()
+        if result_type in {"MAKE", "MISS", "BLOCK"}:
+            return "shot_detach"
+        if result_type == "FOUL":
+            return "foul"
+        if result_type in {"DEAD BALL", "TURNOVER", "CHARGE"}:
+            return "dead_ball_turnover"
+        return "turn_boundary"
+
+    def _build_clock_event_ledger(
+        self,
+        *,
+        result: dict,
+        clock_start: int,
+        clock_end: int,
+        shot_clock_start: int,
+        shot_clock_end: int,
+        shot_clock_reset: bool,
+    ) -> list[dict]:
+        """Build observe-mode clock event ledger rows for this turn."""
+        turn_id = result.get("turn_count") or result.get("id")
+        game_elapsed = max(0, int(clock_start) - int(clock_end))
+        shot_elapsed = max(0, int(shot_clock_start) - int(shot_clock_end))
+        events: list[dict] = []
+
+        def append_event(event_type: str, reason: str, ts_game_seconds: int) -> None:
+            events.append(
+                {
+                    "event_id": f"clk-{uuid.uuid4().hex[:12]}",
+                    "turn_id": turn_id,
+                    "event_type": event_type,
+                    "reason": reason,
+                    "game_clock_before": int(clock_start),
+                    "game_clock_after": int(clock_end),
+                    "shot_clock_before": int(shot_clock_start),
+                    "shot_clock_after": int(shot_clock_end),
+                    "timestamp_game_seconds": int(ts_game_seconds),
+                }
+            )
+
+        if game_elapsed > 0:
+            append_event("game_clock_start", "live_ball_window", int(clock_start))
+            append_event("game_clock_stop", self._clock_stop_reason(result), int(clock_end))
+        else:
+            append_event("game_clock_stop", self._clock_stop_reason(result), int(clock_start))
+
+        if shot_elapsed > 0:
+            append_event("shot_clock_start", "live_possession_window", int(shot_clock_start))
+            append_event(
+                "shot_clock_stop",
+                self._shot_clock_stop_reason(result),
+                int(shot_clock_end),
+            )
+        else:
+            append_event(
+                "shot_clock_stop",
+                self._shot_clock_stop_reason(result),
+                int(shot_clock_start),
+            )
+
+        if shot_clock_reset:
+            append_event(
+                "shot_clock_reset",
+                str(result.get("shot_clock_reset_reason") or "turn_policy_reset"),
+                int(clock_end),
+            )
+
+        if int(clock_end) <= 0:
+            append_event("period_end", "game_clock_zero", 0)
+
+        if int(result.get("points", 0) or 0) > 0 or str(result.get("result_type") or "").upper() == "MAKE":
+            append_event("basket_counted", "scoring_result", int(clock_end))
+
+        possession_team_id = (
+            result.get("possession_team_id")
+            or result.get("offense_team_id")
+            or self.game.game_state.get("offense_team")
+        )
+        append_event("possession_committed", "turn_close", int(clock_end))
+        events[-1]["possession_team_id"] = possession_team_id
+
+        return events
+
+    def _attach_uess_ownership_contract(self, result: dict) -> None:
+        """Attach observational ownership/pass-lifecycle contract fields."""
+        steps = result.get("steps")
+        owner_by_step = result.get("ball_owner_by_step")
+        applicable = isinstance(steps, list) and len(steps) > 0 and isinstance(owner_by_step, list)
+
+        pass_events = []
+        if isinstance(steps, list):
+            for step_index, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    continue
+                for event in step.get("events", []) or []:
+                    if not isinstance(event, dict):
+                        continue
+                    if str(event.get("type") or "").lower().strip() != "pass":
+                        continue
+                    passer = event.get("by")
+                    receiver = event.get("to")
+                    pass_events.append(
+                        {
+                            "step_index": int(step_index),
+                            "passer_pos": passer if isinstance(passer, str) else None,
+                            "receiver_pos": receiver if isinstance(receiver, str) else None,
+                        }
+                    )
+
+        owner_seq = owner_by_step if isinstance(owner_by_step, list) else []
+        terminal_owner = None
+        for owner in reversed(owner_seq):
+            if isinstance(owner, str) and owner.strip():
+                terminal_owner = owner
+                break
+
+        valid_receipt_count = 0
+        for row in pass_events:
+            receiver = row.get("receiver_pos")
+            step_index = int(row.get("step_index") or 0)
+            if not isinstance(receiver, str) or not receiver:
+                continue
+            if any(owner_seq[idx] == receiver for idx in range(step_index, len(owner_seq))):
+                valid_receipt_count += 1
+
+        pass_count = len(pass_events)
+        game_state = getattr(getattr(self, "game", None), "game_state", {}) or {}
+        ownership_mode = self._resolve_ownership_contract_mode(game_state)
+        result["uess_ownership_contract_mode"] = ownership_mode
+        contract = {
+            "applicable": bool(applicable),
+            "mode": ownership_mode,
+            "pass_event_count": int(pass_count),
+            "pass_receipt_valid_count": int(valid_receipt_count),
+            "pass_lifecycle_valid": bool(pass_count == 0 or valid_receipt_count == pass_count),
+            "terminal_owner_pos": terminal_owner,
+            "next_play_type": result.get("next_play_type"),
+            "result_type": result.get("result_type"),
+        }
+        if pass_count > 0:
+            contract["pass_events"] = pass_events
+        result["uess_ownership_contract"] = contract
+
+        if ownership_mode in {"warn", "throw"} and contract["applicable"] and not contract["pass_lifecycle_valid"]:
+            message = (
+                "[UESS ownership contract] pass lifecycle invalid "
+                f"(mode={ownership_mode}, result={result.get('result_type')}, next={result.get('next_play_type')}, "
+                f"passEventCount={contract['pass_event_count']}, validReceiptCount={contract['pass_receipt_valid_count']}, "
+                f"terminalOwner={contract['terminal_owner_pos']})"
+            )
+            if ownership_mode == "throw":
+                raise ValueError(message)
+            logging.warning(
+                "⚠️ [UESS ownership contract] pass lifecycle invalid (result=%s, next=%s, "
+                "passEventCount=%s, validReceiptCount=%s, terminalOwner=%s)",
+                result.get("result_type"),
+                result.get("next_play_type"),
+                contract["pass_event_count"],
+                contract["pass_receipt_valid_count"],
+                contract["terminal_owner_pos"],
+            )
 
     def setup_side_inbound(self):
         """
@@ -239,6 +541,22 @@ class TurnManager:
             "quarter": self.game.quarter,
         }
 
+        from BackEnd.utils.position_snapshot_ledger import (
+            attach_position_snapshots,
+            build_inbound_destinations_snapshot,
+        )
+
+        sip_snap = build_inbound_destinations_snapshot(
+            game,
+            offense_team.lineup,
+            defense_team.lineup,
+            o_dest,
+            d_dest,
+            "SIDE_INBOUND",
+            "sip_inbound_setup",
+        )
+        attach_position_snapshots(payload, [sip_snap])
+
         return payload
 
     def setup_baseline_inbound(self, next_defensive_setup=None):
@@ -296,30 +614,68 @@ class TurnManager:
             # Flip offensive coordinates if the away team has possession
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
         else:
-            # Use random baseline positions for normal HCO inbound (no pressure)
-            # inbound_spot_home already defined above
+            # HCO-only baseline inbound setup uses explicit BIP targets.
+            offense_attrs = offense_team.team_attributes or {}
+            defense_attrs = defense_team.team_attributes or {}
+            offense_chemistry = int(offense_attrs.get("team_chemistry", 15) or 15)
+            defense_execution = int(defense_attrs.get("defense_execution", 0) or 0)
 
-            # Destination ranges for other offensive players (home orientation).
-            home_ranges = {
-                "SG": {"x": (52, 56), "y": (22, 28)},
-                "SF": {"x": (54, 58), "y": (18, 32)},
-                "PF": {"x": (54, 58), "y": (30, 36)},
-                "C":  {"x": (54, 58), "y": (14, 20)},
+            offense_basket = HOME_RIM_COORDS if not is_away_offense else AWAY_RIM_COORDS
+            inbound_spot = {"x": 3, "y": 25} if not is_away_offense else {"x": 97, "y": 25}
+
+            current_pg = offense_team.lineup.get("PG")
+            current_pg_y = 25
+            if getattr(current_pg, "coords", None):
+                current_pg_y = int(current_pg.coords.get("y", 25) or 25)
+
+            if offense_chemistry > 15:
+                sf_y_range = (25, 35) if current_pg_y > 24 else (15, 25)
+            else:
+                sf_y_range = (15, 35)
+
+            sf_y = random.randint(*sf_y_range)
+            sf_x = inbound_spot["x"]
+
+            pg_x_offset = random.randint(9, 15)
+            pg_y_offset = random.randint(-3, 3)
+            pg_x = sf_x + pg_x_offset if not is_away_offense else sf_x - pg_x_offset
+            pg_y = max(1, min(49, sf_y + pg_y_offset))
+
+            def offense_half_court_target():
+                if not is_away_offense:
+                    x = random.randint(offense_basket["x"] - 25, offense_basket["x"] - 5)
+                else:
+                    x = random.randint(offense_basket["x"] + 5, offense_basket["x"] + 25)
+                y = random.randint(
+                    max(1, offense_basket["y"] - 20),
+                    min(49, offense_basket["y"] + 20),
+                )
+                return {"x": x, "y": y}
+
+            o_dest = {
+                "SF": {"x": sf_x, "y": sf_y},
+                "PG": {"x": pg_x, "y": pg_y},
+                "SG": offense_half_court_target(),
+                "PF": offense_half_court_target(),
+                "C": offense_half_court_target(),
             }
 
-            o_dest_home = {}
-            for pos, ranges in home_ranges.items():
-                o_dest_home[pos] = {
-                    "x": random.randint(*ranges["x"]),
-                    "y": random.randint(*ranges["y"]),
-                }
-                self.logger.log(f"destAssigned:{pos}")
+            lane_target_count = 5 if defense_execution > 5 else 4 if defense_execution > 0 else 2
+            defender_positions = [pos for pos in defense_team.lineup.keys() if pos in {"PG", "SG", "SF", "PF", "C"}]
+            lane_positions = set(random.sample(defender_positions, min(lane_target_count, len(defender_positions))))
 
-            # Inbounder (PG) stays at the inbound spot
-            o_dest_home["PG"] = inbound_spot_home.copy()
+            d_dest = {}
+            for pos in defender_positions:
+                if pos in lane_positions:
+                    x = random.randint(74, 87) if not is_away_offense else random.randint(14, 27)
+                    y = random.randint(19, 32)
+                else:
+                    x = random.randint(62, 87) if not is_away_offense else random.randint(14, 39)
+                    y = random.randint(10, 30)
+                d_dest[pos] = {"x": x, "y": y}
 
-            # Flip offensive coordinates if the away team has possession
-            o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+            bh_coords = o_dest["PG"]
+            inbound_spot_home = inbound_spot.copy()
 
         # Determine ball-handler (PG) coordinates in actual orientation
         bh_coords = o_dest["PG"]
@@ -327,46 +683,45 @@ class TurnManager:
         # --- Defensive positioning ---
         # PHASE 6: Use new unified defender coordinate system
         # get_defender_coords handles coordinate orientation automatically
-        self.logger.log("defenseUpdate:start")
-        d_dest = {}
-        for pos, defender in defense_team.lineup.items():
-            if pos == "PG":
-                # BH defender - get_defender_coords handles orientation automatically
-                d_coords = get_defender_coords(
-                    bh_coords,
-                    is_away_offense,
-                    aggression,
-                    "baseline_inbound",
-                    None,
-                    is_ball_handler=True
-                )
-                d_dest[pos] = d_coords
-            elif pos in o_dest:
-                o_coords = o_dest[pos]
-                # Non-BH defender - get_defender_coords handles orientation automatically
-                # Need to determine offensive player's spot (default to "key" for baseline inbound)
-                o_spot = "key"  # Default spot for baseline inbound
-                d_coords = get_defender_coords(
-                    o_coords,
-                    is_away_offense,
-                    aggression,
-                    o_spot,
-                    bh_coords,
-                    is_ball_handler=False,
-                    ball_spot="baseline_inbound"  # Ball handler's spot
-                )
-                d_dest[pos] = d_coords
-        self.logger.log("defenseUpdate:end")
+        if setup_locations:
+            self.logger.log("defenseUpdate:start")
+            d_dest = {}
+            for pos, defender in defense_team.lineup.items():
+                if pos == "PG":
+                    d_coords = get_defender_coords(
+                        bh_coords,
+                        is_away_offense,
+                        aggression,
+                        "baseline_inbound",
+                        None,
+                        is_ball_handler=True
+                    )
+                    d_dest[pos] = d_coords
+                elif pos in o_dest:
+                    o_coords = o_dest[pos]
+                    o_spot = "key"
+                    d_coords = get_defender_coords(
+                        o_coords,
+                        is_away_offense,
+                        aggression,
+                        o_spot,
+                        bh_coords,
+                        is_ball_handler=False,
+                        ball_spot="baseline_inbound"
+                    )
+                    d_dest[pos] = d_coords
+            self.logger.log("defenseUpdate:end")
 
         from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
         payload = {
             "result_type": "BASELINE_INBOUND",
             "time_elapsed": 0,
-            "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
+            "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if (setup_locations and is_away_offense) else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
             "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # for situational Force Foul (pass receiver)
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
+            "turn_type": "BASELINE_INBOUND",  # Back-compat marker for post-BIP pressure slicing.
             "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
             "quarter": self.game.quarter,
             "next_play_type": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ Explicit routing
@@ -389,6 +744,22 @@ class TurnManager:
                 if "pos_actions" in step_0 and step_0["pos_actions"]:
                     payload["offense_setup_positions"] = step_0["pos_actions"]
                     # logging.warning(f"✅ [BASELINE_INBOUND] Including {len(step_0['pos_actions'])} skeleton step 0 positions for {next_defensive_setup} setup")
+
+        from BackEnd.utils.position_snapshot_ledger import (
+            attach_position_snapshots,
+            build_inbound_destinations_snapshot,
+        )
+
+        bip_snap = build_inbound_destinations_snapshot(
+            game,
+            offense_team.lineup,
+            defense_team.lineup,
+            o_dest,
+            d_dest,
+            "BASELINE_INBOUND",
+            "bip_inbound_setup",
+        )
+        attach_position_snapshots(payload, [bip_snap])
 
         return payload
 
@@ -605,6 +976,26 @@ class TurnManager:
                     result["offense_team_id"] = self.game.offense_team.team_id
                     result["current_turn"] = "HCO"
                     result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
+                    if isinstance(victim_coords, dict):
+                        victim.coords = {
+                            "x": float(victim_coords.get("x", 50)),
+                            "y": float(victim_coords.get("y", 25)),
+                        }
+                    attach_position_snapshots(
+                        result,
+                        [
+                            build_phase_post_stopper_snapshot(
+                                self.game,
+                                off_lineup,
+                                def_lineup,
+                                None,
+                                roles,
+                                "HCO",
+                                "non_shooting_foul",
+                                "hco_situational_force_foul_inbound",
+                            )
+                        ],
+                    )
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
 
@@ -914,8 +1305,8 @@ class TurnManager:
         # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
         result["turn_count"] = len(self.game.turns) + 1
         # result["possession_team_id"] = self.game.offense_team.team_id
-        update_player_coords_from_animations(self.game, result["animations"])
-        
+        # Player.coords sync: GameManager._append_turn → sync_lineup_coords_from_turn
+
         # Print turn result summary for debugging
         # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
         turn_num = len(self.game.turns) + 1
@@ -1201,7 +1592,22 @@ class TurnManager:
             "forced_shot": True,
             "shooter_location": shooter_spot,
         }
+        from BackEnd.utils.position_snapshot_ledger import (
+            attach_position_snapshots,
+            build_skeleton_pre_resolve_shot_snapshot,
+        )
+
+        sc_snap = build_skeleton_pre_resolve_shot_snapshot(
+            self.game,
+            off_lineup,
+            def_lineup,
+            roles.get("skeleton"),
+            roles,
+            "HCO",
+            "shot_clock_forced_shot",
+        )
         result = self.game.shot_manager.resolve_shot(roles)
+        attach_position_snapshots(result, [sc_snap])
         result["forced_shot"] = True
         result["forced_shot_reason"] = "SHOT_CLOCK"
         return result
@@ -2435,6 +2841,22 @@ class TurnManager:
         result["offense_team_id"] = self.game.offense_team.team_id
         result["current_turn"] = "HCO"
         result["quick_foul"] = True
+        victim.coords = {"x": 50.0, "y": 25.0}
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    self.game,
+                    off_lineup,
+                    def_lineup,
+                    None,
+                    roles,
+                    "HCO",
+                    "non_shooting_foul",
+                    "hco_force_foul_final_turn",
+                )
+            ],
+        )
         return result
 
     def resolve_fast_break(self):
@@ -2883,7 +3305,12 @@ class TurnManager:
                 if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
                     _pass_sec = calc_pass_segment_seconds(rc, pc)
             _oreb_te = round(_base + _pass_sec)
-            return {
+            from BackEnd.utils.position_snapshot_ledger import (
+                attach_position_snapshots,
+                build_oreb_kickout_snapshot,
+            )
+
+            block_payload = {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": f"{rebounder_name} secures the rebound after the block. Reset to half-court.",
@@ -2919,6 +3346,11 @@ class TurnManager:
                     }
                 },
             }
+            attach_position_snapshots(
+                block_payload,
+                [build_oreb_kickout_snapshot(self.game, off_lineup, def_lineup)],
+            )
+            return block_payload
         
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
@@ -2987,7 +3419,7 @@ class TurnManager:
                 # Update team stats before sending
                 self.game.update_team_stats()
                 
-                return {
+                pm = {
                     "result_type": "PUTBACK_MAKE",
                     "ball_handler": getattr(rebounder, "player_id", None),
                     "shooter": getattr(rebounder, "player_id", None),
@@ -3029,6 +3461,9 @@ class TurnManager:
                         }
                     },
                 }
+                if oreb_event.get("position_snapshots"):
+                    pm["position_snapshots"] = oreb_event["position_snapshots"]
+                return pm
             else:
                 # Putback missed - check for rebound
                 text = f"{get_name_safe(rebounder)} goes back up but misses."
@@ -3112,10 +3547,8 @@ class TurnManager:
                         logging.error(f"❌ [PUTBACK MISS => REBOUND] Cannot set pending_oreb - rebounder not found! ID: {rebounder_id}, Type: {rebound_type}")
                     elif rebound_data.get("rebound_type") == "DREB":
                         # Defensive rebound - preserve next_play_type from original shot
-                        # Fast Break is determined DURING the shot (by defense tempo), not after DREB
-                        # If defense_release_list was set during the shot, next_play_type was already set to FAST_BREAK
-                        # If not, it was set to HCO. We preserve that decision here.
-                        # Legacy: Don't recalculate fast break here - it causes bugs where fast break has no release player
+                        # FB eligibility + play key are set on the miss shot turn (`pending_dreb_fb_play_key` / offensive_state).
+                        # Don't recalculate here.
                         next_play_type = game_state.get("offensive_state", "HCO")
                         result["next_play_type"] = next_play_type
                 
@@ -3175,6 +3608,8 @@ class TurnManager:
                     }
                 }
                 
+                if oreb_event.get("position_snapshots"):
+                    result["position_snapshots"] = oreb_event["position_snapshots"]
                 return result
         
         else:
@@ -3221,7 +3656,7 @@ class TurnManager:
                 if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
                     _pass_sec_kickout = calc_pass_segment_seconds(rc, pc)
             _oreb_te_kickout = round(_base_kickout + _pass_sec_kickout)
-            return {
+            kick_payload = {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
@@ -3257,6 +3692,9 @@ class TurnManager:
                     }
                 },
             }
+            if oreb_event.get("position_snapshots"):
+                kick_payload["position_snapshots"] = oreb_event["position_snapshots"]
+            return kick_payload
 
     def update_clock_and_possession(self, result):
         _cc_clock_start = int(self.game.game_state.get("time_remaining", 0))
@@ -3270,30 +3708,71 @@ class TurnManager:
             te = turn_result.get("time_elapsed", 0)
             return int(te or 0) == 0 and rt in {"SIDE_INBOUND", "BASELINE_INBOUND"}
 
+        def _is_shot_attempt(turn_result):
+            return turn_result.get("result_type") in {"MAKE", "MISS", "BLOCK"} or (
+                turn_result.get("result_type") == "FOUL"
+                and (
+                    int(turn_result.get("free_throws_remaining", 0) or 0) > 0
+                    or turn_result.get("next_play_type") == "FREE_THROW"
+                )
+            )
+
+        def _shot_detach_elapsed_seconds(turn_result, fallback_elapsed):
+            """
+            Resolve the live-possession seconds consumed before shot detach.
+
+            When step timing exists, shot detach occurs at resolution_step_index, so the
+            shot clock should burn only the executed step time through that boundary while
+            the game clock may continue running through the remainder of the turn.
+            """
+            raw_steps = turn_result.get("step_clock_seconds")
+            if not isinstance(raw_steps, list) or not raw_steps:
+                return int(fallback_elapsed)
+            try:
+                step_clock_seconds = [max(0, int(sec or 0)) for sec in raw_steps]
+            except (TypeError, ValueError):
+                return int(fallback_elapsed)
+
+            max_index = len(step_clock_seconds) - 1
+            raw_index = turn_result.get("resolution_step_index")
+            try:
+                resolution_step_index = int(raw_index)
+            except (TypeError, ValueError):
+                resolution_step_index = max_index
+            resolution_step_index = max(0, min(max_index, resolution_step_index))
+            return int(sum(step_clock_seconds[: resolution_step_index + 1]))
+
         def _should_reset_shot_clock(turn_result):
             rt = turn_result.get("result_type")
-            foul_type = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
+            raw_foul_team = str(turn_result.get("foul_type") or turn_result.get("foul_team") or "").upper()
+            is_defensive_foul = raw_foul_team in {"DEFENSIVE", "DEFENSE", "D_FOUL"}
             next_play_type = str(turn_result.get("next_play_type") or turn_result.get("next_turn") or "").upper()
-            current_turn = str(turn_result.get("current_turn") or "").upper()
             rebound_type = str(turn_result.get("rebound_type") or "").upper()
             possession_flips = bool(turn_result.get("possession_flips"))
-            if _is_no_impact_turn(turn_result):
-                return True
-            # Reset on any offensive rebound event, not just a literal "OREB" result_type.
-            # OREB flows commonly use result types like OREB_KICKOUT / PUTBACK_* with rebound_type="OREB".
-            if rebound_type == "OREB" or current_turn == "OREB" or rt == "OREB":
-                return True
-            if rt == "MAKE":
-                return True
-            if rt in {"STEAL", "DEAD BALL", "TURNOVER", "CHARGE"}:
-                return True
-            if rt == "FOUL" and foul_type == "OFFENSIVE":
-                return True
-            if rt == "FOUL" and foul_type == "DEFENSIVE" and next_play_type in {"SIDE_INBOUND", "SIP"}:
-                return True
+            free_throws_remaining = int(turn_result.get("free_throws_remaining", 0) or 0)
+            # Rule 1: possession change resets shot clock.
             if possession_flips and rt != "TIMEOUT":
                 return True
+            # Rule 2: non-shooting defensive foul into SIDE_INBOUND resets even without possession flip.
+            if (
+                rt == "FOUL"
+                and is_defensive_foul
+                and next_play_type in {"SIDE_INBOUND", "SIP"}
+                and not possession_flips
+                and free_throws_remaining <= 0
+            ):
+                return True
+            # Rule 3: offensive rebound possession renewal resets.
+            # Apply on rebound capture outcomes (MISS/BLOCK/FREE_THROW with rebound_type=OREB)
+            # and literal OREB result types; avoid repeated resets on OREB continuation turns.
+            if rt == "OREB":
+                return True
+            if rebound_type == "OREB" and rt in {"MISS", "BLOCK", "FREE_THROW"}:
+                return True
             return False
+
+        def _current_turn_shot_clock_reset_reason(turn_result):
+            return None
 
         game_remaining_before = int(self.game.game_state.get("time_remaining", 0) or 0)
         shot_remaining_before = int(
@@ -3303,28 +3782,20 @@ class TurnManager:
             ) or 0
         )
 
-        # 🕒 Reduce clock by time_elapsed with legal cap enforcement.
-        time_elapsed = int(result.get("time_elapsed", 0) or 0)
+        raw_time_elapsed = int(result.get("time_elapsed", 0) or 0)
         impact_turn = not _is_no_impact_turn(result)
         if impact_turn:
-            legal_cap = max(0, min(game_remaining_before, shot_remaining_before))
-            if time_elapsed > legal_cap:
-                time_elapsed = legal_cap
+            effective_game_elapsed = max(0, min(raw_time_elapsed, game_remaining_before))
         else:
-            time_elapsed = 0
+            effective_game_elapsed = 0
 
-        # Shot attempt: add 1 game second to game clock only (rim-hold time); shot clock does not get the +1.
-        is_shot_attempt = result.get("result_type") in ("MAKE", "MISS", "BLOCK") or (
-            result.get("result_type") == "FOUL"
-            and (int(result.get("free_throws_remaining", 0) or 0) > 0
-                 or result.get("next_play_type") == "FREE_THROW")
-        )
-        if impact_turn and is_shot_attempt:
-            effective_game_elapsed = min(time_elapsed + 1, legal_cap) if impact_turn else time_elapsed
-            shot_elapsed = time_elapsed
+        if not impact_turn:
+            shot_elapsed = 0
+        elif _is_shot_attempt(result):
+            shot_elapsed = _shot_detach_elapsed_seconds(result, effective_game_elapsed)
         else:
-            effective_game_elapsed = time_elapsed
-            shot_elapsed = time_elapsed
+            shot_elapsed = effective_game_elapsed
+        shot_elapsed = max(0, min(int(shot_elapsed), shot_remaining_before, effective_game_elapsed))
 
         result["time_elapsed"] = effective_game_elapsed
         self.game.game_state["time_remaining"] -= effective_game_elapsed
@@ -3334,15 +3805,23 @@ class TurnManager:
             self.game.game_state["time_remaining"] = 0
 
         clock_end = int(self.game.game_state.get("time_remaining", 0))
-        game_seconds_elapsed = _cc_clock_start - clock_end
 
-        # Shot clock: same as game clock except on shot attempts (shot_elapsed = time_elapsed, game = time_elapsed + 1).
+        # Universal clock authority:
+        # - game clock burns only live-ball elapsed for this turn
+        # - shot clock burns until detach/stop event, then remains stopped
+        # - clock-dead turns preserve the visible shot clock value for this turn
+        current_turn_shot_clock_reset_reason = _current_turn_shot_clock_reset_reason(result)
+
         if impact_turn:
             raw_shot_end = max(0, _cc_sc_start - shot_elapsed)
-        else:
+        elif current_turn_shot_clock_reset_reason:
             raw_shot_end = min(30, clock_end)
+        else:
+            raw_shot_end = _cc_sc_start
 
         self.game.game_state["shot_clock_remaining"] = raw_shot_end
+        if current_turn_shot_clock_reset_reason:
+            result["shot_clock_reset_reason"] = current_turn_shot_clock_reset_reason
 
         # Shot clock violations are now resolved via the stopper system (phase_resolution) before we get here;
         # we no longer overwrite the result when raw_shot_end == 0.
@@ -3369,6 +3848,7 @@ class TurnManager:
             game_state=self.game.game_state,
             source=f"ucp:{result.get('result_type', 'UNKNOWN')}",
         )
+        self._attach_uess_ownership_contract(result)
 
         # Reset only affects NEXT turn: set shot_clock_remaining=30 so next turn's _cc_sc_start is 30.
         if _should_reset_shot_clock(result):

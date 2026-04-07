@@ -73,7 +73,7 @@ The Announcement System provides visual feedback for game events using timing-ba
   - Uses `showAndOneAnnouncement()` for two-row announcement with shooter and fouler headshots
   - Both player images display `#jersey lastName` directly beneath the headshot when that data is available
   - Fallback: Single-row announcement if player data missing
-- **"Shooting Foul!"** - Detected when `result === "MISS"` and (`next_play_type === 'FREE_THROW'` or `free_throws_remaining > 0`)
+- **"Shooting Foul!"** - Detected on shot-result turns (`result_type === "MISS"` with shooting-foul context from the shot pipeline)
   - Always displays announcement even if player sprite/info is missing (fallback pattern)
   - Dark yellow text with silver border
 
@@ -95,8 +95,11 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Foul Announcements:**
 - **"Charge!"** - Triggered when `result_type === 'CHARGE'` (offensive foul on drive). Routed via gameAnnouncements.js; AnimationEngine routes CHARGE to handleDefault (skeleton animation, then announcement).
 - **"BLOCKING FOUL!"** - Triggered when `result_type === 'FOUL'`, `foul_team === 'DEFENSE'`, and text contains "blocking foul" (non-shooting defensive foul on drive).
-- **"OFFENSIVE FOUL!"** / **"DEFENSIVE FOUL!"** - Other non-shooting fouls (foul_team OFFENSE or DEFENSE, not blocking).
+- **Offensive non-charge fouls:** Announcement text is now a specific foul call (for example, "Push Off!", "Illegal Screen!", "Elbowing!") selected by weighted language tables.
+- **Defensive non-shooting fouls (non-blocking):** Announcement text is now a specific foul call (for example, "Hand-Checking!", "Holding!", "Pushing!", "Illegal Post Defense!") selected by weighted language tables.
+- **Lane weighting rule:** Offensive/defensive foul language selection uses separate weighted pools for non-lane vs lane locations (lane: `lower/upper lowPost`, `midPost`, `highPost`, `basketSpot`, `midLane`, `topLane`).
 - Shows fouling player's headshot. Skips if shooting foul (already handled in shot result announcements).
+- **Important distinction:** `result_type === 'FOUL'` that routes to `next_play_type === 'FREE_THROW'` (bonus) is still announced as FOUL. True shooting fouls are announced in shot-result handlers (`MAKE/MISS` paths such as `ballManager.js`, `ShotAnimationSystem.js`, `fastBreak.js`).
 
 **Block Announcements:**
 - **"BLOCK!"** - Announced in `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (when ball has reached block spot), **before** the rebound is announced, so order is always Block → Rebound. Shows blocker's headshot. Routed via `announceGameEvent('BLOCK', ...)` in `gameAnnouncements.js`. Fallback: `finalizeTurnAfterAnimation` announces BLOCK only if `!turn._blockAnnounced`.
@@ -201,3 +204,30 @@ When a steal leads to a fast break:
 **Backend:**
 - `BackEnd/engine/phase_resolution.py` - Sets `is_steal_entry` flag for steal-initiated Fast Breaks
 - `BackEnd/models/turn_manager.py` - Populates turn data with announcement triggers
+
+### Foul Taxonomy (Future Event Mapping)
+
+Use this list as the canonical taxonomy for future event-specific micro-animations paired with announcements.
+
+**Offensive Fouls**
+Language Guidance For Offensive Fouls in Announcement System (non lane players / lane location)
+- Push Off (30 / 10)
+- Illegal Screen (20 / 10) (ball handler excluded)
+- Arm Extension (15 /10)
+- Hooking (5 / 5)
+- Illegal Use Of Hands (10 / 5)
+- Elbowing (20 / 20)
+- Illegal Post Up (0 / 40)
+
+**Defensive Non-Shooting Fouls**
+- Blocking Foul (25 / 5)
+- Hand-Checking (25 / 0)
+- Illegal Contact (10 / 10)
+- Holding (15 / 20)
+- Arm Bar (15 / 10)
+- Pushing (10 / 30)
+- Illegal Post Defense (0 / 25)
+
+Lane locations = lower and upper lowPost, midPost, highPost, basketSpot, midLane, topLane
+
+All Force Fouls announce "Quick Foul!"

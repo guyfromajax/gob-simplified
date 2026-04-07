@@ -118,6 +118,57 @@ Specialized Handlers (execution)
 
 Backend sends positions in a single convention (e.g. home-side) where applicable (e.g. Final Turn alignment, HCO string spots). The frontend derives “away offense” (e.g. `offenseTeamId !== homeTeamId`) and applies one flip to both offense and defense when true. This keeps the rule consistent across turn types (HCO entry, Final Turn setup, etc.) without special cases.
 
+## Universal Court Clamp Policy
+
+**Status:** ✅ Production (frontend Phase 1 + backend response sanitation)
+
+Animation-facing player coordinates use one canonical grid clamp policy:
+
+- **x bounds:** `9..91` (between basket x spots)
+- **y bounds:** `2..49`
+
+### Exemptions
+
+The clamp is intentionally skipped for turn types that need out-of-bounds lanes:
+
+- `SIDE_INBOUND` (SIP)
+- `BASELINE_INBOUND` (BIP)
+- `TIMEOUT` (reserved future sideline movement)
+
+### Implementation Contract
+
+- **Frontend clamp source of truth:** `FrontEnd/static/js/phaser/animation/courtClamp.js`
+  - `clampGridCoords()`
+  - `isClampExempt()`
+- **Backend response sanitation:** `BackEnd/utils/shared.py`
+  - `sanitize_turn_animation_payload()`
+  - Applied at `/api/simulate-turn` response boundary (including timeout and batch turn payloads)
+- **Rule:** clamp in grid-space before/at payload consumption; avoid ad-hoc `Math.min/Math.max` clamp variants in feature code.
+
+## Consistent Heartbeat System
+
+**Status:** ✅ Production (render-only visual layer)
+
+Heartbeat is applied consistently to active player sprites as a visual micro-movement layer, with tempo scaled by `NG`.
+
+- **NG tempo contract:** `NG=1.00 -> 75 BPM`, `NG=0.01 -> 750 BPM`
+- **Mapping:** linear interpolation in BPM space between the above anchors
+- **Cycle timing:** `halfCycleMs = 30000 / BPM` (full cycle = `60000 / BPM`)
+- **Visual movement:** render-space drift only (no gameplay coordinate ownership changes)
+- **Safety:** type-safe target selection for sprite/container-backed players; heartbeat never mutates authoritative gameplay `x/y` used by movement systems
+
+### Implementation Points
+
+- `FrontEnd/static/js/phaser/animation/arrivalHeartbeat.js`
+  - `ensureConsistentHeartbeat()` starts/maintains heartbeat across active player sprites
+  - resolves compatible tween target properties per render object type
+  - restores visual target state safely on cleanup
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js`
+  - heartbeat refresh at turn processing entry
+  - teardown cleanup on scene shutdown/destroy
+- `FrontEnd/static/js/phaser/animation/animation_config.js`
+  - heartbeat config: `minBpm`, `maxBpm`, `amplitudePx`, `jitterPx`
+
 ## State Tracking System
 
 **Status:** ✅ **CORE COMPONENT** - Fundamental architectural pattern

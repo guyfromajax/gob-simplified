@@ -29,4 +29,5 @@ def test_height_clamps():
     low_center = compute_position_ratings(low)["C"]
     high_center = compute_position_ratings(high)["C"]
     assert low_center == 1
-    assert high_center == 20
+    # C rating weights height at 40%; max height rating 100 → 40 when other attrs are 0
+    assert high_center == 40

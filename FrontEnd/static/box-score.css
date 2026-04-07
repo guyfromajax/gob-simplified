@@ -578,6 +578,19 @@ h2 {
   width: 100%;
 }
 
+.special-stats-hint-row {
+  padding: 4px 0 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+  justify-content: flex-start;
+}
+
+.special-stats-hint {
+  font-size: 12px;
+  color: #777;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
 .special-stats-label {
   font-weight: 600;
   color: #555;

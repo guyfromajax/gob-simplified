@@ -1,10 +1,11 @@
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { CLAMP_BOUNDS } from "./courtClamp.js";
 
 const COURT_BOUNDS = {
-  minX: 4,
-  maxX: 97,
-  minY: 1,
-  maxY: 50,
+  minX: CLAMP_BOUNDS.minX,
+  maxX: CLAMP_BOUNDS.maxX,
+  minY: CLAMP_BOUNDS.minY,
+  maxY: CLAMP_BOUNDS.maxY,
 };
 
 export function deriveOffenseContext(team) {

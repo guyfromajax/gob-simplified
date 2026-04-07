@@ -1,0 +1,500 @@
+{
+  "result_type": "MAKE",
+  "text": "Fast Break! contract sample make",
+  "possession_flips": false,
+  "offense_team_id": "LANCASTER",
+  "current_turn": "FAST_BREAK",
+  "next_play_type": "BASELINE_INBOUND",
+  "animations": [],
+  "roles": {
+    "offense": [],
+    "defense": [
+      {
+        "first_name": "Bentley-Truman PG",
+        "last_name": "Player",
+        "name": "Bentley-Truman PG Player",
+        "attributes": {
+          "SC": 5,
+          "SH": 5,
+          "ID": 8,
+          "OD": 55,
+          "PS": 8,
+          "BH": 9,
+          "RB": 1,
+          "AG": 55,
+          "ST": 9,
+          "ND": 3,
+          "IQ": 55,
+          "FT": 4,
+          "CH": 5,
+          "NG": 1.0,
+          "anchor_SC": 5,
+          "anchor_SH": 5,
+          "anchor_ID": 8,
+          "anchor_OD": 3,
+          "anchor_PS": 8,
+          "anchor_BH": 9,
+          "anchor_RB": 1,
+          "anchor_AG": 4,
+          "anchor_ST": 9,
+          "anchor_ND": 3,
+          "anchor_IQ": 1,
+          "anchor_FT": 4,
+          "anchor_CH": 5
+        },
+        "stats": {
+          "game": {}
+        },
+        "team": "Bentley-Truman",
+        "height": 78,
+        "jersey": 0,
+        "player_id": "away_pg",
+        "coords": {
+          "x": 55,
+          "y": 22
+        }
+      },
+      {
+        "first_name": "Bentley-Truman SG",
+        "last_name": "Player",
+        "name": "Bentley-Truman SG Player",
+        "attributes": {
+          "SC": 5,
+          "SH": 5,
+          "ID": 8,
+          "OD": 3,
+          "PS": 8,
+          "BH": 9,
+          "RB": 1,
+          "AG": 4,
+          "ST": 9,
+          "ND": 3,
+          "IQ": 1,
+          "FT": 4,
+          "CH": 5,
+          "NG": 1.0,
+          "anchor_SC": 5,
+          "anchor_SH": 5,
+          "anchor_ID": 8,
+          "anchor_OD": 3,
+          "anchor_PS": 8,
+          "anchor_BH": 9,
+          "anchor_RB": 1,
+          "anchor_AG": 4,
+          "anchor_ST": 9,
+          "anchor_ND": 3,
+          "anchor_IQ": 1,
+          "anchor_FT": 4,
+          "anchor_CH": 5
+        },
+        "stats": {
+          "game": {}
+        },
+        "team": "Bentley-Truman",
+        "height": 78,
+        "jersey": 0,
+        "player_id": "away_sg",
+        "coords": {
+          "x": 55,
+          "y": 22
+        }
+      },
+      {
+        "first_name": "Bentley-Truman SF",
+        "last_name": "Player",
+        "name": "Bentley-Truman SF Player",
+        "attributes": {
+          "SC": 5,
+          "SH": 5,
+          "ID": 8,
+          "OD": 3,
+          "PS": 8,
+          "BH": 9,
+          "RB": 1,
+          "AG": 4,
+          "ST": 9,
+          "ND": 3,
+          "IQ": 1,
+          "FT": 4,
+          "CH": 5,
+          "NG": 1.0,
+          "anchor_SC": 5,
+          "anchor_SH": 5,
+          "anchor_ID": 8,
+          "anchor_OD": 3,
+          "anchor_PS": 8,
+          "anchor_BH": 9,
+          "anchor_RB": 1,
+          "anchor_AG": 4,
+          "anchor_ST": 9,
+          "anchor_ND": 3,
+          "anchor_IQ": 1,
+          "anchor_FT": 4,
+          "anchor_CH": 5
+        },
+        "stats": {
+          "game": {}
+        },
+        "team": "Bentley-Truman",
+        "height": 78,
+        "jersey": 0,
+        "player_id": "away_sf",
+        "coords": {
+          "x": 55,
+          "y": 22
+        }
+      },
+      {
+        "first_name": "Bentley-Truman PF",
+        "last_name": "Player",
+        "name": "Bentley-Truman PF Player",
+        "attributes": {
+          "SC": 5,
+          "SH": 5,
+          "ID": 8,
+          "OD": 3,
+          "PS": 8,
+          "BH": 9,
+          "RB": 1,
+          "AG": 4,
+          "ST": 9,
+          "ND": 3,
+          "IQ": 1,
+          "FT": 4,
+          "CH": 5,
+          "NG": 1.0,
+          "anchor_SC": 5,
+          "anchor_SH": 5,
+          "anchor_ID": 8,
+          "anchor_OD": 3,
+          "anchor_PS": 8,
+          "anchor_BH": 9,
+          "anchor_RB": 1,
+          "anchor_AG": 4,
+          "anchor_ST": 9,
+          "anchor_ND": 3,
+          "anchor_IQ": 1,
+          "anchor_FT": 4,
+          "anchor_CH": 5
+        },
+        "stats": {
+          "game": {}
+        },
+        "team": "Bentley-Truman",
+        "height": 78,
+        "jersey": 0,
+        "player_id": "away_pf",
+        "coords": {
+          "x": 55,
+          "y": 22
+        }
+      },
+      {
+        "first_name": "Bentley-Truman C",
+        "last_name": "Player",
+        "name": "Bentley-Truman C Player",
+        "attributes": {
+          "SC": 5,
+          "SH": 5,
+          "ID": 8,
+          "OD": 3,
+          "PS": 8,
+          "BH": 9,
+          "RB": 1,
+          "AG": 4,
+          "ST": 9,
+          "ND": 3,
+          "IQ": 1,
+          "FT": 4,
+          "CH": 5,
+          "NG": 1.0,
+          "anchor_SC": 5,
+          "anchor_SH": 5,
+          "anchor_ID": 8,
+          "anchor_OD": 3,
+          "anchor_PS": 8,
+          "anchor_BH": 9,
+          "anchor_RB": 1,
+          "anchor_AG": 4,
+          "anchor_ST": 9,
+          "anchor_ND": 3,
+          "anchor_IQ": 1,
+          "anchor_FT": 4,
+          "anchor_CH": 5
+        },
+        "stats": {
+          "game": {}
+        },
+        "team": "Bentley-Truman",
+        "height": 78,
+        "jersey": 0,
+        "player_id": "away_c",
+        "coords": {
+          "x": 55,
+          "y": 22
+        }
+      }
+    ],
+    "ball_handler": {
+      "first_name": "Lancaster PG",
+      "last_name": "Player",
+      "name": "Lancaster PG Player",
+      "attributes": {
+        "SC": 5,
+        "SH": 5,
+        "ID": 8,
+        "OD": 3,
+        "PS": 8,
+        "BH": 9,
+        "RB": 1,
+        "AG": 4,
+        "ST": 9,
+        "ND": 3,
+        "IQ": 1,
+        "FT": 4,
+        "CH": 5,
+        "NG": 1.0,
+        "anchor_SC": 5,
+        "anchor_SH": 5,
+        "anchor_ID": 8,
+        "anchor_OD": 3,
+        "anchor_PS": 8,
+        "anchor_BH": 9,
+        "anchor_RB": 1,
+        "anchor_AG": 4,
+        "anchor_ST": 9,
+        "anchor_ND": 3,
+        "anchor_IQ": 1,
+        "anchor_FT": 4,
+        "anchor_CH": 5
+      },
+      "stats": {
+        "game": {}
+      },
+      "team": "Lancaster",
+      "height": 78,
+      "jersey": 0,
+      "player_id": "home_pg",
+      "coords": {
+        "x": 47.0,
+        "y": 15.0
+      }
+    },
+    "outlet_passer": "home_c",
+    "outlet_receiver": "home_pg",
+    "fast_break_play": "rim_runner",
+    "rim_runner_sequence": true,
+    "outlet_score": 31,
+    "outlet_passer_x": 35,
+    "outlet_passer_y": 26,
+    "rim_runner_burst_phase": {
+      "rr_id": "home_sf",
+      "rr_from": {
+        "x": 45.0,
+        "y": 26.0
+      },
+      "rr_to": {
+        "x": 69.0,
+        "y": 33.0
+      },
+      "burst_success": true,
+      "movement_factor": 1,
+      "burst_threshold": 3.6,
+      "skip_outlet_pass": false,
+      "outlet_passer_id": "home_c",
+      "outlet_receiver_id": "home_pg",
+      "receiver_to": {
+        "x": 47.0,
+        "y": 15.0
+      },
+      "outlet_defender_id": "away_pg",
+      "outlet_defender_to": {
+        "x": 37.0,
+        "y": 26.0
+      },
+      "other_players": [
+        {
+          "player_id": "home_sg",
+          "to_x": 40.0,
+          "to_y": 26.0
+        },
+        {
+          "player_id": "home_pf",
+          "to_x": 34.0,
+          "to_y": 26.0
+        },
+        {
+          "player_id": "away_sg",
+          "to_x": 57.0,
+          "to_y": 25.0
+        },
+        {
+          "player_id": "away_sf",
+          "to_x": 57.0,
+          "to_y": 25.0
+        },
+        {
+          "player_id": "away_pf",
+          "to_x": 57.0,
+          "to_y": 25.0
+        },
+        {
+          "player_id": "away_c",
+          "to_x": 58.0,
+          "to_y": 25.0
+        }
+      ],
+      "is_away_offense": false
+    },
+    "ball_handler_id": "home_pg",
+    "rim_runner_id": "home_sf",
+    "ball_handler_outlet_x": 47.0,
+    "ball_handler_outlet_y": 15.0,
+    "ball_handler_move_x": 0,
+    "ball_handler_move_y": 0,
+    "is_away_offense": false,
+    "is_steal_entry": false,
+    "getback_player_ids": [
+      "away_pg"
+    ],
+    "shooter": {
+      "first_name": "Lancaster SF",
+      "last_name": "Player",
+      "name": "Lancaster SF Player",
+      "attributes": {
+        "SC": 5,
+        "SH": 5,
+        "ID": 8,
+        "OD": 3,
+        "PS": 8,
+        "BH": 9,
+        "RB": 1,
+        "AG": 4,
+        "ST": 9,
+        "ND": 3,
+        "IQ": 1,
+        "FT": 4,
+        "CH": 5,
+        "NG": 1.0,
+        "anchor_SC": 5,
+        "anchor_SH": 5,
+        "anchor_ID": 8,
+        "anchor_OD": 3,
+        "anchor_PS": 8,
+        "anchor_BH": 9,
+        "anchor_RB": 1,
+        "anchor_AG": 4,
+        "anchor_ST": 9,
+        "anchor_ND": 3,
+        "anchor_IQ": 1,
+        "anchor_FT": 4,
+        "anchor_CH": 5
+      },
+      "stats": {
+        "game": {}
+      },
+      "team": "Lancaster",
+      "height": 78,
+      "jersey": 0,
+      "player_id": "home_sf",
+      "coords": {
+        "x": 69.0,
+        "y": 33.0
+      }
+    },
+    "passer": {
+      "first_name": "Lancaster PG",
+      "last_name": "Player",
+      "name": "Lancaster PG Player",
+      "attributes": {
+        "SC": 5,
+        "SH": 5,
+        "ID": 8,
+        "OD": 3,
+        "PS": 8,
+        "BH": 9,
+        "RB": 1,
+        "AG": 4,
+        "ST": 9,
+        "ND": 3,
+        "IQ": 1,
+        "FT": 4,
+        "CH": 5,
+        "NG": 1.0,
+        "anchor_SC": 5,
+        "anchor_SH": 5,
+        "anchor_ID": 8,
+        "anchor_OD": 3,
+        "anchor_PS": 8,
+        "anchor_BH": 9,
+        "anchor_RB": 1,
+        "anchor_AG": 4,
+        "anchor_ST": 9,
+        "anchor_ND": 3,
+        "anchor_IQ": 1,
+        "anchor_FT": 4,
+        "anchor_CH": 5
+      },
+      "stats": {
+        "game": {}
+      },
+      "team": "Lancaster",
+      "height": 78,
+      "jersey": 0,
+      "player_id": "home_pg",
+      "coords": {
+        "x": 47.0,
+        "y": 15.0
+      }
+    },
+    "defender": {
+      "first_name": "Bentley-Truman PG",
+      "last_name": "Player",
+      "name": "Bentley-Truman PG Player",
+      "attributes": {
+        "SC": 5,
+        "SH": 5,
+        "ID": 8,
+        "OD": 55,
+        "PS": 8,
+        "BH": 9,
+        "RB": 1,
+        "AG": 55,
+        "ST": 9,
+        "ND": 3,
+        "IQ": 55,
+        "FT": 4,
+        "CH": 5,
+        "NG": 1.0,
+        "anchor_SC": 5,
+        "anchor_SH": 5,
+        "anchor_ID": 8,
+        "anchor_OD": 3,
+        "anchor_PS": 8,
+        "anchor_BH": 9,
+        "anchor_RB": 1,
+        "anchor_AG": 4,
+        "anchor_ST": 9,
+        "anchor_ND": 3,
+        "anchor_IQ": 1,
+        "anchor_FT": 4,
+        "anchor_CH": 5
+      },
+      "stats": {
+        "game": {}
+      },
+      "team": "Bentley-Truman",
+      "height": 78,
+      "jersey": 0,
+      "player_id": "away_pg",
+      "coords": {
+        "x": 55,
+        "y": 22
+      }
+    },
+    "defender_count": 1
+  },
+  "fast_break": true,
+  "fast_break_play": "rim_runner",
+  "time_elapsed": 1
+}

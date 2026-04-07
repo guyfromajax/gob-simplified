@@ -1,4 +1,4 @@
-stat## Mode Initialization System ✅ **COMPLETE** (January 2025)
+## Mode Initialization System ✅ **COMPLETE** (January 2025)
 
 **Base Constants**
 
@@ -167,6 +167,7 @@ Ranges will be determined by each team's seed
   - Set Play Inside: Evenly distributed across all inside set plays
   - Set Play Attack: Evenly distributed across all attack set plays
   - Set Play Outside: Evenly distributed across all outside set plays
+  - Fast Break: Seeded to `covert_release = 50`, `rim_runner = 50`, `full_team = 0`
   - Zone Defense: Evenly distributed across all zone defenses ("2-3 Zone", "3-2 Zone", "1-3-1 Zone")
   - Man Defense: "Man" = 100% (only one man defense exists)
 - **Slot Assignments:** Empty (no plays assigned to priority slots 1-6)
@@ -180,6 +181,50 @@ Ranges will be determined by each team's seed
 - Position filters store `play_id` (ObjectId strings) for each play
 - Play names are mapped to `play_id` by querying the universal `plays` collection
 - If a play name is not found in the database, a warning is logged and the play is skipped
+
+### Strategy Settings (Game Plan)
+
+`strategy_settings` holds the numeric sliders from the Game Plan screen (typically **0–4**, with **2 = Normal**). They are persisted on the mode document per team (Franchise FTD, Tournament team blob, or loaded into memory for Single Game).
+
+**Canonical defaults (API / backfill helper):** `BackEnd/api/gameplan_routes.py` — `get_default_settings()` returns all listed keys at **2**, except it does **not** include `tempo` in that dict (Game Plan API treats tempo as per-game in places; see code comments there). Franchise and Tournament **do** store `tempo` on init (see below).
+
+**Franchise Mode (new instance / FTD seed):**
+
+- **Location:** `BackEnd/models/franchise_manager.py` — `initialize_season()` builds each team’s `franchise_team_data` entry.
+- **Initialization:** Every team gets the **same fixed** `strategy_settings` object — **all keys below are set to `2`**:
+
+| Key | Init value | Role (summary) |
+|-----|------------|----------------|
+| `offense` | 2 | Motion vs set-play mix |
+| `inside` | 2 | Inside focus |
+| `attack` | 2 | Attack focus |
+| `outside` | 2 | Outside focus |
+| `fast_breaks` | 2 | Fast-break defense / release tendency |
+| `tempo` | 2 | Tempo preference (stored for all teams) |
+| `defense` | 2 | Man vs zone mix |
+| `aggression` | 2 | Defensive aggression |
+| `hc_trap` | 2 | Half-court trap usage |
+| `fc_press` | 2 | Full-court press usage |
+| `rebounding` | 2 | Offensive rebounding (crash vs get back) |
+
+**Tournament Mode (new instance):**
+
+- **Location:** `BackEnd/tournament/tournament_manager.py` — `create_tournament()` builds each of the **8** teams’ embedded objects.
+- **Initialization:** Same pattern as Franchise — **all keys in the table above are set to `2`** for every team. (No weighted randomization at tournament creation.)
+
+**Single Game Mode:**
+
+- **Location:** `BackEnd/models/team_manager.py` — `TeamManager._init_strategy_settings()`.
+- **Initialization:** **Weighted random** per key (not all 2). Summary:
+  - **`offense`**, **`fast_breaks`**, **`defense`**: 5% / 15% / **60%** / 15% / 5% for values 0–4 (emphasis on 2).
+  - **`inside`**, **`attack`**, **`outside`**: uniform **1–4** (never 0).
+  - **`aggression`**: 10% / 20% / **40%** / 20% / 10% for 0–4.
+  - **`hc_trap`**, **`fc_press`**: shared draw — 34% / 40% / 20% / 5% / 1% for 0–4.
+  - **`rebounding`**: 5% / 10% / 15% / **30%** / **40%** for 0–4.
+  - **`tempo`**: `TeamManager.init_tempo_random()` (not fixed at 2).
+  - **`play_calling`**: weighted like offense/fast_breaks/defense — present in this default dict for Single Game CPU path; **Franchise and Tournament FTD/tournament seeds do not** set `play_calling` at instance init (only what’s in their explicit `strategy_settings` blobs).
+
+When a team is constructed with a **non-empty** `strategy_settings` dict from the DB (Franchise/Tournament), `TeamManager.__init__` merges it with `_init_strategy_settings()` defaults so any missing keys are filled.
 
 ### Data Persistence
 
@@ -203,7 +248,10 @@ Ranges will be determined by each team's seed
 - `BackEnd/api/api.py` - `init_game()` (lines 2099-2142) - Single Game mode initialization
 - `BackEnd/tournament/tournament_manager.py` - `create_tournament()` (lines 32-86) - Tournament mode initialization
 - `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-210) - Franchise mode initialization
-- `BackEnd/api/gameplan_routes.py` - `initialize_playbook_settings()` (lines 206-378) - Playbook settings initialization
+- `BackEnd/api/gameplan_routes.py` - `initialize_playbook_settings()` (lines 206-378) - Playbook settings initialization; `get_default_settings()` - default strategy keys for API/merges
+- `BackEnd/models/franchise_manager.py` - FTD `strategy_settings` (all keys at 2) on `initialize_season()`
+- `BackEnd/tournament/tournament_manager.py` - per-team `strategy_settings` (all keys at 2) on `create_tournament()`
+- `BackEnd/models/team_manager.py` - `_init_strategy_settings()` - Single Game weighted defaults; merge behavior when DB provides partial settings
 
 **Franchise Mode New Season Schedule Logic**
 At the start of any new season in Franchise mode we will build team schedules for all 128 teams with teh following logic:

@@ -1767,7 +1767,8 @@
       flex: 1;
       display: flex;
       align-items: center;
-      padding: 18px 32px 18px 24px;
+      position: relative;
+      padding: 18px 32px 42px 24px;
     }
     .ann-event-text {
       font-family: 'Barlow Condensed', sans-serif;
@@ -1783,6 +1784,36 @@
     }
     .ann-event-text .ann-accent {
       color: #F79420;
+    }
+    .ann-decision-pill {
+      position: absolute;
+      right: 14px;
+      bottom: 8px;
+      width: 160px;
+      height: 32px;
+      border-radius: 20px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-sizing: border-box;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid #c0c6cf;
+      color: #c0c6cf;
+    }
+    .ann-decision-pill.good {
+      color: #c0c6cf;
+      border-color: #c0c6cf;
+      background: linear-gradient(135deg, #8f6b16 0%, #c89b2a 45%, #e1bc5a 100%);
+    }
+    .ann-decision-pill.bad {
+      color: #c0c6cf;
+      border-color: #c0c6cf;
+      background: #a32020;
     }
     .ann-foul-event-zone {
       flex: 1;
@@ -2566,6 +2597,7 @@
           </div>
           <div class="ann-event-zone">
             <span class="ann-event-text"></span>
+            <span class="ann-decision-pill"></span>
           </div>
         </div>
         <div class="ann-card foul-card" style="display:none;">
@@ -3541,7 +3573,7 @@
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
       const DEFENSE_SCHEMES = ['Man Normal', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
       let currentDefenseIndex = 0;
-      let userHasSetDefenseOverride = false;
+      let selectedDefenseScheme = null; // Explicit user-selected defense scheme, if any
       
       // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
@@ -3679,8 +3711,9 @@
         if (el) el.textContent = DEFENSE_SCHEMES[currentDefenseIndex];
         const defenseCard = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
         if (defenseCard) {
-          if (userHasSetDefenseOverride) defenseCard.classList.add('selected');
-          else defenseCard.classList.remove('selected');
+          const shownScheme = DEFENSE_SCHEMES[currentDefenseIndex];
+          const shouldHighlight = selectedDefenseScheme != null && shownScheme === selectedDefenseScheme;
+          defenseCard.classList.toggle('selected', shouldHighlight);
         }
       }
 
@@ -3767,14 +3800,14 @@
       if (defenseCardEl) {
         defenseCardEl.addEventListener('click', async () => {
           playSound('confirm-2.mp3');
-          userHasSetDefenseOverride = true;
+          selectedDefenseScheme = DEFENSE_SCHEMES[currentDefenseIndex];
           updateDefenseCardDisplay();
           await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
         });
       }
       document.getElementById('clear-defense-card-x')?.addEventListener('click', async () => {
         playSound('x-back.mp3');
-        userHasSetDefenseOverride = false;
+        selectedDefenseScheme = null;
         currentDefenseIndex = 0;
         updateDefenseCardDisplay();
         await setPlaycallOverride('defense', null);
@@ -3795,7 +3828,7 @@
       window.clearPlaycallOverrides = function() {
         playOptions.forEach(opt => opt.classList.remove('selected'));
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
-        userHasSetDefenseOverride = false;
+        selectedDefenseScheme = null;
         currentDefenseIndex = 0;
         updateDefenseCardDisplay();
         console.log('📋 Override selections cleared');
@@ -4290,6 +4323,7 @@
         } else {
           foulCard.style.display = 'none';
           standardCard.style.display = 'flex';
+          var decisionPill = standardCard.querySelector('.ann-decision-pill');
           var hasPlayer = (data.photoUrl && data.photoUrl.length) || (data.lastName && data.lastName.length);
           if (hasPlayer) {
             standardCard.classList.remove('no-player');
@@ -4303,6 +4337,19 @@
           var hasExclaim = raw.endsWith('!');
           var base = hasExclaim ? raw.slice(0, -1) : raw;
           standardCard.querySelector('.ann-event-text').innerHTML = hasExclaim ? base + '<span class="ann-accent">!</span>' : base;
+          var decisionText = (data.decisionPillText || '').trim();
+          var decisionTone = data.decisionPillTone === 'bad' ? 'bad' : (data.decisionPillTone === 'good' ? 'good' : '');
+          if (decisionPill) {
+            decisionPill.classList.remove('good', 'bad');
+            if (decisionText && decisionTone) {
+              decisionPill.textContent = decisionText;
+              decisionPill.classList.add(decisionTone);
+              decisionPill.style.display = 'flex';
+            } else {
+              decisionPill.textContent = '';
+              decisionPill.style.display = 'none';
+            }
+          }
           void standardCard.offsetWidth;
         }
         overlay.classList.remove('hidden');

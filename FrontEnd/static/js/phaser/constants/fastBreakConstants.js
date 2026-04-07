@@ -6,6 +6,23 @@
  * 
  * All coordinates are in HOME orientation (basket at x=91 for home, x=9 for away).
  */
+import { CLAMP_BOUNDS } from "../animation/courtClamp.js";
+
+/**
+ * When false, skips the **"Fast Break!"** entry banners (turn start / FAST_BREAK context).
+ * Makes, misses, rebounds, fouls, "Fast Break Score!", "Great Stop!", etc. are unchanged.
+ * Runtime override:
+ *   window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = false // disable
+ *   window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = true  // enable
+ */
+export const ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS = true;
+
+export function isFastBreakEntryAnnouncementsEnabled() {
+  if (typeof window !== "undefined" && typeof window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS !== "undefined") {
+    return Boolean(window.ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS);
+  }
+  return ENABLE_FAST_BREAK_ENTRY_ANNOUNCEMENTS;
+}
 
 // Ball Handler Movement (Defensive Stop / Shot Attempt)
 export const BALL_HANDLER_MOVE_X_MIN = 5;
@@ -16,8 +33,44 @@ export const BALL_HANDLER_MOVE_Y_RANGE = 3; // ±3 y-coords
 export const STOPPER_OFFSET_MIN = 1;
 export const STOPPER_OFFSET_MAX = 3;
 
-// Defender Positioning (Shot Attempt)
-export const DEFENDER_X_OFFSET = 6; // Defender positioned 6 x-coords behind ball handler
+/** FB shot contest: two x-spots behind shooter relative to offense basket, ±Y — matches Python. */
+export const SHOT_DEFENDER_X_OFFSET = 2;
+export const SHOT_DEFENDER_Y_RANGE = 2;
+export const SECONDARY_SHOT_DEFENDER_Y_OFFSET = 3;
+
+/**
+ * @param {number} bhX shooter final grid x (HOME)
+ * @param {number} bhY shooter final grid y
+ * @param {boolean} isHomeOffense
+ */
+export function fastBreakShotDefenderGridVsShooter(bhX, bhY, isHomeOffense) {
+  const xDelta = isHomeOffense ? -SHOT_DEFENDER_X_OFFSET : SHOT_DEFENDER_X_OFFSET;
+  let x = bhX + xDelta;
+  x = Math.max(CLAMP_BOUNDS.minX, Math.min(CLAMP_BOUNDS.maxX, x));
+  const yOff =
+    -SHOT_DEFENDER_Y_RANGE +
+    Math.floor(Math.random() * (2 * SHOT_DEFENDER_Y_RANGE + 1));
+  let y = Math.max(CLAMP_BOUNDS.minY, Math.min(CLAMP_BOUNDS.maxY, bhY + yOff));
+  return { x, y };
+}
+
+/**
+ * @param {number} primaryX primary defender grid x
+ * @param {number} primaryY primary defender grid y
+ * @param {number} sourceY secondary defender current grid y
+ */
+export function fastBreakSecondaryShotDefenderGrid(primaryX, primaryY, sourceY) {
+  const x = Math.max(CLAMP_BOUNDS.minX, Math.min(CLAMP_BOUNDS.maxX, primaryX));
+  const yDelta =
+    sourceY > primaryY
+      ? SECONDARY_SHOT_DEFENDER_Y_OFFSET
+      : -SECONDARY_SHOT_DEFENDER_Y_OFFSET;
+  const y = Math.max(CLAMP_BOUNDS.minY, Math.min(CLAMP_BOUNDS.maxY, primaryY + yDelta));
+  return { x, y };
+}
+
+/** @deprecated Use fastBreakShotDefenderGridVsShooter — kept for any external imports */
+export const DEFENDER_X_OFFSET = 6;
 
 // Rebounder Positioning
 export const REBOUNDER_X_MIN = 40;

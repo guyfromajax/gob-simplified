@@ -1,7 +1,9 @@
 import pytest
+from unittest.mock import patch
 from fastapi import HTTPException
 from tests.test_utils import build_mock_game
 from BackEnd.engine.phase_resolution import resolve_free_throw_logic
+import BackEnd.engine.phase_resolution as phase_resolution_module
 from BackEnd.models.animator import Animator
 
 
@@ -109,7 +111,7 @@ def test_and_one_miss_results_in_rebound(monkeypatch):
     shooter.attributes["CH"] = 1
     shooter.attributes["MO"] = 0
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 100 if a == 1 and b == 100 else 1)
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 0.0)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
     result = resolve_free_throw_logic(game)
     assert result["possession_flips"] is True
@@ -131,7 +133,7 @@ def test_one_and_one_miss_ends_possession(monkeypatch):
     shooter.attributes["CH"] = 1
     shooter.attributes["MO"] = 0
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 100 if a == 1 and b == 100 else 1)
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 0.0)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
     result = resolve_free_throw_logic(game)
     assert result["possession_flips"] is True
@@ -146,3 +148,29 @@ def test_technical_free_throw_retains_possession():
     assert result["possession_flips"] is False
     game.turn_manager.update_clock_and_possession(result)
     assert game.offense_team == game.home_team
+
+
+def test_missed_final_ft_dreb_no_fast_break_while_flag_disabled(monkeypatch):
+    """TEMP: _FT_MISS_DREB_FAST_BREAK_ENABLED False → DREB after last FT miss sets HCO, not FAST_BREAK."""
+    assert phase_resolution_module._FT_MISS_DREB_FAST_BREAK_ENABLED is False
+    game, shooter = _setup_game(one_and_one=False)
+    shooter.attributes["FT"] = 1
+    shooter.attributes["CH"] = 1
+    shooter.attributes["MO"] = 0
+    dreb_c = game.defense_team.lineup["C"]
+
+    def fake_determine_rebounder(g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+        return dreb_c, game.defense_team, "DREB"
+
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.random.randint",
+        lambda a, b: 100 if (a, b) == (1, 100) else 1,
+    )
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.determine_rebounder", fake_determine_rebounder)
+    with patch.object(Animator, "capture_free_throw_animation", return_value=[]):
+        result = resolve_free_throw_logic(game)
+
+    assert result.get("rebound_type") == "DREB"
+    assert result.get("next_play_type") == "HCO"
+    assert game.game_state["offensive_state"] == "HCO"

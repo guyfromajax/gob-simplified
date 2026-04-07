@@ -1,6 +1,9 @@
 import math
 import random
 import logging
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple
+
 from BackEnd.constants import (
     TURNOVER_CALC_DICT,
     POSITION_LIST,
@@ -123,15 +126,20 @@ def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_sco
     penalty = help_score * 0.15
     return shot_score - penalty, help_defender, penalty
 
-def get_fast_break_chance(game):
+# 0–4 strategy sliders → P(initiate fast break) for DREB (fast_breaks) and steals (aggression).
+SLIDER_TO_FAST_BREAK_PROB = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
+
+
+def fast_break_probability_from_slider(level: int) -> float:
     """
-    Determine fast break probability based on the OFFENSIVE team's aggression setting.
-    Called after defensive rebounds or steals when the team is now on offense.
+    Map a 0–4 Game Plan slider to P(one-shot fast break initiation).
+    Used for: DREB path (rebounding team's fast_breaks) and steal path (stealing team's aggression).
     """
-    game_state = game.game_state
-    off_team = game.offense_team  # Team that just got the rebound/steal (now on offense)
-    level = off_team.strategy_settings.get("aggression", 2)
-    return [0.0, 0.25, 0.5, 0.75, 1.0][level]
+    try:
+        lv = int(level)
+    except (TypeError, ValueError):
+        lv = 2
+    return SLIDER_TO_FAST_BREAK_PROB.get(lv, 0.5)
 
 def get_time_elapsed(tempo_call):
     from BackEnd.constants import TEMPO_PARAMS
@@ -466,6 +474,10 @@ def resolve_offensive_rebound(game, rebounder):
 
     Returns an event dictionary describing the outcome.
     """
+    from BackEnd.utils.position_snapshot_ledger import (
+        build_oreb_kickout_snapshot,
+        build_oreb_putback_attempt_snapshot,
+    )
 
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -480,6 +492,7 @@ def resolve_offensive_rebound(game, rebounder):
         }
 
     if random.random() < 0.90:  # 90% putback attempt, 10% kickout
+        oreb_putback_snap = build_oreb_putback_attempt_snapshot(game, off_lineup, def_lineup)
         attrs = rebounder.attributes
         # ✅ NEW: Use dedicated OREB shot attempt function
         shot_score = oreb_shot_attempt(attrs)
@@ -513,6 +526,7 @@ def resolve_offensive_rebound(game, rebounder):
             "timeElapsed": time_elapsed,
             "result": "MAKE" if made else "MISS",
             "possession_flips": False,
+            "position_snapshots": [oreb_putback_snap],
         }
 
         if made:
@@ -582,6 +596,8 @@ def resolve_offensive_rebound(game, rebounder):
     from_coords = getattr(rebounder, "coords", {"x": 25, "y": 50})
     to_coords = getattr(pg, "coords", {"x": 25, "y": 50}) if pg else {"x": 25, "y": 50}
 
+    oreb_kick_snap = build_oreb_kickout_snapshot(game, off_lineup, def_lineup)
+
     return {
         "event_type": "KICKOUT_RESET",
         "rebounderId": getattr(rebounder, "player_id", None),
@@ -592,6 +608,7 @@ def resolve_offensive_rebound(game, rebounder):
             "duration": duration,
         },
         "timeElapsed": duration,
+        "position_snapshots": [oreb_kick_snap],
     }
 
 def calculate_screen_score(screen_attrs):
@@ -1672,6 +1689,7 @@ def summarize_game_state(game, exclude_animations=True):
         "shot_clock_remaining": game.game_state.get("shot_clock_remaining", min(30, game.game_state.get("time_remaining", 480))),
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence
         "man_defense_matchups_computer": game.game_state.get("man_defense_matchups_computer", {}),  # Computer team matchups (default if missing)
+        "rim_runner_by_team_id": game.game_state.get("rim_runner_by_team_id") or {},
         "computer_timeouts": serialize_computer_timeouts(game.game_state.get("computer_timeouts")),  # ✅ COMPUTER TIMEOUT: Per-quarter count + checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
         
         # Top-level team IDs for team lookup (required for accessing teams object)
@@ -1803,13 +1821,246 @@ def getAwayTeamCoords(coordsDict):
            coordsDict[position] = {"x": xSpot, "y": ySpot}
        return coordsDict
 
-def update_player_coords_from_animations(game, animations):
+
+ANIMATION_CLAMP_BOUNDS: Dict[str, float] = {
+    "min_x": 5.0,
+    "max_x": 95.0,
+    "min_y": 2.0,
+    "max_y": 49.0,
+}
+
+ANIMATION_CLAMP_EXEMPT_RESULT_TYPES = frozenset({
+    "SIDE_INBOUND",
+    "BASELINE_INBOUND",
+    "TIMEOUT",
+})
+
+
+def is_animation_clamp_exempt(result_type: Optional[str], context: Optional[Dict[str, Any]] = None) -> bool:
+    """Return True when a turn payload should skip backend animation coordinate clamping."""
+    if isinstance(context, dict) and context.get("force_exempt") is True:
+        return True
+    return result_type in ANIMATION_CLAMP_EXEMPT_RESULT_TYPES
+
+
+def _clamp_animation_coord_value(value: Any, lower: float, upper: float) -> Any:
+    if not isinstance(value, (int, float)) or not math.isfinite(value):
+        return value
+    return min(upper, max(lower, float(value)))
+
+
+def clamp_animation_grid_coords(
+    coords: Optional[Dict[str, Any]],
+    result_type: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Clamp one grid coordinate pair to canonical animation bounds."""
+    if not isinstance(coords, dict):
+        return coords
+    if is_animation_clamp_exempt(result_type, context):
+        return dict(coords)
+    return {
+        **coords,
+        "x": _clamp_animation_coord_value(coords.get("x"), ANIMATION_CLAMP_BOUNDS["min_x"], ANIMATION_CLAMP_BOUNDS["max_x"]),
+        "y": _clamp_animation_coord_value(coords.get("y"), ANIMATION_CLAMP_BOUNDS["min_y"], ANIMATION_CLAMP_BOUNDS["max_y"]),
+    }
+
+
+def _sanitize_animation_rows(rows: Any, result_type: Optional[str]) -> Any:
+    if not isinstance(rows, list):
+        return rows
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        end = row.get("end")
+        if isinstance(end, dict):
+            row["end"] = clamp_animation_grid_coords(end, result_type)
+        movement = row.get("movement")
+        if isinstance(movement, list):
+            for step in movement:
+                if not isinstance(step, dict):
+                    continue
+                coords = step.get("coords")
+                if isinstance(coords, dict):
+                    step["coords"] = clamp_animation_grid_coords(coords, result_type)
+    return rows
+
+
+def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+    """
+    Return a sanitized copy of a turn payload where animation-facing coordinates are clamped.
+
+    Clamp policy:
+      - x: 9..91
+      - y: 2..49
+    Exempt result types:
+      - SIDE_INBOUND
+      - BASELINE_INBOUND
+      - TIMEOUT
+    """
+    if not isinstance(turn, dict):
+        return turn
+
+    payload = deepcopy(turn)
+    result_type = payload.get("result_type")
+
+    if result_type == "BATCH" and isinstance(payload.get("batch_turns"), list):
+        payload["batch_turns"] = [
+            sanitize_turn_animation_payload(t, context=context) if isinstance(t, dict) else t
+            for t in payload["batch_turns"]
+        ]
+        return payload
+
+    for key in ("oDestinations", "dDestinations", "offense_getback_coords", "defense_release_coords"):
+        block = payload.get(key)
+        if not isinstance(block, dict):
+            continue
+        payload[key] = {
+            k: clamp_animation_grid_coords(v, result_type, context=context) if isinstance(v, dict) else v
+            for k, v in block.items()
+        }
+
+    # Player-only clamp policy: leave ball payload coordinates untouched.
+    # Ball motion/spot fields are consumed by dedicated ball animation logic.
+
+    payload["animations"] = _sanitize_animation_rows(payload.get("animations"), result_type)
+
+    final_turn_meta = payload.get("final_turn_meta")
+    if isinstance(final_turn_meta, dict):
+        coords_by_step = final_turn_meta.get("ball_handler_coords_by_step")
+        if isinstance(coords_by_step, list):
+            final_turn_meta["ball_handler_coords_by_step"] = [
+                clamp_animation_grid_coords(c, result_type, context=context) if isinstance(c, dict) else c
+                for c in coords_by_step
+            ]
+
+    return payload
+
+
+# Turn payload keys: player_id -> {x, y} in HOME grid. Later keys override earlier for same id.
+TURN_COORDS_OVERLAY_KEYS: Tuple[str, ...] = (
+    "defense_release_coords",
+    "offense_getback_coords",
+)
+
+
+def _norm_player_id(pid: Any) -> Optional[str]:
+    if pid is None:
+        return None
+    return str(pid)
+
+
+def _final_xy_from_animation_row(anim: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    """Resolve final grid position from one animation row (matches FE last-step / end usage)."""
+    if not isinstance(anim, dict):
+        return None
+    end = anim.get("end")
+    if isinstance(end, dict):
+        x, y = end.get("x"), end.get("y")
+        if x is not None and y is not None:
+            return {"x": float(x), "y": float(y)}
+    movement = anim.get("movement") or []
+    for step in reversed(movement):
+        if not isinstance(step, dict):
+            continue
+        coords = step.get("coords")
+        if isinstance(coords, dict):
+            x, y = coords.get("x"), coords.get("y")
+            if x is not None and y is not None:
+                return {"x": float(x), "y": float(y)}
+        x, y = step.get("x"), step.get("y")
+        if x is not None and y is not None:
+            return {"x": float(x), "y": float(y)}
+    return None
+
+
+def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]) -> None:
+    """
+    Apply final positions from an animation list to matching lineup players only.
+    Used mid-resolution (e.g. before resolve_shot) and inside sync_lineup_coords_from_turn.
+    """
+    if not animations:
+        return
     for anim in animations:
-        pid = anim["playerId"]
-        for team in [game.home_team, game.away_team]:
-            for player in team.lineup.values():
-                if player is not None and hasattr(player, 'player_id') and player.player_id == pid:
-                    player.coords = anim["end"]
+        if not isinstance(anim, dict):
+            continue
+        pid = anim.get("playerId")
+        if pid is None:
+            continue
+        final = _final_xy_from_animation_row(anim)
+        if final is None:
+            continue
+        ns = _norm_player_id(pid)
+        if not ns:
+            continue
+        for team in (game.home_team, game.away_team):
+            for player in (team.lineup or {}).values():
+                if player is None:
+                    continue
+                if _norm_player_id(getattr(player, "player_id", None)) == ns:
+                    player.coords = dict(final)
+                    break
+
+
+def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None:
+    """
+    After a turn is finalized, align all ten active players' ``Player.coords`` with the
+    same spatial data the frontend uses: carry-forward, then animation finals, then
+    explicit overlay maps on the turn (get-back / release).
+    """
+    if game is None or not isinstance(turn_result, dict):
+        return
+
+    positions: Dict[str, Dict[str, float]] = {}
+    for team in (game.home_team, game.away_team):
+        for player in (team.lineup or {}).values():
+            if player is None or getattr(player, "player_id", None) is None:
+                continue
+            pid = _norm_player_id(player.player_id)
+            if not pid:
+                continue
+            c = getattr(player, "coords", None) or {}
+            if isinstance(c, dict) and c.get("x") is not None and c.get("y") is not None:
+                positions[pid] = {"x": float(c["x"]), "y": float(c["y"])}
+            else:
+                positions[pid] = {"x": 50.0, "y": 25.0}
+
+    animations = turn_result.get("animations")
+    if isinstance(animations, list):
+        for anim in animations:
+            if not isinstance(anim, dict):
+                continue
+            pid = anim.get("playerId")
+            if pid is None:
+                continue
+            final = _final_xy_from_animation_row(anim)
+            if final is None:
+                continue
+            ns = _norm_player_id(pid)
+            if ns:
+                positions[ns] = dict(final)
+
+    for key in TURN_COORDS_OVERLAY_KEYS:
+        block = turn_result.get(key)
+        if not isinstance(block, dict):
+            continue
+        for pid, coords in block.items():
+            if not isinstance(coords, dict):
+                continue
+            if coords.get("x") is None or coords.get("y") is None:
+                continue
+            ns = _norm_player_id(pid)
+            if ns:
+                positions[ns] = {"x": float(coords["x"]), "y": float(coords["y"])}
+
+    for team in (game.home_team, game.away_team):
+        for player in (team.lineup or {}).values():
+            if player is None or getattr(player, "player_id", None) is None:
+                continue
+            pid = _norm_player_id(player.player_id)
+            if pid and pid in positions:
+                player.coords = dict(positions[pid])
+
 
 def serialize_lineup(lineup_dict):
     return {

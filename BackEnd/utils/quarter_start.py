@@ -168,6 +168,22 @@ def create_quarter_start_inbound(game):
         "possession_team_id": offense_team.team_id,
         "quarter": game.quarter,
     }
-    
+
+    from BackEnd.utils.position_snapshot_ledger import (
+        attach_position_snapshots,
+        build_inbound_destinations_snapshot,
+    )
+
+    qs_snap = build_inbound_destinations_snapshot(
+        game,
+        offense_team.lineup,
+        defense_team.lineup,
+        o_dest,
+        d_dest,
+        "BASELINE_INBOUND",
+        "quarter_start_bip",
+    )
+    attach_position_snapshots(turn_result, [qs_snap])
+
     return turn_result
 

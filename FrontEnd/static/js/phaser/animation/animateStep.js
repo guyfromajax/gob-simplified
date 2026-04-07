@@ -1,4 +1,5 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { clampGridCoords } from "./courtClamp.js";
 
 /**
  * Animates a single step of a player's movement.
@@ -106,17 +107,13 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     }, timeoutMs);
     // Use nextStep.coords if available (for movement target), otherwise step.coords
     const targetStep = nextStep || step;
-    const isInboundSpot = targetStep.coords.x <= 5 || targetStep.coords.x >= 95;
-    const shouldClampXToRims =
-      !isInboundSpot &&
-      turnData?.result_type !== "SIDE_INBOUND" &&
-      turnData?.result_type !== "BASELINE_INBOUND";
-    const targetGridX = shouldClampXToRims
-      ? Math.max(9, Math.min(91, targetStep.coords.x))
-      : targetStep.coords.x;
+    const targetGrid = clampGridCoords(targetStep.coords, turnData, {
+      action: targetStep.action ?? null,
+      playerId: sprite?.playerId ?? null,
+    });
     const { x: targetX, y: targetY } = gridToPixels(
-      targetGridX,
-      targetStep.coords.y,
+      targetGrid.x,
+      targetGrid.y,
       scene.game.config.width,
       scene.game.config.height
     );
@@ -533,7 +530,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       }
       
       // Log if we had to manually start it (especially for receive actions which are problematic)
-      if (!tweenStarted || step.action === 'receive' || step.action === 'guard_ball') {
+      if (!tweenStarted || step.action === 'receive') {
         console.warn('animateStep: Tween not playing after creation/play()', {
           playerId: sprite?.playerId,
           action: step.action,
@@ -555,9 +552,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       }
     }
     
-    // For receive/guard_ball actions specifically, add a safety check after a short delay
-    // These actions are prone to getting stuck, so we monitor them more closely
-    if (step.action === 'receive' || step.action === 'guard_ball') {
+    // Watchdog checks:
+    // - keep for receive steps
+    // - only enforce for guard_ball during strict DREB outlet window
+    const isDrebOutletStrictWindow =
+      step.action === "guard_ball" && scene?.__drebOutletWindowActive === true;
+    if (step.action === 'receive' || isDrebOutletStrictWindow) {
       let checkCount = 0;
       const maxChecks = 10; // Check 10 times over 1 second
       const checkInterval = scene.time.addEvent({
@@ -574,6 +574,37 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           const progress = tween?.progress || 0;
           
           if (!isPlaying && progress === 0 && checkCount >= 3) {
+            const tweenDestroyed =
+              !tween ||
+              tween.parent == null ||
+              tween._destroyed === true ||
+              tween.state === "DESTROYED";
+            if (isDrebOutletStrictWindow && tweenDestroyed) {
+              const error = new Error(
+                `animateStep: guard_ball tween destroyed during strict DREB outlet window (playerId=${sprite?.playerId || "?"})`
+              );
+              scene?.events?.emit?.("animTelemetry", {
+                event: "dreb_guard_ball_tween_failure",
+                branchKind: "dreb_hco_setup",
+                playerId: sprite?.playerId ?? null,
+                action: step.action,
+                stepIndex,
+                checkCount,
+                timestampMs: Date.now(),
+                reason: "tween_destroyed",
+              });
+              console.error(error.message, {
+                playerId: sprite?.playerId,
+                action: step.action,
+                checkCount,
+                stepIndex,
+              });
+              tweenCompleted = true;
+              clearTimeout(timeoutId);
+              checkInterval.destroy();
+              reject(error);
+              return;
+            }
             // Tween still not playing after 300ms, try to force it
             console.warn(`animateStep: ${step.action} tween still not playing after ${checkCount * 100}ms, forcing start`, {
               playerId: sprite?.playerId,
@@ -584,15 +615,41 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
             });
             
             // Try multiple methods to start the tween
-            if (typeof tween.play === 'function') {
+            if (!tweenDestroyed && typeof tween.play === 'function') {
               tween.play();
             }
-            if (typeof tween.restart === 'function') {
+            if (!tweenDestroyed && typeof tween.restart === 'function') {
               tween.restart();
             }
             
             // If still not playing after all attempts, resolve to prevent infinite wait
             if (checkCount >= maxChecks) {
+              if (isDrebOutletStrictWindow) {
+                const error = new Error(
+                  `animateStep: guard_ball tween failed to start in strict DREB outlet window (playerId=${sprite?.playerId || "?"})`
+                );
+                scene?.events?.emit?.("animTelemetry", {
+                  event: "dreb_guard_ball_tween_failure",
+                  branchKind: "dreb_hco_setup",
+                  playerId: sprite?.playerId ?? null,
+                  action: step.action,
+                  stepIndex,
+                  checkCount,
+                  timestampMs: Date.now(),
+                  reason: "failed_to_start",
+                });
+                console.error(error.message, {
+                  playerId: sprite?.playerId,
+                  action: step.action,
+                  checkCount,
+                  stepIndex,
+                });
+                tweenCompleted = true;
+                clearTimeout(timeoutId);
+                checkInterval.destroy();
+                reject(error);
+                return;
+              }
               console.error(`animateStep: ${step.action} tween failed to start after ${maxChecks * 100}ms, forcing resolve`, {
                 playerId: sprite?.playerId,
                 action: step.action

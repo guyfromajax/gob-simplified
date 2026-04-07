@@ -125,9 +125,14 @@ The stopper system truncates FCP/HCT "base" variant skeletons at strategic point
 **Clock start and inbound pass**
 - **Game and shot clocks** start only after the inbound receiver has the ball (same behavior as BIP→HCO and SIP).
 - The **inbound pass** runs during the BASELINE_INBOUND (BIP) step; the frontend runs the full inbound sequence (positions + pass) for FCP/HCT as well as HCO.
-- When the FCP/HCT turn directly follows a BIP, the backend now skips all leading skeleton steps where `SF.location == inbound_left`, then starts at the first step where SF is no longer at `inbound_left`. This prevents double inbound-pass sequences when variants contain additional inbound-left pass steps after step 0.
+- When the FCP/HCT turn directly follows a BIP, the backend now skips all leading inbound-equivalent skeleton steps (including both `inbound_left` and `inbound_right`), then starts at the first post-inbound step. This prevents double inbound-pass sequences when versions place inbound staging/pass in step 0 or step 1.
 - Fallback behavior is preserved: if no dynamic match is found, legacy start index logic still applies so turns continue safely.
 - Implemented in: `phase_resolution.py` (post-skeleton start-index selection in both FCP/HCT shot and non-shot paths), `turnAnimation.js` `runInboundSetup()` (inbound pass runs for FCP/HCT; no early return).
+
+**Canonical skeleton contract (authoring)**
+- BIP is the single owner of inbound-pass animation.
+- FCP/HCT skeletons should encode inbound as **step 0 only** (`SF pass` -> `PG receive` at inbound spot), and step 1+ should be post-receive press/trap flow.
+- Runtime now tolerates mixed legacy versions (step 0 hold + step 1 pass), but new versions should follow the canonical step-0 inbound format for consistency.
 
 **Long Form Documentation**
 

@@ -1,27 +1,1456 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenPlayerTo, runPass } from "./ballTween.js";
+import { tweenPlayerTo, runPass, detachBall, getBallDuration } from "./ballTween.js";
 import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
-import { runInboundSetup, getPlayerDuration } from "./turnAnimation.js";
+import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
+import { pauseTweensOfPlayerSprites } from "../utils/playerSpriteTweenPause.js";
+import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
-import {
+import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
+import { CLAMP_BOUNDS } from "./courtClamp.js";
+import * as fastBreakConstants from "../constants/fastBreakConstants.js";
+
+const {
   REBOUNDER_X_MIN,
   REBOUNDER_X_MAX,
   REBOUNDER_Y_RANGE,
   SHOT_ATTEMPT_REBOUNDER_Y_RANGE,
-  OUTLET_PASSER_MOVE_X,
   STEAL_ENTRY_MOVE_X_MIN,
   STEAL_ENTRY_MOVE_X_MAX,
   STEAL_ENTRY_MOVE_Y_RANGE,
   STEAL_ENTRY_Y_MIN,
   STEAL_ENTRY_Y_MAX,
-} from "../constants/fastBreakConstants.js";
+  fastBreakShotDefenderGridVsShooter,
+} = fastBreakConstants;
+const fastBreakSecondaryShotDefenderGrid =
+  fastBreakConstants.fastBreakSecondaryShotDefenderGrid ??
+  function fallbackFastBreakSecondaryShotDefenderGrid(primaryX, primaryY, sourceY) {
+    return {
+      x: Phaser.Math.Clamp(primaryX, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(
+        primaryY + (sourceY > primaryY ? 3 : -3),
+        GRID_MIN_Y,
+        GRID_MAX_Y,
+      ),
+    };
+  };
+
+
+const GRID_MIN_X = CLAMP_BOUNDS.minX;
+const GRID_MAX_X = CLAMP_BOUNDS.maxX;
+const GRID_MIN_Y = CLAMP_BOUNDS.minY;
+const GRID_MAX_Y = CLAMP_BOUNDS.maxY;
+
+/**
+ * Phase 2 resolution kind for fast break turns — mirrors Rim Runner payload contract
+ * (`docs/To Do/FB_Playcall_Update.md`, `tests/fixtures/rim_runner_contract/`).
+ *
+ * @param {object} turnData
+ * @param {{ isBlockingFoul: boolean }} opts
+ * @returns {'fast_break_shot'|'fast_break_shot_foul'|'rim_runner_steal'|'rim_runner_bat_oob'|'rim_runner_hco_settle'|'generic_fb_stop'}
+ */
+function classifyFastBreakPhase2(turnData, { isBlockingFoul }) {
+  const result = turnData.result_type;
+  if (result === "MAKE" || result === "MISS" || result === "BLOCK") {
+    return "fast_break_shot";
+  }
+  if (result === "CHARGE" || isBlockingFoul) {
+    return "fast_break_shot_foul";
+  }
+
+  const isRimRunnerSeq =
+    turnData.fast_break_play === "rim_runner" ||
+    turnData.roles?.rim_runner_sequence === true;
+
+  if (isRimRunnerSeq) {
+    if (turnData.rim_runner_interception && result === "STEAL") {
+      return "rim_runner_steal";
+    }
+    if (turnData.rim_runner_bat_oob && result === "DEAD BALL") {
+      return "rim_runner_bat_oob";
+    }
+    if (result === "DEFENSIVE_STOP" || turnData.rim_runner_outlet_failed) {
+      return "rim_runner_hco_settle";
+    }
+  }
+
+  return "generic_fb_stop";
+}
+
+function deriveFbBranchKind(turnData, phase2Kind) {
+  if (phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul") {
+    return turnData.fast_break_play === "rim_runner" || turnData.roles?.rim_runner_sequence
+      ? "rr_lane_shot"
+      : "generic_fb_shot_stop";
+  }
+  if (phase2Kind === "rim_runner_steal") return "rr_interception";
+  if (phase2Kind === "rim_runner_bat_oob") return "rr_bat_oob";
+  if (phase2Kind === "rim_runner_hco_settle") {
+    if (turnData.rim_runner_outlet_failed) return "rr_outlet_denied";
+    return "rr_hold_up";
+  }
+  return "generic_fb_shot_stop";
+}
+
+function initFbTelemetryContext(scene, { turnData, turnIndex, branchKind }) {
+  scene.__fbTelemetry = {
+    turnIndex,
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    resultType: turnData?.result_type ?? null,
+    branchKind,
+    offenseTeamId: turnData?.offense_team_id ?? scene?.offenseTeamId ?? null,
+    gameClock: scene?.simData?.clock ?? null,
+    quarter: turnData?.quarter ?? scene?.quarter ?? null,
+    counters: {
+      fbFallbackCount: 0,
+      fbRequiredRoleCount: 0,
+      fbClampCount: 0,
+      fbSnapCount: 0,
+    },
+  };
+}
+
+function getFbTelemetry(scene) {
+  return scene?.__fbTelemetry ?? null;
+}
+
+function getFbContractGlobalScope() {
+  return (
+    (typeof window !== "undefined" && window) ||
+    (typeof globalThis !== "undefined" && globalThis) ||
+    null
+  );
+}
+
+const FB_STRICT_DEFAULT_BRANCHES = [
+  "rr_lane_shot",
+  "rr_outlet_denied",
+  "rr_hold_up",
+  "generic_fb_shot_stop",
+];
+
+function isLocalDevFbContractDefault(scope) {
+  const host = scope?.location?.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+function resolveFbStrictContractMode() {
+  const scope = getFbContractGlobalScope();
+  const raw = scope?.FB_STRICT_CONTRACT;
+  if (raw === "throw") return "throw";
+  if (raw === "warn" || raw === true) return "warn";
+  if (raw === "off" || raw === false) return "off";
+  // Local default is strict throw-mode for fail-fast contract checks.
+  if (isLocalDevFbContractDefault(scope)) {
+    return "throw";
+  }
+  // Non-local debug sessions default to warnings.
+  if (scope?.DEBUG_FB_TELEMETRY === true || isAnimationDebugEnabled()) {
+    return "warn";
+  }
+  return "off";
+}
+
+function resolveFbStrictBranches() {
+  const defaults = FB_STRICT_DEFAULT_BRANCHES;
+  const scope = getFbContractGlobalScope();
+  const raw = scope?.FB_STRICT_BRANCHES;
+  if (Array.isArray(raw)) {
+    const cleaned = raw
+      .map((v) => (v == null ? "" : String(v).trim()))
+      .filter((v) => v.length > 0);
+    return cleaned.length ? new Set(cleaned) : new Set(defaults);
+  }
+  if (typeof raw === "string") {
+    const cleaned = raw
+      .split(",")
+      .map((v) => String(v).trim())
+      .filter((v) => v.length > 0);
+    return cleaned.length ? new Set(cleaned) : new Set(defaults);
+  }
+  return new Set(defaults);
+}
+
+function shouldEnforceFbContractForBranch(scene) {
+  const t = getFbTelemetry(scene);
+  const branch = t?.branchKind;
+  if (!branch) return false;
+  return resolveFbStrictBranches().has(branch);
+}
+
+function enforceFbContractGuardrail(scene, {
+  playerId,
+  role,
+  requiredEndpointType,
+  reason,
+} = {}) {
+  if (!shouldEnforceFbContractForBranch(scene)) return;
+  const mode = resolveFbStrictContractMode();
+  if (mode === "off") return;
+  const t = getFbTelemetry(scene);
+  const branch = t?.branchKind ?? "unknown_branch";
+  const msg =
+    `[FB contract] missing required endpoint in strict branch ` +
+    `(branch=${branch}, playerId=${playerId ?? "?"}, role=${role ?? "?"}, ` +
+    `required=${requiredEndpointType ?? "?"}, reason=${reason ?? "unknown"})`;
+  if (mode === "throw") {
+    throw new Error(msg);
+  }
+  console.warn(msg, {
+    branch,
+    playerId,
+    role,
+    requiredEndpointType,
+    reason,
+    turnIndex: t?.turnIndex ?? null,
+    turnId: t?.turnId ?? null,
+  });
+}
+
+function emitFbTelemetry(scene, event, payload = {}) {
+  const t = getFbTelemetry(scene);
+  if (!t) return;
+  const envelope = {
+    event,
+    turnIndex: t.turnIndex,
+    turnId: t.turnId,
+    resultType: t.resultType,
+    branchKind: t.branchKind,
+    offenseTeamId: t.offenseTeamId,
+    gameClock: t.gameClock,
+    quarter: t.quarter,
+    timestampMs: Date.now(),
+  };
+  const row = { ...envelope, ...payload };
+  scene.events?.emit?.("animTelemetry", row);
+  if (isAnimationDebugEnabled()) {
+    animationDebugLog("FB telemetry", row);
+  }
+}
+
+function startRebounderCatchMonitor({
+  scene,
+  rebounderTweens,
+  rebounderSprite,
+  ballGrid,
+  width,
+  height,
+}) {
+  if (!scene || !rebounderSprite || !Array.isArray(rebounderTweens) || rebounderTweens.length === 0) {
+    return () => {};
+  }
+  const scope = (typeof window !== "undefined" && window) || globalThis;
+  const maxMonitorMs = Math.max(
+    0,
+    Number(scope?.UESS_FB_REBOUND_MONITOR_MAX_MS ?? 450) || 450
+  );
+  const pollMs = Math.max(
+    10,
+    Number(scope?.UESS_FB_REBOUND_MONITOR_POLL_MS ?? 40) || 40
+  );
+  const startDelayMs = Math.max(
+    0,
+    Number(scope?.UESS_FB_REBOUND_MONITOR_START_DELAY_MS ?? 60) || 60
+  );
+  const ballBouncePx = gridToPixels(ballGrid.x, ballGrid.y, width, height);
+  const monitorStartMs = Date.now();
+  let monitoringActive = true;
+  let handle = null;
+  const stopAllRebounderTweens = () => {
+    rebounderTweens.forEach((tween) => {
+      if (tween && tween.isPlaying) {
+        tween.stop();
+      }
+    });
+  };
+  const schedule = (fn, ms) => {
+    if (scene.time?.delayedCall) {
+      handle = scene.time.delayedCall(ms, fn);
+    } else {
+      handle = setTimeout(fn, ms);
+    }
+  };
+  const clearScheduled = () => {
+    if (!handle) return;
+    if (scene.time?.delayedCall && typeof handle.remove === "function") {
+      handle.remove(false);
+    } else {
+      clearTimeout(handle);
+    }
+    handle = null;
+  };
+  const checkRebounderReached = () => {
+    if (!monitoringActive) return;
+    const elapsedMs = Date.now() - monitorStartMs;
+    if (elapsedMs >= maxMonitorMs) {
+      // Deterministic fallback: stop rebounder drifts so they cannot leak into next boundary.
+      stopAllRebounderTweens();
+      monitoringActive = false;
+      return;
+    }
+    const distanceToBall = Math.hypot(
+      rebounderSprite.x - ballBouncePx.x,
+      rebounderSprite.y - ballBouncePx.y
+    );
+    if (distanceToBall < 30) {
+      stopAllRebounderTweens();
+      monitoringActive = false;
+      return;
+    }
+    if (rebounderTweens.some((t) => t && t.isPlaying)) {
+      schedule(checkRebounderReached, pollMs);
+    } else {
+      monitoringActive = false;
+    }
+  };
+  schedule(checkRebounderReached, startDelayMs);
+  return () => {
+    monitoringActive = false;
+    clearScheduled();
+  };
+}
+
+function resolveFbUnitContractMode() {
+  const scope = getFbContractGlobalScope();
+  const raw = String(scope?.UESS_FB_CONTRACT_MODE ?? "observe")
+    .trim()
+    .toLowerCase();
+  if (raw === "off" || raw === "observe" || raw === "warn" || raw === "throw") return raw;
+  return "observe";
+}
+
+function getFbUnitBudgetGameSeconds(kind = "phase") {
+  const scope = getFbContractGlobalScope();
+  const rawLeadIn = Number(scope?.UESS_FB_LEAD_IN_MAX_GAME_SECONDS);
+  const rawPhase = Number(scope?.UESS_FB_PHASE_MAX_GAME_SECONDS);
+  const rawOut = Number(scope?.UESS_FB_OUT_MAX_GAME_SECONDS);
+  if (kind === "lead_in" && Number.isFinite(rawLeadIn) && rawLeadIn > 0) return rawLeadIn;
+  if (kind === "out" && Number.isFinite(rawOut) && rawOut > 0) return rawOut;
+  if (Number.isFinite(rawPhase) && rawPhase > 0) return rawPhase;
+  if (kind === "lead_in") return 4;
+  if (kind === "out") return 2;
+  return 6;
+}
+
+function enforceFbUnitContract({
+  scene,
+  turnData,
+  unitId,
+  advanceTrigger,
+  visualSettleTrigger,
+  authorizingEventReceived,
+  visualSettled,
+  unitStartMs,
+  budgetKind = "phase",
+  context = {},
+}) {
+  const mode = resolveFbUnitContractMode();
+  if (mode === "off") return;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+  const elapsedGameSeconds = elapsedMs / clockSecondMs;
+  const maxWaitGameSeconds = getFbUnitBudgetGameSeconds(budgetKind);
+  const overrun =
+    Number.isFinite(maxWaitGameSeconds) &&
+    maxWaitGameSeconds > 0 &&
+    elapsedGameSeconds > maxWaitGameSeconds;
+  const contractContext = {
+    unitId,
+    elapsedMs,
+    elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+    maxWaitGameSeconds,
+    overrun,
+    ...context,
+  };
+  if (overrun) {
+    emitFbTelemetry(scene, "fb_phase_clock_overrun", contractContext);
+  }
+  const logger =
+    mode === "observe"
+      ? {
+          warn: () => {},
+        }
+      : console;
+  enforceUnitCompletionContract({
+    contract: {
+      unit_id: unitId,
+      execution_mode: "dynamic_event",
+      advance_trigger: advanceTrigger,
+      visual_settle_trigger: visualSettleTrigger,
+      failure_policy: mode === "throw" ? "throw" : "warn",
+    },
+    observed: {
+      authorizingEventReceived: authorizingEventReceived === true,
+      visualSettled: visualSettled === true && !overrun,
+    },
+    context: contractContext,
+    emitTelemetry: (event, payload = {}) => emitFbTelemetry(scene, event, payload),
+    logger,
+  });
+  if (mode === "throw" && overrun) {
+    throw new Error(
+      `[FB contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+    );
+  }
+}
+
+function incrementFbCounter(scene, key, n = 1) {
+  const t = getFbTelemetry(scene);
+  if (!t) return;
+  if (!Object.prototype.hasOwnProperty.call(t.counters, key)) return;
+  t.counters[key] += Number(n) || 0;
+}
+
+function getPlayerAnimationRecord(turnData, playerId) {
+  const want = playerId != null ? String(playerId) : null;
+  if (!want || !Array.isArray(turnData?.animations)) return null;
+  return turnData.animations.find((a) => String(a?.playerId) === want) ?? null;
+}
+
+function reportMissingEndpoint(scene, turnData, {
+  playerId,
+  role,
+  requiredEndpointType = "animations_end",
+  hasRoleCoord = false,
+  reason = "missing_endpoint",
+} = {}) {
+  const rec = getPlayerAnimationRecord(turnData, playerId);
+  emitFbTelemetry(scene, "fb_contract_missing_endpoint", {
+    playerId,
+    role,
+    requiredEndpointType,
+    availableAuthority: {
+      hasAnimations: Array.isArray(turnData?.animations) && turnData.animations.length > 0,
+      hasPlayerAnimation: !!rec,
+      hasAnimEnd: !!(rec?.end && Number.isFinite(rec.end.x) && Number.isFinite(rec.end.y)),
+      hasRoleCoord,
+    },
+    reason,
+  });
+  enforceFbContractGuardrail(scene, {
+    playerId,
+    role,
+    requiredEndpointType,
+    reason,
+  });
+}
+
+function reportFallback(scene, {
+  playerId,
+  role,
+  fallbackPolicy,
+  missingAuthority = ["animations_end"],
+  source,
+  target,
+} = {}) {
+  incrementFbCounter(scene, "fbFallbackCount", 1);
+  emitFbTelemetry(scene, "fb_fallback_used", {
+    playerId,
+    role,
+    fallbackPolicy,
+    missingAuthority,
+    source,
+    target,
+  });
+}
+
+function finalizeFbTelemetry(scene) {
+  const t = getFbTelemetry(scene);
+  if (!t) return;
+  const req = t.counters.fbRequiredRoleCount || 0;
+  const rate = req > 0 ? t.counters.fbFallbackCount / req : 0;
+  scene.events?.emit?.("animTelemetry", {
+    event: "fb_telemetry_summary",
+    turnIndex: t.turnIndex,
+    turnId: t.turnId,
+    resultType: t.resultType,
+    branchKind: t.branchKind,
+    offenseTeamId: t.offenseTeamId,
+    gameClock: t.gameClock,
+    quarter: t.quarter,
+    timestampMs: Date.now(),
+    fbFallbackCount: t.counters.fbFallbackCount,
+    fbRequiredRoleCount: req,
+    fbFallbackRate: rate,
+    fbClampCount: t.counters.fbClampCount,
+    fbSnapCount: t.counters.fbSnapCount,
+  });
+  scene.__fbTelemetry = null;
+}
+
+async function awaitWithTimeout(promise, timeoutMs, label) {
+  const ms = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 2500;
+  let timer = null;
+  try {
+    const timeoutPromise = new Promise((resolve) => {
+      timer = setTimeout(() => resolve("__timeout__"), ms);
+    });
+    const result = await Promise.race([promise, timeoutPromise]);
+    if (result === "__timeout__") {
+      const expectedSettleTimeout = label === "rim_runner_burst_secondary_settle";
+      if (!expectedSettleTimeout || isAnimationDebugEnabled()) {
+        console.warn(`[FB animation] timeout while awaiting ${label}`, { timeoutMs: ms });
+      }
+      return false;
+    }
+    return true;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Rim Runner lane pass (BH / outlet receiver → rim runner), spec ~6 grid toward basket from RR post-burst.
+ * Runs after burst/outlet when the sim attempted the lane pass (not hold-up, not outlet denied).
+ */
+function shouldAnimateRimRunnerLanePass(turnData, phase2Kind) {
+  if (turnData.rim_runner_outlet_failed) return false;
+  const seq =
+    turnData.fast_break_play === "rim_runner" ||
+    turnData.roles?.rim_runner_sequence === true;
+  if (!seq) return false;
+  if (!turnData.roles?.rim_runner_burst_phase && turnData.roles?.rim_runner_id == null) {
+    return false;
+  }
+  // Completion-to-shot only: steal / bat OOB use their own lane-style sequences
+  const laneKinds =
+    phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul";
+  if (!laneKinds) return false;
+
+  const sid = (id) => (id != null ? String(id) : null);
+  const bh = sid(
+    turnData.roles?.ball_handler_id ??
+      turnData.roles?.ball_handler?.player_id ??
+      turnData.roles?.passer?.player_id
+  );
+  const rr = sid(turnData.roles?.rim_runner_id ?? turnData.roles?.shooter?.player_id);
+  if (!bh || !rr || bh === rr) return false;
+  return true;
+}
+
+function getRimRunnerDecisionPillMeta(turnData) {
+  const explicitGood = turnData?.rim_runner_decision_good;
+  const passAttempted = Boolean(turnData?.rim_runner_pass_attempted);
+  const fbOpen = Boolean(turnData?.rim_runner_fb_open);
+  const isGoodDecision =
+    typeof explicitGood === "boolean" ? explicitGood : passAttempted === fbOpen;
+  return {
+    decisionPillText: isGoodDecision ? "Good Decision" : "Bad Decision",
+    decisionPillTone: isGoodDecision ? "good" : "bad",
+  };
+}
+
+async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height) {
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const passerId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const passerSprite = playerSprites[passerId];
+  const rrSprite = playerSprites[rrId];
+  if (!passerSprite || !rrSprite) return;
+
+  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const offenseSide = passerSprite.team === "home" ? "home" : "away";
+  const passerTeamId = passerSprite.team_id;
+  const homeTeamField = scene.simData?.home_team;
+  const awayTeamField = scene.simData?.away_team;
+  const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+  const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+  const passerTeamName = passerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+  const passerInfo = scene.playerInfo?.[passerId];
+  const passerPlayerData = passerInfo
+    ? {
+        playerId: passerId,
+        photo: passerSprite.photo || null,
+        teamName: passerTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, passerTeamId),
+      }
+    : null;
+  showAnnouncement("Fast Break!", offenseSide, passerPlayerData, getRimRunnerDecisionPillMeta(turnData));
+
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+
+  let rrGridX =
+    typeof rrSprite.gridX === "number"
+      ? rrSprite.gridX
+      : phase?.rr_to?.x ?? 50;
+  let rrGridY =
+    typeof rrSprite.gridY === "number"
+      ? rrSprite.gridY
+      : phase?.rr_to?.y ?? 25;
+
+  const catchGrid = {
+    x: Phaser.Math.Clamp(rrGridX + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(rrGridY, GRID_MIN_Y, GRID_MAX_Y),
+  };
+  const catchPx = gridToPixels(catchGrid.x, catchGrid.y, width, height);
+
+  attachBallToPlayer(scene, ballSprite, passerSprite);
+
+  const rrDur = getPlayerDuration(rrSprite, catchPx.x, catchPx.y, true);
+
+  const rrTween = tweenPlayerTo(scene, rrSprite, catchPx, {
+    duration: rrDur,
+    easing: "Linear",
+  });
+
+  const passPromise = runPass(scene, {
+    fromId: passerId,
+    toId: rrId,
+    endCoords: { x: catchPx.x, y: catchPx.y },
+    duration: rrDur,
+    easing: "Sine.easeInOut",
+  });
+
+  await Promise.all([passPromise, rrTween]);
+
+  rrSprite.gridX = catchGrid.x;
+  rrSprite.gridY = catchGrid.y;
+
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);
+    else setTimeout(resolve, 50);
+  });
+  const { getBallController, synchronizeBallState } = await import("./BallControllerAdapter.js");
+  const ballController = getBallController();
+  synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+  if (!ballController?.isAttached || ballController.currentOwner !== rrSprite) {
+    attachBallToPlayer(scene, ballSprite, rrSprite, { reason: "rim_runner_lane_pass" });
+  }
+}
+
+function rimRunnerSpriteGrid(sprite, width, height) {
+  if (sprite && typeof sprite.gridX === "number" && typeof sprite.gridY === "number") {
+    return { x: sprite.gridX, y: sprite.gridY };
+  }
+  if (!sprite) return { x: 50, y: 25 };
+  return {
+    x: Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y),
+  };
+}
+
+function setRimRunnerSpriteGrid(sprite, gx, gy) {
+  if (!sprite) return;
+  sprite.gridX = gx;
+  sprite.gridY = gy;
+}
+
+function commitRrLiveSpriteGrid(playerSprites, width, height) {
+  for (const sprite of Object.values(playerSprites || {})) {
+    if (!sprite) continue;
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y);
+    setRimRunnerSpriteGrid(sprite, gx, gy);
+  }
+}
+
+function captureRrLiveSnapshot(playerSprites, width, height) {
+  const snapshot = {};
+  for (const [pid, sprite] of Object.entries(playerSprites || {})) {
+    if (!sprite) continue;
+    snapshot[String(pid)] = {
+      x: Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y),
+    };
+  }
+  return snapshot;
+}
+
+function logRrDenied(scene, stage, payload = {}) {
+  const telemetry = getFbTelemetry(scene);
+  console.log(`[RR DENIED][${stage}]`, {
+    branchKind: telemetry?.branchKind ?? null,
+    turnId: telemetry?.turnId ?? null,
+    turnIndex: telemetry?.turnIndex ?? null,
+    resultType: telemetry?.resultType ?? null,
+    ...payload,
+  });
+}
+
+/** Shared wall time for RR AG-drift beats (outlet denied + hold-up); floors snap/warp from tiny primary moves. */
+function clampRrAgSharedPhaseDurationMs(ms) {
+  const raw = Number(ms);
+  const base = Number.isFinite(raw) ? raw : 500;
+  const minMs = animationConfig.fastBreak?.agDriftSharedPhaseMinMs ?? 520;
+  return Math.max(minMs, base);
+}
+
+/**
+ * Parallel horizontal drifts toward the offense basket: same duration for all, per-sprite distance
+ * from AG (`horizontalGridUnitsForDurationMs`), Y fixed, grid X clamped 4–97. Skips `excludeIds`.
+ */
+function rimRunnerAgHorizontalDriftPromises(
+  scene,
+  playerSprites,
+  width,
+  height,
+  sid,
+  excludeIds,
+  towardBasket,
+  phaseDurationMs
+) {
+  const skip = excludeIds instanceof Set ? excludeIds : new Set();
+  const promises = [];
+  const edgeInsetGrid = Math.max(0, Number(animationConfig.fastBreak?.agDriftEdgeInsetGrid ?? 2));
+  const minDriftX = 4 + edgeInsetGrid;
+  const maxDriftX = 97 - edgeInsetGrid;
+  for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
+    if (!sprite) continue;
+    const pid = sid(pidRaw);
+    if (!pid || skip.has(pid)) continue;
+    if (scene.tweens) {
+      scene.tweens.killTweensOf(sprite);
+    }
+    const g = rimRunnerSpriteGrid(sprite, width, height);
+    const stride = horizontalGridUnitsForDurationMs(sprite, phaseDurationMs, width, { scene });
+    const direction = towardBasket >= 0 ? 1 : -1;
+    const startX = Phaser.Math.Clamp(g.x, GRID_MIN_X, GRID_MAX_X);
+    const strideAbs = Math.abs(stride);
+    const boundedStartX = Phaser.Math.Clamp(startX, minDriftX, maxDriftX);
+    const maxStrideToward =
+      direction > 0
+        ? Math.max(0, maxDriftX - boundedStartX)
+        : Math.max(0, boundedStartX - minDriftX);
+    const usedStride = Math.min(strideAbs, maxStrideToward) * direction;
+    const proposedEndX = startX + stride * direction;
+    const endX = Phaser.Math.Clamp(boundedStartX + usedStride, GRID_MIN_X, GRID_MAX_X);
+    const endY = Phaser.Math.Clamp(g.y, GRID_MIN_Y, GRID_MAX_Y);
+    if (getFbTelemetry(scene)?.branchKind === "rr_outlet_denied") {
+      logRrDenied(scene, "DRIFT PLAN", {
+        playerId: pid,
+        start: { x: startX, y: g.y },
+        stride,
+        proposedEndX,
+        end: { x: endX, y: endY },
+        phaseDurationMs,
+      });
+    }
+    if (Math.abs(strideAbs - Math.abs(usedStride)) > 0.001) {
+      incrementFbCounter(scene, "fbClampCount", 1);
+      const speedPxPerSec = phaseDurationMs > 0
+        ? ((Math.abs(stride) * width) / 100) / (phaseDurationMs / 1000)
+        : null;
+      emitFbTelemetry(scene, "fb_clamp_destination", {
+        playerId: pid,
+        role: "ag_drift",
+        sourceX: startX,
+        proposedEndX,
+        clampedEndX: endX,
+        clampEdge: direction > 0 ? "max_x" : "min_x",
+        edgeInsetGrid,
+        phaseDurationMs,
+        speedPxPerSec,
+      });
+    }
+    const px = gridToPixels(endX, endY, width, height);
+    promises.push(
+      tweenPlayerTo(scene, sprite, px, {
+        duration: phaseDurationMs,
+        easing: "Linear",
+      })
+    );
+  }
+  return promises;
+}
+
+async function finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites = null) {
+  if (scene.skipToEnd) return;
+  if (scene.stateMachine?.state !== States.HalfCourt) {
+    safeTransition(scene.stateMachine, States.HalfCourt);
+  }
+
+  let pre = null;
+  if (turnData.next_play_type === "HCO" && playerSprites) {
+    pre = Object.fromEntries(
+      Object.entries(playerSprites)
+        .filter(([, s]) => !!s)
+        .map(([pid, s]) => [String(pid), { x: Number(s.x), y: Number(s.y) }])
+    );
+    if (turnData.rim_runner_outlet_failed) {
+      logRrDenied(scene, "HCO HANDOFF", {
+        preSnapshot: pre,
+      });
+    }
+  }
+
+  if (
+    turnData.next_play_type === "HCO" &&
+    typeof scene.startNextHalfCourtOffense === "function"
+  ) {
+    scene.startNextHalfCourtOffense();
+  }
+
+  if (pre && playerSprites) {
+    const check = () => {
+      for (const [pid, sprite] of Object.entries(playerSprites)) {
+        if (!sprite || !pre[pid]) continue;
+        const dx = Number(sprite.x) - pre[pid].x;
+        const dy = Number(sprite.y) - pre[pid].y;
+        const deltaPx = Math.hypot(dx, dy);
+        if (deltaPx < 20) continue;
+        incrementFbCounter(scene, "fbSnapCount", 1);
+        emitFbTelemetry(scene, "fb_transition_snap", {
+          playerId: pid,
+          role: "player",
+          fromTurnType: "FAST_BREAK",
+          toTurnType: "HCO",
+          preTransition: pre[pid],
+          postTransition: { x: Number(sprite.x), y: Number(sprite.y) },
+          deltaPx,
+          deltaGridApprox: {
+            x: (dx / (scene.game.config.width || 1)) * 100,
+            y: (-dy / (scene.game.config.height || 1)) * 50,
+          },
+        });
+      }
+      if (turnData.rim_runner_outlet_failed) {
+        const post = Object.fromEntries(
+          Object.entries(playerSprites)
+            .filter(([, s]) => !!s)
+            .map(([pid, s]) => [String(pid), { x: Number(s.x), y: Number(s.y) }])
+        );
+        logRrDenied(scene, "HCO HANDOFF POST", { postSnapshot: post });
+      }
+    };
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(0, check);
+    } else {
+      setTimeout(check, 0);
+    }
+  }
+}
+
+function resolvePlayerSpriteById(playerSprites, rawId) {
+  if (!playerSprites || rawId == null) return { id: null, sprite: null };
+  const sid = String(rawId);
+  if (playerSprites[sid]) return { id: sid, sprite: playerSprites[sid] };
+  if (playerSprites[rawId]) return { id: rawId, sprite: playerSprites[rawId] };
+  const num = Number(rawId);
+  if (Number.isFinite(num) && playerSprites[num]) return { id: num, sprite: playerSprites[num] };
+  return { id: sid, sprite: null };
+}
+
+function appendUniqueIdCandidate(list, seen, rawId, source) {
+  if (rawId == null) return;
+  const sid = String(rawId).trim();
+  if (!sid || seen.has(sid)) return;
+  seen.add(sid);
+  list.push({ rawId, sid, source });
+}
+
+function collectFastBreakDefenderCandidates(turnData) {
+  const list = [];
+  const seen = new Set();
+  appendUniqueIdCandidate(list, seen, turnData?.defender_id, "turnData.defender_id");
+  appendUniqueIdCandidate(list, seen, turnData?.defenderId, "turnData.defenderId");
+
+  const defenderObj = turnData?.defender ?? turnData?.roles?.defender;
+  if (defenderObj && typeof defenderObj === "object") {
+    appendUniqueIdCandidate(list, seen, defenderObj.player_id, "defender.player_id");
+    appendUniqueIdCandidate(list, seen, defenderObj.playerId, "defender.playerId");
+  } else {
+    appendUniqueIdCandidate(list, seen, defenderObj, "defender");
+  }
+
+  if (Array.isArray(turnData?.roles?.defense)) {
+    turnData.roles.defense.forEach((d, i) => {
+      if (d && typeof d === "object") {
+        appendUniqueIdCandidate(list, seen, d.player_id, `roles.defense[${i}].player_id`);
+        appendUniqueIdCandidate(list, seen, d.playerId, `roles.defense[${i}].playerId`);
+      } else {
+        appendUniqueIdCandidate(list, seen, d, `roles.defense[${i}]`);
+      }
+    });
+  }
+
+  return list;
+}
+
+function resolveFastBreakDefenderSprite(playerSprites, turnData, { excludeIds = [] } = {}) {
+  const excluded = new Set(
+    (excludeIds || [])
+      .filter((id) => id != null)
+      .map((id) => String(id))
+  );
+  const candidates = collectFastBreakDefenderCandidates(turnData);
+  for (const candidate of candidates) {
+    if (excluded.has(candidate.sid)) continue;
+    const ref = resolvePlayerSpriteById(playerSprites, candidate.rawId);
+    if (ref?.sprite) {
+      return {
+        id: ref.id,
+        sprite: ref.sprite,
+        source: candidate.source,
+        candidates: candidates.map((c) => ({ id: c.sid, source: c.source })),
+      };
+    }
+  }
+  return {
+    id: candidates[0]?.sid ?? null,
+    sprite: null,
+    source: null,
+    candidates: candidates.map((c) => ({ id: c.sid, source: c.source })),
+  };
+}
+
+/**
+ * Rim Runner outlet denied: defender two grid steps toward the pass direction (same as backend
+ * `outlet_defender_to`), announcement + headshot, receiver cuts to passer x and y±6, then pass.
+ *
+ * While the outlet receiver tweens to the catch spot, all other players move horizontally toward
+ * the offense basket for the same phase duration (AG-scoped distance each, X clamped 4–97), excluding
+ * outlet passer, receiver, and outlet defender. Burst-phase tweens on those players are stopped first;
+ * see `animateRimRunnerBurstPhase` + `Promise.allSettled` when denied.
+ */
+async function animateRimRunnerOutletDeniedBeat(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height,
+  phase,
+  passerSprite,
+  recvSprite
+) {
+  const sid = (id) => (id != null ? String(id) : null);
+  const spriteIdFor = (targetSprite) => {
+    if (!targetSprite) return null;
+    for (const [pid, sprite] of Object.entries(playerSprites || {})) {
+      if (sprite === targetSprite) return sid(pid);
+    }
+    return null;
+  };
+  if (!passerSprite || !recvSprite) {
+    return { branch: "outlet_denied", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
+
+  const defId = sid(phase?.outlet_defender_id);
+  const defSprite = defId ? playerSprites[defId] : null;
+  const rawPasserFallback = turnData.roles?.outlet_passer;
+  const spriteDerivedPasserId = spriteIdFor(passerSprite);
+  const phasePasserId = sid(phase?.outlet_passer_id);
+  const rolesPasserId = sid(
+    rawPasserFallback != null && typeof rawPasserFallback === "object"
+      ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
+      : rawPasserFallback
+  );
+  let passerId = spriteDerivedPasserId;
+  if (
+    spriteDerivedPasserId &&
+    ((phasePasserId && phasePasserId !== spriteDerivedPasserId) ||
+      (rolesPasserId && rolesPasserId !== spriteDerivedPasserId))
+  ) {
+    logRrDenied(scene, "PASSER MISMATCH", {
+      spriteDerivedPasserId,
+      phasePasserId,
+      rolesPasserId,
+    });
+  }
+  if (!passerId && phasePasserId) {
+    passerId = phasePasserId;
+    logRrDenied(scene, "PASSER RECOVERY", {
+      mode: "phase_payload",
+      passerId,
+    });
+  }
+  if (!passerId && rolesPasserId) {
+    passerId = rolesPasserId;
+    logRrDenied(scene, "PASSER RECOVERY", {
+      mode: "roles_payload",
+      passerId,
+    });
+  }
+  if (!passerId) {
+    passerId = sid(getCurrentOwner(scene));
+    if (passerId) {
+      logRrDenied(scene, "PASSER RECOVERY", {
+        mode: "ball_owner",
+        passerId,
+      });
+    }
+  }
+  const recvId = sid(phase?.outlet_receiver_id);
+  const away = Boolean(phase?.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+
+  attachBallToPlayer(scene, ballSprite, passerSprite);
+
+  const pg = rimRunnerSpriteGrid(passerSprite, width, height);
+  const defenderTarget = {
+    x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(pg.y, GRID_MIN_Y, GRID_MAX_Y),
+  };
+  logRrDenied(scene, "ENTRY", {
+    passerId,
+    receiverId: recvId,
+    defenderId: defId,
+    passerGrid: pg,
+    receiverGrid: rimRunnerSpriteGrid(recvSprite, width, height),
+    defenderGrid: defSprite ? rimRunnerSpriteGrid(defSprite, width, height) : null,
+    defenderTarget,
+  });
+
+  if (defSprite && scene.tweens) {
+    scene.tweens.killTweensOf(defSprite);
+  }
+
+  if (defSprite) {
+    const defTargetPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
+    await tweenPlayerTo(scene, defSprite, defTargetPx, {
+      duration: getPlayerDuration(defSprite, defTargetPx.x, defTargetPx.y, true),
+      easing: "Linear",
+    });
+    setRimRunnerSpriteGrid(defSprite, defenderTarget.x, defenderTarget.y);
+  }
+
+  const defenseTeam = passerSprite.team === "home" ? "away" : "home";
+  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  // Freeze ongoing burst tweens (RR, other_players, etc.) during callout + hold — same universal px/s, no motion on screen.
+  pauseTweensOfPlayerSprites(scene, playerSprites);
+  if (defSprite) {
+    const stopperInfo = scene.playerInfo?.[defId];
+    const stopperTeamId = defSprite.team_id;
+    const homeTeamField = scene.simData?.home_team;
+    const awayTeamField = scene.simData?.away_team;
+    const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+    const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+    const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    const stopperPlayerData = stopperInfo
+      ? {
+          playerId: defId,
+          photo: defSprite.photo || null,
+          teamName: stopperTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, defSprite.team_id),
+        }
+      : null;
+    showAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData);
+  } else {
+    showAnnouncement("FB Outlet Pass Denied!", defenseTeam, null);
+  }
+
+  const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(stopHoldMs, resolve);
+    else setTimeout(resolve, stopHoldMs);
+  });
+
+  const recvTarget = {
+    x: Phaser.Math.Clamp(pg.x, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(pg.y < 25 ? pg.y + 6 : pg.y - 6, GRID_MIN_Y, GRID_MAX_Y),
+  };
+
+  const recvTargetPx = gridToPixels(recvTarget.x, recvTarget.y, width, height);
+  const phaseDurationMs = clampRrAgSharedPhaseDurationMs(
+    getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true)
+  );
+
+  const driftExclude = new Set([passerId, recvId, defId].filter(Boolean));
+  logRrDenied(scene, "ENTRY", {
+    driftExclude: Array.from(driftExclude),
+    driftMoverCount: Object.keys(playerSprites || {}).filter((pid) => !driftExclude.has(String(pid))).length,
+  });
+  const driftPromises = rimRunnerAgHorizontalDriftPromises(
+    scene,
+    playerSprites,
+    width,
+    height,
+    sid,
+    driftExclude,
+    towardBasket,
+    phaseDurationMs
+  );
+
+  const recvPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
+    duration: phaseDurationMs,
+    easing: "Linear",
+  });
+
+  await awaitWithTimeout(
+    recvPromise,
+    phaseDurationMs + 2000,
+    "rim_runner_outlet_denied_receiver_cutback"
+  );
+  logRrDenied(scene, "TRIGGER", {
+    trigger: "receiver_cutback_reached",
+    receiverTarget: recvTarget,
+    receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+    snapshotAtTrigger: captureRrLiveSnapshot(playerSprites, width, height),
+  });
+
+  setRimRunnerSpriteGrid(recvSprite, recvTarget.x, recvTarget.y);
+  for (const [pidRaw, sprite] of Object.entries(playerSprites)) {
+    if (!sprite || !scene.tweens) continue;
+    const pid = sid(pidRaw);
+    if (pid === passerId || pid === recvId || pid === defId) continue;
+    scene.tweens.killTweensOf(sprite);
+  }
+  commitRrLiveSpriteGrid(playerSprites, width, height);
+
+  if (passerId && recvId && passerId !== recvId) {
+    logRrDenied(scene, "PASS START", {
+      fromId: passerId,
+      toId: recvId,
+    });
+    await runPass(scene, {
+      fromId: passerId,
+      toId: recvId,
+      easing: "Sine.easeInOut",
+    });
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);
+      else setTimeout(resolve, 50);
+    });
+    const { synchronizeBallState } = await import("./BallControllerAdapter.js");
+    synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+    attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_pass" });
+    logRrDenied(scene, "PASS END", {
+      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
+    });
+  } else {
+    attachBallToPlayer(scene, ballSprite, recvSprite, {
+      reason: "rim_runner_outlet_denied_pass_recovery_failed",
+    });
+    logRrDenied(scene, "PASS END", {
+      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      mode: "pass_recovery_failed",
+      passerId,
+      receiverId: recvId,
+      snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
+    });
+  }
+
+  commitRrLiveSpriteGrid(playerSprites, width, height);
+  const finalSnapshot = captureRrLiveSnapshot(playerSprites, width, height);
+  logRrDenied(scene, "FINAL SNAPSHOT", {
+    snapshot: finalSnapshot,
+  });
+  return { branch: "outlet_denied", snapshot: finalSnapshot };
+}
+
+/**
+ * RR hold-up (no lane pass): the ball handler settle is the branch advance trigger.
+ * Everyone else drifts toward the offense basket only until the ball handler reaches
+ * that hold-up spot, then their drift is stopped and the branch hands off to HCO.
+ */
+async function animateRimRunnerHoldUpLeadIn(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height
+) {
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const bhId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const bh = playerSprites[bhId];
+  if (!bh) {
+    return { branch: "hold_up", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
+
+  if (turnData.rim_runner_no_lane_pass) {
+    const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+    const offenseSide = bh.team === "home" ? "home" : "away";
+    const bhTeamId = bh.team_id;
+    const homeTeamField = scene.simData?.home_team;
+    const awayTeamField = scene.simData?.away_team;
+    const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+    const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+    const bhTeamName = bhTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    const bhInfo = scene.playerInfo?.[bhId];
+    const bhPlayerData = bhInfo
+      ? {
+          playerId: bhId,
+          photo: bh.photo || null,
+          teamName: bhTeamName,
+          secondaryColor: getSecondaryColorForTeam(scene, bhTeamId),
+        }
+      : null;
+    const decisionMeta = getRimRunnerDecisionPillMeta(turnData);
+    showAnnouncement("No Fast Break", offenseSide, bhPlayerData, decisionMeta);
+  }
+
+  attachBallToPlayer(scene, ballSprite, bh);
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+
+  const bhg = rimRunnerSpriteGrid(bh, width, height);
+  const settleBh = {
+    x: Phaser.Math.Clamp(bhg.x + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(bhg.y < 25 ? bhg.y + 8 : bhg.y - 8, GRID_MIN_Y, GRID_MAX_Y),
+  };
+  const bhTargetPx = gridToPixels(settleBh.x, settleBh.y, width, height);
+  const phaseDurationMs = clampRrAgSharedPhaseDurationMs(
+    getPlayerDuration(bh, bhTargetPx.x, bhTargetPx.y)
+  );
+
+  const driftPromises = rimRunnerAgHorizontalDriftPromises(
+    scene,
+    playerSprites,
+    width,
+    height,
+    sid,
+    new Set([bhId]),
+    towardBasket,
+    phaseDurationMs
+  );
+
+  const bhPromise = tweenPlayerTo(scene, bh, bhTargetPx, {
+    duration: phaseDurationMs,
+    easing: "Linear",
+  });
+
+  await awaitWithTimeout(
+    bhPromise,
+    phaseDurationMs + 2000,
+    "rim_runner_hold_up_ball_handler_settle"
+  );
+
+  for (const [pid, sprite] of Object.entries(playerSprites)) {
+    if (sid(pid) === bhId || !sprite || !scene.tweens) continue;
+    scene.tweens.killTweensOf(sprite);
+  }
+
+  setRimRunnerSpriteGrid(bh, settleBh.x, settleBh.y);
+  for (const [pid, sprite] of Object.entries(playerSprites)) {
+    if (sid(pid) === bhId || !sprite) continue;
+    const gx = Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X);
+    const gy = Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y);
+    setRimRunnerSpriteGrid(sprite, gx, gy);
+  }
+
+  const raw = turnData.text || "";
+  const msg = raw.toLowerCase().includes("holding") ? raw.replace(/^Fast Break! /, "") : "Holding up — settling.";
+  appendToTextScroll(msg);
+  return { branch: "hold_up", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+}
+
+async function animateRimRunnerInterception(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height
+) {
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const victimId = sid(
+    turnData.victim_id ?? roles.ball_handler_id ?? roles.ball_handler?.player_id
+  );
+  const stealerId = sid(turnData.stealer_id);
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const victim = playerSprites[victimId];
+  const stealer = playerSprites[stealerId];
+  const rr = rrId ? playerSprites[rrId] : null;
+  if (!victim || !stealer) {
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    return { branch: "interception", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
+
+  attachBallToPlayer(scene, ballSprite, victim);
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+
+  let rrGx =
+    rr && typeof rr.gridX === "number"
+      ? rr.gridX
+      : phase?.rr_to?.x ?? 50;
+  let rrGy =
+    rr && typeof rr.gridY === "number"
+      ? rr.gridY
+      : phase?.rr_to?.y ?? 25;
+  const catchGx = Phaser.Math.Clamp(rrGx + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const catchGy = Phaser.Math.Clamp(rrGy, GRID_MIN_Y, GRID_MAX_Y);
+
+  const vg = rimRunnerSpriteGrid(victim, width, height);
+  const laneX = Phaser.Math.Clamp((vg.x + catchGx) / 2 + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const laneY = Phaser.Math.Clamp((vg.y + catchGy) / 2, GRID_MIN_Y, GRID_MAX_Y);
+  const lanePx = gridToPixels(laneX, laneY, width, height);
+
+  const partialGx = Phaser.Math.Clamp(rrGx + 3 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const partialPx = gridToPixels(partialGx, catchGy, width, height);
+
+  const tw = [
+    tweenPlayerTo(scene, stealer, lanePx, {
+      duration: getPlayerDuration(stealer, lanePx.x, lanePx.y, true),
+      easing: "Quad.easeOut",
+    }),
+  ];
+  if (rr) {
+    tw.push(
+      tweenPlayerTo(scene, rr, partialPx, {
+        duration: getPlayerDuration(rr, partialPx.x, partialPx.y, true),
+        easing: "Linear",
+      })
+    );
+  }
+  await Promise.all(tw);
+  if (rr) setRimRunnerSpriteGrid(rr, partialGx, catchGy);
+  setRimRunnerSpriteGrid(stealer, laneX, laneY);
+
+  await runPass(scene, {
+    fromId: victimId,
+    toId: stealerId,
+    endCoords: { x: stealer.x, y: stealer.y },
+    easing: "Sine.easeIn",
+  });
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(45, resolve);
+    else setTimeout(resolve, 45);
+  });
+  const { synchronizeBallState } = await import("./BallControllerAdapter.js");
+  synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+  attachBallToPlayer(scene, ballSprite, stealer, { reason: "rim_runner_interception" });
+
+  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const stealerInfo = scene.playerInfo?.[stealerId];
+  const stealerTeamId = stealer?.team_id;
+  const homeTeamField = scene.simData?.home_team;
+  const awayTeamField = scene.simData?.away_team;
+  const homeTeamName = typeof homeTeamField === "object" ? homeTeamField?.name : homeTeamField;
+  const awayTeamName = typeof awayTeamField === "object" ? awayTeamField?.name : awayTeamField;
+  const stealerTeamName = stealerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+  const stealerPlayerData = stealerInfo
+    ? {
+        playerId: stealerId,
+        photo: stealer?.photo || null,
+        teamName: stealerTeamName,
+        secondaryColor: getSecondaryColorForTeam(scene, stealerTeamId),
+      }
+    : null;
+  const defenseSide = stealer?.team === "home" ? "home" : "away";
+  showAnnouncement("Interception!", defenseSide, stealerPlayerData);
+  const holdMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(holdMs, resolve);
+    else setTimeout(resolve, holdMs);
+  });
+
+  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+  return { branch: "interception", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+}
+
+async function animateRimRunnerBatOob(
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  width,
+  height
+) {
+  const { animateBallToPosition } = await import("./ballAnimationSimple.js");
+  const roles = turnData.roles || {};
+  const phase = roles.rim_runner_burst_phase;
+  const sid = (id) => (id != null ? String(id) : null);
+  const bhId = sid(
+    roles.ball_handler_id ?? roles.ball_handler?.player_id ?? roles.passer?.player_id
+  );
+  const rrId = sid(roles.rim_runner_id ?? roles.shooter?.player_id);
+  const bh = playerSprites[bhId];
+  const rr = rrId ? playerSprites[rrId] : null;
+
+  let defId = sid(turnData.defender_id ?? turnData.defenderId);
+  const defObj = roles.defender;
+  if (!defId && defObj && typeof defObj === "object") {
+    defId = sid(defObj.player_id ?? defObj.playerId);
+  }
+  if (!defId && Array.isArray(roles.defense) && roles.defense[0]) {
+    const d0 = roles.defense[0];
+    defId = sid(typeof d0 === "string" ? d0 : d0.player_id ?? d0.playerId);
+  }
+  const defSp = defId ? playerSprites[defId] : null;
+
+  if (!bh) {
+    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    return { branch: "bat_oob", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  }
+
+  attachBallToPlayer(scene, ballSprite, bh);
+  const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
+  const towardBasket = away ? -1 : 1;
+  const bg = rimRunnerSpriteGrid(bh, width, height);
+  const rg = rr ? rimRunnerSpriteGrid(rr, width, height) : { x: phase?.rr_to?.x ?? bg.x, y: phase?.rr_to?.y ?? bg.y };
+  const catchGx = Phaser.Math.Clamp(rg.x + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const catchGy = Phaser.Math.Clamp(rg.y, GRID_MIN_Y, GRID_MAX_Y);
+  const laneX = Phaser.Math.Clamp((bg.x + catchGx) / 2 + towardBasket, GRID_MIN_X, GRID_MAX_X);
+  const laneY = Phaser.Math.Clamp((bg.y + catchGy) / 2, GRID_MIN_Y, GRID_MAX_Y);
+
+  const movers = [];
+  if (rr) {
+    const pc = gridToPixels(
+      Phaser.Math.Clamp(rg.x + 4 * towardBasket, GRID_MIN_X, GRID_MAX_X),
+      catchGy,
+      width,
+      height
+    );
+    movers.push(
+      tweenPlayerTo(scene, rr, pc, {
+        duration: getPlayerDuration(rr, pc.x, pc.y, true),
+        easing: "Linear",
+      })
+    );
+  }
+  if (defSp) {
+    const defLanePx = gridToPixels(laneX, laneY, width, height);
+    movers.push(
+      tweenPlayerTo(scene, defSp, defLanePx, {
+        duration: getPlayerDuration(defSp, defLanePx.x, defLanePx.y, true),
+        easing: "Quad.easeOut",
+      })
+    );
+  }
+  if (movers.length) await Promise.all(movers);
+
+  const tipTarget = defSp || bh;
+  attachBallToPlayer(scene, ballSprite, tipTarget);
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(500, resolve);
+    else setTimeout(resolve, 500);
+  });
+
+  const defG = defSp ? rimRunnerSpriteGrid(defSp, width, height) : bg;
+  const oobY = defG.y > 24 ? 1 : 51;
+  const oobGrid = {
+    x: Phaser.Math.Clamp(defG.x, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(oobY, GRID_MIN_Y, GRID_MAX_Y),
+  };
+  const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
+
+  detachBall(scene, ballSprite);
+  await animateBallToPosition(scene, oobPx, {
+    duration: getBallDuration(ballSprite, oobPx.x, oobPx.y),
+    easing: "Quad.easeOut",
+  });
+
+  appendToTextScroll("Batted out of bounds.");
+  const { showAnnouncement } = await import("../utils/announcements.js");
+  showAnnouncement("Out of bounds!", "neutral", null);
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) scene.time.delayedCall(650, resolve);
+    else setTimeout(resolve, 650);
+  });
+
+  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+  return { branch: "bat_oob", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+}
 
 /**
  * Simplified Fast Break Animation System
@@ -55,33 +1484,77 @@ export async function runFastBreakSequence({
   }
   
   const currentState = scene.stateMachine?.state;
-  
+  const hasRimRunnerBurst = Boolean(turnData.roles?.rim_runner_burst_phase);
+  const hasStandardOutlet =
+    turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver;
+  let rrBurstResult = null;
+  let leadInUnit = null;
+  const leadInStartMs = Date.now();
+
   // ✅ Check current state before transitioning - avoid invalid transitions
   // For defensive stops after HCO, we're already in HalfCourt, so transition to FastBreak directly
   // For Fast Break from DREB, we should be in Rebound/OutletSetup, so can transition to FastBreakOutlet
-  if (turnData.roles?.outlet_passer && currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
-    // Only transition to FastBreakOutlet if we have outlet pass and we're not already in Fast Break state
-    // Check if we can transition (must be coming from Rebound or OutletSetup)
+  if (
+    (hasStandardOutlet || hasRimRunnerBurst) &&
+    currentState !== States.FastBreak &&
+    currentState !== States.FastBreakOutlet
+  ) {
     if (currentState === States.Rebound || currentState === States.OutletSetup) {
       safeTransition(scene.stateMachine, States.FastBreakOutlet);
     } else {
-      // Coming from HalfCourt (defensive stop scenario) - go directly to FastBreak
       safeTransition(scene.stateMachine, States.FastBreak);
     }
   } else if (currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
-    // No outlet pass or already in Fast Break state - just ensure we're in FastBreak
     safeTransition(scene.stateMachine, States.FastBreak);
   }
   
   scene.events?.emit("fb:start");
   
   // ============================================================================
-  // PHASE 1: OUTLET PASS (if applicable) - WITHOUT moving receiver toward basket
+  // PHASE 1: Rim Runner burst + outlet (or standard Covert-style outlet)
   // ============================================================================
-  if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
+  if (hasRimRunnerBurst) {
+    rrBurstResult = await animateRimRunnerBurstPhase(
+      scene,
+      turnData,
+      playerSprites,
+      ballSprite,
+      width,
+      height
+    );
+    leadInUnit = turnData.roles?.is_steal_entry
+      ? "fb.lead_in.from_hco_steal"
+      : "fb.lead_in.from_dreb_release";
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: "fb.phase.entry_burst",
+      advanceTrigger: "required movers reach burst targets",
+      visualSettleTrigger: "burst tweens settled",
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      budgetKind: "phase",
+      context: { phase: "entry_burst" },
+    });
+    if (scene.stateMachine?.state !== States.FastBreak) {
+      safeTransition(scene.stateMachine, States.FastBreak);
+    }
+  } else if (hasStandardOutlet) {
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
-    
-    // Transition to FastBreak state after outlet (only if not already there)
+    leadInUnit = "fb.lead_in.from_dreb_release";
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: "fb.phase.outlet",
+      advanceTrigger: "outlet pass received",
+      visualSettleTrigger: "passer/receiver movement + pass settled",
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      budgetKind: "phase",
+      context: { phase: "outlet" },
+    });
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
@@ -91,49 +1564,394 @@ export async function runFastBreakSequence({
     // ============================================================================
     // Check is_steal_entry flag OR if there's no outlet pass (steal-initiated)
     await animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height);
+    leadInUnit = "fb.lead_in.from_hco_steal";
     
     // Transition to FastBreak state after steal entry
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
   }
+  if (leadInUnit) {
+    const leadInAdvanceTrigger =
+      leadInUnit === "fb.lead_in.from_hco_steal"
+        ? "FB route committed + entry owner resolved"
+        : "DREB committed + FB route committed";
+    const leadInVisualSettleTrigger =
+      leadInUnit === "fb.lead_in.from_hco_steal"
+        ? "steal handoff visuals settled"
+        : "rebound secure + release setup settled";
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: leadInUnit,
+      advanceTrigger: leadInAdvanceTrigger,
+      visualSettleTrigger: leadInVisualSettleTrigger,
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: leadInStartMs,
+      budgetKind: "lead_in",
+      context: { phase: "lead_in", leadInUnit },
+    });
+  }
   
   if (scene.skipToEnd) {
     return;
   }
   
   // ============================================================================
-  // PHASE 2: FAST BREAK RESOLUTION - Check result BEFORE moving toward basket
+  // PHASE 2: FAST BREAK RESOLUTION — contract-ordered routing (Rim Runner + generic FB)
   // ============================================================================
   const result = turnData.result_type;
-  const isBlockingFoul = result === "FOUL" && turnData.foul_team === "DEFENSE" && turnData.text?.toLowerCase().includes("blocking foul");
+  const isBlockingFoul =
+    result === "FOUL" &&
+    turnData.foul_team === "DEFENSE" &&
+    turnData.text?.toLowerCase().includes("blocking foul");
 
-  if (result === "MAKE" || result === "MISS" || result === "BLOCK") {
-    // Shot attempt scenario (BLOCK = shot attempt that gets blocked)
-    // Check if ball handler beat the defender (skill check won)
-    if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
-      // Ball handler won skill check - animate past stopper to shot spot
-      await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
-    } else {
-      // Normal shot attempt (no stopper or stopper not in position)
-      await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+  const phase2Kind = classifyFastBreakPhase2(turnData, { isBlockingFoul });
+  const branchKind = deriveFbBranchKind(turnData, phase2Kind);
+  initFbTelemetryContext(scene, { turnData, turnIndex, branchKind });
+  if (branchKind === "rr_outlet_denied") {
+    logRrDenied(scene, "ROUTE", {
+      phase2Kind,
+      branchKind,
+      rim_runner_outlet_failed: Boolean(turnData.rim_runner_outlet_failed),
+      fast_break_play: turnData.fast_break_play ?? null,
+      resultType: turnData.result_type ?? null,
+    });
+  }
+
+  try {
+    const resolutionStartMs = Date.now();
+    if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
+      await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
     }
-  } else if (result === "CHARGE" || isBlockingFoul) {
-    // Charge or blocking foul: animate to shot spot (same as MAKE/MISS) then stop; no shot animation. Announcement runs in finalizeTurnAfterAnimation.
-    await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
-  } else {
-    // Defensive stop, other foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
-    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+
+    if (phase2Kind === "fast_break_shot") {
+      if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
+        await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
+      } else {
+        await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+      }
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.shot_attempt",
+        advanceTrigger: "shot release/result committed",
+        visualSettleTrigger: "shot visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    } else if (phase2Kind === "fast_break_shot_foul") {
+      await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.shot_attempt",
+        advanceTrigger: "shot release/result committed",
+        visualSettleTrigger: "shot visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    } else if (phase2Kind === "rim_runner_steal") {
+      await animateRimRunnerInterception(
+        scene,
+        turnData,
+        playerSprites,
+        ballSprite,
+        width,
+        height
+      );
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "ball attaches to intercepting player's sprite",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    } else if (phase2Kind === "rim_runner_bat_oob") {
+      await animateRimRunnerBatOob(scene, turnData, playerSprites, ballSprite, width, height);
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "ball reaches out-of-bounds destination",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    } else if (phase2Kind === "rim_runner_hco_settle") {
+      if (turnData.rim_runner_outlet_failed) {
+        await animateRimRunnerOutletDeniedBeat(
+          scene,
+          turnData,
+          playerSprites,
+          ballSprite,
+          width,
+          height,
+          rrBurstResult?.phase ?? turnData.roles?.rim_runner_burst_phase,
+          rrBurstResult?.passerSprite ??
+            playerSprites[
+              String(
+                turnData.roles?.rim_runner_burst_phase?.outlet_passer_id ??
+                  turnData.roles?.outlet_passer ??
+                  ""
+              )
+            ],
+          rrBurstResult?.recvSprite ??
+            playerSprites[
+              String(turnData.roles?.rim_runner_burst_phase?.outlet_receiver_id ?? "")
+            ]
+        );
+      } else {
+        await animateRimRunnerHoldUpLeadIn(
+          scene,
+          turnData,
+          playerSprites,
+          ballSprite,
+          width,
+          height
+        );
+      }
+      await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "stop result committed",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    } else {
+      await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.defensive_stop",
+        advanceTrigger: "stop result committed",
+        visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    }
+    if (
+      (phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul") &&
+      (String(turnData?.result_type || "").toUpperCase() === "MISS" ||
+        String(turnData?.result_type || "").toUpperCase() === "BLOCK")
+    ) {
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "fb.phase.rebound_resolution",
+        advanceTrigger: "rebound outcome committed",
+        visualSettleTrigger: "rebound attach + settle complete",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind, reboundType: turnData?.rebound_type ?? null },
+      });
+    }
+    
+    if (scene.skipToEnd) {
+      return;
+    }
+    
+    // ============================================================================
+    // PHASE 3: CLEANUP & STATE TRANSITIONS
+    // ============================================================================
+    const outStartMs = Date.now();
+    const route = String(turnData?.next_play_type || turnData?.next_turn || "").toUpperCase();
+    enforceFbUnitContract({
+      scene,
+      turnData,
+      unitId: "fb.out.to_*",
+      advanceTrigger: "route committed",
+      visualSettleTrigger: "final FB settle complete",
+      authorizingEventReceived: !!route || turnData?.quarter_ends_after === true,
+      visualSettled: true,
+      unitStartMs: outStartMs,
+      budgetKind: "out",
+      context: { route: route || null, quarterEndsAfter: turnData?.quarter_ends_after === true },
+    });
+    scene.events?.emit("fb:end");
+  } finally {
+    finalizeFbTelemetry(scene);
   }
-  
-  if (scene.skipToEnd) {
-    return;
+}
+
+/**
+ * Rim Runner: simultaneous setup tweens (RR sprint, outlet contest defender, role players),
+ * then outlet pass only after the outlet receiver's tween completes (others may still be moving).
+ *
+ * Each burst target uses one tween at universal speed (`getPlayerDuration` = distance ÷ AG×game-speed px/s).
+ */
+async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height) {
+  const phase = turnData.roles?.rim_runner_burst_phase;
+  if (!phase) return { branch: "none", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+
+  const sid = (id) => (id != null ? String(id) : null);
+  const rrSprite = playerSprites[sid(phase.rr_id)];
+  const recvSprite = playerSprites[sid(phase.outlet_receiver_id)];
+  if (!rrSprite || !recvSprite) {
+    return { branch: "none", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   }
-  
-  // ============================================================================
-  // PHASE 3: CLEANUP & STATE TRANSITIONS
-  // ============================================================================
-  scene.events?.emit("fb:end");
+
+  const secondary = [];
+  const startTween = (sprite, grid) => {
+    if (!sprite || grid == null || grid.x == null || grid.y == null) return;
+    const px = gridToPixels(grid.x, grid.y, width, height);
+    const dur = getPlayerDuration(sprite, px.x, px.y, true);
+    secondary.push(
+      tweenPlayerTo(scene, sprite, px, { duration: dur, easing: "Linear" })
+    );
+  };
+
+  startTween(rrSprite, phase.rr_to);
+  if (phase.outlet_defender_id != null && phase.outlet_defender_to) {
+    startTween(playerSprites[sid(phase.outlet_defender_id)], phase.outlet_defender_to);
+  }
+  for (const row of phase.other_players || []) {
+    startTween(playerSprites[sid(row.player_id)], { x: row.to_x, y: row.to_y });
+  }
+
+  const recvTargetPx = gridToPixels(phase.receiver_to.x, phase.receiver_to.y, width, height);
+  const recvDur = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
+  const receiverPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
+    duration: recvDur,
+    easing: "Linear",
+  });
+
+  const passerSprite = phase.skip_outlet_pass
+    ? recvSprite
+    : playerSprites[sid(phase.outlet_passer_id ?? turnData.roles?.outlet_passer)];
+  if (passerSprite) {
+    attachBallToPlayer(scene, ballSprite, passerSprite);
+  }
+
+  await receiverPromise;
+
+  const outletDenied = Boolean(turnData.rim_runner_outlet_failed);
+  if (outletDenied) {
+    // RR burst only owns the fork into outlet-denied. Once receiver reaches the
+    // fork point, the dedicated denied branch becomes the sole owner.
+    logRrDenied(scene, "BURST FORK", {
+      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      rrLive: rimRunnerSpriteGrid(rrSprite, width, height),
+      outletDefenderId: sid(phase.outlet_defender_id),
+      snapshot: captureRrLiveSnapshot(playerSprites, width, height),
+    });
+    return {
+      branch: "outlet_denied",
+      snapshot: captureRrLiveSnapshot(playerSprites, width, height),
+      phase,
+      passerSprite,
+      recvSprite,
+    };
+  }
+
+  const shouldPass = !outletDenied && !phase.skip_outlet_pass && passerSprite;
+
+  if (shouldPass) {
+    await runPass(scene, {
+      fromId: sid(phase.outlet_passer_id ?? turnData.roles?.outlet_passer),
+      toId: sid(phase.outlet_receiver_id),
+      easing: "Sine.easeInOut",
+    });
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) {
+        scene.time.delayedCall(50, resolve);
+      } else {
+        setTimeout(resolve, 50);
+      }
+    });
+    const { getBallController, synchronizeBallState } = await import("./BallControllerAdapter.js");
+    const ballController = getBallController();
+    synchronizeBallState(scene, {
+      clearPassState: true,
+      allowAttachment: true,
+    });
+    if (ballController && recvSprite) {
+      const isAttachedToReceiver =
+        ballController.isAttached && ballController.currentOwner === recvSprite;
+      const isInFlight = ballController.isInFlight;
+      const wrongOwner =
+        ballController.isAttached && ballController.currentOwner !== recvSprite;
+      if (!isAttachedToReceiver || isInFlight || wrongOwner) {
+        if (isInFlight) {
+          ballController.onPassEnd(recvSprite, { reason: "rim_runner_burst_pass_fix" });
+        } else {
+          attachBallToPlayer(scene, ballSprite, recvSprite, {
+            reason: "rim_runner_burst_pass_verify",
+            debugInfo: { reason: "rim_runner_burst_pass_verify", wasInFlight: isInFlight },
+          });
+        }
+      }
+      if (!ballController.isAttached || ballController.currentOwner !== recvSprite) {
+        synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+        attachBallToPlayer(scene, ballSprite, recvSprite, {
+          reason: "rim_runner_burst_pass_retry",
+          debugInfo: { reason: "rim_runner_burst_pass_retry" },
+        });
+      }
+    }
+  }
+
+  if (secondary.length) {
+    await Promise.all(secondary);
+  }
+
+  // Commit burst endpoints into logical grid state before branch-specific follow-up
+  // uses `rimRunnerSpriteGrid(...)`. Without this, stale gridX/gridY from a prior
+  // sequence can skew RR lane-pass, interception, or bat-OOB geometry.
+  if (phase.rr_to && rrSprite) {
+    setRimRunnerSpriteGrid(rrSprite, phase.rr_to.x, phase.rr_to.y);
+  }
+  if (phase.receiver_to && recvSprite) {
+    setRimRunnerSpriteGrid(recvSprite, phase.receiver_to.x, phase.receiver_to.y);
+  }
+  if (phase.outlet_defender_id != null && phase.outlet_defender_to) {
+    const outletDefenderSprite = playerSprites[sid(phase.outlet_defender_id)];
+    if (outletDefenderSprite) {
+      setRimRunnerSpriteGrid(
+        outletDefenderSprite,
+        phase.outlet_defender_to.x,
+        phase.outlet_defender_to.y
+      );
+    }
+  }
+  for (const row of phase.other_players || []) {
+    const sprite = playerSprites[sid(row.player_id)];
+    if (!sprite) continue;
+    setRimRunnerSpriteGrid(sprite, row.to_x, row.to_y);
+  }
+  return {
+    branch: "outlet_completed",
+    snapshot: captureRrLiveSnapshot(playerSprites, width, height),
+    phase,
+    passerSprite,
+    recvSprite,
+  };
 }
 
 /**
@@ -252,8 +2070,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   await runPass(scene, {
     fromId: passerId,
     toId: receiverId,
-    duration: 500,
-    easing: "Sine.easeInOut"
+    easing: "Sine.easeInOut",
   });
   
   // ✅ PHASE 2.8: Defensive attachment verification for fast breaks
@@ -443,32 +2260,43 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
  * - All others move to standard positions
  */
 /**
- * Animate Fast Break shot when ball handler beats defender (skill check won)
- * Defender still animates to stopper position, but ball handler animates past them to shot spot
+ * Animate Fast Break shot when ball handler beats defender (skill check won).
+ * Stopper + trail defender use the unified FB shot-contest spots derived from the shooter final.
  */
 async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height) {
   // ✅ FIX: Import showAnnouncement/showAndOneAnnouncement at the start of the function (AND-1 / shooting foul in Fast Break path)
   const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
   
-  const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || turnData.roles?.ball_handler?.player_id || getCurrentOwner(scene);
-  const shooterSprite = playerSprites[shooterId];
+  const shooterRawId =
+    turnData.roles?.shooter?.player_id ||
+    turnData.shooter_id ||
+    turnData.roles?.ball_handler?.player_id ||
+    getCurrentOwner(scene);
+  const shooterRef = resolvePlayerSpriteById(playerSprites, shooterRawId);
+  const shooterId = shooterRef.id;
+  const shooterSprite = shooterRef.sprite;
   
   if (!shooterSprite) return;
   
   const isHomeOffense = shooterSprite.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const basket = getFastBreakAttackingBasket(isHomeOffense);
   
-  // Ball handler moves to shot spot near rim (past the stopper)
-  const shotSpot = {
-    x: isHomeOffense
-      ? basket.x - Phaser.Math.Between(2, 6)  // Home: basket - 2-6
-      : basket.x + Phaser.Math.Between(2, 6), // Away: basket + 2-6
-    y: basket.y + Phaser.Math.Between(-6, 6)  // ±6 from basket Y
-  };
-  
-  // Clamp to bounds
-  shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
-  shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+  let shotSpot;
+  if (turnData.shot_spot && typeof turnData.shot_spot.x === "number" && typeof turnData.shot_spot.y === "number") {
+    shotSpot = {
+      x: Phaser.Math.Clamp(turnData.shot_spot.x, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(turnData.shot_spot.y, GRID_MIN_Y, GRID_MAX_Y),
+    };
+  } else {
+    shotSpot = {
+      x: isHomeOffense
+        ? basket.x - Phaser.Math.Between(1, 4)
+        : basket.x + Phaser.Math.Between(1, 4),
+      y: basket.y + Phaser.Math.Between(-3, 3),
+    };
+    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, GRID_MIN_X, GRID_MAX_X);
+    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, GRID_MIN_Y, GRID_MAX_Y);
+  }
   
   const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
   
@@ -484,39 +2312,35 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   promises.push(shooterPromise);
   
   // Move stopper to stopper position (between ball handler start and basket)
-  const stopperId = turnData.stopper_id;
-  const stopperSprite = stopperId ? playerSprites[stopperId] : null;
+  const stopperRef = resolvePlayerSpriteById(playerSprites, turnData.stopper_id);
+  const stopperId = stopperRef.id;
+  const stopperSprite = stopperRef.sprite;
   let stopperPromise = null;
   
   if (stopperSprite) {
-    // Get ball handler's starting position (from roles or current position)
-    const ballHandlerStartX = turnData.roles?.ball_handler_outlet_x || shooterSprite.x;
-    const ballHandlerStartY = turnData.roles?.ball_handler_outlet_y || shooterSprite.y;
-    
-    // Convert to grid if needed
-    let startGridX, startGridY;
-    if (typeof ballHandlerStartX === 'number' && ballHandlerStartX <= 100) {
-      // Already in grid coordinates
-      startGridX = ballHandlerStartX;
-      startGridY = ballHandlerStartY;
-    } else {
-      // Convert from pixels to grid
-      startGridX = (ballHandlerStartX / width) * 100;
-      startGridY = 50 - (ballHandlerStartY / height) * 50;
+    const stopperAnimEnd = getAnimationEndGridForPlayer(turnData, stopperId);
+    incrementFbCounter(scene, "fbRequiredRoleCount", 1);
+    const stopperSpot =
+      stopperAnimEnd ??
+      fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense);
+    if (!stopperAnimEnd) {
+      const source = rimRunnerSpriteGrid(stopperSprite, width, height);
+      reportMissingEndpoint(scene, turnData, {
+        playerId: stopperId,
+        role: "stopper",
+        requiredEndpointType: "animations_end",
+        hasRoleCoord: false,
+        reason: "missing_stopper_animation_end",
+      });
+      reportFallback(scene, {
+        playerId: stopperId,
+        role: "stopper",
+        fallbackPolicy: "defender_vs_shooter_grid",
+        missingAuthority: ["animations_end"],
+        source,
+        target: stopperSpot,
+      });
     }
-    
-    // Stopper position: 1-3 spots in front of ball handler (toward basket)
-    const stopperOffset = Phaser.Math.Between(1, 3);
-    const stopperSpot = {
-      x: isHomeOffense
-        ? startGridX + stopperOffset  // Home: +X toward basket (x=90)
-        : startGridX - stopperOffset, // Away: -X toward basket (x=10)
-      y: startGridY
-    };
-    
-    stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
-    stopperSpot.y = Phaser.Math.Clamp(stopperSpot.y, 1, 49);
-    
     const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
     const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
     stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
@@ -526,26 +2350,53 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     promises.push(stopperPromise);
   }
   
-  // Move primary defender (if different from stopper)
-  let defenderId = turnData.defenderId || turnData.roles?.defender?.player_id;
-  if (!defenderId && turnData.roles?.defense && turnData.roles.defense[0]) {
-    const defenderData = turnData.roles.defense[0];
-    defenderId = typeof defenderData === 'string' ? defenderData : (defenderData.player_id || defenderData.playerId);
-  }
-  
-  const defenderSprite = defenderId && defenderId !== stopperId ? playerSprites[defenderId] : null;
+  // Move primary defender (if different from stopper/shooter)
+  const defenderRef = resolveFastBreakDefenderSprite(playerSprites, turnData, {
+    excludeIds: [stopperId, shooterId],
+  });
+  const defenderId = defenderRef.id;
+  const defenderSprite = defenderRef.sprite;
   
   if (defenderSprite) {
-    // Defender follows to position behind shooter
-    const defenderSpot = {
-      x: isHomeOffense
-        ? shotSpot.x + 6  // Home: defender is +6 (behind shooter)
-        : shotSpot.x - 6, // Away: defender is -6 (behind shooter)
-      y: shotSpot.y + Phaser.Math.Between(-2, 2)
-    };
-    defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
-    defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
-    
+    let defenderSpot;
+    if (
+      turnData.defender_spot &&
+      typeof turnData.defender_spot.x === "number" &&
+      typeof turnData.defender_spot.y === "number"
+    ) {
+      defenderSpot = {
+        x: Phaser.Math.Clamp(turnData.defender_spot.x, GRID_MIN_X, GRID_MAX_X),
+        y: Phaser.Math.Clamp(turnData.defender_spot.y, GRID_MIN_Y, GRID_MAX_Y),
+      };
+    } else {
+      const defenderAnimEnd = getAnimationEndGridForPlayer(turnData, defenderId);
+      incrementFbCounter(scene, "fbRequiredRoleCount", 1);
+      defenderSpot =
+        defenderAnimEnd ??
+        fastBreakSecondaryShotDefenderGrid(
+          stopperSpot.x,
+          stopperSpot.y,
+          rimRunnerSpriteGrid(defenderSprite, width, height).y,
+        );
+      if (!defenderAnimEnd) {
+        const source = rimRunnerSpriteGrid(defenderSprite, width, height);
+        reportMissingEndpoint(scene, turnData, {
+          playerId: defenderId,
+          role: "defender",
+          requiredEndpointType: "animations_end",
+          hasRoleCoord: false,
+          reason: "missing_defender_animation_end",
+        });
+        reportFallback(scene, {
+          playerId: defenderId,
+          role: "defender",
+          fallbackPolicy: "defender_vs_shooter_grid",
+          missingAuthority: ["animations_end"],
+          source,
+          target: defenderSpot,
+        });
+      }
+    }
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
     promises.push(
@@ -554,6 +2405,15 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         easing: "Linear"
       })
     );
+  } else if (defenderId) {
+    console.warn("🏀 FB Shot (with stopper) - No trail defender sprite found!", {
+      defenderId,
+      source: defenderRef.source,
+      candidates: defenderRef.candidates,
+      stopperId,
+      shooterId,
+      availableSprites: Object.keys(playerSprites),
+    });
   }
   
   // Move all other players to standard positions
@@ -699,11 +2559,14 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       return;
     }
     
-    const rebounderSprite = playerSprites[rebounderId];
+    const rebounderRef = resolvePlayerSpriteById(playerSprites, rebounderId);
+    const rebounderSprite = rebounderRef.sprite;
+    const rebounderIdResolved = rebounderRef.id;
     
     if (!rebounderSprite) {
       console.error('⚠️ [FAST BREAK MISS WITH STOPPER] Rebounder sprite not found', {
         rebounderId,
+        rebounderIdResolved,
         availableSprites: Object.keys(playerSprites)
       });
       // Return early - rebound will be handled by next turn
@@ -721,40 +2584,14 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
-    if (rebounderTweens.length > 0) {
-      let monitoringActive = true;
-      const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
-      
-      const checkRebounderReached = () => {
-        if (!monitoringActive) return;
-        
-        const distanceToBall = Math.hypot(
-          rebounderSprite.x - ballBouncePx.x,
-          rebounderSprite.y - ballBouncePx.y
-        );
-        
-        // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
-        if (distanceToBall < 30) {
-          monitoringActive = false;
-          rebounderTweens.forEach(tween => {
-            if (tween && tween.isPlaying) {
-              tween.stop();
-            }
-          });
-          return;
-        }
-        
-        // Continue checking until rebounder reaches ball or all tweens are stopped
-        if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) {
-          scene.time.delayedCall(50, checkRebounderReached);
-        } else {
-          monitoringActive = false;
-        }
-      };
-      
-      // Start monitoring after a short delay to let rebounder start moving
-      scene.time.delayedCall(100, checkRebounderReached);
-    }
+    const stopReboundMonitor = startRebounderCatchMonitor({
+      scene,
+      rebounderTweens,
+      rebounderSprite,
+      ballGrid: miss.grid,
+      width,
+      height,
+    });
     
     // Animate rebound
     await animateRebound({
@@ -762,11 +2599,12 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       ballSprite,
       playerSprites,
       animations: [],
-      rebounderId,
+      rebounderId: rebounderIdResolved ?? rebounderId,
       ballSpot: miss.grid,
       shooterId,
       turnData: turnData
     });
+    stopReboundMonitor();
     
     // ✅ FIX: Use runDefensiveReboundSetup for DREB (matching animateFastBreakShot pattern)
     if (turnData.rebound_type === "DREB") {
@@ -777,36 +2615,39 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         playerSprites,
         rebounderId,
         nextPlayType: turnData.next_play_type || "HCO",
-        turnData: turnData
+        turnData: turnData,
+        suppressFastBreakReceiverAuthority: true,
       });
     }
   }
 }
 
 async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, options = {}) {
-  const shooterId = turnData.roles?.shooter?.player_id || turnData.shooter_id || getCurrentOwner(scene);
-  const shooterSprite = playerSprites[shooterId];
+  const shooterRawId = turnData.roles?.shooter?.player_id || turnData.shooter_id || getCurrentOwner(scene);
+  const shooterRef = resolvePlayerSpriteById(playerSprites, shooterRawId);
+  const shooterId = shooterRef.id;
+  const shooterSprite = shooterRef.sprite;
   
   if (!shooterSprite) return;
   
   const isHomeOffense = shooterSprite.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const basket = getFastBreakAttackingBasket(isHomeOffense);
 
   // ✅ SS&S: Backend is single source of truth for shot spot (and defender spot)
   // Use turnData.shot_spot when present (grid coords, HOME orientation); else fallback to local random
   let shotSpot;
   if (turnData.shot_spot && typeof turnData.shot_spot.x === "number" && typeof turnData.shot_spot.y === "number") {
     shotSpot = {
-      x: Phaser.Math.Clamp(turnData.shot_spot.x, 4, 97),
-      y: Phaser.Math.Clamp(turnData.shot_spot.y, 1, 49)
+      x: Phaser.Math.Clamp(turnData.shot_spot.x, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(turnData.shot_spot.y, GRID_MIN_Y, GRID_MAX_Y)
     };
   } else {
     shotSpot = {
-      x: isHomeOffense ? basket.x - Phaser.Math.Between(2, 6) : basket.x + Phaser.Math.Between(2, 6),
-      y: basket.y + Phaser.Math.Between(-6, 6)
+      x: isHomeOffense ? basket.x - Phaser.Math.Between(1, 4) : basket.x + Phaser.Math.Between(1, 4),
+      y: basket.y + Phaser.Math.Between(-3, 3)
     };
-    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, 4, 97);
-    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, 1, 49);
+    shotSpot.x = Phaser.Math.Clamp(shotSpot.x, GRID_MIN_X, GRID_MAX_X);
+    shotSpot.y = Phaser.Math.Clamp(shotSpot.y, GRID_MIN_Y, GRID_MAX_Y);
   }
 
   const shotPx = gridToPixels(shotSpot.x, shotSpot.y, width, height);
@@ -824,33 +2665,45 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   });
   promises.push(shooterPromise);
   
-  // ✅ SS&S: Defender id from backend (defender_id or defenderId), then fallback to roles
-  let defenderId = turnData.defender_id ?? turnData.defenderId;
-  if (!defenderId) {
-    const defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
-    if (defenderData) {
-      if (typeof defenderData === "string") defenderId = defenderData;
-      else defenderId = defenderData.player_id ?? defenderData.playerId;
-    }
-  }
-
-  const defenderSprite = defenderId ? playerSprites[defenderId] : null;
+  // ✅ SS&S: Resolve defender from all supported payload shapes.
+  const defenderRef = resolveFastBreakDefenderSprite(playerSprites, turnData, {
+    excludeIds: [shooterId],
+  });
+  let defenderId = defenderRef.id;
+  const defenderSprite = defenderRef.sprite;
 
   if (defenderSprite) {
     // ✅ SS&S: Use backend defender_spot when present (grid coords, HOME orientation); else fallback to spot between shooter and basket
     let defenderSpot;
     if (turnData.defender_spot && typeof turnData.defender_spot.x === "number" && typeof turnData.defender_spot.y === "number") {
       defenderSpot = {
-        x: Phaser.Math.Clamp(turnData.defender_spot.x, 4, 97),
-        y: Phaser.Math.Clamp(turnData.defender_spot.y, 1, 49)
+        x: Phaser.Math.Clamp(turnData.defender_spot.x, GRID_MIN_X, GRID_MAX_X),
+        y: Phaser.Math.Clamp(turnData.defender_spot.y, GRID_MIN_Y, GRID_MAX_Y)
       };
     } else {
-      defenderSpot = {
-        x: isHomeOffense ? shotSpot.x + 3 : shotSpot.x - 3,
-        y: shotSpot.y + Phaser.Math.Between(-2, 2)
-      };
-      defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
-      defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
+      const defenderAnimEnd = getAnimationEndGridForPlayer(turnData, defenderId);
+      incrementFbCounter(scene, "fbRequiredRoleCount", 1);
+      defenderSpot =
+        defenderAnimEnd ??
+        fastBreakShotDefenderGridVsShooter(shotSpot.x, shotSpot.y, isHomeOffense);
+      if (!defenderAnimEnd) {
+        const source = rimRunnerSpriteGrid(defenderSprite, width, height);
+        reportMissingEndpoint(scene, turnData, {
+          playerId: defenderId,
+          role: "defender",
+          requiredEndpointType: "animations_end",
+          hasRoleCoord: false,
+          reason: "missing_defender_animation_end",
+        });
+        reportFallback(scene, {
+          playerId: defenderId,
+          role: "defender",
+          fallbackPolicy: "defender_vs_shooter_grid",
+          missingAuthority: ["animations_end"],
+          source,
+          target: defenderSpot,
+        });
+      }
     }
 
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
@@ -864,6 +2717,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   } else if (defenderId) {
     console.warn("🏀 FB Shot - No defender sprite found!", {
       defenderId,
+      source: defenderRef.source,
+      candidates: defenderRef.candidates,
       turnDataDefenderId: turnData.defender_id ?? turnData.defenderId,
       availableSprites: Object.keys(playerSprites)
     });
@@ -929,7 +2784,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // Handle outcome
   if (turnData.result_type === "MAKE") {
     // Show announcement with shooter headshot (AND-1 handled here; ballManager path not used for Fast Break)
-    const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
+    const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
     const shooterInfo = scene.playerInfo?.[shooterId];
     const shooterTeamId = shooterSprite?.team_id;
     
@@ -1024,45 +2879,39 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const rebounderId = turnData.rebounderId || turnData.rebounder_id || turnData.rebounder_player_id || turnData.roles?.rebounder?.player_id;
 
     if (rebounderId) {
-      const rebounderSprite = playerSprites[rebounderId];
+      const rebounderRef = resolvePlayerSpriteById(playerSprites, rebounderId);
+      const rebounderSprite = rebounderRef.sprite;
+      const rebounderIdResolved = rebounderRef.id;
       if (rebounderSprite) {
-        if (rebounderTweens.length > 0) {
-          let monitoringActive = true;
-          const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
-          const checkRebounderReached = () => {
-            if (!monitoringActive) return;
-            const distanceToBall = Math.hypot(rebounderSprite.x - ballBouncePx.x, rebounderSprite.y - ballBouncePx.y);
-            if (distanceToBall < 30) {
-              monitoringActive = false;
-              rebounderTweens.forEach(tween => {
-                if (tween && tween.isPlaying) tween.stop();
-              });
-              return;
-            }
-            if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) scene.time.delayedCall(50, checkRebounderReached);
-            else monitoringActive = false;
-          };
-          scene.time.delayedCall(100, checkRebounderReached);
-        }
+        const stopReboundMonitor = startRebounderCatchMonitor({
+          scene,
+          rebounderTweens,
+          rebounderSprite,
+          ballGrid: miss.grid,
+          width,
+          height,
+        });
         await animateRebound({
           scene,
           ballSprite,
           playerSprites,
           animations: [],
-          rebounderId,
+          rebounderId: rebounderIdResolved ?? rebounderId,
           ballSpot: miss.grid,
           shooterId,
           turnData: missTurnForGetback
         });
+        stopReboundMonitor();
         if (turnData.rebound_type === "DREB") {
           const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
           await runDefensiveReboundSetup({
             scene,
             ballSprite,
             playerSprites,
-            rebounderId,
+            rebounderId: rebounderIdResolved ?? rebounderId,
             nextPlayType: turnData.next_play_type || "HCO",
-            turnData
+            turnData,
+            suppressFastBreakReceiverAuthority: true,
           });
         }
       }
@@ -1140,11 +2989,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       return;
     }
     
-    const rebounderSprite = playerSprites[rebounderId];
+    const rebounderRef = resolvePlayerSpriteById(playerSprites, rebounderId);
+    const rebounderSprite = rebounderRef.sprite;
+    const rebounderIdResolved = rebounderRef.id;
     
     if (!rebounderSprite) {
       console.error('⚠️ [FAST BREAK MISS] Rebounder sprite not found', {
         rebounderId,
+        rebounderIdResolved,
         availableSprites: Object.keys(playerSprites)
       });
       // Return early - rebound will be handled by next turn
@@ -1153,51 +3005,26 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
-    if (rebounderTweens.length > 0) {
-      let monitoringActive = true;
-      const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
-      
-      const checkRebounderReached = () => {
-        if (!monitoringActive) return;
-        
-        const distanceToBall = Math.hypot(
-          rebounderSprite.x - ballBouncePx.x,
-          rebounderSprite.y - ballBouncePx.y
-        );
-        
-        // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
-        if (distanceToBall < 30) {
-          monitoringActive = false;
-          rebounderTweens.forEach(tween => {
-            if (tween && tween.isPlaying) {
-              tween.stop();
-            }
-          });
-          return;
-        }
-        
-        // Continue checking until rebounder reaches ball or all tweens are stopped
-        if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) {
-          scene.time.delayedCall(50, checkRebounderReached);
-        } else {
-          monitoringActive = false;
-        }
-      };
-      
-      // Start monitoring after a short delay to let rebounder start moving
-      scene.time.delayedCall(100, checkRebounderReached);
-    }
+    const stopReboundMonitor = startRebounderCatchMonitor({
+      scene,
+      rebounderTweens,
+      rebounderSprite,
+      ballGrid: miss.grid,
+      width,
+      height,
+    });
     
     await animateRebound({
       scene,
       ballSprite,
       playerSprites,
       animations: [],
-      rebounderId,
+      rebounderId: rebounderIdResolved ?? rebounderId,
       ballSpot: miss.grid,
       shooterId,
       turnData: missTurnForGetback // ✅ FIX: Pass previous HCO MISS turn (has offense_getback) so get-back players can be excluded
     });
+    stopReboundMonitor();
     
     // Defensive rebound setup if needed
     if (turnData.rebound_type === "DREB") {
@@ -1206,9 +3033,10 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         scene,
         ballSprite,
         playerSprites,
-        rebounderId,
+        rebounderId: rebounderIdResolved ?? rebounderId,
         nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
-        turnData: turnData // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
+        turnData: turnData, // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
+        suppressFastBreakReceiverAuthority: true,
         // runDefensiveReboundSetup will find offense_getback from previous turn if needed
       });
     }
@@ -1310,7 +3138,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
               x: isHomeOffense ? topKey.x + 2 : topKey.x - 2,
               y: topKey.y
             };
-            stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+            stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, GRID_MIN_X, GRID_MAX_X);
             const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
             const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
             promises.push(
@@ -1483,7 +3311,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         x: isHomeOffense ? topKey.x + 2 : topKey.x - 2,  // 2 spots in front, directly between ball handler and basket
         y: topKey.y  // Same Y as ball handler (directly in front)
       };
-      stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+      stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, GRID_MIN_X, GRID_MAX_X);
       
       const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
       const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
@@ -1548,13 +3376,21 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     await Promise.all(promises);
   }
   
-  // ✅ Show "Great Stop!" announcement with stopper headshot (for Fast Break defensive stops)
+  // ✅ "Great Stop!" after Fast Break defensive stops (stopper headshot; outlet denial = text only, no headshot)
+  const ballHandlerDataForStop = turnData.roles?.ball_handler;
+  const ballHandlerIdForStop =
+    ballHandlerDataForStop?.player_id || ballHandlerDataForStop || getCurrentOwner(scene);
+  const ballHandlerSpriteForStop = playerSprites[ballHandlerIdForStop];
+  const isHomeOffenseForStop = ballHandlerSpriteForStop?.team === 'home';
+  const defenseTeamForStop = isHomeOffenseForStop ? 'away' : 'home';
+
+  // Rim Runner outlet denied: handled in animateRimRunnerOutletDeniedBeat + finalizeRimRunnerNonShotTurn (no Great Stop! here).
   if (turnData.fast_break === true && turnData.stopper_id) {
     const stopperId = turnData.stopper_id;
     const stopperSprite = playerSprites[stopperId];
     
     if (stopperSprite) {
-      const { showAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const stopperInfo = scene.playerInfo?.[stopperId];
       const stopperTeamId = stopperSprite?.team_id;
       
@@ -1565,12 +3401,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
       const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
       
-      // Determine offense side for defense team calculation
-      const ballHandlerData = turnData.roles?.ball_handler;
-      const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
-      const ballHandlerSprite = playerSprites[ballHandlerId];
-      const isHomeOffense = ballHandlerSprite?.team === "home";
-      
       const stopperPlayerData = stopperInfo ? {
         playerId: stopperId,
         photo: stopperSprite?.photo || null,
@@ -1578,9 +3408,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         secondaryColor: getSecondaryColorForTeam(scene, stopperSprite?.team_id)
       } : null;
 
-      // Defensive stop: show in defense team color (they benefited)
-      const defenseTeam = isHomeOffense ? 'away' : 'home';
-      showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
+      showAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData);
       
       const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
       await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));
@@ -1621,8 +3449,9 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 
 /**
  * Animate rebounders (players who stayed near rim for shot attempt) to their target positions
- * - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
- * - Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
+ * - Prefer `turn.animations[].end` per player when present (SS&S with sim).
+ * - Defensive Stop fallback: x=40-60, y=starting_y ± 6 (clamped 1-49)
+ * - Shot Attempt fallback: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
  * 
  * @param {Phaser.Scene} scene - Phaser scene
  * @param {Object} playerSprites - Dictionary of player sprites
@@ -1633,7 +3462,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
  * @param {number} height - Scene height
  * @param {Set} getbackPlayerIdsSet - Set of get-back player IDs (to skip)
  * @param {Set} releasePlayerIdsSet - Set of release player IDs (to skip)
- * @param {string} outletPasserId - ID of outlet passer (to skip)
  * @returns {Array} Array of tween references for rebounder animations (for early termination)
  */
 function animateRebounders(
@@ -1645,8 +3473,7 @@ function animateRebounders(
   width,
   height,
   getbackPlayerIdsSet,
-  releasePlayerIdsSet,
-  outletPasserId
+  releasePlayerIdsSet
 ) {
   const rebounderTweens = [];
   const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP";
@@ -1664,11 +3491,10 @@ function animateRebounders(
   };
   
   for (const [id, sprite] of Object.entries(playerSprites)) {
-    // Skip shooter, primary defender, outlet passer, get-back players, and release players
+    // Skip shooter, primary defender, get-back players, and release players (outlet passer uses same tween path)
     if (
       id === ballHandlerId ||
       id === primaryDefenderId ||
-      id === outletPasserId ||
       getbackPlayerIdsSet.has(id) ||
       releasePlayerIdsSet.has(id)
     ) {
@@ -1681,28 +3507,53 @@ function animateRebounders(
     const startingY = startingGrid.y;
     
     let targetSpot;
-    
-    if (isDefensiveStop) {
+    const animEnd = getAnimationEndGridForPlayer(turnData, id);
+    incrementFbCounter(scene, "fbRequiredRoleCount", 1);
+    if (animEnd) {
+      targetSpot = animEnd;
+    } else if (isDefensiveStop) {
       // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
       targetSpot = {
         x: Phaser.Math.Between(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
-        y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), 1, 49)
+        y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), GRID_MIN_Y, GRID_MAX_Y)
       };
     } else {
       // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
       // Home basket (x=91): 5-20 spots less = 71-86
       // Away basket (x=9): 5-20 spots more = 14-29
       const distanceFromBasket = Phaser.Math.Between(5, 20);
-      const targetX = isHomeOffense 
-        ? basket.x - distanceFromBasket  // Home: move left (toward center court)
-        : basket.x + distanceFromBasket;  // Away: move right (toward center court)
-      
+      const targetX = isHomeOffense
+        ? basket.x - distanceFromBasket // Home: move left (toward center court)
+        : basket.x + distanceFromBasket; // Away: move right (toward center court)
+
       targetSpot = {
-        x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
-        y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE), 1, 49)
+        x: Phaser.Math.Clamp(targetX, GRID_MIN_X, GRID_MAX_X), // Clamp to court bounds
+        y: Phaser.Math.Clamp(
+          basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE),
+          GRID_MIN_Y,
+          GRID_MAX_Y
+        ),
       };
     }
-    
+    if (!animEnd) {
+      const source = rimRunnerSpriteGrid(sprite, width, height);
+      reportMissingEndpoint(scene, turnData, {
+        playerId: id,
+        role: "rebounder",
+        requiredEndpointType: "animations_end",
+        hasRoleCoord: false,
+        reason: "missing_rebounder_animation_end",
+      });
+      reportFallback(scene, {
+        playerId: id,
+        role: "rebounder",
+        fallbackPolicy: isDefensiveStop ? "defensive_stop_band" : "shot_attempt_rebound_band",
+        missingAuthority: ["animations_end"],
+        source,
+        target: targetSpot,
+      });
+    }
+
     const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
     // ✅ Use distance-based duration for consistent speed
     // Players will stop at their current position if shot happens before they reach their spot
@@ -1727,13 +3578,52 @@ function animateRebounders(
 }
 
 /**
+ * Same rim convention as `animateFastBreakShot` / `animateFastBreakShotWithStopper` (HOME grid).
+ */
+function getFastBreakAttackingBasket(isHomeOffense) {
+  return isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+}
+
+/**
+ * X band for get-back defenders to sprint toward the hoop the fast-break offense is attacking.
+ * Must match offense direction used for shot spots — do not hardcode one rim; away FB attacks low x.
+ */
+function getGetBackRetreatXRange(isHomeOffense) {
+  const basket = getFastBreakAttackingBasket(isHomeOffense);
+  if (isHomeOffense) {
+    return {
+      minX: 50,
+      maxX: Phaser.Math.Clamp(basket.x - 2, GRID_MIN_X, GRID_MAX_X),
+    };
+  }
+  return {
+    minX: Phaser.Math.Clamp(basket.x + 2, GRID_MIN_X, GRID_MAX_X),
+    maxX: 50,
+  };
+}
+
+function resolveFastBreakOffenseIsHome(playerSprites, ballHandlerId, turnData, scene) {
+  const bhSprite = ballHandlerId != null ? playerSprites[ballHandlerId] : null;
+  if (bhSprite?.team === "home") return true;
+  if (bhSprite?.team === "away") return false;
+  const oid =
+    turnData?.offense_team_id ??
+    turnData?.possession_team_id ??
+    scene?.offenseTeamId;
+  const hid = scene?.simData?.home_team_id;
+  if (oid != null && hid != null) {
+    return String(oid) === String(hid);
+  }
+  return true;
+}
+
+/**
  * Helper: Move all non-involved players to their positions
- * - Outlet passer: moves forward 7 x-coords toward basket (+7 for home offense, -7 for away offense)
- * - Get-back players: chase toward basket (X: 50 to basket-15, Y: 15-35)
- * - Rebounders: handled by animateRebounders() function
+ * - Get-back players: prefer `turn.animations[].end` (SS&S with sim); else retreat band toward rim, Y: 15–35
+ * - Outlet passer & other trail players: same targets/tweens as animateRebounders (incl. early stop)
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
  * - Rebounders stop early when defensive stop is made (ball handler and stopper reach their spots)
- * 
+ *
  * @returns {Array} Array of tween references for rebounder animations (for early termination)
  */
 async function moveOtherPlayersToStandardPositions(
@@ -1764,49 +3654,9 @@ async function moveOtherPlayersToStandardPositions(
   const getbackPlayerIdsSet = new Set(getbackPlayerIds);
   const releasePlayerIdsSet = new Set(releasePlayerIds);
   
-  // ✅ Get outlet passer ID - they move forward 7 x-coords toward basket
-  const outletPasserId = turnData.roles?.outlet_passer;
-  
-  // Determine which basket is being attacked and if this is a defensive stop or shot attempt
-  const shooterSprite = playerSprites[ballHandlerId];
-  const isHomeOffense = shooterSprite?.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP";
-  
-  // Convert sprite positions to grid for starting y calculation
-  const pixelsToGrid = (pixelX, pixelY) => {
-    const gridX = (pixelX / width) * 100;
-    const gridY = 50 - (pixelY / height) * 50;
-    return { x: gridX, y: gridY };
-  };
-  
   for (const [id, sprite] of Object.entries(playerSprites)) {
     // Skip shooter and primary defender (already animated)
     if (id === ballHandlerId || id === primaryDefenderId) {
-      continue;
-    }
-    
-    // ✅ Outlet passer moves forward 7 x-coords toward basket
-    if (id === outletPasserId) {
-      const passerCurrentGrid = pixelsToGrid(sprite.x, sprite.y);
-      const passerTargetX = isHomeOffense 
-        ? Phaser.Math.Clamp(passerCurrentGrid.x + OUTLET_PASSER_MOVE_X, 4, 97)  // Home: +7 (toward x=90)
-        : Phaser.Math.Clamp(passerCurrentGrid.x - OUTLET_PASSER_MOVE_X, 4, 97); // Away: -7 (toward x=10)
-      
-      const targetSpot = {
-        x: passerTargetX,
-        y: passerCurrentGrid.y  // Keep same y-coord
-      };
-      
-      const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
-      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
-      
-      promises.push(
-        tweenPlayerTo(scene, sprite, targetPx, {
-          duration: playerDuration,
-          easing: "Linear"
-        })
-      );
       continue;
     }
     
@@ -1818,15 +3668,40 @@ async function moveOtherPlayersToStandardPositions(
     // ✅ Only animate get-back players as defenders (not all players in defense list)
     // Rebounders are handled separately by animateRebounders() function
     if (getbackPlayerIdsSet.has(id)) {
-      // Get-back defenders chase: X between 50 and 15 spots closer to basket
-      const minX = isHomeOffense ? 50 : basket.x + 2;
-      const maxX = isHomeOffense ? basket.x - 2 : 50;
-      
-      const targetSpot = {
-        x: Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX)),
-        y: Phaser.Math.Between(15, 35)
+      const isHomeOffense = resolveFastBreakOffenseIsHome(
+        playerSprites,
+        ballHandlerId,
+        turnData,
+        scene
+      );
+      const { minX, maxX } = getGetBackRetreatXRange(isHomeOffense);
+      const lo = Math.min(minX, maxX);
+      const hi = Math.max(minX, maxX);
+      const animEnd = getAnimationEndGridForPlayer(turnData, id);
+      incrementFbCounter(scene, "fbRequiredRoleCount", 1);
+      const targetSpot = animEnd ?? {
+        x: Phaser.Math.Between(lo, hi),
+        y: Phaser.Math.Between(15, 35),
       };
-      
+      if (!animEnd) {
+        const source = rimRunnerSpriteGrid(sprite, width, height);
+        reportMissingEndpoint(scene, turnData, {
+          playerId: id,
+          role: "getback_defender",
+          requiredEndpointType: "animations_end",
+          hasRoleCoord: false,
+          reason: "missing_getback_animation_end",
+        });
+        reportFallback(scene, {
+          playerId: id,
+          role: "getback_defender",
+          fallbackPolicy: "random_band",
+          missingAuthority: ["animations_end"],
+          source,
+          target: targetSpot,
+        });
+      }
+
       const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
       
@@ -1850,8 +3725,7 @@ async function moveOtherPlayersToStandardPositions(
     width,
     height,
     getbackPlayerIdsSet,
-    releasePlayerIdsSet,
-    outletPasserId
+    releasePlayerIdsSet
   );
   
   // Add rebounder tween promises for awaiting

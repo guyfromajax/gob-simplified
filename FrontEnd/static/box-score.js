@@ -638,7 +638,7 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
         const statKeys = ['FGM', 'FGA', '3PTM', '3PTA', 'FTM', 'FTA', 'OREB', 'DREB', 'REB', 
                          'AST', 'STL', 'BLK', 'TO', 'F', 'MIN', 'PTS', 'PIP', 'FB_PTS',
                          'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S',
-                         'FB_A', 'FB_S', 'FB_F', 'FB_N', 'FB_A_D', 'FB_S_D', 'FB_F_D',
+                         'FB_A', 'FB_S', 'FB_A_D', 'FB_S_D', 'FB_F_D',
                          'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum',
                          'HCT_A', 'HCT_S', 'HCT_A_D', 'HCT_S_D',
                          'FCP_A', 'FCP_S', 'FCP_A_D', 'FCP_S_D'];
@@ -658,7 +658,7 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
         const statKeys = ['FGM', 'FGA', '3PTM', '3PTA', 'FTM', 'FTA', 'OREB', 'DREB', 'REB', 
                          'AST', 'STL', 'BLK', 'TO', 'F', 'MIN', 'PTS', 'PIP', 'FB_PTS',
                          'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S',
-                         'FB_A', 'FB_S', 'FB_F', 'FB_N', 'FB_A_D', 'FB_S_D', 'FB_F_D',
+                         'FB_A', 'FB_S', 'FB_A_D', 'FB_S_D', 'FB_F_D',
                          'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum',
                          'HCT_A', 'HCT_S', 'HCT_A_D', 'HCT_S_D',
                          'FCP_A', 'FCP_S', 'FCP_A_D', 'FCP_S_D'];
@@ -1102,12 +1102,6 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   // Special situations use canonical EOG snapshot when available (matches EOG attribute calculations).
   const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
 
-  // Fast Breaks
-  const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
-  const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
-  const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
-  specialSection.appendChild(createScoutingItem('Fast Breaks', `${fbSuccess} / ${fbEntries}`, `${fbPct}%`));
-
   // HC Traps
   const hct = defense.HCT || {};
   const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
@@ -1209,6 +1203,60 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   defensePlayCallsSection.appendChild(zone131DefenseSection);
 
   container.appendChild(defensePlayCallsSection);
+
+  // Fast Breaks (offense scouting; per-play splits — after Defense Play Calls per product spec)
+  const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
+  const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
+  const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
+
+  // Match defense subsection pattern: h4 line with title + S/A/%, then scouting-item rows (vs Motion, etc.)
+  const fastBreakSection = document.createElement('div');
+  fastBreakSection.className = 'scouting-section';
+  const fastBreakSub = document.createElement('div');
+  fastBreakSub.className = 'scouting-subsection';
+  fastBreakSub.innerHTML = `<h4>Fast Breaks: ${fbSuccess} / ${fbEntries} (${fbPct}%)</h4>`;
+
+  const mergedFbPlays = mergeFastBreakPlaysForBoxScore(
+    offense.fast_break_plays,
+    scoutingSnapshot.fast_break_plays
+  );
+  const fbPlayRows = [
+    { key: 'covert_release', label: 'Covert Release' },
+    { key: 'rim_runner', label: 'Rim Runner' },
+    { key: 'full_team', label: 'Full Team' },
+    { key: 'after_steal', label: 'After Steal' },
+  ];
+  for (const row of fbPlayRows) {
+    const p = mergedFbPlays[row.key] || { A: 0, S: 0 };
+    const a = Number(p.A) || 0;
+    const s = Number(p.S) || 0;
+    const pct = a > 0 ? ((s / a) * 100).toFixed(0) : '0';
+    fastBreakSub.appendChild(createScoutingItem(row.label, `${s} / ${a}`, `${pct}%`));
+  }
+
+  fastBreakSection.appendChild(fastBreakSub);
+  container.appendChild(fastBreakSection);
+}
+
+/**
+ * Merge offense.fast_break_plays with EOG snapshot (if present) for box score display.
+ */
+function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
+  const keys = ['covert_release', 'rim_runner', 'full_team', 'after_steal'];
+  const out = {};
+  for (const k of keys) {
+    const o = (offensePlays && offensePlays[k]) || {};
+    const s = (snapshotPlays && snapshotPlays[k]) || {};
+    const aO = o.A !== undefined && o.A !== null ? Number(o.A) : 0;
+    const sO = o.S !== undefined && o.S !== null ? Number(o.S) : 0;
+    const aSnap = s.A !== undefined && s.A !== null ? Number(s.A) : null;
+    const sSnap = s.S !== undefined && s.S !== null ? Number(s.S) : null;
+    out[k] = {
+      A: aSnap !== null ? aSnap : aO,
+      S: sSnap !== null ? sSnap : sO,
+    };
+  }
+  return out;
 }
 
 // Create playcall subsection (Motion, Set, Cumulative)
@@ -1744,17 +1792,11 @@ function showSpecialStatsPopup(player) {
   // Convert to string and display if we have a valid jersey (including 0)
   const jerseyDisplay = (jerseyNum !== null && jerseyNum !== undefined) ? ` | #${String(jerseyNum)}` : '';
   
-  // Calculate Fast Break stats
+  // Calculate Fast Break stats (popup: S / A / %)
   const fbA = stats.FB_A || 0;
   const fbS = stats.FB_S || 0;
-  const fbF = stats.FB_F || 0;
-  const fbN = fbA - (fbS + fbF); // Calculated
-  
   const fbAD = stats.FB_A_D || 0;
   const fbSD = stats.FB_S_D || 0;
-  const fbFD = stats.FB_F_D || 0;
-  
-  // Calculate success rates
   const offenseSuccessRate = fbA > 0 ? ((fbS / fbA) * 100).toFixed(0) : '0';
   const defenseSuccessRate = fbAD > 0 ? ((fbSD / fbAD) * 100).toFixed(0) : '0';
   
@@ -1798,13 +1840,16 @@ function showSpecialStatsPopup(player) {
             <div class="special-stats-row">
               <h3>Fast Breaks</h3>
             </div>
+            <div class="special-stats-row special-stats-hint-row">
+              <span class="special-stats-hint">S / A / %</span>
+            </div>
             <div class="special-stats-row">
               <span class="special-stats-label">Offense:</span>
-              <span class="special-stats-value">${fbA} / ${offenseSuccessRate}%</span>
+              <span class="special-stats-value">${fbS} / ${fbA} / ${offenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row">
               <span class="special-stats-label">Defense:</span>
-              <span class="special-stats-value">${fbAD} / ${defenseSuccessRate}%</span>
+              <span class="special-stats-value">${fbSD} / ${fbAD} / ${defenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row empty-row"></div>
             <div class="special-stats-row">
@@ -1819,13 +1864,16 @@ function showSpecialStatsPopup(player) {
             <div class="special-stats-row">
               <h3>Traps</h3>
             </div>
+            <div class="special-stats-row special-stats-hint-row">
+              <span class="special-stats-hint">S / A / %</span>
+            </div>
             <div class="special-stats-row">
               <span class="special-stats-label">Offense:</span>
-              <span class="special-stats-value">${hctA} / ${hctOffenseSuccessRate}%</span>
+              <span class="special-stats-value">${hctS} / ${hctA} / ${hctOffenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row">
               <span class="special-stats-label">Defense:</span>
-              <span class="special-stats-value">${hctAD} / ${hctDefenseSuccessRate}%</span>
+              <span class="special-stats-value">${hctSD} / ${hctAD} / ${hctDefenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row empty-row"></div>
             <div class="special-stats-row">
@@ -1839,13 +1887,16 @@ function showSpecialStatsPopup(player) {
             <div class="special-stats-row">
               <h3>Presses</h3>
             </div>
+            <div class="special-stats-row special-stats-hint-row">
+              <span class="special-stats-hint">S / A / %</span>
+            </div>
             <div class="special-stats-row">
               <span class="special-stats-label">Offense:</span>
-              <span class="special-stats-value">${fcpA} / ${fcpOffenseSuccessRate}%</span>
+              <span class="special-stats-value">${fcpS} / ${fcpA} / ${fcpOffenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row">
               <span class="special-stats-label">Defense:</span>
-              <span class="special-stats-value">${fcpAD} / ${fcpDefenseSuccessRate}%</span>
+              <span class="special-stats-value">${fcpSD} / ${fcpAD} / ${fcpDefenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row empty-row"></div>
           </div>

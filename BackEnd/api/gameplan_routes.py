@@ -403,6 +403,7 @@ def initialize_playbook_settings():
         - set_play_inside: {play_name: percentage}
         - set_play_attack: {play_name: percentage}
         - set_play_outside: {play_name: percentage}
+        - fast_break: {play_key: percentage}
         - zone_defense: {defense_name: percentage} - Evenly distributed across all zone defenses
         - man_defense: {"Man": 100}
         - slot_assignments: {}
@@ -425,6 +426,7 @@ def initialize_playbook_settings():
             "set_play_inside": {},
             "set_play_attack": {},
             "set_play_outside": {},
+            "fast_break": {},
             "zone_defense": {},
             "man_defense": {},
             "slot_assignments": {},
@@ -511,6 +513,12 @@ def initialize_playbook_settings():
             playbook_settings["set_play_outside"],
             [p for p in set_plays_outside if p in seeded_offense_plays],
         )
+
+        playbook_settings["fast_break"] = {
+            "covert_release": 50,
+            "rim_runner": 50,
+            "full_team": 0,
+        }
         
         # Zone defense: Even distribution across all zone defenses
         # Zone defenses are hardcoded: "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
@@ -627,6 +635,11 @@ def initialize_playbook_settings():
             "set_play_inside": {},
             "set_play_attack": {},
             "set_play_outside": {},
+            "fast_break": {
+                "covert_release": 50,
+                "rim_runner": 50,
+                "full_team": 0,
+            },
             "zone_defense": {"2-3 Zone": 100},
             "man_defense": {"Man": 100},
             "slot_assignments": {},
@@ -2183,6 +2196,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         set_play_inside_percentages = playbook_settings.get("set_play_inside", {}) if playbook_settings else {}
         set_play_attack_percentages = playbook_settings.get("set_play_attack", {}) if playbook_settings else {}
         set_play_outside_percentages = playbook_settings.get("set_play_outside", {}) if playbook_settings else {}
+        fast_break_percentages = playbook_settings.get("fast_break", {}) if playbook_settings else {}
         zone_defense_percentages = playbook_settings.get("zone_defense", {}) if playbook_settings else {}
         man_defense_percentages = playbook_settings.get("man_defense", {}) if playbook_settings else {}
         
@@ -2207,6 +2221,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 "set_play_inside": set_play_inside_percentages,
                 "set_play_attack": set_play_attack_percentages,
                 "set_play_outside": set_play_outside_percentages,
+                "fast_break": fast_break_percentages,
                 "zone_defense": zone_defense_percentages,
                 "man_defense": man_defense_percentages
             }

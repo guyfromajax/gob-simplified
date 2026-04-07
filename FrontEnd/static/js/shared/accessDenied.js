@@ -41,6 +41,11 @@
 
   function handleAccessDenied(response) {
     var is401 = response && response.status === 401;
+    if (is401 && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem('auth_token');
+      } catch (e) { /* ignore */ }
+    }
     var message = is401
       ? 'Please sign in. Redirecting...'
       : 'Access denied. Redirecting...';

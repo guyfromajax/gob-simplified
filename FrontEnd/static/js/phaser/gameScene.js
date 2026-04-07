@@ -11,6 +11,7 @@ import gameStore from '../state/gameStore.js';
 import { animateCountdownTransition } from './animation/countdownAnimation.js';
 import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
 import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
+import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAttributes.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -55,6 +56,176 @@ function resolveCourtImagePath(teamNameOrSlug) {
   });
 }
 
+function installOwnershipContractGlobalHelpers() {
+  const scope = typeof window !== 'undefined' ? window : globalThis;
+  if (!scope || scope.__ownershipContractHelpersInstalled) return;
+  scope.__ownershipContractHelpersInstalled = true;
+
+  const resolveOwnershipWarnThresholds = () => ({
+    minRows: Math.max(1, Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MIN_ROWS ?? 40) || 40)),
+    invalidApplicableRateMax: Math.max(
+      0,
+      Number(scope.UESS_OWNERSHIP_WARN_INVALID_APPLICABLE_RATE_MAX ?? 0.02) || 0.02
+    ),
+    missingContractRowsMax: Math.max(
+      0,
+      Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MISSING_CONTRACT_ROWS_MAX ?? 0) || 0)
+    ),
+  });
+
+  scope.showOwnershipContractConfig = () => {
+    const summaryEvery = Math.max(
+      1,
+      Math.floor(Number(scope.UESS_OWNERSHIP_SUMMARY_EVERY ?? 10) || 10)
+    );
+    const thresholds = resolveOwnershipWarnThresholds();
+    const config = {
+      mode: String(scope.UESS_OWNERSHIP_CONTRACT_MODE ?? "warn"),
+      summaryEvery,
+      thresholds,
+      latestSummary: scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ ?? null,
+    };
+    console.log("[OWNERSHIP CONTRACT CONFIG]", config);
+    return config;
+  };
+  scope.getOwnershipContractSummaryLatest = (n = 5) => {
+    const count = Math.max(0, Math.floor(Number(n) || 0));
+    const list = Array.isArray(scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__)
+      ? scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__
+      : [];
+    return list.slice(-count);
+  };
+  scope.clearOwnershipContractBuffers = () => {
+    scope.__OWNERSHIP_CONTRACT_LAST__ = undefined;
+    scope.__OWNERSHIP_CONTRACT_BUFFER__ = [];
+    scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ = undefined;
+    scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__ = [];
+    scope.__OWNERSHIP_CONTRACT_SESSION__ = undefined;
+  };
+}
+
+function installPressureReworkGlobalHelpers() {
+  const scope = typeof window !== 'undefined' ? window : globalThis;
+  if (!scope || scope.__pressureReworkHelpersInstalled) return;
+  scope.__pressureReworkHelpersInstalled = true;
+
+  const resolvePressureReworkWarnThresholds = () => ({
+    minRows: Math.max(
+      1,
+      Math.floor(Number(scope.UESS_PRESSURE_REWORK_WARN_MIN_ROWS ?? 10) || 10)
+    ),
+    warnRowsMax: Math.max(
+      0,
+      Math.floor(Number(scope.UESS_PRESSURE_REWORK_WARN_ROWS_MAX ?? 0) || 0)
+    ),
+    warnRateMax: Math.max(
+      0,
+      Number(scope.UESS_PRESSURE_REWORK_WARN_RATE_MAX ?? 0.02) || 0.02
+    ),
+  });
+
+  scope.showPressureReworkConfig = () => {
+    const phase = String(scope.UESS_PRESSURE_REWORK_PHASE ?? "off");
+    const leadInContractMode = String(scope.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE ?? "off");
+    const stepContractMode = String(scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE ?? "inherit_legacy");
+    const resolutionContractMode = String(scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE ?? "inherit_step_mode");
+    const outContractMode = String(scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE ?? "inherit_step_mode");
+    const summaryEvery = Math.max(
+      1,
+      Math.floor(Number(scope.UESS_PRESSURE_REWORK_SUMMARY_EVERY ?? 5) || 5)
+    );
+    const thresholds = resolvePressureReworkWarnThresholds();
+    const buffer = Array.isArray(scope.__PRESSURE_REWORK_BUFFER__)
+      ? scope.__PRESSURE_REWORK_BUFFER__
+      : [];
+    const enabledPhases = new Set(["phase1_scaffold", "phase2_split", "phase3_lead_in"]);
+    const config = {
+      phase,
+      enabled: enabledPhases.has(phase),
+      leadInContractMode,
+      stepContractMode,
+      resolutionContractMode,
+      outContractMode,
+      summaryEvery,
+      thresholds,
+      bufferRows: buffer.length,
+      latestSummary: scope.__PRESSURE_REWORK_SUMMARY_LAST__ ?? null,
+      lastEvent: scope.__PRESSURE_REWORK_LAST__ ?? null,
+    };
+    console.log("[PRESSURE REWORK CONFIG]", config);
+    return config;
+  };
+  scope.getPressureReworkLatest = (n = 5) => {
+    const count = Math.max(0, Math.floor(Number(n) || 0));
+    const buffer = Array.isArray(scope.__PRESSURE_REWORK_BUFFER__)
+      ? scope.__PRESSURE_REWORK_BUFFER__
+      : [];
+    return buffer.slice(-count);
+  };
+  scope.clearPressureReworkBuffer = () => {
+    scope.__PRESSURE_REWORK_LAST__ = undefined;
+    scope.__PRESSURE_REWORK_BUFFER__ = [];
+    scope.__PRESSURE_REWORK_SUMMARY_LAST__ = undefined;
+    scope.__PRESSURE_REWORK_SUMMARY_BUFFER__ = [];
+    scope.__PRESSURE_REWORK_SESSION__ = undefined;
+  };
+  scope.getPressureReworkSummaryLatest = (n = 5) => {
+    const count = Math.max(0, Math.floor(Number(n) || 0));
+    const list = Array.isArray(scope.__PRESSURE_REWORK_SUMMARY_BUFFER__)
+      ? scope.__PRESSURE_REWORK_SUMMARY_BUFFER__
+      : [];
+    return list.slice(-count);
+  };
+  scope.showPressureReworkPromotionReadiness = () => {
+    const summary = scope.__PRESSURE_REWORK_SUMMARY_LAST__ || null;
+    const readiness = {
+      phase: String(scope.UESS_PRESSURE_REWORK_PHASE ?? "off"),
+      summaryPresent: Boolean(summary),
+      rows: summary?.rows ?? 0,
+      warnRows: summary?.warnRows ?? 0,
+      warnRate: summary?.warnRate ?? 0,
+      hasEnoughRows: summary?.hasEnoughRows ?? false,
+      meetsWarnPromotionGate: summary?.meetsWarnPromotionGate ?? false,
+      thresholds: summary?.thresholds ?? resolvePressureReworkWarnThresholds(),
+    };
+    console.log("[PRESSURE REWORK READINESS]", readiness);
+    return readiness;
+  };
+  scope.applyPressureReworkPromotionProfile = (profile = "warn") => {
+    const p = String(profile || "").trim().toLowerCase();
+    // Shared baseline for pressure rework.
+    scope.UESS_PRESSURE_REWORK_PHASE = "phase3_lead_in";
+    scope.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE = "warn";
+    scope.UESS_PRESSURE_REWORK_SUMMARY_EVERY = 1;
+    if (p === "full_throw") {
+      scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "throw";
+      scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "throw";
+      scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "throw";
+    } else if (p === "pilot_throw") {
+      scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "throw";
+      scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "warn";
+      scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "warn";
+    } else {
+      // Default/invalid profile falls back to warn-only rollout.
+      scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE = "warn";
+      scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE = "warn";
+      scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE = "warn";
+      profile = "warn";
+    }
+    const applied = {
+      profile: p === "pilot_throw" || p === "full_throw" ? p : "warn",
+      phase: scope.UESS_PRESSURE_REWORK_PHASE,
+      leadInContractMode: scope.UESS_PRESSURE_LEAD_IN_CONTRACT_MODE,
+      stepContractMode: scope.UESS_PRESSURE_REWORK_STEP_CONTRACT_MODE,
+      resolutionContractMode: scope.UESS_PRESSURE_REWORK_RESOLUTION_CONTRACT_MODE,
+      outContractMode: scope.UESS_PRESSURE_REWORK_OUT_CONTRACT_MODE,
+      summaryEvery: scope.UESS_PRESSURE_REWORK_SUMMARY_EVERY,
+    };
+    console.log("[PRESSURE REWORK PROFILE APPLIED]", applied);
+    return applied;
+  };
+}
+
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
     constructor() {
@@ -67,6 +238,8 @@ export function createGameScene(Phaser) {
       this.possessionManager = null; // Will be initialized in create()
       this.gameClock = null;
       this.shotClock = null;
+      installOwnershipContractGlobalHelpers();
+      installPressureReworkGlobalHelpers();
     }
 
     init(data) {
@@ -279,6 +452,10 @@ export function createGameScene(Phaser) {
       }
       
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
+      const hRim = urlParams.get('home_rim_runner_player_id');
+      const aRim = urlParams.get('away_rim_runner_player_id');
+      if (hRim) payload.home_rim_runner_player_id = hRim;
+      if (aRim) payload.away_rim_runner_player_id = aRim;
       // Only pass game_id if we have one AND it's not a new game
       if (this.gameId && !isNewGameStart) {
         payload.game_id = this.gameId;
@@ -1308,6 +1485,7 @@ export function createGameScene(Phaser) {
               }
             }
           }
+          syncSpriteAttributesFromPlayerEnergy(this.playerSprites, turn.player_energy);
         }
       };
 
@@ -1497,12 +1675,41 @@ export function createGameScene(Phaser) {
           const currentClockSec = Number.isFinite(clockState.timeRemaining) ? clockState.timeRemaining : null;
           const incomingQuarter = (typeof turn.quarter === 'number') ? turn.quarter : liveQuarter;
           const allowIncrease = incomingQuarter > liveQuarter;
-          if (currentClockSec == null || allowIncrease || incomingGameSec <= currentClockSec) {
+          const nonMonotonicSlackSeconds = Math.max(
+            0,
+            Number(window?.UESS_CLOCK_NON_MONOTONIC_SLACK_SECONDS ?? 1) || 1
+          );
+          const inboundOrBoundaryTypes = new Set([
+            'FREE_THROW',
+            'SIDE_INBOUND',
+            'BASELINE_INBOUND',
+            'TIMEOUT',
+            'PUTBACK_MAKE',
+            'PUTBACK_MISS',
+            'OREB_KICKOUT',
+          ]);
+          const resultTypeKey = String(turn?.result_type || '').toUpperCase();
+          const increaseDeltaSeconds =
+            currentClockSec == null ? 0 : Number(incomingGameSec) - Number(currentClockSec);
+          const allowBoundarySlackIncrease =
+            increaseDeltaSeconds > 0 &&
+            increaseDeltaSeconds <= nonMonotonicSlackSeconds &&
+            inboundOrBoundaryTypes.has(resultTypeKey);
+
+          if (
+            currentClockSec == null ||
+            allowIncrease ||
+            incomingGameSec <= currentClockSec ||
+            allowBoundarySlackIncrease
+          ) {
             this.gameClock.syncWithBackend(incomingGameSec);
           } else {
             console.warn('⏱️ Ignoring non-monotonic clock update', {
               currentClockSec,
               incomingClockSec: incomingGameSec,
+              increaseDeltaSeconds,
+              nonMonotonicSlackSeconds,
+              allowBoundarySlackIncrease,
               liveQuarter,
               incomingQuarter,
               result_type: turn.result_type
@@ -2110,6 +2317,34 @@ export function createGameScene(Phaser) {
       // Part 2 (Preload): helper and state defined early so we can preload during initial turns (opening tip → first HCO).
       const simMode = this.mode || 'single';
       const fetchTurnData = async (offenseOverride, defenseOverride) => {
+        const resolveClockAuthorityMode = () => {
+          const raw = String(window?.UESS_CLOCK_AUTHORITY_MODE ?? "").trim().toLowerCase();
+          if (raw === "observe" || raw === "warn" || raw === "throw" || raw === "off") {
+            return raw;
+          }
+          return null;
+        };
+        const resolveClockElapsedAuthority = () => {
+          const raw = String(window?.UESS_CLOCK_ELAPSED_AUTHORITY ?? "").trim().toLowerCase();
+          if (raw === "legacy" || raw === "ledger") {
+            return raw;
+          }
+          return null;
+        };
+        const resolveOwnershipContractMode = () => {
+          const raw = String(window?.UESS_OWNERSHIP_CONTRACT_MODE ?? "").trim().toLowerCase();
+          if (raw === "off" || raw === "observe" || raw === "warn" || raw === "throw") {
+            return raw;
+          }
+          return null;
+        };
+        const resolveClockReconToleranceSeconds = () => {
+          const raw = window?.UESS_CLOCK_RECON_TOLERANCE_SECONDS;
+          if (raw === null || typeof raw === "undefined" || raw === "") return null;
+          const parsed = Number(raw);
+          if (!Number.isFinite(parsed) || parsed < 0) return null;
+          return parsed;
+        };
         const response = await fetch(API_CONFIG.buildUrl('/api/simulate-turn'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2117,7 +2352,11 @@ export function createGameScene(Phaser) {
             game_id: gameId,
             offense_override: offenseOverride ?? null,
             defense_override: defenseOverride ?? null,
-            mode: simMode
+            mode: simMode,
+            uess_clock_authority_mode: resolveClockAuthorityMode(),
+            uess_clock_elapsed_authority: resolveClockElapsedAuthority(),
+            uess_ownership_contract_mode: resolveOwnershipContractMode(),
+            uess_clock_recon_tolerance_seconds: resolveClockReconToleranceSeconds(),
           })
         });
         if (!response.ok) {
@@ -2144,6 +2383,261 @@ export function createGameScene(Phaser) {
           throw new Error(`API error: ${errorData.detail || `HTTP ${response.status}`}`);
         }
         return await response.json();
+      };
+
+      const mirrorClockReconDebug = (turnPayload) => {
+        try {
+          installOwnershipContractGlobalHelpers();
+          const scope = typeof window !== 'undefined' ? window : globalThis;
+          if (!turnPayload || typeof turnPayload !== 'object') return;
+          const requestedOwnershipMode = resolveOwnershipContractMode();
+          const firstBatchTurn =
+            turnPayload.result_type === 'BATCH' && Array.isArray(turnPayload.batch_turns)
+              ? turnPayload.batch_turns.find((row) => row && typeof row === 'object') ?? null
+              : null;
+
+          const defaultOwnershipMode =
+            turnPayload.uess_ownership_contract_mode ??
+            turnPayload.uess_ownership_contract?.mode ??
+            firstBatchTurn?.uess_ownership_contract_mode ??
+            firstBatchTurn?.uess_ownership_contract?.mode ??
+            requestedOwnershipMode ??
+            null;
+          const rows =
+            turnPayload.result_type === 'BATCH' && Array.isArray(turnPayload.batch_turns)
+              ? turnPayload.batch_turns
+              : [turnPayload];
+          for (const row of rows) {
+            if (!row || typeof row !== 'object') continue;
+            const ownershipMode =
+              row.uess_ownership_contract_mode ??
+              row.uess_ownership_contract?.mode ??
+              defaultOwnershipMode ??
+              requestedOwnershipMode ??
+              null;
+            const snapshot = {
+              resultType: row.result_type ?? null,
+              mode: row.uess_clock_authority_mode ?? row.uess_clock_reconciliation?.mode ?? null,
+              elapsedAuthority:
+                row.uess_clock_elapsed_authority ?? row.uess_clock_reconciliation?.elapsed_authority ?? null,
+              ownershipMode: ownershipMode ?? null,
+              ledgerCount: Array.isArray(row.clock_event_ledger) ? row.clock_event_ledger.length : 0,
+              ledgerElapsed: row.uess_clock_elapsed_game_seconds ?? null,
+              legacyElapsed: row.uess_clock_elapsed_legacy_game_seconds ?? row.time_elapsed ?? null,
+              delta: row.uess_clock_elapsed_delta_seconds ?? null,
+              withinTolerance: row.uess_clock_elapsed_observe_within_tolerance ?? row.uess_clock_reconciliation?.within_tolerance ?? null,
+              timestampMs: Date.now(),
+            };
+            scope.__CLOCK_RECON_LAST__ = snapshot;
+            if (!Array.isArray(scope.__CLOCK_RECON_BUFFER__)) {
+              scope.__CLOCK_RECON_BUFFER__ = [];
+            }
+            scope.__CLOCK_RECON_BUFFER__.push(snapshot);
+            if (scope.__CLOCK_RECON_BUFFER__.length > 100) {
+              scope.__CLOCK_RECON_BUFFER__.splice(0, scope.__CLOCK_RECON_BUFFER__.length - 100);
+            }
+
+            const ownershipContract = row.uess_ownership_contract;
+            const ownershipSnapshot = {
+              resultType: row.result_type ?? null,
+              mode: ownershipMode ?? null,
+              applicable:
+                typeof ownershipContract?.applicable === "boolean"
+                  ? ownershipContract.applicable
+                  : null,
+              passLifecycleValid:
+                typeof ownershipContract?.pass_lifecycle_valid === "boolean"
+                  ? ownershipContract.pass_lifecycle_valid
+                  : null,
+              passEventCount: Number(ownershipContract?.pass_event_count ?? 0) || 0,
+              validReceiptCount: Number(ownershipContract?.pass_receipt_valid_count ?? 0) || 0,
+              terminalOwnerPos: ownershipContract?.terminal_owner_pos ?? null,
+              timestampMs: Date.now(),
+            };
+            scope.__OWNERSHIP_CONTRACT_LAST__ = ownershipSnapshot;
+            if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_BUFFER__)) {
+              scope.__OWNERSHIP_CONTRACT_BUFFER__ = [];
+            }
+            scope.__OWNERSHIP_CONTRACT_BUFFER__.push(ownershipSnapshot);
+            if (scope.__OWNERSHIP_CONTRACT_BUFFER__.length > 100) {
+              scope.__OWNERSHIP_CONTRACT_BUFFER__.splice(
+                0,
+                scope.__OWNERSHIP_CONTRACT_BUFFER__.length - 100
+              );
+            }
+
+            const summaryEvery = Math.max(
+              1,
+              Math.floor(Number(scope.UESS_OWNERSHIP_SUMMARY_EVERY ?? 10) || 10)
+            );
+            if (!scope.__OWNERSHIP_CONTRACT_SESSION__) {
+              scope.__OWNERSHIP_CONTRACT_SESSION__ = {
+                rows: 0,
+                applicableRows: 0,
+                invalidRows: 0,
+                missingContractRows: 0,
+              };
+            }
+            const session = scope.__OWNERSHIP_CONTRACT_SESSION__;
+            session.rows += 1;
+            if (ownershipSnapshot.applicable === true) {
+              session.applicableRows += 1;
+              if (ownershipSnapshot.passLifecycleValid === false) {
+                session.invalidRows += 1;
+              }
+            } else if (ownershipSnapshot.applicable === null) {
+              session.missingContractRows += 1;
+            }
+
+            if (session.rows % summaryEvery === 0) {
+              const applicableRows = session.applicableRows;
+              const invalidRows = session.invalidRows;
+              const invalidApplicableRate =
+                applicableRows > 0 ? Number((invalidRows / applicableRows).toFixed(4)) : 0;
+              const thresholds = {
+                minRows: Math.max(
+                  1,
+                  Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MIN_ROWS ?? 40) || 40)
+                ),
+                invalidApplicableRateMax: Math.max(
+                  0,
+                  Number(scope.UESS_OWNERSHIP_WARN_INVALID_APPLICABLE_RATE_MAX ?? 0.02) || 0.02
+                ),
+                missingContractRowsMax: Math.max(
+                  0,
+                  Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MISSING_CONTRACT_ROWS_MAX ?? 0) || 0)
+                ),
+              };
+              const hasEnoughRows = session.rows >= thresholds.minRows;
+              const meetsWarnPromotionGate =
+                hasEnoughRows &&
+                invalidApplicableRate <= thresholds.invalidApplicableRateMax &&
+                session.missingContractRows <= thresholds.missingContractRowsMax;
+              const summary = {
+                event: "ownership_contract_summary",
+                mode: String(ownershipSnapshot.mode ?? "warn"),
+                rows: session.rows,
+                applicableRows,
+                invalidRows,
+                invalidApplicableRate,
+                missingContractRows: session.missingContractRows,
+                thresholds,
+                hasEnoughRows,
+                meetsWarnPromotionGate,
+                timestampMs: Date.now(),
+              };
+              scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ = summary;
+              if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__)) {
+                scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__ = [];
+              }
+              scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.push(summary);
+              if (scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length > 50) {
+                scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.splice(
+                  0,
+                  scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length - 50
+                );
+              }
+              if (!meetsWarnPromotionGate) {
+                const breach = {
+                  event: "ownership_contract_threshold_breach",
+                  mode: summary.mode,
+                  rows: summary.rows,
+                  invalidApplicableRate: summary.invalidApplicableRate,
+                  missingContractRows: summary.missingContractRows,
+                  thresholds: summary.thresholds,
+                  hasEnoughRows: summary.hasEnoughRows,
+                  meetsWarnPromotionGate: summary.meetsWarnPromotionGate,
+                  timestampMs: Date.now(),
+                };
+                scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.push(breach);
+                if (scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length > 50) {
+                  scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.splice(
+                    0,
+                    scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length - 50
+                  );
+                }
+              }
+            }
+          }
+        } catch (_) {
+          // Debug mirror must never impact gameplay loop.
+        }
+      };
+
+      const getBatchBoundaryHoldBudgetMs = () => {
+        const scope = typeof window !== "undefined" ? window : globalThis;
+        const raw = Number(scope?.UESS_BATCH_BOUNDARY_UNDECLARED_HOLD_BUDGET_MS);
+        if (Number.isFinite(raw) && raw > 0) return raw;
+        return 1200;
+      };
+
+      const isBoundaryInterruptResultType = (resultType) => {
+        const key = String(resultType || "").toUpperCase();
+        return (
+          key === "TIMEOUT" ||
+          key === "DEAD BALL" ||
+          key === "FOUL" ||
+          key === "CHARGE" ||
+          key === "TURNOVER" ||
+          key === "PERIOD_END"
+        );
+      };
+
+      const emitBatchBoundaryTelemetry = (event, payload = {}) => {
+        const scope = typeof window !== "undefined" ? window : globalThis;
+        const row = {
+          event,
+          branchKind: "batch_transition_boundary",
+          timestampMs: Date.now(),
+          ...payload,
+        };
+        this.events?.emit?.("animTelemetry", row);
+        scope.__BATCH_BOUNDARY_LAST__ = row;
+        if (!Array.isArray(scope.__BATCH_BOUNDARY_BUFFER__)) {
+          scope.__BATCH_BOUNDARY_BUFFER__ = [];
+        }
+        scope.__BATCH_BOUNDARY_BUFFER__.push(row);
+        if (scope.__BATCH_BOUNDARY_BUFFER__.length > 100) {
+          scope.__BATCH_BOUNDARY_BUFFER__.splice(
+            0,
+            scope.__BATCH_BOUNDARY_BUFFER__.length - 100
+          );
+        }
+      };
+
+      const validateBatchBoundaryDuration = ({
+        turnLike,
+        elapsedMs,
+        contextType,
+        turnIndex,
+        batchIndex = null,
+      }) => {
+        const expectedMs = Math.max(
+          0,
+          Number(turnLike?.real_time_elapsed_ms ?? turnLike?.realTimeElapsedMs ?? 0) || 0
+        );
+        const overrunMs = Math.max(0, Number(elapsedMs) - expectedMs);
+        const holdBudgetMs = getBatchBoundaryHoldBudgetMs();
+        const resultType = String(turnLike?.result_type ?? "");
+        const interruptResult = isBoundaryInterruptResultType(resultType);
+        if (!interruptResult && overrunMs > holdBudgetMs) {
+          emitBatchBoundaryTelemetry("batch_boundary_undeclared_hold_violation", {
+            violationType: "turn_duration_exceeds_contract_elapsed_without_interrupt",
+            resultType: resultType || null,
+            contextType,
+            turnIndex: Number.isFinite(turnIndex) ? turnIndex : null,
+            batchIndex: Number.isFinite(batchIndex) ? batchIndex : null,
+            elapsedMs: Math.round(elapsedMs),
+            expectedElapsedMs: Math.round(expectedMs),
+            overrunMs: Math.round(overrunMs),
+            holdBudgetMs,
+            allowedInterrupts: [
+              "dead_ball_or_whistle_stop",
+              "timeout_pause_barrier",
+              "period_end",
+            ],
+          });
+        }
       };
 
       let preloadedTurnPromise = null;
@@ -2238,6 +2732,7 @@ export function createGameScene(Phaser) {
           
           // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
+          mirrorClockReconDebug(turn);
           // Guarantee clock contract on turn so AnimationRouter always has clock_start/shot_clock_start (API now sends at top level)
           const clockContractKeys = [
             ['clock_start', 'clockStart'],
@@ -2314,11 +2809,35 @@ export function createGameScene(Phaser) {
             // ✅ REMOVED: Batch turn logging (cluttering console)
             
             // Animate each turn in the batch (try/catch so timeout sub-turn still runs if foul sub-turn errors)
-            for (const subTurn of turn.batch_turns) {
+            let previousSubTurnEndAtMs = Date.now();
+            for (let subTurnIndex = 0; subTurnIndex < turn.batch_turns.length; subTurnIndex++) {
+              const subTurn = turn.batch_turns[subTurnIndex];
               turnCount++;
               subTurn.index = turnCount;
               mergeClockContract(subTurn, turnData);
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
+              const subTurnStartAtMs = Date.now();
+              const boundaryGapMs = subTurnStartAtMs - previousSubTurnEndAtMs;
+              const holdBudgetMs = getBatchBoundaryHoldBudgetMs();
+              const previousResultType =
+                subTurnIndex > 0
+                  ? String(turn.batch_turns[subTurnIndex - 1]?.result_type || "")
+                  : null;
+              if (
+                subTurnIndex > 0 &&
+                !isBoundaryInterruptResultType(previousResultType) &&
+                boundaryGapMs > holdBudgetMs
+              ) {
+                emitBatchBoundaryTelemetry("batch_subturn_boundary_gap_overrun", {
+                  violationType: "gap_between_subturns_without_interrupt",
+                  previousResultType: previousResultType || null,
+                  nextResultType: String(subTurn?.result_type || "") || null,
+                  turnIndex: turnCount,
+                  batchIndex: subTurnIndex,
+                  gapMs: Math.round(boundaryGapMs),
+                  holdBudgetMs,
+                });
+              }
               
               // Display debug info in text scroll
               if (subTurn.debug_turn_start) {
@@ -2344,10 +2863,19 @@ export function createGameScene(Phaser) {
                   ballSprite: this.ballSprite,
                   onUpdate: updateScoreboard
                 });
+                const subTurnElapsedMs = Date.now() - subTurnStartAtMs;
+                validateBatchBoundaryDuration({
+                  turnLike: subTurn,
+                  elapsedMs: subTurnElapsedMs,
+                  contextType: "batch_subturn",
+                  turnIndex: turnCount,
+                  batchIndex: subTurnIndex,
+                });
               } catch (batchSubErr) {
                 console.error(`❌ BATCH sub-turn (${subTurn.result_type}) animation error; continuing to next sub-turn:`, batchSubErr);
                 // Continue so timeout sub-turn (e.g. foul-out) still runs
               }
+              previousSubTurnEndAtMs = Date.now();
               
               // Update finalTurn to be the last sub-turn in the batch
               finalTurn = subTurn;
@@ -2379,6 +2907,7 @@ export function createGameScene(Phaser) {
             // Normal single turn
             turnCount++;
             turn.index = turnCount;
+            const singleTurnStartAtMs = Date.now();
             
             console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
             
@@ -2411,6 +2940,13 @@ export function createGameScene(Phaser) {
               playerSprites: this.playerSprites,
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
+            });
+            const singleTurnElapsedMs = Date.now() - singleTurnStartAtMs;
+            validateBatchBoundaryDuration({
+              turnLike: turn,
+              elapsedMs: singleTurnElapsedMs,
+              contextType: "single_turn",
+              turnIndex: turnCount,
             });
             if (turn.is_final_turn_of_quarter) {
               console.log('✅ [FINAL TURN DEBUG] Animation of final turn completed', {

@@ -22,6 +22,8 @@ import { animateStep } from './animateStep.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
 import animationConfig from './animation_config.js';
+import { clampGridCoords } from './courtClamp.js';
+import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -59,6 +61,103 @@ export class ShotAnimationSystem {
     
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Initialized');
+    }
+  }
+
+  resolveOrebContractMode() {
+    const raw = String(
+      (typeof window !== 'undefined' ? window.UESS_OREB_CONTRACT_MODE : null) ?? 'observe'
+    )
+      .trim()
+      .toLowerCase();
+    if (raw === 'off' || raw === 'observe' || raw === 'warn' || raw === 'throw') return raw;
+    return 'observe';
+  }
+
+  getOrebBudgetGameSeconds(kind = 'decision') {
+    const scope = typeof window !== 'undefined' ? window : globalThis;
+    const generic =
+      kind === 'decision'
+        ? Number(scope?.UESS_OREB_DECISION_MAX_GAME_SECONDS)
+        : Number(scope?.UESS_OREB_ACTION_MAX_GAME_SECONDS);
+    if (Number.isFinite(generic) && generic > 0) return generic;
+    return kind === 'decision' ? 2 : 3;
+  }
+
+  emitOrebContractTelemetry(turnData, event, payload = {}) {
+    this.scene?.events?.emit?.('animTelemetry', {
+      event,
+      branchKind: 'oreb_phase_contract',
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      ...payload,
+    });
+  }
+
+  enforceOrebUnitContract({
+    turnData,
+    unitId,
+    advanceTrigger,
+    visualSettleTrigger,
+    authorizingEventReceived,
+    visualSettled,
+    unitStartMs,
+    maxWaitGameSeconds,
+    context = {},
+  }) {
+    const mode = this.resolveOrebContractMode();
+    if (mode === 'off') return;
+    const clockSecondMs = this.scene?.gameClock?.getState?.().tickMs || 350;
+    const elapsedMs = Math.max(0, Date.now() - Number(unitStartMs || Date.now()));
+    const elapsedGameSeconds = elapsedMs / clockSecondMs;
+    const overrun =
+      Number.isFinite(maxWaitGameSeconds) &&
+      maxWaitGameSeconds > 0 &&
+      elapsedGameSeconds > maxWaitGameSeconds;
+    const contractContext = {
+      elapsedMs,
+      elapsedGameSeconds: Number(elapsedGameSeconds.toFixed(2)),
+      maxWaitGameSeconds,
+      overrun,
+      ...context,
+    };
+    if (overrun) {
+      this.emitOrebContractTelemetry(turnData, 'oreb_phase_clock_overrun', {
+        unitId,
+        ...contractContext,
+      });
+    }
+    const logger =
+      mode === 'observe'
+        ? {
+            warn: () => {},
+          }
+        : console;
+    enforceUnitCompletionContract({
+      contract: {
+        unit_id: unitId,
+        execution_mode: 'dynamic_event',
+        advance_trigger: advanceTrigger,
+        visual_settle_trigger: visualSettleTrigger,
+        failure_policy: mode === 'throw' ? 'throw' : 'warn',
+      },
+      observed: {
+        authorizingEventReceived: authorizingEventReceived === true,
+        visualSettled: visualSettled === true && !overrun,
+      },
+      context: contractContext,
+      emitTelemetry: (event, payload = {}) =>
+        this.emitOrebContractTelemetry(turnData, event, payload),
+      logger,
+    });
+    if (mode === 'throw' && overrun) {
+      throw new Error(
+        `[OREB contract] clock overrun (unit=${unitId}, elapsedGameSeconds=${elapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${maxWaitGameSeconds})`
+      );
     }
   }
 
@@ -396,8 +495,14 @@ export class ShotAnimationSystem {
     }
     
     // ✅ VALIDATION: Ensure we have exactly 5 offensive and 5 defensive players
-    if (offensiveCount !== 5 || defensiveCount !== 5) {
+    // only on full-roster turns. Embedded helper/synthetic paths may not include
+    // all 10 animations and should not trigger false positives.
+    const expectedFullRosterClassification =
+      Array.isArray(turnData?.animations) && turnData.animations.length >= 10;
+    if (expectedFullRosterClassification && (offensiveCount !== 5 || defensiveCount !== 5)) {
       console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
+        resultType: turnData?.result_type ?? null,
+        animationCount: turnData?.animations?.length ?? 0,
         offensiveCount,
         defensiveCount
       });
@@ -542,107 +647,41 @@ export class ShotAnimationSystem {
       //   willStartInPhase2: true // ShotAnimationSystem always starts defenders in Phase 2
       // });
       
-      // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
-      // This maintains the existing behavior where pass doesn't start until passer reaches their spot
-      // All offensive players start animating simultaneously, but we only wait for the passer
+      // Phase 1 — Offense-gated: same as playTurnAnimation (defense tweens already running from loop).
       const phase1StartTime = performance.now();
       if (passInfo && passerPromise) {
-        // Wait for passer to complete before starting pass animation
-        // Other offensive players continue animating in the background
         await passerPromise;
       } else if (offensivePromises.length > 0) {
-        // No pass, wait for all offensive players to complete
         await Promise.all(offensivePromises);
       }
-      
-      // ✅ FIX: Phase 2 - Animate pass and defensive players in parallel
-      // This creates the natural feel of defensive players moving while ball is in the air
-      // Other offensive players (non-passer) continue animating from Phase 1
-      const passAndDefensePromises = [];
+
+      // Phase 2 — Await pass only; do not gate the step on defensive completion.
       const phase2StartTime = performance.now();
-      
-      // ✅ COMMENTED OUT: Phase 2 start log (cluttering console)
-      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting Phase 2`, {
-      //   hasPassInfo: !!passInfo,
-      //   defensivePromisesCount: defensivePromises.length,
-      //   phase1Duration: phase2StartTime - phase1StartTime
-      // });
-      
       if (passInfo) {
-        // Add pass animation to the parallel batch
         const passPromise = handlePassAnimation({
           scene: this.scene,
           passInfo,
-          playerSprites: this.playerSprites
+          playerSprites: this.playerSprites,
         });
-        
-        passAndDefensePromises.push(passPromise);
-        // ✅ COMMENTED OUT: Pass animation start log (cluttering console)
-        // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Starting pass animation + defensive animations in parallel`);
-      } else {
-        // ✅ COMMENTED OUT: No pass log (cluttering console)
-        // console.log(`⚠️ [SHOT ANIM] Step ${stepIndex}: No pass - starting defensive animations in Phase 2`);
+        await passPromise;
       }
-      
-      // Add all defensive player movements to the parallel batch
-      // Extract promises from defensivePromises array (which now contains objects with {promise, playerId})
-      const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
-      passAndDefensePromises.push(...defensivePromiseArray);
 
-      // 🔍 [SHOT ANIM TIMING] Log only for first step with a pass (compare DREB vs non-DREB)
       if (step4DefenderStarts && step4DefenderStarts.length > 0) {
-        const earliest = Math.min(...step4DefenderStarts.map(d => d.startTime));
-        console.log('🔍 [SHOT ANIM TIMING]', {
+        const earliest = Math.min(...step4DefenderStarts.map((d) => d.startTime));
+        console.log("🔍 [SHOT ANIM TIMING]", {
           stepIndex,
           result_type: turnData.result_type,
           rebound_type: turnData.rebound_type ?? null,
           phase2StartTime,
           defenderStarts: step4DefenderStarts,
           earliestDefenderStart: earliest,
-          msFromFirstDefenderToPhase2: Math.round(phase2StartTime - earliest)
+          msFromFirstDefenderToPhase2: Math.round(phase2StartTime - earliest),
         });
       }
-      // ✅ COMMENTED OUT: Defensive animations added log (cluttering console)
-      // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
-      
-      // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
-      // if (defensivePromises.length > 0) {
-      //   const earliestDefensiveStart = Math.min(...defensivePromises.map(dp => dp.startTime));
-      //   const timeDiff = phase2StartTime - earliestDefensiveStart;
-      //   console.log(`⏱️ [TIMING] Step ${stepIndex}: Time between defensive tween start and Phase 2 start`, {
-      //     earliestDefensiveStart,
-      //     phase2StartTime,
-      //     timeDifferenceMs: timeDiff,
-      //     note: timeDiff > 0 ? 'Defensive tweens started BEFORE Phase 2' : 'Defensive tweens started AFTER Phase 2 (unexpected)'
-      //   });
-      // }
-      // 
-      // const beforePromiseAll = performance.now();
-      // console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() about to start waiting for pass + defensive animations`, {
-      //   passAndDefensePromisesCount: passAndDefensePromises.length,
-      //   hasPass: !!passInfo,
-      //   defensiveCount: defensivePromiseArray.length
-      // });
-      
-      // Animate pass and defensive players simultaneously
-      if (passAndDefensePromises.length > 0) {
-        await Promise.all(passAndDefensePromises);
-      }
-      
-      // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
-      // const afterPromiseAll = performance.now();
-      // console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() completed`, {
-      //   waitDuration: afterPromiseAll - beforePromiseAll
-      // });
-      
-      // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
-      // This ensures all offensive players finish their movements
-      // Note: If there was no pass, we already waited for all offensive players above
-      if (passInfo && passerPromise) {
-        const remainingOffensivePromises = offensivePromises.filter(p => p !== passerPromise);
-        if (remainingOffensivePromises.length > 0) {
-          await Promise.all(remainingOffensivePromises);
-        }
+
+      // Phase 3 — After pass, wait for all offensive step tweens (passer already resolved).
+      if (passInfo && offensivePromises.length > 0) {
+        await Promise.all(offensivePromises);
       }
       
       // Handle shot if this step contains one
@@ -897,8 +936,13 @@ export class ShotAnimationSystem {
         }
         // Else: y is exactly 25 or 26, keep it the same (rare)
         
-        // Clamp X to court between the two rims (prevent players moving out of bounds on HCO shot attempts)
-        targetGridX = Math.max(9, Math.min(91, targetGridX));
+        const clampedReboundTarget = clampGridCoords(
+          { x: targetGridX, y: targetGridY },
+          turnData,
+          { action: "shot_get_back_rebound_window", playerId }
+        );
+        targetGridX = clampedReboundTarget.x;
+        targetGridY = clampedReboundTarget.y;
         
         // Convert target grid back to pixels
         const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
@@ -1315,6 +1359,20 @@ export class ShotAnimationSystem {
       // ✅ REVERTED: Back to embedded DREB handling (standalone step approach didn't fix animation sync issue)
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.lead_in.from_miss',
+        advanceTrigger: 'OREB committed',
+        visualSettleTrigger: 'rebound secure + attach settled',
+        authorizingEventReceived: true,
+        visualSettled: !!rebounderSprite,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('decision'),
+        context: {
+          reboundType: turnData?.rebound_type ?? null,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
       await this.handleOffensiveRebound(rebounderSprite, turnData);
     } else {
       // ✅ REMOVED: Unknown rebound type logging (cluttering console)
@@ -1372,13 +1430,13 @@ export class ShotAnimationSystem {
       const offsetY = Phaser.Math.Between(-6, 6);
       const offsetX = Phaser.Math.Between(-4, 4);
       
-      // Apply offsets and clamp to bounds
-      let targetGridX = bounceGridX + offsetX;
-      let targetGridY = bounceGridY + offsetY;
-      
-      // Clamp to court bounds between rims on X (9-91) and full court on Y (0-50)
-      targetGridX = Math.max(9, Math.min(91, targetGridX));
-      targetGridY = Math.max(0, Math.min(50, targetGridY));
+      const clampedCollapseTarget = clampGridCoords(
+        { x: bounceGridX + offsetX, y: bounceGridY + offsetY },
+        turnData,
+        { action: "shot_rebound_collapse", playerId }
+      );
+      const targetGridX = clampedCollapseTarget.x;
+      const targetGridY = clampedCollapseTarget.y;
       
       const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
       
@@ -1416,29 +1474,25 @@ export class ShotAnimationSystem {
       const angle = Math.random() * 2 * Math.PI;
       const distance = Math.random() * maxDistance;
       
-      const targetGridX = bounceGridX + Math.cos(angle) * distance;
-      const targetGridY = bounceGridY + Math.sin(angle) * distance;
+      const clampedTargetGrid = clampGridCoords({
+        x: bounceGridX + Math.cos(angle) * distance,
+        y: bounceGridY + Math.sin(angle) * distance
+      });
       
       // Convert back to pixel coordinates
-      const targetX = targetGridX * (this.scene.game.config.width / 100);
-      const targetY = targetGridY * (this.scene.game.config.height / 100);
-      
-      // Ensure target is within court bounds
-      const courtWidth = this.scene.game.config.width;
-      const courtHeight = this.scene.game.config.height;
-      const clampedX = Math.max(20, Math.min(courtWidth - 20, targetX));
-      const clampedY = Math.max(20, Math.min(courtHeight - 20, targetY));
+      const targetX = clampedTargetGrid.x * (this.scene.game.config.width / 100);
+      const targetY = clampedTargetGrid.y * (this.scene.game.config.height / 100);
       
       // ✅ REMOVED: Player moving to rebound spot logging (cluttering console)
       
       // ✅ FIX: Use distance-based duration for consistent speed
-      const duration = getPlayerDuration(playerSprite, clampedX, clampedY);
+      const duration = getPlayerDuration(playerSprite, targetX, targetY);
       
       // Animate player movement
       const tween = this.scene.tweens.add({
         targets: playerSprite,
-        x: clampedX,
-        y: clampedY,
+        x: targetX,
+        y: targetY,
         duration,
         ease: 'Linear', // Match other player movements
         onComplete: () => {
@@ -1463,8 +1517,28 @@ export class ShotAnimationSystem {
     //   fullTurnData: turnData // Log full object to see what's actually present
     // });
     
-    // ✅ PRIORITY 2 FIX: Validate next_play_type is present (no fallback - must be correct)
+    // ✅ PRIORITY 2 FIX: Validate next_play_type is present for normal turns.
+    // Final/terminal shot turns can legally omit a next route at quarter boundary.
+    const isTerminalTurnContext =
+      turnData?.is_final_turn_of_quarter === true ||
+      turnData?.final_turn === true ||
+      turnData?.quarter_complete === true;
+    const gameClockZero =
+      Number(turnData?.clock_end ?? turnData?.time_remaining ?? 1) <= 0;
+    const shouldAllowMissingNextPlayType = isTerminalTurnContext && gameClockZero;
+
     if (!turnData.next_play_type) {
+      if (shouldAllowMissingNextPlayType) {
+        // Quarter-end terminal route: no inbound/outlet follow-up should be executed.
+        if (this.stateMachine) {
+          this.stateMachine.transition(AnimationStates.POSSESSION, {
+            reason: 'rebound_terminal_turn',
+            rebounder_id: turnData.rebounderId,
+            quarter_complete: true,
+          });
+        }
+        return;
+      }
       // Diagnostic: Check if next_play_type is on the next turn (shouldn't be, but let's check)
       const currentTurnIndex = this.scene.currentTurn || 0;
       const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
@@ -1554,11 +1628,123 @@ export class ShotAnimationSystem {
     
     // ✅ REMOVED: Offensive rebound logging (cluttering console)
     
+    const holdStartMs = Date.now();
+    const orebHoldSeconds = Number(turnData?.oreb_hold_seconds);
+    const hasHoldWindow = Number.isFinite(orebHoldSeconds) && orebHoldSeconds > 0;
+    if (hasHoldWindow && this.scene?.time) {
+      const holdMs = Math.max(0, orebHoldSeconds * 350);
+      await new Promise((resolve) => this.scene.time.delayedCall(holdMs, resolve));
+    }
+    this.enforceOrebUnitContract({
+      turnData,
+      unitId: 'oreb.phase.hold',
+      advanceTrigger: 'hold boundary reached',
+      visualSettleTrigger: 'no active attach/tween conflicts',
+      authorizingEventReceived: true,
+      visualSettled: this.scene?.passInFlight !== true,
+      unitStartMs: holdStartMs,
+      maxWaitGameSeconds: this.getOrebBudgetGameSeconds('decision'),
+      context: {
+        holdSeconds: hasHoldWindow ? orebHoldSeconds : 0,
+        holdApplied: hasHoldWindow && !!this.scene?.time,
+      },
+    });
+
+    const decisionStartMs = Date.now();
+    const hasKickoutEvent =
+      Array.isArray(turnData?.events) &&
+      turnData.events.some((event) => event?.event_type === 'KICKOUT_RESET');
+    const isPutbackAttempt = this.isPutbackAttempt(turnData);
+    const decisionType = isPutbackAttempt ? 'putback' : hasKickoutEvent ? 'kickout' : 'forced_putback';
+    this.enforceOrebUnitContract({
+      turnData,
+      unitId: 'oreb.phase.decision',
+      advanceTrigger: 'decision event committed',
+      visualSettleTrigger: 'decision prep visuals settled',
+      authorizingEventReceived: true,
+      visualSettled: true,
+      unitStartMs: decisionStartMs,
+      maxWaitGameSeconds: this.getOrebBudgetGameSeconds('decision'),
+      context: {
+        decisionType,
+        hasKickoutEvent,
+        isPutbackAttempt,
+      },
+    });
+
+    const actionStartMs = Date.now();
+    if (decisionType === 'kickout') {
+      await this.executeKickoutPass(rebounderSprite, turnData);
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.phase.kickout_pass',
+        advanceTrigger: 'pass received',
+        visualSettleTrigger: 'ball flight + receiver settle',
+        authorizingEventReceived: hasKickoutEvent,
+        visualSettled: true,
+        unitStartMs: actionStartMs,
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          decisionType,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
+      const route = String(turnData?.next_play_type || 'HCO').toUpperCase();
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.out.to_*',
+        advanceTrigger: 'route committed',
+        visualSettleTrigger: 'OREB final settle complete',
+        authorizingEventReceived: route.length > 0,
+        visualSettled: true,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          route,
+          branch: 'kickout',
+        },
+      });
+      return;
+    }
     try {
-      // TEMPORARY: Force all offensive rebounds to be putback attempts for testing
+      // Current branch behavior remains unchanged: forced putback path.
       await this.executePutbackAttempt(rebounderSprite, turnData);
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.phase.putback_attempt',
+        advanceTrigger: 'shot release/result committed',
+        visualSettleTrigger: 'putback visuals settled',
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: actionStartMs,
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          decisionType,
+          rebounderId: turnData?.rebounderId ?? null,
+        },
+      });
+      const route = String(turnData?.next_play_type || 'HCO').toUpperCase();
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.out.to_*',
+        advanceTrigger: 'route committed',
+        visualSettleTrigger: 'OREB final settle complete',
+        authorizingEventReceived: route.length > 0,
+        visualSettled: true,
+        unitStartMs: Date.now(),
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          route,
+          branch: 'putback',
+        },
+      });
     } catch (error) {
       console.error('🎬 ShotAnimationSystem: executePutbackAttempt failed', error);
+      this.emitOrebContractTelemetry(turnData, 'oreb_phase_putback_failed', {
+        decisionType,
+        rebounderId: turnData?.rebounderId ?? null,
+        error: error?.message ?? String(error),
+      });
       throw error;
     }
     

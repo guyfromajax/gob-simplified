@@ -8,6 +8,7 @@
 import { AnimationEngine } from '../AnimationEngine.js';
 import { AnimationRouter } from '../AnimationRouter.js';
 import { ShotAnimationSystem } from '../ShotAnimationSystem.js';
+import { CLAMP_BOUNDS, clampGridCoords } from '../courtClamp.js';
 
 // Mock dependencies
 const createMockScene = () => ({
@@ -173,6 +174,20 @@ describe('BASELINE_INBOUND Animation Tests', () => {
       // Verify runInboundSetup was NOT called from handleMadeShot
       // (It should only be called from the BASELINE_INBOUND turn itself)
       expect(runInboundSetupCallCount).toBe(0);
+    });
+  });
+
+  describe('Inbound clamp exemptions', () => {
+    test('BASELINE_INBOUND keeps out-of-bounds inbound passer lane unmodified', () => {
+      const inboundCoords = { x: CLAMP_BOUNDS.minX - 6, y: CLAMP_BOUNDS.maxY + 2 };
+      const result = clampGridCoords(inboundCoords, { result_type: 'BASELINE_INBOUND' });
+      expect(result).toEqual(inboundCoords);
+    });
+
+    test('SIDE_INBOUND keeps out-of-bounds inbound passer lane unmodified', () => {
+      const inboundCoords = { x: CLAMP_BOUNDS.maxX + 6, y: CLAMP_BOUNDS.minY - 1 };
+      const result = clampGridCoords(inboundCoords, { result_type: 'SIDE_INBOUND' });
+      expect(result).toEqual(inboundCoords);
     });
   });
 

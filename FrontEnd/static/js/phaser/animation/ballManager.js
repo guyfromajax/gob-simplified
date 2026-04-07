@@ -6,7 +6,8 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import {
   detachBall,
-  runPass as baseRunPass
+  runPass as baseRunPass,
+  tweenPlayerTo,
 } from "./ballTween.js";
 // ✅ STEP 3 MIGRATION: Import new ball animation functions
 import { animateShotToRim, animateBallToPosition } from "./ballAnimationSimple.js";
@@ -26,6 +27,7 @@ import {
   animationDebugWarn,
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
+import { CLAMP_BOUNDS } from "./courtClamp.js";
 
 /**
  * ✅ PHASE 3.3: Removed wrapper function
@@ -167,7 +169,11 @@ export async function bounceFromRim(
     rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
     
   // Ensure bounce stays in bounds
-  const clampedBounceX = Phaser.Math.Clamp(bounceGridX, 4, 97);
+  const clampedBounceX = Phaser.Math.Clamp(
+    bounceGridX,
+    CLAMP_BOUNDS.minX,
+    CLAMP_BOUNDS.maxX
+  );
   const clampedBounceY = Phaser.Math.Clamp(bounceGridY, 1, 50);
   
   const bounce = gridToPixels(
@@ -758,6 +764,7 @@ export function animateRebound({
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
   const promises = []; // For other players' rebound animations (non-blocking)
+  const reboundParticipantSprites = [];
   const finalPositions = [];
   const MIN_X_SEP = 3;
   const MIN_Y_SEP = 2;
@@ -804,118 +811,115 @@ export function animateRebound({
       });
     }
     rebounderPromise = new Promise((resolve) => {
-        scene.tweens.add({
-          targets: rebounderSprite,
-          x: spotPx.x,
-          y: spotPx.y,
-          duration: rebCfg.playerMoveMs,
-          ease: "Linear",
-          onComplete: async () => {
-            console.log('🟡 [animateRebound] rebounder tween onComplete', { rebounderId });
-            try {
+      tweenPlayerTo(scene, rebounderSprite, spotPx, {
+        duration: rebCfg.playerMoveMs,
+        easing: "Linear",
+      })
+        .then(async () => {
+          console.log('🟡 [animateRebound] rebounder tween onComplete', { rebounderId });
+          try {
+            if (debugEnabled && REBOUND_DEBUG) {
+              animationDebugLog("reb:moveEnd", {
+                playerId: rebounderId,
+                x: spotPx.x,
+                y: spotPx.y
+              });
+            }
+            
+            // Announce rebound when rebounder reaches the ball
+            const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+            const rebounderTeam = rebounderSprite.team; // "home" or "away"
+            const rebounderTeamId = rebounderSprite.team_id;
+
+            // Handle both new nested structure (object) and old flat structure (string)
+            const homeTeamField = scene.simData?.home_team;
+            const awayTeamField = scene.simData?.away_team;
+            const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+            const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+            const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+
+            const playerData = {
+              playerId: rebounderId,
+              photo: rebounderSprite?.photo || null,
+              teamName: rebounderTeamName,
+              secondaryColor: getSecondaryColorForTeam(scene, rebounderTeamId)
+            };
+
+            showAnnouncement("Rebound!", rebounderTeam, playerData);
+            
+            // Identify if this is OREB or DREB (rebounderTeamId already declared above on line 911)
+            // Use outer scope variables or re-declare only what we need
+            const shooterSpriteInner = playerSprites[shooterId];
+            const shooterTeamIdInner = shooterSpriteInner?.team_id;
+            const isOREBInner = rebounderTeamId === shooterTeamIdInner;
+            const reboundType = isOREBInner ? 'OREB' : 'DREB';
+            
+            // CRITICAL: Don't attach ball if a putback is in progress
+            // The putback turn will handle ball positioning and shooting
+            // ✅ PHASE 4: Check BallController state instead of old _putbackInProgress flag
+            const { getBallController } = await import('./BallControllerAdapter.js');
+            const ballController = getBallController();
+            const isPutbackInProgress = ballController && (ballController.reason === 'putback_shot' || ballController.state === 'PUTBACK_ATTEMPT');
+            if (isPutbackInProgress) {
               if (debugEnabled && REBOUND_DEBUG) {
-                animationDebugLog("reb:moveEnd", {
-                  playerId: rebounderId,
-                  x: spotPx.x,
-                  y: spotPx.y
+                animationDebugLog("reb:skipAttach", {
+                  reason: 'putback_in_progress',
+                  rebounderId,
+                  reboundType
                 });
               }
-              
-              // Announce rebound when rebounder reaches the ball
-              const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-              const rebounderTeam = rebounderSprite.team; // "home" or "away"
-              const rebounderTeamId = rebounderSprite.team_id;
-
-              // Handle both new nested structure (object) and old flat structure (string)
-              const homeTeamField = scene.simData?.home_team;
-              const awayTeamField = scene.simData?.away_team;
-              const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-              const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-              const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-
-              const playerData = {
-                playerId: rebounderId,
-                photo: rebounderSprite?.photo || null,
-                teamName: rebounderTeamName,
-                secondaryColor: getSecondaryColorForTeam(scene, rebounderTeamId)
-              };
-
-              showAnnouncement("Rebound!", rebounderTeam, playerData);
-              
-              // Identify if this is OREB or DREB (rebounderTeamId already declared above on line 911)
-              // Use outer scope variables or re-declare only what we need
-              const shooterSpriteInner = playerSprites[shooterId];
-              const shooterTeamIdInner = shooterSpriteInner?.team_id;
-              const isOREBInner = rebounderTeamId === shooterTeamIdInner;
-              const reboundType = isOREBInner ? 'OREB' : 'DREB';
-              
-              // CRITICAL: Don't attach ball if a putback is in progress
-              // The putback turn will handle ball positioning and shooting
-              // ✅ PHASE 4: Check BallController state instead of old _putbackInProgress flag
-              const { getBallController } = await import('./BallControllerAdapter.js');
-              const ballController = getBallController();
-              const isPutbackInProgress = ballController && (ballController.reason === 'putback_shot' || ballController.state === 'PUTBACK_ATTEMPT');
-              if (isPutbackInProgress) {
-                if (debugEnabled && REBOUND_DEBUG) {
-                  animationDebugLog("reb:skipAttach", {
-                    reason: 'putback_in_progress',
-                    rebounderId,
-                    reboundType
-                  });
+            } else {
+              attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+                debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
+              });
+            }
+            
+            const newOffenseId = rebounderSprite.team_id;
+            const previousOffenseId = scene.offenseTeamId;
+            scene.offenseTeamId = newOffenseId;
+            const changed =
+              newOffenseId != null &&
+              (previousOffenseId == null || String(previousOffenseId) !== String(newOffenseId));
+            if (changed) {
+              scene.events?.emit?.("possessionChange", {
+                offenseTeamId: newOffenseId,
+              });
+            }
+            if (scene.stateMachine?.is(States.Rebound)) {
+              const holdReboundState = shouldHoldForFastBreak();
+              if (holdReboundState) {
+                if (debugEnabled && getDebugTransitions()) {
+                  animationDebugLog(
+                    "animateRebound: holding Rebound state for fast break handoff",
+                    {
+                      rebounderId,
+                      currentTurn: scene.currentTurn,
+                    }
+                  );
                 }
               } else {
-                attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-                  debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
+                safeTransition(scene.stateMachine, States.HalfCourt, {
+                  currentOwnerId: getCurrentOwner(scene),
+                  pendingOwnerId: getPendingOwner(scene),
                 });
               }
-              
-              const newOffenseId = rebounderSprite.team_id;
-              const previousOffenseId = scene.offenseTeamId;
-              scene.offenseTeamId = newOffenseId;
-              const changed =
-                newOffenseId != null &&
-                (previousOffenseId == null || String(previousOffenseId) !== String(newOffenseId));
-              if (changed) {
-                scene.events?.emit?.("possessionChange", {
-                  offenseTeamId: newOffenseId,
-                });
-              }
-              if (scene.stateMachine?.is(States.Rebound)) {
-                const holdReboundState = shouldHoldForFastBreak();
-                if (holdReboundState) {
-                  if (debugEnabled && getDebugTransitions()) {
-                    animationDebugLog(
-                      "animateRebound: holding Rebound state for fast break handoff",
-                      {
-                        rebounderId,
-                        currentTurn: scene.currentTurn,
-                      }
-                    );
-                  }
-                } else {
-                  safeTransition(scene.stateMachine, States.HalfCourt, {
-                    currentOwnerId: getCurrentOwner(scene),
-                    pendingOwnerId: getPendingOwner(scene),
-                  });
-                }
-              }
-              scene.rebounderId = null;
-            } catch (e) {
-              console.error('❌ [animateRebound] Error in rebounder tween onComplete', {
-                rebounderId,
-                error: e?.message ?? String(e),
-                stack: e?.stack
-              });
-            } finally {
-              resolve();
             }
-          },
-          onStop: () => {
-            console.log('🟡 [animateRebound] rebounder tween onStop', { rebounderId });
+            scene.rebounderId = null;
+          } catch (e) {
+            console.error('❌ [animateRebound] Error in rebounder tween onComplete', {
+              rebounderId,
+              error: e?.message ?? String(e),
+              stack: e?.stack
+            });
+          } finally {
             resolve();
           }
+        })
+        .catch(() => {
+          console.log('🟡 [animateRebound] rebounder tween onStop', { rebounderId });
+          resolve();
         });
-      });
+    });
     // Add rebounder promise to promises array for other players' animations (non-blocking)
     promises.push(rebounderPromise);
   }
@@ -1003,18 +1007,12 @@ export function animateRebound({
       scene.game.config.height
     );
 
+    reboundParticipantSprites.push(sprite);
     promises.push(
-      new Promise((resolve) => {
-        scene.tweens.add({
-          targets: sprite,
-          x: targetPx.x,
-          y: targetPx.y,
-          duration: rebCfg.playerMoveMs,
-          ease: "Linear",
-          onComplete: resolve,
-          onStop: resolve
-        });
-      })
+      tweenPlayerTo(scene, sprite, targetPx, {
+        duration: rebCfg.playerMoveMs,
+        easing: "Linear",
+      }).catch(() => {})
     );
   }
 
@@ -1024,6 +1022,13 @@ export function animateRebound({
     return rebounderPromise.then(
     () =>
       new Promise((resolve) => {
+        // End-of-rebound boundary: stop non-rebounder rebound tweens so they
+        // do not leak into the next turn and cause transition hitching.
+        if (scene?.tweens && reboundParticipantSprites.length > 0) {
+          reboundParticipantSprites.forEach((sprite) => {
+            if (sprite) scene.tweens.killTweensOf(sprite);
+          });
+        }
         const logPayload = {
           rebounderId,
           ballSpot,
@@ -1032,10 +1037,22 @@ export function animateRebound({
         if (debugEnabled && REBOUND_DEBUG) {
           animationDebugLog("[rebound]", logPayload);
         }
+        const attachDelayCapMs = Math.max(
+          0,
+          Number(
+            (typeof window !== "undefined"
+              ? window.UESS_REBOUND_ATTACH_DELAY_CAP_MS
+              : globalThis?.UESS_REBOUND_ATTACH_DELAY_CAP_MS) ?? 180
+          ) || 180
+        );
+        const effectiveAttachDelayMs = Math.min(
+          Math.max(0, Number(rebCfg.attachDelayMs) || 0),
+          attachDelayCapMs
+        );
         if (scene.time?.delayedCall) {
-          scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
+          scene.time.delayedCall(effectiveAttachDelayMs, resolve);
         } else {
-          setTimeout(resolve, rebCfg.attachDelayMs);
+          setTimeout(resolve, effectiveAttachDelayMs);
         }
       })
   );

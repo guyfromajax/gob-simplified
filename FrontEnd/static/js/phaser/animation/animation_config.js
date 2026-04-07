@@ -76,14 +76,29 @@ const defaults = {
     makeAnnouncementHoldMs: 1000,
     // Announcement hold after "Great Stop!" (FB defensive stop); 0 game time
     defensiveStopHoldMs: 500,
+    // Rim Runner outlet-denied + hold-up: shared phase for BH/receiver + AG horizontal drifts.
+    // Floors wall-clock so a tiny primary move doesn't collapse to 50ms (warp) for everyone.
+    agDriftSharedPhaseMinMs: 520,
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
   finalTurn: {
     holdClockOutMs: 1800,
     holdFinalShotMs: 3000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
+    // Late-pass window for Final Turn shot feel: ball handler holds until this clock band.
+    latePassTargetSecMin: 5.7,
+    latePassTargetSecMax: 6.3,
     alignment: { ease: 'Linear' },
     moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
+  },
+  heartbeat: {
+    enabled: true,
+    amplitudePx: 1.4, // Render-space drift in pixels (does not touch gameplay x/y)
+    jitterPx: 0.2,
+    // BPM mapping:
+    // NG=1.00 -> minBpm, NG=0.01 -> maxBpm
+    minBpm: 75,
+    maxBpm: 750,
   },
   possession: {
     msPerTick: 1,
@@ -127,6 +142,7 @@ export const animationConfig = {
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
   finalTurn: { ...defaults.finalTurn, ...(overrides.finalTurn || {}) },
+  heartbeat: { ...defaults.heartbeat, ...(overrides.heartbeat || {}) },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
     minFrameDurationMs:

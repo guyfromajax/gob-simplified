@@ -26,7 +26,7 @@ from BackEnd.utils.shared import (
     calc_isotropic_segment_seconds,
     calc_pass_segment_seconds,
     clamp_turn_time_elapsed,
-    get_fast_break_chance,
+    fast_break_probability_from_slider,
     calculate_rebound_score,
     calculate_outlet_pass_score,
     resolve_offensive_rebound,
@@ -34,10 +34,22 @@ from BackEnd.utils.shared import (
     unpack_game_context,
     calculate_bounce_spot,
     determine_rebounder,
-    update_player_coords_from_animations,
+    apply_coords_from_animations_list,
+)
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_fast_break_pre_shot_snapshot,
+    build_free_throw_snapshot,
+    build_hco_pre_resolve_shot_snapshot,
+    build_phase_post_stopper_snapshot,
+    build_skeleton_pre_resolve_shot_snapshot,
 )
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
+
+# TEMPORARY (Mar 2026): When False, missed FT → DREB always continues as HCO (no fast-break roll).
+# Set True to restore `fast_break_probability_from_slider` after FT miss rebounds.
+_FT_MISS_DREB_FAST_BREAK_ENABLED = False
 
 
 def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
@@ -228,8 +240,8 @@ def _get_fcp_hct_post_inbound_start_index(skeleton, game):
     Determine where FCP/HCT should start after an inbound pass.
 
     Default behavior remains "skip step 0" (legacy behavior). When this turn
-    directly follows BASELINE_INBOUND, dynamically skip all leading steps where
-    SF is still positioned at inbound_left.
+    directly follows BASELINE_INBOUND, dynamically skip all leading
+    inbound-equivalent setup/pass steps so BIP remains the single inbound owner.
     """
     steps = (skeleton or {}).get("steps") or []
     if not steps:
@@ -238,20 +250,46 @@ def _get_fcp_hct_post_inbound_start_index(skeleton, game):
     default_start_index = 1 if len(steps) > 1 else 0
 
     prev_turn = game.turns[-1] if getattr(game, "turns", None) else {}
-    if prev_turn.get("turn_type") != "BASELINE_INBOUND":
+    prev_turn_type = (
+        prev_turn.get("turn_type")
+        or prev_turn.get("current_turn")
+        or prev_turn.get("result_type")
+        or ""
+    )
+    if str(prev_turn_type).upper() != "BASELINE_INBOUND":
         return default_start_index
 
-    for i, step in enumerate(steps):
+    def _normalize_action(pos_actions, pos):
+        action = (pos_actions.get(pos, {}) or {}).get("action")
+        return str(action or "").strip().lower()
+
+    def _is_inbound_equivalent_step(step):
         pos_actions = step.get("pos_actions") or {}
-        sf_action = pos_actions.get("SF")
-        if not isinstance(sf_action, dict):
-            return i
+        sf_action_info = pos_actions.get("SF") or {}
+        sf_location = (sf_action_info.get("location") or sf_action_info.get("spot") or "").strip().lower()
+        if sf_location not in {"inbound_left", "inbound_right"}:
+            return False
 
-        sf_location = (sf_action.get("location") or sf_action.get("spot") or "").strip().lower()
-        if sf_location != "inbound_left":
-            return i
+        sf_action = _normalize_action(pos_actions, "SF")
+        pg_action = _normalize_action(pos_actions, "PG")
 
-    return default_start_index
+        # Canonical inbound release in many skeletons.
+        if sf_action == "pass" and pg_action == "receive":
+            return True
+
+        # Pre-release inbound staging in some versions (step 0 hold, step 1 pass).
+        if sf_action in {"handle_ball", "stationary", "get_open"}:
+            return True
+
+        return False
+
+    start_index = 0
+    while start_index < len(steps) and _is_inbound_equivalent_step(steps[start_index]):
+        start_index += 1
+
+    # Keep legacy safety floor and never trim all steps.
+    start_index = max(start_index, default_start_index)
+    return min(start_index, len(steps) - 1)
 
 
 def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_pos, defender, off_team, def_team, game):
@@ -530,6 +568,7 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_X_MAX,
     BALL_HANDLER_MOVE_Y_RANGE,
     DEFENSIVE_STOP_Y_RANGE,
+    DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET,
     STEAL_ENTRY_MOVE_X_MIN,
     STEAL_ENTRY_MOVE_X_MAX,
     STEAL_ENTRY_MOVE_Y_RANGE,
@@ -563,15 +602,12 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
     # Determine success/failure criteria (aligned with team-level Fast_Break_Success)
     # FB_S (offense): Shot Make, Defensive Foul (non-shooting)
     # Note: MISS does NOT count as success (matches team-level criteria)
-    # FB_F (offense): Steal, Dead Ball Turnover, Offensive Foul
+    # Offensive FB_F / FB_N retired — only FB_A and FB_S tracked for offense
     # FB_S_D (defense): DEFENSIVE_STOP
     # FB_F_D (defense): Shot Make, Shot Miss, Defensive Foul (any shot attempt or defensive foul)
     
     is_fb_s_offense = result_type == "MAKE" or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
-    )
-    is_fb_f_offense = result_type in ["TURNOVER", "STEAL", "DEAD BALL"] or (
-        result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     is_fb_s_defense = result_type == "DEFENSIVE_STOP"
     is_fb_f_defense = result_type in ["MAKE", "MISS", "BLOCK"] or (
@@ -601,13 +637,8 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
     if offensive_player:
         # Always increment FB_A (Fast Break Attempt)
         offensive_player.record_stat("FB_A", 1)
-        
-        # Increment FB_S or FB_F based on result
         if is_fb_s_offense:
             offensive_player.record_stat("FB_S", 1)
-        elif is_fb_f_offense:
-            offensive_player.record_stat("FB_F", 1)
-        # FB_N is calculated: FB_A - (FB_S + FB_F)
     
     # Track stats for get-back players - DEFENSIVE stats
     # ✅ SS&S FIX: For DREB-initiated Fast Breaks, use getback_player_ids
@@ -769,6 +800,76 @@ def _record_hct_stats(hct_roles, turn_result, game, off_lineup, def_lineup):
             if is_hct_s_defense:
                 player.record_stat("HCT_S_D", 1)
 
+
+def apply_fast_break_cg_time(turn_result, shot_attempted=False):
+    """
+    Cover-ground timing for fast breaks (shared by Covert Release and Rim Runner).
+    """
+    roles_data = turn_result.get("roles", {}) or {}
+    animations_data = turn_result.get("animations", []) or []
+    path_points = []
+
+    bh = roles_data.get("ball_handler")
+    bh_id = getattr(bh, "player_id", None) if bh else None
+    if bh_id:
+        for anim in animations_data:
+            if anim.get("playerId") == bh_id:
+                movement = anim.get("movement", []) or []
+                for step in movement:
+                    coords = step.get("coords") or {}
+                    if "x" in coords and "y" in coords:
+                        path_points.append({"x": coords["x"], "y": coords["y"]})
+                break
+
+    if len(path_points) < 2:
+        start = {
+            "x": roles_data.get("ball_handler_outlet_x"),
+            "y": roles_data.get("ball_handler_outlet_y"),
+        }
+        end = turn_result.get("shot_spot")
+        if not end and bh_id:
+            for anim in animations_data:
+                if anim.get("playerId") == bh_id and isinstance(anim.get("end"), dict):
+                    end = anim.get("end")
+                    break
+        if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
+            path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
+
+    distance_seconds = 0.0
+    if len(path_points) >= 2:
+        for idx in range(1, len(path_points)):
+            distance_seconds += calc_isotropic_segment_seconds(
+                path_points[idx - 1], path_points[idx], CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+            )
+
+    overhead_seconds = 0.0
+    outlet_passer_x = roles_data.get("outlet_passer_x")
+    outlet_passer_y = roles_data.get("outlet_passer_y")
+    receiver_x = roles_data.get("ball_handler_outlet_x")
+    receiver_y = roles_data.get("ball_handler_outlet_y")
+    if (
+        roles_data.get("outlet_passer")
+        and roles_data.get("outlet_receiver")
+        and isinstance(outlet_passer_x, (int, float))
+        and isinstance(outlet_passer_y, (int, float))
+        and isinstance(receiver_x, (int, float))
+        and isinstance(receiver_y, (int, float))
+    ):
+        passer_coords = {"x": outlet_passer_x, "y": outlet_passer_y}
+        receiver_coords = {"x": receiver_x, "y": receiver_y}
+        overhead_seconds += calc_pass_segment_seconds(passer_coords, receiver_coords)
+    elif roles_data.get("outlet_passer") and roles_data.get("outlet_receiver"):
+        overhead_seconds += 2.0
+    if shot_attempted:
+        overhead_seconds += 1.0
+
+    turn_result["time_elapsed"] = clamp_turn_time_elapsed(
+        round(distance_seconds + overhead_seconds),
+        cap=30,
+    )
+    return turn_result
+
+
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
     # print("Entering resolve_fast_break()")
@@ -779,8 +880,26 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # ✅ NOTE: Bench recharge does NOT happen during Fast Break turns (only during HCO turns)
     
+    # DREB outlet → covert_release (incl. fallback outlet); steal entry → after_steal
+    rebound = game_state.get("last_rebound") == "DREB"
+    from BackEnd.constants.fast_break_play_types import (
+        RIM_RUNNER,
+        FULL_TEAM,
+        ensure_fast_break_plays,
+        play_key_for_fast_break_entry,
+    )
+
+    if rebound:
+        fb_play_key = game_state.pop("pending_dreb_fb_play_key", None)
+        if fb_play_key is None:
+            fb_play_key = play_key_for_fast_break_entry(True)
+    else:
+        fb_play_key = play_key_for_fast_break_entry(rebound)
+
     off_scouting = off_team.scouting_data
     def_scouting = def_team.scouting_data
+    fb_plays = ensure_fast_break_plays(off_scouting["offense"])
+    fb_plays[fb_play_key]["A"] += 1
     off_scouting["offense"]["Fast_Break_Entries"] += 1
     def_scouting["defense"]["vs_Fast_Break"]["used"] += 1
 
@@ -790,9 +909,17 @@ def resolve_fast_break_logic(game: "GameManager"):
         "ball_handler": None,
         "outlet_passer": None,
         "outlet_receiver": None,
+        "fast_break_play": fb_play_key,
     }
-    
-    rebound = game_state.get("last_rebound") == "DREB"
+    # Wider y-band for DREB/outlet breaks (Covert Release); steals keep ±6
+    defensive_stop_y_range = (
+        DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
+    )
+
+    if rebound and fb_play_key in (RIM_RUNNER, FULL_TEAM):
+        from BackEnd.engine.rim_runner_fast_break import resolve_rim_runner_fast_break
+
+        return resolve_rim_runner_fast_break(game, fb_play_key)
 
     if rebound:
         #resetting last_rebound to avoid carry over bugs
@@ -801,9 +928,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Choose outlet passer (rebounder)
         rebounder = game_state.get("last_rebounder", None)
         
-        # ✅ Use release player as outlet receiver (if available), otherwise fallback to random ball handler
-        # The release player is the defender who released for fast break during the shot
-        # This ensures outlet passes go to the player who was set up to receive it
+        # ✅ Covert Release only: release player = outlet receiver from shot turn; else random PG/SG/SF
         release_player = game_state.get("last_release_player", None)
         
         if release_player:
@@ -1166,7 +1291,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Coordinates are stored in HOME orientation, so we compare directly in HOME orientation
         # For away offense: basket is at x=10, smaller x is closer → defender ahead if x <= ball handler x
         # For home offense: basket is at x=90, larger x is closer → defender ahead if x >= ball handler x
-        # ✅ NEW: Defender must also be within ±6 y-coords to force defensive stop
+        # ✅ Defender must also be within y-range (±6 steal, ±8 DREB/outlet) to force defensive stop
         
         # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Defender comparison for {defender_id}:")
         # logging.debug(f"  defender_actual_x (start, HOME): {defender_actual_x}")
@@ -1201,10 +1326,10 @@ def resolve_fast_break_logic(game: "GameManager"):
             is_ahead = defender_outlet_x >= ball_handler_outlet_x
             # logging.debug(f"  X Comparison (HOME orientation, home offense): {defender_outlet_x} >= {ball_handler_outlet_x} = {is_ahead}")
         
-        # ✅ NEW: Check if defender is within ±6 y-coords of outlet receiver
+        # ✅ Check if defender is within y-range of outlet receiver (see defensive_stop_y_range)
         y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
-        is_within_y_range = y_diff <= DEFENSIVE_STOP_Y_RANGE
-        # logging.debug(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= 6 = {is_within_y_range}")
+        is_within_y_range = y_diff <= defensive_stop_y_range
+        # logging.debug(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= {defensive_stop_y_range} = {is_within_y_range}")
         
         # Defender can force defensive stop if: ahead AND within y-range
         if is_ahead and is_within_y_range:
@@ -1329,73 +1454,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game)
     # ==================== END OUTLET PASS STAT TRACKING ====================
 
-    def _apply_fast_break_cg_time(turn_result, shot_attempted=False):
-        """
-        Cover-ground timing for fast breaks:
-        - distance time from ball handler movement path
-        - +1s pass, +1s receive, +1s shot overhead (when applicable)
-        - round at end, cap at 30
-        """
-        roles_data = turn_result.get("roles", {}) or {}
-        animations_data = turn_result.get("animations", []) or []
-        path_points = []
-
-        bh = roles_data.get("ball_handler")
-        bh_id = getattr(bh, "player_id", None) if bh else None
-        if bh_id:
-            for anim in animations_data:
-                if anim.get("playerId") == bh_id:
-                    movement = anim.get("movement", []) or []
-                    for step in movement:
-                        coords = step.get("coords") or {}
-                        if "x" in coords and "y" in coords:
-                            path_points.append({"x": coords["x"], "y": coords["y"]})
-                    break
-
-        if len(path_points) < 2:
-            start = {
-                "x": roles_data.get("ball_handler_outlet_x"),
-                "y": roles_data.get("ball_handler_outlet_y"),
-            }
-            end = turn_result.get("shot_spot")
-            if not end and bh_id:
-                for anim in animations_data:
-                    if anim.get("playerId") == bh_id and isinstance(anim.get("end"), dict):
-                        end = anim.get("end")
-                        break
-            if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
-                path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
-
-        distance_seconds = 0.0
-        if len(path_points) >= 2:
-            for idx in range(1, len(path_points)):
-                distance_seconds += calc_isotropic_segment_seconds(
-                    path_points[idx - 1], path_points[idx], CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
-                )
-
-        overhead_seconds = 0.0
-        # Outlet pass: use distance-based pass time (passer -> receiver) when coords available
-        outlet_passer_x = roles_data.get("outlet_passer_x")
-        outlet_passer_y = roles_data.get("outlet_passer_y")
-        receiver_x = roles_data.get("ball_handler_outlet_x")
-        receiver_y = roles_data.get("ball_handler_outlet_y")
-        if (roles_data.get("outlet_passer") and roles_data.get("outlet_receiver")
-                and isinstance(outlet_passer_x, (int, float)) and isinstance(outlet_passer_y, (int, float))
-                and isinstance(receiver_x, (int, float)) and isinstance(receiver_y, (int, float))):
-            passer_coords = {"x": outlet_passer_x, "y": outlet_passer_y}
-            receiver_coords = {"x": receiver_x, "y": receiver_y}
-            overhead_seconds += calc_pass_segment_seconds(passer_coords, receiver_coords)
-        elif roles_data.get("outlet_passer") and roles_data.get("outlet_receiver"):
-            overhead_seconds += 2.0  # fallback when coords missing
-        if shot_attempted:
-            overhead_seconds += 1.0
-
-        turn_result["time_elapsed"] = clamp_turn_time_elapsed(
-            round(distance_seconds + overhead_seconds),
-            cap=30
-        )
-        return turn_result
-
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
     if event_type == "DEFENSIVE_STOP":
@@ -1426,6 +1484,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             "offense_team_id": off_team.team_id,  # ✅ FIX: Add offense_team_id (possession doesn't flip, same team continues)
             "roles": fb_roles,  # ✅ Include roles so frontend can animate outlet pass
             "fast_break": True,  # Legacy flag for backwards compatibility
+            "fast_break_play": fb_play_key,
         }
         
         # 🏀 [FAST BREAK RESULT] One-line debug for animation tuning (ball_handler end = where they are when turn ends)
@@ -1448,7 +1507,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Record Fast Break stats for release player (offensive) and get-back players (defensive)
         _record_fast_break_stats(fb_roles, result, game)
         # ==================== END FAST BREAK STAT TRACKING ====================
-        _apply_fast_break_cg_time(result, shot_attempted=False)
+        apply_fast_break_cg_time(result, shot_attempted=False)
         
         return result
 
@@ -1535,9 +1594,13 @@ def resolve_fast_break_logic(game: "GameManager"):
             shooter.coords = shot_spot
             roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
 
-        update_player_coords_from_animations(game, [])
+        snap_roles = {**roles, "ball_handler": fb_roles.get("ball_handler")}
+        fb_snap = build_fast_break_pre_shot_snapshot(
+            game, off_lineup, def_lineup, snap_roles, "fb_logic_pre_shot"
+        )
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
+        attach_position_snapshots(turn_result, [fb_snap])
 
         # 🔍 [FB MISS DEBUG] Log Fast Break miss outcome and next-turn/possession state for debugging
         if turn_result.get("result_type") == "MISS":
@@ -1567,10 +1630,12 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     if turn_result["result_type"] == "MAKE": #def_scouting
         off_scouting["offense"]["Fast_Break_Success"] += 1
+        ensure_fast_break_plays(off_scouting["offense"])[fb_play_key]["S"] += 1
 
     elif turn_result["result_type"] == "FOUL":
         if game_state.get("foul_team") == "DEFENSE":
             off_scouting["offense"]["Fast_Break_Success"] += 1
+            ensure_fast_break_plays(off_scouting["offense"])[fb_play_key]["S"] += 1
         elif game_state.get("foul_team") == "OFFENSE":
             def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
@@ -1587,7 +1652,29 @@ def resolve_fast_break_logic(game: "GameManager"):
         )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
-    _apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
+    apply_fast_break_cg_time(turn_result, shot_attempted=(event_type == "SHOT"))
+
+    rt_fb = turn_result.get("result_type")
+    if rt_fb in ("STEAL", "DEAD BALL", "FOUL"):
+        fb_anims = turn_result.get("animations") or []
+        if fb_anims:
+            apply_coords_from_animations_list(game, fb_anims)
+        outcome_kind = "non_shooting_foul" if rt_fb == "FOUL" else "turnover"
+        attach_position_snapshots(
+            turn_result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    None,
+                    fb_roles,
+                    "FAST_BREAK",
+                    outcome_kind,
+                    f"fb_{outcome_kind}_post_stopper",
+                )
+            ],
+        )
 
     # ✅ SS&S: Backend is single source of truth for shot spot and defender placement on Fast Break shots
     # Expose so frontend uses these instead of recomputing (avoids mismatch and missing defender)
@@ -1650,6 +1737,8 @@ def resolve_fast_break_logic(game: "GameManager"):
     # Prepend "Fast Break!" to the text
     turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
 
+    turn_result["fast_break_play"] = fb_play_key
+
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"
     assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"
@@ -1689,6 +1778,8 @@ def resolve_free_throw_logic(game):
     )
     shooter_pos = get_player_position(off_lineup, shooter)
 
+    ft_snap = build_free_throw_snapshot(game, off_lineup, def_lineup, shooter)
+
     if makes_shot:
         apply_scoring(game, off_team, shooter, 1, ["FTM"])
         text += "and hits the free throw!"
@@ -1702,7 +1793,7 @@ def resolve_free_throw_logic(game):
                 # Made front end → unlock second FT
                 game_state["free_throws_remaining"] = 1
                 game_state["one_and_one"] = False
-                return {
+                ooo = {
                     "result_type": "FREE_THROW",
                     "ball_handler": shooter,
                     "shooter": shooter,
@@ -1720,6 +1811,8 @@ def resolve_free_throw_logic(game):
                     "free_throws_remaining": game_state["free_throws_remaining"],  # ✅ FIX: Include free_throws_remaining so frontend knows more FTs remain
                     "one_and_one": False,  # ✅ FIX: Include one_and_one flag (now False since second FT is unlocked)
                 }
+                attach_position_snapshots(ooo, [ft_snap])
+                return ooo
             else:
                 # Missed front end → dead ball, rebound
                 game_state["free_throws_remaining"] = 0
@@ -1766,7 +1859,13 @@ def resolve_free_throw_logic(game):
             if rebound_team == def_team:
                 possession_flips = True
                 text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
-                next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(game) else "HCO"
+                if _FT_MISS_DREB_FAST_BREAK_ENABLED:
+                    p_dreb = fast_break_probability_from_slider(
+                        def_team.strategy_settings.get("fast_breaks", 2)
+                    )
+                    next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
+                else:
+                    next_play_type = "HCO"
                 game_state["offensive_state"] = next_play_type
             else:
                 # Offensive rebound - store for separate turn processing
@@ -1817,6 +1916,7 @@ def resolve_free_throw_logic(game):
             if game_state.get("last_rebound") == "DREB":
                 result["next_play_type"] = game_state.get("offensive_state", "HCO")
 
+    attach_position_snapshots(result, [ft_snap])
     return result
 
 
@@ -1861,9 +1961,12 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
         text = f"{stealer_name} jumps the pass"
-        fast_break_chance = get_fast_break_chance(game)
+        # Stealing team = def_team; single roll uses their aggression only.
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
         fast_break_roll = random.random()
-        if fast_break_roll < fast_break_chance:
+        if fast_break_roll < p_steal:
             game_state["offensive_state"] = "FAST_BREAK"
             text += " and takes it the other way!"
         else:
@@ -1885,7 +1988,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         logging.debug(f"🏀 [STEAL FLOW] HCO Steal detected:")
         logging.debug(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
         logging.debug(f"  Victim: {get_name_safe(ball_handler)} (ID: {victim_id})")
-        logging.debug(f"  Fast break chance: {fast_break_chance:.2%}, Roll: {fast_break_roll:.3f}")
+        logging.debug(f"  Fast break chance: {p_steal:.2%}, Roll: {fast_break_roll:.3f}")
         logging.debug(f"  Next offensive_state: {game_state['offensive_state']}")
         logging.debug(f"  last_stealer SET: {get_name_safe(defender)} (ID: {stealer_id})")
 
@@ -3759,7 +3862,11 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
     game_state["final_turn"] = True
     try:
+        final_snap = build_skeleton_pre_resolve_shot_snapshot(
+            game, off_lineup, def_lineup, skeleton, roles, "FINAL_TURN", "final_turn_pre_resolve_shot"
+        )
         shot_result = game.shot_manager.resolve_shot(roles)
+        attach_position_snapshots(shot_result, [final_snap])
     finally:
         game_state.pop("final_turn", None)
     # Use time_elapsed = time_remaining for the turn so clock goes to 0 and quarter/game end triggers
@@ -4365,7 +4472,9 @@ def resolve_half_court_offense_logic(game):
                 def_lineup,
                 add_defenders=True
             )
-        
+        if animations:
+            apply_coords_from_animations_list(game, animations)
+
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system,
         # avoiding coordinate orientation issues and reusing existing calculations
@@ -4446,6 +4555,21 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["steps"] = roles["steps"]
             if serializable_roles:
                 turn_result["roles"] = serializable_roles
+            attach_position_snapshots(
+                turn_result,
+                [
+                    build_phase_post_stopper_snapshot(
+                        game,
+                        off_lineup,
+                        def_lineup,
+                        skeleton,
+                        roles,
+                        "HCO",
+                        "turnover",
+                        "hco_turnover_post_stopper",
+                    )
+                ],
+            )
             return turn_result
 
         elif event_type == "O_FOUL":
@@ -4489,6 +4613,21 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["steps"] = roles["steps"]
             if serializable_roles:
                 foul_result["roles"] = serializable_roles
+            attach_position_snapshots(
+                foul_result,
+                [
+                    build_phase_post_stopper_snapshot(
+                        game,
+                        off_lineup,
+                        def_lineup,
+                        skeleton,
+                        roles,
+                        "HCO",
+                        "non_shooting_foul",
+                        "hco_o_foul_post_stopper",
+                    )
+                ],
+            )
             return foul_result
 
         elif event_type == "D_FOUL":
@@ -4530,11 +4669,26 @@ def resolve_half_court_offense_logic(game):
                 serializable_roles["steps"] = roles["steps"]
             if serializable_roles:
                 foul_result["roles"] = serializable_roles
+            attach_position_snapshots(
+                foul_result,
+                [
+                    build_phase_post_stopper_snapshot(
+                        game,
+                        off_lineup,
+                        def_lineup,
+                        skeleton,
+                        roles,
+                        "HCO",
+                        "non_shooting_foul",
+                        "hco_d_foul_post_stopper",
+                    )
+                ],
+            )
             return foul_result
 
     # 3. Shot Result
     # For SHOT path, animations was never set (it's only set inside event_type != "SHOT").
-    # Build animations from skeleton so update_player_coords_from_animations can sync coords before resolve_shot.
+    # Build animations from skeleton so apply_coords_from_animations_list can sync coords before resolve_shot.
     animations = []
     if skeleton and "steps" in skeleton:
         animator = Animator(game)
@@ -4604,9 +4758,11 @@ def resolve_half_court_offense_logic(game):
                 game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
     
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
-    update_player_coords_from_animations(game, animations)
+    apply_coords_from_animations_list(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
+    hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
+    attach_position_snapshots(shot_result, [hco_snap])
     
     # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Real_Time_Clock_System.md)
     if "_shot_at_one_second_time_elapsed" in game_state:
@@ -5172,9 +5328,13 @@ def resolve_full_court_press_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
-        update_player_coords_from_animations(game, animations)
+        apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        fcp_snap = build_skeleton_pre_resolve_shot_snapshot(
+            game, off_lineup, def_lineup, skeleton, shot_roles, "FCP", "fcp_pre_resolve_shot"
+        )
         shot_result = game.shot_manager.resolve_shot(shot_roles)
+        attach_position_snapshots(shot_result, [fcp_snap])
         
         # ✅ Handle AND-1 situations (MAKE with shooting foul)
         # Check for shooting foul on both MAKE and MISS
@@ -5426,6 +5586,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     else:
         logging.warning(f"⚠️ [FCP] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
         animations = []
+
+    if animations:
+        apply_coords_from_animations_list(game, animations)
     
     # Determine possession flip
     possession_flips = False
@@ -5437,7 +5600,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
     next_play_type = None
     if result_type == "STEAL":
-        if random.random() < get_fast_break_chance(game):
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
+        if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
             game_state["offensive_state"] = "FAST_BREAK"
         else:
@@ -5528,6 +5694,39 @@ def resolve_full_court_press_logic(game: "GameManager"):
             "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None,
         }
         logging.info(f"✅ FOUL OUT (FCP): Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_pt}")
+
+    if result_type in ("DEAD BALL", "STEAL"):
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "FCP",
+                    "turnover",
+                    "fcp_turnover_post_stopper",
+                )
+            ],
+        )
+    elif result_type == "FOUL":
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "FCP",
+                    "non_shooting_foul",
+                    "fcp_non_shooting_foul_post_stopper",
+                )
+            ],
+        )
 
     return result
 
@@ -6345,9 +6544,13 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         }
         
         # Use shot manager to resolve the shot
-        update_player_coords_from_animations(game, animations)
+        apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        hct_snap = build_skeleton_pre_resolve_shot_snapshot(
+            game, off_lineup, def_lineup, skeleton, shot_roles, "HCT", "hct_pre_resolve_shot"
+        )
         shot_result = game.shot_manager.resolve_shot(shot_roles)
+        attach_position_snapshots(shot_result, [hct_snap])
         
         # ✅ Handle AND-1 situations (MAKE with shooting foul)
         # Check for shooting foul on both MAKE and MISS
@@ -6580,6 +6783,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     else:
         logging.warning(f"⚠️ [HCT] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
         animations = []
+
+    if animations:
+        apply_coords_from_animations_list(game, animations)
     
     # Determine possession flip (same logic as FCP)
     possession_flips = False
@@ -6591,7 +6797,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
     next_play_type = None
     if result_type == "STEAL":
-        if random.random() < get_fast_break_chance(game):
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
+        if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
             game_state["offensive_state"] = "FAST_BREAK"
         else:
@@ -6682,6 +6891,39 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None,
         }
         logging.info(f"✅ FOUL OUT (HCT): Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_pt}")
+
+    if result_type in ("DEAD BALL", "STEAL"):
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "HCT",
+                    "turnover",
+                    "hct_turnover_post_stopper",
+                )
+            ],
+        )
+    elif result_type == "FOUL":
+        attach_position_snapshots(
+            result,
+            [
+                build_phase_post_stopper_snapshot(
+                    game,
+                    off_lineup,
+                    def_lineup,
+                    skeleton,
+                    roles,
+                    "HCT",
+                    "non_shooting_foul",
+                    "hct_non_shooting_foul_post_stopper",
+                )
+            ],
+        )
 
     # logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
     return result

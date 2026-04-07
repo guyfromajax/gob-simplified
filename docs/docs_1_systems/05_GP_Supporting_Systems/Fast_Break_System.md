@@ -1,14 +1,16 @@
-## Fast Break System ✅ **COMPLETE** (January 2025)
+## Fast Break System ✅ **COMPLETE** (January 2025; Rim Runner March 2025; FB shot contest grid unification March 2026)
+
+> **Canonical reference (Bible):** This document is the **single source of truth** for sustained Fast Break knowledge—selection logic, coordinates, defensive stops, shot attempts, constants, and file touchpoints. Short-term project notes may live in `docs/To Do/FB_Update_Brief.md`; if something conflicts, **treat this file as authoritative** unless the team explicitly updates both.
 
 **Base Constants**
 
-1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` (defender must be within ±6 y-coords of outlet receiver to force stop)
+1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` for **steal → fast break** (defender must be within ±6 y of outlet receiver to force stop). **`DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8`** for **DREB → outlet** fast breaks (Covert Release; wider band than steals).
 2. **Ball Handler Movement (Defensive Stop/Shot)**: X: 5-10 spots toward basket, Y: ±3 spots
-3. **Stopper Positioning**: 1-3 spots in front of ball handler (defensive stop)
-4. **Defender Positioning (Shot)**: Defender 1 x-coord toward basket from shooter (home offense: shooter x + 1; away offense: shooter x − 1); Y: ±2 of shooter
+3. **Stopper Positioning (defensive stop only)**: 1–3 spots in front of ball handler end, same **Y** (confrontation — not the rim shot spot)
+4. **Shot contest defender (all fast break shot attempts)**: Grid vs the shooter’s **final** spot (`_bh_final_x/y`, exposed as `shot_spot`). Shooter shot spot is now a tighter rim band: **x = basket.x ± uniform integer in [1, 4]** and **y = basket.y + uniform integer in [−3, +3]** (`FB_SHOT_SPOT_X_MIN/MAX`, `FB_SHOT_SPOT_Y_RANGE` in `BackEnd/constants/fast_break_constants.py`). Primary defender uses **x = shooter_x - 2** for home offense or **x = shooter_x + 2** for away offense, and **y = shooter_y + uniform integer in [−2, +2]** (`SHOT_DEFENDER_X_OFFSET`, `SHOT_DEFENDER_Y_RANGE`). In beat-stopper cases, the **second** contest defender uses the same **x** and **y = primary_y ± 3** based on his starting row (`SECONDARY_SHOT_DEFENDER_Y_OFFSET`). **Helpers:** `fast_break_shot_defender_end_coords(...)` and `fast_break_secondary_shot_defender_end_coords(...)`. **JS mirrors:** `fastBreakShotDefenderGridVsShooter()` and `fastBreakSecondaryShotDefenderGrid()` in `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` for fallbacks; `animateFastBreakShotWithStopper` prefers `turnData.shot_spot` / `defender_spot` from the backend when present.
 5. **Steal Entry Movement**: X: 5-10 spots toward basket, Y: ±4 spots (clamped 3-47)
-6. **Outlet Pass Score Formula**: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100 range
-7. **Defense Release Chances**: Based on `fast_breaks` setting (0-4): `{0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}`
+6. **Outlet Pass Score Formula (Covert Release / default DREB path)**: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100 range. **Rim Runner** uses a different outlet base for the outlet contest (see **Rim Runner** under *Fast break plays* below).
+7. **Fast break initiation (single roll)**: Slider **0–4** maps to probability **`{0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}`** via `fast_break_probability_from_slider()` in `BackEnd/utils/shared.py` (`SLIDER_TO_FAST_BREAK_PROB`). **Missed shot → DREB (HCO or FT):** one roll on the **rebounding team’s** `strategy_settings["fast_breaks"]` only — no second roll for Covert release. **Steal:** one roll on the **stealing team’s** `strategy_settings["aggression"]` only (that team is `def_team` at steal resolution before possession flips in `game_manager`). User playbook settings now also seed **`playbook_settings.fast_break`** with `covert_release = 50`, `rim_runner = 50`, and `full_team = 0`.
 
 **Fast Break Resolution Flow (8 Steps)**
 
@@ -21,19 +23,22 @@
    - Increment `def_scouting["defense"]["vs_Fast_Break"]["used"]`
 
 3. **Determine Entry Type and Set Roles**
-   - **DREB Entry**: 
+   - **DREB Entry (shot turn, `shot_manager`)**: On the shot attempt, **one** roll: `random.random() < fast_break_probability_from_slider(def_team["fast_breaks"])` (with situational override to 0 when applicable). **No second roll** for Covert. If eligible, **`play_key_for_fast_break_entry(True)`** runs **once** (**50/50** `rim_runner` vs `covert_release` for now; `full_team` remains seeded at 0 until that execution path ships). **Covert Release only**: if eligible and key is `covert_release`, **`select_covert_release_position`** assigns the release defender (no extra probability roll). **Rim Runner / `full_team`**: all defenders crash; no release list. Key stored as **`game_state["pending_dreb_fb_play_key"]`** when miss → DREB and **`next_play_type == "FAST_BREAK"`** (consumed in resolver). **Missed FT → DREB** (`resolve_free_throw_logic`): same **single** roll using rebounding team’s **`fast_breaks`** for `FAST_BREAK` vs `HCO`.
+   - **`resolve_fast_break_logic()`**: For DREB, **`fb_play_key = game_state.pop("pending_dreb_fb_play_key", None)`**; if missing (legacy/tests), fallback **`play_key_for_fast_break_entry(True)`**. Branches: **`rim_runner`** or **`full_team`** → `resolve_rim_runner_fast_break(game, fb_play_key)`; **`covert_release`** → existing Covert flow below.
+   - **DREB Entry (Covert Release path only)**: 
      - Outlet passer = rebounder (from `game_state["last_rebounder"]`)
-     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF
+     - Outlet receiver = release player (from `game_state["last_release_player"]`) or fallback to random PG/SG/SF. **Release selection** runs **only when the pending play key is `covert_release`**: on the **prior shot turn**, `select_covert_release_position` chose the releaser (defender **farthest from the rim in x** among those **not** guarding the shooter — no second `fast_breaks` roll). **IQ reads**: roll `the_read` 1–100 → **good_release** if `the_read <` release player IQ; roll `d_read` 1–100 once → each get-back player gets **good_d_release** if `d_read <` that player’s IQ. **AG**: outlet and get-back **x-band floors** use each player’s **AG** (see **Covert Release** below). Final coords sampled in `covert_release.py` (HOME orientation; mirror **x** when the future FB offense team is away).
      - Calculate outlet pass score: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)`, scaled to 1-100
    - **Steal Entry**:
      - Ball handler = stealer (from `game_state["last_stealer"]`)
      - No outlet pass (no outlet passer/receiver)
 
 4. **Calculate Ball Handler Position After Entry**
-   - **DREB Entry**: Ball handler receives outlet pass at starting position (no movement during outlet pass)
+   - **DREB Entry (Covert / generic)**: Ball handler receives outlet pass at starting position (no movement during outlet pass)
      - Priority 1: `defense_release_coords` from most recent MISS/MAKE turn
      - Priority 2: `offense_getback_coords` from most recent MISS/MAKE turn
      - Fallback: `player.coords`
+   - **DREB Entry (Rim Runner / Full Team)**: After a **successful** outlet contest, sim coords for the rim runner and outlet ball handler are set from **`rim_runner_burst_phase`** (`rr_to`, `receiver_to`); `roles["ball_handler_outlet_x/y"]` match **`receiver_to`** for stop/shot geography and animation. **Denied** outlet: coords are **not** advanced (only the burst payload is present for the client).
    - **Steal Entry**: Ball handler moves 5-10 x spots toward basket, ±4 y spots (clamped 3-47)
      - Uses `last_stealer_coords` from game_state if available
 
@@ -46,20 +51,19 @@
      - **X-Coordinate Check (Ahead)**: 
        - Home offense: `defender_x >= ball_handler_x` (basket at x=90)
        - Away offense: `defender_x <= ball_handler_x` (basket at x=10)
-     - **Y-Coordinate Check (Within Range)**: `|defender_y - ball_handler_y| <= 6`
+     - **Y-Coordinate Check (Within Range)**: `|defender_y - ball_handler_y| <= 6` (steal entry) or `<= 8` (DREB/outlet entry)
    - Track closest stopping defender (x-distance only) and **closest defender overall among get-back players only** (Euclidean distance; only defenders in `offense_getback` from most recent shot are eligible for shot defender)
 
 6. **Determine Event Type**
    - **0 Defenders**: Always `SHOT`
    - **Defender Ahead AND Within Y-Range**: Skill check between ball handler and defender
-     - **Geography Check**: Defender must be ahead AND within ±6 y-coords (determines if stop attempt is possible)
+     - **Geography Check**: Defender must be ahead AND within y-range (**±6** steal, **±8** DREB/outlet) (determines if stop attempt is possible)
      - **Skill Check** (if geography check passes):
        - `break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * random(1-6)`
        - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
        - If `stop_score >= break_score` → `DEFENSIVE_STOP` (defender wins)
        - If `break_score > stop_score` → `SHOT` (ball handler wins, beats defender)
-         - Defender still animates to stopper position (shows the attempt)
-         - Ball handler animates past stopper to shot spot (shows offensive success)
+         - **Animation**: stopper + optional trail defender use the **unified shot contest spots** vs rim **`shot_spot`** (see **Shot contest grid**); not “1–3 from outlet start” on the sim
          - **Shot defender**: Closest get-back (by distance) **excluding the failed stopper**; if no other get-back, no shot defender (defender_count = 0)
    - **Otherwise**: `SHOT`. **Shot defender only when 1 or 2 get-back players**: closest get-back by Euclidean distance; if 0 or 3+ get-back, no shot defender (defender_count = 0)
 
@@ -80,9 +84,9 @@
    - **Shot defender pool**: Only **get-back players** (from `offense_getback` on the most recent shot) are eligible. **Only when there are 1 or 2 get-back players** is a shot defender assigned; 0 or 3+ get-back → no shot defender (defender_count = 0). If a get-back defender attempted a stop and failed (`ball_handler_beats_defender`), that defender is **excluded** from being the shot defender (closest remaining get-back is used, or none if he was the only get-back).
    - **Special Case - Ball Handler Beats Defender**:
      - If `ball_handler_beats_defender = True` (from Step 6 skill check):
-       - Defender still animates to stopper position (1-3 spots in front of ball handler's starting position)
-       - Ball handler animates past stopper to shot spot (shows offensive success)
-       - Use `animateFastBreakShotWithStopper()` animation path
+       - **Stopper** uses the primary FB shot-defender spot from **`shot_spot`**; the **trail shot defender** (if any) uses the same **x** plus a **±3 y** offset based on his starting row so the sprites do not stack
+       - Ball handler animates to shot spot near rim (same rim-band logic as other FB shots)
+       - Client: `animateFastBreakShotWithStopper()` (uses `shot_spot` / `defender_spot` when on the turn)
        - Shot defender = closest get-back **excluding the failed stopper** (or none if no other get-back)
    - **Charge/Blocking Foul**: Only checked when there is a shot defender (defender present and defender_count ≥ 1). If 0 defenders back, no charge/block check; shot proceeds normally. When applicable, uses same attack-shot logic as half-court (`calculate_charge()`); CHARGE → possession to defense, BLOCKING_FOUL → foul on defender (SIP or free throws if bonus). Shooter and defender are animated to the shot spot; no shot-to-rim.
    - Call `shot_manager.resolve_shot()` (attack adapter) for shot resolution
@@ -97,18 +101,53 @@
 The **Fast Break** system handles transition offense situations that occur after defensive rebounds or steals. The system determines whether a fast break results in a defensive stop or a shot attempt based on defender positioning relative to the ball handler after the outlet pass.
 
 **Key Functions:**
-- `FastBreakTrigger.can_trigger_from_dreb()` - Determines if fast break should trigger from DREB in `BackEnd/engine/fast_break_trigger.py`
-- `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py`
+- **DREB outlet**: On the **HCO shot** turn, `shot_manager` rolls FB eligibility once via **`fast_break_probability_from_slider`** on the **defensive (rebounding) team’s `fast_breaks`**, then play key; **Covert** runs `select_covert_release_position` + coords (no second roll). **Rim Runner / Full Team** skip release. `FastBreakTrigger.DEFENSE_RELEASE_CHANCES` aliases the same **`SLIDER_TO_FAST_BREAK_PROB`** table (legacy `can_trigger_from_dreb()` helper). **Rim Runner / Full Team** DREB possessions resolve in `BackEnd/engine/rim_runner_fast_break.py` after **`pending_dreb_fb_play_key`** is consumed.
+- `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py` (delegates to Rim Runner module when DREB + play key is **`rim_runner`** or **`full_team`**)
 - `capture_fast_break_animation()` - Builds animation packet in `BackEnd/models/animator.py`
 - `runFastBreakSequence()` - Orchestrates fast break animation in `FrontEnd/static/js/phaser/animation/fastBreak.js`
+
+### Fast break plays (per-play reference)
+
+Use this subsection for **behavior and formulas by play key** (`covert_release`, `rim_runner`, `full_team`, `after_steal`). The **8-step flow** above describes the **Covert Release** DREB path in full; Rim Runner replaces that path when selected.
+
+#### Covert Release (`covert_release`)
+
+- **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** (from the prior miss shot turn) is **`covert_release`** (50/50 vs Rim Runner until settings ship).
+- **What**: Release defender selection, IQ/AG bands, outlet receiver coords, then **defensive stop vs shot** per Steps 4–8 (geography + AG/BH vs AG/OD skill check, shot via `resolve_shot`).
+- **Code**: `BackEnd/engine/covert_release.py`, `resolve_fast_break_logic()` (Covert branch), `shot_manager` for Covert-only release/get-back coords on the prior shot turn.
+
+#### Rim Runner (`rim_runner`)
+
+- **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** is **`rim_runner`**.
+- **Designation**: Optional per team — `game_state["rim_runner_by_team_id"][str(team_id)]` = player id (set from lineup / `simulate-quarter` payload). If omitted, finisher = offensive player **closest to the attacking basket** at DREB (with transfer rule when the designated player is the rebounder; see implementation). Lineup UI: optional Rim Runner select on **Set Lineup**; URL params `home_rim_runner_player_id` / `away_rim_runner_player_id` → game payload.
+- **Outlet chain (sim + animation)**: Offensive **outlet target** `(tx, ty)` is computed from the rim runner’s **post–burst-sprint** vertical half: `ty = 15` if rim runner ends **above** the lane (`y > 24` in HOME grid), else `ty = 35`. Each non–rim-runner offensive player gets a candidate `tx` from **their** current **x** plus **8** grid spots toward the basket, clamped to the backcourt band (**home** offense: `min(start_x + 8, 40)`; **away**: `max(start_x - 8, 60)`). The **outlet receiver** is the offensive player (not the rim runner) **closest** to their own `(tx, ty)` in grid space. If that player is the **rebounder**, there is **no outlet pass** (`roles["outlet_passer"] = null`); the rebounder **dribbles** to `(tx, ty)` in parallel with the burst-phase animation. Otherwise **`outlet_passer`** = rebounder and **`outlet_receiver`** = that closest player. `roles["rim_runner_sequence"]` is **true** only for **`rim_runner`**, not **`full_team`**.
+- **Dynamic outlet / burst x (rebound-driven)**: When the prior shot turn has **`ball_bounce_x`** (e.g. block/miss bounce) or rebounder x falls in a “bad” band, **`resolve_rim_runner_fast_break`** may override: **home** offense — `25 < rebound_x < 50` → outlet receiver target **`rebound_x + 12`**; **away** offense — `50 < rebound_x < 75` → **`rebound_x - 12`**. Then rim runner **`rr_to.x`** = that receiver target **plus** the usual burst delta (**20–25** if animation burst success, **9–14** if fail) **toward the basket** from the receiver target (not from RR’s pre-burst x). **Y** logic unchanged. Outside those bands, legacy **+8** outlet candidate + RR sprint from RR’s current x applies.
+- **Rim runner sprint (animation geometry only)**: Roll `movement_factor = random.randint(1, 100)` vs organic threshold **`0.6*AG + 0.2*IQ + 0.2*CH`** (no cap at 100). **Success**: move rim runner **x** by **`random.randint(20, 25)`** toward the basket (**+** home offense, **−** away); **fail**: **`random.randint(9, 14)`**; **x** clamped **`[4, 97]`**. **New y** uses rim runner **y before the sprint**: if **`y > 24`** → **`random.randint(30, 35)`**, else **`random.randint(15, 20)`**. (Sim burst open/closed **`fb_open`** below still uses the separate AG/IQ vs defender roll.) *When dynamic placement applies, the x delta is measured from the computed outlet receiver target instead of RR’s start x.*
+- **`roles["rim_runner_burst_phase"]`**: Structured payload for the client: `rr_id`, `rr_from` / `rr_to`, `burst_success`, `movement_factor`, `burst_threshold`, `skip_outlet_pass`, `outlet_passer_id`, `outlet_receiver_id`, `receiver_to` `{x,y}`, `outlet_defender_id`, `outlet_defender_to` (closest outlet contest defender tweens to **passer x ± 2** same **y** as passer; home **+2**, away **−2`), `other_players` (everyone not passer, that defender, rim runner, or outlet receiver). **Offense (rebounding team):** **x** toward basket **`random.randint(1, 4)`**, **y** unchanged. **Defense — get-back** (from prior shot’s `offense_getback`, excluding outlet contest defender): **x** **15** spots toward the attacking basket, clamped so they do not cross the rim **x**; **y** up to **6** toward the rim runner’s burst **y** (`rr_to.y`), without crossing past the RR in either vertical direction. **Defense — all other defenders:** roll `x_roll = random.randint(1, 100) −` defending team’s **`fb_opp_modifier`** (clamped **−10…+10**); if **`0.5×IQ + 0.5×AG` > `x_roll`**, move **15–20** x spots toward the basket (same clamp); else **8–12** x spots; **y** still uses **up to 6 toward y = 25** (legacy `_y_toward_25`). Present on **both** successful and **denied** outlet turns so the sprint/setup can still animate when **`rim_runner_outlet_failed`** is true.
+- **Resolution (high level)**: Dedicated module **`resolve_rim_runner_fast_break()`** — build **`rim_runner_burst_phase`** + outlet roles → outlet contest → on success, apply rim runner + ball handler **coords** to burst targets → sim **burst** (`fb_open`) → ball-handler IQ read → pass vs hold → if pass: open lane → fast break shot; if not open → intercept tiers / bat OOB (`rim_runner_bat_oob`, SIP) / completion to shot. Uses team attrs **`fb_efficiency`** / **`fb_opp_modifier`** (clamped **−10…+10**) and `random.randint(1,6)` where applicable.
+- **Outlet contest (step A)**: Offense: `(PS*0.5 + ST*0.3 + IQ*0.2) * d6` vs defense: `(IQ*0.5 + OD*0.3 + ST*0.2) * d6`; offense adds **`+3 × fb_efficiency`**, defense adds **`+2 × fb_opp_modifier`**; if offense **≤** defense, settle to HCO — turn is still `DEFENSIVE_STOP` with **`rim_runner_outlet_failed: true`**, `defender` = outlet contest defender, text *“Outlet denied — settling…”* (see **client** below: this path does **not** use the generic fast-break defensive-stop animation or **`Great Stop!`**).
+- **Burst**: Offense `(AG*0.7 + IQ*0.3) * d6` vs primary defender — get-back pool: `(IQ*1.0 + AG*0.5) * d6`; else `(IQ*0.5 + AG*0.5) * d6`. **`fb_open`** if offense score **>** defense score.
+- **Read**: `IQ * d6` vs threshold **`200 - 5×fb_efficiency`** (offense team). **Aggression** (offense `strategy_settings`, ≥3 = aggressive) weights wrong-read pass vs hold.
+- **Pass / shot / events**: Open lane → FB shot (Rim Runner shooter, existing `resolve_shot` attack path). Forced pass when not open: intercept roll vs **`250 - fb_opp_modifier`** / **`200 - fb_opp_modifier`** tiers; bat OOB announces **“Batted Ball Out Of Bounds!”** (`RIM_RUNNER_BATTED_OOB`). Full detail matches `rim_runner_fast_break.py`.
+- **Client — outlet denied (`rim_runner_outlet_failed`)**: After **`animateRimRunnerBurstPhase`**, the outlet pass is skipped. **`animateRimRunnerOutletDeniedBeat`** (in `fastBreak.js`): ball remains on the **outlet passer**; any burst tween on the **outlet defender** is cleared so they move to **`outlet_defender_to`** (**passer x ± 2** toward the pass, same **y** as passer — HOME grid); announcement **“FB Outlet Pass Denied!”** with the defender’s headshot; after the standard FB hold, **all players except** outlet passer, outlet receiver, and outlet defender run a **long horizontal drift** toward the offense basket (same idea as hold-up) while the **receiver** tweens to the catch spot; drift stops when the receiver arrives; burst tweens stopped for those players use **`Promise.allSettled`** in **`animateRimRunnerBurstPhase`** so the sequence does not reject. Then **`runPass`** to the receiver (if passer ≠ receiver; dribble-outlet / **`skip_outlet_pass`** keeps one player with the ball). **Phase 2** calls **`finalizeRimRunnerNonShotTurn`** only — **no** **`animateDefensiveStop`**, **no** **`Great Stop!`**. Next HCO follows normal half-court entry (**`startNextHalfCourtOffense`**).
+- **Client — hold-up (no lane pass after successful outlet)**: **`animateRimRunnerHoldUpLeadIn`** — ball handler (outlet receiver): **+6** grid **x** toward the basket, **+8 y** if **`y < 25`** else **−8 y**. **Everyone else** tweens in a **straight horizontal** line toward the offense basket (**y** fixed at current grid row, **x** up to **40** grid toward the rim on a long easing duration). Those horizontal tweens are **stopped** when the ball handler **finishes** his move; then grid coords are synced from pixels. **No** **`animateDefensiveStop`** / top-of-key. Phase 2 **`finalizeRimRunnerHoldUpToHco`** sets **`scene._rimRunnerHoldUpInboundPass`** when ball handler ≠ offensive **PG**, then **`finalizeRimRunnerNonShotTurn`**. On the **next HCO** turn, **`playTurnAnimation`** runs **`runRimRunnerHoldUpSetupTween`**: all players except the ball handler tween to skeleton **step 0**; when **PG** reaches step 0, **`runPass`** from the ball handler’s hold-up spot to **PG**; then remaining setup completes and the ball handler tweens to step 0 (ball stays with **PG**). If ball handler **is** PG, normal **`runSetupTween`** only. **`Great Stop!`** remains for **Covert** / **`stopper_id`** stops only, not RR hold-up. **Lineup invariant:** both teams always field **PG, SG, SF, PF, C** (one each), so offensive **PG** exists for the hold-up → HCO inbound pass path.
+- **Code**: `BackEnd/engine/rim_runner_fast_break.py`; entry from `resolve_fast_break_logic()` when DREB + `RIM_RUNNER`.
+
+#### Full Team (`full_team`)
+
+- **Status**: **Stub** — same resolver as Rim Runner (`resolve_rim_runner_fast_break`) for DREB outlet until a dedicated Full Team path exists. No Covert release on the shot turn (same geometry rules as Rim Runner). `roles["rim_runner_sequence"]` is **false** for **`full_team`** so UI/announcements can distinguish later.
+
+#### After Steal (`after_steal`)
+
+- **When**: Fast break entered from **steal** (not DREB outlet). `play_key_for_fast_break_entry(False)` → **`after_steal`**.
+- **What**: No Covert Release outlet; ball handler = stealer; steal entry movement; same **defensive stop y-range ±6** and stop vs shot logic as in Steps 4–8 (steal branch). See **Steal Entry** in Step 3 above.
 
 ### When Fast Break Activates
 
 **Trigger Conditions:**
-- After defensive rebounds when `defense_releases = True` (defensive players release for fast break)
-- After steals with fast break chance
+- After **DREB** on a miss when the **single** `fast_breaks` roll succeeded on the **shot attempt** (or FT miss path); **`pending_dreb_fb_play_key`** selects **Covert** (requires successful Covert release position) or **Rim Runner** / **Full Team** (no release). **`next_play_type = "FAST_BREAK"`** no longer requires a non-empty defense release list.
+- After steals with fast break chance (`FastBreakTrigger.can_trigger_from_steal()`)
 - Set via `next_play_type = "FAST_BREAK"` in turn result
-- Determined by `FastBreakTrigger.can_trigger_from_dreb()` for DREB or `FastBreakTrigger.can_trigger_from_steal()` for steals (in `BackEnd/engine/fast_break_trigger.py`)
 
 **State Flow:**
 1. DREB or STEAL → Fast break chance determined
@@ -121,15 +160,15 @@ The **Fast Break** system handles transition offense situations that occur after
 Fast breaks can result in:
 
 1. **Defensive Stop (DEFENSIVE_STOP)**
-   - Defender is ahead of ball handler after outlet pass AND within ±6 y-coords
+   - Defender is ahead of ball handler after outlet pass AND within y-range (**±6** steal, **±8** DREB/outlet)
    - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
    - Closest defender ahead becomes "stopper" and is placed 1-3 spots in front of ball handler
    - Routes to: HCO (half court offense)
 
 2. **Shot Attempt (SHOT)**
-   - No defender ahead of ball handler after outlet pass OR defender not within ±6 y-coords
-   - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
-   - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender (or, if ball handler beat a stopper, closest get-back **excluding that stopper**). If 0 or 3+ get-back, or only get-back was the failed stopper, no shot defender. When present, defender is positioned 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter.
+   - No defender ahead of ball handler after outlet pass OR defender not within the applicable y-range (±6 vs ±8)
+   - Ball handler moves to **rim shot spot** (see `capture_fast_break_animation`); not the old “outlet + 5–10 only” path for contested shots
+   - **Shot defender (if any)**: Only when there are **1 or 2 get-back players**; pool is **get-back players only**. Closest get-back by Euclidean distance becomes shot defender, or—if the ball handler **beat** a stopper—the closest **remaining** get-back after excluding the failed stopper. If 0 or 3+ get-back, or the only get-back was the failed stopper, no shot defender. **Animation end coords** for the primary shot defender always come from the shooter-relative FB shot-defender rule (see **Shot contest grid** under *Animation Sequence* below); beat-stopper path adds a second defender at the same **x** and **±3 y** from the primary defender.
    - Routes to: Standard shot resolution flow (MAKE, MISS, or **BLOCK** — block reconciliation can run on attack shots; see Block System)
 
 ### Charge and Blocking Foul (Fast Break Shot Only)
@@ -168,13 +207,46 @@ When a Fast Break shot is **blocked** (block reconciliation in `shot_manager.res
 - Frontend flips coordinates for away team display
 - Backend calculations always use HOME orientation for consistency
 
+### Covert Release (DREB → outlet only)
+
+Steal-initiated fast breaks **do not** use Covert Release. Play-type naming (e.g. “Covert Release”) applies only to **DREB → outlet** paths.
+
+**Selection (summary)**  
+1. Defender guarding the shooter cannot release.  
+2. Among other defenders, choose the one **farthest from the basket being attacked** in x (HOME): home team shooting → lowest x on defense; away team shooting → highest x on defense; ties → random.  
+3. **`the_read`**, **`d_read`**, **`good_release`**, **`good_d_release` per get-back** — see Step 3 in **Fast Break Resolution Flow** above.
+
+**AG → x floors (HOME, when the fast-break offense team is home)**  
+These set the **lower** end of random x; upper bounds and y come from the IQ bands below.
+
+| Role | AG | Floor label | Value |
+|------|-----|-------------|--------|
+| **Outlet / release player** | AG ≥ 80 | `x_min` | 50 |
+| | 60 ≤ AG < 80 | `x_min` | 47 |
+| | AG < 60 | `x_min` | 45 |
+| **Each get-back player** | AG ≥ 80 | `def_x_min` | 55 |
+| | 60 ≤ AG < 80 | `def_x_min` | 53 |
+| | AG < 60 | `def_x_min` | 50 |
+
+**IQ → random bands (after floors)**  
+Random integer coords; **x** is mirrored with `100 - x` when the **future** fast-break **offense** team is **away** (same as before); **y** is not mirrored.
+
+| Player | Condition | x range (HOME, home FB offense) | y range |
+|--------|-----------|----------------------------------|---------|
+| Release (outlet receiver) | `good_release` | `x_min` – 55 | 18 – 32 |
+| Release | not `good_release` | `(x_min - 5)` – 50 | 22 – 30 |
+| Get-back | `good_d_release` | `def_x_min` – 60 | 22 – 30 |
+| Get-back | not `good_d_release` | `(def_x_min - 5)` – 60 | 18 – 32 |
+
+Implementation: `BackEnd/engine/covert_release.py` — `release_x_min_from_ag`, `getback_def_x_min_from_ag`, `sample_release_coords`, `sample_getback_coords`, `player_ag`.
+
 **Outlet Receiver (Ball Handler) Starting Coordinates:**
-- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player)
+- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player). Sampled via **`covert_release.sample_release_coords(good_release, will_be_home_fb_offense, ag)`** with **release player’s AG**.
 - **Priority 2**: `offense_getback_coords` from most recent MISS/MAKE turn (if ball handler was a get-back player)
 - **Fallback**: `player.coords` (current position on court)
 
 **Get-Back Defender Coordinates:**
-- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only
+- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only — **`covert_release.sample_getback_coords(good_d, will_be_home_fb_offense, ag)`** per get-back player (**that player’s AG**)
 - Only defenders who were actually get-back players in the turn that triggered the fast break
 - **Fallback**: `defender.coords` (current position on court)
 
@@ -182,15 +254,15 @@ When a Fast Break shot is **blocked** (block reconciliation in `shot_manager.res
 ```
 Outlet Receiver: x=55, y=23 (from defense_release_coords)
 Get-Back Defender: x=57, y=34 (from offense_getback_coords)
-Y Difference: |34 - 23| = 11 (exceeds ±6 range)
+Y Difference: |34 - 23| = 11 (exceeds ±6 steal band and ±8 DREB/outlet band)
 Result: SHOT (defender is ahead in x but NOT within y-range)
 Note: Even though defender at x=57 is ahead of ball handler at x=55, they are 11 y-coords 
-away, which exceeds the ±6 requirement, so it becomes a shot attempt instead of defensive stop.
+away, so it becomes a shot attempt instead of defensive stop.
 
 Another Example:
 Outlet Receiver: x=55, y=23 (from defense_release_coords)
 Get-Back Defender: x=57, y=25 (from offense_getback_coords)
-Y Difference: |25 - 23| = 2 (within ±6 range)
+Y Difference: |25 - 23| = 2 (within ±6 and ±8 y-bands)
 Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 2)
 ```
 
@@ -201,14 +273,14 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 **Home Offense:**
 - Basket at x=90 (larger x is closer to basket)
 - Defender ahead if: `defender_x >= ball_handler_x`
-- **Defender must also be within ±6 y-coords of outlet receiver**
+- **Defender must also be within y-range of outlet receiver** (±6 steal, ±8 DREB/outlet — see `defensive_stop_y_range` in `resolve_fast_break_logic`)
 - If defender ahead AND within y-range → DEFENSIVE_STOP
 - Otherwise → SHOT
 
 **Away Offense:**
 - Basket at x=10 (smaller x is closer to basket)
 - Defender ahead if: `defender_x <= ball_handler_x`
-- **Defender must also be within ±6 y-coords of outlet receiver**
+- **Same y-range rule** (±6 vs ±8 by entry type)
 - If defender ahead AND within y-range → DEFENSIVE_STOP
 - Otherwise → SHOT
 
@@ -224,18 +296,17 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 **Skill Check Implementation:**
 - **Two-Step Process**: Geography determines if a stop attempt is possible, then skill check determines the outcome.
-  1. **Geography Check**: Defender must be ahead AND within ±6 y-coords (determines if stop attempt is possible)
+  1. **Geography Check**: Defender must be ahead AND within y-range (**±6** steal, **±8** DREB/outlet — determines if stop attempt is possible)
   2. **Skill Check** (if geography check passes):
      - `break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * random(1-6)`
      - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
      - If `stop_score >= break_score` → `DEFENSIVE_STOP` (defender successfully stops the break)
      - If `break_score > stop_score` → `SHOT` (ball handler beats the defender)
 - **Animation Behavior When Ball Handler Wins**:
-  - Defender still animates to stopper position (1-3 spots in front of ball handler's starting position)
-  - Ball handler animates past the stopper to shot spot near rim
-  - This visually shows the offensive player's success in beating the defender
-  - Flag `ball_handler_beats_defender = True` is set in `fb_roles` to trigger special animation path
-  - **Shot defender**: The failed stopper is excluded; the closest **other** get-back (by distance) becomes the shot defender, or none if he was the only get-back
+  - **Stopper** tweens to the primary shooter-relative FB shot-defender spot
+  - Ball handler tweens to rim shot spot; **trail shot defender** (if assigned) uses the same **x** and a **±3 y** offset from the stopper so the sprites do not stack
+  - Flag `ball_handler_beats_defender = True` triggers `animateFastBreakShotWithStopper` on the client
+  - **Shot defender**: The failed stopper is excluded from the *pool*; the closest **other** get-back becomes the shot defender, or none if he was the only get-back
 
 **Critical Implementation Detail - Defender Assignment (Get-Back Only, 1 or 2):**
 - **Backend Calculation**: In `phase_resolution.py`, `closest_defender_overall` is tracked **only among defenders in `getback_player_ids`** (get-back players from the most recent shot). A shot defender is assigned only when `len(getback_player_ids) in (1, 2)`; otherwise `fb_roles["defender"] = None` and `fb_roles["defender_count"] = 0`. When `ball_handler_beats_defender` is True, the stopper is excluded and the closest remaining get-back is chosen (or none).
@@ -302,14 +373,14 @@ else:
 ### Animation Sequence
 
 **Phase 1: Outlet Pass (DREB Entry Only)**
-- Outlet passer (rebounder) stays at rebound spot
-- Outlet receiver (ball handler) receives pass at current position (no movement)
-- Defenders stay at current position (no movement)
-- Rebounders (non-get-back, non-release) stay at current position (no movement)
+
+- **Covert Release / default DREB path (no `rim_runner_burst_phase`)**: Outlet passer (rebounder) stays at rebound spot; outlet receiver (ball handler) receives pass at current position (no movement); defenders and other players stay put (`animateOutletPhase()` in `fastBreak.js`).
+- **Rim Runner / Full Team (`rim_runner_burst_phase` present)**: `animateRimRunnerBurstPhase()` runs first. **All** burst-phase tweens (rim runner sprint, outlet contest defender, `other_players`, outlet receiver run to `receiver_to`) **start together**. The **outlet pass** tween runs **only after** the **outlet receiver’s** move completes; rim runner, defender, and other players **may still be moving** during the pass. If **`skip_outlet_pass`**, the ball stays on the rebounder and moves with them to `receiver_to` (no pass). If **`rim_runner_outlet_failed`**, setup tweens play as usual; the scripted outlet pass is skipped and **`animateRimRunnerOutletDeniedBeat`** runs inside Phase 1 (see **Rim Runner** → *Client — outlet denied* above). Phase 2 for outlet denied is **HCO finalize only** — not the generic defensive-stop block below.
 
 **Phase 2: Defensive Stop or Shot Attempt**
 
 **Defensive Stop:**
+- *(Excludes Rim Runner **outlet denied** and **hold-up**; those paths finalize HCO without this block.)*
 - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
 - Stopper (closest defender ahead) moves to position 1-3 spots in front of ball handler
 - Get-back defenders chase toward basket
@@ -317,9 +388,10 @@ else:
 - **Early Termination**: Rebounder animations stop when ball handler and stopper both reach their spots
 
 **Shot Attempt:**
-- Ball handler (shooter) moves to **shot spot near rim** (basket ± 2-6, ±6 Y). The backend always sets this spot for shot attempts (see "Shot spot (ball handler end position) – backend" below).
-- Defender follows to position 1 x-coord toward basket from shooter (home: +1, away: −1), ±2 y from shooter
-- Get-back defenders chase toward basket
+- Ball handler (shooter) moves to **shot spot near rim** (basket ± 2-6, ±6 Y in `capture_fast_break_animation`; exposed as `turn_result["shot_spot"]`). See **Shot spot (ball handler end position)** below.
+- **Shot contest defender(s)** animate from the shooter final. Primary defender: **x = shooter_x - 2** for home offense or **x = shooter_x + 2** for away offense; **y = shooter_y + random(-2, 2)**. In beat-stopper cases, the second defender uses the same **x** and **y = primary_y ± 3** based on his starting row. `turn_result["defender_spot"]` is the primary defender row’s **`end`** in the animation packet (`phase_resolution`).
+- **Client timing**: `animateFastBreakShot` / `animateFastBreakShotWithStopper` **`await` only the shooter** reaching the shot spot before `animateShotToRim`. The shot defender’s tween **may still be in progress** when the ball is released (defender and rebounders are not awaited at the shoot cue).
+- Get-back defenders (non–shot-defender) chase toward basket per `moveOtherPlayersToStandardPositions`
 - Rebounders move to random x=5-20 spots from basket, y=rim_y ± 10 (clamped)
 - **Ball flight**: MAKE/MISS → ball to rim (or adjusted rim for make). **BLOCK** → ball to **block spot** when `ball_bounce_x`/`ball_bounce_y` are present; then bounce from that spot, "Block!" announcement, and rebound/DREB same as miss.
 - **Early Termination**: 
@@ -335,7 +407,21 @@ In `capture_fast_break_animation()` (BackEnd/models/animator.py), the ball handl
 3. **Shot attempt with outlet, no defensive stop** (`hold_up` False, outlet set): Shot spot **near the rim** (same logic as case 1). Previously this used "outlet + 5–10", which caused the shot to animate from the top-of-key area; the fix ensures all shot attempts get a rim shot spot so the animation shows the shot from near the basket.
 4. **Fallback** (no outlet): Defensive stop → top of key; shot attempt → near rim.
 
-The frontend uses `turnData.shot_spot` when present (FAST_BREAK handler) so the shot animates from the correct position.
+The frontend uses `turnData.shot_spot` when present (FAST_BREAK handler) so the shot animates from the correct position. **`animateFastBreakShotWithStopper`** also consumes **`shot_spot`** when present so stopper/trail defender targets match the sim.
+
+### Shot contest grid vs shooter final (authoritative)
+
+**Rule (all FB shot attempts in `capture_fast_break_animation`):**
+
+- Let **`(sx, sy)`** = ball handler end = **`_bh_final_x/y`** (same as `shot_spot` on the turn for shots).
+- **Single contest defender** (`hold_up` is false, or only one animated defender): end = primary shooter-relative FB shot-defender spot:
+  - home offense: **`x = sx - 2`**
+  - away offense: **`x = sx + 2`**
+  - **`y = sy + random(-2, 2)`**
+- **Handler beats stopper** (`hold_up` + `ball_handler_beats_defender`): failed **stopper** gets that same primary defender spot. **Trail shot defender** (different player, from `fb_roles["defender"]`) gets the same **x** and **`y = primary_y + 3`** when his starting **y** is greater than the primary defender’s **y**; otherwise **`y = primary_y - 3`**.
+- **True defensive stop** (no shot): unchanged — stopper remains **1–3** X toward basket from ball handler **confrontation** end, same **Y**; other get-backs use *between key and rim* sampling (not the shot contest helper).
+
+**Constants / code:** `SHOT_DEFENDER_X_OFFSET`, `SHOT_DEFENDER_Y_RANGE`, `SECONDARY_SHOT_DEFENDER_Y_OFFSET`, **`fast_break_shot_defender_end_coords`**, **`fast_break_secondary_shot_defender_end_coords`** — `BackEnd/constants/fast_break_constants.py`. Animator: `BackEnd/models/animator.py` (`capture_fast_break_animation`). Client fallback / parity: **`fastBreakShotDefenderGridVsShooter`** and **`fastBreakSecondaryShotDefenderGrid`** — `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`; `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`).
 
 ### Fast Break MISS → DREB Transition
 
@@ -399,11 +485,7 @@ The release player (outlet receiver) tracks:
   - Shot Make
   - Defensive Foul (non-shooting)
   - **Note**: Shot Miss (without defensive foul) does NOT count as success (matches team-level criteria)
-- **`FB_F`** (Fast Break Failure): Incremented when Fast Break results in:
-  - Steal
-  - Dead Ball Turnover
-  - Offensive Foul
-- **`FB_N`** (Fast Break Neutral): Calculated as `FB_A - (FB_S + FB_F)`
+- **`FB_F` / `FB_N`**: Retired — not tracked; use **S / A / %** from **`FB_S`** / **`FB_A`**.
 
 **Defensive Stats (Get-Back Players):**
 
@@ -445,18 +527,20 @@ The outlet passer tracks:
 - Stats are recorded in both `run_micro_turn()` and `resolve_offensive_rebound_turn()` paths
 
 **Team Stats (Scouting Data):**
-- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break
+- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break (in parallel with per-play **`A`** below)
 - **`Fast_Break_Success`** (Offense): Incremented only when Fast Break result_type is:
   - `MAKE`, or
   - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
   - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
+- **`fast_break_plays`** (Offense): Per-play **`A`** / **`S`** for `covert_release`, `rim_runner`, `full_team`, `after_steal` (see `BackEnd/constants/fast_break_play_types.py`). **DREB outlet**: play key is chosen on the **miss shot** turn and stored in **`pending_dreb_fb_play_key`**; the resolver pops it and increments the matching bucket (**50/50** `rim_runner` vs `covert_release` if not pre-set). **Steal entry** → **`after_steal`**. **`full_team`**: stub resolution via Rim Runner module. Same success rules as **`Fast_Break_Success`**, applied to the active play bucket.
+- Turn payloads include **`fast_break_play`** for the active bucket.
 - **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
 - **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
   - `DEFENSIVE_STOP`, or
   - `MISS`, or
   - `TURNOVER`, or
   - `FOUL` where `foul_team == "OFFENSE"`
-- **Alignment with player stats:** Player `FB_S` now matches team `Fast_Break_Success` (only `MAKE` or defensive foul). A `MISS` without defensive foul is neutral (`FB_N`) for players and not a success for the team.
+- **Alignment with player stats:** Player **`FB_S`** matches team **`Fast_Break_Success`** (only `MAKE` or defensive foul). A `MISS` without defensive foul is not a success for the team or player **`FB_S`**.
 
 **Special Handling:**
 - **`Outlet_Score_List`**: Excluded from stat delta calculations (it's a list, not numeric)
@@ -466,46 +550,59 @@ The outlet passer tracks:
 **Box Score Display:**
 - Fast Break stats are available in the Box Score page
 - Clicking a player's name opens a popup showing:
-  - Fast Breaks: Offense (Attempts / Success Rate), Defense (Attempts / Success Rate)
-  - Outlet Passes: Att / Score (average of `Outlet_Score_List`)
+  - Fast Breaks: Offense and Defense as **S / A / %** (with hint row); Outlet Passes: Att / Score
+- **Scouting Notes** (per team): **Fast Breaks** appears after **Defense Play Calls**, styled like a defense subsection: **`h4`** line **`Fast Breaks: S / A (%)`** (aggregate), then **`scouting-item`** rows for **Covert Release**, **Rim Runner**, **Full Team**, **After Steal** from **`offense.fast_break_plays`** (EOG snapshot override when present).
 
 ### Key Files
 
+- `BackEnd/utils/shared.py` — `SLIDER_TO_FAST_BREAK_PROB`, `fast_break_probability_from_slider()` (DREB: rebounding `fast_breaks`; steal: stealing team `aggression`)
 - `BackEnd/engine/fast_break_trigger.py`
-  - `FastBreakTrigger` - Class for determining fast break triggers
-  - `can_trigger_from_dreb()` - Determines if fast break should trigger from defensive rebound
-  - `can_trigger_from_steal()` - Determines if fast break should trigger from steal (for future use)
+  - `FastBreakTrigger.DEFENSE_RELEASE_CHANCES` — same table as `SLIDER_TO_FAST_BREAK_PROB` (legacy helpers)
+  - `can_trigger_from_dreb()` - Legacy PG/SG release tuple (live DREB uses Covert in `shot_manager`)
+  - `can_trigger_from_steal()` - Legacy steal helper
+- `BackEnd/engine/covert_release.py`
+  - Covert Release: defender farthest from rim (excluding shooter’s matchup); **AG**-based x floors + **IQ** (`good_release` / `good_d_release`) y/x bands; HOME orientation + **x** mirror for away FB offense
+- `BackEnd/constants/fast_break_constants.py` — Movement bands, **`fast_break_shot_defender_end_coords()`** / **`fast_break_secondary_shot_defender_end_coords()`** (single source for FB shot defender geometry vs shooter final)
+- `BackEnd/constants/fast_break_play_types.py` — Play keys, `default_fast_break_plays()`, `ensure_fast_break_plays()`, `play_key_for_fast_break_entry()` (DREB: **50/50** when called; live path uses **`pending_dreb_fb_play_key`** from `shot_manager`)
+- `BackEnd/engine/rim_runner_fast_break.py` — **`resolve_rim_runner_fast_break()`** — Rim Runner DREB outlet play (outlet contest, burst, read, pass/intercept/bat/shot)
 - `BackEnd/engine/phase_resolution.py`
-  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt
+  - `resolve_free_throw_logic()` — missed FT + DREB: `fast_break_probability_from_slider(def_team["fast_breaks"])` for FAST_BREAK vs HCO
+  - `resolve_turnover_logic()` / FCP / HCT steal branches — `fast_break_probability_from_slider(def_team["aggression"])` (**stealing** team)
+  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt; increments **`fast_break_plays`** and sets **`fast_break_play`**; **early return** to Rim Runner resolver when DREB + **`rim_runner`** or **`full_team`**
   - Uses coordinate comparison in HOME orientation
   - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
 - `BackEnd/models/shot_manager.py`
-  - `_calculate_getback_coordinates()` - Calculates get-back player coordinates
-  - `_calculate_release_coordinates()` - Calculates release player coordinates
-  - Stores `offense_getback_coords` and `defense_release_coords` in turn results
+  - **DREB FB (HCO shots)**: one `fast_breaks` roll → play key → Covert (`select_covert_release_position`) or all-defenders-crash for RR/Full Team; sets **`_shot_dreb_fb_play_key`** → **`pending_dreb_fb_play_key`** on DREB → FAST_BREAK
+  - `_calculate_getback_coordinates(..., good_d=)` / `_calculate_release_coordinates(..., good_release=)` — Covert outlet positioning only when play key is **`covert_release`**
+  - Stores `offense_getback_coords` and `defense_release_coords` in turn results (release coords empty for RR/Full Team)
 - `BackEnd/models/animator.py`
-  - `capture_fast_break_animation()` - Builds animation packet
+  - `capture_fast_break_animation()` - Builds animation packet; primary shot defender end coords via **`fast_break_shot_defender_end_coords`** and beat-stopper secondary defender coords via **`fast_break_secondary_shot_defender_end_coords`** for every FB **shot** path; defensive stop path keeps legacy stopper 1–3 + between-key-and-rim for other get-backs
   - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
   - **Ball handler end position (shot spot)**: Defensive stop → confrontation spot (outlet + 5–10); shot attempt (with or without outlet) → shot spot near rim (so the shot always animates from near the basket, not from top-of-key). Exposed as `turn_result["shot_spot"]` in phase_resolution for frontend use.
+- `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` — **`fastBreakShotDefenderGridVsShooter()`**, **`fastBreakSecondaryShotDefenderGrid()`**, `SHOT_DEFENDER_X_OFFSET`, `SHOT_DEFENDER_Y_RANGE`, `SECONDARY_SHOT_DEFENDER_Y_OFFSET` (mirror backend contest grid for client fallbacks)
 - `FrontEnd/static/js/phaser/animation/fastBreak.js`
-  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop)
-  - `animateOutletPhase()` - Handles outlet pass (no player movement)
+  - `runFastBreakSequence()` - Orchestrates fast break animation; routes MAKE, MISS, and **BLOCK** to shot path (not defensive stop); if `roles.rim_runner_burst_phase` is set, runs **`animateRimRunnerBurstPhase()`** before Phase 2 instead of the static Covert-style **`animateOutletPhase()`**. **Rim Runner HCO settle** (`rim_runner_hco_settle`): if **`rim_runner_outlet_failed`**, Phase 2 is **`finalizeRimRunnerNonShotTurn()`** only; else (hold-up) **`animateRimRunnerHoldUpLeadIn()`** then **`finalizeRimRunnerHoldUpToHco()`** (no **`animateDefensiveStop`**).
+  - `animateRimRunnerBurstPhase()` - Rim Runner burst + simultaneous role-player moves; pass gated on outlet receiver tween completion (and skipped when outlet denied or dribble-outlet); outlet denied delegates to **`animateRimRunnerOutletDeniedBeat()`**
+  - `animateRimRunnerOutletDeniedBeat()` - Outlet-denied sequence: defender press coords, **“FB Outlet Pass Denied!”** + defender headshot, receiver cut, pass (or dribble-outlet), then burst tweens finish
+  - `animateOutletPhase()` - Covert-style outlet pass (no player movement)
   - `animateDefensiveStop()` - Handles defensive stop animation
   - `animateFastBreakShot()` - Handles shot attempt (MAKE/MISS/BLOCK): shot spot move, ball to rim or block spot, then make/miss/block outcome (BLOCK: block announcement, bounce from block spot, rebound/DREB)
   - `animateFastBreakShotWithStopper()` - Same outcome handling for BLOCK (block spot target, block announcement, bounce from block spot, rebound/DREB)
   - `moveOtherPlayersToStandardPositions()` - Positions outlet passer and get-back defenders
+    - **Get-back retreat (client)**: Non-shooter get-back defenders tween toward an x-band toward the **rim the fast-break offense is attacking** — same HOME-grid convention as `animateFastBreakShot` (`HOME_RIM` when home has the ball, `AWAY_RIM` when away has the ball). **Do not** hardcode only the home rim in this path: that made away-FB get-backs sprint the wrong direction. Resolve offense from the ball-handler sprite’s `team` when possible, with `turnData.offense_team_id` / `possession_team_id` (+ `scene.simData.home_team_id`) as fallback. If get-backs ever look reversed after future refactors, check that `ballHandlerId` and possession fields still refer to the **FB offense** at this call site (possible second-order bugs).
   - `animateRebounders()` - Handles rebounder animation (extracted for maintainability)
     - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
     - Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
     - Returns tween references for early termination
   - Early termination logic for rebounder animations
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+  - `runRimRunnerHoldUpSetupTween()` - After RR hold-up, HCO step 0 with optional **BH → PG** pass when PG reaches step 0 ( **`_rimRunnerHoldUpInboundPass`** )
   - `runDefensiveReboundSetup()` - Handles DREB → HCO transition, including Fast Break MISS → DREB cases
   - Automatically looks up `offense_getback` from previous turn if current turn doesn't have it (Fast Break case)
 
 ### Future Enhancements
 
-- **More Nuanced Get-Back Logic**: Consider player attributes (speed, IQ) for get-back player selection
+- **User FB play settings**: Replace **50/50** DREB play selection with user-configured weights (Rim Runner vs Covert Release vs **Full Team**).
+- **Full Team (`full_team`)**: Implement engine path and extend *Fast break plays* subsection above.
 - **Fast Break Fouls**: Add foul handling during fast break sequences
 - **Fast Break Turnovers**: Add turnover handling during fast break sequences
-

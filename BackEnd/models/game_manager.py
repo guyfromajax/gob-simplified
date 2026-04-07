@@ -7,6 +7,11 @@ from BackEnd.constants import POSITION_LIST, PLAYCALLS, BOX_SCORE_KEYS
 from copy import deepcopy
 import random
 
+from BackEnd.utils.shared import sync_lineup_coords_from_turn
+from BackEnd.utils.position_snapshot_ledger import (
+    attach_position_snapshots,
+    build_phase_post_stopper_snapshot,
+)
 from BackEnd.utils.stat_updater import update_game_stats
 from BackEnd.utils.transition_validator import validate_transition, get_turn_type_from_offensive_state
 from BackEnd.utils.transition_event_detector import detect_instigating_event, validate_event_matches_transition
@@ -15,6 +20,9 @@ import logging
 import uuid
 
 class GameManager:
+    _POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS = 60
+    _POST_MAKE_BIP_CLOCK_RUNOFF_SECONDS = 2
+
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None, community_engagement_crowd_shift="none"):
         import time
         # ⏱️ Coarse timers for gm_create breakdown
@@ -131,6 +139,43 @@ class GameManager:
         print(f"Opening tip winner: {offense_team.name}")
         logging.warning(f"🏀 [OPENING TIP] Winner: {offense_team.name}, offense_team_id={offense_team.team_id}, defense_team={defense_team.name}")
 
+    def _resolve_post_make_bip_clock_runoff(self, last_turn: dict | None) -> int:
+        """
+        Return game-clock runoff seconds to apply during the made-shot baseline inbound.
+
+        Rule: let clock continue through BIP only for made field goals when more than
+        60 seconds remain in the quarter. Free throws/timeouts keep existing stoppages.
+        """
+        if not isinstance(last_turn, dict):
+            return 0
+        result_type = str(last_turn.get("result_type") or "").upper()
+        if result_type not in {"MAKE", "PUTBACK_MAKE"}:
+            return 0
+        time_remaining = int(self.game_state.get("time_remaining", 0) or 0)
+        if time_remaining <= self._POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS:
+            return 0
+        configured = int(
+            self.game_state.get(
+                "post_make_bip_clock_runoff_seconds",
+                self._POST_MAKE_BIP_CLOCK_RUNOFF_SECONDS,
+            )
+            or 0
+        )
+        return max(0, min(configured, time_remaining))
+
+    def _apply_game_clock_elapsed(self, elapsed_seconds: int) -> int:
+        """
+        Apply elapsed game-clock seconds to game_state and return the applied amount.
+        """
+        elapsed = max(0, int(elapsed_seconds or 0))
+        current = int(self.game_state.get("time_remaining", 0) or 0)
+        applied = min(elapsed, current)
+        self.game_state["time_remaining"] = current - applied
+        minutes = self.game_state["time_remaining"] // 60
+        seconds = self.game_state["time_remaining"] % 60
+        self.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        return applied
+
     
     def _init_game_state(self):
         import random
@@ -151,6 +196,9 @@ class GameManager:
             "clock": "8:00",
             "shot_clock_remaining": 30,
             "time_elapsed": 0,
+            "uess_clock_authority_mode": "warn",
+            "uess_clock_elapsed_authority": "ledger",
+            "uess_ownership_contract_mode": "warn",
             "turns": self.turns,
             "current_playcall": "Outside",
             "defense_playcall": "Zone",
@@ -193,7 +241,8 @@ class GameManager:
                 "SF": "SF",
                 "PF": "PF",
                 "C": "C"
-            }
+            },
+            "rim_runner_by_team_id": {},  # team_id str -> player_id for designated Rim Runner
         }
 
 
@@ -401,9 +450,16 @@ class GameManager:
                 ),
             )
             turn_result.setdefault("quarter", self.game_state.get("quarter", self.quarter))
+            if (
+                not isinstance(turn_result.get("uess_ownership_contract"), dict)
+                or "uess_ownership_contract_mode" not in turn_result
+            ):
+                self.turn_manager._attach_uess_ownership_contract(turn_result)
 
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))
+        if isinstance(turn_result, dict):
+            sync_lineup_coords_from_turn(self, turn_result)
         self._check_lineups_for_foul_out(turn_result)
         if turn_result.get("fouled_out"):
             self._handle_foul_out_timeout(turn_result)
@@ -709,6 +765,25 @@ class GameManager:
                 foul_result = resolve_non_shooting_foul(
                     roles, self, time_elapsed_override=sl.force_foul_time_elapsed()
                 )
+                victim.coords = {
+                    "x": float(victim_coords.get("x", 50)),
+                    "y": float(victim_coords.get("y", 25)),
+                }
+                attach_position_snapshots(
+                    foul_result,
+                    [
+                        build_phase_post_stopper_snapshot(
+                            self,
+                            self.offense_team.lineup,
+                            self.defense_team.lineup,
+                            None,
+                            roles,
+                            "HCO",
+                            "non_shooting_foul",
+                            "hco_force_foul_after_dreb",
+                        )
+                    ],
+                )
                 foul_result["offense_team_id"] = self.offense_team.team_id
                 foul_result["current_turn"] = "HCO"
                 foul_result["quick_foul"] = True
@@ -831,8 +906,6 @@ class GameManager:
             
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
-            # Any time we come out of a SIP, shot clock resets to 30 (next turn is HCO with full clock)
-            self.game_state["shot_clock_remaining"] = min(30, int(self.game_state.get("time_remaining", 30)))
 
         # ✅ FIX 2: Backend flip for Made Shots → Inbound (Pattern A)
         # Create BASELINE_INBOUND turns for ALL made shots (HCO, FT, FB, FCP/HCT, OREB)
@@ -934,9 +1007,14 @@ class GameManager:
             else:
                 # ✅ Situational Logic: Force Foul after BIP — set pending so next turn is the foul
                 self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "BASELINE_INBOUND")
+                bip_clock_start = int(self.game_state.get("time_remaining", 0))
+                bip_clock_runoff = self._resolve_post_make_bip_clock_runoff(last_turn)
+                inbound_payload["time_elapsed"] = self._apply_game_clock_elapsed(
+                    bip_clock_runoff
+                )
                 self.turn_manager._attach_clock_contract(
                     inbound_payload,
-                    clock_start=int(self.game_state.get("time_remaining", 0)),
+                    clock_start=bip_clock_start,
                     shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
                     game_state=self.game_state,
                     source="bypass:BIP",

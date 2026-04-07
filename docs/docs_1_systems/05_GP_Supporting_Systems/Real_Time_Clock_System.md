@@ -37,7 +37,7 @@ Execution:
 Used for non-skeleton turns that travel significant court distance (`FAST_BREAK`).
 
 Clock calculation (per movement segment):
-- Fast Break movement uses **Challenged Open Floor (COF)** rate (18/18): `segment_seconds = sqrt(dx^2 + dy^2) / 18`. See **Movement rates** below.
+- Fast Break movement uses **Challenged Open Floor (COF)** rate (16/12): `segment_seconds = sqrt(dx^2 + dy^2) / 16`. See **Movement rates** below.
 - Turn elapsed = sum of all segment seconds (plus pass in-air where applicable). See **Movement rates** below.
 
 Execution:
@@ -57,7 +57,7 @@ Execution:
 - Sync to backend authoritative clock/time_remaining after turn resolution
 
 ### 4. No Impact
-Used for turn types that should not reduce game clock (`INBOUND_PASS`, `SIDE_INBOUND_PASS`, `FREE_THROW` per current plan).
+Used for turn types that should not reduce game clock (`SIDE_INBOUND_PASS`, `FREE_THROW`, and baseline inbound defaults per current plan).
 
 Clock calculation:
 - `time_elapsed = 0`
@@ -103,7 +103,7 @@ Pass is used in: HCO, HCT, FCP (skeleton steps with pass events); Fast Break (ou
 ## Turn Classification Matrix
 
 1. `OPENING_TIP`: `non-CG`
-2. `INBOUND_PASS` (BIP): `No Impact`
+2. `INBOUND_PASS` (BIP): `No Impact` by default (post-make exception below)
 3. `SIDE_INBOUND_PASS` (SIP): `No Impact`
 4. `HCO`: `Skeleton`
 5. `OREB`: `non-CG`
@@ -121,7 +121,7 @@ Pass is used in: HCO, HCT, FCP (skeleton steps with pass events); Fast Break (ou
 - For skeleton turns, frontend must consume backend `step_clock_seconds[]` so per-step animation time and elapsed clock time are aligned.
 
 ## Live clock end-of-turn snap
-The frontend snaps the shot clock using the same pattern as the game clock: use turn’s explicit field when present (`shot_clock_remaining`), else use the contract end value **`shot_clock_end`**, else **`shot_clock_start`** (on every turn with a contract). When updating after a batch or at a turn boundary without a per-turn payload (e.g. summary update), the frontend uses the response’s top-level **`shot_clock_remaining`**. No extra backend fields; reset and shot-clock violation remain backend-only. The frontend does not implement reset or SIP→30 logic; it displays only values sent by the backend (turn or response). See `clock_sync_system.md` §9.
+The frontend snaps the shot clock using the same pattern as the game clock: use turn’s explicit field when present (`shot_clock_remaining`), else use the contract end value **`shot_clock_end`**, else **`shot_clock_start`** (on every turn with a contract). When updating after a batch or at a turn boundary without a per-turn payload (e.g. summary update), the frontend uses the response’s top-level **`shot_clock_remaining`**. No extra backend fields; reset and shot-clock violation remain backend-only. The frontend does not implement reset policy logic; it displays only values sent by the backend (turn or response). See `clock_sync_system.md` §9.
 
 ## Implementation Plan
 
@@ -200,8 +200,8 @@ Goal: ensure correctness, responsiveness, and stable UX.
 ## Acceptance Criteria
 - Every simulated turn has deterministic category-based `time_elapsed` logic applied on backend.
 - `Skeleton` and `CG` turns never exceed `30` seconds elapsed.
-- CG (Fast Break) calculation uses COF rate: `segment_seconds = sqrt(dx^2 + dy^2) / 18`; see Movement rates. Round-at-end and cap apply.
-- `INBOUND_PASS`, `SIDE_INBOUND_PASS`, and `FREE_THROW` always return `time_elapsed = 0`.
+- CG (Fast Break) calculation uses COF rate: `segment_seconds = sqrt(dx^2 + dy^2) / 16`; see Movement rates. Round-at-end and cap apply.
+- `SIDE_INBOUND_PASS` and `FREE_THROW` always return `time_elapsed = 0`; `INBOUND_PASS` (BIP) is `0` by default with the post-make (`MAKE`/`PUTBACK_MAKE`) `time_remaining > 60` exception.
 - Frontend countdown runs continuously during active play, pauses correctly, and syncs at turn boundaries.
 - No increase in backend/API call frequency.
 
@@ -236,12 +236,15 @@ Both are clamped to `>= 0`.
 
 Whenever the game clock is running, the shot clock runs, with one exception.
 
-**Exception — shot attempt:** When a shot is attempted, the shot clock **stops** at that moment (in game time). The game clock keeps running for the rest of the turn. The shot clock **restarts** (resets to 30 and begins running) as follows:
+**Exception — shot attempt:** When a shot is attempted, the shot clock **stops** at that moment (in game time). The game clock keeps running for the rest of the turn.
 
-- **Made shot, no shooting foul** → Next turn is BIP. Shot clock restarts when the receiver **receives the inbound pass** on that BIP turn.
-- **Miss, offensive rebound** → Next turn is OREB (kickout, putback attempt, etc.). Shot clock restarts when the ball is **attached to the rebounder** on that OREB turn.
-- **Miss, defensive rebound** → DREB occurs within the same shot-attempt turn. Shot clock restarts when the ball is **attached to the rebounding player** (at the DREB event) in that same turn.
-- **Made or missed with shooting foul (free throws)** → After the final free throw: if the final FT is a **make**, shot clock restarts when the receiver receives the inbound on the following BIP turn; if the final FT is a **miss**, shot clock restarts when the ball is attached to the rebounder (on the rebound that follows).
+Shot clock reset triggers (authoritative policy):
+
+- **Possession change** (except timeout turns).
+- **Non-shooting defensive foul** where next turn is `SIDE_INBOUND`/`SIP` and possession does not change (defensive aliases accepted: `DEFENSIVE`, `DEFENSE`, `D_FOUL` from `foul_type`/`foul_team`).
+- **OREB possession renewal** event.
+
+Inbound receive by itself does **not** reset shot clock.
 
 ### Backend: Shot clock derivation
 
@@ -255,7 +258,7 @@ The backend does **not** track shot clock independently. For each turn it derive
    - The **clock contract** attached to the turn uses this derived `shot_clock_end` so the frontend animates from `shot_clock_start` to `shot_clock_end` during the turn.
 
 2. **Reset only affects the next turn**
-   - Reset logic (make, miss with possession change, steal, dead ball, etc.) must **not** change the current turn’s `shot_clock_end`.
+   - Reset logic must **not** change the current turn’s `shot_clock_end`.
    - After the contract is attached, the backend sets `game_state["shot_clock_remaining"] = 30` (or min(30, time_remaining)) so that the **next** turn’s `shot_clock_start` is 30.
    - Order of operations: compute derived `shot_clock_end` → attach contract (so current turn shows start→end) → then, if reset, set game_state for next turn to 30.
 
@@ -264,18 +267,21 @@ The backend does **not** track shot clock independently. For each turn it derive
 
 ### Shot clock reset instances
 
-1. All shot attempts — reset at rim hold of make or miss; shot clock restarts when game clock restarts.
-2. Offensive foul.
-3. Defensive foul.
-4. Steal.
-5. Dead ball turnover.
-6. Shot clock violation.
+1. Possession change (except `TIMEOUT`).
+2. Non-shooting defensive foul with next turn `SIDE_INBOUND`/`SIP`, no possession change.
+3. OREB possession renewal.
 
 ### Shot clock carryover between turns
 
 1. FCP/HCT to HCO (with no foul or turnover in between).
 2. Steal to HCO (with no foul or turnover in between).
 3. OREB Kickout to HCO (with no foul or turnover in between).
+
+## Post-Make BIP Clock Run-Through Rule
+
+- After made field goals (`MAKE`, `PUTBACK_MAKE`), the following `BASELINE_INBOUND` turn may consume game-clock time when quarter `time_remaining > 60`.
+- At `time_remaining <= 60`, BIP stays clock-dead.
+- This does not change timeout/free-throw stoppage rules.
 
 
 **Shot Attempt or Shot Clock Violation**

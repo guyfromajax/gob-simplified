@@ -12,7 +12,12 @@
 
 import { showAnnouncement, showAndOneAnnouncement } from './announcements.js';
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
+import {
+  pickOffensiveFoulAnnouncementText,
+  pickDefensiveFoulAnnouncementText,
+} from './foulAnnouncementLanguage.js';
 import gameStore from '../../state/gameStore.js';
+import { isFastBreakEntryAnnouncementsEnabled } from '../constants/fastBreakConstants.js';
 
 function getSecondaryColorForTeam(scene, teamId) {
   if (!scene?.simData || teamId == null) return '#333333';
@@ -113,7 +118,13 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
 
     // ========== FAST BREAK ==========
     case 'FAST_BREAK':
-      showAnnouncement("Fast Break!", offenseTeam);
+      if (isFastBreakEntryAnnouncementsEnabled()) {
+        showAnnouncement("Fast Break!", offenseTeam);
+      }
+      break;
+
+    case 'RIM_RUNNER_BATTED_OOB':
+      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
       break;
 
     // ========== SITUATIONAL LOGIC (Q4/OT) ==========
@@ -131,6 +142,11 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       break;
 
     case 'DEFENSIVE_STOP':
+      // Outlet denial / team stop: optional no headshot (e.g. Rim Runner outlet denied)
+      if (context.noPlayerImage) {
+        showAnnouncement('Great Stop!', defenseTeam, null);
+        break;
+      }
       // Get stopper data if available
       const stopperId = context.stopperId || turnData.stopper_id;
       let stopperData = null;
@@ -309,7 +325,8 @@ function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) 
     }
   }
 
-  showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
+  const foulText = pickOffensiveFoulAnnouncementText(turnData);
+  showAnnouncement(foulText, defenseTeam, playerData);
 
   // Trigger visual effect
   if (scene && foulerId) {
@@ -333,7 +350,8 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
     }
   }
 
-  showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
+  const foulText = pickDefensiveFoulAnnouncementText(turnData);
+  showAnnouncement(foulText, offenseTeam, playerData);
 
   // Trigger visual effect
   if (scene && foulerId) {

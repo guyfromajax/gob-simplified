@@ -33,6 +33,15 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
+/** @returns {boolean} true if response was 401/403 and redirect was triggered — caller must stop. */
+function abortIfAccessDenied(response) {
+  if (!response) return false;
+  if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
+    return AccessDenied.checkAccessDenied(response);
+  }
+  return false;
+}
+
 function playSound(filename) {
   try {
     const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
@@ -48,6 +57,7 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
       headers: API_CONFIG.getAuthHeaders()
     });
+    if (abortIfAccessDenied(response)) return false;
     if (!response.ok) return false;
     const data = await response.json();
     const currentWeek = Number(data.week || 1);
@@ -288,6 +298,8 @@ let roster = [];
 /** Team chemistry from /roster (franchise/tournament FTD); single-game default 15. */
 let rosterTeamChemistry = 15;
 const lineup = {};
+/** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
+let rimRunnerPlayerId = null;
 const playerMap = {};
 
 function getRT(player) {
@@ -322,7 +334,8 @@ async function loadRoster() {
   }
   console.log("Loading roster for lineup", franchiseId ? "(franchise mode)" : tournamentId ? "(tournament mode)" : "(single game mode)");
   
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
+  if (abortIfAccessDenied(res)) return;
   if (!res.ok) return;
   const data = await res.json();
   rosterTeamChemistry = data.team_chemistry != null && data.team_chemistry !== ''
@@ -367,6 +380,7 @@ async function loadRoster() {
         headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(initPayload)
       });
+      if (abortIfAccessDenied(initRes)) return;
       if (initRes.ok) {
         const initData = await initRes.json();
         const newGameId = initData.game_id;
@@ -408,6 +422,7 @@ async function loadRoster() {
     try {
         // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
         const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=${quarter}&source=db`, { headers: API_CONFIG.getAuthHeaders() });
+        if (abortIfAccessDenied(gameRes)) return;
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
@@ -859,6 +874,7 @@ async function autosetLineup() {
       headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (abortIfAccessDenied(res)) return;
     if (!res.ok) {
       let msg = `Autoset failed (${res.status})`;
       try {
@@ -952,7 +968,9 @@ function updateSlotDisplay(slot) {
     const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     const slotDisplayName =
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
-    // Build slot content HTML
+    const pidStr = String(playerId);
+    const rrChecked = rimRunnerPlayerId != null && String(rimRunnerPlayerId) === pidStr;
+    // Build slot content HTML (RR column after ENERGY, before remove button)
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="${imgBase}${playerId}.png" 
@@ -974,6 +992,9 @@ function updateSlotDisplay(slot) {
       </div>
       <div class="player-fouls">${fouls}</div>
       <div class="player-energy ${energyClass}">${energyPercent}%</div>
+      <div class="player-rim-runner">
+        <input type="checkbox" class="rim-runner-checkbox" data-player-id="${pidStr}" aria-label="Rim Runner for ${player.name.replace(/"/g, '&quot;')}" ${rrChecked ? 'checked' : ''} />
+      </div>
     `;
     
     slotContent.classList.remove('empty');
@@ -1001,7 +1022,17 @@ function updateSlotDisplay(slot) {
   }
 }
 
+/** Clear Rim Runner if that player is no longer in the lineup */
+function normalizeRimRunnerSelection() {
+  if (rimRunnerPlayerId == null) return;
+  const inLineup = Object.values(lineup).some((id) => String(id) === String(rimRunnerPlayerId));
+  if (!inLineup) {
+    rimRunnerPlayerId = null;
+  }
+}
+
 function updateAllSlotDisplays() {
+  normalizeRimRunnerSelection();
   document.querySelectorAll('.slot').forEach(slot => {
     updateSlotDisplay(slot);
   });
@@ -1009,7 +1040,11 @@ function updateAllSlotDisplays() {
 
 function clearSlot(slot) {
   const pos = slot.dataset.pos;
+  const removedId = lineup[pos];
   delete lineup[pos];
+  if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
+    rimRunnerPlayerId = null;
+  }
   updateSlotDisplay(slot);
   updatePlayButton();
   
@@ -1028,6 +1063,22 @@ function setupSlots() {
   
   const slotsContainer = document.getElementById('slots');
   if (!slotsContainer) return;
+
+  // Rim Runner: single-select checkboxes (column after Energy, before remove)
+  slotsContainer.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t || !t.classList || !t.classList.contains('rim-runner-checkbox')) return;
+    const pid = t.getAttribute('data-player-id');
+    if (!pid) return;
+    if (t.checked) {
+      rimRunnerPlayerId = pid;
+      slotsContainer.querySelectorAll('.rim-runner-checkbox').forEach((cb) => {
+        if (cb !== t) cb.checked = false;
+      });
+    } else if (String(rimRunnerPlayerId) === String(pid)) {
+      rimRunnerPlayerId = null;
+    }
+  });
 
   // Delegated dragstart on container
   slotsContainer.addEventListener('dragstart', (e) => {
@@ -1161,6 +1212,7 @@ async function setHeader() {
   if (!scoresFromUrl && gameId) {
     try {
       const gameRes = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}?quarter=${quarter}&source=db`), { headers: API_CONFIG.getAuthHeaders() });
+      if (abortIfAccessDenied(gameRes)) return;
       if (gameRes.ok) {
         gameData = await gameRes.json();
         const score = gameData.score || {};
@@ -1346,6 +1398,10 @@ function wireLineupNavButtons() {
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(initPayload)
           });
+          if (abortIfAccessDenied(initRes)) {
+            initGameInProgress = false;
+            return;
+          }
           if (initRes.ok) {
             const initData = await initRes.json();
             currentGameId = initData.game_id;
@@ -1412,6 +1468,10 @@ function wireLineupNavButtons() {
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(initPayload)
           });
+          if (abortIfAccessDenied(initRes)) {
+            initGameInProgress = false;
+            return;
+          }
           if (initRes.ok) {
             const initData = await initRes.json();
             currentGameId = initData.game_id;
@@ -1604,6 +1664,7 @@ async function init() {
               headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify(initPayload)
             });
+            if (abortIfAccessDenied(initRes)) return;
             if (initRes.ok) {
               const initData = await initRes.json();
               currentGameId = initData.game_id;
@@ -1656,6 +1717,11 @@ async function init() {
       // Pass through quarter_break_from so court knows whether to play airhorn (play_quarter only)
       const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
+
+      if (rimRunnerPlayerId && myTeamSide) {
+        const k = myTeamSide === 'home' ? 'home_rim_runner_player_id' : 'away_rim_runner_player_id';
+        params.set(k, String(rimRunnerPlayerId));
+      }
       
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - After building params:', {
         resume_from_timeout: params.get('resume_from_timeout'),

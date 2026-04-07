@@ -21,12 +21,12 @@ In-game tactical hub at the bottom of the court. User overrides apply only to th
     - **Tempo**: Fast / Normal / Slow — IDs `#tempo-fast`, `#tempo-normal`, `#tempo-slow`, `#clear-tempo-x`
     - **Aggression**: Passive / Normal / Aggr — IDs `#aggr-passive`, `#aggr-normal`, `#aggr-aggressive`, `#clear-aggression-override-x`
     - **Press/Trap**: Press / Trap / None — IDs `#press-btn`, `#trap-btn`, `#press-trap-none-btn`, `#clear-press-trap-x`
-  - **Behavior**: Click a stack button to select (highlight + send override). ✕ clears that stack’s override. Stack highlights are synced from turn data **only when the call belongs to the user’s team** (tempo when user on offense, aggression and press/trap when user on defense).
+  - **Behavior**: Click a stack button to select (highlight + send override). ✕ clears that stack’s override. **Tempo** and **Aggression** highlights are user-intent driven (set by clicks, changed by clicking a different button, cleared by ✕ / clear). **Press/Trap** highlight remains synced from `press_trap_override` when applicable.
 
 - **Defense Card Zone (33%)** — `.pcc-card-zone.defense-zone`
   - **Nav column** (left): ▲ (`#defense-nav-up`), ▼ (`#defense-nav-down`), ✕ (`#clear-defense-card-x`).
   - **Play card** with scheme name only (`.defense-play-name`). Schemes in order: **Man Normal**, 2-3 Zone, 3-2 Zone, 1-3-1 Zone.
-  - **Behavior**: ▲/▼ **browse** schemes (no highlight, no API). **Click the defense card** to **select** the currently displayed scheme (highlight + send override). ✕ resets to Man Normal, clears defense and aggression overrides, unhighlights. **Starts unhighlighted**; game uses default defense until user selects a scheme.
+  - **Behavior**: ▲/▼ **browse** schemes (no API). **Click the defense card** to **select** the currently displayed scheme (highlight + send override). Only the explicitly selected scheme is highlighted; browsing other schemes does not highlight them. ✕ resets to Man Normal, clears defense and aggression overrides, unhighlights. **Starts unhighlighted**; game uses default defense until user selects a scheme.
 
 **Container**
 - `#playcall-center` dimensions (max-height, min-height, padding, positioning) are fixed; all layout fits within that footprint. Game controls strip lives inside the court container below the canvas, not in the Playcall Center.
@@ -53,7 +53,9 @@ In-game tactical hub at the bottom of the court. User overrides apply only to th
 4. **Frontend highlighting**
    - **Offense**: `.play-option.selected` on the chosen play; cleared when `turnData.offense_override_cleared === true` or when user clicks ✕.
    - **Defense**: `.pcc-play-card.selected` on the defense card only when the user has explicitly selected a scheme (click card). Unhighlighted on load and after ✕ or `clearPlaycallOverrides()`.
-   - **Stacks**: `.pcc-stack-btn.selected` synced from turn data **only when the call is for the user’s team** (tempo when user on offense; aggression and press_trap when user on defense). Prevents computer team’s calls from driving the user’s stack highlights.
+   - **Stacks**:
+     - **Tempo / Aggression**: `.pcc-stack-btn.selected` is controlled by user interaction only (click to select, click another button to swap selection, ✕ to clear). Backend strategy calls update status text but do not auto-highlight these stacks.
+     - **Press/Trap**: `.pcc-stack-btn.selected` may sync from `turnData.press_trap_override` when user is on defense.
 
 ---
 
@@ -87,6 +89,7 @@ team.strategy_calls = {
 - **Stack ✕**: Clears that stack’s override and deselects its buttons.
 - **Defense ✕**: Resets to Man Normal, clears defense and aggression overrides, unhighlights defense card, deselects aggression stack buttons.
 - **`window.clearPlaycallOverrides()`**: Clears all play and stack selections, resets defense to unhighlighted Man Normal (no override). Used when overrides are consumed or reset elsewhere.
+- **Quarter transition (backend + UI reset)**: All Playcall Center overrides are cleared at quarter end (`offense_call`, `defense_call`, `tempo_override`, `aggression_override`, `press_trap_override`), and UI returns to unhighlighted baseline.
 
 ---
 

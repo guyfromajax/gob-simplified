@@ -213,7 +213,7 @@ class TestFCPStopperSystem:
         # Need 4 randint calls: offense multiplier, defense multiplier, time_elapsed, stopper step index (middle step for STEAL)
         with patch('BackEnd.engine.phase_resolution.random.randint', side_effect=[1, 100, 7, 3]):  # Low offense, high defense multipliers, time=7, stop_step=3 (middle)
             with patch('BackEnd.engine.phase_resolution.random.choices', return_value=["STEAL"]):  # Force STEAL from choices
-                with patch('BackEnd.utils.shared.get_fast_break_chance', return_value=0.5):
+                with patch('BackEnd.utils.shared.fast_break_probability_from_slider', return_value=0.5):
                     with patch('BackEnd.engine.phase_resolution.random.random', return_value=0.3):  # Fast break
                         result = resolve_full_court_press_logic(self.game)
         
@@ -384,7 +384,7 @@ class TestHCTStopperSystem:
         # Need 4 randint calls: offense multiplier, defense multiplier, time_elapsed, stopper step index (middle step for STEAL)
         with patch('BackEnd.engine.phase_resolution.random.randint', side_effect=[1, 100, 7, 3]):  # Low offense, high defense multipliers, time=7, stop_step=3 (middle)
             with patch('BackEnd.engine.phase_resolution.random.choices', return_value=["STEAL"]):  # Force STEAL from choices
-                with patch('BackEnd.utils.shared.get_fast_break_chance', return_value=0.5):
+                with patch('BackEnd.utils.shared.fast_break_probability_from_slider', return_value=0.5):
                     with patch('BackEnd.engine.phase_resolution.random.random', return_value=0.3):  # Fast break
                         result = resolve_half_court_trap_logic(self.game)
         

@@ -24,11 +24,12 @@ _startup_error = None
 try:
     from fastapi import Depends, FastAPI, HTTPException, Response
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, HTMLResponse
+    from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
     from BackEnd.constants import POSITION_LIST
     import uuid
+    import math
     from BackEnd.main import run_simulation, simulate_quarter
     from BackEnd.models.game_manager import GameManager
     # ✅ PERFORMANCE: Removed debug print statements
@@ -49,6 +50,7 @@ try:
         format_height,
         format_player_display_name,
         deserialize_computer_timeouts,
+        sanitize_turn_animation_payload,
     )
     from BackEnd.utils import stat_updater
     from pydantic import BaseModel
@@ -248,6 +250,59 @@ try:
     # In production, Netlify serves static files
     environment = os.getenv("ENVIRONMENT", "development")
     if environment == "development":
+        @app.middleware("http")
+        async def local_static_html_redirect(request: Request, call_next):
+            """
+            Local dev convenience: frontend uses root static paths
+            (e.g. /set-lineup.html, /mode-select.css, /js/..., /images/...),
+            while FastAPI serves static files at /static/*.
+            Redirect those requests to /static/* in development only.
+            """
+            path = request.url.path or ""
+            method = (request.method or "").upper()
+            if method not in {"GET", "HEAD"}:
+                return await call_next(request)
+            if path.startswith("/static/") or path.startswith("/api/") or path.startswith("/health"):
+                return await call_next(request)
+
+            static_dirs = (
+                "/js/",
+                "/images/",
+                "/sounds/",
+                "/team-roster/",
+                "/styles/",
+            )
+            static_exts = (
+                ".html",
+                ".css",
+                ".js",
+                ".mjs",
+                ".map",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".webp",
+                ".svg",
+                ".ico",
+                ".wav",
+                ".mp3",
+                ".json",
+                ".woff",
+                ".woff2",
+                ".ttf",
+            )
+            if (
+                path.startswith(static_dirs)
+                or path.endswith(static_exts)
+            ):
+                query = request.url.query
+                target = f"/static{path}"
+                if query:
+                    target = f"{target}?{query}"
+                return RedirectResponse(url=target, status_code=307)
+            return await call_next(request)
+
         app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
         print("✅ Static files mounted (development mode)")
     
@@ -360,6 +415,9 @@ try:
         # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
         resume_from_timeout: bool = False
         timeout_trace_id: str | None = None
+        # Optional: designated Rim Runner (player id) per team for fast-break resolution
+        home_rim_runner_player_id: str | None = None
+        away_rim_runner_player_id: str | None = None
     
     
     ongoing_games: dict[str, GameManager] = {}
@@ -370,6 +428,14 @@ try:
         # Optional user overrides for this specific turn
         offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
         defense_override: str | None = None  # e.g., "Zone", "Man"
+        # Optional UESS clock authority override for this request/session
+        uess_clock_authority_mode: str | None = None  # "observe" | "warn" | "throw" | "off"
+        # Optional UESS elapsed authority override for this request/session
+        uess_clock_elapsed_authority: str | None = None  # "legacy" | "ledger"
+        # Optional UESS ownership contract mode override for this request/session
+        uess_ownership_contract_mode: str | None = None  # "off" | "observe" | "warn" | "throw"
+        # Optional UESS reconciliation tolerance override for this request/session
+        uess_clock_recon_tolerance_seconds: float | None = None
     
     
     class CallTimeoutRequest(BaseModel):
@@ -1152,7 +1218,7 @@ try:
         # Return consistent response format (same for both user and computer)
         # Use saved data (db_summary) to ensure response matches what was saved to DB
         response = {
-            "turn": timeout_turn,
+            "turn": sanitize_turn_animation_payload(timeout_turn),
             "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
             "time_remaining": db_summary.get("time_remaining", gm.game_state.get("time_remaining", 480)),
             "clock": db_summary.get("clock", gm.game_state.get("clock", "8:00")),
@@ -1365,6 +1431,8 @@ try:
             gm.game_state[COMPUTER_MATCHUPS_KEY] = saved.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
         elif not gm.game_state.get(COMPUTER_MATCHUPS_KEY):
             gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
+        if saved.get("rim_runner_by_team_id"):
+            gm.game_state["rim_runner_by_team_id"] = dict(saved["rim_runner_by_team_id"])
 
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
 
@@ -3632,6 +3700,12 @@ try:
                 for log in loggers_to_quiet:
                     log.setLevel(logging.ERROR)
             try:
+                # Rim Runner designation (persist on game_state for fast-break logic)
+                rr_map = gm.game_state.setdefault("rim_runner_by_team_id", {})
+                if body.home_rim_runner_player_id:
+                    rr_map[str(gm.home_team.team_id)] = body.home_rim_runner_player_id
+                if body.away_rim_runner_player_id:
+                    rr_map[str(gm.away_team.team_id)] = body.away_rim_runner_player_id
                 # ⏱️ PERFORMANCE: Time the quarter simulation
                 sim_start = time.time()
                 if profile:
@@ -4011,6 +4085,54 @@ try:
         if body.defense_override:
             gm.game_state["user_defense_override"] = body.defense_override
             logging.info(f"🎮 User defense override: {body.defense_override}")
+
+        # Optional: propagate frontend UESS clock mode to backend game_state for unified behavior.
+        if body.uess_clock_authority_mode:
+            raw_mode = str(body.uess_clock_authority_mode).strip().lower()
+            if raw_mode in {"observe", "warn", "throw", "off"}:
+                gm.game_state["uess_clock_authority_mode"] = raw_mode
+                logging.info(f"⏱️ UESS clock authority mode override: {raw_mode}")
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_clock_authority_mode ignored: %s",
+                    body.uess_clock_authority_mode,
+                )
+
+        if body.uess_clock_elapsed_authority:
+            raw_elapsed_authority = str(body.uess_clock_elapsed_authority).strip().lower()
+            if raw_elapsed_authority in {"legacy", "ledger"}:
+                gm.game_state["uess_clock_elapsed_authority"] = raw_elapsed_authority
+                logging.info("⏱️ UESS clock elapsed authority override: %s", raw_elapsed_authority)
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_clock_elapsed_authority ignored: %s",
+                    body.uess_clock_elapsed_authority,
+                )
+
+        if body.uess_ownership_contract_mode:
+            raw_ownership_mode = str(body.uess_ownership_contract_mode).strip().lower()
+            if raw_ownership_mode in {"off", "observe", "warn", "throw"}:
+                gm.game_state["uess_ownership_contract_mode"] = raw_ownership_mode
+                logging.info("⏱️ UESS ownership contract mode override: %s", raw_ownership_mode)
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_ownership_contract_mode ignored: %s",
+                    body.uess_ownership_contract_mode,
+                )
+
+        if body.uess_clock_recon_tolerance_seconds is not None:
+            try:
+                tol = float(body.uess_clock_recon_tolerance_seconds)
+            except (TypeError, ValueError):
+                tol = None
+            if tol is not None and math.isfinite(tol) and tol >= 0:
+                gm.game_state["uess_clock_recon_tolerance_seconds"] = tol
+                logging.info("⏱️ UESS clock recon tolerance override: %.3f", tol)
+            else:
+                logging.warning(
+                    "⚠️ Invalid uess_clock_recon_tolerance_seconds ignored: %s",
+                    body.uess_clock_recon_tolerance_seconds,
+                )
         
         pending_terminal_ft = _has_pending_terminal_free_throw(gm)
 
@@ -4072,7 +4194,7 @@ try:
                 gm.turns.pop()
                 return JSONResponse(
                     content={
-                        "turn": timeout_turn,
+                        "turn": sanitize_turn_animation_payload(timeout_turn),
                         "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
                         "time_remaining": gm.game_state["time_remaining"],
                         "clock": gm.game_state.get("clock", "8:00"),
@@ -4163,7 +4285,7 @@ try:
                         # Return timeout turn without save (fallback)
                         if timeout_turn:
                             fallback = {
-                                "turn": timeout_turn,
+                                "turn": sanitize_turn_animation_payload(timeout_turn),
                                 "time_remaining": gm.game_state.get("time_remaining", 480),
                                 "clock": gm.game_state.get("clock", "8:00"),
                                 "quarter_complete": False,
@@ -4236,10 +4358,36 @@ try:
             else:
                 # Multiple turns created (e.g., HCO miss → OREB turn)
                 # Return them as a batch for the frontend to animate sequentially
+                first_turn = new_turns[0] if new_turns and isinstance(new_turns[0], dict) else {}
+                first_ownership_contract = (
+                    first_turn.get("uess_ownership_contract")
+                    if isinstance(first_turn.get("uess_ownership_contract"), dict)
+                    else None
+                )
+                first_ownership_mode = (
+                    first_turn.get("uess_ownership_contract_mode")
+                    or (first_ownership_contract.get("mode") if isinstance(first_ownership_contract, dict) else None)
+                )
                 latest_turn = {
                     "result_type": "BATCH",
                     "batch_turns": new_turns,
-                    "text": " → ".join(t.get("text", "") for t in new_turns)
+                    "text": " → ".join(t.get("text", "") for t in new_turns),
+                    # Mirror first sub-turn contract at wrapper level for shape completeness.
+                    "clock_start": first_turn.get("clock_start"),
+                    "clock_end": first_turn.get("clock_end"),
+                    "shot_clock_start": first_turn.get("shot_clock_start"),
+                    "shot_clock_end": first_turn.get("shot_clock_end"),
+                    "real_time_elapsed_ms": first_turn.get("real_time_elapsed_ms"),
+                    "clock_event_ledger": first_turn.get("clock_event_ledger"),
+                    "uess_clock_authority_mode": first_turn.get("uess_clock_authority_mode"),
+                    "uess_clock_elapsed_authority": first_turn.get("uess_clock_elapsed_authority"),
+                    "uess_clock_elapsed_game_seconds": first_turn.get("uess_clock_elapsed_game_seconds"),
+                    "uess_clock_elapsed_legacy_game_seconds": first_turn.get("uess_clock_elapsed_legacy_game_seconds"),
+                    "uess_clock_elapsed_delta_seconds": first_turn.get("uess_clock_elapsed_delta_seconds"),
+                    "uess_clock_elapsed_observe_within_tolerance": first_turn.get("uess_clock_elapsed_observe_within_tolerance"),
+                    "uess_clock_reconciliation": first_turn.get("uess_clock_reconciliation"),
+                    "uess_ownership_contract_mode": first_ownership_mode,
+                    "uess_ownership_contract": first_ownership_contract,
                 }
             
             # ✅ FOUL_OUT RESUME: Persist timeout state via same path as user/computer timeout so return-to-court finds it
@@ -4336,6 +4484,20 @@ try:
                 gm.quarter += 1
                 gm.game_state["quarter"] = gm.quarter  # ✅ FIX: Ensure game_state is updated
                 logging.info(f"✅ Advanced to quarter {gm.quarter}")
+
+                # ✅ PLAYCALL CENTER RESET: Clear all user-facing PC overrides at quarter transition.
+                # Quarter transitions should start with no carried tactical overrides.
+                for team in (gm.home_team, gm.away_team):
+                    calls = getattr(team, "strategy_calls", None)
+                    if not isinstance(calls, dict):
+                        continue
+                    calls["offense_call"] = None
+                    calls["defense_call"] = None
+                    calls["tempo_override"] = None
+                    calls["aggression_override"] = None
+                    calls["press_trap_override"] = None
+                gm.game_state["user_defense_override"] = None
+                logging.info("✅ QUARTER BREAK: Cleared Playcall Center overrides (offense/defense/tempo/aggression/press_trap)")
                 
                 # ✅ MAN DEFENSE MATCHUPS: Reset to defaults at start of quarter break
                 from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
@@ -4388,7 +4550,7 @@ try:
             ) if isinstance(_src, dict) else (None, None, None, None, None)
             # Return turn data + metadata
             response_data = {
-                "turn": latest_turn,
+                "turn": sanitize_turn_animation_payload(latest_turn),
                 "clock_start": _contract[0],
                 "clock_end": _contract[1],
                 "shot_clock_start": _contract[2],
@@ -4899,9 +5061,22 @@ try:
             _out = [None]
             def _wrapped():
                 _out[0] = get_team_roster(team_identifier, team_id, tournament_id, franchise_id, response, profile=False)
-            profile_summary = run_profiled(_wrapped, top_n=60)
-            result = _out[0]
-            result["profile_summary"] = profile_summary
+            try:
+                profile_summary = run_profiled(_wrapped, top_n=60)
+                result = _out[0]
+                result["profile_summary"] = profile_summary
+            except ValueError as exc:
+                # Local/dev safety: if another profiler is active, serve roster normally
+                # instead of failing the request.
+                result = get_team_roster(
+                    team_identifier,
+                    team_id,
+                    tournament_id,
+                    franchise_id,
+                    response,
+                    profile=False,
+                )
+                result["profile_error"] = str(exc)
             return result
         endpoint_start = time.time()
         # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data

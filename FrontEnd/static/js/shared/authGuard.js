@@ -38,10 +38,14 @@
   var path = window.location.pathname;
   // Normalize: ensure path consistency (trim trailing slash for root)
   var pathNormalized = path === "" ? "/" : path.replace(/\/$/, "") || "/";
+  // Local dev can serve pages under /static/*; normalize to logical route path.
+  var logicalPath = pathNormalized.indexOf("/static/") === 0
+    ? (pathNormalized.slice("/static".length) || "/")
+    : pathNormalized;
 
   var isPublic = publicPaths.some(function (p) {
     var norm = p.replace(/\/$/, "") || "/";
-    return pathNormalized === norm || path === p;
+    return logicalPath === norm || pathNormalized === norm || path === p;
   });
 
   if (isPublic) {
@@ -50,7 +54,7 @@
 
   var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
   if (!token) {
-    var redirectParam = encodeURIComponent(path + (window.location.search || ""));
+    var redirectParam = encodeURIComponent(logicalPath + (window.location.search || ""));
     window.location.replace("/login.html?redirect=" + redirectParam);
   }
 

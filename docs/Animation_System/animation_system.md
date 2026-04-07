@@ -1,8 +1,47 @@
 # Animation System Overview
 
-> **Last Updated:** January 2025
+> **Last Updated:** March 2026
 
 This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
+
+---
+
+## Canonical Current-State (March 2026)
+
+> If any legacy section below conflicts with this section, this section is the source of truth.
+
+### Runtime Routing Authority
+
+- `AnimationEngine.determineHandler()` is the canonical entry router.
+- `fast_break === true` (or `"true"`) routes to `handleFastBreak()` -> `runFastBreakSequence()`.
+- Non-fast-break animated turns route through `handleDefault()` -> `playTurnAnimation()`.
+- `result_type`-specific handlers (`FOUL`, `TURNOVER`, `TIMEOUT`, `OPENING_TIP`, etc.) are registered in `AnimationEngine.initializeDefaultHandlers()`.
+
+### Universal Movement and Speed Authority
+
+- **Player locomotion duration**: `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` (`getPlayerMovementDurationMs`) is the shared duration authority.
+- **Speed model**: AG-based base speed from `playerMovementSpeed.js` (`400 + AG`, ball-handler multiplier `0.95`), then scaled by game-speed preset via `window.__GAME_SPEED / 450`.
+- **Default player tween behavior**: `ballTween.tweenPlayerTo()` uses `getPlayerMovementDurationMs` when duration is omitted.
+- **Game speed presets in production UI**: `Normal=450`, `Fast=550`, `Super Fast=1000` (`gameSpeedManager.js` + `court.html`).
+
+### Fast Break Motion Authority (Current Hybrid Model)
+
+- Fast break flow is orchestrated in `fastBreak.js` (burst, outlet, shot/stop resolution).
+- For FB shot-phase helper movement (get-back/rebounder/contest support), client now **prefers backend animation endpoints** via `getAnimationEndGridForPlayer(turnData, playerId)` in `utils/animationEndFromTurn.js`.
+- When `turn.animations` endpoint data is missing for a role, fallback logic in `fastBreak.js` is still used (deterministic/random target generation depending on role).
+- Rim Runner outlet-denied beat freezes active player tweens during the denial callout via `utils/playerSpriteTweenPause.js`.
+
+### Announcement Freeze Policy (Current)
+
+- There is **no global automatic “pause all player movement for every announcement” rule** inside `announcements.js`.
+- Freeze behavior is currently **path-specific** (example: RR outlet-denied beat) and separate from timeout-level `scene.tweens.pauseAll()` behavior.
+
+### Known Non-Universal Areas (Important)
+
+- Some animation paths still use bespoke orchestration and role-specific fallback positioning (especially in fast break branches).
+- Therefore, universal speed math is shared, but full universal **placement/orchestration authority** is still partially hybrid in production.
+- DREB -> HCO outlet setup now prefers backend `animations[].end` targets and emits DREB contract telemetry (`dreb_*` events), but missing `outlet_receiver` endpoint currently degrades to warn+fallback (even under local throw mode) to avoid aborting live turn flow while backend contract coverage is being completed.
+- For `MISS/BLOCK -> DREB -> {HCO|HCT|FCP}` transitions, outlet pass now uses explicit backend contract payload `dreb_outlet_pass{passer_id, receiver_id}` and does **not** use synthetic fallback; missing contract is treated as strict branch failure.
 
 ---
 
@@ -115,8 +154,10 @@ Every turn result from the backend contains data organized into **three distinct
 - `animations[]` - Array of per-player movement tracks
   - Each animation contains:
     - `playerId` - Player identifier
+    - `start` / `end` - Start and destination grid coords (HOME orientation)
     - `movement[]` - Array of movement steps
-      - Each step: `coords` (x, y), `action`, `timestamp`, `has_ball`
+      - Each step uses: `coords` (x, y), `action`, `timestamp`
+    - `duration` and `hasBallAtStep[]` may be present by builder path
   - May be empty array `[]` if no animation (e.g., some free throws, turnovers)
 
 **Conditional:**
@@ -174,6 +215,8 @@ Every turn result from the backend contains data organized into **three distinct
 
 ## SS&S Core Systems (December 2024)
 
+> **Legacy snapshot note:** This section captures December 2024 SS&S rollout intent and migration rationale. For current production behavior and conflict resolution, use **Canonical Current-State (March 2026)** above.
+
 ### Possession Management System ✅ **SS&S**
 
 **Single Source of Truth:** Each turn's `offense_team_id` field
@@ -200,6 +243,8 @@ Every turn result from the backend contains data organized into **three distinct
 
 ### Announcement System ✅ **SS&S**
 
+> **Legacy scope note:** This subsection documents timing taxonomy (`start` vs `end`) and idempotency patterns. It does **not** imply global player tween freeze for every announcement. Current freeze behavior is path-specific (see Canonical section).
+
 **Timing-Based Separation:**
 
 **timing='start'** - Context announcements (situation being entered):
@@ -214,16 +259,15 @@ Every turn result from the backend contains data organized into **three distinct
 - "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!" - Foul types
 - "Rebound!" - Defensive rebound (ballManager.js, when ball reaches rebounder)
 
-**Idempotent Design:**
-- `prepareTurnForAnimation()` may be called multiple times (animateGameTurns + AnimationRouter)
-- Uses `turn._startAnnouncementsShown` and `turn._endAnnouncementsShown` flags
-- First call: Shows announcements, sets flag
-- Subsequent calls: Skips announcements (already shown)
+**Turn Preparation Flow:**
+- `prepareTurnForAnimation()` is executed once per routed turn in `AnimationRouter`.
+- `animateGameTurns` only sets lightweight turn-index context (`scene.currentTurn`, `turn.index`) before routing.
+- Announcement guards still use `turn._startAnnouncementsShown` and `turn._endAnnouncementsShown` to prevent duplicates.
 
 **Benefits:**
+- ✅ Lower turn-boundary overhead (no duplicated prep path)
 - ✅ No duplicate announcements (flags prevent)
 - ✅ Clear separation (context at start, result at end)
-- ✅ Works across all turn types
 
 **See:** `turnPreparation.js` - `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`  
 **See:** `announcements.js` - `announceFromTurnData()` function
@@ -2682,6 +2726,8 @@ Whenever a turn updates the scoreboard, the debug logger records the delta in `A
 
 ### Player Animation System
 
+> **Historical + current overlap note:** This section mixes still-valid movement architecture with migration-era cleanup notes. If any implementation detail conflicts with current files, prioritize **Canonical Current-State (March 2026)** and direct code references.
+
 **Status:** Already using WIP_GOB approach
 
 Player animations already use the simplified approach:
@@ -2700,78 +2746,96 @@ Player animations already use the simplified approach:
 
 **Status:** Fully implemented and operational
 
-The animation system uses a unified distance-based duration calculation that ensures consistent speeds across all animations and respects game speed settings (Slow/Normal/Fast).
+The animation system uses a **universal speed management** model: player tween time is derived from **distance ÷ effective pixels per second**, not from fixed millisecond guesses. Global animation speed (Normal / Fast / Super Fast) scales those effective speeds so the UI presets stay meaningful.
 
-**Architecture:**
+#### Universal speed management (implementation)
 
-#### Core Functions
+**Module split**
 
-- **`getPlayerDuration(sprite, targetX, targetY, isTransition = false)`** (`turnAnimation.js`)
-  - Calculates player movement duration based on distance from current sprite position to target
-  - Uses `getPlayerSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
-  - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
-  - Supports transition flag for longer movements (uses `MAX_TRANSITION_DURATION` = 3000ms cap)
-  - Default speed: 450 pixels/second (Normal preset)
+| Module | Role |
+|--------|------|
+| `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` | **Single entry point** for player tween duration: `getGameSpeedPxPerSec()`, `resolveMovementSpeedPxPerSec()`, `getPlayerMovementDurationMs()`. |
+| `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js` | AG → base px/s before global scale: `agToSpeedPxPerSec()`, `getEffectiveAgilityForMovement()`, constants `MOVEMENT_SPEED_BASE` (400), `MOVEMENT_SPEED_SLOPE` (1), `BALL_HANDLER_SPEED_MULTIPLIER` (0.95). |
 
+**Player effective speed**
+
+1. **Base (before global game-speed scale):** `400 + AG` px/s (`agToSpeedPxPerSec`). If the sprite is the current ball handler (see below), multiply by **0.95**. Missing AG falls back to **50** (`DEFAULT_AG_WHEN_MISSING`).
+2. **Global scale:** multiply by `getGameSpeedPxPerSec() / 450`. `getGameSpeedPxPerSec()` reads `window.__GAME_SPEED` when set; otherwise **450** (Normal). The divisor **450** is the reference preset so “Normal” keeps AG 50 ≈ **450** px/s before BH penalty.
+3. **Duration:** `duration = (distance / effectiveSpeed) * 1000` ms, **minimum 50** ms (`MIN_DURATION_MS`).
+
+**Ball-handler detection for movement speed**
+
+- `playerMovementDuration.js` resolves BH via `BallControllerAdapter.getCurrentOwner(scene)` vs the sprite’s `playerId`, unless callers pass `opts.isBallHandler` explicitly.
+
+**Wrappers and call sites**
+
+- **`getPlayerDuration(...)`** and **`getPlayerDurationUncapped(...)`** (`turnAnimation.js`) both delegate to **`getPlayerMovementDurationMs()`** (same math today; use the exported name that matches the callsite intent).
+- **`tweenPlayerTo()`** (`ballTween.js`): if **`duration` is omitted**, it uses **`getPlayerMovementDurationMs`** for that player sprite so tweens do not default to a fixed **300** ms.
+- **`fastBreak.js`** and other flows that already import **`getPlayerDuration`** from `turnAnimation.js` use the same universal duration path for player movement.
+- **Ball** movement uses **`getBallDuration()`** / **`getBallSpeed()`** in `ballTween.js` (ball px/s from `window.__GAME_SPEED`, still distance-based, with its own min/max clamping)—separate from the AG-based player pipeline.
+
+#### Core Functions (quick reference)
+
+- **`getPlayerDuration(sprite, targetX, targetY, isTransition = false, opts)`** (`turnAnimation.js`)
+  - Delegates to **`getPlayerMovementDurationMs()`** in `playerMovementDuration.js`.
+- **`tweenPlayerTo()`** (`ballTween.js`): default **`duration`** → **`getPlayerMovementDurationMs`** when not provided.
 - **`getBallDuration(ballSprite, targetX, targetY)`** (`ballTween.js`)
-  - Calculates ball movement duration based on distance from current position to target
-  - Uses `getBallSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
-  - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
-  - Default speed: 450 pixels/second (Normal preset)
-  - Clamped between 50ms (minimum) and 1000ms (maximum)
+  - Distance ÷ **`getBallSpeed()`** (uses `window.__GAME_SPEED`), clamped between **50** ms and **1000** ms.
 
-#### Game Speed Integration
+#### Game speed integration
 
-**Speed Presets** (`gameSpeedManager.js`):
-- **Slow**: 350 pixels/second
-- **Normal**: 450 pixels/second (default)
-- **Fast**: 550 pixels/second
+**Speed presets** (`gameSpeedManager.js` + `court.html` speed dropdown): **Normal 450**, **Fast 550**, **Super Fast 1000** px/s (`window.__GAME_SPEED`).
 
-**How It Works**:
-1. User selects speed via UI buttons (Slow/Normal/Fast)
-2. `gameSpeedManager.setGameSpeed()` updates `window.__GAME_SPEED`
-3. `getPlayerSpeed()` and `getBallSpeed()` check `window.__GAME_SPEED` before falling back to defaults
-4. All duration calculations automatically use the current speed setting
+**How it works**
 
-#### Where It's Used
+1. User selects a preset; `setGameSpeed()` writes **`window.__GAME_SPEED`**.
+2. **Players:** `resolveMovementSpeedPxPerSec` combines AG + BH rule, then scales by `getGameSpeedPxPerSec() / 450`.
+3. **Ball:** `getBallSpeed()` reads `window.__GAME_SPEED` for pass / ball tweens that use `getBallDuration`.
 
-**Player Animations**:
+#### Where it's used
+
+**Player animations**
+
 - ✅ HCO turn animations (`ShotAnimationSystem.animatePlayerMovement()`)
 - ✅ Transition animations (IP→HCO, DREB→HCO)
 - ✅ Inbound pass setup animations
 - ✅ Opening tip player movements
 - ✅ Free throw player movements
-- ✅ Fast break player movements
+- ✅ Fast break player movements (via `getPlayerDuration` / shared duration helpers)
 
-**Ball Animations**:
+**Ball animations**
+
 - ✅ Pass animations (`passDetection.js`)
 - ✅ Opening tip ball movements
-- ✅ All ball tweens via `getBallDuration()`
+- ✅ Ball tweens via `getBallDuration()` / explicit durations where passes supply distance-based speed
 
 #### Benefits
 
-- ✅ **Consistent Speeds**: All animations use the same distance-based calculation
-- ✅ **Game Speed Support**: Slow/Normal/Fast buttons work across all animations
-- ✅ **Smooth Transitions**: Distance-based calculation ensures smooth movement regardless of timestamp gaps
-- ✅ **No More "Stuck in Mud"**: Replaced slow timestamp-based calculations with responsive distance-based ones
-- ✅ **Unified System**: Single source of truth for duration calculations
+- ✅ **Consistent speeds**: One AG + game-speed story for player movement duration
+- ✅ **Preset-aligned scaling**: Normal keeps 450 as the reference px/s for the global multiplier
+- ✅ **Smooth motion**: Distance-based duration avoids timestamp-multiplier “stuck in mud” behavior
+- ✅ **No silent 300 ms player tweens**: `tweenPlayerTo` defaults through `getPlayerMovementDurationMs` when duration is omitted
 
-#### Migration History
+#### Migration history
 
-**Before (Bug 3 - Fixed January 2025)**:
+**Before (Bug 3 — fixed January 2025)**
+
 - `ShotAnimationSystem` used timestamp-based calculation: `(nextStep.timestamp - step.timestamp) * 3`
 - Hardcoded speeds in `passDetection.js` and `openingTip.js`
-- Game speed buttons had no effect
+- Game speed had little or no effect on many paths
 - Inconsistent speeds between HCO and transitions
 
-**After (Fixed January 2025)**:
-- All animations use `getPlayerDuration()` or `getBallDuration()`
-- Game speed settings respected everywhere
-- Consistent speeds across all animation types
+**After**
 
-**See:**
-- `docs/PHASE_2.5_BUG_LIST.md` - Bug 3 fix details
-- `docs/To Do/animation_speed_edge_cases.md` - Remaining edge cases
+- Player movement duration goes through **`getPlayerMovementDurationMs`** / **`getPlayerDuration`**
+- Ball movement uses **`getBallDuration()`** where applicable
+- **`window.__GAME_SPEED`** drives the global scale for both pipelines
+
+**See also**
+
+- `docs/To Do/AG_Implementation.md` — AG ↔ movement mapping
+- `docs/PHASE_2.5_BUG_LIST.md` — Bug 3 fix context
+- `docs/To Do/animation_speed_edge_cases.md` — remaining edge cases
 
 ---
 

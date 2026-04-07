@@ -12,6 +12,15 @@
 4. THREE_POINTER_FOUL_MISS_CHANCE = 0.4 (40% chance foul forces miss on 3-pointers)
 5. TWO_POINTER_FOUL_MISS_CHANCE = 0.2 (20% chance foul forces miss on 2-pointers)
 
+**Location: contest range, rim box, `has_contest` (implemented in `shot_manager.py`)**
+1. **Shooter coordinates:** `roles["shot_spot"]` `{x,y}` when present; otherwise `shooter.coords` (defaults x=50, y=25 if missing).
+2. **Attacking basket:** Home offense attacks the away rim `AWAY_RIM_COORDS` (x≈9, y≈25); away offense attacks `HOME_RIM_COORDS` (x≈91, y≈25). Same convention as the rest of the court engine.
+3. **Contest range (`has_contest`):** Axis-aligned box around the shooter: **|Δx| ≤ 6** and **|Δy| ≤ 4**. **Every** player in the defensive lineup is checked (not only `roles["defender"]`). If any defender lies in that box, `has_contest` is true.
+4. **Rim box:** Axis-aligned box around the attacking basket: **|shooter_x − basket_x| ≤ 6** and **|shooter_y − basket_y| ≤ 6** (same margin on both axes).
+5. **Unguarded rim shortcut (99% make):** If `shot_type` is **inside** or **attack**, the attempt is **not** a three-pointer, the shooter is **in the rim box**, and **`has_contest` is false** → resolve make/miss as **make** unless `random.randint(1, 100) == 100` (1% miss). This path **does not** run `calculate_shot_score` defense, **does not** run block reconciliation, charge/blocking foul, or defensive shooting fouls.
+6. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`.
+7. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
+
 **Shot Resolution Flow (12 Steps)**
 1. Extract Roles
    - shooter, passer, screener, defender, second_defender from roles dict
@@ -52,7 +61,9 @@
    - contested: +25 to threshold
    - broken: +100 to threshold
 
-6. Calculate Shot Score (`calculate_shot_score()`)
+6. Location layer → then Calculate Shot Score (`calculate_shot_score()`)
+   - After shot threshold modifiers: compute shooter `(x,y)`, attacking basket, `has_contest`, and whether the **unguarded rim shortcut** applies (see **Location** above). Shortcut: 99% make, skip defense/foul/block/charge pipeline for that outcome.
+   - Otherwise `calculate_shot_score(..., apply_defense=has_contest)`.
    a. Base Score: `sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.items()) * random.randint(1, 6)`
       - Uses shot_type (inside/attack/outside) instead of playcall for attribute weights
       - Shot type weights from PLAYCALL_ATTRIBUTE_WEIGHTS:
@@ -64,12 +75,12 @@
       - if passer: `(passer.PS * 0.8 + passer.IQ * 0.2) * random(1-6) * 0.2`
       - else: `(shooter.AG * 0.8 + shooter.IQ * 0.2) * random(1-6) * 0.2`
    
-   c. Defense Score (varies by shot type)
+   c. Defense Score (varies by shot type) — **skipped when `apply_defense` is False** (no defender in contest range, and not taking the unguarded rim shortcut)
       - Paint shots: `(ID * 0.6 + ST * 0.2 + IQ * 0.1 + CH * 0.1) * random(1-6)`
       - Three-point: `(OD * 0.8 + IQ * 0.1 + CH * 0.1) * random(1-6)`
       - Mid-range: `(OD * 0.3 + ID * 0.3 + AG * 0.1 + ST * 0.1 + IQ * 0.1 + CH * 0.1) * random(1-6)`
    
-   d. Check Defensive Foul (thresholds vary by shot_type)
+   d. Check Defensive Foul (thresholds vary by shot_type) — **not run when `apply_defense` is False**
       - Inside shots: hard_threshold = 50 + defense_team.fight, soft_threshold = 110 + defense_team.fight
       - Attack shots: hard_threshold = 70 + defense_team.fight, soft_threshold = 130 + defense_team.fight
       - Outside shots: hard_threshold = 30 + defense_team.fight, soft_threshold = 90 + defense_team.fight
@@ -86,7 +97,7 @@
       - Otherwise: no multiplier
    
    g. Help Defense Check
-      - REMOVED (will be replaced with location-based check in future)
+      - REMOVED; **location-based contest** (`has_contest` bounding box) determines whether defense/foul/block/charge logic runs (see **Location** at top of this doc)
    
    h. Screener Bonus
       - if screener: shot_score += `calculate_screen_score(screener_attrs) * 0.15`
@@ -127,8 +138,8 @@
     - Determine defense release players (based on fast_breaks strategy setting)
     - Calculate coordinates for animation
 
-**Charge and Blocking Foul (attack shots only)**
-- Before make/miss: if shot_type is attack, run charge/block check (`calculate_charge()`). If **CHARGE**: return early with result_type "CHARGE", possession_flips True, next_play_type SIP; no shot attempted. If **BLOCKING_FOUL**: return early with result_type "FOUL", text "Blocking foul on X!", next_play_type SIP or FREE_THROW (if bonus); no shot attempted.
+**Charge and Blocking Foul (attack shots only; requires contest)**
+- Before make/miss: if shot_type is **attack** and a defender is in **contest range** (`has_contest`), run charge/block check (`calculate_charge()`). If **CHARGE**: return early with result_type "CHARGE", possession_flips True, next_play_type SIP; no shot attempted. If **BLOCKING_FOUL**: return early with result_type "FOUL", text "Blocking foul on X!", next_play_type SIP or FREE_THROW (if bonus); no shot attempted. With **no** contest, `calculate_charge` is not called (no charge/blocking foul from this path).
 - Backend: game_manager treats CHARGE like FOUL for transition—flips possession and appends SIDE_INBOUND when result_type is CHARGE or FOUL (non–free-throw).
 - Frontend: CHARGE and FOUL (blocking) both route to handleDefault → playTurnAnimation (skeleton/drive animates; no ball to basket). Announcements: "Charge!" for CHARGE, "BLOCKING FOUL!" for blocking foul.
 
@@ -252,7 +263,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `100 - (random(1-5) * momentum)` (higher momentum = easier threes)
 4. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 5. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
-6. **Help Defense**: Removed (will be replaced with location-based check in future)
+6. **Location-based contest**: Bounding box around shooter (|Δx|≤6, |Δy|≤4) vs all defenders; rim box around attacking basket (±6); unguarded rim shortcut (99% make); `apply_defense` only when `has_contest` (unless shortcut applies)
 7. **Motion Attack Penalty**: Applied when Motion offense attack shot is stopped short of basket (penalty = distance to basket)
 8. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
 9. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)

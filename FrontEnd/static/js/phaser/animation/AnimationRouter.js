@@ -42,6 +42,7 @@ export class AnimationRouter {
     
     // Initialize the system
     this.initialize();
+    this.installClockReconGlobalHelpers();
     
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: Initialized with all components');
@@ -72,6 +73,387 @@ export class AnimationRouter {
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: System initialized successfully');
     }
+  }
+
+  installClockReconGlobalHelpers() {
+    const scope = (typeof window !== "undefined" && window) || globalThis;
+    if (!scope || scope.__clockReconHelpersInstalled) return;
+    scope.__clockReconHelpersInstalled = true;
+
+    const asNumber = (v, fallback, min = 0) => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < min) return fallback;
+      return n;
+    };
+
+    if (typeof scope.showClockReconConfig !== "function") {
+      scope.showClockReconConfig = () => {
+        const config = {
+          mode: String(scope.UESS_CLOCK_AUTHORITY_MODE ?? "observe"),
+          toleranceSeconds: asNumber(scope.UESS_CLOCK_RECON_TOLERANCE_SECONDS, 0.1, 0),
+          summaryEvery: Math.floor(
+            asNumber(scope.UESS_CLOCK_RECON_SUMMARY_EVERY, 10, 1)
+          ),
+          warnGate: {
+            minRows: Math.floor(
+              asNumber(scope.UESS_CLOCK_RECON_WARN_MIN_ROWS, 40, 1)
+            ),
+            outOfToleranceRateMax: asNumber(
+              scope.UESS_CLOCK_RECON_WARN_OUT_OF_TOLERANCE_RATE_MAX,
+              0.02,
+              0
+            ),
+            averageAbsDeltaSecondsMax: asNumber(
+              scope.UESS_CLOCK_RECON_WARN_AVG_ABS_DELTA_SECONDS_MAX,
+              0.25,
+              0
+            ),
+            maxAbsDeltaSecondsMax: asNumber(
+              scope.UESS_CLOCK_RECON_WARN_MAX_ABS_DELTA_SECONDS_MAX,
+              1.0,
+              0
+            ),
+          },
+          latestSummary: scope.__CLOCK_RECON_SUMMARY_LAST__ ?? null,
+        };
+        console.log("[CLOCK RECON CONFIG]", config);
+        return config;
+      };
+    }
+
+    if (typeof scope.getClockReconSummaryLatest !== "function") {
+      scope.getClockReconSummaryLatest = (n = 5) => {
+        const count = Math.max(0, Math.floor(Number(n) || 0));
+        const list = Array.isArray(scope.__CLOCK_RECON_SUMMARY_BUFFER__)
+          ? scope.__CLOCK_RECON_SUMMARY_BUFFER__
+          : [];
+        return list.slice(-count);
+      };
+    }
+
+    if (typeof scope.clearClockReconBuffers !== "function") {
+      scope.clearClockReconBuffers = () => {
+        scope.__CLOCK_RECON_LAST__ = undefined;
+        scope.__CLOCK_RECON_SUMMARY_LAST__ = undefined;
+        scope.__CLOCK_RECON_BUFFER__ = [];
+        scope.__CLOCK_RECON_SUMMARY_BUFFER__ = [];
+      };
+    }
+
+    if (typeof scope.getTurnBoundaryWaitLatest !== "function") {
+      scope.getTurnBoundaryWaitLatest = (n = 20) => {
+        const count = Math.max(0, Math.floor(Number(n) || 0));
+        const list = Array.isArray(scope.__TURN_BOUNDARY_WAIT_BUFFER__)
+          ? scope.__TURN_BOUNDARY_WAIT_BUFFER__
+          : [];
+        return list.slice(-count);
+      };
+    }
+
+    if (typeof scope.clearTurnBoundaryWaitBuffer !== "function") {
+      scope.clearTurnBoundaryWaitBuffer = () => {
+        scope.__TURN_BOUNDARY_WAIT_LAST__ = undefined;
+        scope.__TURN_BOUNDARY_WAIT_BUFFER__ = [];
+      };
+    }
+
+    if (typeof scope.showTurnBoundaryWaitSummary !== "function") {
+      scope.showTurnBoundaryWaitSummary = (n = 40) => {
+        const count = Math.max(0, Math.floor(Number(n) || 0));
+        const list = Array.isArray(scope.__TURN_BOUNDARY_WAIT_BUFFER__)
+          ? scope.__TURN_BOUNDARY_WAIT_BUFFER__
+          : [];
+        const rows = list.slice(-count);
+        const waits = rows
+          .map((r) => Number(r?.waitedMs))
+          .filter((v) => Number.isFinite(v) && v >= 0)
+          .sort((a, b) => a - b);
+        const total = waits.length;
+        const avg = total
+          ? waits.reduce((sum, v) => sum + v, 0) / total
+          : 0;
+        const percentile = (p) => {
+          if (!total) return 0;
+          const idx = Math.min(
+            total - 1,
+            Math.max(0, Math.ceil((p / 100) * total) - 1)
+          );
+          return waits[idx];
+        };
+        const byBranch = rows.reduce((acc, row) => {
+          const key = String(row?.branch || "unknown");
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        const summary = {
+          sampleSize: total,
+          avgWaitMs: Number(avg.toFixed(1)),
+          p50WaitMs: Number(percentile(50).toFixed(1)),
+          p95WaitMs: Number(percentile(95).toFixed(1)),
+          maxWaitMs: Number((waits[total - 1] || 0).toFixed(1)),
+          byBranch,
+        };
+        console.table(rows);
+        console.log("[TURN BOUNDARY WAIT SUMMARY]", summary);
+        return summary;
+      };
+    }
+  }
+
+  _clearClockInterpolationTracking() {
+    if (!this.scene) return;
+    this.scene._clockInterpolationTween = null;
+    this.scene._clockInterpolationPromise = null;
+    this.scene._clockInterpolationResolve = null;
+    this.scene._clockInterpolationStartedAtMs = null;
+    this.scene._clockInterpolationDurationMs = null;
+  }
+
+  _resolveClockInterpolationTracking() {
+    if (!this.scene) return;
+    const resolve = this.scene._clockInterpolationResolve;
+    this._clearClockInterpolationTracking();
+    if (typeof resolve === "function") {
+      try {
+        resolve();
+      } catch (_) {
+        // no-op
+      }
+    }
+  }
+
+  _isBoundaryWaitDebugEnabled() {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    return scope?.UESS_TURN_BOUNDARY_WAIT_DEBUG === true;
+  }
+
+  _emitBoundaryWaitTelemetry(turnData, payload = {}) {
+    if (!this._isBoundaryWaitDebugEnabled()) return;
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const row = {
+      event: "turn_boundary_clock_settle_wait",
+      branchKind: "clock_boundary_wait",
+      timestampMs: Date.now(),
+      resultType: turnData?.result_type ?? null,
+      turnIndex:
+        turnData?.index ?? turnData?.turnIndex ?? this.scene?.currentTurn ?? null,
+      ...payload,
+    };
+    this.scene?.events?.emit?.("animTelemetry", row);
+    scope.__TURN_BOUNDARY_WAIT_LAST__ = row;
+    if (!Array.isArray(scope.__TURN_BOUNDARY_WAIT_BUFFER__)) {
+      scope.__TURN_BOUNDARY_WAIT_BUFFER__ = [];
+    }
+    scope.__TURN_BOUNDARY_WAIT_BUFFER__.push(row);
+    if (scope.__TURN_BOUNDARY_WAIT_BUFFER__.length > 120) {
+      scope.__TURN_BOUNDARY_WAIT_BUFFER__.splice(
+        0,
+        scope.__TURN_BOUNDARY_WAIT_BUFFER__.length - 120
+      );
+    }
+  }
+
+  _collectActiveBoundaryTweens() {
+    if (!this.scene?.tweens?.getTweensOf) return [];
+    const heartbeatStore = this.scene?.__arrivalHeartbeatStore;
+    const ignoredTweens = new Set();
+    if (heartbeatStore && typeof heartbeatStore.values === "function") {
+      for (const entry of heartbeatStore.values()) {
+        if (entry?.tween) ignoredTweens.add(entry.tween);
+      }
+    }
+    const targets = [
+      ...Object.values(this.playerSprites || {}),
+      this.ballSprite,
+      this.scene?.ballShadowSprite,
+    ].filter(Boolean);
+    const isNonBoundaryVisualTween = (tween) => {
+      const allowedVisualKeys = new Set([
+        "displayOriginX",
+        "displayOriginY",
+        "scaleX",
+        "scaleY",
+      ]);
+      const data = Array.isArray(tween?.data) ? tween.data : [];
+      if (!data.length) return false;
+      const keys = data
+        .map((d) => String(d?.key ?? ""))
+        .filter((k) => k.length > 0);
+      if (!keys.length) return false;
+      // Heartbeat-like visual tweens only mutate origin/scale; they are intentionally
+      // long-lived and should never gate turn-boundary progression.
+      return keys.every((k) => allowedVisualKeys.has(k));
+    };
+    const seen = new Set();
+    const activeTweens = [];
+    for (const target of targets) {
+      const tweens = this.scene.tweens.getTweensOf(target) || [];
+      for (const tween of tweens) {
+        if (!tween || seen.has(tween)) continue;
+        if (ignoredTweens.has(tween)) continue;
+        if (tween.__uessBoundaryIgnore === true) continue;
+        if (isNonBoundaryVisualTween(tween)) continue;
+        seen.add(tween);
+        const isPlaying = typeof tween.isPlaying === "function"
+          ? tween.isPlaying()
+          : tween.isPlaying !== false;
+        if (isPlaying) activeTweens.push(tween);
+      }
+    }
+    return activeTweens;
+  }
+
+  _describeBoundaryTweens(maxItems = 10) {
+    const activeTweens = this._collectActiveBoundaryTweens();
+    const playerKeyBySprite = new Map();
+    for (const [id, sprite] of Object.entries(this.playerSprites || {})) {
+      if (sprite) playerKeyBySprite.set(sprite, String(id));
+    }
+    const describeTarget = (target) => {
+      if (!target) return "unknown_target";
+      if (playerKeyBySprite.has(target)) {
+        return `player:${playerKeyBySprite.get(target)}`;
+      }
+      if (target === this.ballSprite) return "ballSprite";
+      if (target === this.scene?.ballShadowSprite) return "ballShadowSprite";
+      return String(
+        target?.playerId ??
+          target?.name ??
+          target?.texture?.key ??
+          target?.type ??
+          "unknown_target"
+      );
+    };
+    return activeTweens.slice(0, Math.max(0, Number(maxItems) || 0)).map((tween) => {
+      const targets = Array.isArray(tween?.targets) ? tween.targets : [];
+      const tweenKeys = (Array.isArray(tween?.data) ? tween.data : [])
+        .map((d) => String(d?.key ?? ""))
+        .filter((k) => k.length > 0);
+      return {
+        targets: targets.map(describeTarget),
+        keys: tweenKeys,
+        progress:
+          typeof tween?.progress === "number"
+            ? Number(tween.progress.toFixed(3))
+            : null,
+        totalDuration:
+          Number.isFinite(Number(tween?.totalDuration))
+            ? Math.round(Number(tween.totalDuration))
+            : null,
+      };
+    });
+  }
+
+  _countActiveTweensForBoundary() {
+    return this._collectActiveBoundaryTweens().length;
+  }
+
+  _forceStopBoundaryTweens() {
+    const activeTweens = this._collectActiveBoundaryTweens();
+    let stopped = 0;
+    for (const tween of activeTweens) {
+      try {
+        if (typeof tween.stop === "function") {
+          tween.stop();
+          stopped += 1;
+        } else if (typeof tween.remove === "function") {
+          tween.remove();
+          stopped += 1;
+        }
+      } catch (_) {
+        // no-op; boundary guard is best-effort cleanup
+      }
+    }
+    return stopped;
+  }
+
+  async waitForBoundaryTweenDrain(maxWaitMs = 120, pollMs = 20) {
+    const timeoutMs = Math.max(0, Number(maxWaitMs) || 0);
+    const stepMs = Math.max(5, Number(pollMs) || 20);
+    if (!this.scene?.tweens?.getTweensOf || timeoutMs <= 0) {
+      return { waitedMs: 0, remainingTweens: this._countActiveTweensForBoundary() };
+    }
+    const start = Date.now();
+    let remaining = this._countActiveTweensForBoundary();
+    while (remaining > 0 && (Date.now() - start) < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
+      remaining = this._countActiveTweensForBoundary();
+    }
+    return {
+      waitedMs: Math.max(0, Date.now() - start),
+      remainingTweens: remaining,
+    };
+  }
+
+  async waitForClockInterpolationSettle(maxWaitMs = 0) {
+    const p = this.scene?._clockInterpolationPromise;
+    if (!p || typeof p.then !== "function") return;
+    const timeoutMs = Math.max(0, Number(maxWaitMs) || 0);
+    const settleCapMs = Math.max(
+      0,
+      Number(
+        (typeof window !== "undefined" && window.UESS_CLOCK_SETTLE_CAP_MS) ?? 120
+      ) || 120
+    );
+    const nowMs =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    const startedAtMs = Number(this.scene?._clockInterpolationStartedAtMs);
+    const durationMs = Number(this.scene?._clockInterpolationDurationMs);
+
+    // If interpolation still has a long runway, do not block turn boundaries.
+    if (
+      Number.isFinite(startedAtMs) &&
+      Number.isFinite(durationMs) &&
+      durationMs > 0
+    ) {
+      const elapsedMs = Math.max(0, nowMs - startedAtMs);
+      const remainingMs = Math.max(0, durationMs - elapsedMs);
+      if (remainingMs > settleCapMs) return;
+      const tailWaitMs = Math.min(timeoutMs || settleCapMs, remainingMs + 32);
+      if (tailWaitMs <= 0) return;
+      const waitStartMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      await Promise.race([
+        p,
+        new Promise((resolve) => setTimeout(resolve, tailWaitMs)),
+      ]);
+      const waitEndMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      return {
+        waitedMs: Math.max(0, waitEndMs - waitStartMs),
+        settleCapMs,
+        branch: "tail",
+      };
+    }
+
+    // Fallback for cases without timing metadata.
+    const fallbackWaitMs = Math.min(timeoutMs || settleCapMs, settleCapMs);
+    if (fallbackWaitMs <= 0) {
+      return { waitedMs: 0, settleCapMs, branch: "none" };
+    }
+    const waitStartMs =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    await Promise.race([
+      p,
+      new Promise((resolve) => setTimeout(resolve, fallbackWaitMs)),
+    ]);
+    const waitEndMs =
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    return {
+      waitedMs: Math.max(0, waitEndMs - waitStartMs),
+      settleCapMs,
+      branch: "fallback",
+    };
   }
 
   /**
@@ -138,6 +520,12 @@ export class AnimationRouter {
       const durationMs = Math.max(0, Math.floor(Number(turnData?.real_time_elapsed_ms ?? turnData?.realTimeElapsedMs) || 0));
       const gameSecondsToCount = Number.isFinite(clockStart) && Number.isFinite(clockEnd) ? clockStart - clockEnd : 0;
       const shotSecondsToCount = Number.isFinite(shotClockStart) && Number.isFinite(shotClockEnd) ? shotClockStart - shotClockEnd : 0;
+      const clockEventLedger = Array.isArray(turnData?.clock_event_ledger)
+        ? turnData.clock_event_ledger
+        : [];
+      const clockAuthorityMode = String(
+        turnData?.uess_clock_authority_mode ?? ""
+      ).toLowerCase();
       // Sync diagnostics: compare backend real-time estimate to game time (1:1 would be game_seconds * 1000)
       const expectedRealMsIf1To1 = gameSecondsToCount * 1000;
       const ratioRealToGame = expectedRealMsIf1To1 > 0 ? (durationMs / expectedRealMsIf1To1) : null;
@@ -157,10 +545,19 @@ export class AnimationRouter {
         ratio_real_to_game: ratioRealToGame != null ? `${(ratioRealToGame * 100).toFixed(0)}%` : null,
         keys: typeof turnData === 'object' ? Object.keys(turnData).filter(k => k.includes('clock') || k === 'real_time_elapsed_ms') : [],
       });
+      this.emitClockObserveParityTelemetry(turnData, {
+        clockStart,
+        clockEnd,
+        shotClockStart,
+        shotClockEnd,
+        durationMs,
+        clockEventLedger,
+        clockAuthorityMode,
+      });
 
       if (this.scene._clockInterpolationTween) {
         this.scene._clockInterpolationTween.remove();
-        this.scene._clockInterpolationTween = null;
+        this._resolveClockInterpolationTracking();
       }
 
       // Turn start: same condition for both — when game clock has contract, sync both (shot uses shot keys, clamp 30)
@@ -184,6 +581,15 @@ export class AnimationRouter {
         const useTwoPhase = gameSecondsToCount > 0 && shotSecondsToCount < gameSecondsToCount;
         const ratio = useTwoPhase ? shotSecondsToCount / gameSecondsToCount : 1;
         const progressObj = { p: 0 };
+        const tweenStartMs =
+          typeof performance !== "undefined" && typeof performance.now === "function"
+            ? performance.now()
+            : Date.now();
+        this.scene._clockInterpolationPromise = new Promise((resolve) => {
+          this.scene._clockInterpolationResolve = resolve;
+        });
+        this.scene._clockInterpolationStartedAtMs = tweenStartMs;
+        this.scene._clockInterpolationDurationMs = durationMs;
         this.scene._clockInterpolationTween = this.scene.tweens.add({
           targets: progressObj,
           p: 1,
@@ -211,9 +617,7 @@ export class AnimationRouter {
             shotClock.syncWithBackend(Math.max(0, Math.min(30, shotSeconds)));
           },
           onComplete: () => {
-            if (this.scene._clockInterpolationTween) {
-              this.scene._clockInterpolationTween = null;
-            }
+            this._resolveClockInterpolationTracking();
           },
         });
       }
@@ -307,6 +711,57 @@ export class AnimationRouter {
         // Calling engine (log removed)
       }
       await this.animationEngine.processTurn(turnData, context);
+      // Universal continuity guard: do not advance next turn until
+      // this turn's clock interpolation window has settled.
+      const boundaryWait = await this.waitForClockInterpolationSettle(
+        Math.max(0, Number(durationMs) || 0) + 150
+      );
+      if (boundaryWait) {
+        this._emitBoundaryWaitTelemetry(turnData, {
+          waitedMs: Math.round(boundaryWait.waitedMs ?? 0),
+          settleCapMs: boundaryWait.settleCapMs ?? null,
+          branch: boundaryWait.branch ?? null,
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
+      }
+      const tweenDrain = await this.waitForBoundaryTweenDrain(
+        Number(
+          (typeof window !== "undefined"
+            ? window.UESS_BOUNDARY_TWEEN_DRAIN_MAX_MS
+            : globalThis?.UESS_BOUNDARY_TWEEN_DRAIN_MAX_MS) ?? 120
+        ) || 120,
+        Number(
+          (typeof window !== "undefined"
+            ? window.UESS_BOUNDARY_TWEEN_DRAIN_POLL_MS
+            : globalThis?.UESS_BOUNDARY_TWEEN_DRAIN_POLL_MS) ?? 20
+        ) || 20
+      );
+      if (tweenDrain?.remainingTweens > 0) {
+        const leakTweenSample = this._describeBoundaryTweens(
+          Number(
+            (typeof window !== "undefined"
+              ? window.UESS_BOUNDARY_TWEEN_LEAK_SAMPLE_SIZE
+              : globalThis?.UESS_BOUNDARY_TWEEN_LEAK_SAMPLE_SIZE) ?? 8
+          ) || 8
+        );
+        this._emitBoundaryWaitTelemetry(turnData, {
+          event: "turn_boundary_active_tween_leak",
+          waitedMs: Math.round(tweenDrain.waitedMs ?? 0),
+          remainingTweens: tweenDrain.remainingTweens,
+          leakTweenSample,
+          branch: "tween_drain",
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
+        const stoppedCount = this._forceStopBoundaryTweens();
+        this._emitBoundaryWaitTelemetry(turnData, {
+          event: "turn_boundary_force_stop_applied",
+          waitedMs: 0,
+          remainingTweensAfterStop: this._countActiveTweensForBoundary(),
+          stoppedTweens: stoppedCount,
+          branch: "tween_drain_force_stop",
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
+      }
       if (!shouldLog) {
         // Completed (log removed)
       }
@@ -329,7 +784,7 @@ export class AnimationRouter {
       // PHASE2: Stop bounded clock interpolation so final snap (updateScoreboard) is authoritative
       if (this.scene?._clockInterpolationTween) {
         this.scene._clockInterpolationTween.remove();
-        this.scene._clockInterpolationTween = null;
+        this._resolveClockInterpolationTracking();
       }
       // ✅ PHASE 2.3: Call finalizeTurnAfterAnimation in finally block (always runs)
       try {
@@ -419,6 +874,435 @@ export class AnimationRouter {
       hasBallController: !!this.ballController,
       hasAnimationEngine: !!this.animationEngine
     };
+  }
+
+  deriveClockElapsedFromLedger(clockEventLedger = []) {
+    if (!Array.isArray(clockEventLedger)) return 0;
+    let elapsed = 0;
+    for (const row of clockEventLedger) {
+      if (!row || row.event_type !== "game_clock_stop") continue;
+      const before = Number(row.game_clock_before);
+      const after = Number(row.game_clock_after);
+      if (!Number.isFinite(before) || !Number.isFinite(after)) continue;
+      elapsed += Math.max(0, before - after);
+    }
+    return elapsed;
+  }
+
+  resolveClockReconToleranceSeconds(turnData) {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const globalRaw = Number(scope?.UESS_CLOCK_RECON_TOLERANCE_SECONDS);
+    if (Number.isFinite(globalRaw) && globalRaw >= 0) return globalRaw;
+    const turnRaw = Number(turnData?.uess_clock_reconciliation?.tolerance_seconds);
+    if (Number.isFinite(turnRaw) && turnRaw >= 0) return turnRaw;
+    return 0.1;
+  }
+
+  resolveClockAuthorityMode(turnData, contextMode = null) {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const normalize = (raw) => {
+      const v = String(raw ?? "").trim().toLowerCase();
+      if (v === "observe" || v === "warn" || v === "throw" || v === "off") {
+        return v;
+      }
+      return null;
+    };
+    const globalMode = normalize(scope?.UESS_CLOCK_AUTHORITY_MODE);
+    if (globalMode) return globalMode;
+    const ctxMode = normalize(contextMode);
+    if (ctxMode) return ctxMode;
+    const turnMode = normalize(
+      turnData?.uess_clock_authority_mode ??
+      turnData?.uess_clock_reconciliation?.mode
+    );
+    if (turnMode) return turnMode;
+    return "observe";
+  }
+
+  resolveClockReconSummaryEvery() {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const raw = Number(scope?.UESS_CLOCK_RECON_SUMMARY_EVERY);
+    if (Number.isFinite(raw) && raw >= 1) return Math.floor(raw);
+    return 10;
+  }
+
+  resolveClockReconWarnThresholds() {
+    const scope = typeof window !== "undefined" ? window : globalThis;
+    const asNumber = (v, fallback, min = 0) => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < min) return fallback;
+      return n;
+    };
+    return {
+      minRows: Math.floor(
+        asNumber(scope?.UESS_CLOCK_RECON_WARN_MIN_ROWS, 40, 1)
+      ),
+      outOfToleranceRateMax: asNumber(
+        scope?.UESS_CLOCK_RECON_WARN_OUT_OF_TOLERANCE_RATE_MAX,
+        0.02,
+        0
+      ),
+      averageAbsDeltaSecondsMax: asNumber(
+        scope?.UESS_CLOCK_RECON_WARN_AVG_ABS_DELTA_SECONDS_MAX,
+        0.25,
+        0
+      ),
+      maxAbsDeltaSecondsMax: asNumber(
+        scope?.UESS_CLOCK_RECON_WARN_MAX_ABS_DELTA_SECONDS_MAX,
+        1.0,
+        0
+      ),
+    };
+  }
+
+  getClockReconSession() {
+    if (!this.scene.__clockReconSession) {
+      this.scene.__clockReconSession = {
+        rows: 0,
+        withTolerance: 0,
+        outOfTolerance: 0,
+        missingCompare: 0,
+        absDeltaSum: 0,
+        maxAbsDelta: 0,
+        byResultType: {},
+      };
+    }
+    return this.scene.__clockReconSession;
+  }
+
+  emitClockReconSummaryIfNeeded(basePayload = {}) {
+    const session = this.getClockReconSession();
+    const every = this.resolveClockReconSummaryEvery();
+    if (session.rows === 0 || session.rows % every !== 0) return;
+    const avgAbsDelta =
+      session.rows > 0 ? session.absDeltaSum / session.rows : 0;
+    const thresholds = this.resolveClockReconWarnThresholds();
+    const outOfToleranceRate =
+      session.rows > 0 ? session.outOfTolerance / session.rows : 0;
+    const hasEnoughRows = session.rows >= thresholds.minRows;
+    const meetsWarnPromotionGate =
+      hasEnoughRows &&
+      outOfToleranceRate <= thresholds.outOfToleranceRateMax &&
+      avgAbsDelta <= thresholds.averageAbsDeltaSecondsMax &&
+      session.maxAbsDelta <= thresholds.maxAbsDeltaSecondsMax;
+    const summary = {
+      event: "clock_contract_reconciliation_summary",
+      branchKind: "clock_contract",
+      timestampMs: Date.now(),
+      mode: basePayload.mode ?? "observe",
+      rows: session.rows,
+      withTolerance: session.withTolerance,
+      outOfTolerance: session.outOfTolerance,
+      missingCompare: session.missingCompare,
+      withToleranceRate:
+        session.rows > 0 ? session.withTolerance / session.rows : 0,
+      outOfToleranceRate,
+      averageAbsDeltaSeconds: Number(avgAbsDelta.toFixed(3)),
+      maxAbsDeltaSeconds: Number(session.maxAbsDelta.toFixed(3)),
+      thresholds,
+      hasEnoughRows,
+      meetsWarnPromotionGate,
+      byResultType: { ...session.byResultType },
+    };
+    try {
+      const scope = (typeof window !== "undefined" && window) || globalThis;
+      scope.__CLOCK_RECON_SUMMARY_LAST__ = summary;
+      if (!Array.isArray(scope.__CLOCK_RECON_SUMMARY_BUFFER__)) {
+        scope.__CLOCK_RECON_SUMMARY_BUFFER__ = [];
+      }
+      scope.__CLOCK_RECON_SUMMARY_BUFFER__.push(summary);
+      if (scope.__CLOCK_RECON_SUMMARY_BUFFER__.length > 50) {
+        scope.__CLOCK_RECON_SUMMARY_BUFFER__.splice(
+          0,
+          scope.__CLOCK_RECON_SUMMARY_BUFFER__.length - 50
+        );
+      }
+    } catch (_) {
+      // no-op
+    }
+    const emit = this.scene?.events?.emit;
+    if (typeof emit === "function") {
+      emit.call(this.scene.events, "animTelemetry", summary);
+      if (!summary.meetsWarnPromotionGate) {
+        emit.call(this.scene.events, "animTelemetry", {
+          ...summary,
+          event: "clock_contract_reconciliation_threshold_breach",
+        });
+      }
+    }
+  }
+
+  emitClockObserveParityTelemetry(turnData, context = {}) {
+    const emit = this.scene?.events?.emit;
+    if (typeof emit !== "function") return;
+    const mode = this.resolveClockAuthorityMode(
+      turnData,
+      context.clockAuthorityMode
+    );
+    if (mode === "off") return;
+    const clockEventLedger = Array.isArray(context.clockEventLedger)
+      ? context.clockEventLedger
+      : Array.isArray(turnData?.clock_event_ledger)
+        ? turnData.clock_event_ledger
+        : [];
+    const hasValidLedger = clockEventLedger.length > 0;
+    const feElapsedFromLedger = this.deriveClockElapsedFromLedger(clockEventLedger);
+    const feElapsed = hasValidLedger ? feElapsedFromLedger : null;
+    const beElapsed = Number(turnData?.uess_clock_elapsed_game_seconds);
+    const legacyElapsed = Number(
+      turnData?.uess_clock_elapsed_legacy_game_seconds ??
+      turnData?.time_elapsed ??
+      turnData?.timeElapsed ??
+      0
+    );
+    const toleranceSeconds = this.resolveClockReconToleranceSeconds(turnData);
+    const deltaSeconds =
+      Number.isFinite(beElapsed) && Number.isFinite(feElapsed) ? feElapsed - beElapsed : null;
+    const withinTolerance =
+      Number.isFinite(deltaSeconds)
+        ? Math.abs(deltaSeconds) <= toleranceSeconds
+        : null;
+    const basePayload = {
+      event: "clock_contract_event_applied",
+      branchKind: "clock_contract",
+      turnId: turnData?.turn_count ?? turnData?.id ?? null,
+      turnIndex: turnData?.index ?? this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      gameClock: this.scene?.simData?.clock ?? null,
+      quarter: turnData?.quarter ?? this.scene?.quarter ?? null,
+      timestampMs: Date.now(),
+      mode,
+      clockEventCount: clockEventLedger.length,
+      feElapsedGameSeconds: Number.isFinite(feElapsed) ? Number(feElapsed) : null,
+      beElapsedGameSeconds: Number.isFinite(beElapsed) ? Number(beElapsed) : null,
+      legacyElapsedGameSeconds: Number.isFinite(legacyElapsed)
+        ? Number(legacyElapsed)
+        : null,
+      deltaSeconds: Number.isFinite(deltaSeconds) ? Number(deltaSeconds) : null,
+      toleranceSeconds: Number(toleranceSeconds),
+      withinTolerance,
+      feElapsedSource: hasValidLedger ? "clock_event_ledger" : "missing_clock_event_ledger",
+      missingClockEventLedger: !hasValidLedger,
+      clockStart: Number.isFinite(context.clockStart) ? Number(context.clockStart) : null,
+      clockEnd: Number.isFinite(context.clockEnd) ? Number(context.clockEnd) : null,
+      shotClockStart: Number.isFinite(context.shotClockStart)
+        ? Number(context.shotClockStart)
+        : null,
+      shotClockEnd: Number.isFinite(context.shotClockEnd)
+        ? Number(context.shotClockEnd)
+        : null,
+      realTimeElapsedMs: Number.isFinite(context.durationMs)
+        ? Number(context.durationMs)
+        : null,
+    };
+    const session = this.getClockReconSession();
+    session.rows += 1;
+    if (basePayload.withinTolerance === true) session.withTolerance += 1;
+    else if (basePayload.withinTolerance === false) session.outOfTolerance += 1;
+    else session.missingCompare += 1;
+    const absDelta = Math.abs(Number(basePayload.deltaSeconds));
+    if (Number.isFinite(absDelta)) {
+      session.absDeltaSum += absDelta;
+      session.maxAbsDelta = Math.max(session.maxAbsDelta, absDelta);
+    }
+    const rt = String(basePayload.resultType || "UNKNOWN");
+    session.byResultType[rt] = (session.byResultType[rt] || 0) + 1;
+
+    // Lightweight runtime mirror for local validation without event listeners.
+    // This is observe/debug only and has no gameplay effect.
+    const scope = (typeof window !== "undefined" && window) || globalThis;
+    try {
+      scope.__CLOCK_RECON_LAST__ = { ...basePayload };
+      if (!Array.isArray(scope.__CLOCK_RECON_BUFFER__)) {
+        scope.__CLOCK_RECON_BUFFER__ = [];
+      }
+      scope.__CLOCK_RECON_BUFFER__.push({ ...basePayload });
+      if (scope.__CLOCK_RECON_BUFFER__.length > 50) {
+        scope.__CLOCK_RECON_BUFFER__.splice(0, scope.__CLOCK_RECON_BUFFER__.length - 50);
+      }
+
+      // Ownership contract mirror/session summary is maintained here as well so
+      // it is emitted from the same always-on path as clock reconciliation.
+      // For BATCH wrappers, evaluate ownership per sub-turn row and skip wrapper-only rows.
+      const ownershipRows =
+        turnData?.result_type === "BATCH" && Array.isArray(turnData?.batch_turns)
+          ? turnData.batch_turns
+          : [turnData];
+      const defaultOwnershipMode =
+        turnData?.uess_ownership_contract_mode ??
+        turnData?.uess_ownership_contract?.mode ??
+        scope?.UESS_OWNERSHIP_CONTRACT_MODE ??
+        "warn";
+
+      for (const ownershipRow of ownershipRows) {
+        if (!ownershipRow || typeof ownershipRow !== "object") continue;
+        const ownershipContract = ownershipRow?.uess_ownership_contract;
+        if (
+          !ownershipContract &&
+          String(ownershipRow?.result_type || "").toUpperCase() === "BATCH"
+        ) {
+          continue;
+        }
+        const resolvedOwnershipMode =
+          ownershipRow?.uess_ownership_contract_mode ??
+          ownershipContract?.mode ??
+          defaultOwnershipMode ??
+          "warn";
+        const ownershipSnapshot = {
+          resultType: ownershipRow?.result_type ?? null,
+          mode: String(resolvedOwnershipMode ?? "warn"),
+          applicable:
+            typeof ownershipContract?.applicable === "boolean"
+              ? ownershipContract.applicable
+              : null,
+          passLifecycleValid:
+            typeof ownershipContract?.pass_lifecycle_valid === "boolean"
+              ? ownershipContract.pass_lifecycle_valid
+              : null,
+          passEventCount: Number(ownershipContract?.pass_event_count ?? 0) || 0,
+          validReceiptCount: Number(ownershipContract?.pass_receipt_valid_count ?? 0) || 0,
+          terminalOwnerPos: ownershipContract?.terminal_owner_pos ?? null,
+          timestampMs: Date.now(),
+        };
+        scope.__OWNERSHIP_CONTRACT_LAST__ = ownershipSnapshot;
+        if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_BUFFER__)) {
+          scope.__OWNERSHIP_CONTRACT_BUFFER__ = [];
+        }
+        scope.__OWNERSHIP_CONTRACT_BUFFER__.push(ownershipSnapshot);
+        if (scope.__OWNERSHIP_CONTRACT_BUFFER__.length > 100) {
+          scope.__OWNERSHIP_CONTRACT_BUFFER__.splice(
+            0,
+            scope.__OWNERSHIP_CONTRACT_BUFFER__.length - 100
+          );
+        }
+
+        const ownershipSummaryEvery = Math.max(
+          1,
+          Math.floor(Number(scope.UESS_OWNERSHIP_SUMMARY_EVERY ?? 10) || 10)
+        );
+        if (!scope.__OWNERSHIP_CONTRACT_SESSION__) {
+          scope.__OWNERSHIP_CONTRACT_SESSION__ = {
+            rows: 0,
+            applicableRows: 0,
+            invalidRows: 0,
+            missingContractRows: 0,
+          };
+        }
+        const ownershipSession = scope.__OWNERSHIP_CONTRACT_SESSION__;
+        ownershipSession.rows += 1;
+        if (ownershipSnapshot.applicable === true) {
+          ownershipSession.applicableRows += 1;
+          if (ownershipSnapshot.passLifecycleValid === false) {
+            ownershipSession.invalidRows += 1;
+          }
+        } else if (ownershipSnapshot.applicable === null) {
+          ownershipSession.missingContractRows += 1;
+        }
+
+        if (ownershipSession.rows % ownershipSummaryEvery === 0) {
+          const applicableRows = ownershipSession.applicableRows;
+          const invalidRows = ownershipSession.invalidRows;
+          const invalidApplicableRate =
+            applicableRows > 0 ? Number((invalidRows / applicableRows).toFixed(4)) : 0;
+          const thresholds = {
+            minRows: Math.max(
+              1,
+              Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MIN_ROWS ?? 40) || 40)
+            ),
+            invalidApplicableRateMax: Math.max(
+              0,
+              Number(scope.UESS_OWNERSHIP_WARN_INVALID_APPLICABLE_RATE_MAX ?? 0.02) || 0.02
+            ),
+            missingContractRowsMax: Math.max(
+              0,
+              Math.floor(Number(scope.UESS_OWNERSHIP_WARN_MISSING_CONTRACT_ROWS_MAX ?? 0) || 0)
+            ),
+          };
+          const hasEnoughRows = ownershipSession.rows >= thresholds.minRows;
+          const meetsWarnPromotionGate =
+            hasEnoughRows &&
+            invalidApplicableRate <= thresholds.invalidApplicableRateMax &&
+            ownershipSession.missingContractRows <= thresholds.missingContractRowsMax;
+          const summary = {
+            event: "ownership_contract_summary",
+            mode: ownershipSnapshot.mode,
+            rows: ownershipSession.rows,
+            applicableRows,
+            invalidRows,
+            invalidApplicableRate,
+            missingContractRows: ownershipSession.missingContractRows,
+            thresholds,
+            hasEnoughRows,
+            meetsWarnPromotionGate,
+            timestampMs: Date.now(),
+          };
+          scope.__OWNERSHIP_CONTRACT_SUMMARY_LAST__ = summary;
+          if (!Array.isArray(scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__)) {
+            scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__ = [];
+          }
+          scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.push(summary);
+          if (scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length > 50) {
+            scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.splice(
+              0,
+              scope.__OWNERSHIP_CONTRACT_SUMMARY_BUFFER__.length - 50
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // no-op: debug mirror should never break animation flow
+    }
+
+    emit.call(this.scene.events, "animTelemetry", basePayload);
+
+    if (!hasValidLedger) {
+      emit.call(this.scene.events, "animTelemetry", {
+        ...basePayload,
+        event: "clock_contract_missing_ledger",
+      });
+      if (mode === "warn") {
+        console.warn("[CLOCK CONTRACT] missing clock_event_ledger", {
+          resultType: basePayload.resultType,
+          turnId: basePayload.turnId,
+          turnIndex: basePayload.turnIndex,
+        });
+      } else if (mode === "throw") {
+        throw new Error(
+          `[CLOCK contract] missing clock_event_ledger (result=${basePayload.resultType ?? "?"}, turn=${basePayload.turnId ?? "?"})`
+        );
+      }
+    }
+
+    if (withinTolerance === true) {
+      emit.call(this.scene.events, "animTelemetry", {
+        ...basePayload,
+        event: "clock_contract_reconciliation_pass",
+      });
+    } else if (withinTolerance === false) {
+      emit.call(this.scene.events, "animTelemetry", {
+        ...basePayload,
+        event: "clock_contract_reconciliation_fail",
+      });
+      if (mode === "warn") {
+        console.warn(
+          "[CLOCK CONTRACT] reconciliation fail",
+          {
+            resultType: basePayload.resultType,
+            turnId: basePayload.turnId,
+            turnIndex: basePayload.turnIndex,
+            feElapsed: basePayload.feElapsedGameSeconds,
+            beElapsed: basePayload.beElapsedGameSeconds,
+            deltaSeconds: basePayload.deltaSeconds,
+            toleranceSeconds: basePayload.toleranceSeconds,
+          }
+        );
+      } else if (mode === "throw") {
+        throw new Error(
+          `[CLOCK contract] reconciliation fail (result=${basePayload.resultType ?? "?"}, turn=${basePayload.turnId ?? "?"}, feElapsed=${basePayload.feElapsedGameSeconds}, beElapsed=${basePayload.beElapsedGameSeconds}, delta=${basePayload.deltaSeconds}, tolerance=${basePayload.toleranceSeconds})`
+        );
+      }
+    }
+    this.emitClockReconSummaryIfNeeded(basePayload);
   }
 
   /**
