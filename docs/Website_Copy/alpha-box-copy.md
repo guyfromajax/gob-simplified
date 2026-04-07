@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **March 20 Update** Added training notes to training report. Added Player Maximizer training functionality. Added projected starting lineup to Scouting Report. Improved autoset lineup logic for both user and computer teams.
+- **April 6 Update** Added AG-based player speed. Added more Fast Break plays. Added more realist & detailed fouls. Tigher sync of game clock to animation and game logic. Fixed player clamping.
 
 Source:
 - `FrontEnd/static/mode-select.html`
