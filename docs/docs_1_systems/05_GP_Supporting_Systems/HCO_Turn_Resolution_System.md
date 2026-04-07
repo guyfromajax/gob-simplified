@@ -1136,6 +1136,34 @@ When a defensive rebound (DREB) transitions to an HCO turn, the outlet pass exec
 - `FrontEnd/static/js/phaser/animation/fastBreak.js` - `animateOutletPhase()` (Fast Break outlet pass)
 - `FrontEnd/static/js/phaser/animation/animateGameTurns.js` - `handleOrebTurn()` (calls outlet setup for HCO)
 
+### HCO Step 0 Entry Handoff ✅ **NEW** (April 2026)
+
+**Design Pattern:**
+When entering an `HCO` skeleton turn, if the live ball owner carried over from the previous turn is **not** the intended **step 0 ball handler**, the frontend does **not** teleport the ball to the step 0 handler at turn start.
+
+Instead:
+1. All players move to their normal **step 0** animation locations.
+2. The current live owner keeps the ball during that step 0 movement.
+3. Once the intended **step 0** handler reaches his step 0 location, the system animates a real pass from the current owner to that step 0 handler.
+4. Step 1 then begins normally.
+
+**Why This Exists:**
+- Some transitions into HCO already have a live ball owner from the prior turn.
+- This includes inbound-driven entries such as pressure-break outcomes (`FCP` / `HCT` → `HCO`) and stopped Fast Breaks.
+- The intended first HCO handler is still defined by **step 0** in the skeleton.
+- Animating the pass after step 0 settlement avoids visible ball teleports while preserving the normal HCO skeleton structure.
+
+**Clock / UESS Rule:**
+- This handoff is part of the **step 0 lead-in**, not a separate free-floating transition.
+- The step 0 lead-in budget covers:
+  - movement to step 0 positions
+  - the entry pass when needed
+
+**Implementation:**
+- **Location:** `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+- **Rule Scope:** `HCO` only
+- **Helper:** `runStep0EntryPassIfNeeded()`
+
 ### Screener Offset Coordinate System ✅ **NEW** (January 2025)
 
 **Purpose:**

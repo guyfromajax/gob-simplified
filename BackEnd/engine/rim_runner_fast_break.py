@@ -10,13 +10,16 @@ import logging
 import random
 from typing import Any, Dict, List, Optional, Tuple
 
-from BackEnd.constants.fast_break_play_types import RIM_RUNNER
+from BackEnd.constants import AWAY_RIM_COORDS, HCO_STRING_SPOTS, HOME_RIM_COORDS
+from BackEnd.constants.fast_break_play_types import RIM_RUNNER, TRIANGLE
 from BackEnd.models.animator import Animator
 from BackEnd.utils.shared import (
     apply_coords_from_animations_list,
     calculate_outlet_pass_score,
+    get_away_player_coords,
     unpack_game_context,
 )
+from BackEnd.utils.shared_defense import calculate_defender_coords
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
     build_fast_break_pre_shot_snapshot,
@@ -30,6 +33,440 @@ from BackEnd.engine.phase_resolution import (
 )
 
 logger = logging.getLogger(__name__)
+
+TRIANGLE_LANE_TARGETS = (
+    "lower lowPost",
+    "upper lowPost",
+    "lower midPost",
+    "upper midPost",
+    "lower highPost",
+    "upper highPost",
+    "basketSpot",
+    "midLane",
+    "topLane",
+    "lower bird",
+    "upper bird",
+    "lower apex",
+    "upper apex",
+)
+
+
+def _spot_coords(spot: str, is_away_offense: bool) -> Dict[str, float]:
+    coords = dict(HCO_STRING_SPOTS.get(spot, {"x": 50, "y": 25}))
+    if is_away_offense:
+        coords = get_away_player_coords(coords)
+    return {"x": float(coords["x"]), "y": float(coords["y"])}
+
+
+def _triangle_half_from_y(y: float) -> str:
+    return "upper" if float(y) > 25.0 else "lower"
+
+
+def _triangle_same_half_spot(prefix: str, half: str) -> str:
+    return f"{half} {prefix}"
+
+
+def _triangle_other_half(half: str) -> str:
+    return "lower" if half == "upper" else "upper"
+
+
+def _player_dict_coords(player: Any) -> Dict[str, float]:
+    return {"x": _player_x(player), "y": _player_y(player)}
+
+
+def _resolve_triangle_offense_roles(
+    off_lineup: Dict[str, Any],
+    *,
+    rim_runner: Any,
+    ball_handler: Any,
+    rebounder: Any,
+    is_away_offense: bool,
+) -> Dict[str, Any]:
+    rr_id = str(getattr(rim_runner, "player_id", None)) if rim_runner else None
+    bh_id = str(getattr(ball_handler, "player_id", None)) if ball_handler else None
+    reb_id = str(getattr(rebounder, "player_id", None)) if rebounder else None
+    offense_players = [p for p in off_lineup.values() if p is not None]
+
+    corner_candidates = []
+    for player in offense_players:
+        pid = str(getattr(player, "player_id", None))
+        if pid in {rr_id, bh_id, reb_id}:
+            continue
+        corner_candidates.append(player)
+
+    basket_x = _basket_x_for_offense(is_away_offense)
+    if len(corner_candidates) < 2:
+        pool = [p for p in offense_players if str(getattr(p, "player_id", None)) not in {rr_id, bh_id}]
+        pool.sort(key=lambda p: abs(_player_x(p) - basket_x))
+        corner_candidates = pool[:2]
+
+    corner_candidates = corner_candidates[:2]
+    trailer = rebounder
+    if trailer is None or str(getattr(trailer, "player_id", None)) == bh_id:
+        trailer_pool = [
+            p for p in offense_players
+            if str(getattr(p, "player_id", None)) not in {rr_id, bh_id}
+            and all(str(getattr(p, "player_id", None)) != str(getattr(cp, "player_id", None)) for cp in corner_candidates)
+        ]
+        trailer = trailer_pool[0] if trailer_pool else rebounder
+
+    if len(corner_candidates) == 2:
+        c0, c1 = corner_candidates
+        y0, y1 = _player_y(c0), _player_y(c1)
+        if y0 < y1:
+            lower_corner, upper_corner = c0, c1
+        elif y1 < y0:
+            lower_corner, upper_corner = c1, c0
+        else:
+            lower_corner, upper_corner = random.sample(corner_candidates, 2)
+    else:
+        lower_corner = upper_corner = corner_candidates[0] if corner_candidates else None
+
+    return {
+        "lower_corner": lower_corner,
+        "upper_corner": upper_corner,
+        "trailer": trailer,
+    }
+
+
+def _resolve_triangle_setup_payload(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    ball_handler: Any,
+    rim_runner: Any,
+    rebounder: Any,
+    is_away_offense: bool,
+    fb_opp: int,
+) -> Dict[str, Any]:
+    offense_roles = _resolve_triangle_offense_roles(
+        off_lineup,
+        rim_runner=rim_runner,
+        ball_handler=ball_handler,
+        rebounder=rebounder,
+        is_away_offense=is_away_offense,
+    )
+    bh_half = _triangle_half_from_y(_player_y(ball_handler))
+    other_half = _triangle_other_half(bh_half)
+    bh_spot = _triangle_same_half_spot("wing", bh_half)
+    rr_spot = _triangle_same_half_spot("lowPost", bh_half)
+    trailer_spot = _triangle_same_half_spot("wing", other_half)
+    lower_corner_spot = "lower corner"
+    upper_corner_spot = "upper corner"
+
+    corners = []
+    if offense_roles["lower_corner"] is not None:
+        corners.append(
+            {
+                "player_id": getattr(offense_roles["lower_corner"], "player_id", None),
+                "spot": lower_corner_spot,
+                "to": _spot_coords(lower_corner_spot, is_away_offense),
+                "burst": True,
+            }
+        )
+    if offense_roles["upper_corner"] is not None:
+        corners.append(
+            {
+                "player_id": getattr(offense_roles["upper_corner"], "player_id", None),
+                "spot": upper_corner_spot,
+                "to": _spot_coords(upper_corner_spot, is_away_offense),
+                "burst": True,
+            }
+        )
+
+    bh_to = _spot_coords(bh_spot, is_away_offense)
+    rr_to = _spot_coords(rr_spot, is_away_offense)
+    trailer = offense_roles["trailer"]
+    trailer_to = _spot_coords(trailer_spot, is_away_offense) if trailer is not None else None
+
+    defense_players = [p for p in def_lineup.values() if p is not None]
+    basket_x = _basket_x_for_offense(is_away_offense)
+    defense_sorted = sorted(defense_players, key=lambda d: abs(_player_x(d) - basket_x))
+    rr_defender = defense_sorted[0] if defense_sorted else None
+    bh_defender = defense_sorted[1] if len(defense_sorted) > 1 else None
+    helper_defenders = defense_sorted[2:]
+    target_basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+    rr_def_to = None
+    bh_def_to = None
+    if rr_defender is not None:
+        rr_def_to = calculate_defender_coords(
+            rr_to,
+            target_basket,
+            "normal",
+            spot=rr_spot,
+            ball_handler_coords=bh_to,
+            is_ball_handler=False,
+            ball_spot=bh_spot,
+        )
+    if bh_defender is not None:
+        bh_def_to = calculate_defender_coords(
+            bh_to,
+            target_basket,
+            "normal",
+            spot=bh_spot,
+            ball_handler_coords=bh_to,
+            is_ball_handler=True,
+            ball_spot=bh_spot,
+        )
+
+    helper_moves = []
+    helper_burst = fb_opp > 5
+    for defender in helper_defenders:
+        lane_spot = random.choice(TRIANGLE_LANE_TARGETS)
+        helper_moves.append(
+            {
+                "player_id": getattr(defender, "player_id", None),
+                "spot": lane_spot,
+                "to": _spot_coords(lane_spot, is_away_offense),
+                "burst": helper_burst,
+            }
+        )
+
+    same_side_corner = next((c for c in corners if c["spot"].startswith(bh_half)), None)
+    opposite_side_corner = next((c for c in corners if not c["spot"].startswith(bh_half)), None)
+
+    return {
+        "is_away_offense": is_away_offense,
+        "same_side": bh_half,
+        "ball_handler_id": getattr(ball_handler, "player_id", None),
+        "ball_handler_spot": bh_spot,
+        "ball_handler_to": bh_to,
+        "rim_runner_id": getattr(rim_runner, "player_id", None),
+        "rim_runner_spot": rr_spot,
+        "rim_runner_to": rr_to,
+        "trailer_id": getattr(trailer, "player_id", None) if trailer is not None else None,
+        "trailer_spot": trailer_spot,
+        "trailer_to": trailer_to,
+        "corner_players": corners,
+        "same_side_corner_id": same_side_corner["player_id"] if same_side_corner else None,
+        "same_side_corner_spot": same_side_corner["spot"] if same_side_corner else None,
+        "same_side_corner_to": same_side_corner["to"] if same_side_corner else None,
+        "opposite_side_corner_id": opposite_side_corner["player_id"] if opposite_side_corner else None,
+        "opposite_side_corner_spot": opposite_side_corner["spot"] if opposite_side_corner else None,
+        "opposite_side_corner_to": opposite_side_corner["to"] if opposite_side_corner else None,
+        "rr_defender_id": getattr(rr_defender, "player_id", None) if rr_defender else None,
+        "rr_defender_to": rr_def_to,
+        "bh_defender_id": getattr(bh_defender, "player_id", None) if bh_defender else None,
+        "bh_defender_to": bh_def_to,
+        "helper_defenders": helper_moves,
+    }
+
+
+def _triangle_find_player(lineup: Dict[str, Any], player_id: Any) -> Optional[Any]:
+    pid_s = str(player_id) if player_id is not None else None
+    for player in lineup.values():
+        if player is not None and str(getattr(player, "player_id", None)) == pid_s:
+            return player
+    return None
+
+
+def _triangle_apply_coords(player: Any, coords: Optional[Dict[str, float]]) -> None:
+    if player is None or not isinstance(coords, dict):
+        return
+    player.coords = {"x": float(coords["x"]), "y": float(coords["y"])}
+
+
+def _triangle_commit_setup_positions(
+    setup_payload: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    for key in ("ball_handler_id", "rim_runner_id", "trailer_id"):
+        player = _triangle_find_player(off_lineup, setup_payload.get(key))
+        coords = setup_payload.get(key.replace("_id", "_to"))
+        _triangle_apply_coords(player, coords)
+
+    for corner in setup_payload.get("corner_players", []):
+        _triangle_apply_coords(
+            _triangle_find_player(off_lineup, corner.get("player_id")),
+            corner.get("to"),
+        )
+
+    for key in ("rr_defender_id", "bh_defender_id"):
+        player = _triangle_find_player(def_lineup, setup_payload.get(key))
+        coords = setup_payload.get(key.replace("_id", "_to"))
+        _triangle_apply_coords(player, coords)
+
+    for helper in setup_payload.get("helper_defenders", []):
+        _triangle_apply_coords(
+            _triangle_find_player(def_lineup, helper.get("player_id")),
+            helper.get("to"),
+        )
+
+
+def _triangle_distance(a: Dict[str, float], b: Dict[str, float]) -> float:
+    return ((float(a["x"]) - float(b["x"])) ** 2 + (float(a["y"]) - float(b["y"])) ** 2) ** 0.5
+
+
+def _triangle_corner_shot_defender(def_lineup: Dict[str, Any], shooter_coords: Dict[str, float]) -> Optional[Any]:
+    best = None
+    best_dist = float("inf")
+    for defender in def_lineup.values():
+        if defender is None:
+            continue
+        dist = _triangle_distance(_player_dict_coords(defender), shooter_coords)
+        if dist <= 6.0 and dist < best_dist:
+            best = defender
+            best_dist = dist
+    return best
+
+
+def _triangle_build_turn_result(
+    *,
+    game: Any,
+    game_state: dict,
+    off_team: Any,
+    def_team: Any,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    ball_handler: Any,
+    rim_runner: Any,
+    setup_payload: Dict[str, Any],
+    branch: str,
+    fb_open: bool,
+    custom_corner_override: bool = False,
+) -> Dict[str, Any]:
+    animator = Animator(game)
+    fb_roles["triangle_sequence"] = True
+    fb_roles["triangle_branch"] = branch
+    fb_roles["triangle_setup_phase"] = setup_payload
+    _triangle_commit_setup_positions(setup_payload, off_lineup, def_lineup)
+
+    same_side_corner_id = setup_payload.get("same_side_corner_id")
+    same_side_corner = _triangle_find_player(off_lineup, same_side_corner_id)
+    ball_handler_spot = setup_payload.get("ball_handler_spot")
+    rim_runner_spot = setup_payload.get("rim_runner_spot")
+    same_side_corner_spot = setup_payload.get("same_side_corner_spot")
+    shot_roles: Dict[str, Any]
+
+    if branch == "triangle_rr_post":
+        shooter = rim_runner
+        passer = ball_handler
+        shot_type = "inside"
+        shooter_spot = rim_runner_spot
+        defender = _triangle_find_player(def_lineup, setup_payload.get("rr_defender_id"))
+        shot_spot = setup_payload.get("rim_runner_to")
+    elif branch == "triangle_corner_three":
+        shooter = same_side_corner
+        passer = ball_handler
+        shot_type = "outside"
+        shooter_spot = same_side_corner_spot
+        shot_spot = setup_payload.get("same_side_corner_to")
+        defender = _triangle_corner_shot_defender(def_lineup, shot_spot)
+    elif branch == "triangle_bh_wing_three":
+        shooter = ball_handler
+        passer = None
+        shot_type = "outside"
+        shooter_spot = ball_handler_spot
+        shot_spot = setup_payload.get("ball_handler_to")
+        defender = _triangle_find_player(def_lineup, setup_payload.get("bh_defender_id"))
+    elif branch == "triangle_bh_drive":
+        drive_to = _spot_coords(_triangle_same_half_spot("lowPost", setup_payload["same_side"]), setup_payload["is_away_offense"])
+        mid_lane = _spot_coords("midLane", setup_payload["is_away_offense"])
+        _triangle_apply_coords(ball_handler, drive_to)
+        _triangle_apply_coords(rim_runner, mid_lane)
+        setup_payload["triangle_drive_to"] = drive_to
+        setup_payload["triangle_rr_drive_to"] = mid_lane
+        shooter = ball_handler
+        passer = None
+        shot_type = "attack"
+        shooter_spot = _triangle_same_half_spot("lowPost", setup_payload["same_side"])
+        shot_spot = drive_to
+        defender = _triangle_find_player(def_lineup, setup_payload.get("bh_defender_id"))
+    elif branch == "triangle_drive_rr_feed":
+        drive_to = _spot_coords(_triangle_same_half_spot("lowPost", setup_payload["same_side"]), setup_payload["is_away_offense"])
+        mid_lane = _spot_coords("midLane", setup_payload["is_away_offense"])
+        _triangle_apply_coords(ball_handler, drive_to)
+        _triangle_apply_coords(rim_runner, mid_lane)
+        setup_payload["triangle_drive_to"] = drive_to
+        setup_payload["triangle_rr_drive_to"] = mid_lane
+        shooter = rim_runner
+        passer = ball_handler
+        shot_type = "inside"
+        shooter_spot = "midLane"
+        shot_spot = mid_lane
+        defender = _triangle_find_player(def_lineup, setup_payload.get("rr_defender_id"))
+    elif branch == "triangle_drive_corner_kick":
+        drive_to = _spot_coords(_triangle_same_half_spot("lowPost", setup_payload["same_side"]), setup_payload["is_away_offense"])
+        mid_lane = _spot_coords("midLane", setup_payload["is_away_offense"])
+        _triangle_apply_coords(ball_handler, drive_to)
+        _triangle_apply_coords(rim_runner, mid_lane)
+        setup_payload["triangle_drive_to"] = drive_to
+        setup_payload["triangle_rr_drive_to"] = mid_lane
+        shooter = same_side_corner
+        passer = ball_handler
+        shot_type = "outside"
+        shooter_spot = same_side_corner_spot
+        shot_spot = setup_payload.get("same_side_corner_to")
+        defender = _triangle_corner_shot_defender(def_lineup, shot_spot)
+    else:
+        raise ValueError(f"Unsupported triangle branch: {branch}")
+
+    if shooter is None:
+        raise ValueError(f"Triangle branch missing shooter: {branch}")
+
+    shooter.coords = {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])}
+    defender_count = 1 if defender is not None else 0
+    fb_roles["ball_handler"] = ball_handler
+    fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
+    fb_roles["passer"] = passer
+    fb_roles["shooter"] = shooter
+    fb_roles["defender"] = defender
+    fb_roles["defender_count"] = defender_count
+
+    shot_roles = {
+        "shooter": shooter,
+        "passer": passer,
+        "screener": None,
+        "defender": defender,
+        "shot_type": shot_type,
+        "is_fast_break": True,
+        "motion_playcall": "Outside" if shot_type == "outside" else "Attack",
+        "defender_count": defender_count,
+        "shot_spot": {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+        "triangle_branch": branch,
+    }
+
+    if custom_corner_override:
+        game_state["fast_break_shot_threshold_override"] = 190 - int(
+            off_team.team_attributes.get("fb_efficiency", 0) or 0
+        )
+        game_state["fast_break_force_threshold_no_three_bonus"] = True
+    elif branch in {"triangle_rr_post", "triangle_drive_rr_feed"} and defender_count == 0:
+        game_state["fast_break_shot_threshold_override"] = 1
+
+    rr_snap_roles = {**shot_roles, "ball_handler": ball_handler}
+    rr_snap = build_fast_break_pre_shot_snapshot(
+        game, off_lineup, def_lineup, rr_snap_roles, "fb_triangle_pre_shot"
+    )
+    fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
+    turn_result = game.shot_manager.resolve_shot(shot_roles)
+    game_state.pop("fast_break_shot_threshold_override", None)
+    game_state.pop("fast_break_force_threshold_no_three_bonus", None)
+    attach_position_snapshots(turn_result, [rr_snap])
+    turn_result["animations"] = fb_animations
+    turn_result["roles"] = fb_roles
+    turn_result["fast_break"] = True
+    turn_result["fast_break_play"] = TRIANGLE
+    turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
+    turn_result["triangle_branch"] = branch
+    turn_result["triangle_sequence"] = True
+    _apply_rr_decision_metadata(turn_result, pass_attempted=False, fb_open=fb_open)
+    if turn_result.get("result_type") == "MAKE":
+        off_team.scouting_data["offense"]["Fast_Break_Success"] = (
+            off_team.scouting_data["offense"].get("Fast_Break_Success", 0) + 1
+        )
+        from BackEnd.constants.fast_break_play_types import ensure_fast_break_plays
+
+        ensure_fast_break_plays(off_team.scouting_data["offense"])[TRIANGLE]["S"] += 1
+    elif turn_result.get("result_type") == "MISS":
+        def_team.scouting_data["defense"]["vs_Fast_Break"]["success"] = (
+            def_team.scouting_data["defense"]["vs_Fast_Break"].get("success", 0) + 1
+        )
+    _record_fast_break_stats(fb_roles, turn_result, game)
+    apply_fast_break_cg_time(turn_result, shot_attempted=True)
+    return turn_result
 
 
 def _apply_rr_decision_metadata(payload: Dict[str, Any], *, pass_attempted: bool, fb_open: bool) -> None:
@@ -534,7 +971,10 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     else:
         burst_defense_score = 0.0
 
-    fb_open = burst_offense_score > burst_defense_score
+    if fb_play_key == TRIANGLE:
+        fb_open = (burst_offense_score * 0.6) > burst_defense_score
+    else:
+        fb_open = burst_offense_score > burst_defense_score
 
     # --- PG read (ball handler IQ) ---
     bh_attrs = getattr(ball_handler, "attributes", {})
@@ -553,6 +993,88 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             pass_attempted = random.choice([True, True, False])
         else:
             pass_attempted = random.choice([True, False])
+
+    if not pass_attempted and fb_play_key == TRIANGLE:
+        setup_payload = _resolve_triangle_setup_payload(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            ball_handler=ball_handler,
+            rim_runner=rr,
+            rebounder=rebounder,
+            is_away_offense=is_away_offense,
+            fb_opp=fb_opp,
+        )
+        fb_roles["triangle_sequence"] = True
+        fb_roles["triangle_setup_phase"] = setup_payload
+
+        decision = random.randint(1, 8)
+        branch = None
+        custom_corner_override = False
+        if decision in (1, 2):
+            branch = "triangle_rr_post"
+        elif decision == 3:
+            branch = "triangle_corner_three"
+            custom_corner_override = True
+        elif decision == 4:
+            branch = "triangle_bh_wing_three"
+        elif decision in (5, 6):
+            drive_decision = random.randint(1, 5)
+            setup_payload["triangle_drive_decision"] = drive_decision
+            if drive_decision in (1, 2):
+                branch = "triangle_bh_drive"
+            elif drive_decision in (3, 4):
+                branch = "triangle_drive_rr_feed"
+            else:
+                branch = "triangle_drive_corner_kick"
+                custom_corner_override = True
+        else:
+            game_state["offensive_state"] = "HCO"
+            animator = Animator(game)
+            animations = animator.capture_fast_break_animation(fb_roles, False, None)
+            result = {
+                "result_type": "DEFENSIVE_STOP",
+                "ball_handler": ball_handler,
+                "defender": primary_def,
+                "text": "Fast Break! Triangle — flowing into half court.",
+                "possession_flips": False,
+                "time_elapsed": 0,
+                "animations": animations,
+                "current_turn": "FAST_BREAK",
+                "next_play_type": "HCO",
+                "next_turn": "HCO",
+                "offense_team_id": off_team.team_id,
+                "roles": fb_roles,
+                "fast_break": True,
+                "fast_break_play": fb_play_key,
+                "triangle_enter_hco": True,
+                "triangle_sequence": True,
+                "triangle_branch": "triangle_enter_hco",
+                "rim_runner_fb_open": fb_open,
+                "rim_runner_correct_read": correct_read,
+                "rim_runner_no_lane_pass": True,
+            }
+            _apply_rr_decision_metadata(result, pass_attempted=False, fb_open=fb_open)
+            _record_fast_break_stats(fb_roles, result, game)
+            apply_fast_break_cg_time(result, shot_attempted=False)
+            return result
+
+        setup_payload["triangle_branch"] = branch
+        setup_payload["triangle_decision_roll"] = decision
+        return _triangle_build_turn_result(
+            game=game,
+            game_state=game_state,
+            off_team=off_team,
+            def_team=def_team,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            fb_roles=fb_roles,
+            ball_handler=ball_handler,
+            rim_runner=rr,
+            setup_payload=setup_payload,
+            branch=branch,
+            fb_open=fb_open,
+            custom_corner_override=custom_corner_override,
+        )
 
     if not pass_attempted:
         game_state["offensive_state"] = "HCO"

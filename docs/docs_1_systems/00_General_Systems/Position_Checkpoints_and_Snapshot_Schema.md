@@ -96,7 +96,7 @@ Fast break is resolved along **two disjoint entry paths** in code:
 | **Standard / Covert Release / steal-initiated** | `resolve_fast_break_logic` | `BackEnd/engine/phase_resolution.py` |
 | **Rim Runner (and Thirty-Two on DREB)** | `resolve_rim_runner_fast_break` | `BackEnd/engine/rim_runner_fast_break.py` |
 
-`resolve_fast_break_logic` **returns early** into `resolve_rim_runner_fast_break` when `rebound` and `fb_play_key in (RIM_RUNNER, FULL_TEAM)` (see `phase_resolution.py` around the Rim Runner branch). So a given turn uses **one** of these functions end-to-end, not both.
+`resolve_fast_break_logic` **returns early** into `resolve_rim_runner_fast_break` when `rebound` and `fb_play_key in (RIM_RUNNER, TRIANGLE)` (see `phase_resolution.py` around the Rim Runner branch). So a given turn uses **one** of these functions end-to-end, not both.
 
 Use **`phase`** strings below in snapshot checkpoints. Prefer the **code anchor** column when wiring the ledger so names stay traceable in reviews.
 

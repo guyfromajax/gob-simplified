@@ -24,6 +24,7 @@ import { getPlayerDuration } from './turnAnimation.js';
 import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
+import { runPass } from './ballTween.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -62,6 +63,43 @@ export class ShotAnimationSystem {
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Initialized');
     }
+  }
+
+  async runStep0EntryPassIfNeeded(ballSprite, currentBallOwnerRef, liveOwnerId, step0OwnerId) {
+    if (liveOwnerId == null || step0OwnerId == null) return false;
+    const fromId = String(liveOwnerId);
+    const toId = String(step0OwnerId);
+    if (!fromId || !toId || fromId === toId) return false;
+    const fromSprite = this.playerSprites?.[fromId];
+    const toSprite = this.playerSprites?.[toId];
+    if (!fromSprite || !toSprite) return false;
+
+    const {
+      attachBallToPlayer,
+      setCurrentOwner,
+      clearPendingOwner,
+    } = await import('./BallControllerAdapter.js');
+    const { setBallHolderId } = await import('./ballAnimationSimple.js');
+
+    attachBallToPlayer(this.scene, ballSprite, fromSprite, { reason: 'final_turn_step0_entry_pass_start' });
+    currentBallOwnerRef.value = fromSprite;
+    setBallHolderId(this.scene, fromId);
+    setCurrentOwner(this.scene, fromId);
+    clearPendingOwner(this.scene);
+
+    await runPass(this.scene, {
+      fromId,
+      toId,
+      endCoords: { x: toSprite.x, y: toSprite.y },
+      easing: 'Sine.easeInOut',
+    });
+
+    attachBallToPlayer(this.scene, ballSprite, toSprite, { reason: 'final_turn_step0_entry_pass_complete' });
+    currentBallOwnerRef.value = toSprite;
+    setBallHolderId(this.scene, toId);
+    setCurrentOwner(this.scene, toId);
+    clearPendingOwner(this.scene);
+    return true;
   }
 
   resolveOrebContractMode() {
@@ -257,9 +295,28 @@ export class ShotAnimationSystem {
             .map(anim => anim.movement.length)
         )
       : 0;
+    let step0OwnerId = null;
+    for (const anim of turnData.animations || []) {
+      if (anim?.hasBallAtStep?.[0]) {
+        step0OwnerId = anim.playerId != null ? String(anim.playerId) : null;
+        break;
+      }
+    }
+    const {
+      getCurrentOwner,
+      getPendingOwner,
+      updateBallOwnership,
+    } = await import('./BallControllerAdapter.js');
+    const liveOwnerId = getCurrentOwner(this.scene) ?? getPendingOwner(this.scene) ?? null;
+    const requiresStep0EntryPass =
+      turnData.final_turn === true &&
+      liveOwnerId != null &&
+      step0OwnerId != null &&
+      String(liveOwnerId) !== String(step0OwnerId);
     
-    // 1. Setup: Move players to step 0 positions (Phase 5: skip for Final Turn — alignment already done in Phase 4)
-    if (!turnData.final_turn) {
+    // 1. Setup: Move players to step 0 positions. Final Turn usually skips this because Phase 4
+    // already aligned players, but we still run it when a real step-0 handoff is required.
+    if (!turnData.final_turn || requiresStep0EntryPass) {
       await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
     } else {
       const delayMs = animationConfig?.finalTurn?.moveDelayMs ?? 0;
@@ -269,16 +326,17 @@ export class ShotAnimationSystem {
     }
     
     // ✅ MATCH playTurnAnimation EXACTLY: Update ball ownership at step 0
-    const { updateBallOwnership } = await import('./BallControllerAdapter.js');
-    updateBallOwnership({
-      scene: this.scene,
-      ballSprite,
-      animations: turnData.animations,
-      playerSprites: this.playerSprites,
-      stepIndex: 0,
-      offenseTeamId: this.scene.offenseTeamId ?? turnData.possession_team_id,
-      currentBallOwnerRef
-    });
+    if (!requiresStep0EntryPass) {
+      updateBallOwnership({
+        scene: this.scene,
+        ballSprite,
+        animations: turnData.animations,
+        playerSprites: this.playerSprites,
+        stepIndex: 0,
+        offenseTeamId: this.scene.offenseTeamId ?? turnData.possession_team_id,
+        currentBallOwnerRef
+      });
+    }
     
     // ✅ CRITICAL FIX: Match playTurnAnimation's ball attachment logic exactly
     // Determine which player owns the ball at step 0
@@ -293,7 +351,7 @@ export class ShotAnimationSystem {
     // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
     // Phase 5: Final Turn — ball already attached to ball handler in runFinalTurnAlignment.
     let step0OwnerSprite = null;
-    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip && !turnData.final_turn) {
+    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip && !turnData.final_turn && !requiresStep0EntryPass) {
       for (const anim of turnData.animations) {
         if (anim.hasBallAtStep?.[0]) {
           step0OwnerSprite = this.playerSprites[anim.playerId];
@@ -321,6 +379,14 @@ export class ShotAnimationSystem {
     }
     if (this.scene._previousTurnWasOpeningTip) {
       this.scene._previousTurnWasOpeningTip = false;
+    }
+    if (requiresStep0EntryPass) {
+      await this.runStep0EntryPassIfNeeded(
+        ballSprite,
+        currentBallOwnerRef,
+        liveOwnerId,
+        step0OwnerId,
+      );
     }
     
     // 3. Animate step-by-step player movement

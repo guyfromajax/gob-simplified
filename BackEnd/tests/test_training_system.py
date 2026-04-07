@@ -182,7 +182,7 @@ def test_training_system():
         "fast_break": {
             "covert_release": 34,
             "rim_runner": 33,
-            "full_team": 33
+            "triangle": 33
         },
         "set_play_inside": {
             "Inside Play 1": 100

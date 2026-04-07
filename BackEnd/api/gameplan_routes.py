@@ -515,9 +515,9 @@ def initialize_playbook_settings():
         )
 
         playbook_settings["fast_break"] = {
-            "covert_release": 50,
-            "rim_runner": 50,
-            "full_team": 0,
+            "covert_release": 33,
+            "rim_runner": 33,
+            "triangle": 34,
         }
         
         # Zone defense: Even distribution across all zone defenses
@@ -636,9 +636,9 @@ def initialize_playbook_settings():
             "set_play_attack": {},
             "set_play_outside": {},
             "fast_break": {
-                "covert_release": 50,
-                "rim_runner": 50,
-                "full_team": 0,
+                "covert_release": 33,
+                "rim_runner": 33,
+                "triangle": 34,
             },
             "zone_defense": {"2-3 Zone": 100},
             "man_defense": {"Man": 100},

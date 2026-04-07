@@ -553,7 +553,7 @@ class PlaybooksUI {
         this.fastBreakPercentages = this.savedPlaybookPercentages.fast_break || {
           covert_release: 50,
           rim_runner: 50,
-          full_team: 0
+          triangle: 0
         };
         console.log('🔍 [PLAYBOOKS LOAD] Loaded saved percentages from API:', this.savedPlaybookPercentages);
         console.log('🔍 [PLAYBOOKS LOAD] motion keys:', Object.keys(this.savedPlaybookPercentages.motion || {}));

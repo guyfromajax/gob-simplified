@@ -9,6 +9,27 @@ import { AnimationStates } from '../SimplifiedStateMachine.js';
 
 // Mock dependencies
 jest.mock('../SimplifiedStateMachine.js');
+const mockSynchronizeBallState = jest.fn();
+const mockAttachBallToPlayer = jest.fn();
+const mockGetBallController = jest.fn(() => ({
+  isAttached: false,
+  currentOwner: null,
+  isInFlight: false
+}));
+const mockAnimateRebound = jest.fn(async () => {});
+const mockRunDefensiveReboundSetup = jest.fn(async () => {});
+
+jest.mock('../BallControllerAdapter.js', () => ({
+  synchronizeBallState: mockSynchronizeBallState,
+  attachBallToPlayer: mockAttachBallToPlayer,
+  getBallController: mockGetBallController
+}));
+jest.mock('../ballManager.js', () => ({
+  animateRebound: mockAnimateRebound
+}));
+jest.mock('../turnAnimation.js', () => ({
+  runDefensiveReboundSetup: mockRunDefensiveReboundSetup
+}));
 jest.mock('../utils/debugFlags.js', () => ({
   DebugFlags: {
     FREE_THROW_ANIMATION: true
@@ -49,7 +70,8 @@ const createMockBallController = () => ({
 
 // Mock state machine
 const createMockStateMachine = () => ({
-  transitionTo: jest.fn()
+  transitionTo: jest.fn(),
+  transition: jest.fn()
 });
 
 // Mock player sprites
@@ -353,6 +375,70 @@ describe('FreeThrowAnimationSystem', () => {
           y: expect.any(Number),
           duration: ftSystem.ftConfig.bounceDuration,
           ease: ftSystem.ftConfig.bounceEase
+        })
+      );
+    });
+
+    test('should scrub stale state and attach rebounder on final missed FT DREB before HCO setup', async () => {
+      const turnData = createMockFreeThrowTurnData('MISS', {
+        attempt: 1,
+        total: 1
+      });
+      turnData.rebound_type = 'DREB';
+      turnData.next_play_type = 'HCO';
+      turnData.rebounderId = 'player2';
+
+      await ftSystem.handleFinalMissedFreeThrow(turnData, { grid: { x: 50, y: 25 } });
+
+      expect(mockSynchronizeBallState).toHaveBeenCalledWith(
+        mockScene,
+        expect.objectContaining({
+          clearShotState: true,
+          clearPutbackState: true,
+          clearPassState: true,
+          allowAttachment: true
+        })
+      );
+      expect(mockAnimateRebound).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scene: mockScene,
+          rebounderId: 'player2',
+          preserveBallPosition: true
+        })
+      );
+      expect(mockAttachBallToPlayer).toHaveBeenCalledWith(
+        mockScene,
+        mockBallController.ballSprite,
+        mockPlayerSprites.player2,
+        expect.objectContaining({
+          reason: 'ft_final_miss_dreb_pre_outlet'
+        })
+      );
+      expect(mockRunDefensiveReboundSetup).toHaveBeenCalled();
+    });
+
+    test('should use rebounder_player_id fallback for final missed FT DREB attach', async () => {
+      const turnData = createMockFreeThrowTurnData('MISS', {
+        attempt: 1,
+        total: 1
+      });
+      turnData.rebound_type = 'DREB';
+      turnData.next_play_type = 'HCO';
+      turnData.rebounder_player_id = 'player2';
+
+      await ftSystem.handleFinalMissedFreeThrow(turnData, { grid: { x: 50, y: 25 } });
+
+      expect(mockAnimateRebound).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rebounderId: 'player2'
+        })
+      );
+      expect(mockAttachBallToPlayer).toHaveBeenCalledWith(
+        mockScene,
+        mockBallController.ballSprite,
+        mockPlayerSprites.player2,
+        expect.objectContaining({
+          reason: 'ft_final_miss_dreb_pre_outlet'
         })
       );
     });
