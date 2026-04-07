@@ -939,21 +939,38 @@ async function animateRimRunnerOutletDeniedBeat(
   const defId = sid(phase?.outlet_defender_id);
   const defSprite = defId ? playerSprites[defId] : null;
   const rawPasserFallback = turnData.roles?.outlet_passer;
-  let passerId =
-    sid(phase?.outlet_passer_id) ??
-    sid(
-      rawPasserFallback != null && typeof rawPasserFallback === "object"
-        ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
-        : rawPasserFallback
-    );
-  if (!passerId) {
-    passerId = spriteIdFor(passerSprite);
-    if (passerId) {
-      logRrDenied(scene, "PASSER RECOVERY", {
-        mode: "sprite_match",
-        passerId,
-      });
-    }
+  const spriteDerivedPasserId = spriteIdFor(passerSprite);
+  const phasePasserId = sid(phase?.outlet_passer_id);
+  const rolesPasserId = sid(
+    rawPasserFallback != null && typeof rawPasserFallback === "object"
+      ? rawPasserFallback.player_id ?? rawPasserFallback.playerId
+      : rawPasserFallback
+  );
+  let passerId = spriteDerivedPasserId;
+  if (
+    spriteDerivedPasserId &&
+    ((phasePasserId && phasePasserId !== spriteDerivedPasserId) ||
+      (rolesPasserId && rolesPasserId !== spriteDerivedPasserId))
+  ) {
+    logRrDenied(scene, "PASSER MISMATCH", {
+      spriteDerivedPasserId,
+      phasePasserId,
+      rolesPasserId,
+    });
+  }
+  if (!passerId && phasePasserId) {
+    passerId = phasePasserId;
+    logRrDenied(scene, "PASSER RECOVERY", {
+      mode: "phase_payload",
+      passerId,
+    });
+  }
+  if (!passerId && rolesPasserId) {
+    passerId = rolesPasserId;
+    logRrDenied(scene, "PASSER RECOVERY", {
+      mode: "roles_payload",
+      passerId,
+    });
   }
   if (!passerId) {
     passerId = sid(getCurrentOwner(scene));
