@@ -1368,7 +1368,9 @@ async function runDefensiveReboundSetup({
     }
   }
   const drebOutletPassContract =
-    authorityTurn?.dreb_outlet_pass && typeof authorityTurn.dreb_outlet_pass === "object"
+    !isFastBreakMissDrebToHco &&
+    authorityTurn?.dreb_outlet_pass &&
+    typeof authorityTurn.dreb_outlet_pass === "object"
       ? authorityTurn.dreb_outlet_pass
       : null;
   const contractPasserId =
@@ -1510,6 +1512,7 @@ async function runDefensiveReboundSetup({
   const isHalfCourtSetup =
     nextPlayType === "HCO" || nextPlayType === "HCT" || nextPlayType === "FCP";
   const requiresDrebOutletPassContract =
+    !isFastBreakMissDrebToHco &&
     isHalfCourtSetup &&
     (authorityTurn?.result_type === "MISS" || authorityTurn?.result_type === "BLOCK") &&
     String(authorityTurn?.rebound_type || "").toUpperCase() === "DREB";

@@ -145,7 +145,7 @@ Every turn result from the backend contains data organized into **three distinct
 **Fast Break Results:**
 - `fast_break` - true flag
 - `roles` - {outlet_passer, outlet_receiver} - Fast break roles
-- **Fast Break miss → DREB → HCO handoff rule:** when a Fast Break shot misses and the defense secures a `DREB`, backend forces `next_play_type = "HCO"` and the frontend must transition into the standard `DREB -> HCO` outlet path. The outlet receiver for that handoff must **not** be inherited from the prior Fast Break shot roles / ball handler. Instead, the handoff resolves the receiver using the standard DREB outlet policy (PG-first, then same-team non-rebounder fallback) unless a dedicated `dreb_outlet_pass` contract is present.
+- **Fast Break miss → DREB → HCO handoff rule:** when a Fast Break shot misses and the defense secures a `DREB`, backend forces `next_play_type = "HCO"` and the frontend must transition into the standard `DREB -> HCO` outlet path. The outlet receiver for that handoff must **not** be inherited from the prior Fast Break shot roles / ball handler, and the prior Fast Break miss turn’s `dreb_outlet_pass` contract must not be used as the authority for the new half-court outlet. Instead, the handoff resolves the receiver using the standard DREB outlet policy (PG-first, then same-team non-rebounder fallback) and uses the normal rebounder-relative outlet target policy.
 
 **FCP/HCT Results:**
 - `fcp_foul` / `hct_foul` - Pressure foul flags
