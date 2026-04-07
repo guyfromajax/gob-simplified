@@ -45,7 +45,7 @@ from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
     COVERT_RELEASE,
     RIM_RUNNER,
-    FULL_TEAM,
+    TRIANGLE,
     play_key_for_fast_break_entry,
 )
 
@@ -464,7 +464,8 @@ class ShotManager:
         
         # Three-point threshold: 100 - (random(1-5) * momentum)
         # Higher momentum = easier three-pointers
-        if is_three:
+        skip_three_point_threshold = bool(game_state.pop("fast_break_force_threshold_no_three_bonus", False))
+        if is_three and not skip_three_point_threshold:
             momentum = off_team.team_attributes.get("momentum", 0)
             three_point_modifier = THREE_POINT_SHOT_THRESHOLD_INCREASE - (random.randint(1, 5) * momentum) 
             shot_threshold += three_point_modifier
@@ -901,7 +902,7 @@ class ShotManager:
         
         # DREB → Fast Break (HCO shots only): single roll on shot attempt using **rebounding team's**
         # `fast_breaks` (def_team here). No second roll for Covert — if eligible + Covert, pick release position.
-        # Play key from `play_key_for_fast_break_entry` — Rim Runner / Full Team: all crash.
+        # Play key from `play_key_for_fast_break_entry` — Rim Runner / Triangle: all crash.
         # `_shot_dreb_fb_play_key` → `pending_dreb_fb_play_key` on DREB miss.
         from BackEnd.engine import covert_release as cr
 
@@ -914,7 +915,10 @@ class ShotManager:
             dreb_fb_eligible = random.random() < p_fb
             shot_fb_pk = None
             if dreb_fb_eligible:
-                shot_fb_pk = play_key_for_fast_break_entry(True)
+                shot_fb_pk = play_key_for_fast_break_entry(
+                    True,
+                    getattr(off_team, "playbook_settings", None),
+                )
                 if shot_fb_pk == COVERT_RELEASE:
                     rp = cr.select_covert_release_position(
                         def_team.lineup,
@@ -931,7 +935,7 @@ class ShotManager:
                     defense_rebounders = [
                         pos for pos in def_team.lineup.keys() if pos not in defense_release_list
                     ]
-                elif shot_fb_pk in (RIM_RUNNER, FULL_TEAM):
+                elif shot_fb_pk in (RIM_RUNNER, TRIANGLE):
                     defense_rebounders = list(def_team.lineup.keys())
                 else:
                     defense_rebounders = list(def_team.lineup.keys())

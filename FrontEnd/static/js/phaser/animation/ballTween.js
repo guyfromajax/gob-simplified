@@ -139,11 +139,11 @@ export function detachBall(scene, ballSprite) {
  * @param {Phaser.Scene} scene
  * @param {Phaser.GameObjects.Sprite} sprite
  * @param {{x:number,y:number}} target
- * @param {{duration?:number, easing?:string}} opts
+ * @param {{duration?:number, easing?:string, debugTag?:string}} opts
  */
 export function tweenPlayerTo(scene, sprite, target, opts = {}) {
   if (!scene || !sprite || !target) return Promise.resolve();
-  const { easing = 'Linear' } = opts;
+  const { easing = 'Linear', debugTag = null } = opts;
   const universalDuration = getPlayerMovementDurationMs(sprite, target.x, target.y, {
     scene,
     isBallHandler: opts.isBallHandler,
@@ -186,6 +186,7 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
         const summary = {
           type: 'tweenPlayerTo',
           status,
+          debugTag,
           playerId: sprite?.playerId ?? null,
           duration,
           requestedDuration,
@@ -205,6 +206,9 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
           final: { x: sprite.x, y: sprite.y },
         };
         animationDebugLog('ANIM tween summary', summary);
+        if (status === 'stop') {
+          console.warn('[BOUNDARY TWEEN][STOP]', summary);
+        }
         if (durationClampedByPolicy) {
           animationDebugWarn('ANIM speed policy clamp', {
             playerId: sprite?.playerId ?? null,
@@ -252,6 +256,12 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
       },
       onComplete: () => finalize('complete')
     });
+    if (tween) {
+      tween.__debugTag = debugTag;
+      tween.__debugPlayerId = sprite?.playerId ?? null;
+      tween.__debugTarget = { x: target.x, y: target.y };
+      tween.__debugStart = startPosition;
+    }
     tween?.once?.('stop', () => finalize('stop', new Error('tween stopped')));
   });
 }

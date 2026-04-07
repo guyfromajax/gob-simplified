@@ -2,9 +2,10 @@
 Fast break play identifiers (DREB → outlet) and steal bucket.
 
 - Code / persistence: snake_case keys below.
-- UI label for ``FULL_TEAM`` is "Full Team" (see Fast_Break_System / FB_Update_Brief).
+- UI label for ``TRIANGLE`` is "Triangle" (see Fast_Break_System / FB_Update_Brief).
 
-``full_team`` uses the same resolution stub as Rim Runner until a dedicated full-team path exists.
+``triangle`` reuses the Rim Runner entry/denied-outlet family, then branches into
+its own setup / decision / finish payload once the RR lane-pass read is declined.
 DREB play key is chosen on the shot attempt (``shot_manager``) and passed via
 ``pending_dreb_fb_play_key``; ``play_key_for_fast_break_entry`` is only a fallback when pending is missing.
 ``after_steal`` is used for steal entry.
@@ -14,20 +15,25 @@ from __future__ import annotations
 
 import copy
 import random
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 # Canonical keys (match scouting_data["offense"]["fast_break_plays"])
 COVERT_RELEASE = "covert_release"
 RIM_RUNNER = "rim_runner"
-FULL_TEAM = "full_team"
+TRIANGLE = "triangle"
 AFTER_STEAL = "after_steal"
 
 FAST_BREAK_PLAY_KEYS = (
     COVERT_RELEASE,
     RIM_RUNNER,
-    FULL_TEAM,
+    TRIANGLE,
     AFTER_STEAL,
 )
+DEFAULT_DREB_FAST_BREAK_WEIGHTS = {
+    COVERT_RELEASE: 33,
+    RIM_RUNNER: 33,
+    TRIANGLE: 34,
+}
 
 def default_fast_break_plays() -> Dict[str, Dict[str, int]]:
     """Fresh A/S counters per play (offense scouting only)."""
@@ -56,10 +62,40 @@ def ensure_fast_break_plays(offense_scouting: Dict[str, Any]) -> Dict[str, Dict[
     return fb
 
 
-def play_key_for_fast_break_entry(is_dreb_outlet: bool) -> str:
+def _coerce_non_negative_weight(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, numeric)
+
+
+def _resolve_dreb_fast_break_weights(
+    playbook_settings: Optional[Dict[str, Any]],
+) -> Dict[str, int]:
+    raw = None
+    if isinstance(playbook_settings, dict):
+        raw = playbook_settings.get("fast_break")
+    if not isinstance(raw, dict):
+        return dict(DEFAULT_DREB_FAST_BREAK_WEIGHTS)
+
+    resolved = {
+        COVERT_RELEASE: _coerce_non_negative_weight(raw.get(COVERT_RELEASE)),
+        RIM_RUNNER: _coerce_non_negative_weight(raw.get(RIM_RUNNER)),
+        TRIANGLE: _coerce_non_negative_weight(raw.get(TRIANGLE)),
+    }
+    if sum(resolved.values()) <= 0:
+        return dict(DEFAULT_DREB_FAST_BREAK_WEIGHTS)
+    return resolved
+
+
+def play_key_for_fast_break_entry(
+    is_dreb_outlet: bool,
+    playbook_settings: Optional[Dict[str, Any]] = None,
+) -> str:
     """Which scouting bucket gets an attempt for this FB possession."""
     if not is_dreb_outlet:
         return AFTER_STEAL
-    # Until user FB play settings drive this selection directly: 50/50 Rim Runner vs Covert Release on DREB outlet.
-    # Normal path: key is pre-set on the shot turn as ``pending_dreb_fb_play_key``.
-    return RIM_RUNNER if random.random() < 0.5 else COVERT_RELEASE
+    weights = _resolve_dreb_fast_break_weights(playbook_settings)
+    plays = [COVERT_RELEASE, RIM_RUNNER, TRIANGLE]
+    return random.choices(plays, weights=[weights[p] for p in plays], k=1)[0]

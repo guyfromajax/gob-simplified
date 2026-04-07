@@ -655,6 +655,21 @@ export class FreeThrowAnimationSystem {
       miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
     }
 
+    // Defensive scrub before rebound attach path:
+    // stale putback/shot/pass state can block rebound attachment and produce
+    // "ball stuck at bounce spot -> step-0 teleport" failures on FT miss -> DREB.
+    const {
+      synchronizeBallState,
+      getBallController,
+      attachBallToPlayer,
+    } = await import('./BallControllerAdapter.js');
+    synchronizeBallState(this.scene, {
+      clearShotState: true,
+      clearPutbackState: true,
+      clearPassState: true,
+      allowAttachment: true,
+    });
+
     // Execute rebound system using existing system
     const { animateRebound } = await import('./ballManager.js');
     
@@ -669,6 +684,24 @@ export class FreeThrowAnimationSystem {
       shooterId: turnData.shooter_id,
       preserveBallPosition: true  // ✅ FIX: Ball is already at bounce spot, don't move it
     });
+
+    // Safety attach for FT miss -> DREB path before outlet setup logic.
+    // If rebound animation path was skipped or attachment was blocked earlier,
+    // ensure the rebounder owns the ball before transition movement starts.
+    const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
+    const rebounderKey = rebounderId != null ? String(rebounderId) : null;
+    const rebounderSprite = rebounderKey ? this.playerSprites?.[rebounderKey] : null;
+    const ballController = getBallController();
+    if (
+      turnData.rebound_type === "DREB" &&
+      rebounderSprite &&
+      (!ballController?.isAttached || ballController.currentOwner !== rebounderSprite) &&
+      !ballController?.isInFlight
+    ) {
+      attachBallToPlayer(this.scene, this.ballController.ballSprite, rebounderSprite, {
+        reason: "ft_final_miss_dreb_pre_outlet",
+      });
+    }
 
     // Handle defensive rebound setup if needed
     // Only call runDefensiveReboundSetup for HCO/HCT/FCP, not for FAST_BREAK

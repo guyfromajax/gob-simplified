@@ -750,6 +750,14 @@ Runtime now emits/enforces unit-completion contracts for Fast Break orchestratio
 - `fb.phase.rebound_resolution`
 - `fb.out.to_*`
 
+Play-specific Fast Break dynamic-event units may extend the generic FB family when their branch graph diverges from the base Covert/RR flow. Triangle is the first planned extension:
+
+- `triangle.phase.entry`
+- `triangle.phase.rr_read`
+- `triangle.phase.setup`
+- `triangle.phase.decision`
+- `triangle.phase.finish`
+
 Telemetry includes:
 
 - `unit_completion_contract_validated`
@@ -768,6 +776,22 @@ Advance-trigger lock parity (runtime-verified):
 | `fb.phase.shot_attempt` | `shot release/result committed` | `shot visuals settled` | `locked` |
 | `fb.phase.rebound_resolution` | `rebound outcome committed` | `rebound attach + settle complete` | `locked` |
 | `fb.out.to_*` | `route committed` | `final FB settle complete` | `locked` |
+
+Triangle Fast Break advance-trigger lock plan:
+
+| Unit | `advance_trigger` (locked) | `visual_settle_trigger` (locked) | Runtime parity |
+| --- | --- | --- | --- |
+| `triangle.phase.entry` | `successful outlet received` or `denied comeback pass received` | `RR entry/outlet visuals settled` | `planned` |
+| `triangle.phase.rr_read` | `RR read committed` | `post-outlet read visuals settled` | `planned` |
+| `triangle.phase.setup` | `rim runner and ball handler reached setup spots` | `required Triangle setup movers settled` | `planned` |
+| `triangle.phase.decision` | `shot branch committed` or `same-side corner reached HCO trigger spot` | `decision prep visuals settled` | `planned` |
+| `triangle.phase.finish` | `shot release/result committed` or `HCO route committed` | `Triangle finish visuals settled` | `planned` |
+
+Triangle carry-forward lock:
+
+- If Triangle routes to a shot branch, the existing Fast Break shot-attempt contract applies.
+- If Triangle routes to `HCO`, all player live positions at the HCO decision boundary carry forward as the HCO step-0 start snapshot.
+- If the current Triangle ball handler is not the PG, the handoff into HCO requires an animated pass to the PG once the PG reaches HCO step-0 location.
 
 ## HCO Core Unit-Completion Contract
 

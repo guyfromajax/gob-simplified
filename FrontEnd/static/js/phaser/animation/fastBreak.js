@@ -57,11 +57,20 @@ const GRID_MAX_Y = CLAMP_BOUNDS.maxY;
  */
 function classifyFastBreakPhase2(turnData, { isBlockingFoul }) {
   const result = turnData.result_type;
+  const isTriangleSeq =
+    turnData.fast_break_play === "triangle" ||
+    turnData.roles?.triangle_sequence === true ||
+    Boolean(turnData.roles?.triangle_setup_phase);
   if (result === "MAKE" || result === "MISS" || result === "BLOCK") {
     return "fast_break_shot";
   }
   if (result === "CHARGE" || isBlockingFoul) {
     return "fast_break_shot_foul";
+  }
+  // Outlet-denied must route through RR denied settle, even for Triangle-tagged
+  // possessions that share the same burst/denied handoff contract.
+  if (turnData.rim_runner_outlet_failed) {
+    return "rim_runner_hco_settle";
   }
 
   const isRimRunnerSeq =
@@ -80,6 +89,10 @@ function classifyFastBreakPhase2(turnData, { isBlockingFoul }) {
     }
   }
 
+  if (isTriangleSeq && (result === "DEFENSIVE_STOP" || turnData.triangle_enter_hco)) {
+    return "triangle_hco_settle";
+  }
+
   return "generic_fb_stop";
 }
 
@@ -95,6 +108,7 @@ function deriveFbBranchKind(turnData, phase2Kind) {
     if (turnData.rim_runner_outlet_failed) return "rr_outlet_denied";
     return "rr_hold_up";
   }
+  if (phase2Kind === "triangle_hco_settle") return "triangle_hco";
   return "generic_fb_shot_stop";
 }
 
@@ -667,6 +681,213 @@ function captureRrLiveSnapshot(playerSprites, width, height) {
   return snapshot;
 }
 
+function resolveFbPassEndpointGrid(targetGrid, sprite, width, height) {
+  if (
+    targetGrid &&
+    Number.isFinite(targetGrid.x) &&
+    Number.isFinite(targetGrid.y)
+  ) {
+    return {
+      x: Phaser.Math.Clamp(targetGrid.x, GRID_MIN_X, GRID_MAX_X),
+      y: Phaser.Math.Clamp(targetGrid.y, GRID_MIN_Y, GRID_MAX_Y),
+    };
+  }
+  return rimRunnerSpriteGrid(sprite, width, height);
+}
+
+function resolveFbInterceptionContactGrid({
+  passerTarget,
+  passerSprite,
+  receiverTarget,
+  receiverSprite,
+  width,
+  height,
+}) {
+  const passerGrid = resolveFbPassEndpointGrid(passerTarget, passerSprite, width, height);
+  const receiverGrid = resolveFbPassEndpointGrid(receiverTarget, receiverSprite, width, height);
+
+  const x =
+    passerGrid.x > receiverGrid.x
+      ? receiverGrid.x + 3
+      : receiverGrid.x - 3;
+
+  let y = receiverGrid.y;
+  if (passerGrid.y >= receiverGrid.y + 3) {
+    y = receiverGrid.y + 3;
+  } else if (passerGrid.y <= receiverGrid.y - 3) {
+    y = receiverGrid.y - 3;
+  }
+
+  return {
+    x: Phaser.Math.Clamp(x, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(y, GRID_MIN_Y, GRID_MAX_Y),
+    passerGrid,
+    receiverGrid,
+  };
+}
+
+function resolveNearestOutOfBoundsGrid(interceptorGrid) {
+  const candidates = [
+    { edge: "left_sideline", x: GRID_MIN_X, y: interceptorGrid.y, distance: Math.abs(interceptorGrid.x - GRID_MIN_X) },
+    { edge: "right_sideline", x: GRID_MAX_X, y: interceptorGrid.y, distance: Math.abs(GRID_MAX_X - interceptorGrid.x) },
+    { edge: "top_baseline", x: interceptorGrid.x, y: GRID_MIN_Y, distance: Math.abs(interceptorGrid.y - GRID_MIN_Y) },
+    { edge: "bottom_baseline", x: interceptorGrid.x, y: GRID_MAX_Y, distance: Math.abs(GRID_MAX_Y - interceptorGrid.y) },
+  ];
+  candidates.sort((a, b) => a.distance - b.distance);
+  const winner = candidates[0];
+  return {
+    x: Phaser.Math.Clamp(winner.x, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(winner.y, GRID_MIN_Y, GRID_MAX_Y),
+    edge: winner.edge,
+  };
+}
+
+function isTriangleSequence(turnData) {
+  return (
+    turnData?.fast_break_play === "triangle" ||
+    turnData?.roles?.triangle_sequence === true ||
+    Boolean(turnData?.roles?.triangle_setup_phase)
+  );
+}
+
+function getTriangleSetupPayload(turnData) {
+  return turnData?.roles?.triangle_setup_phase || null;
+}
+
+async function tweenTriangleSpriteToGrid(scene, sprite, grid, width, height, { burst = false } = {}) {
+  if (!sprite || !grid || typeof grid.x !== "number" || typeof grid.y !== "number") return null;
+  if (scene.tweens) scene.tweens.killTweensOf(sprite);
+  const px = gridToPixels(
+    Phaser.Math.Clamp(grid.x, GRID_MIN_X, GRID_MAX_X),
+    Phaser.Math.Clamp(grid.y, GRID_MIN_Y, GRID_MAX_Y),
+    width,
+    height
+  );
+  const duration = getPlayerDuration(sprite, px.x, px.y, burst);
+  return tweenPlayerTo(scene, sprite, px, {
+    duration,
+    easing: "Linear",
+  });
+}
+
+async function animateTriangleSetupPhase(scene, turnData, playerSprites, ballSprite, width, height) {
+  const payload = getTriangleSetupPayload(turnData);
+  if (!payload) return { payload: null, snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+  const sid = (id) => (id != null ? String(id) : null);
+  console.log("[TRIANGLE SETUP][OWNER]", {
+    turnId: turnData?.turn_count ?? turnData?.id ?? null,
+    resultType: turnData?.result_type ?? null,
+    triangleBranch:
+      turnData?.triangle_branch ?? turnData?.roles?.triangle_branch ?? payload?.triangle_branch ?? null,
+    liveOwnerId: getCurrentOwner(scene),
+    triangleBallHandlerId: sid(payload.ball_handler_id),
+    outletPasserId: sid(turnData?.roles?.outlet_passer),
+    outletReceiverId: sid(turnData?.roles?.outlet_receiver),
+    burstOutletPasserId: sid(turnData?.roles?.rim_runner_burst_phase?.outlet_passer_id),
+    burstOutletReceiverId: sid(turnData?.roles?.rim_runner_burst_phase?.outlet_receiver_id),
+    skipOutletPass:
+      turnData?.roles?.rim_runner_burst_phase?.skip_outlet_pass === true,
+  });
+  const moved = [];
+  const promises = [];
+  const queueMove = (playerId, target, opts = {}) => {
+    const pid = sid(playerId);
+    if (!pid || moved.includes(pid)) return;
+    const sprite = playerSprites?.[pid];
+    if (!sprite || !target) return;
+    moved.push(pid);
+    const promise = tweenTriangleSpriteToGrid(scene, sprite, target, width, height, opts);
+    if (promise) promises.push(Promise.resolve(promise).then(() => setRimRunnerSpriteGrid(sprite, target.x, target.y)));
+  };
+
+  queueMove(payload.ball_handler_id, payload.ball_handler_to, { burst: false });
+  queueMove(payload.rim_runner_id, payload.rim_runner_to, { burst: false });
+  queueMove(payload.trailer_id, payload.trailer_to, { burst: false });
+  for (const corner of payload.corner_players || []) {
+    queueMove(corner.player_id, corner.to, { burst: Boolean(corner.burst) });
+  }
+  queueMove(payload.rr_defender_id, payload.rr_defender_to, { burst: false });
+  queueMove(payload.bh_defender_id, payload.bh_defender_to, { burst: false });
+  for (const helper of payload.helper_defenders || []) {
+    queueMove(helper.player_id, helper.to, { burst: Boolean(helper.burst) });
+  }
+
+  const bhSprite = playerSprites?.[sid(payload.ball_handler_id)];
+  if (bhSprite) attachBallToPlayer(scene, ballSprite, bhSprite, { reason: "triangle_setup" });
+
+  await Promise.all(promises);
+  commitRrLiveSpriteGrid(playerSprites, width, height);
+  return { payload, snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
+}
+
+async function animateTriangleDecisionLeadIn(scene, turnData, playerSprites, ballSprite, width, height) {
+  const payload = getTriangleSetupPayload(turnData);
+  if (!payload) return;
+  const sid = (id) => (id != null ? String(id) : null);
+  const branch = turnData?.triangle_branch ?? turnData?.roles?.triangle_branch ?? payload?.triangle_branch;
+  const bhId = sid(payload.ball_handler_id);
+  const rrId = sid(payload.rim_runner_id);
+  const sameCornerId = sid(payload.same_side_corner_id);
+  const bhSprite = bhId ? playerSprites?.[bhId] : null;
+  const rrSprite = rrId ? playerSprites?.[rrId] : null;
+  const sameCornerSprite = sameCornerId ? playerSprites?.[sameCornerId] : null;
+
+  if (bhSprite) attachBallToPlayer(scene, ballSprite, bhSprite, { reason: "triangle_decision" });
+
+  const runOptionalPass = async (fromId, toId, target) => {
+    if (!fromId || !toId || fromId === toId) return;
+    if (!playerSprites?.[String(toId)] || !target) return;
+    await runPass(scene, {
+      fromId: String(fromId),
+      toId: String(toId),
+      endCoords: gridToPixels(target.x, target.y, width, height),
+      easing: "Sine.easeInOut",
+    });
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) scene.time.delayedCall(45, resolve);
+      else setTimeout(resolve, 45);
+    });
+    attachBallToPlayer(scene, ballSprite, playerSprites[String(toId)], { reason: "triangle_branch_pass" });
+  };
+
+  if (branch === "triangle_rr_post") {
+    await runOptionalPass(bhId, rrId, payload.rim_runner_to);
+  } else if (branch === "triangle_corner_three") {
+    await runOptionalPass(bhId, sameCornerId, payload.same_side_corner_to);
+  } else if (branch === "triangle_bh_wing_three") {
+    return;
+  } else if (branch === "triangle_bh_drive" || branch === "triangle_drive_rr_feed" || branch === "triangle_drive_corner_kick") {
+    const movers = [];
+    if (bhSprite && payload.triangle_drive_to) {
+      movers.push(
+        tweenTriangleSpriteToGrid(scene, bhSprite, payload.triangle_drive_to, width, height, { burst: false }).then(() => {
+          setRimRunnerSpriteGrid(bhSprite, payload.triangle_drive_to.x, payload.triangle_drive_to.y);
+        })
+      );
+    }
+    if (rrSprite && payload.triangle_rr_drive_to) {
+      movers.push(
+        tweenTriangleSpriteToGrid(scene, rrSprite, payload.triangle_rr_drive_to, width, height, { burst: false }).then(() => {
+          setRimRunnerSpriteGrid(rrSprite, payload.triangle_rr_drive_to.x, payload.triangle_rr_drive_to.y);
+        })
+      );
+    }
+    await Promise.all(movers);
+    if (branch === "triangle_drive_rr_feed") {
+      await runOptionalPass(bhId, rrId, payload.triangle_rr_drive_to);
+    } else if (branch === "triangle_drive_corner_kick") {
+      await runOptionalPass(bhId, sameCornerId, payload.same_side_corner_to);
+    }
+  }
+
+  commitRrLiveSpriteGrid(playerSprites, width, height);
+}
+
+async function animateTriangleHcoSettle(scene, turnData, playerSprites, ballSprite, width, height) {
+  appendToTextScroll("Triangle flow into half court.");
+  await finalizeRimRunnerNonShotTurn(scene, turnData, playerSprites);
+}
+
 function logRrDenied(scene, stage, payload = {}) {
   const telemetry = getFbTelemetry(scene);
   console.log(`[RR DENIED][${stage}]`, {
@@ -758,6 +979,10 @@ function rimRunnerAgHorizontalDriftPromises(
       tweenPlayerTo(scene, sprite, px, {
         duration: phaseDurationMs,
         easing: "Linear",
+        debugTag:
+          getFbTelemetry(scene)?.branchKind === "rr_outlet_denied"
+            ? `rr_denied_drift_${pid}`
+            : null,
       })
     );
   }
@@ -1011,6 +1236,7 @@ async function animateRimRunnerOutletDeniedBeat(
     await tweenPlayerTo(scene, defSprite, defTargetPx, {
       duration: getPlayerDuration(defSprite, defTargetPx.x, defTargetPx.y, true),
       easing: "Linear",
+      debugTag: "rr_denied_defender_closeout",
     });
     setRimRunnerSpriteGrid(defSprite, defenderTarget.x, defenderTarget.y);
   }
@@ -1071,10 +1297,14 @@ async function animateRimRunnerOutletDeniedBeat(
     towardBasket,
     phaseDurationMs
   );
+  // Denied branch advances on receiver cutback, not drift completion. Drift tweens
+  // can be stopped at handoff, so consume outcomes to avoid unhandled stop errors.
+  void Promise.allSettled(driftPromises);
 
   const recvPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
     duration: phaseDurationMs,
     easing: "Linear",
+    debugTag: "rr_denied_receiver_cutback",
   });
 
   await awaitWithTimeout(
@@ -1164,7 +1394,7 @@ async function animateRimRunnerHoldUpLeadIn(
     return { branch: "hold_up", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   }
 
-  if (turnData.rim_runner_no_lane_pass) {
+  if (turnData.rim_runner_no_lane_pass && !isTriangleSequence(turnData)) {
     const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
     const offenseSide = bh.team === "home" ? "home" : "away";
     const bhTeamId = bh.team_id;
@@ -1280,10 +1510,14 @@ async function animateRimRunnerInterception(
   const catchGx = Phaser.Math.Clamp(rrGx + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X);
   const catchGy = Phaser.Math.Clamp(rrGy, GRID_MIN_Y, GRID_MAX_Y);
 
-  const vg = rimRunnerSpriteGrid(victim, width, height);
-  const laneX = Phaser.Math.Clamp((vg.x + catchGx) / 2 + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X);
-  const laneY = Phaser.Math.Clamp((vg.y + catchGy) / 2, GRID_MIN_Y, GRID_MAX_Y);
-  const lanePx = gridToPixels(laneX, laneY, width, height);
+  const contactGrid = resolveFbInterceptionContactGrid({
+    passerSprite: victim,
+    receiverTarget: { x: catchGx, y: catchGy },
+    receiverSprite: rr,
+    width,
+    height,
+  });
+  const lanePx = gridToPixels(contactGrid.x, contactGrid.y, width, height);
 
   const partialGx = Phaser.Math.Clamp(rrGx + 3 * towardBasket, GRID_MIN_X, GRID_MAX_X);
   const partialPx = gridToPixels(partialGx, catchGy, width, height);
@@ -1304,7 +1538,7 @@ async function animateRimRunnerInterception(
   }
   await Promise.all(tw);
   if (rr) setRimRunnerSpriteGrid(rr, partialGx, catchGy);
-  setRimRunnerSpriteGrid(stealer, laneX, laneY);
+  setRimRunnerSpriteGrid(stealer, contactGrid.x, contactGrid.y);
 
   await runPass(scene, {
     fromId: victimId,
@@ -1390,8 +1624,14 @@ async function animateRimRunnerBatOob(
   const rg = rr ? rimRunnerSpriteGrid(rr, width, height) : { x: phase?.rr_to?.x ?? bg.x, y: phase?.rr_to?.y ?? bg.y };
   const catchGx = Phaser.Math.Clamp(rg.x + 6 * towardBasket, GRID_MIN_X, GRID_MAX_X);
   const catchGy = Phaser.Math.Clamp(rg.y, GRID_MIN_Y, GRID_MAX_Y);
-  const laneX = Phaser.Math.Clamp((bg.x + catchGx) / 2 + towardBasket, GRID_MIN_X, GRID_MAX_X);
-  const laneY = Phaser.Math.Clamp((bg.y + catchGy) / 2, GRID_MIN_Y, GRID_MAX_Y);
+  const contactGrid = resolveFbInterceptionContactGrid({
+    passerTarget: bg,
+    passerSprite: bh,
+    receiverTarget: { x: catchGx, y: catchGy },
+    receiverSprite: rr,
+    width,
+    height,
+  });
 
   const movers = [];
   if (rr) {
@@ -1409,7 +1649,7 @@ async function animateRimRunnerBatOob(
     );
   }
   if (defSp) {
-    const defLanePx = gridToPixels(laneX, laneY, width, height);
+    const defLanePx = gridToPixels(contactGrid.x, contactGrid.y, width, height);
     movers.push(
       tweenPlayerTo(scene, defSp, defLanePx, {
         duration: getPlayerDuration(defSp, defLanePx.x, defLanePx.y, true),
@@ -1419,22 +1659,18 @@ async function animateRimRunnerBatOob(
   }
   if (movers.length) await Promise.all(movers);
 
-  const tipTarget = defSp || bh;
-  attachBallToPlayer(scene, ballSprite, tipTarget);
-  await new Promise((resolve) => {
-    if (scene.time?.delayedCall) scene.time.delayedCall(500, resolve);
-    else setTimeout(resolve, 500);
+  if (defSp) {
+    setRimRunnerSpriteGrid(defSp, contactGrid.x, contactGrid.y);
+  }
+  const contactPx = gridToPixels(contactGrid.x, contactGrid.y, width, height);
+  detachBall(scene, ballSprite);
+  await animateBallToPosition(scene, contactPx, {
+    duration: getBallDuration(ballSprite, contactPx.x, contactPx.y),
+    easing: "Sine.easeInOut",
   });
 
-  const defG = defSp ? rimRunnerSpriteGrid(defSp, width, height) : bg;
-  const oobY = defG.y > 24 ? 1 : 51;
-  const oobGrid = {
-    x: Phaser.Math.Clamp(defG.x, GRID_MIN_X, GRID_MAX_X),
-    y: Phaser.Math.Clamp(oobY, GRID_MIN_Y, GRID_MAX_Y),
-  };
+  const oobGrid = resolveNearestOutOfBoundsGrid(contactGrid);
   const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
-
-  detachBall(scene, ballSprite);
   await animateBallToPosition(scene, oobPx, {
     duration: getBallDuration(ballSprite, oobPx.x, oobPx.y),
     easing: "Quad.easeOut",
@@ -1622,11 +1858,23 @@ export async function runFastBreakSequence({
 
   try {
     const resolutionStartMs = Date.now();
+    const triangleSetupRequired =
+      isTriangleSequence(turnData) &&
+      !turnData.rim_runner_outlet_failed &&
+      Boolean(getTriangleSetupPayload(turnData));
+
+    if (triangleSetupRequired) {
+      await animateTriangleSetupPhase(scene, turnData, playerSprites, ballSprite, width, height);
+    }
+
     if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
       await animateRimRunnerLanePass(scene, turnData, playerSprites, ballSprite, width, height);
     }
 
     if (phase2Kind === "fast_break_shot") {
+      if (triangleSetupRequired) {
+        await animateTriangleDecisionLeadIn(scene, turnData, playerSprites, ballSprite, width, height);
+      }
       if (turnData.roles?.ball_handler_beats_defender && turnData.stopper_id) {
         await animateFastBreakShotWithStopper(scene, turnData, playerSprites, ballSprite, width, height);
       } else {
@@ -1645,6 +1893,9 @@ export async function runFastBreakSequence({
         context: { phase2Kind },
       });
     } else if (phase2Kind === "fast_break_shot_foul") {
+      if (triangleSetupRequired) {
+        await animateTriangleDecisionLeadIn(scene, turnData, playerSprites, ballSprite, width, height);
+      }
       await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height, { foulOnly: true });
       enforceFbUnitContract({
         scene,
@@ -1733,6 +1984,20 @@ export async function runFastBreakSequence({
         unitId: "fb.phase.defensive_stop",
         advanceTrigger: "stop result committed",
         visualSettleTrigger: "stop visuals settled",
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: resolutionStartMs,
+        budgetKind: "phase",
+        context: { phase2Kind },
+      });
+    } else if (phase2Kind === "triangle_hco_settle") {
+      await animateTriangleHcoSettle(scene, turnData, playerSprites, ballSprite, width, height);
+      enforceFbUnitContract({
+        scene,
+        turnData,
+        unitId: "triangle.phase.finish",
+        advanceTrigger: "same-side corner reached HCO trigger spot",
+        visualSettleTrigger: "Triangle HCO settle visuals settled",
         authorizingEventReceived: true,
         visualSettled: true,
         unitStartMs: resolutionStartMs,
@@ -1834,6 +2099,9 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   for (const row of phase.other_players || []) {
     startTween(playerSprites[sid(row.player_id)], { x: row.to_x, y: row.to_y });
   }
+  // These movers can be stopped by downstream branch handoff logic; consume their
+  // eventual outcomes to avoid unhandled promise rejections on expected stop().
+  void Promise.allSettled(secondary);
 
   const recvTargetPx = gridToPixels(phase.receiver_to.x, phase.receiver_to.y, width, height);
   const recvDur = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);

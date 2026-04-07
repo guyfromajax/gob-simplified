@@ -884,7 +884,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     rebound = game_state.get("last_rebound") == "DREB"
     from BackEnd.constants.fast_break_play_types import (
         RIM_RUNNER,
-        FULL_TEAM,
+        TRIANGLE,
         ensure_fast_break_plays,
         play_key_for_fast_break_entry,
     )
@@ -892,7 +892,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     if rebound:
         fb_play_key = game_state.pop("pending_dreb_fb_play_key", None)
         if fb_play_key is None:
-            fb_play_key = play_key_for_fast_break_entry(True)
+            fb_play_key = play_key_for_fast_break_entry(
+                True,
+                getattr(off_team, "playbook_settings", None),
+            )
     else:
         fb_play_key = play_key_for_fast_break_entry(rebound)
 
@@ -916,7 +919,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
     )
 
-    if rebound and fb_play_key in (RIM_RUNNER, FULL_TEAM):
+    if rebound and fb_play_key in (RIM_RUNNER, TRIANGLE):
         from BackEnd.engine.rim_runner_fast_break import resolve_rim_runner_fast_break
 
         return resolve_rim_runner_fast_break(game, fb_play_key)

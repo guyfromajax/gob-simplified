@@ -1223,7 +1223,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const fbPlayRows = [
     { key: 'covert_release', label: 'Covert Release' },
     { key: 'rim_runner', label: 'Rim Runner' },
-    { key: 'full_team', label: 'Full Team' },
+    { key: 'triangle', label: 'Triangle' },
     { key: 'after_steal', label: 'After Steal' },
   ];
   for (const row of fbPlayRows) {
@@ -1242,7 +1242,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
  * Merge offense.fast_break_plays with EOG snapshot (if present) for box score display.
  */
 function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
-  const keys = ['covert_release', 'rim_runner', 'full_team', 'after_steal'];
+  const keys = ['covert_release', 'rim_runner', 'triangle', 'after_steal'];
   const out = {};
   for (const k of keys) {
     const o = (offensePlays && offensePlays[k]) || {};

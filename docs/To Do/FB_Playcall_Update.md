@@ -1,6 +1,6 @@
 # Fast Break playcall at shot attempt — implementation plan
 
-This document describes how to resolve **which DREB fast-break play** (Covert Release vs Rim Runner vs future `full_team`) **on the shot attempt** (same step as today’s release/get-back geometry), **gate Covert-only release behavior** on that playcall, **decouple fast-break eligibility** from “someone released,” and how **`resolve_fast_break_logic`** should consume a **precomputed** key without rolling twice.
+This document describes how to resolve **which DREB fast-break play** (Covert Release vs Rim Runner vs future `triangle`) **on the shot attempt** (same step as today’s release/get-back geometry), **gate Covert-only release behavior** on that playcall, **decouple fast-break eligibility** from “someone released,” and how **`resolve_fast_break_logic`** should consume a **precomputed** key without rolling twice.
 
 **Related code today**
 
@@ -26,7 +26,7 @@ This document describes how to resolve **which DREB fast-break play** (Covert Re
 
 1. **Single decision point** for DREB FB **play key** when the offense is about to lose possession on a miss → DREB → FB (same “moment” as today’s positioning block in `shot_manager`).  
 2. **Execute Covert release pipeline** (select position, `defense_release` IDs, `defense_release_coords`, `last_release_player`) **only if** `fast_break_play == covert_release`.  
-3. For **Rim Runner** and **`full_team`** (until specified otherwise): **no** Covert release list, **no** release coords, **no** `last_release_player`; defense treats all lineup spots as rebounders for that shot’s geometry (unless a future spec adds a different rule for Full Team).  
+3. For **Rim Runner** and **`triangle`** (until specified otherwise): **no** Covert release list, **no** release coords, **no** `last_release_player`; defense treats all lineup spots as rebounders for that shot’s geometry (unless a future spec adds a different rule for Triangle).  
 4. **Decouple** “we go to `FAST_BREAK` on this DREB” from `defense_release_list`. **Done:** single `fast_break_probability_from_slider(fast_breaks)` on shot / FT DREB; see `Fast_Break_System.md`.  
 5. **`resolve_fast_break_logic`** uses **stored** play key; **no second roll** for DREB outlet.  
 6. Remove redundant branches and outdated coupling to reduce bloat.
@@ -37,7 +37,7 @@ This document describes how to resolve **which DREB fast-break play** (Covert Re
 
 ### Phase A — State contract (game_state + turn payload)
 
-1. **Add** a persistent field, e.g. `game_state["pending_dreb_fb_play_key"]` (string: `covert_release` \| `rim_runner` \| `full_team` \| unset).  
+1. **Add** a persistent field, e.g. `game_state["pending_dreb_fb_play_key"]` (string: `covert_release` \| `rim_runner` \| `triangle` \| unset).  
    - Set **only** when resolving a miss that ends in DREB and the engine commits to **next_play_type `FAST_BREAK`**.  
    - **Clear** after `resolve_fast_break_logic` consumes it (or when possession resets / quarter ends), to avoid carryover bugs (same pattern as `last_release_player`).
 
@@ -63,7 +63,7 @@ This document describes how to resolve **which DREB fast-break play** (Covert Re
    - Call **`play_key_for_fast_break_entry(True)` once** → `fb_play_key`.  
    - Store: `game_state["pending_dreb_fb_play_key"] = fb_play_key`.  
    - **If `fb_play_key == covert_release`:** run **today’s** Covert path: `DEFENSE_RELEASE_CHANCES` roll + `select_covert_release_position` → `defense_release_list`, stats, `good_release_flag`, `_calculate_release_coordinates`, populate `result["defense_release"]`, `defense_release_coords`, and on DREB commit `last_release_player`.  
-   - **If `fb_play_key` is `rim_runner` or `full_team`:** force **`defense_release_list = []`**, skip release coord updates, `last_release_player = None`, `result["defense_release"] = []`, `defense_release_coords = {}` (or omit); **`defense_rebounders` = full lineup** for rebound resolution.  
+   - **If `fb_play_key` is `rim_runner` or `triangle`:** force **`defense_release_list = []`**, skip release coord updates, `last_release_player = None`, `result["defense_release"] = []`, `defense_release_coords = {}` (or omit); **`defense_rebounders` = full lineup** for rebound resolution.  
    - On DREB: `next_play_type = "FAST_BREAK"` whenever **eligible**, regardless of release list.
 
 5. **MAKE / foul / block branches** that today attach `defense_release` / coords: apply the **same** rule — only populate release arrays/coords when **Covert** was selected **and** eligibility was true. If miss never happens, pending key might still be set incorrectly — **only set `pending_dreb_fb_play_key` when you also know the turn will end with DREB→FB** (see Phase C).
@@ -151,7 +151,7 @@ Alternatively: compute play key **once** at start of miss handling and store on 
 
 1. **Exact FB eligibility formula** for DREB (see `fast_break_probability_from_slider` + `SLIDER_TO_FAST_BREAK_PROB`).  
 2. **Covert release select fails** (no `rp`): HCO vs retry vs force PG release.  
-3. **`full_team`**: same as RR (no release) until spec says otherwise.  
+3. **`triangle`**: same as RR (no release) until spec says otherwise.  
 4. Whether **offense get-back** should differ by play type (probably no for v1).
 
 ---

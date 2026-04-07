@@ -350,6 +350,22 @@ export class AnimationRouter {
 
   _forceStopBoundaryTweens() {
     const activeTweens = this._collectActiveBoundaryTweens();
+    if (activeTweens.length > 0) {
+      console.warn('[BOUNDARY TWEEN][FORCE STOP]', activeTweens.map((tween) => ({
+        debugTag: tween?.__debugTag ?? null,
+        debugPlayerId: tween?.__debugPlayerId ?? null,
+        debugStart: tween?.__debugStart ?? null,
+        debugTarget: tween?.__debugTarget ?? null,
+        progress:
+          typeof tween?.progress === "number"
+            ? Number(tween.progress.toFixed(3))
+            : null,
+        totalDuration:
+          Number.isFinite(Number(tween?.totalDuration))
+            ? Math.round(Number(tween.totalDuration))
+            : null,
+      })));
+    }
     let stopped = 0;
     for (const tween of activeTweens) {
       try {

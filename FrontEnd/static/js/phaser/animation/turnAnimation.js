@@ -645,6 +645,45 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   await Promise.all(promises);
 }
 
+async function runStep0EntryPassIfNeeded({
+  scene,
+  ballSprite,
+  playerSprites,
+  currentBallOwnerRef,
+  liveOwnerId,
+  step0OwnerId,
+}) {
+  if (!scene || !ballSprite || !playerSprites) return false;
+  if (liveOwnerId == null || step0OwnerId == null) return false;
+  const fromRef = resolveSpriteById(playerSprites, liveOwnerId);
+  const toRef = resolveSpriteById(playerSprites, step0OwnerId);
+  const fromId = fromRef.id != null ? String(fromRef.id) : "";
+  const toId = toRef.id != null ? String(toRef.id) : "";
+  const fromSprite = fromRef.sprite;
+  const toSprite = toRef.sprite;
+  if (!fromId || !toId || fromId === toId || !fromSprite || !toSprite) return false;
+
+  attachBallToPlayer(scene, ballSprite, fromSprite, { reason: "step0_entry_pass_start" });
+  currentBallOwnerRef.value = fromSprite;
+  setBallHolderId(scene, fromId);
+  setCurrentOwner(scene, fromId);
+  clearPendingOwner(scene);
+
+  await runPass(scene, {
+    fromId,
+    toId,
+    endCoords: { x: toSprite.x, y: toSprite.y },
+    easing: "Sine.easeInOut",
+  });
+
+  attachBallToPlayer(scene, ballSprite, toSprite, { reason: "step0_entry_pass_complete" });
+  currentBallOwnerRef.value = toSprite;
+  setBallHolderId(scene, toId);
+  setCurrentOwner(scene, toId);
+  clearPendingOwner(scene);
+  return true;
+}
+
 /**
  * HCO step 0 after Rim Runner hold-up: everyone except ball handler tweens to step 0; when PG arrives,
  * pass from ball handler (still at hold-up end) to PG; then finish remaining setup tweens; then BH → step 0.
@@ -3203,6 +3242,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // ✅ SS&S: Use current_turn to detect FCP/HCT (replaces fragmented flags)
   const isFCPHCT = turnData?.current_turn === 'FCP' || turnData?.current_turn === 'HCT';
+  const isHcoTurn = turnData?.current_turn === 'HCO';
   
   // ✅ REMOVED: Step-by-step animation logging (cluttering console)
   
@@ -3302,35 +3342,48 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
   
   let step0OwnerSprite = null;
+  let step0OwnerId = null;
+  let requiresStep0EntryPass = false;
+  let step0EntryPassFromId = null;
+  for (const anim of turnData.animations) {
+    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
+    if (anim.hasBallAtStep?.[0]) {
+      step0OwnerSprite = playerSprites[anim.playerId];
+      break;
+    }
+  }
+
+  if (step0OwnerSprite) {
+    step0OwnerId = step0OwnerSprite.playerId;
+    const liveOwnerId = getCurrentOwner(scene) ?? getPendingOwner(scene) ?? null;
+    if (
+      isHcoTurn &&
+      liveOwnerId != null &&
+      String(liveOwnerId) !== String(step0OwnerId)
+    ) {
+      requiresStep0EntryPass = true;
+      step0EntryPassFromId = String(liveOwnerId);
+    }
+  }
+
   // If we are coming directly from an inbound or opening tip, the ball should already be attached
   // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
-  if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
-    for (const anim of turnData.animations) {
-      if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
-      if (anim.hasBallAtStep?.[0]) {
-        step0OwnerSprite = playerSprites[anim.playerId];
-        break;
-      }
-    }
+  if (!previousTurnWasShot && !fromInbound && !fromOpeningTip && step0OwnerSprite) {
+    const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
 
-    if (step0OwnerSprite) {
-      const step0OwnerId = step0OwnerSprite.playerId;
-      const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
+    if (isPutbackTurn) {
+      // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
+      const { getBallController } = await import('./BallControllerAdapter.js');
+      const ballController = getBallController();
+      // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
+      // This prevents the brief attachment flash before the putback shot
+    } else if (!requiresStep0EntryPass) {
+      attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
+      currentBallOwnerRef.value = step0OwnerSprite;
 
-      if (isPutbackTurn) {
-        // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
-        const { getBallController } = await import('./BallControllerAdapter.js');
-        const ballController = getBallController();
-        // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
-        // This prevents the brief attachment flash before the putback shot
-      } else {
-        attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
-        currentBallOwnerRef.value = step0OwnerSprite;
-
-        // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
-        // This enables the new simple ball animation system to track ball holder
-        setBallHolderId(scene, step0OwnerId);
-      }
+      // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
+      // This enables the new simple ball animation system to track ball holder
+      setBallHolderId(scene, step0OwnerId);
     }
   }
 
@@ -3349,15 +3402,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // animationDebugLog("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
   // animationDebugLog("turnData.animations[0].playerId", turnData.animations[0].playerId);
   // animationDebugLog("turnData.animations[0].movement", turnData.animations[0].movement);
-  updateBallOwnership({
-    scene,
-    ballSprite,
-    animations: turnData.animations,
-    playerSprites,
-    stepIndex: 0,
-    offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
-    currentBallOwnerRef,
-  });
+  if (!requiresStep0EntryPass) {
+    updateBallOwnership({
+      scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites,
+      stepIndex: 0,
+      offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
+      currentBallOwnerRef,
+    });
+  }
 
   // Initial active player display update
   if (!scene.skipToEnd) {
@@ -4591,6 +4646,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }
+  if (requiresStep0EntryPass) {
+    await runStep0EntryPassIfNeeded({
+      scene,
+      ballSprite,
+      playerSprites,
+      currentBallOwnerRef,
+      liveOwnerId: step0EntryPassFromId,
+      step0OwnerId,
+    });
+  }
   if (isPressureSkeletonTurn) {
     validatePressureLeadInContract({ phase: "post_setup_tween" });
   }
@@ -5583,7 +5648,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 /**
  * Phase 4: Final Turn alignment — tween offense and defense to oDestinations/dDestinations.
  * When away team is on offense, flip both offense and defense coords so the whole setup is on the
- * away (attacking) half; backend sends home-side coords. Attaches ball to ball handler when done.
+ * away (attacking) half; backend sends home-side coords. If the live owner differs from the step-0
+ * handler, preserve the live owner so ShotAnimationSystem can animate the step-0 entry pass.
  */
 export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
   if (scene?.skipToEnd || !turnData) return;
@@ -5649,7 +5715,12 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
   } else if (ballHandlerId) {
     ballHandlerSprite = playerSprites[ballHandlerId];
   }
-  if (ballSprite && ballHandlerSprite) {
+  const liveOwnerId = getCurrentOwner(scene) ?? getPendingOwner(scene) ?? null;
+  const preserveLiveOwner =
+    ballHandlerSprite &&
+    liveOwnerId != null &&
+    String(liveOwnerId) !== String(ballHandlerSprite.playerId);
+  if (ballSprite && ballHandlerSprite && !preserveLiveOwner) {
     attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
   }
 }
