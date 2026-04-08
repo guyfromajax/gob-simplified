@@ -2746,46 +2746,11 @@
       <div class="pcc-card-zone">
         <div class="pcc-play-card">
           <div id="offense-play-scroller" class="play-scroller">
-            <div class="play-option" data-play="4-1 Motion" data-focus="inside">
+            <div class="play-option">
               <img class="play-headshot" src="" alt="Shooter">
               <div class="play-info">
-                <div class="play-name">4-1 Motion</div>
-                <div class="play-focus">Inside</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="3-2 Motion" data-focus="attack">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">3-2 Motion</div>
-                <div class="play-focus">Attack</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="5-0 Motion" data-focus="outside">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">5-0 Motion</div>
-                <div class="play-focus">Outside</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="Base Post Play" data-focus="inside">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Base Post Play</div>
-                <div class="play-focus">Inside</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="Pick & Roll (Lower Wing)" data-focus="attack">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Pick & Roll</div>
-                <div class="play-focus">Attack</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="Double Screen For SG" data-focus="outside">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Double Screen for SG</div>
-                <div class="play-focus">Outside</div>
+                <div class="play-name">Loading playbook...</div>
+                <div class="play-focus"></div>
               </div>
             </div>
           </div>
@@ -3019,15 +2984,18 @@
       // For each play, fetch play document and extract intended shooter position from successful skeleton
       for (const playOption of playOptions) {
         const playName = playOption.getAttribute('data-play');
-        if (!playName) continue;
+        const playId = playOption.getAttribute('data-play-id');
+        if (!playName && !playId) continue;
         
         try {
           // Fetch play document from backend
-          const encodedPlayName = encodeURIComponent(playName);
-          const response = await fetch(API_CONFIG.buildUrl(`/api/play/${encodedPlayName}`));
+          const playUrl = playId
+            ? API_CONFIG.buildUrl(`/api/plays/${encodeURIComponent(playId)}`)
+            : API_CONFIG.buildUrl(`/api/play/${encodeURIComponent(playName)}`);
+          const response = await fetch(playUrl);
           
           if (!response.ok) {
-            console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName}': ${response.status}`);
+            console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName || playId}': ${response.status}`);
             continue;
           }
           
@@ -3181,59 +3149,17 @@
               console.warn(`⚠️ [PLAYCALL HEADSHOTS] No player found for Motion play '${playName}' focus '${focusLower}'. Inside opportunities:`, playerInsideOpportunities, 'Outside opportunities:', playerOutsideOpportunities);
             }
           } else {
-            // ✅ SET PLAYS: Use existing logic (intended shooter from successful skeleton v0)
-            const skeletons = playDoc.skeletons || {};
-            const successfulVariant = skeletons.successful;
-            
-            if (!successfulVariant) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful variant for play '${playName}'`);
-              continue;
-            }
-            
-            // Access successful skeleton v0 from versions array (new structure)
-            let successfulSkeleton = null;
-            if (successfulVariant.versions && Array.isArray(successfulVariant.versions) && successfulVariant.versions.length > 0) {
-              // New format: versions array - find v0
-              const v0Version = successfulVariant.versions.find(v => v.version === 'v0');
-              if (v0Version && v0Version.steps) {
-                successfulSkeleton = { steps: v0Version.steps };
-              } else {
-                // Fallback to first version if v0 not found
-                const firstVersion = successfulVariant.versions.find(v => v.steps && v.steps.length > 0);
-                if (firstVersion) {
-                  successfulSkeleton = { steps: firstVersion.steps };
-                }
-              }
-            } else if (successfulVariant.steps) {
-              // Old format: direct steps array (backward compatibility)
-              successfulSkeleton = { steps: successfulVariant.steps };
-            }
-            
-            if (!successfulSkeleton || !successfulSkeleton.steps || successfulSkeleton.steps.length === 0) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful skeleton (v0) for play '${playName}'`);
-              continue;
-            }
-            
-            // Extract intended shooter position from final step (same logic as backend phase_resolution.py lines 1011-1017)
-            const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
-            const posActions = finalStep.pos_actions || {};
-            
-            let intendedShooterPos = null;
-            for (const [pos, actionInfo] of Object.entries(posActions)) {
-              const action = (actionInfo.action || '').toLowerCase();
-              if (action === 'shoot') {
-                intendedShooterPos = pos.toUpperCase(); // Normalize to uppercase (C, PG, SG, SF, PF)
-                break;
-              }
-            }
-          
-            // Map position to player ID from lineup
-            if (intendedShooterPos && lineup[intendedShooterPos]) {
-              shooterId = lineup[intendedShooterPos];
-            } else if (intendedShooterPos) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] Intended shooter position '${intendedShooterPos}' not found in lineup for play '${playName}'`);
+            // ✅ SET PLAYS: Use target_shooter as the source of truth for the offense card headshot.
+            // This avoids parsing skeleton position keys, which may be stored as
+            // target_shooter/pos1/pos2/pos3/pos4 in the database.
+            const targetShooterPos = (playDoc.target_shooter || '').toUpperCase();
+
+            if (targetShooterPos && lineup[targetShooterPos]) {
+              shooterId = lineup[targetShooterPos];
+            } else if (targetShooterPos) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] target_shooter '${targetShooterPos}' not found in lineup for play '${playName}'`);
             } else {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No intended shooter found in skeleton for play '${playName}'`);
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No target_shooter found for play '${playName}'`);
             }
           }
           
@@ -3258,18 +3184,21 @@
             }
           }
         } catch (error) {
-          console.error(`❌ [PLAYCALL HEADSHOTS] Error processing play '${playName}':`, error);
+          console.error(`❌ [PLAYCALL HEADSHOTS] Error processing play '${playName || playId}':`, error);
         }
       }
       
     }
     
     // Create a play option DOM element
-    function createPlayOptionElement(playName, playFocus) {
+    function createPlayOptionElement(playName, playFocus, playId = '') {
       const playOption = document.createElement('div');
       playOption.className = 'play-option';
       playOption.setAttribute('data-play', playName);
       playOption.setAttribute('data-focus', playFocus || '');
+      if (playId) {
+        playOption.setAttribute('data-play-id', playId);
+      }
       
       const headshotImg = document.createElement('img');
       headshotImg.className = 'play-headshot';
@@ -3384,6 +3313,7 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         setPlayInside.forEach((play, index) => {
           const frontendId = `set-inside-${index + 1}`;
@@ -3393,6 +3323,7 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         setPlayAttack.forEach((play, index) => {
           const frontendId = `set-attack-${index + 1}`;
@@ -3402,6 +3333,7 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         setPlayOutside.forEach((play, index) => {
           const frontendId = `set-outside-${index + 1}`;
@@ -3411,14 +3343,28 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         
         // Store for persisting slot changes to game doc (Data Persistence: in-game → game document)
         const playNameToSection = {};
-        motionPlays.forEach(p => { playNameToSection[p.name] = 'motion'; });
-        setPlayInside.forEach(p => { playNameToSection[p.name] = 'set_play_inside'; });
-        setPlayAttack.forEach(p => { playNameToSection[p.name] = 'set_play_attack'; });
-        setPlayOutside.forEach(p => { playNameToSection[p.name] = 'set_play_outside'; });
+        const playNameToPlayId = {};
+        motionPlays.forEach(p => {
+          playNameToSection[p.name] = 'motion';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
+        setPlayInside.forEach(p => {
+          playNameToSection[p.name] = 'set_play_inside';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
+        setPlayAttack.forEach(p => {
+          playNameToSection[p.name] = 'set_play_attack';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
+        setPlayOutside.forEach(p => {
+          playNameToSection[p.name] = 'set_play_outside';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
         const percentages = data.playbook_percentages || {};
         const playbookPayload = {
           motion: percentages.motion || {},
@@ -3435,6 +3381,7 @@
         };
         lastPlaybookDataForSave = {
           playNameToSection,
+          playNameToPlayId,
           playbookPayload,
           requestContext: { mode, teamId, gameId, franchiseId, tournamentId }
         };
@@ -3486,7 +3433,7 @@
             }
             
             // Get play focus from play object or assignment
-            const playObj = playIdToPlay[playName];
+            const playObj = playIdToPlay[assignment.playId] || playIdToPlay[playName];
             if (playObj) {
               playFocus = playObj.play_focus || '';
             }
@@ -3512,7 +3459,7 @@
               playOption = existingPlay;
             } else {
               // Create new play option element
-              playOption = createPlayOptionElement(playName, playFocus);
+              playOption = createPlayOptionElement(playName, playFocus, playObj?.play_id || assignment.playId || '');
             }
             
             orderedPlays.push(playOption);
@@ -3526,7 +3473,7 @@
           for (const play of allPlays) {
             if (orderedPlays.length >= 6) break;
             if (!usedPlayNames.has(play.name)) {
-              const playOption = createPlayOptionElement(play.name, play.play_focus || '');
+              const playOption = createPlayOptionElement(play.name, play.play_focus || '', play.play_id || '');
               orderedPlays.push(playOption);
               usedPlayNames.add(play.name);
             }
@@ -3678,7 +3625,12 @@
             if (slotNum >= 1 && slotNum <= 6) {
               const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
               const slotKey = String(slotNum);
-              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = { section: section, playId: playName };
+              const persistedPlayId = lastPlaybookDataForSave.playNameToPlayId[playName] || option.dataset.playId || playName;
+              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = {
+                section: section,
+                playId: persistedPlayId,
+                playName: playName
+              };
               const ctx = lastPlaybookDataForSave.requestContext;
               const body = {
                 mode: ctx.mode,

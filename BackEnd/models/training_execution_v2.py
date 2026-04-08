@@ -13,6 +13,11 @@ import random
 import logging
 from typing import List, Dict, Tuple, Optional, Any
 from BackEnd.constants import ALL_ATTRS
+from BackEnd.utils.playbook_settings_utils import (
+    ZONE_DEFENSE_ID_TO_NAME,
+    resolve_playbook_percentage,
+)
+from BackEnd.utils.team_play_utils import iter_team_plays
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +73,11 @@ def execute_training(
     
     # Store original effectiveness values BEFORE any changes
     original_plays_effectiveness = {}
-    for play_name, play_data in plays_data.items():
-        if isinstance(play_data, dict):
-            eff = play_data.get("effectiveness", 0)
-            original_plays_effectiveness[play_name] = eff
-            logger.warning(f"📚 [TRAINING] Play '{play_name}': initial effectiveness = {eff}, play_type = {play_data.get('play_type', 'unknown')}")
+    for play_key, play_data, display_name in iter_team_plays(plays_data):
+        eff = play_data.get("effectiveness", 0)
+        original_key = play_data.get("play_id") or play_key
+        original_plays_effectiveness[original_key] = eff
+        logger.warning(f"📚 [TRAINING] Play '{display_name}': initial effectiveness = {eff}, play_type = {play_data.get('play_type', 'unknown')}")
     
     original_defenses_effectiveness = {}
     if scouting_data and "defense" in scouting_data:
@@ -122,10 +127,11 @@ def execute_training(
     
     # Calculate effectiveness changes for training report
     plays_effectiveness_changes = {}
-    for play_name, original_eff in original_plays_effectiveness.items():
-        if play_name in updated_plays:
-            new_eff = updated_plays[play_name].get("effectiveness", 0)
-            plays_effectiveness_changes[play_name] = new_eff - original_eff
+    for play_key, play_data, _display_name in iter_team_plays(updated_plays):
+        change_key = play_data.get("play_id") or play_key
+        if change_key in original_plays_effectiveness:
+            new_eff = play_data.get("effectiveness", 0)
+            plays_effectiveness_changes[change_key] = new_eff - original_plays_effectiveness[change_key]
     
     defenses_effectiveness_changes = {}
     if updated_scouting_data and "defense" in updated_scouting_data:
@@ -1614,14 +1620,14 @@ def _apply_pre_training_effectiveness_decay(plays_data: Dict) -> Dict:
     """
     updated_plays = plays_data.copy() if plays_data else {}
     
-    for play_name, play_data in updated_plays.items():
+    for play_key, play_data, display_name in iter_team_plays(updated_plays):
         if isinstance(play_data, dict):
             current_effectiveness = play_data.get("effectiveness", 0)
             if current_effectiveness > 0:
                 decay = random.randint(5, 15)
                 new_effectiveness = max(0, current_effectiveness - decay)
                 play_data["effectiveness"] = new_effectiveness
-                logger.warning(f"📉 [PLAY DECAY] {play_name}: {current_effectiveness} → {new_effectiveness} (decay: -{decay})")
+                logger.warning(f"📉 [PLAY DECAY] {display_name}: {current_effectiveness} → {new_effectiveness} (decay: -{decay})")
     
     return updated_plays
 
@@ -1815,9 +1821,8 @@ def _apply_offense_play_training(
         # Even distribution across ALL plays (motion AND set plays)
         # plays_data is a dict where keys are play names and values are play data
         all_plays = []
-        for play_name, play_data in updated_plays.items():
-            if isinstance(play_data, dict):
-                all_plays.append((play_name, play_data))
+        for play_key, play_data, display_name in iter_team_plays(updated_plays):
+            all_plays.append((play_key, play_data, display_name))
         
         logger.warning(f"🎯 [PLAY TRAINING] Found {len(all_plays)} total plays for even distribution (all-plays-even mode)")
         
@@ -1825,7 +1830,7 @@ def _apply_offense_play_training(
             points_per_play = math.floor(total_points / len(all_plays))
             remainder = total_points - (points_per_play * len(all_plays))
             
-            for i, (play_name, play_data) in enumerate(all_plays):
+            for i, (play_key, play_data, display_name) in enumerate(all_plays):
                 points = points_per_play + (1 if i < remainder else 0)
                 is_set_play = play_data.get("play_type") == "set_play"
                 is_motion_play = play_data.get("play_type") == "motion"
@@ -1837,9 +1842,9 @@ def _apply_offense_play_training(
                 )
                 old_effectiveness = play_data.get("effectiveness", 0)
                 new_effectiveness = old_effectiveness + points
-                updated_plays[play_name]["effectiveness"] = new_effectiveness
+                updated_plays[play_key]["effectiveness"] = new_effectiveness
                 play_type = play_data.get("play_type", "unknown")
-                logger.warning(f"🎯 [PLAY TRAINING] {play_name} ({play_type}): {old_effectiveness} → {new_effectiveness} (+{points})")
+                logger.warning(f"🎯 [PLAY TRAINING] {display_name} ({play_type}): {old_effectiveness} → {new_effectiveness} (+{points})")
     else:
         # Use playbook settings with layered filtering
         # Filter 1: strategy_settings["offense"] determines motion/set split
@@ -1875,9 +1880,9 @@ def _apply_offense_play_training(
         if motion_points > 0:
             motion_playbook = playbook_settings.get("motion", {})
             motion_plays = []
-            for play_name, play_data in updated_plays.items():
+            for play_key, play_data, display_name in iter_team_plays(updated_plays):
                 if isinstance(play_data, dict) and play_data.get("play_type") == "motion":
-                    motion_plays.append((play_name, play_data))
+                    motion_plays.append((play_key, play_data, display_name))
             
             logger.warning(f"🎯 [PLAY TRAINING] Motion points: {motion_points}, found {len(motion_plays)} motion plays")
             logger.warning(f"🎯 [PLAY TRAINING] Motion playbook settings: {motion_playbook}")
@@ -1886,8 +1891,13 @@ def _apply_offense_play_training(
             total_motion_pct = sum(motion_playbook.values())
             
             if total_motion_pct > 0:
-                for play_name, play_data in motion_plays:
-                    play_pct = motion_playbook.get(play_name, 0) / total_motion_pct
+                for play_key, play_data, display_name in motion_plays:
+                    play_pct = resolve_playbook_percentage(
+                        motion_playbook,
+                        play_id=play_data.get("play_id"),
+                        play_name=display_name,
+                        default=0,
+                    ) / total_motion_pct
                     points = math.floor(motion_points * play_pct)
                     if points > 0:
                         points = _scale_install_training_effectiveness_points(
@@ -1895,21 +1905,21 @@ def _apply_offense_play_training(
                         )
                         old_effectiveness = play_data.get("effectiveness", 0)
                         new_effectiveness = old_effectiveness + points
-                        updated_plays[play_name]["effectiveness"] = new_effectiveness
-                        logger.warning(f"🎯 [PLAY TRAINING] {play_name}: {old_effectiveness} → {new_effectiveness} (+{points}, {play_pct*100:.1f}%)")
+                        updated_plays[play_key]["effectiveness"] = new_effectiveness
+                        logger.warning(f"🎯 [PLAY TRAINING] {display_name}: {old_effectiveness} → {new_effectiveness} (+{points}, {play_pct*100:.1f}%)")
             else:
                 # No playbook percentages, distribute evenly
                 points_per_play = math.floor(motion_points / len(motion_plays)) if motion_plays else 0
                 remainder = motion_points - (points_per_play * len(motion_plays)) if motion_plays else 0
-                for i, (play_name, play_data) in enumerate(motion_plays):
+                for i, (play_key, play_data, display_name) in enumerate(motion_plays):
                     points = points_per_play + (1 if i < remainder else 0)
                     points = _scale_install_training_effectiveness_points(
                         points, authoritarian_teamwork_eff_mult, True
                     )
                     old_effectiveness = play_data.get("effectiveness", 0)
                     new_effectiveness = old_effectiveness + points
-                    updated_plays[play_name]["effectiveness"] = new_effectiveness
-                    logger.warning(f"🎯 [PLAY TRAINING] {play_name}: {old_effectiveness} → {new_effectiveness} (+{points}, even dist)")
+                    updated_plays[play_key]["effectiveness"] = new_effectiveness
+                    logger.warning(f"🎯 [PLAY TRAINING] {display_name}: {old_effectiveness} → {new_effectiveness} (+{points}, even dist)")
         
         # Distribute set play points
         if set_points > 0:
@@ -1940,31 +1950,32 @@ def _apply_offense_play_training(
             # Distribute points for each focus
             for focus, focus_points in [("inside", inside_points), ("outside", outside_points), ("attack", attack_points)]:
                 if focus_points > 0:
-                    set_playbook_key = f"set_play_{focus}"
-                    set_playbook = playbook_settings.get(set_playbook_key, {})
+                    set_playbook = playbook_settings.get("set_plays", {})
+                    if not set_playbook:
+                        set_playbook = playbook_settings.get(f"set_play_{focus}", {})
                     
                     # 🔍 DEBUG: Log set playbook lookup
                     logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] {focus} focus:")
                     logger.warning(f"   - focus_points: {focus_points}")
-                    logger.warning(f"   - set_playbook_key: '{set_playbook_key}'")
+                    logger.warning(f"   - set_playbook_key: 'set_plays'")
                     logger.warning(f"   - set_playbook found: {bool(set_playbook)}")
                     logger.warning(f"   - set_playbook keys: {list(set_playbook.keys()) if set_playbook else 'EMPTY'}")
                     
                     set_plays = []
                     # 🔍 DEBUG: First, log all set plays and their play_focus values
                     all_set_plays = []
-                    for play_name, play_data in updated_plays.items():
+                    for play_key, play_data, display_name in iter_team_plays(updated_plays):
                         if isinstance(play_data, dict) and play_data.get("play_type") == "set_play":
-                            all_set_plays.append((play_name, play_data.get("play_focus", "MISSING")))
+                            all_set_plays.append((display_name, play_data.get("play_focus", "MISSING")))
                             if play_data.get("play_focus") == focus:
-                                set_plays.append((play_name, play_data))
+                                set_plays.append((play_key, play_data, display_name))
                     
                     if all_set_plays:
                         logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] All set plays in plays_data: {[(name, focus) for name, focus in all_set_plays]}")
                     
                     logger.warning(f"🎯 [PLAY TRAINING] {focus} focus points: {focus_points}, found {len(set_plays)} set plays")
                     if set_plays:
-                        logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] Set plays found: {[name for name, _ in set_plays]}")
+                        logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] Set plays found: {[name for _, _, name in set_plays]}")
                     elif all_set_plays:
                         logger.warning(f"⚠️ [SET PLAY TRAINING DEBUG] No set plays matched focus '{focus}'! Available focuses: {set([f for _, f in all_set_plays])}")
                     
@@ -1973,8 +1984,13 @@ def _apply_offense_play_training(
                     logger.warning(f"🔍 [SET PLAY TRAINING DEBUG] total_set_pct: {total_set_pct}")
                     
                     if total_set_pct > 0:
-                        for play_name, play_data in set_plays:
-                            play_pct = set_playbook.get(play_name, 0) / total_set_pct
+                        for play_key, play_data, display_name in set_plays:
+                            play_pct = resolve_playbook_percentage(
+                                set_playbook,
+                                play_id=play_data.get("play_id"),
+                                play_name=display_name,
+                                default=0,
+                            ) / total_set_pct
                             points = math.floor(focus_points * play_pct)
                             if points > 0:
                                 points = _scale_install_training_effectiveness_points(
@@ -1982,21 +1998,21 @@ def _apply_offense_play_training(
                                 )
                                 old_effectiveness = play_data.get("effectiveness", 0)
                                 new_effectiveness = old_effectiveness + points
-                                updated_plays[play_name]["effectiveness"] = new_effectiveness
-                                logger.warning(f"🎯 [PLAY TRAINING] {play_name}: {old_effectiveness} → {new_effectiveness} (+{points}, {play_pct*100:.1f}%)")
+                                updated_plays[play_key]["effectiveness"] = new_effectiveness
+                                logger.warning(f"🎯 [PLAY TRAINING] {display_name}: {old_effectiveness} → {new_effectiveness} (+{points}, {play_pct*100:.1f}%)")
                     else:
                         # No playbook percentages, distribute evenly
                         points_per_play = math.floor(focus_points / len(set_plays)) if set_plays else 0
                         remainder = focus_points - (points_per_play * len(set_plays)) if set_plays else 0
-                        for i, (play_name, play_data) in enumerate(set_plays):
+                        for i, (play_key, play_data, display_name) in enumerate(set_plays):
                             points = points_per_play + (1 if i < remainder else 0)
                             points = _scale_install_training_effectiveness_points(
                                 points, authoritarian_execution_eff_mult, True
                             )
                             old_effectiveness = play_data.get("effectiveness", 0)
                             new_effectiveness = old_effectiveness + points
-                            updated_plays[play_name]["effectiveness"] = new_effectiveness
-                            logger.warning(f"🎯 [PLAY TRAINING] {play_name}: {old_effectiveness} → {new_effectiveness} (+{points}, even dist)")
+                            updated_plays[play_key]["effectiveness"] = new_effectiveness
+                            logger.warning(f"🎯 [PLAY TRAINING] {display_name}: {old_effectiveness} → {new_effectiveness} (+{points}, even dist)")
     
     return updated_plays
 
@@ -2106,7 +2122,8 @@ def _apply_defense_training(
             
             if total_zone_pct > 0:
                 for defense_name in valid_zone_defenses:
-                    defense_pct = zone_playbook.get(defense_name, 0) / total_zone_pct
+                    defense_id = next((key for key, value in ZONE_DEFENSE_ID_TO_NAME.items() if value == defense_name), defense_name)
+                    defense_pct = zone_playbook.get(defense_id, zone_playbook.get(defense_name, 0)) / total_zone_pct
                     points = math.floor(zone_points * defense_pct)
                     if points > 0:
                         points = _scale_install_training_effectiveness_points(

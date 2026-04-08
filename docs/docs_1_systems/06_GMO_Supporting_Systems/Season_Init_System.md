@@ -1,100 +1,45 @@
 # Season Init System
 
-This document covers the start of a new season inside an existing Franchise instance. This is distinct from `Mode_Init_System.md`, which covers brand new mode-instance creation.
+This document covers the start of a new season inside an existing franchise instance.
 
 ## Scope
 
-- Applies only when a user finishes week 36 and presses `Go To Next Season`.
-- Does not touch the universal `players` or `teams` collections.
-- Rebuilds the next season entirely from persisted franchise-instance data.
+Season init rebuilds the next season from franchise-instance persistence only.
 
-## High-Level Flow
+It does not:
+- read universal player progression as source of truth
+- rebuild team playbooks from scratch in a way that drops franchise state
 
-1. Read the current franchise instance state from:
-   - `franchises`
-   - `franchise_team_data`
-   - `franchise_players_data`
-   - `franchise_recruits_data`
-2. Remove graduating seniors from the franchise instance.
-3. Carry all returning players forward into the next season.
-4. Add signed recruits and walk-ons produced by week 35 recruiting.
-5. Reset season-level state.
-6. Generate the next season's recruits and schedule.
+## Play / Playbook Relevance
 
-## Player Continuity
+For the current playbook migration, the important season-init rules are:
 
-- Returning players keep their existing franchise `player_id`.
-- Signed recruits and walk-ons receive new franchise-scoped UUID player ids.
-- Player `career` stats persist.
-- Player `season` stats reset to zero for the new season.
-- Player years advance:
-  - Freshman -> Sophomore
-  - Sophomore -> Junior
-  - Junior -> Senior
-  - Seniors / Graduates are removed from the franchise instance
+- team-owned `plays` remain franchise-instance state
+- `training_reports` reset each season
+- playbook settings persist as franchise-instance team state unless explicitly rebuilt
+- team play copies continue to carry:
+  - `play_id`
+  - `name`
+  - `play_type`
+  - `play_focus`
+  - `target_shooter`
 
-## Roster Rebuild
+## Fields Reset
 
-For each franchise team:
+Season init resets:
+- `training_reports`
+- recruiting state
+- season-progress fields
+- current-season game docs
 
-1. Start with all returning non-graduating players.
-2. Add all week-35 signed recruits.
-3. Add any generated walk-ons needed to reach 15 total roster players.
-4. Build scholarship state:
-   - keep all returning scholarship players except graduates
-   - add signed recruits who accepted scholarship offers
-   - hard cap = 12
-   - if the cap is somehow exceeded, remove scholarship from the lowest-RT freshman scholarship player
-5. Build roster state:
-   - keep the full 12-15 player roster together
-   - sort the carried roster for storage/display
-   - `training_squad_players` remains stored but is reset to `[]` and is currently dormant
+Season init does not intentionally wipe:
+- the franchise team’s play library metadata
+- the team’s playbook identity model
 
-## Team Fields Reset
+## Rename / Identity Note
 
-Each FTD doc is reset for the new season:
+Because the current rollout moved playbook settings to `play_id`, season-init continuity should treat:
+- `play_id` as stable identity
+- `name` as mutable display text
 
-- `Recruits` -> keys `"1"` through `"20"` set to `None`
-- `recruiting_orders_week_35` -> `{}`
-- `recruit_visit` -> `None`
-- `training_reports` -> `{}`
-- `playing_time_promise_players` -> signed freshmen who accepted a PT promise
-- `scholarship_players` -> current scholarship player ids
-- `training_squad_players` -> `[]` (field retained, functionality dormant)
-
-## Franchise Fields Reset
-
-On next-season init:
-
-- `current_season` increments by 1
-- `week` resets to `1`
-- EOS bracket state clears
-- `recruiting_results` clears
-- `recruiting_lean_updates_applied` clears
-- `week_35_recruiting_ran` resets to `False`
-- `week_35_recruiting_results` clears
-- `awards` clears
-- training status resets to preseason
-- current-season game docs tied to the franchise are deleted
-
-## New Recruit Generation
-
-After the prior season closes:
-
-- delete the prior season's `franchise_recruits_data` docs
-- generate 200 fresh recruits
-- assign each recruit:
-  - new `recruit_id`
-  - `Home Region`
-  - `Lean`
-
-## Schedule Generation
-
-- Generate a fresh 26-week regular-season schedule for the new season.
-- This is the franchise-instance continuation schedule, not a new franchise bootstrap.
-
-## SS&S Rules
-
-- New franchise instance init may use universal data.
-- New season init inside an existing franchise must not.
-- Franchise continuity is preserved through FTD/FPD/FRD state only.
+Any future season-init rebuild of playbook settings should preserve `play_id` keys.

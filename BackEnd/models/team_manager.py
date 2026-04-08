@@ -561,6 +561,8 @@ class TeamManager:
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
+                "target_shooter": play.get("target_shooter"),
+                "motion_focus": None if play.get("play_type") == "motion" else None,
                 # Per-team effectiveness, momentum, and cloaking (separate from calculated effectiveness in stats)
                 "effectiveness": initial_effectiveness,
                 "momentum": initial_momentum,

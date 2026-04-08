@@ -50,6 +50,8 @@ from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 # TEMPORARY (Mar 2026): When False, missed FT → DREB always continues as HCO (no fast-break roll).
 # Set True to restore `fast_break_probability_from_slider` after FT miss rebounds.
 _FT_MISS_DREB_FAST_BREAK_ENABLED = False
+_CANONICAL_SET_PLAY_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+_SET_PLAY_EVENT_POSITION_FIELDS = ("by", "for", "from", "to")
 
 
 def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
@@ -75,6 +77,106 @@ def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
             if d_x > bh_x:
                 in_play.append(defender)
     return in_play
+
+
+def _build_set_play_alias_map(target_shooter):
+    """Map staging set-play aliases back to canonical lineup positions."""
+    if target_shooter not in _CANONICAL_SET_PLAY_POSITIONS:
+        return {}
+
+    remaining = [pos for pos in _CANONICAL_SET_PLAY_POSITIONS if pos != target_shooter]
+    alias_map = {"target_shooter": target_shooter}
+    for index, position in enumerate(remaining, start=1):
+        alias_map[f"pos{index}"] = position
+    return alias_map
+
+
+def _remap_set_play_event_positions(event, alias_map):
+    if not isinstance(event, dict) or not alias_map:
+        return event
+
+    updated = copy.deepcopy(event)
+    for field in _SET_PLAY_EVENT_POSITION_FIELDS:
+        value = updated.get(field)
+        if value in alias_map:
+            updated[field] = alias_map[value]
+    return updated
+
+
+def _remap_set_play_steps_to_canonical(steps, target_shooter):
+    alias_map = _build_set_play_alias_map(target_shooter)
+    if not alias_map:
+        return steps
+
+    updated_steps = []
+    changed = False
+
+    for step in steps or []:
+        if not isinstance(step, dict):
+            updated_steps.append(step)
+            continue
+
+        updated_step = copy.deepcopy(step)
+        pos_actions = updated_step.get("pos_actions") or {}
+        remapped_pos_actions = {}
+
+        for position, action_info in pos_actions.items():
+            mapped_position = alias_map.get(position, position)
+            remapped_pos_actions[mapped_position] = action_info
+            if mapped_position != position:
+                changed = True
+
+        updated_step["pos_actions"] = remapped_pos_actions
+
+        events = updated_step.get("events")
+        if isinstance(events, list):
+            remapped_events = [_remap_set_play_event_positions(event, alias_map) for event in events]
+            if remapped_events != events:
+                changed = True
+            updated_step["events"] = remapped_events
+
+        updated_steps.append(updated_step)
+
+    return updated_steps if changed else steps
+
+
+def _apply_set_play_runtime_position_mapping(skeleton, target_shooter):
+    """
+    Convert DB alias positions back to canonical lineup positions for runtime use.
+    """
+    if not skeleton or "steps" not in skeleton:
+        return skeleton
+
+    remapped_steps = _remap_set_play_steps_to_canonical(skeleton.get("steps") or [], target_shooter)
+    if remapped_steps == skeleton.get("steps"):
+        return skeleton
+
+    updated_skeleton = copy.deepcopy(skeleton)
+    updated_skeleton["steps"] = remapped_steps
+    return updated_skeleton
+
+
+def _select_default_set_play_skeleton(play_doc):
+    """Return a usable successful set-play skeleton from either steps or versions."""
+    skeletons = play_doc.get("skeletons", {})
+    successful = skeletons.get("successful")
+    if not isinstance(successful, dict):
+        return None
+
+    versions = successful.get("versions")
+    if isinstance(versions, list):
+        non_empty_versions = [v for v in versions if isinstance(v, dict) and v.get("steps")]
+        if non_empty_versions:
+            selected_version = non_empty_versions[0]
+            return {
+                "steps": selected_version.get("steps", []),
+                "version": selected_version.get("version", "v0"),
+            }
+
+    if successful.get("steps"):
+        return successful
+
+    return None
 
 
 def apply_energy_decay(off_lineup, def_lineup, omit_zeros_for_defense=False):
@@ -4958,7 +5060,8 @@ def resolve_half_court_offense_logic(game):
             # Get current playcall name and offensive team's plays dict
             current_playcall = game.game_state.get("current_playcall")
             if current_playcall and hasattr(off_team, 'plays') and off_team.plays:
-                play_obj = off_team.plays.get(current_playcall)
+                from BackEnd.utils.team_play_utils import resolve_team_play
+                play_obj = resolve_team_play(off_team.plays, current_playcall)
                 if play_obj:
                     # Always increment times_run
                     if "game_stats" in play_obj:
@@ -6103,13 +6206,16 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
             if skeleton:
                 # Add variant name to skeleton metadata for shot modifier
                 skeleton["_variant"] = variant
-                return skeleton
+                return _apply_set_play_runtime_position_mapping(
+                    skeleton, play_doc.get("target_shooter")
+                )
         
         # Default to successful skeleton (Set Play only)
-        skeletons = play_doc.get("skeletons", {})
-        if "successful" in skeletons:
-            skeleton = skeletons["successful"]
-            return skeleton
+        skeleton = _select_default_set_play_skeleton(play_doc)
+        if skeleton:
+            return _apply_set_play_runtime_position_mapping(
+                skeleton, play_doc.get("target_shooter")
+            )
     
     # Final fallback to old skeleton system
     from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
@@ -6156,19 +6262,22 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
     """
     from BackEnd.db import games_collection, tournaments_collection, franchises_collection, plays_collection
     from bson import ObjectId
+    from BackEnd.utils.team_play_utils import resolve_team_play
     
     # Initialize skeleton cache on game_context if it doesn't exist
     if not hasattr(game_context, '_skeleton_cache'):
         game_context._skeleton_cache = {}
     
     play_id = None
+    team_target_shooter = None
     
     # STEP 1: Get play_id from team plays (in-memory or database)
     offense_team = game_context.offense_team
     if hasattr(offense_team, 'plays') and offense_team.plays:
-        if playcall in offense_team.plays:
-            play_obj = offense_team.plays[playcall]
+        play_obj = resolve_team_play(offense_team.plays, playcall)
+        if play_obj:
             play_id = play_obj.get("play_id")
+            team_target_shooter = play_obj.get("target_shooter")
     
     # If not found in memory, check database
     if not play_id:
@@ -6178,9 +6287,10 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
             if game_doc and "teams" in game_doc:
                 team_obj = game_doc["teams"].get(team_id, {})
                 plays = team_obj.get("plays", {})
-                if playcall in plays:
-                    play_obj = plays[playcall]
+                play_obj = resolve_team_play(plays, playcall)
+                if play_obj:
                     play_id = play_obj.get("play_id")
+                    team_target_shooter = play_obj.get("target_shooter")
     
     if not play_id:
         # print(f"🔍 NOT FOUND: No play_id for '{playcall}'")
@@ -6245,15 +6355,15 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
         skeleton, variant = get_skeleton_by_lean(play_doc, lean_score)
         if skeleton and skeleton.get("steps"):
             skeleton["_variant"] = variant
-            return skeleton
-    
+            target_shooter = team_target_shooter or play_doc.get("target_shooter")
+            return _apply_set_play_runtime_position_mapping(skeleton, target_shooter)
+
     # Default to successful variant (Set Play only)
-    skeletons = play_doc.get("skeletons", {})
-    if "successful" in skeletons:
-        skeleton = skeletons["successful"]
-        if skeleton and skeleton.get("steps"):
-            return skeleton
-    
+    skeleton = _select_default_set_play_skeleton(play_doc)
+    if skeleton and skeleton.get("steps"):
+        target_shooter = team_target_shooter or play_doc.get("target_shooter")
+        return _apply_set_play_runtime_position_mapping(skeleton, target_shooter)
+
     return None
 
 

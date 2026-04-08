@@ -435,7 +435,8 @@
         
         allPlays.forEach(play => {
           const option = document.createElement('option');
-          option.value = play.name;
+          option.value = play._id || play.name;
+          option.dataset.playName = play.name;
           option.textContent = play.name;
           dropdown.appendChild(option);
           console.log(`  ✓ Added play: ${play.name}`);
@@ -450,8 +451,10 @@
 
     // Handle play selection
     document.getElementById('play-dropdown').addEventListener('change', async (e) => {
-      const playName = e.target.value;
-      if (!playName) {
+      const playReference = e.target.value;
+      const selectedOption = e.target.selectedOptions && e.target.selectedOptions[0];
+      const playName = selectedOption?.dataset.playName || '';
+      if (!playReference) {
         document.getElementById('content-container').style.display = 'none';
         document.getElementById('animation-controls').style.display = 'none';
         document.getElementById('submit-section').style.display = 'none';
@@ -459,7 +462,7 @@
       }
 
       try {
-        const response = await fetch(`/api/play/${encodeURIComponent(playName)}`);
+        const response = await fetch(`/api/play/${encodeURIComponent(playReference)}`);
         if (!response.ok) throw new Error('Failed to load play');
         currentPlay = await response.json();
         
@@ -772,4 +775,3 @@
   </script>
 </body>
 </html>
-

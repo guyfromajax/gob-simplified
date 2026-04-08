@@ -1317,10 +1317,19 @@ def summarize_game_state(game, exclude_animations=True):
     home_plays = deepcopy(getattr(game.home_team, 'plays', {}))
     # Get plays from away team (in-memory, with updated game_stats)
     away_plays = deepcopy(getattr(game.away_team, 'plays', {}))
+    from BackEnd.utils.team_play_utils import iter_team_plays
     
     # 🔍 DEBUG: Log game_stats in plays
-    home_plays_with_stats = {name: play for name, play in home_plays.items() if play.get("game_stats", {}).get("times_run", 0) > 0}
-    away_plays_with_stats = {name: play for name, play in away_plays.items() if play.get("game_stats", {}).get("times_run", 0) > 0}
+    home_plays_with_stats = {
+        display_name: play
+        for _play_key, play, display_name in iter_team_plays(home_plays)
+        if play.get("game_stats", {}).get("times_run", 0) > 0
+    }
+    away_plays_with_stats = {
+        display_name: play
+        for _play_key, play, display_name in iter_team_plays(away_plays)
+        if play.get("game_stats", {}).get("times_run", 0) > 0
+    }
     # if home_plays_with_stats:
     #     logging.warning(f"🔍 [SUMMARIZE_GAME_STATE] Home team plays with game_stats: {list(home_plays_with_stats.keys())}")
     #     for play_name, play_data in list(home_plays_with_stats.items())[:3]:  # Log first 3

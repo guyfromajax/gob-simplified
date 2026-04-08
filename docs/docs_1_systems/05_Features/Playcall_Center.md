@@ -15,6 +15,7 @@ In-game tactical hub at the bottom of the court. User overrides apply only to th
   - Single **play card** (`.pcc-play-card`) showing one play at a time: player headshot (`.play-headshot`), play name (`.play-name`), play focus (`.play-focus`) inside `#offense-play-scroller` with multiple `.play-option` items (one visible).
   - **Nav column** (`.pcc-nav-col`): ▲ (`#play-nav-up`), ▼ (`#play-nav-down`), ✕ (`#clear-offense-override-x`).
   - **Behavior**: ▲/▼ scroll through slots (browse only). **Click** the visible play option to **select** it (highlight + send override). ✕ clears offense override.
+  - **Load state**: the static fallback no longer hardcodes named offensive plays. The card starts with a neutral loading placeholder until live playbook data populates the slots.
 
 - **Stacks Zone (34%)** — `#pcc-stacks-zone`
   - Three equal vertical stacks with group labels and red ✕ at bottom:
@@ -77,9 +78,30 @@ team.strategy_calls = {
 
 ### Player headshot assignment (offense card)
 
-- Set plays: intended shooter from `play.skeletons.successful` final step (`action == "shoot"`).
+- Set plays: use `play.target_shooter` as the source of truth, then map that position to the current lineup player ID.
 - Motion plays: analyze steps 1–10 of `play.skeletons.base_loop` for most likely shooter per focus.
 - Map shooter position to player ID from lineup (URL). Set headshot on page load via `populatePlayHeadshots()` in `court.html`.
+
+### Slot assignment persistence
+
+Playcall Center slot assignments are now persisted by `playId`.
+
+Current slot object shape:
+
+```json
+{
+  "1": {
+    "section": "motion",
+    "playId": "mongo_object_id_as_string",
+    "playName": "3-2 Motion"
+  }
+}
+```
+
+Important notes:
+- the slot identity is `playId`
+- `playName` is retained as display text
+- the actual next-play override sent during gameplay is still the display name because the runtime call text remains name-based
 
 ---
 

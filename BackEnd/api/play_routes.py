@@ -168,7 +168,11 @@ async def get_play_by_name(play_name: str):
         from urllib.parse import unquote
         staging_collection = get_staging_plays_collection()
         decoded_name = unquote(play_name)
-        play = staging_collection.find_one({"name": decoded_name})
+        play = None
+        if ObjectId.is_valid(decoded_name):
+            play = staging_collection.find_one({"_id": ObjectId(decoded_name)})
+        if not play:
+            play = staging_collection.find_one({"name": decoded_name})
         if not play:
             raise HTTPException(status_code=404, detail=f"Play '{decoded_name}' not found")
         
@@ -224,4 +228,3 @@ async def delete_play(play_id: str, _user=Depends(require_admin_for_builder)):
         return {"message": "Play deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-

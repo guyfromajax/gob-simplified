@@ -2141,11 +2141,12 @@ function renderPlaybookSummary() {
   
   for (const [play_name, play_data] of Object.entries(plays_data)) {
     if (typeof play_data === 'object' && play_data !== null) {
+      const resolvedName = play_data.name || play_name;
       const play_type = play_data.play_type || '';
       if (play_type === 'motion') {
-        motion_plays.push({ name: play_name, ...play_data });
+        motion_plays.push({ ...play_data, name: resolvedName, display_name: resolvedName, play_key: play_name });
       } else if (play_type === 'set_play') {
-        set_plays.push({ name: play_name, ...play_data });
+        set_plays.push({ ...play_data, name: resolvedName, display_name: resolvedName, play_key: play_name });
       }
     }
   }
@@ -2184,7 +2185,7 @@ function renderPlaybookSummary() {
   if (motion_plays.length > 0) {
     motion_plays.forEach(play => {
       // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
-      const playRow = createPlayRow(play.name, play, null, players);
+      const playRow = createPlayRow(play.display_name || play.name, play, null, players);
       offenseSection.appendChild(playRow);
     });
   }
@@ -2192,7 +2193,7 @@ function renderPlaybookSummary() {
   if (set_plays.length > 0) {
     set_plays.forEach(play => {
       // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
-      const playRow = createPlayRow(play.name, play, null, players);
+      const playRow = createPlayRow(play.display_name || play.name, play, null, players);
       offenseSection.appendChild(playRow);
     });
   }
@@ -2242,6 +2243,9 @@ function createPlayRow(playName, playData, change, players = []) {
   
   const row = document.createElement('div');
   row.className = 'playbook-row';
+  if (playData && typeof playData === 'object' && playData.play_id) {
+    row.dataset.playId = playData.play_id;
+  }
   
   // Play name
   const nameDiv = document.createElement('div');

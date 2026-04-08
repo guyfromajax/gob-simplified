@@ -36,6 +36,10 @@ from BackEnd.utils.shared import (
     getAwayTeamCoords,
     calc_pass_segment_seconds,
 )
+from BackEnd.utils.playbook_settings_utils import (
+    ZONE_DEFENSE_ID_TO_NAME,
+    resolve_playbook_percentage,
+)
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
     build_phase_post_stopper_snapshot,
@@ -2056,8 +2060,8 @@ class TurnManager:
             logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings OFFENSE: hasattr={has_attr}, team={offense_team.name}, team_id={getattr(offense_team, 'team_id', 'NO_ID')}")
             if has_attr:
                 attr_value = getattr(offense_team, 'playbook_settings', None)
-                slot_count = len(attr_value.get("slot_assignments", {})) if attr_value else 0
-                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: slot_assignments={slot_count}, value_type={type(attr_value)}")
+                pc_count = len((attr_value.get("pc_order", {}) or {}).get("offense", [])) if attr_value else 0
+                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: pc_order.offense={pc_count}, value_type={type(attr_value)}")
                 return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
             else:
                 logging.error(f"🔴🔴🔴 [DIAG] OFFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={offense_team.name}, dir(team)={[x for x in dir(offense_team) if not x.startswith('_')][:10]}")
@@ -2066,8 +2070,8 @@ class TurnManager:
             logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr={has_attr}, team={defense_team.name}, team_id={getattr(defense_team, 'team_id', 'NO_ID')}")
             if has_attr:
                 attr_value = getattr(defense_team, 'playbook_settings', None)
-                slot_count = len(attr_value.get("slot_assignments", {})) if attr_value else 0
-                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: slot_assignments={slot_count}, value_type={type(attr_value)}")
+                pc_count = len((attr_value.get("pc_order", {}) or {}).get("defense", [])) if attr_value else 0
+                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: pc_order.defense={pc_count}, value_type={type(attr_value)}")
                 return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
             else:
                 logging.error(f"🔴🔴🔴 [DIAG] DEFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={defense_team.name}, dir(team)={[x for x in dir(defense_team) if not x.startswith('_')][:10]}")
@@ -2209,14 +2213,28 @@ class TurnManager:
         weights = {}
         for play in valid_plays:
             play_name = play.get("name")
+            play_id = play.get("play_id") or play.get("_id")
             
             if playbook_settings:
                 # Get percentage from playbook settings
                 if play_type == "motion":
-                    percentage = playbook_settings.get("motion", {}).get(play_name, 0)
+                    percentage = resolve_playbook_percentage(
+                        playbook_settings.get("motion", {}),
+                        play_id=play_id,
+                        play_name=play_name,
+                        default=0,
+                    )
                 elif play_type == "set_play":
-                    focus_key = f"set_play_{play_focus}" if play_focus else "set_play_inside"
-                    percentage = playbook_settings.get(focus_key, {}).get(play_name, 0)
+                    set_playbook = playbook_settings.get("set_plays", {})
+                    if not set_playbook:
+                        focus_key = f"set_play_{play_focus}" if play_focus else "set_play_inside"
+                        set_playbook = playbook_settings.get(focus_key, {})
+                    percentage = resolve_playbook_percentage(
+                        set_playbook,
+                        play_id=play_id,
+                        play_name=play_name,
+                        default=0,
+                    )
                 else:
                     percentage = 0
                 
@@ -2258,7 +2276,8 @@ class TurnManager:
             zone_settings = playbook_settings.get("zone_defense", {})
             weights = {}
             for zone_type in zone_types:
-                percentage = zone_settings.get(zone_type, 0)
+                zone_id = next((key for key, value in ZONE_DEFENSE_ID_TO_NAME.items() if value == zone_type), zone_type)
+                percentage = zone_settings.get(zone_id, zone_settings.get(zone_type, 0))
                 if percentage > 0:
                     weights[zone_type] = percentage
             

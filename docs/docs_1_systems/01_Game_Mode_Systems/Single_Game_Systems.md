@@ -30,7 +30,7 @@ Single Game Mode is designed for one-off games with no persistent state between 
 **Settings:**
 - `playcall_settings`: Default settings (all set to 2 = Normal)
 - `strategy_settings`: Default settings (all set to 2 = Normal)
-- `playbook_settings`: Even distribution across all plays in each category (not first play = 100%)
+- `playbook_settings`: `play_id`-first offensive weighting plus defense weighting
 
 ## System Flow
 
@@ -99,15 +99,18 @@ Single Game Mode is designed for one-off games with no persistent state between 
   "plays": {...},
   "scouting_data": {...},
   "playbook_settings": {
-    "motion": {play_name: percentage}, // Even distribution
-    "set_play_inside": {play_name: percentage}, // Even distribution
-    "set_play_attack": {play_name: percentage}, // Even distribution
-    "set_play_outside": {play_name: percentage}, // Even distribution
-    "zone_defense": {defense_name: percentage}, // Even distribution
+    "motion": {"play_id": percentage},
+    "set_play_inside": {"play_id": percentage},
+    "set_play_attack": {"play_id": percentage},
+    "set_play_outside": {"play_id": percentage},
+    "zone_defense": {"Defense Name": percentage},
     "man_defense": {"Man": 100},
-    "slot_assignments": {},
-    "motion_dropdowns": {},
-    "position_filters": {...}
+    "slot_assignments": {
+      "1": {"section": "motion", "playId": "play_id", "playName": "display name"}
+    },
+    "motion_dropdowns": {"play_id": "inside|attack|outside|-"},
+    "position_filters": {"standard": ["play_id"]},
+    "even_distribution_all": true
   },
   "shot_threshold": random.randint(-10, 190),
   "discipline": random.randint(-10, 10),
@@ -146,6 +149,7 @@ Single Game Mode is designed for one-off games with no persistent state between 
 - Updated when user submits playbook changes
 - **Team Resolution:** Frontend sends team name (e.g., "Bentley-Truman"), backend resolves to `team_id` (e.g., "BENTLEY_TRUMAN") by matching team name in game document's `teams` object
 - **Mode Handling:** Backend `/api/playbooks` endpoint explicitly handles `mode="single"` to save to game document using `game_id`
+- **Identity Rule:** Offensive play settings now persist by `play_id`, while defense settings remain defense-name keyed
 
 **Strategy Settings:**
 - Saved to `games.{game_id}.teams.{team_id}.strategy_settings`
@@ -174,4 +178,3 @@ Single Game Mode is designed for one-off games with no persistent state between 
 
 - `Mode_Init_System.md` - Complete mode initialization system documentation
 - `Playbooks_Page.md` - Playbook settings management
-
