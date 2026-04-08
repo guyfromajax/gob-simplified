@@ -2520,6 +2520,7 @@ let upcomingOpponentId = null;
 function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
+  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
   
   // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-26) and EOS Tournament (weeks 27-34)
   // Also show during preseason (week 0 or undefined) if there's a schedule
@@ -2551,14 +2552,24 @@ function updateScoutingButton(data) {
     })
     .then(res => res.json())
     .then(matchup => {
+      upcomingOpponent = null;
+      upcomingOpponentId = null;
       if (matchup && matchup.home && matchup.away) {
-        // Determine opponent
-        if (userTeamName === matchup.home) {
+        // Prefer API-sourced team identity, then fall back to ObjectId match.
+        if (resolvedUserTeamName === matchup.home) {
           upcomingOpponent = matchup.away;
           upcomingOpponentId = matchup.away_id;
-        } else if (userTeamName === matchup.away) {
+        } else if (resolvedUserTeamName === matchup.away) {
           upcomingOpponent = matchup.home;
           upcomingOpponentId = matchup.home_id;
+        } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
+          if (String(userTeamId) === String(matchup.home_id)) {
+            upcomingOpponent = matchup.away;
+            upcomingOpponentId = matchup.away_id;
+          } else if (String(userTeamId) === String(matchup.away_id)) {
+            upcomingOpponent = matchup.home;
+            upcomingOpponentId = matchup.home_id;
+          }
         }
         
         if (upcomingOpponent) {
