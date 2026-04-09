@@ -795,6 +795,16 @@
 
         this.showToast("Playbooks saved");
         this.state.playbookMeta.user_saved = true;
+        if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {
+          try {
+            window.sessionStorage.setItem(
+              `playbooks_saved_refresh:${this.context.franchiseId}:${this.context.teamId}`,
+              "1"
+            );
+          } catch (storageError) {
+            console.warn("Unable to store playbook save refresh flag:", storageError);
+          }
+        }
       } catch (error) {
         console.error("Failed to save playbooks:", error);
         this.showToast("Failed to save playbooks");

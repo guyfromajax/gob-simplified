@@ -41,6 +41,16 @@ window.addEventListener('pageshow', (event) => {
   }
 });
 
+window.addEventListener('focus', () => {
+  maybeRefreshPlaybooksButtonState();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    maybeRefreshPlaybooksButtonState();
+  }
+});
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
@@ -269,7 +279,33 @@ async function updatePlaybooksButtonState(topData) {
   );
   const savedForWeek = Number(data?.playbook_meta?.saved_for_week || 0);
   playbooksWeekSavedCache = savedForWeek;
-  playbooksBtn.classList.toggle('needs-playbook-save', savedForWeek !== currentWeek);
+  const needsSave = savedForWeek !== currentWeek;
+  playbooksBtn.classList.toggle('needs-playbook-save', needsSave);
+  if (needsSave) {
+    playbooksBtn.title = "Playbooks have not been set for this week's game.";
+    playbooksBtn.setAttribute('aria-label', "Playbooks have not been set for this week's game.");
+  } else {
+    playbooksBtn.removeAttribute('title');
+    playbooksBtn.removeAttribute('aria-label');
+  }
+}
+
+async function maybeRefreshPlaybooksButtonState() {
+  if (!commandCenterTopDataCache || !franchiseId || !userTeamId) return;
+  const storageKey = `playbooks_saved_refresh:${franchiseId}:${userTeamId}`;
+  let shouldRefresh = false;
+  try {
+    shouldRefresh = window.sessionStorage.getItem(storageKey) === '1';
+  } catch (error) {
+    shouldRefresh = false;
+  }
+  if (!shouldRefresh) return;
+  await updatePlaybooksButtonState(commandCenterTopDataCache);
+  try {
+    window.sessionStorage.removeItem(storageKey);
+  } catch (error) {
+    // ignore storage cleanup failures
+  }
 }
 
 function bindResourcesLinks() {

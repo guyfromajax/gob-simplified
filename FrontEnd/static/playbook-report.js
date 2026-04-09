@@ -150,13 +150,10 @@ function buildOffenseRows(data) {
 function buildDefenseRows(data) {
   const percentages = data.simple_playbook_percentages || {};
   const defensePcIds = new Set(ensureArray((data.pc_order || {}).defense).map(String));
-  const rows = []
-    .concat(ensureArray(data.man_defense_rows))
-    .concat(ensureArray(data.zone_defense_rows))
+
+  const manRows = ensureArray(data.man_defense_rows)
     .map((defense) => {
-      const value = defense.id.startsWith('man_')
-        ? Number((percentages.man_defense || {})[defense.id] || 0)
-        : Number((percentages.zone_defense || {})[defense.id] || 0);
+      const value = Number((percentages.man_defense || {})[defense.id] || 0);
       return {
         label: defense.name,
         value,
@@ -166,7 +163,20 @@ function buildDefenseRows(data) {
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .map((defense) => buildRow(defense.label, formatPct(defense.value), { highlight: defense.highlight }));
 
-  renderList('defense-list', rows);
+  const zoneRows = ensureArray(data.zone_defense_rows)
+    .map((defense) => {
+      const value = Number((percentages.zone_defense || {})[defense.id] || 0);
+      return {
+        label: defense.name,
+        value,
+        highlight: defensePcIds.has(String(defense.id)),
+      };
+    })
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .map((defense) => buildRow(defense.label, formatPct(defense.value), { highlight: defense.highlight }));
+
+  renderList('defense-man-list', manRows);
+  renderList('defense-zone-list', zoneRows);
 }
 
 function buildFastBreakRows(data) {
@@ -289,7 +299,7 @@ async function initPlaybookReport() {
 
   const opponentName = await resolveOpponentName();
   const subhead = document.getElementById('report-subhead');
-  if (subhead) subhead.textContent = `Vs ${opponentName}`;
+  if (subhead) subhead.textContent = `vs ${opponentName}`;
 
   const data = await reportFetchJson(getPlaybookUrl());
   if (!data) return;
