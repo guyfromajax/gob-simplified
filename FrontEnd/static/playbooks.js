@@ -160,7 +160,10 @@
       }
     });
 
-    return `${API_CONFIG.buildUrl("/static/play-details.html")}?${params.toString()}`;
+    const playDetailsPath = (typeof API_CONFIG !== "undefined" && API_CONFIG.buildStaticPath)
+      ? API_CONFIG.buildStaticPath("/play-details.html")
+      : "/play-details.html";
+    return `${playDetailsPath}?${params.toString()}`;
   }
 
   class ConfirmModal {
@@ -239,6 +242,7 @@
       this.toastTimer = null;
       this.dragContext = null;
       this.modal = new ConfirmModal();
+      this.draftStorageKey = this.buildDraftStorageKey();
 
       this.elements = {
         saveBtn: document.getElementById("save-btn"),
@@ -269,7 +273,72 @@
       }
       this.bindGlobalEvents();
       await this.loadData();
+      this.restoreDraftState();
       this.render();
+    }
+
+    buildDraftStorageKey() {
+      const parts = [
+        "playbooksDraft",
+        this.context.mode || "single",
+        this.context.teamId || "",
+        this.context.franchiseId || "",
+        this.context.tournamentId || "",
+        this.context.gameId || "",
+      ];
+      return parts.join(":");
+    }
+
+    persistDraftState() {
+      try {
+        window.sessionStorage.setItem(this.draftStorageKey, JSON.stringify(this.state));
+      } catch (error) {
+        console.warn("Unable to persist playbooks draft:", error);
+      }
+    }
+
+    restoreDraftState() {
+      try {
+        const raw = window.sessionStorage.getItem(this.draftStorageKey);
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        if (!draft || typeof draft !== "object") return;
+
+        if (Array.isArray(draft.motion)) this.state.motion = draft.motion;
+        if (Array.isArray(draft.setPlays)) this.state.setPlays = draft.setPlays;
+        if (Array.isArray(draft.fastBreaks)) this.state.fastBreaks = draft.fastBreaks;
+        if (Array.isArray(draft.manDefense)) this.state.manDefense = draft.manDefense;
+        if (Array.isArray(draft.zoneDefense)) this.state.zoneDefense = draft.zoneDefense;
+        if (draft.pcOrder && typeof draft.pcOrder === "object") {
+          this.state.pcOrder = {
+            offense: Array.isArray(draft.pcOrder.offense) ? draft.pcOrder.offense.map(String) : [],
+            defense: Array.isArray(draft.pcOrder.defense) ? draft.pcOrder.defense.map(String) : [],
+          };
+        }
+        if (draft.playbookMeta && typeof draft.playbookMeta === "object") {
+          this.state.playbookMeta = draft.playbookMeta;
+        }
+        if (draft.positionFilters && typeof draft.positionFilters === "object") {
+          this.state.positionFilters = draft.positionFilters;
+        }
+        if (typeof draft.evenDistributionAll === "boolean") {
+          this.state.evenDistributionAll = draft.evenDistributionAll;
+        }
+        if (draft.sorts && typeof draft.sorts === "object") {
+          this.state.sorts = draft.sorts;
+        }
+        this.syncSelectionFromPcOrder();
+      } catch (error) {
+        console.warn("Unable to restore playbooks draft:", error);
+      }
+    }
+
+    clearDraftState() {
+      try {
+        window.sessionStorage.removeItem(this.draftStorageKey);
+      } catch (error) {
+        console.warn("Unable to clear playbooks draft:", error);
+      }
     }
 
     renderGameplayLockout() {
@@ -422,6 +491,7 @@
         `;
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
+          this.persistDraftState();
           window.location.href = buildPlayDetailsUrl(this.context, play);
         });
         this.bindPercentEvents(tr, play.id, "motion");
@@ -452,6 +522,7 @@
         `;
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
+          this.persistDraftState();
           window.location.href = buildPlayDetailsUrl(this.context, play);
         });
         this.bindPercentEvents(tr, play.id, "setPlays");
@@ -873,6 +944,7 @@
 
         showSuccessPopup("Playbooks Successfully Saved");
         this.state.playbookMeta.user_saved = true;
+        this.clearDraftState();
         if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {
           try {
             window.sessionStorage.setItem(
