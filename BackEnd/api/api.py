@@ -2945,12 +2945,16 @@ try:
                                 if home_plays_data:
                                     for play_name, play_data in home_plays_data.items():
                                         # Copy effectiveness/cloaking/momentum from FTD
-                                        # Initialize game_stats = 0 (season_stats stays in FTD)
+                                        # Preserve team-owned play config needed by gameplay runtime
+                                        # (for example target_shooter / motion_focus), while
+                                        # initializing fresh per-game tracking stats.
                                         home_plays_data[play_name] = {
                                             "play_id": play_data.get("play_id", ""),
                                             "name": play_data.get("name", play_name),
                                             "play_type": play_data.get("play_type", ""),
                                             "play_focus": play_data.get("play_focus", ""),
+                                            "target_shooter": play_data.get("target_shooter"),
+                                            "motion_focus": play_data.get("motion_focus"),
                                             "effectiveness": play_data.get("effectiveness", 0),
                                             "cloaking": play_data.get("cloaking", 0),
                                             "momentum": play_data.get("momentum", 0),
@@ -3007,6 +3011,8 @@ try:
                                             "name": play_data.get("name", play_name),
                                             "play_type": play_data.get("play_type", ""),
                                             "play_focus": play_data.get("play_focus", ""),
+                                            "target_shooter": play_data.get("target_shooter"),
+                                            "motion_focus": play_data.get("motion_focus"),
                                             "effectiveness": play_data.get("effectiveness", 0),
                                             "cloaking": play_data.get("cloaking", 0),
                                             "momentum": play_data.get("momentum", 0),
