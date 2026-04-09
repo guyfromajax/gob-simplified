@@ -9,8 +9,88 @@ This phase is focused on:
 - simplifying the visible configuration surface
 - making Playcall Center selection and ordering clearer
 
-This brief does **not** yet define the final database implementation.
-Once the UI direction is locked, we will design the supporting DB shape.
+This brief now includes the final **Franchise Mode** persistence model for Playbooks.
+
+Single Game and Tournament compatibility may remain temporarily, but the implementation
+and architecture in this phase are explicitly **franchise-first**.
+
+## Franchise Persistence Contract
+
+Franchise Mode Playbooks should follow a simple two-stage source-of-truth model:
+
+- `franchise_team_data` (`FTD`) is the authoritative **pregame / franchise master** source
+- the `game` document is the authoritative **in-game** source once a game has been initialized
+
+### FCC / Pregame
+
+When the user opens Playbooks from the Franchise Command Center:
+
+- load Playbooks from `FTD`
+- save Playbooks to `FTD`
+
+This includes:
+- `playbook_settings`
+- team-owned `plays` play-level configuration such as:
+  - `target_shooter`
+  - `motion_focus`
+
+### Game Initialization
+
+When the user starts a franchise game:
+
+- the game should ingest a full Playbooks snapshot from `FTD`
+- that snapshot should be copied into the game doc before gameplay begins
+
+The copied snapshot must include:
+- `playbook_settings`
+- team-owned `plays`
+
+This ensures gameplay starts from exactly what the user last saved in FCC.
+
+### Gameplay
+
+Once the game exists:
+
+- gameplay reads Playbooks from the game doc
+- gameplay should not continue to mix reads from both the game doc and `FTD`
+
+This is important for SS&S:
+- `FTD` remains the franchise master
+- the game doc remains the current game snapshot
+
+### Halftime Editing
+
+Playbooks editing during gameplay should be heavily restricted.
+
+Rules:
+- remove the Playbooks button from the lineup / pre-tip gameplay flow
+- allow Playbooks access only at halftime, between Q2 and Q3
+- at halftime, the user may edit only:
+  - percentages
+  - Playcall Center membership / ordering
+
+The user may **not** edit at halftime:
+- `target_shooter`
+- `motion_focus`
+- other structural / play-level configuration
+
+### Halftime Persistence
+
+Halftime Playbooks changes:
+
+- save to the current game doc only
+- do **not** save back to `FTD`
+
+This means:
+- halftime changes affect only the current game
+- the next game still starts from the franchise master settings stored in `FTD`
+
+### Postgame Behavior
+
+After the game:
+
+- returning to FCC should show the franchise master Playbooks settings from `FTD`
+- halftime-only tactical changes from the finished game should not overwrite franchise master settings
 
 ## Top-Level Page Structure
 

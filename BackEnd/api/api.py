@@ -2,6 +2,7 @@
 import re
 import sys
 import os
+import copy
 # ✅ PERFORMANCE: Removed debug print statements - use logger instead
 
 # Sentry - init before FastAPI (captures unhandled exceptions)
@@ -5467,13 +5468,14 @@ try:
                         # Load FTD for user team
                         user_ftd = franchise_team_data_collection.find_one(
                             {"franchise_id": ObjectId(franchise_id), "team_id": user_team_object_id},
-                            {"playbook_settings": 1, "strategy_settings": 1}
+                            {"playbook_settings": 1, "strategy_settings": 1, "plays": 1}
                         )
                         
                         if user_ftd:
                             # Copy master settings to game doc for user team
                             master_playbook = user_ftd.get("playbook_settings", {})
                             master_strategy = user_ftd.get("strategy_settings", {})
+                            master_plays = user_ftd.get("plays", {})
                             
                             # Determine which team is the user team
                             user_team_id_in_game = None
@@ -5499,6 +5501,13 @@ try:
                                         gm.home_team.strategy_settings = dict(master_strategy) if master_strategy else {}
                                     elif user_team_id_in_game == away_team_id:
                                         gm.away_team.strategy_settings = dict(master_strategy) if master_strategy else {}
+                                if master_plays:
+                                    summary["teams"][user_team_id_in_game]["plays"] = copy.deepcopy(master_plays)
+                                    logging.warning(f"✅ [FTD] Copied plays from FTD to game doc for team {user_team_id_in_game}")
+                                    if user_team_id_in_game == home_team_id:
+                                        gm.home_team.plays = copy.deepcopy(master_plays)
+                                    elif user_team_id_in_game == away_team_id:
+                                        gm.away_team.plays = copy.deepcopy(master_plays)
             except Exception as e:
                 logging.warning(f"⚠️ [FTD] Error copying settings from FTD: {e}")
                 import traceback

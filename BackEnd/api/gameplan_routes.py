@@ -1905,7 +1905,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
                     logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (franchise_doc not found)")
         elif mode == "franchise":
-            # ✅ FTD: Load playbook_settings from FTD collection instead of franchise doc
+            # Franchise FCC / pregame reads use FTD as the authoritative master source.
+            # Gameplay with game_id should use the game doc snapshot instead of mixing sources.
             from BackEnd.db import franchise_team_data_collection
             try:
                 team_object_id = ObjectId(authoritative_team_id)
