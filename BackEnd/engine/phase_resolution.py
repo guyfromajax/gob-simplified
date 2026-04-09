@@ -1881,6 +1881,10 @@ def resolve_free_throw_logic(game):
         offense_is_home=(off_team.team_id == game.home_team.team_id),
         no_lane=game_state.get("no_lane", False),
     )
+    # Keep lineup coordinates in sync with the FT lane/setup animation before
+    # any rebound geography logic runs. Without this, missed-FT rebound
+    # selection can read stale half-court coords.
+    apply_coords_from_animations_list(game, animations)
     shooter_pos = get_player_position(off_lineup, shooter)
 
     ft_snap = build_free_throw_snapshot(game, off_lineup, def_lineup, shooter)

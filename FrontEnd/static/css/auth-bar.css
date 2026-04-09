@@ -3,7 +3,7 @@
  * White background. Used on all pages except gameplay (court, set-lineup) and training screens.
  */
 body.has-auth-bar {
-  padding-top: 50px;
+  padding-top: 72px;
 }
 
 .auth-bar {

@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **April 6 Update** Added AG-based player speed. Added more Fast Break plays. Added more realistic & detailed fouls. Tighter sync of game clock to animation and game logic. Fixed player clamping. Player and ball location have greater impact on player decision making and situation outcomes.
+- **April 9 Update** Sunset Single Game & Tournament modes (for now anyway -- 99% of you were playing Franchise mode anyway :). Added customizable and more intuitive playbooks. Fixed a handful of bugs.
 
 Source:
 - `FrontEnd/static/mode-select.html`

@@ -13,7 +13,7 @@ import random
 
 from BackEnd.constants import ALL_ATTRS
 
-TRAINABLE_ATTRS_FOR_NOTES = tuple(a for a in ALL_ATTRS if a not in ["EM", "MO", "NG"])
+TRAINABLE_ATTRS_FOR_NOTES = tuple(a for a in ALL_ATTRS if a not in ["EM", "MO", "NG", "CH"])
 
 NSS = "No Significant Updates"
 
@@ -64,6 +64,16 @@ def _team_attr_delta_sums(players: List[dict], baselines_by_id: Dict[Any, Dict[s
             s += _anchor_val(p.get("attributes") or {}, attr) - old_v
         sums[attr] = s
     return sums
+
+
+def _mvp_discounted_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, int]]) -> float:
+    total = float(_cumulative_delta(player, baselines_by_id))
+    year = str(player.get("year", "") or "").strip().lower()
+    if year == "freshman":
+        return total * 0.7
+    if year == "sophomore":
+        return total * 0.9
+    return total
 
 
 def _readiness_label(s: float) -> str:
@@ -163,10 +173,11 @@ def build_structured_training_report_notes(
 ) -> List[Dict[str, str]]:
     sections: List[Dict[str, str]] = []
     by_name = { _player_name(p): _cumulative_delta(p, original_player_baselines) for p in players }
+    discounted_by_name = { _player_name(p): _mvp_discounted_total(p, original_player_baselines) for p in players }
     sums = _team_attr_delta_sums(players, original_player_baselines)
 
     if is_training_camp:
-        pos = [(n, t) for n, t in by_name.items() if t > 0]
+        pos = [(n, t) for n, t in discounted_by_name.items() if t > 0]
         if pos:
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)
@@ -192,7 +203,7 @@ def build_structured_training_report_notes(
         lo = sorted(a for a, s in sums.items() if s < 21)
         sections.append({"title": "Concerning Progression", "body": ", ".join(lo) if lo else NSS})
     else:
-        pos = [(n, t) for n, t in by_name.items() if t > 0]
+        pos = [(n, t) for n, t in discounted_by_name.items() if t > 0]
         if pos:
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)

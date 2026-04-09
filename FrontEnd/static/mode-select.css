@@ -3,7 +3,6 @@ body {
   background: linear-gradient(180deg, #f8f9fb 0%, #eef1f5 100%);
   margin: 0;
   padding: 28px 20px 32px;
-  padding-top: 56px;
   color: #1f2937;
 }
 
@@ -160,7 +159,8 @@ body {
 
 .franchise-card-media {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  align-self: flex-start;
   height: auto;
   margin-right: 8px;
   flex-shrink: 0;

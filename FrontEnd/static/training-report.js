@@ -1357,12 +1357,41 @@ function renderTrainingNotes() {
   // Structured sections: { title, body } (Training_Notes_System.md)
   const first = training_notes[0];
   if (first && typeof first === 'object' && first.title != null) {
+    const sectionMap = new Map();
     training_notes.forEach(function (section) {
+      sectionMap.set(section.title || '', section);
+    });
+
+    const orderedTitles = [
+      'Training Camp MVP',
+      'Training Camp Co-MVPs',
+      'Practice Player Of The Week',
+      'Practice Players Of The Week',
+      'Biggest Concern',
+      'Biggest Concerns',
+      'Biggest Regression',
+      'Most Positive Locker Room Influence',
+      'Strong Cumulative Increase',
+      'Concerning Progression',
+      'Concerning Regression',
+      'Strongest Offensive Plays',
+      'Strongest Defensive Set',
+      'Fast Break Readiness',
+      'Press/Trap Readiness',
+      'Player Energy Levels'
+    ];
+
+    orderedTitles.forEach(function (title) {
+      const section = sectionMap.get(title);
+      if (!section) return;
       const wrap = document.createElement('div');
       wrap.className = 'training-note-section';
+      if (section.title === 'Player Energy Levels') {
+        wrap.classList.add('training-note-section-wide');
+      }
       const h3 = document.createElement('h3');
       h3.className = 'training-note-section-title';
-      h3.textContent = section.title || '';
+      h3.textContent = section.title === 'Player Energy Levels' ? 'Miscellaneous Notes' : (section.title || '');
       const body = document.createElement('div');
       body.className = 'training-note-section-body';
       const text = section.body != null ? String(section.body) : '';
