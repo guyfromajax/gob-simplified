@@ -91,6 +91,7 @@ body {
   margin: 0 auto;
   padding: 0 24px;
   box-sizing: border-box;
+  text-align: center;
 }
 
 .franchise-home-card {
@@ -98,6 +99,7 @@ body {
   border: 1px solid #d1d5db;
   border-radius: 10px;
   box-sizing: border-box;
+  text-align: left;
 }
 
 .franchise-home-card-empty {
@@ -227,6 +229,26 @@ body {
   font-size: 13px;
   color: #ff9800;
   font-weight: 600;
+}
+
+.franchise-delete-link {
+  margin-top: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #9ca3af;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.franchise-delete-link:hover,
+.franchise-delete-link:focus-visible {
+  color: #dc2626;
+  text-decoration: underline;
+  outline: none;
 }
 
 .scout-section {

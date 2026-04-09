@@ -8,6 +8,7 @@ function playSound(filename) {
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
+const franchiseDeleteLink = document.getElementById('franchise-delete-link');
 const franchiseEmptyCard = document.getElementById('franchise-empty-card');
 const franchiseCardBanner = document.getElementById('franchise-card-banner');
 const franchiseCardWeek = document.getElementById('franchise-card-week');
@@ -134,6 +135,7 @@ function deriveNextOpponent(commandCenterData, teamName) {
 function renderFranchiseEmptyState() {
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
+  if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'none';
 }
 
 function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
@@ -151,6 +153,7 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
 
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
   franchisePlayNowBtn.style.display = 'flex';
+  if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'inline';
 }
 
 function goToFranchiseCommandCenter() {
@@ -179,6 +182,28 @@ function goToNewFranchise() {
   window.location.href = './franchise-select-team.html';
 }
 
+async function startNewFranchiseFlow() {
+  playSound('click-beep.wav');
+  const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
+  const hasExistingFranchise = !!currentFranchise;
+  if (hasExistingFranchise && !dontShow) {
+    openNewFranchiseModal();
+    return;
+  }
+  if (hasExistingFranchise && dontShow) {
+    try {
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) clearFranchiseLocalStorage();
+    } catch (e) {
+      console.warn('[mode-select] delete-current franchise (dontShow path):', e);
+    }
+  }
+  goToNewFranchise();
+}
+
 if (franchisePlayNowBtn) {
   franchisePlayNowBtn.addEventListener('click', function () {
     playSound('click-strong.wav');
@@ -194,27 +219,11 @@ if (franchisePlayNowBtn) {
 }
 
 if (franchiseNewBtn) {
-  franchiseNewBtn.addEventListener('click', async function () {
-    playSound('click-beep.wav');
-    const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
-    const hasExistingFranchise = !!currentFranchise;
-    if (hasExistingFranchise && !dontShow) {
-      openNewFranchiseModal();
-      return;
-    }
-    if (hasExistingFranchise && dontShow) {
-      try {
-        const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
-          method: 'POST',
-          headers: getAuthHeaders(),
-        });
-        if (res.ok) clearFranchiseLocalStorage();
-      } catch (e) {
-        console.warn('[mode-select] delete-current franchise (dontShow path):', e);
-      }
-    }
-    goToNewFranchise();
-  });
+  franchiseNewBtn.addEventListener('click', startNewFranchiseFlow);
+}
+
+if (franchiseDeleteLink) {
+  franchiseDeleteLink.addEventListener('click', startNewFranchiseFlow);
 }
 
 if (newFranchiseModalCancel) {
