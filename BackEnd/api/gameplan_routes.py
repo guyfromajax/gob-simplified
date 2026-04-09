@@ -1868,42 +1868,20 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
-            # ✅ Franchise in-game: game doc has playbook_settings but not the full plays structure; merge plays from FTD
+            # Franchise gameplay should read only from the game snapshot once the
+            # game exists. Do not silently merge FTD or cached populated plays here,
+            # because that masks init/snapshot bugs and causes UI/runtime drift.
             if mode == "franchise":
-                _pl = team_obj.get("plays") or {}
-                _n = len(_pl) if isinstance(_pl, dict) else 0
-                if (not _pl or _n == 0):
-                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: entering FTD merge block (team_obj plays count={_n})")
-                else:
-                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: skipping FTD merge (team_obj already has {_n} plays)")
-            if mode == "franchise" and (not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
-                franchise_doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"user_team_id": 1, "user_team_object_id": 1}
-                )
-                if franchise_doc:
-                    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-                    if user_team_object_id:
-                        try:
-                            ftd_doc = franchise_team_data_collection.find_one(
-                                {"franchise_id": ObjectId(doc_id), "team_id": ObjectId(user_team_object_id)},
-                                {"plays": 1}
-                            )
-                            if ftd_doc and ftd_doc.get("plays"):
-                                team_obj["plays"] = ftd_doc["plays"]
-                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from FTD (count={len(ftd_doc['plays'])})")
-                            else:
-                                team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (FTD missing or empty)")
-                        except Exception as ex:
-                            team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                            logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (FTD lookup error: {ex!r})")
-                    else:
-                        team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                        logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (no user_team_object_id)")
-                else:
-                    team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (franchise_doc not found)")
+                current_plays = team_obj.get("plays") or {}
+                if not isinstance(current_plays, dict):
+                    current_plays = {}
+                    team_obj["plays"] = current_plays
+                if len(current_plays) == 0:
+                    logger.warning(
+                        "⚠️ [GET PLAYBOOKS] franchise+game_doc missing plays snapshot for team_id=%s game_id=%s",
+                        authoritative_team_id,
+                        game_id,
+                    )
         elif mode == "franchise":
             # Franchise FCC / pregame reads use FTD as the authoritative master source.
             # Gameplay with game_id should use the game doc snapshot instead of mixing sources.

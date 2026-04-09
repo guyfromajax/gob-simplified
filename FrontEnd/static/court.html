@@ -2942,6 +2942,8 @@
     
     // ==================== PLAYCALL CENTER OVERRIDE LOGIC ====================
     
+    let currentPlaycallSnapshotByName = {};
+
     // ✅ SS&S: Populate shooter headshots for the 6-play list using intended shooter from play skeletons
     // This runs on all game entry/re-entry instances (game start, quarter breaks, timeouts, foul outs, overtime)
     // Lineups are locked at timeout navigation points, so we can safely assign images here
@@ -2988,18 +2990,28 @@
         if (!playName && !playId) continue;
         
         try {
-          // Fetch play document from backend
-          const playUrl = playId
-            ? API_CONFIG.buildUrl(`/api/plays/${encodeURIComponent(playId)}`)
-            : API_CONFIG.buildUrl(`/api/play/${encodeURIComponent(playName)}`);
-          const response = await fetch(playUrl);
-          
-          if (!response.ok) {
-            console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName || playId}': ${response.status}`);
-            continue;
+          const snapshotPlay = currentPlaycallSnapshotByName[playName] || currentPlaycallSnapshotByName[playId] || null;
+          let playDoc = snapshotPlay;
+
+          // Motion plays still need the universal skeleton document to infer a likely shooter.
+          // Set plays should use the team/game snapshot because that carries franchise-specific
+          // target_shooter overrides.
+          if (!snapshotPlay || snapshotPlay.play_type === 'motion') {
+            const playUrl = playId
+              ? API_CONFIG.buildUrl(`/api/plays/${encodeURIComponent(playId)}`)
+              : API_CONFIG.buildUrl(`/api/play/${encodeURIComponent(playName)}`);
+            const response = await fetch(playUrl);
+            
+            if (!response.ok) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName || playId}': ${response.status}`);
+              continue;
+            }
+            
+            const universalPlayDoc = await response.json();
+            playDoc = snapshotPlay
+              ? { ...universalPlayDoc, ...snapshotPlay, skeletons: universalPlayDoc.skeletons || {} }
+              : universalPlayDoc;
           }
-          
-          const playDoc = await response.json();
           
           // Check if this is a Motion play
           const playType = playDoc.play_type || '';
@@ -3191,13 +3203,21 @@
     }
     
     // Create a play option DOM element
-    function createPlayOptionElement(playName, playFocus, playId = '') {
+    function createPlayOptionElement(playName, playFocus, playId = '', playMeta = null) {
       const playOption = document.createElement('div');
       playOption.className = 'play-option';
       playOption.setAttribute('data-play', playName);
       playOption.setAttribute('data-focus', playFocus || '');
       if (playId) {
         playOption.setAttribute('data-play-id', playId);
+      }
+      if (playMeta && typeof playMeta === 'object') {
+        if (playMeta.play_type) {
+          playOption.setAttribute('data-play-type', playMeta.play_type);
+        }
+        if (playMeta.target_shooter) {
+          playOption.setAttribute('data-target-shooter', playMeta.target_shooter);
+        }
       }
       
       const headshotImg = document.createElement('img');
@@ -3345,6 +3365,8 @@
           playIdToPlay[play.name] = play;
           if (play.play_id) playIdToPlay[play.play_id] = play;
         });
+
+        currentPlaycallSnapshotByName = { ...playIdToPlay };
         
         // Store for persisting slot changes to game doc (Data Persistence: in-game → game document)
         const playNameToSection = {};
@@ -3459,7 +3481,7 @@
               playOption = existingPlay;
             } else {
               // Create new play option element
-              playOption = createPlayOptionElement(playName, playFocus, playObj?.play_id || assignment.playId || '');
+              playOption = createPlayOptionElement(playName, playFocus, playObj?.play_id || assignment.playId || '', playObj);
             }
             
             orderedPlays.push(playOption);
@@ -3473,7 +3495,7 @@
           for (const play of allPlays) {
             if (orderedPlays.length >= 6) break;
             if (!usedPlayNames.has(play.name)) {
-              const playOption = createPlayOptionElement(play.name, play.play_focus || '', play.play_id || '');
+              const playOption = createPlayOptionElement(play.name, play.play_focus || '', play.play_id || '', play);
               orderedPlays.push(playOption);
               usedPlayNames.add(play.name);
             }
