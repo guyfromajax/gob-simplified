@@ -27,6 +27,28 @@ function reportFetchJson(url) {
     });
 }
 
+function reportPostJson(url, body) {
+  return fetch(url, {
+    method: 'POST',
+    headers: {
+      ...API_CONFIG.getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body || {}),
+  })
+    .then((response) => {
+      if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
+        if (AccessDenied.checkAccessDenied(response)) return null;
+      }
+      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+      return response.json();
+    })
+    .catch((error) => {
+      console.error('[PLAYBOOK REPORT] Request failed:', url, error);
+      return null;
+    });
+}
+
 function formatPct(rawValue) {
   const numericValue = Number(rawValue || 0);
   return `${Math.round(numericValue)}%`;
@@ -246,7 +268,9 @@ async function resolveOpponentName() {
   if (gameplayOpponent) return gameplayOpponent;
 
   if (reportState.mode === 'franchise' && reportState.franchiseId) {
-    const data = await reportFetchJson(`${API_CONFIG.buildUrl('/franchise/play-next-game')}?franchise_id=${encodeURIComponent(reportState.franchiseId)}`);
+    const data = await reportPostJson(API_CONFIG.buildUrl('/franchise/play-next-game'), {
+      franchise_id: reportState.franchiseId,
+    });
     if (data) {
       const myTeamName = formatTeamName(localStorage.getItem('franchise_user_team') || '');
       const myTeamId = reportState.teamId;

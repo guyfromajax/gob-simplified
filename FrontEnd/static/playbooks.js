@@ -12,6 +12,76 @@
   const SET_PLAY_FOCUS_ORDER = ["attack", "inside", "outside"];
   const TARGET_SHOOTER_ORDER = ["PG", "SG", "SF", "PF", "C"];
 
+  function playSound(filename) {
+    try {
+      const base = (typeof API_CONFIG !== "undefined" && API_CONFIG.buildStaticPath)
+        ? API_CONFIG.buildStaticPath("/sounds/")
+        : "/sounds/";
+      const audio = new Audio(base + encodeURIComponent(filename));
+      audio.volume = 0.7;
+      audio.play().catch(() => {});
+    } catch (error) {}
+  }
+
+  function showSuccessPopup(message) {
+    const overlay = document.createElement("div");
+    overlay.className = "gameplan-success-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+
+    const modal = document.createElement("div");
+    modal.className = "gameplan-success-modal";
+    modal.style.cssText = `
+      background: #1a1a1a;
+      border: 2px solid #00ff00;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      color: #fff;
+      text-align: center;
+    `;
+
+    const messageEl = document.createElement("p");
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 1.125rem;
+      margin-bottom: 20px;
+      font-weight: 600;
+      color: #00ff00;
+    `;
+
+    const okBtn = document.createElement("button");
+    okBtn.textContent = "OK";
+    okBtn.style.cssText = `
+      padding: 10px 30px;
+      background: #00ff00;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+    `;
+    okBtn.addEventListener("click", () => {
+      overlay.remove();
+    });
+
+    modal.appendChild(messageEl);
+    modal.appendChild(okBtn);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
   function focusCode(value) {
     if (value === "attack") return "A";
     if (value === "inside") return "I";
@@ -221,6 +291,7 @@
       this.elements.evenAllBtn.addEventListener("click", () => this.handleEvenDistributionAll());
       document.querySelectorAll(".sort-btn").forEach((button) => {
         button.addEventListener("click", () => {
+          playSound("click-tiny.wav");
           this.toggleSort(button.dataset.section, button.dataset.sortKey);
         });
       });
@@ -500,6 +571,7 @@
       if (!this.dragContext || this.dragContext.listType !== listType) {
         return;
       }
+      playSound("click-tiny.wav");
 
       const order = this.state.pcOrder[listType];
       const sourceIndex = order.indexOf(this.dragContext.id);
@@ -610,12 +682,14 @@
 
       if (input) {
         input.addEventListener("change", () => {
+          playSound("click-tiny.wav");
           this.setPercentage(sectionKey, id, parseInteger(input.value, 0));
         });
       }
 
       buttons.forEach((button) => {
         button.addEventListener("click", () => {
+          playSound("click-tiny.wav");
           const delta = parseInteger(button.dataset.delta, 0);
           const current = parseInteger(input.value, 0);
           this.setPercentage(sectionKey, id, current + delta);
@@ -627,6 +701,7 @@
       const select = row.querySelector(".motion-focus-select");
       if (!select) return;
       select.addEventListener("change", () => {
+        playSound("click-tiny.wav");
         const play = this.state.motion.find((item) => item.id === id);
         if (!play) return;
         play.motion_focus = normalizeMotionFocus(select.value);
@@ -638,6 +713,7 @@
       const select = row.querySelector(".target-shooter-select");
       if (!select) return;
       select.addEventListener("change", () => {
+        playSound("click-tiny.wav");
         const play = this.state.setPlays.find((item) => item.id === id);
         if (!play) return;
         play.target_shooter = select.value;
@@ -649,6 +725,7 @@
       const checkbox = row.querySelector(`.control-check[data-id="${id}"]`);
       if (!checkbox) return;
       checkbox.addEventListener("change", () => {
+        playSound("click-tiny.wav");
         const list = this.state.pcOrder[listType];
         const isSelected = list.includes(id);
 
@@ -752,6 +829,7 @@
       if (this.elements.saveBtn.disabled) {
         return;
       }
+      playSound("confirm-2.mp3");
 
       const payload = {
         mode: this.context.mode,
@@ -793,7 +871,7 @@
           throw new Error(`Save failed (${response.status})`);
         }
 
-        this.showToast("Playbooks saved");
+        showSuccessPopup("Playbooks Successfully Saved");
         this.state.playbookMeta.user_saved = true;
         if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {
           try {
