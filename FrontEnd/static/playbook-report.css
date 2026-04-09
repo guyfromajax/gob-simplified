@@ -1,0 +1,222 @@
+.playbook-report-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(64, 101, 175, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(255, 122, 0, 0.12), transparent 24%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef3fa 100%);
+  color: #1f2a3d;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  padding: 24px 20px 40px;
+}
+
+.report-header,
+.report-main {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+}
+
+.report-header {
+  display: grid;
+  grid-template-columns: 120px 1fr 160px;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.report-title-wrap {
+  text-align: center;
+}
+
+.report-title-wrap h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 4vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: #16233b;
+}
+
+.report-title-wrap p {
+  margin: 10px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #4065af;
+}
+
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.report-btn {
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 12px 18px;
+  border: 1px solid #33579f;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.report-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(30, 53, 92, 0.12);
+}
+
+.report-btn-back {
+  background: #ffffff;
+  color: #284f97;
+}
+
+.report-btn-primary {
+  background: #4065af;
+  color: #ffffff;
+}
+
+.report-main {
+  display: grid;
+  gap: 20px;
+}
+
+.report-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(64, 101, 175, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 18px 36px rgba(24, 40, 72, 0.08);
+  padding: 22px 24px;
+  backdrop-filter: blur(8px);
+}
+
+.report-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.report-column {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.report-section-head h2,
+.report-subsection h3 {
+  margin: 0;
+}
+
+.report-section-head h2 {
+  font-size: 1.45rem;
+  color: #16233b;
+}
+
+.report-section-head p {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: #6c7b96;
+  font-style: italic;
+}
+
+.report-subsection h3 {
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4065af;
+}
+
+.report-list {
+  display: grid;
+  gap: 10px;
+}
+
+.report-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(241, 245, 252, 0.95), rgba(233, 239, 248, 0.95));
+  border: 1px solid rgba(64, 101, 175, 0.08);
+}
+
+.report-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-row-label {
+  font-weight: 800;
+  color: #1f2a3d;
+}
+
+.report-row-value {
+  font-weight: 900;
+  color: #4065af;
+}
+
+.report-row-meta {
+  font-size: 0.92rem;
+  color: #5f6f8d;
+}
+
+.report-row.is-highlight .report-row-label,
+.report-row.is-highlight .report-row-value,
+.report-row.is-highlight .report-row-meta {
+  color: #d96a00;
+  font-weight: 900;
+}
+
+.report-list-ordered .report-row {
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+}
+
+.report-order-num {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  background: #dfe7f7;
+  color: #294c93;
+}
+
+.report-list-ordered .report-row.is-highlight .report-order-num {
+  background: rgba(255, 122, 0, 0.16);
+  color: #d96a00;
+}
+
+.report-list-ordered .report-row-content {
+  display: grid;
+  gap: 6px;
+}
+
+.report-placeholder,
+.report-empty {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(229, 236, 247, 0.9);
+  color: #5f6f8d;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .report-header {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .report-actions {
+    justify-content: center;
+  }
+
+  .report-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .report-title-wrap {
+    order: -1;
+  }
+}

@@ -1621,6 +1621,30 @@ function setupLockerRoomButton() {
   const period = urlParams.get('period');
   const startWithInbound = urlParams.get('start_with_inbound');
   const startingPossession = urlParams.get('starting_possession');
+
+  const buildLineupBackUrl = () => {
+    const helper = window.TimeoutNavigationHelper;
+    if (!helper) return null;
+    const currentGameId = helper.getGameId(urlParams);
+    const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+    const lineup = {};
+    const myTeamParam = urlParams.get('my_team');
+    if (myTeamParam) {
+      ['pg', 'sg', 'sf', 'pf', 'c'].forEach((pos) => {
+        const playerId = urlParams.get(`${myTeamParam}_${pos}`);
+        if (playerId) lineup[pos.toUpperCase()] = playerId;
+      });
+    }
+    const params = helper.buildGameNavigationParams({
+      sourceParams: urlParams,
+      targetQuarter: parseInt(quarter, 10) || 1,
+      gameId: currentGameId,
+      resumeFromTimeout,
+      lineup,
+      myTeamSide: myTeam
+    });
+    return `/set-lineup.html?${params.toString()}`;
+  };
   
   // ✅ SS&S: Handle back navigation from lineup or game-plan screens
   // Both use TimeoutNavigationHelper to preserve timeout state
@@ -1685,6 +1709,20 @@ function setupLockerRoomButton() {
       window.location.href = backUrl;
     });
     return;
+  }
+
+  if (gameData && urlParams.get('game_id') && !gameData.is_final) {
+    const lineupUrl = buildLineupBackUrl();
+    if (lineupUrl) {
+      cleanButton.textContent = 'Back';
+      cleanButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        playSound('x-back.mp3');
+        window.location.href = lineupUrl;
+      });
+      return;
+    }
   }
 
   // Otherwise, behave like a post-game "Go To Locker Room" button

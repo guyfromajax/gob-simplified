@@ -248,6 +248,11 @@ def serve_playbooks_html():
     """Return the playbooks page so query params work in production."""
     return FileResponse(STATIC_DIR / "playbooks.html")
 
+@router.get("/playbook-report.html")
+def serve_playbook_report_html():
+    """Return the playbook report page so query params work in production."""
+    return FileResponse(STATIC_DIR / "playbook-report.html")
+
 @router.get("/tutorial.html")
 def serve_tutorial_html():
     """Return the tutorials page."""
@@ -413,16 +418,13 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
             if mode == "franchise":
                 if game_mode == "franchise" and str(game_franchise_id) == str(franchise_id):
                     # Save to game doc whenever game exists (including quarter=0 so lineup saves persist)
-                    logger.warning(f"🔍 [SAVE-LOCATION] franchise: game doc (game_id={game_id!r})")
                     return games_collection, game_id, True
             elif mode == "tournament":
                 if game_mode == "tournament" and str(game_tournament_id) == str(tournament_id):
                     # Save to game doc whenever game exists (including quarter=0 so lineup saves persist)
-                    logger.warning(f"🔍 [SAVE-LOCATION] tournament: game doc (game_id={game_id!r})")
                     return games_collection, game_id, True
         
         # Game doesn't exist or doesn't match - save to master
-        logger.warning(f"🔍 [SAVE-LOCATION] {mode}: master (game_id={game_id!r})")
         if mode == "franchise":
             return franchises_collection, franchise_id, False
         elif mode == "tournament":
@@ -1765,16 +1767,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc (for single mode only; franchise/tournament use single source: FTD or tournament doc)
+                            # Find matching team_id in the game doc. Franchise gameplay should
+                            # read the frozen game snapshot once the game exists.
                             for tid, team_obj in game_teams.items():
                                 doc_name = (team_obj.get("name") or "").strip()
                                 master_name = (user_team_name or "").strip()
                                 if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Single source of truth: franchise/tournament never use game doc for playbooks
-                                    if mode not in ["franchise", "tournament"]:
-                                        doc = game_doc
-                                        load_from_game_doc = True
+                                    doc = game_doc
+                                    load_from_game_doc = True
                                     break
             except Exception as e:
                 logger.warning(f"🔍 [GET PLAYBOOKS] Game doc path failed: {e!r}")
@@ -2404,12 +2405,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
     """
     from BackEnd.utils.team_settings_manager import save_team_settings
     
-    logger.warning(
-        f"🔍 [SAVE PLAYBOOKS] request: mode={request.mode!r}, team_id={request.team_id!r}, "
-        f"franchise_id={request.franchise_id!r}, tournament_id={request.tournament_id!r}, game_id={request.game_id!r}, "
-        f"playbook_keys={list((request.playbook_settings or {}).keys())[:12]}, "
-        f"play_update_ids={list((request.play_updates or {}).keys())[:24]}"
-    )
     try:
         # Normalize incoming data to the simplified canonical structure.
         incoming_playbook_settings = dict(request.playbook_settings or {})
@@ -2458,6 +2453,13 @@ def save_playbooks(request: PlaybookSettingsRequest):
             playbook_meta = {}
         playbook_meta["user_saved"] = True
         playbook_meta["schema_version"] = 2
+        if request.mode == "franchise" and request.franchise_id and not request.game_id:
+            from BackEnd.db import franchises_collection
+            franchise_doc = franchises_collection.find_one(
+                {"_id": ObjectId(request.franchise_id)},
+                {"week": 1}
+            ) or {}
+            playbook_meta["saved_for_week"] = int(franchise_doc.get("week", 1) or 1)
         playbook_settings["_meta"] = playbook_meta
 
         # ✅ UNIFIED: Use unified save function for consistent team_id resolution
@@ -2478,7 +2480,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
 
         play_updates = request.play_updates or {}
         if isinstance(play_updates, dict) and play_updates:
-            logger.warning("🧭 [PLAYBOOK TRACE] incoming play_updates=%s", play_updates)
             current_plays, plays_team_id = _load_current_team_plays_for_save(
                 request.mode,
                 request.team_id,
@@ -2503,13 +2504,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     next_target = update_data.get("target_shooter")
                     normalized_target = next_target if next_target in {"PG", "SG", "SF", "PF", "C"} else play_data.get("target_shooter")
                     if play_data.get("target_shooter") != normalized_target:
-                        logger.warning(
-                            "🧭 [PLAYBOOK TRACE] applying set-play update play='%s' play_id=%s old_target_shooter=%s new_target_shooter=%s",
-                            play_data.get("name"),
-                            play_id,
-                            play_data.get("target_shooter"),
-                            normalized_target,
-                        )
                         play_data["target_shooter"] = normalized_target
                         plays_changed = True
 
@@ -2527,12 +2521,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
                 )
                 if not plays_success:
                     raise HTTPException(status_code=500, detail="Failed to save play configuration")
-                logger.warning(
-                    "🧭 [PLAYBOOK TRACE] plays save succeeded mode=%s game_id=%s plays_team_id=%s",
-                    request.mode,
-                    request.game_id,
-                    plays_team_id,
-                )
 
                 if request.game_id:
                     try:
@@ -2541,14 +2529,10 @@ def save_playbooks(request: PlaybookSettingsRequest):
                         if gm:
                             if gm.home_team.team_id == plays_team_id or gm.home_team.name == request.team_id:
                                 gm.home_team.plays = dict(current_plays)
-                                logger.warning("🧭 [PLAYBOOK TRACE] updated ongoing game home_team.plays for game_id=%s", request.game_id)
                             elif gm.away_team.team_id == plays_team_id or gm.away_team.name == request.team_id:
                                 gm.away_team.plays = dict(current_plays)
-                                logger.warning("🧭 [PLAYBOOK TRACE] updated ongoing game away_team.plays for game_id=%s", request.game_id)
                     except Exception:
                         pass
-            else:
-                logger.warning("🧭 [PLAYBOOK TRACE] play_updates present but produced no plays_changed")
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         

@@ -131,19 +131,6 @@ try:
         """Test endpoint - raises error to verify backend Sentry capture. Remove before public launch."""
         raise RuntimeError("Test Sentry backend capture")
 
-    def _summarize_set_play_targets(plays: dict) -> dict:
-        """Compact debug summary of set-play target_shooter values."""
-        summary = {}
-        if not isinstance(plays, dict):
-            return summary
-        for play_name, play_data in plays.items():
-            if not isinstance(play_data, dict):
-                continue
-            if play_data.get("play_type") != "set_play":
-                continue
-            summary[play_name] = play_data.get("target_shooter")
-        return summary
-    
     
     @app.get("/app-config")
     def get_app_config():
@@ -2295,22 +2282,14 @@ try:
                         game_id=game_id_arg
                     )
                     # ✅ Apply playbook_settings to GameManager so _load_playbook_settings uses cache (no DB per turn)
-                    trace_id_cached = f"sim_q{body.quarter}_{body.game_id}_cached"
-                    logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Setting playbook_settings on GameManager. gm_id={id(gm)}, home_team_id={id(gm.home_team)}, away_team_id={id(gm.away_team)}")
                     if home_settings and "playbook_settings" in home_settings:
                         gm.home_team.playbook_settings = home_settings.get("playbook_settings") or {}
-                        after_slots = len(gm.home_team.playbook_settings.get("slot_assignments", {})) if gm.home_team.playbook_settings else 0
-                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set home playbook_settings: slots={after_slots}, team_obj_id={id(gm.home_team)}")
                     elif not hasattr(gm.home_team, 'playbook_settings'):
                         gm.home_team.playbook_settings = {}
-                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set empty home playbook_settings (no DB settings), team_obj_id={id(gm.home_team)}")
                     if away_settings and "playbook_settings" in away_settings:
                         gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
-                        after_slots = len(gm.away_team.playbook_settings.get("slot_assignments", {})) if gm.away_team.playbook_settings else 0
-                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set away playbook_settings: slots={after_slots}, team_obj_id={id(gm.away_team)}")
                     elif not hasattr(gm.away_team, 'playbook_settings'):
                         gm.away_team.playbook_settings = {}
-                        logging.warning(f"🔴🔴🔴 [DIAG] CACHED PATH: Set empty away playbook_settings (no DB settings), team_obj_id={id(gm.away_team)}")
             
             # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
             # Only check database for timeout state if we have a game_id (existing game, not new game start)
@@ -2467,17 +2446,6 @@ try:
                                 home_scouting = saved.get("scouting", {}).get(home)
                                 away_scouting = saved.get("scouting", {}).get(away)
 
-                            logging.warning(
-                                "🧭 [PLAYBOOK TRACE] db-load saved home set-play targets team=%s targets=%s",
-                                home,
-                                _summarize_set_play_targets(home_plays),
-                            )
-                            logging.warning(
-                                "🧭 [PLAYBOOK TRACE] db-load saved away set-play targets team=%s targets=%s",
-                                away,
-                                _summarize_set_play_targets(away_plays),
-                            )
-                            
                             # ✅ UNIFIED: Load both strategy_settings and playbook_settings using unified function
                             # This ensures consistent logic for both settings types (extract from DB, override with request if valid)
                             from BackEnd.utils.team_settings_manager import load_and_apply_team_settings_to_gamemanager
@@ -2540,23 +2508,8 @@ try:
                             # ✅ FIX: Always set playbook_settings (even if empty dict or None) to prevent DB fallbacks during gameplay
                             # This ensures the attribute exists so _load_playbook_settings can check it without hitting DB 37 times per quarter
                             # Empty dict means "no settings configured" which is valid - cache it so we don't hit DB
-                            logging.warning(f"🔴🔴🔴 [DIAG] DB LOAD PATH: Setting playbook_settings on GameManager. gm_id={id(gm)}, home_team_id={id(gm.home_team)}, away_team_id={id(gm.away_team)}")
                             gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
-                            slot_count = len(home_playbook_settings.get("slot_assignments", {})) if home_playbook_settings else 0
-                            logging.warning(f"🔴🔴🔴 [DIAG] DB LOAD PATH: Set home playbook_settings: slots={slot_count}, team_obj_id={id(gm.home_team)}")
                             gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
-                            slot_count = len(away_playbook_settings.get("slot_assignments", {})) if away_playbook_settings else 0
-                            logging.warning(f"🔴🔴🔴 [DIAG] DB LOAD PATH: Set away playbook_settings: slots={slot_count}, team_obj_id={id(gm.away_team)}")
-                            logging.warning(
-                                "🧭 [PLAYBOOK TRACE] db-load gm home set-play targets team=%s targets=%s",
-                                home,
-                                _summarize_set_play_targets(getattr(gm.home_team, "plays", {})),
-                            )
-                            logging.warning(
-                                "🧭 [PLAYBOOK TRACE] db-load gm away set-play targets team=%s targets=%s",
-                                away,
-                                _summarize_set_play_targets(getattr(gm.away_team, "plays", {})),
-                            )
                             
                             # ✅ VERIFY: Log settings after GameManager creation to confirm they were applied
                             if home_strategy or away_strategy:
@@ -3000,14 +2953,6 @@ try:
                                             }
                                             # NO season_stats - that stays in FTD
                                         }
-                                        if play_data.get("play_type") == "set_play":
-                                            logging.warning(
-                                                "🧭 [PLAYBOOK TRACE] franchise new-game home play='%s' play_id=%s target_shooter=%s motion_focus=%s",
-                                                play_name,
-                                                play_data.get("play_id", ""),
-                                                play_data.get("target_shooter"),
-                                                play_data.get("motion_focus"),
-                                            )
                                 # Initialize game_stats for scouting_data defense
                                 if home_scouting_data and "defense" in home_scouting_data:
                                     for defense_name, defense_data in home_scouting_data["defense"].items():
@@ -3065,14 +3010,6 @@ try:
                                                 "effectiveness": 0.0
                                             }
                                         }
-                                        if play_data.get("play_type") == "set_play":
-                                            logging.warning(
-                                                "🧭 [PLAYBOOK TRACE] franchise new-game away play='%s' play_id=%s target_shooter=%s motion_focus=%s",
-                                                play_name,
-                                                play_data.get("play_id", ""),
-                                                play_data.get("target_shooter"),
-                                                play_data.get("motion_focus"),
-                                            )
                                 # Initialize game_stats for scouting_data defense (same as home)
                                 if away_scouting_data and "defense" in away_scouting_data:
                                     for defense_name, defense_data in away_scouting_data["defense"].items():
@@ -5532,23 +5469,12 @@ try:
                             user_team_object_id_obj = None
                         # Load FTD for user team
                         if user_team_object_id_obj is not None:
-                            logging.warning(
-                                "🧭 [PLAYBOOK TRACE] init-game franchise lookup franchise_id=%s user_team_name=%s user_team_object_id=%s",
-                                franchise_id,
-                                user_team_name,
-                                user_team_object_id,
-                            )
                             user_ftd = franchise_team_data_collection.find_one(
                                 {"franchise_id": ObjectId(franchise_id), "team_id": user_team_object_id_obj},
                                 {"playbook_settings": 1, "strategy_settings": 1, "plays": 1}
                             )
                         else:
                             user_ftd = None
-                        logging.warning(
-                            "🧭 [PLAYBOOK TRACE] init-game user_ftd found=%s play_count=%s",
-                            bool(user_ftd),
-                            len((user_ftd or {}).get("plays", {}) or {}),
-                        )
                         
                         if user_ftd:
                             # Copy master settings to game doc for user team
@@ -5564,15 +5490,6 @@ try:
                                 user_team_id_in_game = away_team_id
                             
                             if user_team_id_in_game:
-                                logging.warning(
-                                    "🧭 [PLAYBOOK TRACE] init-game user_team_id_in_game=%s home_team_id=%s away_team_id=%s master_playbook=%s master_strategy=%s master_plays=%s",
-                                    user_team_id_in_game,
-                                    home_team_id,
-                                    away_team_id,
-                                    bool(master_playbook),
-                                    bool(master_strategy),
-                                    len(master_plays or {}),
-                                )
                                 if master_playbook:
                                     summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
                                     logging.warning(f"✅ [FTD] Copied playbook_settings from FTD to game doc for team {user_team_id_in_game}")
@@ -5594,25 +5511,8 @@ try:
                                     logging.warning(f"✅ [FTD] Copied plays from FTD to game doc for team {user_team_id_in_game}")
                                     if user_team_id_in_game == home_team_id:
                                         gm.home_team.plays = copy.deepcopy(master_plays)
-                                        logging.warning(
-                                            "🧭 [PLAYBOOK TRACE] init-game gm home set-play targets team=%s targets=%s",
-                                            home_team,
-                                            _summarize_set_play_targets(gm.home_team.plays),
-                                        )
                                     elif user_team_id_in_game == away_team_id:
                                         gm.away_team.plays = copy.deepcopy(master_plays)
-                                        logging.warning(
-                                            "🧭 [PLAYBOOK TRACE] init-game gm away set-play targets team=%s targets=%s",
-                                            away_team,
-                                            _summarize_set_play_targets(gm.away_team.plays),
-                                        )
-                                    logging.warning(
-                                        "🧭 [PLAYBOOK TRACE] init-game summary set-play targets team_id=%s targets=%s",
-                                        user_team_id_in_game,
-                                        _summarize_set_play_targets(
-                                            summary["teams"][user_team_id_in_game].get("plays", {})
-                                        ),
-                                    )
             except Exception as e:
                 logging.warning(f"⚠️ [FTD] Error copying settings from FTD: {e}")
                 import traceback

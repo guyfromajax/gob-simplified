@@ -102,6 +102,12 @@
   transform: translateY(-1px);
 }
 
+#franchise-container #playbooks-franchise.secondary-btn.needs-playbook-save {
+  box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.18), 0 0 24px rgba(255, 122, 0, 0.45);
+  border-color: #ff7a00;
+  color: #d66a00;
+}
+
 /* Scouting Report - Gray fill */
 #franchise-container #scouting-report-btn.secondary-btn {
   background: #9e9d9d;

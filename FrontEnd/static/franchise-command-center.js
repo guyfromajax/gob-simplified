@@ -29,6 +29,7 @@ let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
 let commandCenterTopDataCache = null;
+let playbooksWeekSavedCache = null;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -257,6 +258,18 @@ function buildResourceUrl(page, extraParams) {
   params.set('return_url', getCurrentRelativeUrl());
   if (extraParams) Object.keys(extraParams).forEach(k => params.set(k, extraParams[k]));
   return `/${page}?${params.toString()}`;
+}
+
+async function updatePlaybooksButtonState(topData) {
+  const playbooksBtn = document.getElementById('playbooks-franchise');
+  if (!playbooksBtn || !franchiseId || !userTeamId) return;
+  const currentWeek = Number(topData?.week || 1);
+  const data = await fetchJSON(
+    `${API_CONFIG.buildUrl('/api/playbooks')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`
+  );
+  const savedForWeek = Number(data?.playbook_meta?.saved_for_week || 0);
+  playbooksWeekSavedCache = savedForWeek;
+  playbooksBtn.classList.toggle('needs-playbook-save', savedForWeek !== currentWeek);
 }
 
 function bindResourcesLinks() {
@@ -1283,6 +1296,7 @@ async function init() {
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
   updateAwardsButton(topData);
+  await updatePlaybooksButtonState(topData);
   maybeShowChampionshipCompleteModal(topData);
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
@@ -1828,7 +1842,7 @@ function wireFccNavButtons() {
       params.set('team_id', userTeamId);
       params.set('from', 'franchise-command-center');
       params.set('return_url', getCurrentRelativeUrl());
-      window.location.href = `/playbooks.html?${params.toString()}`;
+      window.location.href = `/playbook-report.html?${params.toString()}`;
     });
   }
 }

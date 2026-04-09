@@ -787,14 +787,6 @@ class ShotManager:
                         intended_shooter_pos = roles.get("intended_shooter_pos")
                         intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
                         intended_shooter_id = intended_shooter.player_id if intended_shooter else None
-                        logging.warning(
-                            "🧭 [PLAYBOOK TRACE] foul result playcall='%s' shooter_pos=%s intended_shooter_pos=%s shooter_id=%s intended_shooter_id=%s",
-                            self.game_state.get("current_playcall"),
-                            shooter_pos,
-                            intended_shooter_pos,
-                            getattr(shooter, "player_id", None),
-                            intended_shooter_id,
-                        )
 
                         result = {
                             "result_type": "FOUL",
@@ -1701,15 +1693,6 @@ class ShotManager:
         intended_shooter_pos = roles.get("intended_shooter_pos")
         intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
         intended_shooter_id = intended_shooter.player_id if intended_shooter else None
-        logging.warning(
-            "🧭 [PLAYBOOK TRACE] shot result playcall='%s' shooter_pos=%s intended_shooter_pos=%s shooter_id=%s intended_shooter_id=%s made=%s",
-            self.game_state.get("current_playcall"),
-            shooter_pos,
-            intended_shooter_pos,
-            getattr(shooter, "player_id", None),
-            intended_shooter_id,
-            made,
-        )
 
         # ✅ BLOCKING_FOUL: Add blocking foul info to result if applicable
         blocking_foul_next_play_type = None
