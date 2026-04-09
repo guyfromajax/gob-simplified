@@ -2966,6 +2966,14 @@ try:
                                             }
                                             # NO season_stats - that stays in FTD
                                         }
+                                        if play_data.get("play_type") == "set_play":
+                                            logging.warning(
+                                                "🧭 [PLAYBOOK TRACE] franchise new-game home play='%s' play_id=%s target_shooter=%s motion_focus=%s",
+                                                play_name,
+                                                play_data.get("play_id", ""),
+                                                play_data.get("target_shooter"),
+                                                play_data.get("motion_focus"),
+                                            )
                                 # Initialize game_stats for scouting_data defense
                                 if home_scouting_data and "defense" in home_scouting_data:
                                     for defense_name, defense_data in home_scouting_data["defense"].items():
@@ -3023,6 +3031,14 @@ try:
                                                 "effectiveness": 0.0
                                             }
                                         }
+                                        if play_data.get("play_type") == "set_play":
+                                            logging.warning(
+                                                "🧭 [PLAYBOOK TRACE] franchise new-game away play='%s' play_id=%s target_shooter=%s motion_focus=%s",
+                                                play_name,
+                                                play_data.get("play_id", ""),
+                                                play_data.get("target_shooter"),
+                                                play_data.get("motion_focus"),
+                                            )
                                 # Initialize game_stats for scouting_data defense (same as home)
                                 if away_scouting_data and "defense" in away_scouting_data:
                                     for defense_name, defense_data in away_scouting_data["defense"].items():

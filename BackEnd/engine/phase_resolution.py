@@ -6278,6 +6278,13 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
         if play_obj:
             play_id = play_obj.get("play_id")
             team_target_shooter = play_obj.get("target_shooter")
+            logging.warning(
+                "🧭 [PLAYBOOK TRACE] skeleton in-memory playcall='%s' offense_team=%s play_id=%s team_target_shooter=%s",
+                playcall,
+                getattr(offense_team, "name", None),
+                play_id,
+                team_target_shooter,
+            )
     
     # If not found in memory, check database
     if not play_id:
@@ -6291,6 +6298,13 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
                 if play_obj:
                     play_id = play_obj.get("play_id")
                     team_target_shooter = play_obj.get("target_shooter")
+                    logging.warning(
+                        "🧭 [PLAYBOOK TRACE] skeleton DB fallback playcall='%s' team_id=%s play_id=%s team_target_shooter=%s",
+                        playcall,
+                        team_id,
+                        play_id,
+                        team_target_shooter,
+                    )
     
     if not play_id:
         # print(f"🔍 NOT FOUND: No play_id for '{playcall}'")
@@ -6356,12 +6370,29 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
         if skeleton and skeleton.get("steps"):
             skeleton["_variant"] = variant
             target_shooter = team_target_shooter or play_doc.get("target_shooter")
+            logging.warning(
+                "🧭 [PLAYBOOK TRACE] skeleton lean playcall='%s' play_id=%s team_target_shooter=%s universal_target_shooter=%s applied_target_shooter=%s variant=%s",
+                playcall,
+                play_id,
+                team_target_shooter,
+                play_doc.get("target_shooter"),
+                target_shooter,
+                variant,
+            )
             return _apply_set_play_runtime_position_mapping(skeleton, target_shooter)
 
     # Default to successful variant (Set Play only)
     skeleton = _select_default_set_play_skeleton(play_doc)
     if skeleton and skeleton.get("steps"):
         target_shooter = team_target_shooter or play_doc.get("target_shooter")
+        logging.warning(
+            "🧭 [PLAYBOOK TRACE] skeleton default playcall='%s' play_id=%s team_target_shooter=%s universal_target_shooter=%s applied_target_shooter=%s",
+            playcall,
+            play_id,
+            team_target_shooter,
+            play_doc.get("target_shooter"),
+            target_shooter,
+        )
         return _apply_set_play_runtime_position_mapping(skeleton, target_shooter)
 
     return None
