@@ -5521,10 +5521,33 @@ try:
                 if franchise_doc:
                     user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
                     if user_team_object_id:
+                        try:
+                            user_team_object_id_obj = ObjectId(user_team_object_id)
+                        except Exception:
+                            logging.warning(
+                                "⚠️ [FTD] init-game invalid user_team_object_id=%r for franchise_id=%s",
+                                user_team_object_id,
+                                franchise_id,
+                            )
+                            user_team_object_id_obj = None
                         # Load FTD for user team
-                        user_ftd = franchise_team_data_collection.find_one(
-                            {"franchise_id": ObjectId(franchise_id), "team_id": user_team_object_id},
-                            {"playbook_settings": 1, "strategy_settings": 1, "plays": 1}
+                        if user_team_object_id_obj is not None:
+                            logging.warning(
+                                "🧭 [PLAYBOOK TRACE] init-game franchise lookup franchise_id=%s user_team_name=%s user_team_object_id=%s",
+                                franchise_id,
+                                user_team_name,
+                                user_team_object_id,
+                            )
+                            user_ftd = franchise_team_data_collection.find_one(
+                                {"franchise_id": ObjectId(franchise_id), "team_id": user_team_object_id_obj},
+                                {"playbook_settings": 1, "strategy_settings": 1, "plays": 1}
+                            )
+                        else:
+                            user_ftd = None
+                        logging.warning(
+                            "🧭 [PLAYBOOK TRACE] init-game user_ftd found=%s play_count=%s",
+                            bool(user_ftd),
+                            len((user_ftd or {}).get("plays", {}) or {}),
                         )
                         
                         if user_ftd:
@@ -5541,6 +5564,15 @@ try:
                                 user_team_id_in_game = away_team_id
                             
                             if user_team_id_in_game:
+                                logging.warning(
+                                    "🧭 [PLAYBOOK TRACE] init-game user_team_id_in_game=%s home_team_id=%s away_team_id=%s master_playbook=%s master_strategy=%s master_plays=%s",
+                                    user_team_id_in_game,
+                                    home_team_id,
+                                    away_team_id,
+                                    bool(master_playbook),
+                                    bool(master_strategy),
+                                    len(master_plays or {}),
+                                )
                                 if master_playbook:
                                     summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
                                     logging.warning(f"✅ [FTD] Copied playbook_settings from FTD to game doc for team {user_team_id_in_game}")
