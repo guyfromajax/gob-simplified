@@ -150,6 +150,7 @@
         tournamentId: this.params.get("tournament_id") || "",
         gameId: this.params.get("game_id") || "",
         from: this.params.get("from") || "",
+        isGameplayContext: Boolean(this.params.get("game_id") || ""),
       };
 
       this.state = {
@@ -186,13 +187,32 @@
         zoneDefenseTotal: document.getElementById("zone-defense-total"),
         pcOffense: document.getElementById("pc-order-offense"),
         pcDefense: document.getElementById("pc-order-defense"),
+        gameplayLockout: document.getElementById("gameplay-lockout"),
       };
     }
 
     async init() {
+      if (this.context.isGameplayContext) {
+        this.renderGameplayLockout();
+        this.bindGlobalEvents();
+        return;
+      }
       this.bindGlobalEvents();
       await this.loadData();
       this.render();
+    }
+
+    renderGameplayLockout() {
+      if (this.elements.gameplayLockout) {
+        this.elements.gameplayLockout.hidden = false;
+      }
+      document.querySelectorAll(".settings-card").forEach((card) => {
+        if (card !== this.elements.gameplayLockout) {
+          card.hidden = true;
+        }
+      });
+      if (this.elements.saveBtn) this.elements.saveBtn.hidden = true;
+      if (this.elements.evenAllBtn) this.elements.evenAllBtn.hidden = true;
     }
 
     bindGlobalEvents() {

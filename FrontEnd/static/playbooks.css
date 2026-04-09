@@ -135,6 +135,14 @@ select {
   box-shadow: var(--shadow);
 }
 
+.empty-state-copy {
+  margin: 8px 4px 0;
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
 .section-block + .section-block {
   margin-top: 26px;
 }

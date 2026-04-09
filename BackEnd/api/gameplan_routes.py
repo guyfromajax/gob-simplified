@@ -379,12 +379,6 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode for get_save_location: {mode}")
     
-    # Single source of truth: franchise/tournament always save to FTD or tournament doc, never to game doc
-    if mode == "franchise":
-        return franchises_collection, franchise_id, False
-    if mode == "tournament":
-        return tournaments_collection, tournament_id, False
-    
     # Check if game exists and is active (franchise/tournament games use ObjectId _id; try that first)
     try:
         game_doc = None

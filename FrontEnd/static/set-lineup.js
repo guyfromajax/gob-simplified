@@ -1450,7 +1450,14 @@ function wireLineupNavButtons() {
   }
   const playbooksBtn = document.getElementById('playbooks-button');
   if (playbooksBtn) {
+    if (isGameplayLineupContext()) {
+      playbooksBtn.hidden = true;
+      playbooksBtn.disabled = true;
+    }
     playbooksBtn.addEventListener('click', async () => {
+      if (isGameplayLineupContext()) {
+        return;
+      }
       playSound('positive-beep.wav');
       console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
       const currentUrlParams = new URLSearchParams(window.location.search);
