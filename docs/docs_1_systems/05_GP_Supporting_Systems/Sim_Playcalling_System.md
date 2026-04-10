@@ -7,7 +7,7 @@ The Sim Playcalling System chooses offensive and defensive calls for gameplay tu
 Current architecture:
 - Universal offensive plays live in the `plays` collection.
 - Team-owned play copies live in mode-specific team documents and carry mutable team data like `effectiveness`, `momentum`, `cloaking`, and `target_shooter`.
-- `play_id` is the canonical identity for playbook percentages and slot assignments.
+- `play_id` is the canonical identity for playbook percentages and offensive Playcall Center order.
 - `name` is display text and compatibility fallback only.
 
 Primary runtime file:
@@ -27,9 +27,7 @@ Supporting files:
 5. Query matching universal plays.
 6. Weight candidate plays using `playbook_settings`:
    - `motion`
-   - `set_play_inside`
-   - `set_play_attack`
-   - `set_play_outside`
+   - `set_plays`
 7. Store the result in `game_state["current_playcall"]`, plus `offense_play_type` and `offense_play_focus`.
 
 ## Defensive Selection Flow
@@ -46,19 +44,18 @@ Offensive playbook persistence now uses `play_id` keys:
 ```python
 playbook_settings = {
     "motion": {play_id: percentage},
-    "set_play_inside": {play_id: percentage},
-    "set_play_attack": {play_id: percentage},
-    "set_play_outside": {play_id: percentage},
-    "slot_assignments": {
-        "1": {"section": "motion", "playId": play_id, "playName": display_name}
-    },
-    "motion_dropdowns": {play_id: "inside|attack|outside|-"}
+    "set_plays": {play_id: percentage},
+    "fast_breaks": {play_id_or_fb_key: percentage},
+    "pc_order": {
+        "offense": [play_id, ...],
+        "defense": ["Man", "2-3 Zone", ...]
+    }
 }
 ```
 
 Compatibility behavior:
 - Runtime still tolerates old name-keyed percentage maps.
-- Runtime still tolerates name-based `slot_assignments`.
+- Runtime still tolerates split set-play maps and legacy `slot_assignments`.
 - Resolution prefers `play_id` first, then falls back to `name`.
 
 ## Team-Owned Play Copies
@@ -110,8 +107,7 @@ That is acceptable because:
 
 Current rename-safe areas:
 - offensive playbook percentages
-- slot assignments
-- motion dropdowns
+- offensive Playcall Center ordering (`pc_order.offense`)
 - most play-selection weighting paths
 
 Still compatibility-based rather than fully canonical:

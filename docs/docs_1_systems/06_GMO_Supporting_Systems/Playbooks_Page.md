@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Playbooks page configures offensive and defensive weighting plus Playcall Center slot assignments.
+The Playbooks page configures offensive and defensive weighting plus Playcall Center ordering.
 
 Primary frontend:
 - `FrontEnd/static/playbooks.js`
@@ -13,24 +13,30 @@ Primary backend:
 
 ## Current Identity Model
 
-Offensive playbook persistence is now `play_id`-first.
+Offensive playbook persistence is now `play_id`-first, and the internal persistence model is the simplified canonical shape.
 
-Current offensive storage shape:
+Current canonical storage shape:
 
 ```python
 playbook_settings = {
     "motion": {play_id: percentage},
-    "set_play_inside": {play_id: percentage},
-    "set_play_attack": {play_id: percentage},
-    "set_play_outside": {play_id: percentage},
-    "slot_assignments": {
-        "1": {"section": "motion", "playId": play_id, "playName": display_name}
+    "set_plays": {play_id: percentage},
+    "fast_breaks": {"triangle": 34, "rim_runner": 33, "covert_release": 33},
+    "man_defense": {defense_id: percentage},
+    "zone_defense": {defense_id: percentage},
+    "pc_order": {
+        "offense": [play_id_1, play_id_2, ...],
+        "defense": [defense_id_1, defense_id_2, ...]
     },
-    "motion_dropdowns": {play_id: dropdown_value}
+    "position_filters": {...},
+    "even_distribution_all": bool,
+    "_meta": {...}
 }
 ```
 
-Defense remains name-keyed because the defense library is still name-based.
+Play-level metadata is stored on the team `plays` objects:
+- motion plays use `motion_focus`
+- set plays use `target_shooter`
 
 ## Play Loading
 
@@ -44,21 +50,25 @@ The page uses:
 
 ## Compatibility
 
-The page and backend still tolerate old name-keyed data during rollout.
+The page and backend still tolerate old name-keyed and legacy-shaped data during rollout, but all internal persistence should normalize into the canonical shape above.
 
 Normalization rules:
 - old percentage maps keyed by play name are converted to `play_id`
-- old `slot_assignments` keyed by display names are normalized to `playId`
-- old motion dropdown maps keyed by play name are normalized to `play_id`
+- old split set-play buckets are merged into `set_plays`
+- old `fast_break` maps are normalized to `fast_breaks`
+- old `slot_assignments` are treated as compatibility input and normalized into `pc_order`
+- old motion dropdown maps keyed by play name are normalized to `play_id` and resolved into play metadata
 
-## Slot Assignments
+## Playcall Center Ordering
 
-Playcall Center slot assignments now persist by `playId`.
+`pc_order` is the only authoritative persistence model for Playcall Center membership and ordering.
 
-`playName` is still stored for:
-- display
-- compatibility fallback
-- human readability in docs / DB inspection
+Implications:
+- a checked offensive play must exist in `pc_order.offense`
+- a checked defensive scheme must exist in `pc_order.defense`
+- unchecked rows must be removed from the appropriate list
+- gameplay ordering should be restored from `pc_order` first
+- `slot_assignments` may still exist as a compatibility output for older callers, but should not be treated as the source of truth
 
 ## Position Filters
 
@@ -90,12 +100,35 @@ and still includes:
 
 for compatibility fallback.
 
+## Franchise Persistence Policy
+
+Franchise mode now uses a two-stage persistence model:
+
+- **FCC / Pregame**
+  - read Playbooks from `FTD`
+  - save Playbooks to `FTD`
+- **Game Init**
+  - copy the user team's Playbooks snapshot from `FTD` into the game doc
+- **Active Gameplay**
+  - read Playbooks from the game doc
+  - save gameplay-scoped Playbooks changes to the game doc only
+
+This applies to:
+- offense percentages
+- defense percentages
+- fast break percentages
+- Playcall Center ordering for offense and defense
+- motion focus
+- target shooter
+
+Gameplay changes do not write back to `FTD`. FCC remains the franchise master editor.
+
 ## Rename Safety Status
 
 Rename-safe:
 - offense percentages
-- slot assignments
-- motion dropdowns
+- Playcall Center ordering (`pc_order`)
+- motion-focus persistence
 - position filters
 - most Play Details navigation
 

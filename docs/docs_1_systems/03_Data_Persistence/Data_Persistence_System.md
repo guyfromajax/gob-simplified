@@ -18,8 +18,8 @@
 
 **Common Data Fields (All Modes):**
 - Team attributes: `shot_threshold`, `discipline`, `fight`, `rebound_modifier`, `offensive_efficiency`, `team_chemistry`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- Strategy settings: `{offense, inside, attack, outside, tempo, defense, aggression, hc_trap, fc_press, rebounding}` (0-4)
-- Playbook settings: `{motion, set_play_inside, set_play_attack, set_play_outside, zone_defense, man_defense, slot_assignments, motion_dropdowns, position_filters}`
+- Strategy settings: `{offense, inside, attack, outside, fast_breaks, defense, aggression, hc_trap, fc_press, rebounding}` (0-4)
+- Playbook settings: `{motion, set_plays, fast_breaks, man_defense, zone_defense, pc_order, position_filters, even_distribution_all, _meta}`
 - Plays data: `{[playName]: {effectiveness, momentum, cloaking, game_stats, season_stats}}`
 - Scouting data: `{defense: {Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT: {effectiveness, momentum, cloaking, game_stats, season_stats}}}`
 
@@ -354,15 +354,21 @@ This system documents data persistence across all three game modes when users ar
 
 ## Known Issues & Fixes (January 2025-2026)
 
-**Note:** All major persistence issues have been resolved through the Unified State Persistence refactoring (Phases 1-5.7) and the single-source-of-truth simplification (February 2026). The fixes documented below are historical and have been integrated into the current system. For complete implementation history, see `Unified_State_Persistence_Work_Plan.md`.
+**Note:** All major persistence issues have been resolved through the Unified State Persistence refactoring (Phases 1-5.7). The fixes documented below are historical and have been integrated into the current system. For complete implementation history, see `Unified_State_Persistence_Work_Plan.md`.
 
-### ✅ Fixed: Single Source of Truth for Franchise/Tournament Game Plan & Playbooks (February 2026)
+### ✅ Fixed: Franchise/Tournament Settings Source Drift (February 2026, superseded by April 2026 two-stage model)
 
 **Issue:** In franchise and tournament mode, game plan and playbook settings could appear to be "lost" when returning to the lineup screen after a timeout or when navigating during gameplay. Persistence worked before the game but not consistently during the game.
 
 **Root Cause:** Settings were sometimes read from or written to the game document and sometimes to the master store (FTD or tournament doc). When the backend chose the wrong source (e.g. read from master after writing to game doc, or overwrite in-memory state from game doc), the UI showed stale or empty settings.
 
-**Fix:** Franchise and tournament now use a **single source of truth** for game plan and playbook settings. Settings are **always** read from and written to the master store (FTD for franchise, tournament document for tournament). The game document is not used for these settings in franchise or tournament mode. Implementation: (1) `get_save_location_for_franchise_tournament()` always returns `is_game_doc = False` for franchise and tournament. (2) GET gameplan and GET playbooks never set `load_from_game_doc = True` for franchise or tournament, so they always load from FTD or tournament doc. (3) **Follow-up (February 2026):** Tournament save in `team_settings_manager.py` was updated to resolve the authoritative `user_team_object_id` from the tournament document (same as franchise uses from franchise doc); request `team_id` is ignored for tournament master save. This ensures save and load use the same key (`teams.{user_team_object_id}`) and fixes tournament settings not persisting from TCC or in-game.
+**Historical Fix:** February 2026 temporarily forced franchise/tournament settings back to the master store to stop save/load drift.
+
+**Current Model (April 2026):**
+1. FCC / TCC / pregame save to the master store
+2. Game init snapshots those settings into the game document
+3. Active gameplay reads and writes the game document only
+4. Master settings remain unchanged by gameplay-only edits
 
 **Files Changed:** `BackEnd/api/gameplan_routes.py` (get_save_location_for_franchise_tournament, get_gameplan, get_playbooks); `BackEnd/utils/team_settings_manager.py` (tournament master save uses authoritative user_team_object_id)
 
@@ -452,15 +458,18 @@ This system documents data persistence across all three game modes when users ar
 ```javascript
 {
   "motion": { "play_id": percentage (0-100), ... },
-  "set_play_inside": { "play_id": percentage (0-100), ... },
-  "set_play_attack": { "play_id": percentage (0-100), ... },
-  "set_play_outside": { "play_id": percentage (0-100), ... },
-  "zone_defense": { "Defense Name": percentage (0-100), ... },
+  "set_plays": { "play_id": percentage (0-100), ... },
+  "fast_breaks": { "play_id_or_fb_key": percentage (0-100), ... },
   "man_defense": { "Defense Name": percentage (0-100), ... },
-  "slot_assignments": {
-    "1": { "section": "motion", "playId": "play_id", "playName": "display name" }
+  "zone_defense": { "Defense Name": percentage (0-100), ... },
+  "pc_order": {
+    "offense": ["play_id", ...],
+    "defense": ["Man", "2-3 Zone", ...]
   },
-  "motion_dropdowns": { "playId": dropdownValue, ... },
+  "_meta": {
+    "offense_sort": "...",
+    "defense_sort": "..."
+  },
   "position_filters": { "standard": [...], "PG": [...], ... },
   "even_distribution_all": boolean
 }
@@ -472,6 +481,8 @@ This system documents data persistence across all three game modes when users ar
 - Defense plays come from hardcoded `DEFENSE_PLAY_DATA` (not from database), so they always appear
 - Offense plays come from database `plays` object, so structure must be maintained
 - Offensive persistence is now `play_id`-first; play names are display values only
+- Motion focus and set-play target shooter live on the team-owned `plays` data, not as separate playbook maps
+- Legacy `set_play_inside`, `set_play_attack`, `set_play_outside`, `slot_assignments`, and `motion_dropdowns` are compatibility inputs only and should not be treated as canonical persistence fields
 
 ---
 
@@ -547,11 +558,11 @@ This system documents data persistence across all three game modes when users ar
 
 ### Overview
 
-Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use a unified persistence system. **Franchise and Tournament use a single source of truth:** settings are always read from and written to the master store (FTD for franchise, tournament document for tournament). The game document is **not** used for these settings in franchise or tournament mode—neither before the game nor during gameplay (lineup, timeout, in-game). This eliminates sync bugs and "lost on comeback" issues.
+Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use a unified persistence system. **Franchise and Tournament use a two-stage source of truth:** FCC / TCC / pregame reads and writes the master store (FTD for franchise, tournament document for tournament), then game init snapshots those settings into the active game document. During active gameplay, lineup / timeout / in-game settings read and write the game document only. This eliminates sync bugs while keeping pregame defaults separate from gameplay-only adjustments.
 
-**Franchise:** All strategy/playbook settings live in the `franchise_team_data` (FTD) collection, keyed by `(franchise_id, user_team_object_id)`. Save uses **upsert** so the first save creates the FTD doc if missing. **FCC / pre-game save:** `save_team_settings()` uses **authoritative** `user_team_object_id` from the franchise document; request `team_id` is ignored. Load (GET gameplan, GET playbooks, init-game, simulate-quarter) always reads from FTD for franchise—never from the game document.
+**Franchise:** The master copy of strategy/playbook settings lives in the `franchise_team_data` (FTD) collection, keyed by `(franchise_id, user_team_object_id)`. Save uses **upsert** so the first save creates the FTD doc if missing. **FCC / pre-game save:** `save_team_settings()` uses **authoritative** `user_team_object_id` from the franchise document; request `team_id` is ignored. FCC / pregame reads from FTD; active gameplay reads from the game document snapshot created at init.
 
-**Tournament:** All strategy/playbook settings live in the tournament document → `teams.{team_id}.{settings_type}`. Save and load always use the tournament document—never the game document.
+**Tournament:** The master copy of strategy/playbook settings lives in the tournament document → `teams.{team_id}.{settings_type}`. TCC / pregame reads and writes the tournament document; active gameplay reads and writes the game document snapshot created at init.
 
 **Single Game Mode:** Settings are stored in and read from the game document only (no master doc).
 
@@ -575,16 +586,19 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
    - Applies to GameManager consistently
    - Handles request overrides (if user visited respective page)
 
-### Save Location Logic (Phase 5.7, simplified February 2026)
+### Save Location Logic (Phase 5.7, updated April 2026)
 
 **Determined by `get_save_location_for_franchise_tournament()`:**
 
-**Franchise and Tournament (single source of truth):**
-- **Always save to master store.** `get_save_location_for_franchise_tournament()` always returns `is_game_doc = False` for franchise and tournament, regardless of whether a game is in progress. No branching on `game_id`.
+**Franchise and Tournament (two-stage persistence):**
+- **Pre-game / FCC / TCC:** save to master store.
   - **Franchise:** `franchise_team_data` collection (FTD). One doc per `(franchise_id, team_id)`. Settings stored as `strategy_settings` / `playbook_settings` top-level fields. Save uses **upsert**: if no FTD doc exists, one is created on first save.
   - **Tournament:** `tournaments` document → `teams.{team_id}.{settings_type}`
-- **Team ID Format:** ObjectId string (e.g., `"68c98b08674d3f9b04546b2f"`). Franchise FTD and tournament `teams` use ObjectId strings as keys (from `user_team_object_id`).
-- **Read path:** GET gameplan and GET playbooks never load from the game document for franchise/tournament; they always load from FTD (franchise) or tournament doc (tournament). So in-game changes persist because they are written to and read from the same master store.
+- **Active gameplay:** save to game document.
+  - Path: `teams.{canonical_team_id}.{settings_type}`
+  - Triggered when `game_id` is present and the request is in active-game context
+- **Team ID Format:** ObjectId string in master docs; canonical team ID in game docs.
+- **Read path:** GET gameplan and GET playbooks load from the master store for FCC / TCC / pregame, and from the game document for active gameplay.
 
 **Single Game Mode:**
 - Always saves to and loads from the game document (no master doc).
@@ -630,7 +644,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 **User Flow:**
 1. User accesses Game Plan/Playbooks from FCC or TCC
 2. User changes settings and clicks "Save"
-3. Settings saved to master document (franchise/tournament doc)
+3. Settings saved to master document (franchise → FTD, tournament → tournament doc)
 4. User navigates away and returns
 5. Settings loaded from master document (persist correctly)
 
@@ -645,62 +659,71 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 
 **User Flow:**
 1. User starts new game in franchise/tournament mode
-2. Settings are read from master (FTD or tournament doc) when needed (e.g. init-game, simulate-quarter)
-3. Game begins with master settings as starting point
+2. Settings are read from master (FTD or tournament doc) during game init
+3. A full settings snapshot is copied into the game document for the user team
+4. Game begins with that snapshot as the starting point
 
 **Backend Flow:**
-- **Franchise/Tournament:** Settings are always loaded from the master store (FTD or tournament doc). Init-game and simulate-quarter read from FTD/tournament doc. No copy of settings is stored in the game document for franchise/tournament.
+- **Franchise/Tournament:** Init-game loads master settings, then copies `strategy_settings` and `playbook_settings` into the game document as the active-game baseline.
 - **Single Game:** Settings are copied from or stored in the game document as before.
+
+**Canonical stored shapes:**
+- `strategy_settings`
+  - `offense`, `inside`, `attack`, `outside`, `fast_breaks`, `defense`, `aggression`, `hc_trap`, `fc_press`, `rebounding`
+- `playbook_settings`
+  - `motion`, `set_plays`, `fast_breaks`, `man_defense`, `zone_defense`, `pc_order`, `position_filters`, `even_distribution_all`, `_meta`
 
 #### 3. During Active Gameplay (Franchise/Tournament)
 
 **User Flow:**
 1. User changes settings during game (e.g. from lineup or timeout)
-2. Settings saved to master store (FTD or tournament doc)—same as pre-game
-3. Settings persist through timeout/quarter breaks because they are always read from the same master store
+2. Settings saved to the active game document only
+3. Settings persist through timeout/quarter breaks because gameplay reads from the same game document snapshot
+4. Master settings in FTD / tournament doc remain unchanged
 
 **Backend Flow:**
-- `save_team_settings()` called with `game_id` (e.g. from lineup or in-game). For franchise/tournament, `get_save_location_for_franchise_tournament()` always returns master (FTD or tournament doc), so settings are written there.
-- No game-document write for game plan/playbooks in franchise or tournament mode.
+- `save_team_settings()` called with `game_id` during active gameplay writes to `teams.{canonical_team_id}.{settings_type}` in the game document.
+- The game document is the source of truth for gameplay-scoped settings until the game ends.
+- FCC / TCC master settings are not mutated by in-game changes.
 
 #### 4. Timeout Resume (Franchise/Tournament)
 
 **User Flow:**
 1. User calls timeout during game
 2. User navigates to Game Plan/Playbooks (or changes 6 presets in Playcall Center on court)
-3. Settings loaded from master store (FTD or tournament doc)—same source as before and during game
+3. Settings loaded from the active game document
 4. User makes changes (or keeps current)
-5. Settings saved to master store (if changed)
+5. Settings saved back to the active game document (if changed)
 6. User returns to game
-7. Settings persist correctly (single source of truth)
+7. Settings persist correctly for the current game only
 
 **Backend Flow:**
-- GET gameplan and GET playbooks never load from the game document for franchise/tournament; they always load from FTD or tournament doc. So the lineup screen and Game Plan/Playbooks pages always show and save to the same store.
-- `load_and_apply_team_settings_to_gamemanager()` and simulate-quarter load settings from the same master store when building game state.
+- GET gameplan and GET playbooks load from the game document when `game_id` is present and the game is active.
+- FCC / TCC pages load from the master store (FTD or tournament doc) when there is no active-game context.
+- `load_and_apply_team_settings_to_gamemanager()` and simulate-quarter use the game document during active gameplay and the master store only for pregame / snapshot creation.
 - **Single Game:** Settings may still be read from the game document when `game_id` is present; behavior unchanged.
 
-**Playcall Center (court) and the 6 presets:**  
-When the user changes one of the 6 preset plays in the Playcall Center during a timeout, the court must **also** call **POST /api/playbooks** with the updated `slot_assignments` (and `game_id`, `franchise_id`/`tournament_id`, etc.). If the court only calls `/api/set-playcall-override`, that sets the *next play* override in memory but does **not** persist slot_assignments. POST /api/playbooks writes to the correct store (FTD for franchise, tournament doc for tournament, game doc for single) so GET /api/playbooks returns the updated presets on reopen.
+**Playcall Center (court):**  
+When the user changes Playcall Center ordering during gameplay, the court must also call **POST /api/playbooks** with the updated canonical `pc_order` payload (plus `game_id`, `franchise_id` / `tournament_id`, etc.). `/api/set-playcall-override` only changes the next-play override in memory; it does not persist Playcall Center ordering. During active gameplay, POST `/api/playbooks` writes to the game document so GET `/api/playbooks` returns the updated order on reopen.
 
 ### Key Implementation Details
 
 **Unified Save Function:**
 ```python
-# Franchise/tournament: always master (FTD or tournament doc); single: game doc
-if mode in ["franchise", "tournament"]:
-    collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(...)
-    # is_game_doc is always False for franchise/tournament (single source of truth)
-    actual_team_id = team_id  # Master doc - use ObjectId string (Franchise: resolved from franchise doc)
-elif mode == "single" and game_id:
+# Franchise/tournament: master store in FCC/TCC, game doc during active gameplay
+collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(...)
+if is_game_doc:
     actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
+else:
+    actual_team_id = authoritative_user_team_object_id
 ```
 
-**Game document `_id` when saving to game doc (Single Game only):**  
-Franchise and tournament no longer write game plan/playbooks to the game doc. For **single game mode**, game documents are created by `init-game` with `_id` set to a **string** (24-char hex from `generate_game_id()`). When `save_team_settings()` writes to a game doc (single mode), it must try `_id` as **string** first (`update_one({"_id": doc_id}, ...)`). If no document is matched and `doc_id` is 24-char hex, retry with `ObjectId(doc_id)`. This ensures the update finds the document regardless of whether it was stored with string or ObjectId `_id`.
+**Game document `_id` when saving to game doc:**  
+Game documents are created by `init-game` with `_id` commonly stored as a **string** (24-char hex from `generate_game_id()`). When `save_team_settings()` writes to a game doc, it must try `_id` as **string** first (`update_one({"_id": doc_id}, ...)`). If no document is matched and `doc_id` is 24-char hex, retry with `ObjectId(doc_id)`. This applies to single game mode and to franchise/tournament active-game settings writes.
 
 **Unified Extract Function:**
 - **Tournament / game docs:** `extract_team_settings()` uses `teams` (or `franchise_teams` for legacy paths). Resolves team_identifier; tries direct lookup, then name matching.
-- **Franchise master (pre-game):** Settings are **not** read from `franchise_teams` (now empty post-FTD migration). `load_team_settings_from_doc()` loads directly from **FTD** by `(franchise_id, user_team_object_id)` and returns `strategy_settings` / `playbook_settings`. Used by init-game, simulate-quarter, and other master-doc load paths.
+- **Franchise master (pre-game):** Settings are **not** read from `franchise_teams` (now empty post-FTD migration). `load_team_settings_from_doc()` loads directly from **FTD** by `(franchise_id, user_team_object_id)` and returns `strategy_settings` / `playbook_settings` for FCC / pregame and game-init snapshot creation.
 
 **Unified Load Function:**
 ```python
@@ -722,11 +745,12 @@ if gm:
 
 ### Benefits
 
-1. **Single Source of Truth (Franchise/Tournament):** Game plan and playbooks always read from and written to FTD (franchise) or tournament doc (tournament). No game document for these settings—eliminates sync bugs and "lost on comeback" when returning to lineup after timeout.
+1. **Two Clear Sources of Truth:** Master settings live in FTD / tournament doc for FCC/TCC and next-game setup; active-game settings live in the game document once a game starts.
 2. **Consistency:** Same save/load logic across all modes and contexts
 3. **Correct Key Resolution:** Handles ObjectId vs canonical format correctly
-4. **Timeout Persistence:** Settings persist through timeout navigation because the same store is used before, during, and after the game
-5. **Unified Functions:** `save_team_settings()`, `get_save_location_for_franchise_tournament()`, and GET endpoints enforce the single source
+4. **Timeout Persistence:** Gameplay settings persist through timeout navigation because the game document remains the active-game source
+5. **No Back-Writes To Master:** In-game tactical changes do not overwrite FCC / franchise defaults
+6. **Unified Functions:** `save_team_settings()`, `get_save_location_for_franchise_tournament()`, and GET endpoints enforce the correct source by context
 
 ### Key Files
 
