@@ -374,70 +374,63 @@ def extract_team_settings(
 
 def _transform_playbook_api_response_to_db_structure(playbook_settings: dict) -> dict:
     """
-    Transform playbook settings from API response structure to database structure.
-    
-    API response structure (from /api/playbooks GET):
+    Transform any supported playbook payload into the simplified canonical structure.
+
+    Canonical structure:
     {
-        "slot_assignments": {...},
-        "motion_dropdowns": {...},
+        "motion": {...},
+        "set_plays": {...},
+        "fast_breaks": {...},
+        "man_defense": {...},
+        "zone_defense": {...},
+        "pc_order": {"offense": [...], "defense": [...]},
         "position_filters": {...},
         "even_distribution_all": bool,
-        "motion": [...],  # Play lists (not percentages)
-        "set_play_inside": [...],
-        "playbook_percentages": {
-            "motion": {...},  # Actual percentages
-            "set_play_inside": {...},
-            ...
-        }
+        "_meta": {...}
     }
-    
-    Database structure (what GameManager expects):
-    {
-        "slot_assignments": {...},
-        "motion_dropdowns": {...},
-        "position_filters": {...},
-        "even_distribution_all": bool,
-        "motion": {...},  # Percentages dict (not play lists)
-        "set_play_inside": {...},
-        ...
-    }
+
+    Older request payloads may still contain:
+    - nested playbook_percentages
+    - split set-play buckets
+    - fast_break
+    - slot_assignments
+    - motion_dropdowns
     """
+    from BackEnd.utils.playbook_settings_utils import build_simplified_playbook_settings
+
     # ✅ FIX: Safety check - handle non-dict types (list, None, etc.)
     if not isinstance(playbook_settings, dict):
         logger.error(f"❌ [TRANSFORM-PLAYBOOK] playbook_settings is not a dict (type: {type(playbook_settings)}), returning empty dict")
         return {}
-    
-    # Check if this is the API response structure (has playbook_percentages nested)
+
+    source = playbook_settings
+
+    # Older frontend/gameplay request payloads can send nested percentages plus arrays for display.
+    # Normalize that into the simplified persistence shape before handing it to GameManager.
     if "playbook_percentages" in playbook_settings:
-        # Transform: extract percentages from nested structure
-        percentages = playbook_settings.get("playbook_percentages", {})
-        
-        # Build database structure
-        db_structure = {
-            "slot_assignments": playbook_settings.get("slot_assignments", {}),
-            "motion_dropdowns": playbook_settings.get("motion_dropdowns", {}),
-            "position_filters": playbook_settings.get("position_filters", {}),
-            "even_distribution_all": playbook_settings.get("even_distribution_all", False),
-            # Flatten percentages to top level
+        percentages = playbook_settings.get("playbook_percentages", {}) or {}
+        source = {
             "motion": percentages.get("motion", {}),
+            "set_plays": percentages.get("set_plays", {}),
             "set_play_inside": percentages.get("set_play_inside", {}),
             "set_play_attack": percentages.get("set_play_attack", {}),
             "set_play_outside": percentages.get("set_play_outside", {}),
+            "fast_breaks": percentages.get("fast_breaks", percentages.get("fast_break", {})),
             "zone_defense": percentages.get("zone_defense", {}),
-            "man_defense": percentages.get("man_defense", {})
+            "man_defense": percentages.get("man_defense", {}),
+            "pc_order": playbook_settings.get("pc_order"),
+            "slot_assignments": playbook_settings.get("slot_assignments", {}),
+            "position_filters": playbook_settings.get("position_filters", {}),
+            "even_distribution_all": playbook_settings.get("even_distribution_all", False),
+            "_meta": playbook_settings.get("_meta", playbook_settings.get("playbook_meta", {})),
         }
-        
-        logger.info(f"✅ [UNIFIED-SETTINGS] Transformed API response structure to DB structure for playbook_settings")
-        return db_structure
-    
-    # Already in database structure (or missing playbook_percentages key)
-    # Check if it has motion at top level (database structure) or if it's missing percentages entirely
-    if "motion" in playbook_settings and isinstance(playbook_settings.get("motion"), dict):
-        # Already in database structure
-        return playbook_settings
-    
-    # If we get here, it might be missing percentages - return as-is (will be handled by validation)
-    return playbook_settings
+
+    canonical = build_simplified_playbook_settings(source, {}, {})
+    canonical["position_filters"] = dict(source.get("position_filters", {}) or {})
+    canonical["even_distribution_all"] = bool(source.get("even_distribution_all", False))
+
+    logger.info("✅ [UNIFIED-SETTINGS] Normalized playbook request to simplified canonical structure")
+    return canonical
 
 
 def load_and_apply_team_settings_to_gamemanager(
@@ -517,15 +510,21 @@ def load_and_apply_team_settings_to_gamemanager(
     if request_strategy_settings and user_team_side:
         try:
             if isinstance(request_strategy_settings, dict):
-                required_keys = ['offense', 'inside', 'attack', 'outside', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
-                has_valid_request_settings = all(key in request_strategy_settings for key in required_keys)
+                normalized_request_strategy = dict(request_strategy_settings)
+                if "half_court_trap" in normalized_request_strategy and "hc_trap" not in normalized_request_strategy:
+                    normalized_request_strategy["hc_trap"] = normalized_request_strategy.pop("half_court_trap")
+                if "full_court_press" in normalized_request_strategy and "fc_press" not in normalized_request_strategy:
+                    normalized_request_strategy["fc_press"] = normalized_request_strategy.pop("full_court_press")
+
+                required_keys = ['offense', 'inside', 'attack', 'outside', 'fast_breaks', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding']
+                has_valid_request_settings = all(key in normalized_request_strategy for key in required_keys)
                 
                 if has_valid_request_settings:
                     if user_team_side == "home":
-                        home_strategy = dict(request_strategy_settings)
+                        home_strategy = normalized_request_strategy
                         logger.info(f"✅ [UNIFIED-SETTINGS] Using request strategy_settings for home team (user visited Game Plan)")
                     elif user_team_side == "away":
-                        away_strategy = dict(request_strategy_settings)
+                        away_strategy = normalized_request_strategy
                         logger.info(f"✅ [UNIFIED-SETTINGS] Using request strategy_settings for away team (user visited Game Plan)")
         except Exception as e:
             logger.error(f"❌ [UNIFIED-SETTINGS] Error processing request strategy_settings: {e}, using DB settings", exc_info=True)
@@ -540,20 +539,32 @@ def load_and_apply_team_settings_to_gamemanager(
                 # ✅ FIX: Transform API response structure to database structure
                 transformed_playbook = _transform_playbook_api_response_to_db_structure(request_playbook_settings)
                 
-                # Check if request has valid playbook settings (has slot_assignments or other playbook keys)
-                has_slot_assignments = bool(transformed_playbook.get("slot_assignments"))
-                has_playbook_keys = any(key in transformed_playbook for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside", "zone_defense", "man_defense"])
-                has_valid_request_playbook = has_slot_assignments or has_playbook_keys
+                # Check if request has valid playbook settings in canonical shape.
+                has_playbook_keys = any(
+                    key in transformed_playbook
+                    for key in ["motion", "set_plays", "fast_breaks", "zone_defense", "man_defense", "pc_order"]
+                )
+                has_nonempty_values = any(
+                    bool(transformed_playbook.get(key))
+                    for key in ["motion", "set_plays", "fast_breaks", "zone_defense", "man_defense"]
+                ) or bool((transformed_playbook.get("pc_order") or {}).get("offense")) or bool((transformed_playbook.get("pc_order") or {}).get("defense"))
+                has_valid_request_playbook = has_playbook_keys and has_nonempty_values
                 
                 if has_valid_request_playbook:
                     if user_team_side == "home":
                         home_playbook = dict(transformed_playbook)
-                        slot_count = len(home_playbook.get("slot_assignments", {}))
-                        logger.info(f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for home team (user visited Playbooks): slot_assignments={slot_count}")
+                        pc_order = home_playbook.get("pc_order") or {}
+                        logger.info(
+                            f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for home team (user visited Playbooks): "
+                            f"pc_order.offense={len(pc_order.get('offense') or [])}, pc_order.defense={len(pc_order.get('defense') or [])}"
+                        )
                     elif user_team_side == "away":
                         away_playbook = dict(transformed_playbook)
-                        slot_count = len(away_playbook.get("slot_assignments", {}))
-                        logger.info(f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for away team (user visited Playbooks): slot_assignments={slot_count}")
+                        pc_order = away_playbook.get("pc_order") or {}
+                        logger.info(
+                            f"✅ [UNIFIED-SETTINGS] Using request playbook_settings for away team (user visited Playbooks): "
+                            f"pc_order.offense={len(pc_order.get('offense') or [])}, pc_order.defense={len(pc_order.get('defense') or [])}"
+                        )
         except Exception as e:
             logger.error(f"❌ [UNIFIED-SETTINGS] Error processing request playbook_settings: {e}, using DB settings", exc_info=True)
     

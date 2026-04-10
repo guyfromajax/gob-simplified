@@ -533,10 +533,11 @@ export function createGameScene(Phaser) {
       // ✅ UNIFIED: Send playbook settings (same pattern as strategy_settings)
       if (this.playbookSettings && this.userTeamSide) {
         payload.playbook_settings = this.playbookSettings;
-        const slotCount = this.playbookSettings.slot_assignments ? Object.keys(this.playbookSettings.slot_assignments).length : 0;
+        const pcOrder = this.playbookSettings.pc_order || {};
         console.log('🎮 [gameScene] Sending playbook settings to backend:', {
           user_team_side: this.userTeamSide,
-          slot_assignments: slotCount,
+          pc_order_offense: Array.isArray(pcOrder.offense) ? pcOrder.offense.length : 0,
+          pc_order_defense: Array.isArray(pcOrder.defense) ? pcOrder.defense.length : 0,
           quarter: this.quarter
         });
       } else if (this.quarter === 1) {

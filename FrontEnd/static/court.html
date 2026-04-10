@@ -3369,41 +3369,28 @@
 
         currentPlaycallSnapshotByName = { ...playIdToPlay };
         
-        // Store for persisting slot changes to game doc (Data Persistence: in-game → game document)
-        const playNameToSection = {};
+        // Store for persisting Playcall Center order changes to the game doc.
         const playNameToPlayId = {};
-        motionPlays.forEach(p => {
-          playNameToSection[p.name] = 'motion';
-          playNameToPlayId[p.name] = p.play_id || '';
-        });
-        setPlayInside.forEach(p => {
-          playNameToSection[p.name] = 'set_play_inside';
-          playNameToPlayId[p.name] = p.play_id || '';
-        });
-        setPlayAttack.forEach(p => {
-          playNameToSection[p.name] = 'set_play_attack';
-          playNameToPlayId[p.name] = p.play_id || '';
-        });
-        setPlayOutside.forEach(p => {
-          playNameToSection[p.name] = 'set_play_outside';
-          playNameToPlayId[p.name] = p.play_id || '';
-        });
-        const percentages = data.playbook_percentages || {};
+        motionPlays.forEach(p => { playNameToPlayId[p.name] = p.play_id || ''; });
+        setPlayInside.forEach(p => { playNameToPlayId[p.name] = p.play_id || ''; });
+        setPlayAttack.forEach(p => { playNameToPlayId[p.name] = p.play_id || ''; });
+        setPlayOutside.forEach(p => { playNameToPlayId[p.name] = p.play_id || ''; });
+        const percentages = data.simple_playbook_percentages || data.playbook_percentages || {};
         const playbookPayload = {
           motion: percentages.motion || {},
-          set_play_inside: percentages.set_play_inside || {},
-          set_play_attack: percentages.set_play_attack || {},
-          set_play_outside: percentages.set_play_outside || {},
+          set_plays: percentages.set_plays || {},
+          fast_breaks: percentages.fast_breaks || percentages.fast_break || {},
           zone_defense: percentages.zone_defense || {},
           man_defense: percentages.man_defense || {},
-          slot_assignments: JSON.parse(JSON.stringify(slotAssignments)),
-          motion_dropdowns: data.motion_dropdowns || {},
+          pc_order: {
+            offense: Array.isArray(offensePcOrder) ? offensePcOrder.slice(0, MAX_OFFENSE_PC_ITEMS) : [],
+            defense: Array.isArray((((data || {}).pc_order || {}).defense)) ? (((data || {}).pc_order || {}).defense).slice() : []
+          },
           position_filters: data.position_filters || { standard: [], PG: [], SG: [], SF: [], PF: [], C: [] },
           even_distribution_all: data.even_distribution_all || false,
           _meta: data.playbook_meta && typeof data.playbook_meta === 'object' ? data.playbook_meta : {}
         };
         lastPlaybookDataForSave = {
-          playNameToSection,
           playNameToPlayId,
           playbookPayload,
           requestContext: { mode, teamId, gameId, franchiseId, tournamentId }
@@ -3537,7 +3524,7 @@
       console.error('❌ [PLAYCALL HEADSHOTS] Error populating headshots:', error);
     });
     
-    // Load and apply slot assignments from playbooks
+    // Load and apply Playcall Center ordering from playbooks
     // This is async, so navigation code should wait for the 'playcall-center-reordered' event
     loadAndApplySlotAssignments().catch(error => {
       console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
@@ -3651,18 +3638,11 @@
           // ✅ SS&S: Store override via API (next play uses this)
           await setPlaycallOverride('offense', playName);
           
-          // ✅ Data Persistence: Persist this slot change to game document so presets survive timeout/reopen
+          // Persist the updated Playcall Center order to the game doc so it survives timeout/reopen.
           if (lastPlaybookDataForSave && playName && lastPlaybookDataForSave.requestContext) {
             const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
             if (slotNum >= 1 && slotNum <= MAX_OFFENSE_PC_ITEMS) {
-              const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
-              const slotKey = String(slotNum);
               const persistedPlayId = lastPlaybookDataForSave.playNameToPlayId[playName] || option.dataset.playId || playName;
-              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = {
-                section: section,
-                playId: persistedPlayId,
-                playName: playName
-              };
               if (!lastPlaybookDataForSave.playbookPayload.pc_order) {
                 lastPlaybookDataForSave.playbookPayload.pc_order = { offense: [], defense: [] };
               }
@@ -3670,6 +3650,10 @@
                 lastPlaybookDataForSave.playbookPayload.pc_order.offense = [];
               }
               lastPlaybookDataForSave.playbookPayload.pc_order.offense[slotNum - 1] = persistedPlayId;
+              lastPlaybookDataForSave.playbookPayload.pc_order.offense =
+                lastPlaybookDataForSave.playbookPayload.pc_order.offense
+                  .slice(0, MAX_OFFENSE_PC_ITEMS)
+                  .filter((value) => !!value);
               const ctx = lastPlaybookDataForSave.requestContext;
               const body = {
                 mode: ctx.mode,
@@ -4415,8 +4399,8 @@
     const MAX_OFFENSE_PC_ITEMS = 8;
     let currentPlayIndex = 0;
     let playOptions = []; // Will be populated after slot assignments are loaded
-    // Persist 6-preset changes to game doc (Data Persistence: in-game changes saved to game document)
-    let lastPlaybookDataForSave = null; // { slot_assignments, playNameToSection, playbookPayload }
+    // Persist Playcall Center changes to game doc (Data Persistence: in-game changes saved to game document)
+    let lastPlaybookDataForSave = null; // { playNameToPlayId, playbookPayload, requestContext }
     
     function updatePlayOptions() {
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
