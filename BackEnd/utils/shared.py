@@ -469,6 +469,79 @@ def oreb_shot_attempt(player_attrs):
     ) * random.randint(1, 6)
 
 
+def _oreb_putback_distance(a_coords, b_coords):
+    ax = float((a_coords or {}).get("x", 50))
+    ay = float((a_coords or {}).get("y", 25))
+    bx = float((b_coords or {}).get("x", 50))
+    by = float((b_coords or {}).get("y", 25))
+    return math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
+
+
+def _oreb_defender_is_at_least_as_close_to_basket(defender_x, shooter_x, basket_x):
+    if basket_x >= 50:
+        return defender_x >= shooter_x
+    return defender_x <= shooter_x
+
+
+def _resolve_oreb_putback_defender(game, rebounder, def_lineup, basket_x):
+    """
+    Resolve the shot defender for an OREB putback attempt.
+
+    Rules:
+    0. Only defenders within 10 Euclidean distance of the shooter are initially eligible.
+    1. Among those, defenders at least as close to the basket on the x-axis as the shooter
+       are immediate contest candidates.
+    2. If multiple immediate contest candidates exist, choose the one closest to the shooter;
+       ties are broken randomly.
+    3. If none qualify on x-axis, pick the closest initially eligible defender and run an IQ
+       read. On success, move that defender one x-grid closer to the basket than the shooter
+       and within +/-1 y of the shooter. On failure, the putback is uncontested.
+    """
+    shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
+    shooter_x = float(shooter_coords.get("x", 50))
+    shooter_y = float(shooter_coords.get("y", 25))
+
+    eligible = []
+    for defender in (def_lineup or {}).values():
+        if defender is None:
+            continue
+        defender_coords = getattr(defender, "coords", None) or {"x": 50, "y": 25}
+        distance = _oreb_putback_distance(shooter_coords, defender_coords)
+        if distance <= 10:
+            eligible.append((defender, defender_coords, distance))
+
+    if not eligible:
+        return None, False
+
+    immediate = []
+    for defender, defender_coords, distance in eligible:
+        defender_x = float(defender_coords.get("x", 50))
+        if _oreb_defender_is_at_least_as_close_to_basket(defender_x, shooter_x, basket_x):
+            immediate.append((defender, defender_coords, distance))
+
+    if immediate:
+        min_distance = min(distance for _, _, distance in immediate)
+        tied = [item for item in immediate if abs(item[2] - min_distance) < 1e-9]
+        chosen, _, _ = random.choice(tied)
+        return chosen, True
+
+    min_distance = min(distance for _, _, distance in eligible)
+    tied = [item for item in eligible if abs(item[2] - min_distance) < 1e-9]
+    chosen, _, _ = random.choice(tied)
+
+    iq_roll = random.randint(1, 100)
+    if iq_roll <= chosen.attributes.get("IQ", 0):
+        new_x = shooter_x + 1 if basket_x >= 50 else shooter_x - 1
+        new_y = shooter_y + random.randint(-1, 1)
+        chosen.coords = {
+            "x": max(0, min(100, new_x)),
+            "y": max(0, min(50, new_y)),
+        }
+        return chosen, True
+
+    return None, False
+
+
 def resolve_offensive_rebound(game, rebounder):
     """Resolve an offensive rebound by choosing a putback or a kick-out.
 
@@ -494,62 +567,126 @@ def resolve_offensive_rebound(game, rebounder):
     if random.random() < 0.90:  # 90% putback attempt, 10% kickout
         oreb_putback_snap = build_oreb_putback_attempt_snapshot(game, off_lineup, def_lineup)
         attrs = rebounder.attributes
-        # ✅ NEW: Use dedicated OREB shot attempt function
-        shot_score = oreb_shot_attempt(attrs)
         time_elapsed = random.randint(1, 5)
 
-        defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
-        defender = def_team.lineup[defender_pos]
-        defense_attrs = defender.attributes
-        defense_penalty = (
-            defense_attrs["ID"] * 0.6 +
-            defense_attrs["ST"] * 0.2 +
-            defense_attrs["IQ"] * 0.1 +
-            defense_attrs["CH"] * 0.1
-        ) * random.randint(1, 6) * 0.7
-        shot_score -= defense_penalty
+        is_away_offense = off_team.team_id == game.away_team.team_id
+        basket_x = 9 if is_away_offense else 91
+        defender, has_shot_defender = _resolve_oreb_putback_defender(
+            game,
+            rebounder,
+            def_lineup,
+            basket_x,
+        )
 
-        # Track defensive attempt for putback
-        defender.record_stat("DEF_A")
+        d_foul = False
+        foul_player = None
+        made = False
+        contested = bool(has_shot_defender and defender is not None)
 
-        # ✅ NEW: Uniform shot threshold of 0 for all OREB putback attempts
-        oreb_threshold = 0
-        made = shot_score >= oreb_threshold
-        
+        if contested:
+            from BackEnd.models.shot_manager import ShotManager
+
+            shot_manager = ShotManager(game)
+            shot_score, _, d_foul, foul_player = shot_manager.calculate_shot_score(
+                rebounder,
+                None,
+                None,
+                defender,
+                "inside",
+                game_state.get("defense_call", "Man"),
+                False,
+                True,
+                None,
+                "oreb_putback",
+                apply_defense=True,
+            )
+            shot_threshold = off_team.team_attributes["shot_threshold"]
+            shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, game)
+            made = shot_score >= shot_threshold
+        else:
+            made = random.randint(1, 100) < 100
+
         rebounder.record_stat("FGA")
-        # print(f"📦 PUTBACK FGA: Recorded FGA for {get_name_safe(rebounder)}")
-        # print(f"📦 PUTBACK DEBUG: shot_score={shot_score}, threshold={off_team.team_attributes['shot_threshold']}, made={made}")
 
         event = {
             "event_type": "PUTBACK_ATTEMPT",
             "shooterId": getattr(rebounder, "player_id", None),
+            "defenderId": getattr(defender, "player_id", None) if defender else None,
             "timeElapsed": time_elapsed,
             "result": "MAKE" if made else "MISS",
             "possession_flips": False,
             "position_snapshots": [oreb_putback_snap],
+            "contested": contested,
         }
 
         if made:
-            # print(f"📦 PUTBACK MAKE DEBUG: About to call apply_scoring for {get_name_safe(rebounder)}")
-            # print(f"📦 PUTBACK MAKE DEBUG: rebounder object={rebounder}, player_id={getattr(rebounder, 'player_id', None)}")
-            # print(f"📦 PUTBACK MAKE DEBUG: rebounder current PTS before scoring={rebounder.stats['game'].get('PTS', 0)}")
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])
-            # print(f"📦 PUTBACK MAKE DEBUG: rebounder PTS after scoring={rebounder.stats['game'].get('PTS', 0)}")
             # Putbacks are always from the paint
             rebounder.record_stat("PIP", amount=2)
-            # print(f"📦 PUTBACK FGM: Recorded FGM for {get_name_safe(rebounder)}")
-            # print(f"📦 PUTBACK PIP: Recorded 2 PIP for {get_name_safe(rebounder)}")
             event["points"] = 2
             event["possession_flips"] = True
+            if d_foul and foul_player:
+                from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+
+                foul_player.record_stat("F")
+                def_team.team_fouls += 1
+                game.game_state["foul_team"] = "DEFENSE"
+                game.game_state["shooter"] = rebounder
+                game.game_state["offensive_state"] = "FREE_THROW"
+                game.game_state["free_throws"] = 1
+                game.game_state["free_throws_remaining"] = 1
+                game.game_state["one_and_one"] = False
+                foul_out_info = check_and_handle_foul_out(foul_player, game.game_state, def_team)
+
+                event["possession_flips"] = False
+                event["foul_player_id"] = getattr(foul_player, "player_id", None)
+                event["foul_team"] = "DEFENSE"
+                event["next_play_type"] = "FREE_THROW"
+                event["free_throws_remaining"] = 1
+                event["has_and_one"] = True
+                if foul_out_info.get("fouled_out"):
+                    event["fouled_out"] = True
+                    event["foul_out_player"] = {
+                        "player_id": foul_out_info["foul_player_id"],
+                        "name": foul_out_info["foul_player_name"],
+                        "photo": foul_out_info["foul_player_photo"],
+                        "team": foul_out_info["foul_player_team"],
+                    }
+                    event["foul_count"] = foul_out_info["foul_count"]
         else:
-            # Track defensive success for missed putback
-            defender.record_stat("DEF_S")
-            
+            if d_foul and foul_player:
+                from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+
+                foul_player.record_stat("F")
+                def_team.team_fouls += 1
+                game.game_state["foul_team"] = "DEFENSE"
+                game.game_state["shooter"] = rebounder
+                game.game_state["offensive_state"] = "FREE_THROW"
+                game.game_state["free_throws"] = 2
+                game.game_state["free_throws_remaining"] = 2
+                game.game_state["one_and_one"] = False
+                foul_out_info = check_and_handle_foul_out(foul_player, game.game_state, def_team)
+
+                event["foul_player_id"] = getattr(foul_player, "player_id", None)
+                event["foul_team"] = "DEFENSE"
+                event["next_play_type"] = "FREE_THROW"
+                event["free_throws_remaining"] = 2
+                if foul_out_info.get("fouled_out"):
+                    event["fouled_out"] = True
+                    event["foul_out_player"] = {
+                        "player_id": foul_out_info["foul_player_id"],
+                        "name": foul_out_info["foul_player_name"],
+                        "photo": foul_out_info["foul_player_photo"],
+                        "team": foul_out_info["foul_player_team"],
+                    }
+                    event["foul_count"] = foul_out_info["foul_count"]
+                return event
+
+            if defender:
+                defender.record_stat("DEF_S")
+
             # Unified geography-based rebound system for putback misses
             # Putback happens at the same basket where the original shot was taken
-            is_away_offense = off_team.team_id == game.away_team.team_id
-            # Home team attacks away basket (x=91), away team attacks home basket (x=9)
-            basket_x = 9 if is_away_offense else 91
             bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
             
             # Penalize the rebounder who attempted the putback (20% distance penalty) but don't exclude

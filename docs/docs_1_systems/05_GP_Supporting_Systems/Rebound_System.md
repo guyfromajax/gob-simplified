@@ -7,6 +7,31 @@ A unified system that handles rebound logic for all missed shot instances.
 
 **Note - we need to animate rebounders into position during shot attempt**
 
+## OREB Putback Shot Defender
+
+OREB putbacks now use a proximity-qualified shot defender system instead of the old weighted-by-position shortcut.
+
+### Defender Qualification
+1. Only defenders within `10` Euclidean distance of the OREB shooter are initially eligible.
+2. Among those eligible defenders, first look for players whose `x` position is at least as close to the basket as the shooter:
+   - home offense attacking right basket: `defender_x >= shooter_x`
+   - away offense attacking left basket: `defender_x <= shooter_x`
+3. If exactly one qualifies, he is the shot defender.
+4. If more than one qualifies, choose the one closest to the shooter. Ties are broken randomly.
+5. If none qualify on the x-axis, take the closest initially eligible defender and run an IQ read:
+   - `x = random.randint(1, 100)`
+   - if `x <= defender.IQ`, move the defender to one x-grid closer to the basket than the shooter and within `-1` to `+1` y of the shooter, and he becomes the shot defender
+   - if `x > defender.IQ`, the putback is uncontested
+
+### Putback Resolution
+- Contested putback:
+  - use the same `inside` shot logic as a standard inside shot with no passer
+  - this includes standard make/miss thresholding, defensive foul checks, and and-1 / 2 FT outcomes
+- Uncontested putback:
+  - `y = random.randint(1, 100)`
+  - if `y < 100`, shot is good
+  - else the putback is missed and rebound resolution proceeds normally
+
 ## Rebound Stat Recording
 
 ### Standard Flow (HCO, Fast Break, Free Throw)
@@ -62,4 +87,3 @@ A unified system that handles rebound logic for all missed shot instances.
     -else:
         rebound_team = OFFENSE
         rebounder = o_rebounder
-

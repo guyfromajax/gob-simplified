@@ -3383,8 +3383,12 @@ class TurnManager:
 
             # Build roles for the putback shot (for animation and three-point determination)
             # Putback shots don't have a skeleton, so we'll use current coords
-            defender_pos = ["C", "PF", "SF"][0]  # Simplified - closest big
-            defender = def_lineup.get(defender_pos, list(def_lineup.values())[0])
+            defender_id = oreb_event.get("defenderId")
+            defender = None
+            if defender_id is not None:
+                defender = def_team.get_player_by_id(str(defender_id))
+            if defender is None:
+                defender = next((p for p in def_lineup.values() if p is not None), None)
             
             putback_roles = {
                 "shooter": rebounder,
@@ -3396,15 +3400,21 @@ class TurnManager:
             }
             
             if oreb_event["result"] == "MAKE":
-                text = f"{get_name_safe(rebounder)} goes back up and puts it in!"
-                possession_flips = True
+                is_and_one = oreb_event.get("next_play_type") == "FREE_THROW"
+                text = (
+                    f"{get_name_safe(rebounder)} goes back up, scores, and gets fouled!"
+                    if is_and_one
+                    else f"{get_name_safe(rebounder)} goes back up and puts it in!"
+                )
+                possession_flips = not is_and_one
                 # Check for defensive pressure opportunity (FCP/HCT) after putback make
-                pressure_type = self.determine_defensive_pressure_type()
-                game_state["offensive_state"] = pressure_type
-                # ✅ SS&S Pattern A: Set next_play_type so backend creates BASELINE_INBOUND turn
-                # This ensures putback makes follow same pattern as HCO/FT/Fast Break makes
-                next_play_type = "BASELINE_INBOUND"
-                next_defensive_setup = pressure_type
+                if is_and_one:
+                    pressure_type = None
+                    next_defensive_setup = None
+                else:
+                    pressure_type = self.determine_defensive_pressure_type()
+                    game_state["offensive_state"] = pressure_type
+                    next_defensive_setup = pressure_type
                 
                 shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
                 # print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
@@ -3453,8 +3463,8 @@ class TurnManager:
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
-                    "next_play_type": "BASELINE_INBOUND",  # ✅ FIX 2: Create BASELINE_INBOUND turn (Pattern A)
-                    "next_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit next turn
+                    "next_play_type": oreb_event.get("next_play_type", "BASELINE_INBOUND"),  # ✅ FIX 2: Create BASELINE_INBOUND turn (Pattern A)
+                    "next_turn": oreb_event.get("next_play_type", "BASELINE_INBOUND"),  # ✅ SS&S: Explicit next turn
                     "next_defensive_setup": pressure_type,
                     "animations": [],  # Putbacks use simple animation, not skeleton
                     "rebounderId": getattr(rebounder, "player_id", None),
@@ -3480,6 +3490,15 @@ class TurnManager:
                         }
                     },
                 }
+                if oreb_event.get("foul_player_id"):
+                    pm["foul_player_id"] = oreb_event["foul_player_id"]
+                    pm["foul_team"] = oreb_event.get("foul_team")
+                    pm["free_throws_remaining"] = oreb_event.get("free_throws_remaining", 0)
+                    pm["has_and_one"] = oreb_event.get("has_and_one", False)
+                    if oreb_event.get("fouled_out"):
+                        pm["fouled_out"] = True
+                        pm["foul_out_player"] = oreb_event.get("foul_out_player")
+                        pm["foul_count"] = oreb_event.get("foul_count")
                 if oreb_event.get("position_snapshots"):
                     pm["position_snapshots"] = oreb_event["position_snapshots"]
                 return pm
@@ -3510,6 +3529,15 @@ class TurnManager:
                     "rebounderId": getattr(rebounder, "player_id", None),
                     "quarter": self.game.quarter,
                 }
+                if oreb_event.get("foul_player_id"):
+                    result["foul_player_id"] = oreb_event["foul_player_id"]
+                    result["foul_team"] = oreb_event.get("foul_team")
+                    result["next_play_type"] = oreb_event.get("next_play_type")
+                    result["free_throws_remaining"] = oreb_event.get("free_throws_remaining", 0)
+                    if oreb_event.get("fouled_out"):
+                        result["fouled_out"] = True
+                        result["foul_out_player"] = oreb_event.get("foul_out_player")
+                        result["foul_count"] = oreb_event.get("foul_count")
                 
                 # Check if there's another rebound
                 if oreb_event.get("rebound"):
