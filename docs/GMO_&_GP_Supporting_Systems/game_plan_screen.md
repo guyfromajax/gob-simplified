@@ -329,9 +329,17 @@ The Game Plan screen detects where the user came from via the `from` URL paramet
   - `playcall_settings`: Legacy offense settings (Base, Freelance, Inside, Attack, Outside, Set) - stored but not displayed as UI sliders
   - `strategy_settings`: Current UI settings (offense, inside, attack, outside, fast_breaks, defense, aggression, hc_trap, fc_press, rebounding) - all 10 UI sliders map here
 - **Storage Locations:**
-  - Franchise: `franchise_teams.{team_id}.playcall_settings` and `franchise_teams.{team_id}.strategy_settings`
-  - Tournament: `teams.{team_id}.playcall_settings` and `teams.{team_id}.strategy_settings`
-  - Single Game: `teams.{team_id}.playcall_settings` and `teams.{team_id}.strategy_settings`
+  - Franchise FCC / pregame: `franchise_team_data` (FTD) → `strategy_settings`
+  - Franchise active gameplay: `games` → `teams.{canonical_team_id}.strategy_settings`
+  - Tournament pregame: tournament document → `teams.{user_team_object_id}.strategy_settings`
+  - Tournament active gameplay: `games` → `teams.{canonical_team_id}.strategy_settings`
+  - Single Game: `games` → `teams.{canonical_team_id}.strategy_settings`
+
+**Franchise/Tournament persistence rule:**
+- pregame edits save to the master store
+- game init snapshots master settings into the game doc
+- in-game edits save only to the active game doc
+- in-game edits do not overwrite the master settings used by FCC / TCC
 
 ## Future Enhancements
 
@@ -341,4 +349,3 @@ Potential future additions:
 - In-game adjustments
 - Analytics showing which settings correlate with wins
 - Coach recommendations based on opponent tendencies
-

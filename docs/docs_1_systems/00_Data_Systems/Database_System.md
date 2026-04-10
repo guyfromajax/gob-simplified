@@ -80,23 +80,24 @@ Current offensive playbook persistence is `play_id`-first:
 ```json
 {
   "motion": {"play_id": 33},
-  "set_play_inside": {"play_id": 50},
-  "set_play_attack": {"play_id": 50},
-  "set_play_outside": {"play_id": 50},
-  "zone_defense": {"2-3 Zone": 40},
+  "set_plays": {"play_id": 50},
+  "fast_breaks": {"Covert Release": 25, "Rim Runner": 25},
   "man_defense": {"Man": 100},
-  "slot_assignments": {
-    "1": {"section": "motion", "playId": "play_id", "playName": "display name"}
+  "zone_defense": {"2-3 Zone": 40},
+  "pc_order": {
+    "offense": ["play_id"],
+    "defense": ["Man", "2-3 Zone"]
   },
-  "motion_dropdowns": {"play_id": "inside"},
+  "_meta": {"offense_sort": "usage_desc"},
   "position_filters": {"standard": ["play_id"]},
   "even_distribution_all": true
 }
 ```
 
 Notes:
-- offensive percentages, slot assignments, motion dropdowns, and position filters are now `play_id`-based
+- offensive percentages, offensive Playcall Center ordering, and position filters are now `play_id`-based
 - defensive weighting is still defense-name keyed
+- legacy split set-play maps, `slot_assignments`, and `motion_dropdowns` may still appear in older documents as compatibility fields
 
 ## Training / Reporting Persistence
 

@@ -1059,6 +1059,7 @@ export class ShotAnimationSystem {
   async handleMadeShot(rimCoords, turnData) {
     // ✅ REMOVED: Made shot logging (cluttering console)
     const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
+    const isTerminalQuarterEndShot = turnData?.quarter_ends_after === true;
     
     // 🔍 STATE COMPARISON: Log state at start of handleMadeShot
     const getTweenManagerState = () => {
@@ -1146,7 +1147,7 @@ export class ShotAnimationSystem {
 
     // Single wait: rim hold and announcement in unison (use announcement hold so announcement stays 1000ms)
     const holdMs = !isPutbackMake
-      ? (animationConfig.shot?.makeAnnouncementHoldMs ?? 1000)
+      ? (isTerminalQuarterEndShot ? 0 : (animationConfig.shot?.makeAnnouncementHoldMs ?? 1000))
       : (isFastBreak ? (animationConfig.fastBreak?.rimHoldMs ?? 1000) : (animationConfig.shot?.rimHoldMs ?? 1000));
     try {
       await new Promise(resolve => {
@@ -1170,7 +1171,9 @@ export class ShotAnimationSystem {
         });
         this._getBackTweens = [];
       }
-      ballSprite.setVisible(false);
+      if (!isTerminalQuarterEndShot) {
+        ballSprite.setVisible(false);
+      }
     }
 
     if (this.stateMachine) {
@@ -1997,6 +2000,8 @@ export class ShotAnimationSystem {
       // Calculate bounce destination
       const bounceCoords = this.calculateBounceCoords(rimCoords, turnData);
 
+      const isTerminalQuarterEndShot = turnData?.quarter_ends_after === true;
+
       // Animate bounce
       const tween = this.scene.tweens.add({
         targets: ballSprite,
@@ -2005,8 +2010,10 @@ export class ShotAnimationSystem {
         duration: this.shotConfig.bounceDuration,
         ease: this.shotConfig.bounceEase,
         onComplete: () => {
-          // Hide ball after bounce
-          ballSprite.setVisible(false);
+          if (!isTerminalQuarterEndShot) {
+            // Hide ball after bounce
+            ballSprite.setVisible(false);
+          }
           resolve();
         },
         onUpdate: () => {

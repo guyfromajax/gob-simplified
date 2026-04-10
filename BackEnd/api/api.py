@@ -4497,6 +4497,9 @@ try:
                 from BackEnd.utils.man_defense_matchups import reset_matchups_to_defaults
                 reset_matchups_to_defaults(gm.game_state)
                 logging.info("✅ QUARTER BREAK: Reset man defense matchups to defaults")
+
+                # Final Shot is a one-possession execution flag and must not survive a quarter boundary.
+                gm.game_state.pop("final_turn_shot_this_turn", None)
                 
                 # ✅ QUARTER BREAK: Clear timeout state when quarter completes (not a timeout resume)
                 # This ensures quarter breaks are treated as new quarter starts, not timeout resumes

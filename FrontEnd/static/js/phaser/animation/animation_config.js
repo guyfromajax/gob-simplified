@@ -84,7 +84,7 @@ const defaults = {
   putback: { duration: 500, easing: 'Sine.easeInOut' },
   finalTurn: {
     holdClockOutMs: 1800,
-    holdFinalShotMs: 3000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
+    holdFinalShotMs: 2000, // Hold at rim (make) or bounce (miss) before quarter end; no BIP/rebound
     // Late-pass window for Final Turn shot feel: ball handler holds until this clock band.
     latePassTargetSecMin: 5.7,
     latePassTargetSecMax: 6.3,

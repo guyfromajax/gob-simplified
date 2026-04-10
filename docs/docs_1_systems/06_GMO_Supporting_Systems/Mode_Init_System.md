@@ -40,21 +40,22 @@ Important:
 
 ## Playbook Settings Initialization
 
-`initialize_playbook_settings()` now seeds offense using `play_id`-keyed maps.
+`initialize_playbook_settings()` now seeds the canonical simplified playbook structure using `play_id`-keyed offensive maps.
 
 Current default shape:
 
 ```python
 {
     "motion": {play_id: percentage},
-    "set_play_inside": {play_id: percentage},
-    "set_play_attack": {play_id: percentage},
-    "set_play_outside": {play_id: percentage},
-    "fast_break": {...},
-    "zone_defense": {...},
+    "set_plays": {play_id: percentage},
+    "fast_breaks": {...},
     "man_defense": {...},
-    "slot_assignments": {},
-    "motion_dropdowns": {},
+    "zone_defense": {...},
+    "pc_order": {
+        "offense": [play_id, ...],
+        "defense": ["Man", "2-3 Zone", ...]
+    },
+    "_meta": {...},
     "position_filters": {
         "standard": [play_id, ...],
         "PG": [play_id, ...],

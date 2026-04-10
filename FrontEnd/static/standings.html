@@ -50,7 +50,9 @@
   function buildTeamLink(t) {
     const a = document.createElement('a');
     a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_url=${encodeURIComponent(getCurrentRelativeUrl())}`;
-    a.textContent = t.name;
+    const rank = Number(t?.natl_rank);
+    const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
+    a.textContent = `${rankPrefix}${t.name}`;
     a.style.color = '#4a90e2';
     a.style.textDecoration = 'none';
     return a;
