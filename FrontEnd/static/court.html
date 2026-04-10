@@ -2570,7 +2570,7 @@
       <div class="pre-game-container">
         <button class="play-button">Play Quarter</button>
         <button class="sim-full-game-button">Sim Full Game</button>
-        <button class="sim-to-fourth-button">Sim Quarter</button>
+        <button class="sim-to-fourth-button" style="display: none;" aria-hidden="true" tabindex="-1">Sim Quarter</button>
       </div>
       
       <!-- Sim Quarter Scrolling Text Popup -->
@@ -2746,46 +2746,11 @@
       <div class="pcc-card-zone">
         <div class="pcc-play-card">
           <div id="offense-play-scroller" class="play-scroller">
-            <div class="play-option" data-play="4-1 Motion" data-focus="inside">
+            <div class="play-option">
               <img class="play-headshot" src="" alt="Shooter">
               <div class="play-info">
-                <div class="play-name">4-1 Motion</div>
-                <div class="play-focus">Inside</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="3-2 Motion" data-focus="attack">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">3-2 Motion</div>
-                <div class="play-focus">Attack</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="5-0 Motion" data-focus="outside">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">5-0 Motion</div>
-                <div class="play-focus">Outside</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="Base Post Play" data-focus="inside">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Base Post Play</div>
-                <div class="play-focus">Inside</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="Pick & Roll (Lower Wing)" data-focus="attack">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Pick & Roll</div>
-                <div class="play-focus">Attack</div>
-              </div>
-            </div>
-            <div class="play-option" data-play="Double Screen For SG" data-focus="outside">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Double Screen for SG</div>
-                <div class="play-focus">Outside</div>
+                <div class="play-name">Loading playbook...</div>
+                <div class="play-focus"></div>
               </div>
             </div>
           </div>
@@ -2977,6 +2942,8 @@
     
     // ==================== PLAYCALL CENTER OVERRIDE LOGIC ====================
     
+    let currentPlaycallSnapshotByName = {};
+
     // ✅ SS&S: Populate shooter headshots for the 6-play list using intended shooter from play skeletons
     // This runs on all game entry/re-entry instances (game start, quarter breaks, timeouts, foul outs, overtime)
     // Lineups are locked at timeout navigation points, so we can safely assign images here
@@ -3019,19 +2986,32 @@
       // For each play, fetch play document and extract intended shooter position from successful skeleton
       for (const playOption of playOptions) {
         const playName = playOption.getAttribute('data-play');
-        if (!playName) continue;
+        const playId = playOption.getAttribute('data-play-id');
+        if (!playName && !playId) continue;
         
         try {
-          // Fetch play document from backend
-          const encodedPlayName = encodeURIComponent(playName);
-          const response = await fetch(API_CONFIG.buildUrl(`/api/play/${encodedPlayName}`));
-          
-          if (!response.ok) {
-            console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName}': ${response.status}`);
-            continue;
+          const snapshotPlay = currentPlaycallSnapshotByName[playName] || currentPlaycallSnapshotByName[playId] || null;
+          let playDoc = snapshotPlay;
+
+          // Motion plays still need the universal skeleton document to infer a likely shooter.
+          // Set plays should use the team/game snapshot because that carries franchise-specific
+          // target_shooter overrides.
+          if (!snapshotPlay || snapshotPlay.play_type === 'motion') {
+            const playUrl = playId
+              ? API_CONFIG.buildUrl(`/api/plays/${encodeURIComponent(playId)}`)
+              : API_CONFIG.buildUrl(`/api/play/${encodeURIComponent(playName)}`);
+            const response = await fetch(playUrl);
+            
+            if (!response.ok) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] Failed to fetch play '${playName || playId}': ${response.status}`);
+              continue;
+            }
+            
+            const universalPlayDoc = await response.json();
+            playDoc = snapshotPlay
+              ? { ...universalPlayDoc, ...snapshotPlay, skeletons: universalPlayDoc.skeletons || {} }
+              : universalPlayDoc;
           }
-          
-          const playDoc = await response.json();
           
           // Check if this is a Motion play
           const playType = playDoc.play_type || '';
@@ -3181,59 +3161,17 @@
               console.warn(`⚠️ [PLAYCALL HEADSHOTS] No player found for Motion play '${playName}' focus '${focusLower}'. Inside opportunities:`, playerInsideOpportunities, 'Outside opportunities:', playerOutsideOpportunities);
             }
           } else {
-            // ✅ SET PLAYS: Use existing logic (intended shooter from successful skeleton v0)
-            const skeletons = playDoc.skeletons || {};
-            const successfulVariant = skeletons.successful;
-            
-            if (!successfulVariant) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful variant for play '${playName}'`);
-              continue;
-            }
-            
-            // Access successful skeleton v0 from versions array (new structure)
-            let successfulSkeleton = null;
-            if (successfulVariant.versions && Array.isArray(successfulVariant.versions) && successfulVariant.versions.length > 0) {
-              // New format: versions array - find v0
-              const v0Version = successfulVariant.versions.find(v => v.version === 'v0');
-              if (v0Version && v0Version.steps) {
-                successfulSkeleton = { steps: v0Version.steps };
-              } else {
-                // Fallback to first version if v0 not found
-                const firstVersion = successfulVariant.versions.find(v => v.steps && v.steps.length > 0);
-                if (firstVersion) {
-                  successfulSkeleton = { steps: firstVersion.steps };
-                }
-              }
-            } else if (successfulVariant.steps) {
-              // Old format: direct steps array (backward compatibility)
-              successfulSkeleton = { steps: successfulVariant.steps };
-            }
-            
-            if (!successfulSkeleton || !successfulSkeleton.steps || successfulSkeleton.steps.length === 0) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful skeleton (v0) for play '${playName}'`);
-              continue;
-            }
-            
-            // Extract intended shooter position from final step (same logic as backend phase_resolution.py lines 1011-1017)
-            const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
-            const posActions = finalStep.pos_actions || {};
-            
-            let intendedShooterPos = null;
-            for (const [pos, actionInfo] of Object.entries(posActions)) {
-              const action = (actionInfo.action || '').toLowerCase();
-              if (action === 'shoot') {
-                intendedShooterPos = pos.toUpperCase(); // Normalize to uppercase (C, PG, SG, SF, PF)
-                break;
-              }
-            }
-          
-            // Map position to player ID from lineup
-            if (intendedShooterPos && lineup[intendedShooterPos]) {
-              shooterId = lineup[intendedShooterPos];
-            } else if (intendedShooterPos) {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] Intended shooter position '${intendedShooterPos}' not found in lineup for play '${playName}'`);
+            // ✅ SET PLAYS: Use target_shooter as the source of truth for the offense card headshot.
+            // This avoids parsing skeleton position keys, which may be stored as
+            // target_shooter/pos1/pos2/pos3/pos4 in the database.
+            const targetShooterPos = (playDoc.target_shooter || '').toUpperCase();
+
+            if (targetShooterPos && lineup[targetShooterPos]) {
+              shooterId = lineup[targetShooterPos];
+            } else if (targetShooterPos) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] target_shooter '${targetShooterPos}' not found in lineup for play '${playName}'`);
             } else {
-              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No intended shooter found in skeleton for play '${playName}'`);
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No target_shooter found for play '${playName}'`);
             }
           }
           
@@ -3258,18 +3196,29 @@
             }
           }
         } catch (error) {
-          console.error(`❌ [PLAYCALL HEADSHOTS] Error processing play '${playName}':`, error);
+          console.error(`❌ [PLAYCALL HEADSHOTS] Error processing play '${playName || playId}':`, error);
         }
       }
       
     }
     
     // Create a play option DOM element
-    function createPlayOptionElement(playName, playFocus) {
+    function createPlayOptionElement(playName, playFocus, playId = '', playMeta = null) {
       const playOption = document.createElement('div');
       playOption.className = 'play-option';
       playOption.setAttribute('data-play', playName);
       playOption.setAttribute('data-focus', playFocus || '');
+      if (playId) {
+        playOption.setAttribute('data-play-id', playId);
+      }
+      if (playMeta && typeof playMeta === 'object') {
+        if (playMeta.play_type) {
+          playOption.setAttribute('data-play-type', playMeta.play_type);
+        }
+        if (playMeta.target_shooter) {
+          playOption.setAttribute('data-target-shooter', playMeta.target_shooter);
+        }
+      }
       
       const headshotImg = document.createElement('img');
       headshotImg.className = 'play-headshot';
@@ -3354,6 +3303,7 @@
         const data = await response.json();
         
         const slotAssignments = data.slot_assignments || {};
+        const offensePcOrder = (((data || {}).pc_order || {}).offense || []);
         const motionDropdowns = data.motion_dropdowns || {};
         
         // ✅ DIAGNOSTIC: Log slot assignments structure
@@ -3384,6 +3334,7 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         setPlayInside.forEach((play, index) => {
           const frontendId = `set-inside-${index + 1}`;
@@ -3393,6 +3344,7 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         setPlayAttack.forEach((play, index) => {
           const frontendId = `set-attack-${index + 1}`;
@@ -3402,6 +3354,7 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
         setPlayOutside.forEach((play, index) => {
           const frontendId = `set-outside-${index + 1}`;
@@ -3411,14 +3364,30 @@
             playIdToName[play.play_id] = play.name; // ✅ Map MongoDB ObjectId to play name
           }
           playIdToPlay[play.name] = play;
+          if (play.play_id) playIdToPlay[play.play_id] = play;
         });
+
+        currentPlaycallSnapshotByName = { ...playIdToPlay };
         
         // Store for persisting slot changes to game doc (Data Persistence: in-game → game document)
         const playNameToSection = {};
-        motionPlays.forEach(p => { playNameToSection[p.name] = 'motion'; });
-        setPlayInside.forEach(p => { playNameToSection[p.name] = 'set_play_inside'; });
-        setPlayAttack.forEach(p => { playNameToSection[p.name] = 'set_play_attack'; });
-        setPlayOutside.forEach(p => { playNameToSection[p.name] = 'set_play_outside'; });
+        const playNameToPlayId = {};
+        motionPlays.forEach(p => {
+          playNameToSection[p.name] = 'motion';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
+        setPlayInside.forEach(p => {
+          playNameToSection[p.name] = 'set_play_inside';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
+        setPlayAttack.forEach(p => {
+          playNameToSection[p.name] = 'set_play_attack';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
+        setPlayOutside.forEach(p => {
+          playNameToSection[p.name] = 'set_play_outside';
+          playNameToPlayId[p.name] = p.play_id || '';
+        });
         const percentages = data.playbook_percentages || {};
         const playbookPayload = {
           motion: percentages.motion || {},
@@ -3435,6 +3404,7 @@
         };
         lastPlaybookDataForSave = {
           playNameToSection,
+          playNameToPlayId,
           playbookPayload,
           requestContext: { mode, teamId, gameId, franchiseId, tournamentId }
         };
@@ -3449,84 +3419,93 @@
         // Clear existing play options
         scroller.innerHTML = '';
         
-        // Build ordered list based on slot assignments (1-6)
+        // Build ordered list based on canonical pc_order first, with legacy slot assignments as fallback.
         const orderedPlays = [];
         const usedPlayNames = new Set(); // Track which plays we've already added
-        
-        for (let slot = 1; slot <= 6; slot++) {
-          const assignment = slotAssignments[slot];
-          if (assignment) {
-            // Get play name from assignment
-            let playName = null;
-            let playFocus = null;
-            
+
+        const appendOrderedPlay = (rawRef, slotLabel) => {
+          if (!rawRef) return;
+
+          let playName = null;
+          let playFocus = null;
+          let assignment = null;
+          let playObj = null;
+          let resolvedPlayId = '';
+
+          if (typeof rawRef === 'string') {
+            resolvedPlayId = rawRef;
+            playName = playIdToName[rawRef] || rawRef;
+            playObj = playIdToPlay[rawRef] || playIdToPlay[playName] || null;
+            assignment = Object.values(slotAssignments).find((slotAssignment) =>
+              slotAssignment && (
+                slotAssignment.playId === rawRef ||
+                slotAssignment.playName === playName
+              )
+            ) || null;
+          } else if (typeof rawRef === 'object') {
+            assignment = rawRef;
+            resolvedPlayId = assignment.playId || '';
             if (assignment.playName) {
-              // ✅ Use playName if available (most reliable)
               playName = assignment.playName;
             } else if (assignment.playId) {
-              // ✅ Try to find play name from playId
-              // playId may be: frontend ID ("motion-1"), MongoDB ObjectId ("68fa42c33a0eec681847f886"), or play name
-              playName = playIdToName[assignment.playId];
-              if (!playName) {
-                // ✅ Fallback: try to find by matching playId to play_id (MongoDB ObjectId) or name
-                const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
-                const play = allPlays.find(p => 
-                  p.play_id === assignment.playId || 
-                  p.name === assignment.playId ||
-                  p.name === assignment.playName
-                );
-                playName = play ? play.name : null;
-              }
+              playName = playIdToName[assignment.playId] || assignment.playId;
             }
-            
-            if (!playName) {
-              console.warn(`⚠️ [PLAYCALL CENTER] Could not find play name for slot ${slot}, assignment:`, assignment);
-              console.warn(`⚠️ [PLAYCALL CENTER] Available playIdToName keys:`, Object.keys(playIdToName).slice(0, 10));
-              continue;
+            playObj = playIdToPlay[assignment.playId] || playIdToPlay[playName] || null;
+          }
+
+          if (!playName) {
+            console.warn(`⚠️ [PLAYCALL CENTER] Could not resolve play for ${slotLabel}:`, rawRef);
+            console.warn(`⚠️ [PLAYCALL CENTER] Available playIdToName keys:`, Object.keys(playIdToName).slice(0, 10));
+            return;
+          }
+
+          if (playObj) {
+            playFocus = playObj.play_focus || '';
+          }
+
+          if (assignment && assignment.section === 'motion') {
+            const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
+            if (dropdown !== '-') {
+              playFocus = dropdown;
             }
-            
-            // Get play focus from play object or assignment
-            const playObj = playIdToPlay[playName];
-            if (playObj) {
-              playFocus = playObj.play_focus || '';
+          }
+
+          const existingPlay = orderedPlays.find(p =>
+            p.getAttribute('data-play') === playName &&
+            (!playFocus || p.getAttribute('data-focus') === playFocus)
+          );
+
+          const playOption = existingPlay || createPlayOptionElement(
+            playName,
+            playFocus,
+            playObj?.play_id || resolvedPlayId || assignment?.playId || '',
+            playObj
+          );
+
+          orderedPlays.push(playOption);
+          usedPlayNames.add(playName);
+        };
+
+        if (Array.isArray(offensePcOrder) && offensePcOrder.length > 0) {
+          offensePcOrder.slice(0, MAX_OFFENSE_PC_ITEMS).forEach((playRef, index) => {
+            appendOrderedPlay(playRef, `pc_order.offense[${index}]`);
+          });
+        } else {
+          for (let slot = 1; slot <= MAX_OFFENSE_PC_ITEMS; slot++) {
+            const assignment = slotAssignments[slot];
+            if (assignment) {
+              appendOrderedPlay(assignment, `slot ${slot}`);
             }
-            
-            // For motion plays, use dropdown variant as focus
-            if (assignment.section === 'motion') {
-              const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
-              if (dropdown !== '-') {
-                playFocus = dropdown;
-              }
-            }
-            
-            // Create or find play option element
-            let playOption = null;
-            
-            // Check if we already created this play
-            const existingPlay = orderedPlays.find(p => 
-              p.getAttribute('data-play') === playName && 
-              (!playFocus || p.getAttribute('data-focus') === playFocus)
-            );
-            
-            if (existingPlay) {
-              playOption = existingPlay;
-            } else {
-              // Create new play option element
-              playOption = createPlayOptionElement(playName, playFocus);
-            }
-            
-            orderedPlays.push(playOption);
-            usedPlayNames.add(playName);
           }
         }
         
-        // If we have fewer than 6 plays, fill remaining slots with other available plays
-        if (orderedPlays.length < 6) {
+        // If we have fewer than MAX_OFFENSE_PC_ITEMS plays, fill remaining slots with other available plays
+        if (orderedPlays.length < MAX_OFFENSE_PC_ITEMS) {
           const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
           for (const play of allPlays) {
-            if (orderedPlays.length >= 6) break;
+            if (orderedPlays.length >= MAX_OFFENSE_PC_ITEMS) break;
             if (!usedPlayNames.has(play.name)) {
-              const playOption = createPlayOptionElement(play.name, play.play_focus || '');
+              const playOption = createPlayOptionElement(play.name, play.play_focus || '', play.play_id || '', play);
               orderedPlays.push(playOption);
               usedPlayNames.add(play.name);
             }
@@ -3650,7 +3629,7 @@
         }
       }
       
-      // Handle play selection (6-play scroller) - use event delegation for dynamically created elements
+      // Handle play selection - use event delegation for dynamically created elements
       const playScroller = document.getElementById('offense-play-scroller');
       if (playScroller) {
         playScroller.addEventListener('click', async (e) => {
@@ -3675,10 +3654,22 @@
           // ✅ Data Persistence: Persist this slot change to game document so presets survive timeout/reopen
           if (lastPlaybookDataForSave && playName && lastPlaybookDataForSave.requestContext) {
             const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
-            if (slotNum >= 1 && slotNum <= 6) {
+            if (slotNum >= 1 && slotNum <= MAX_OFFENSE_PC_ITEMS) {
               const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
               const slotKey = String(slotNum);
-              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = { section: section, playId: playName };
+              const persistedPlayId = lastPlaybookDataForSave.playNameToPlayId[playName] || option.dataset.playId || playName;
+              lastPlaybookDataForSave.playbookPayload.slot_assignments[slotKey] = {
+                section: section,
+                playId: persistedPlayId,
+                playName: playName
+              };
+              if (!lastPlaybookDataForSave.playbookPayload.pc_order) {
+                lastPlaybookDataForSave.playbookPayload.pc_order = { offense: [], defense: [] };
+              }
+              if (!Array.isArray(lastPlaybookDataForSave.playbookPayload.pc_order.offense)) {
+                lastPlaybookDataForSave.playbookPayload.pc_order.offense = [];
+              }
+              lastPlaybookDataForSave.playbookPayload.pc_order.offense[slotNum - 1] = persistedPlayId;
               const ctx = lastPlaybookDataForSave.requestContext;
               const body = {
                 mode: ctx.mode,
@@ -4421,6 +4412,7 @@
     }
 
     // ==================== SLOT-BASED PLAY NAVIGATION ====================
+    const MAX_OFFENSE_PC_ITEMS = 8;
     let currentPlayIndex = 0;
     let playOptions = []; // Will be populated after slot assignments are loaded
     // Persist 6-preset changes to game doc (Data Persistence: in-game changes saved to game document)

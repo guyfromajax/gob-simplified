@@ -14,6 +14,7 @@ from BackEnd.db import (
     franchise_players_data_collection,
 )
 from BackEnd.utils.roster_loader import load_roster
+from BackEnd.utils.team_play_utils import iter_team_plays
 
 logger = logging.getLogger(__name__)
 
@@ -908,7 +909,7 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
             if str(team_object_id) not in ftd_updates:
                 ftd_updates[str(team_object_id)] = {"inc": {}, "set": {}}
         
-        for play_name, play_data in plays.items():
+        for play_storage_key, play_data, play_name in iter_team_plays(plays):
             game_stats = play_data.get("game_stats", {})
             if not game_stats:
                 continue
@@ -924,7 +925,7 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
             # Build update paths
             if mode == "franchise" and team_object_id:
                 # ✅ FTD: Update FTD collection
-                base_path = f"plays.{play_name}.season_stats"
+                base_path = f"plays.{play_storage_key}.season_stats"
                 ftd_team_updates = ftd_updates[str(team_object_id)]
                 
                 # Increment times_run and successes
@@ -939,7 +940,7 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
                         if points > 0:
                             ftd_team_updates["inc"][f"{base_path}.player_points.{player_id}"] = points
             else:  # tournament
-                base_path = f"teams.{actual_team_id}.plays.{play_name}.season_stats"
+                base_path = f"teams.{actual_team_id}.plays.{play_storage_key}.season_stats"
                 
                 # Increment times_run and successes
                 if "times_run" in game_stats and game_stats["times_run"] > 0:

@@ -6,16 +6,233 @@ from pathlib import Path
 import logging
 from typing import Optional
 
-from BackEnd.db import db, games_collection, franchise_team_data_collection
+from BackEnd.db import db, games_collection, franchise_team_data_collection, players_collection, tournaments_collection, franchises_collection
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
 from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical
+from BackEnd.utils.playbook_settings_utils import (
+    PLAYBOOK_PERCENTAGE_KEYS,
+    MAN_DEFENSE_ID_TO_NAME,
+    ZONE_DEFENSE_ID_TO_NAME,
+    build_legacy_playbook_settings_view,
+    build_play_lookups_from_team_plays,
+    build_play_lookups_from_universal_plays,
+    build_simplified_playbook_settings,
+    normalize_motion_dropdowns_to_play_ids,
+    normalize_pc_order,
+    normalize_percentage_map_to_play_ids,
+    normalize_string_keyed_map,
+    normalize_slot_assignments_to_play_ids,
+)
+from BackEnd.utils.team_play_utils import iter_team_plays
 from datetime import datetime
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+
+# Stable play identity for seeded defaults and legacy position filters.
+# These must use play_id, not name, so play renames do not break initialization.
+SEEDED_OFFENSE_PLAY_IDS = {
+    "68fa43953a0eec681847f8e4",  # 3-2 Motion
+    "68f919f9065f78d452557809",  # 4-1 Motion
+    "68fa42c33a0eec681847f886",  # 5-0 Motion
+    "68fa7cc53a0eec6818481681",  # Base Post Play
+    "68fa7b883a0eec68184815dc",  # Pick & Roll (Lower Wing)
+    "68fa7c513a0eec681848164f",  # Double Screen For SG
+    "695ac54cffd7a778902eb6d0",  # SF Back Door
+    "695ac373ffd7a778902eb5fe",  # SF Isolation
+    "695ac732ffd7a778902eb7c7",  # SF Misdirection Three
+}
+
+POSITION_FILTER_PLAY_IDS = {
+    "standard": [
+        "68fa43953a0eec681847f8e4",  # 3-2 Motion
+        "68f919f9065f78d452557809",  # 4-1 Motion
+        "68fa42c33a0eec681847f886",  # 5-0 Motion
+        "68fa7cc53a0eec6818481681",  # Base Post Play
+        "68fa7b883a0eec68184815dc",  # Pick & Roll (Lower Wing)
+        "68fa7c513a0eec681848164f",  # Double Screen For SG
+    ],
+    "PF": [
+        "694b3377ffd7a77890233ed3",  # PF Post Motion
+        "694c1b65ffd7a77890240286",  # PF Post Up
+        "694c1717ffd7a77890240095",  # PF High Post Drive
+        "694be9afffd7a7789023ec66",  # PF Corner Shot
+        "694b371dffd7a77890234084",  # PF Quick Jumper
+    ],
+    "PG": [
+        "695a9dedffd7a778902ea508",  # PG Post Up
+        "695a9ae5ffd7a778902ea3b6",  # PG Wrap-Around
+        "695a9f2effd7a778902ea5a0",  # PG Wing Three
+    ],
+    "SG": [
+        "695ab891ffd7a778902eb11a",  # SG Pass & Cut
+        "695aba39ffd7a778902eb1d1",  # SG Pick & Roll
+        "695ab738ffd7a778902eb07b",  # SG Wheel Three
+    ],
+    "SF": [
+        "695ac54cffd7a778902eb6d0",  # SF Back Door
+        "695ac373ffd7a778902eb5fe",  # SF Isolation
+        "695ac732ffd7a778902eb7c7",  # SF Misdirection Three
+    ],
+    "C": [
+        "695abf8effd7a778902eb447",  # C Post Iso
+        "695ac0ecffd7a778902eb4e4",  # C High Post Clear Out
+        "695ac24cffd7a778902eb578",  # C Screen & Three
+    ],
+}
+
+
+def _get_player_display_name(player_doc: dict) -> str:
+    if not isinstance(player_doc, dict):
+        return "Unknown"
+    return (
+        player_doc.get("name")
+        or f"{player_doc.get('first_name', '')} {player_doc.get('last_name', '')}".strip()
+        or "Unknown"
+    )
+
+
+def _build_player_name_lookup(team_obj: dict | None) -> dict[str, str]:
+    player_lookup: dict[str, str] = {}
+    unresolved_ids: set[str] = set()
+
+    raw_players = (team_obj or {}).get("players")
+    player_candidates = []
+    if isinstance(raw_players, list):
+        player_candidates = raw_players
+    elif isinstance(raw_players, dict):
+        player_candidates = list(raw_players.values())
+
+    for raw_player in player_candidates:
+        if isinstance(raw_player, dict):
+            player_id = raw_player.get("_id") or raw_player.get("id") or raw_player.get("player_id")
+            if player_id:
+                display_name = _get_player_display_name(raw_player)
+                if display_name and display_name != "Unknown":
+                    player_lookup[str(player_id)] = display_name
+                else:
+                    unresolved_ids.add(str(player_id))
+        elif raw_player is not None:
+            unresolved_ids.add(str(raw_player))
+
+    query_object_ids = []
+    for raw_id in unresolved_ids:
+        try:
+            query_object_ids.append(ObjectId(raw_id))
+        except Exception:
+            continue
+
+    if unresolved_ids:
+        for player_doc in players_collection.find(
+            {"_id": {"$in": list(unresolved_ids)}},
+            {"name": 1, "first_name": 1, "last_name": 1}
+        ):
+            player_lookup[str(player_doc["_id"])] = _get_player_display_name(player_doc)
+
+    if query_object_ids:
+        for player_doc in players_collection.find({"_id": {"$in": query_object_ids}}, {"name": 1, "first_name": 1, "last_name": 1}):
+            player_lookup[str(player_doc["_id"])] = _get_player_display_name(player_doc)
+
+    return player_lookup
+
+
+def _get_top_scorer_label(play_data: dict, player_lookup: dict[str, str]) -> str | None:
+    season_stats = (play_data or {}).get("season_stats", {})
+    player_points = season_stats.get("player_points", {}) if isinstance(season_stats, dict) else {}
+    top_player_id = None
+    top_points = 0
+
+    for player_id, points in player_points.items():
+        try:
+            numeric_points = int(points or 0)
+        except Exception:
+            numeric_points = 0
+        if numeric_points > top_points:
+            top_points = numeric_points
+            top_player_id = str(player_id)
+
+    if top_player_id and top_points > 0:
+        player_name = player_lookup.get(top_player_id, "Unknown")
+        return f"{player_name} ({top_points})"
+    return None
+
+
+def _load_current_team_plays_for_save(
+    mode: str,
+    team_id: str,
+    franchise_id: str | None = None,
+    tournament_id: str | None = None,
+    game_id: str | None = None,
+) -> tuple[dict, str]:
+    """Load the current team-owned plays object from the same save target used for playbooks."""
+    if mode == "single":
+        doc = games_collection.find_one({"_id": game_id}, {"teams": 1})
+        if not doc and game_id:
+            try:
+                doc = games_collection.find_one({"_id": ObjectId(game_id)}, {"teams": 1})
+            except Exception:
+                doc = None
+        if not doc:
+            raise HTTPException(status_code=404, detail="Game document not found")
+        actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
+        plays = doc.get("teams", {}).get(actual_team_id, {}).get("plays", {})
+        return dict(plays or _get_cached_populated_plays(mode="single")), actual_team_id
+
+    if mode == "franchise":
+        collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(
+            mode=mode,
+            game_id=game_id,
+            franchise_id=franchise_id,
+            tournament_id=tournament_id,
+        )
+        if is_game_doc:
+            actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
+            doc = games_collection.find_one({"_id": doc_id}, {"teams": 1}) or games_collection.find_one({"_id": ObjectId(doc_id)}, {"teams": 1})
+            plays = (doc or {}).get("teams", {}).get(actual_team_id, {}).get("plays")
+            if plays:
+                return dict(plays), actual_team_id
+
+        franchise_doc = franchises_collection.find_one(
+            {"_id": ObjectId(franchise_id)},
+            {"user_team_id": 1, "user_team_object_id": 1},
+        )
+        _, user_team_object_id = get_user_team_from_franchise(franchise_doc or {})
+        if not user_team_object_id:
+            raise HTTPException(status_code=404, detail="User team not found in franchise")
+        ftd_doc = franchise_team_data_collection.find_one(
+            {"franchise_id": ObjectId(franchise_id), "team_id": ObjectId(user_team_object_id)},
+            {"plays": 1},
+        )
+        return dict((ftd_doc or {}).get("plays") or _get_cached_populated_plays(mode="franchise")), user_team_object_id
+
+    if mode == "tournament":
+        collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(
+            mode=mode,
+            game_id=game_id,
+            franchise_id=franchise_id,
+            tournament_id=tournament_id,
+        )
+        if is_game_doc:
+            actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
+            doc = games_collection.find_one({"_id": doc_id}, {"teams": 1}) or games_collection.find_one({"_id": ObjectId(doc_id)}, {"teams": 1})
+            plays = (doc or {}).get("teams", {}).get(actual_team_id, {}).get("plays")
+            if plays:
+                return dict(plays), actual_team_id
+
+        tournament_doc = tournaments_collection.find_one(
+            {"_id": ObjectId(tournament_id)},
+            {"user_team_id": 1, "user_team_object_id": 1, "teams": 1},
+        )
+        _, user_team_object_id = get_user_team_from_tournament(tournament_doc or {})
+        if not user_team_object_id:
+            raise HTTPException(status_code=404, detail="User team not found in tournament")
+        plays = (tournament_doc or {}).get("teams", {}).get(user_team_object_id, {}).get("plays", {})
+        return dict(plays or _get_cached_populated_plays(mode="tournament")), user_team_object_id
+
+    raise HTTPException(status_code=400, detail=f"Unsupported mode for team plays save: {mode}")
 
 # ✅ CORS FIX: Removed explicit OPTIONS handlers - CORS middleware handles preflight automatically
 # The middleware configured in api.py properly handles CORS for all routes including these
@@ -30,6 +247,11 @@ def serve_game_plan_html():
 def serve_playbooks_html():
     """Return the playbooks page so query params work in production."""
     return FileResponse(STATIC_DIR / "playbooks.html")
+
+@router.get("/playbook-report.html")
+def serve_playbook_report_html():
+    """Return the playbook report page so query params work in production."""
+    return FileResponse(STATIC_DIR / "playbook-report.html")
 
 @router.get("/tutorial.html")
 def serve_tutorial_html():
@@ -162,12 +384,6 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
         else:
             raise HTTPException(status_code=400, detail=f"Invalid mode for get_save_location: {mode}")
     
-    # Single source of truth: franchise/tournament always save to FTD or tournament doc, never to game doc
-    if mode == "franchise":
-        return franchises_collection, franchise_id, False
-    if mode == "tournament":
-        return tournaments_collection, tournament_id, False
-    
     # Check if game exists and is active (franchise/tournament games use ObjectId _id; try that first)
     try:
         game_doc = None
@@ -202,16 +418,13 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
             if mode == "franchise":
                 if game_mode == "franchise" and str(game_franchise_id) == str(franchise_id):
                     # Save to game doc whenever game exists (including quarter=0 so lineup saves persist)
-                    logger.warning(f"🔍 [SAVE-LOCATION] franchise: game doc (game_id={game_id!r})")
                     return games_collection, game_id, True
             elif mode == "tournament":
                 if game_mode == "tournament" and str(game_tournament_id) == str(tournament_id):
                     # Save to game doc whenever game exists (including quarter=0 so lineup saves persist)
-                    logger.warning(f"🔍 [SAVE-LOCATION] tournament: game doc (game_id={game_id!r})")
                     return games_collection, game_id, True
         
         # Game doesn't exist or doesn't match - save to master
-        logger.warning(f"🔍 [SAVE-LOCATION] {mode}: master (game_id={game_id!r})")
         if mode == "franchise":
             return franchises_collection, franchise_id, False
         elif mode == "tournament":
@@ -313,6 +526,8 @@ def populate_team_plays(mode="single"):
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
+                "target_shooter": play.get("target_shooter"),
+                "motion_focus": None if play.get("play_type") == "motion" else None,
                 # Per-team effectiveness, momentum, and cloaking (separate from calculated effectiveness in stats)
                 "effectiveness": initial_effectiveness,
                 "momentum": initial_momentum,
@@ -394,22 +609,7 @@ def get_play_ids_by_names(play_names, plays_map=None):
 
 def initialize_playbook_settings():
     """
-    Initialize playbook_settings with alpha-friendly defaults for first-time setup.
-    Offense is seeded with Standard + SF plays only, evenly distributed per container.
-    
-    Returns:
-        dict: playbook_settings structure with defaults:
-        - motion: {play_name: percentage}
-        - set_play_inside: {play_name: percentage}
-        - set_play_attack: {play_name: percentage}
-        - set_play_outside: {play_name: percentage}
-        - fast_break: {play_key: percentage}
-        - zone_defense: {defense_name: percentage} - Evenly distributed across all zone defenses
-        - man_defense: {"Man": 100}
-        - slot_assignments: {}
-        - motion_dropdowns: {}
-        - position_filters: {standard: [...], PG: [...], SG: [...], SF: [...], PF: [...], C: [...]}
-        - _meta: {"seed_version": "alpha_v1", "user_saved": false}
+    Initialize simplified playbook_settings with alpha-friendly defaults.
     """
     try:
         from BackEnd.db import plays_collection
@@ -423,14 +623,11 @@ def initialize_playbook_settings():
         # Initialize structure
         playbook_settings = {
             "motion": {},
-            "set_play_inside": {},
-            "set_play_attack": {},
-            "set_play_outside": {},
-            "fast_break": {},
+            "set_plays": {},
+            "fast_breaks": {},
             "zone_defense": {},
             "man_defense": {},
-            "slot_assignments": {},
-            "motion_dropdowns": {},
+            "pc_order": {"offense": [], "defense": []},
             "position_filters": {
                 "standard": [],  # Empty = show all plays when selected
                 "PG": [],        # Point Guard plays (play_id ObjectId strings)
@@ -441,88 +638,62 @@ def initialize_playbook_settings():
             },
             "even_distribution_all": True,  # Macro toggle for Even Distribution - All
             "_meta": {
-                "seed_version": "alpha_v1",
                 "user_saved": False,
+                "schema_version": 2,
             },
         }
         
-        # Group plays by type and focus
+        # Group seeded offense plays by type.
         motion_plays = []
-        set_plays_inside = []
-        set_plays_attack = []
-        set_plays_outside = []
+        set_plays = []
         
         for play in all_plays:
             play_name = play.get("name", "")
             play_type = play.get("play_type", "")
-            play_focus = play.get("play_focus", "")
             
             # Skip "To Be Added" placeholder plays
             if play_name == "To Be Added":
                 continue
             
             if play_type == "motion":
-                motion_plays.append(play_name)
-            elif play_type == "set_play":
-                if play_focus == "inside":
-                    set_plays_inside.append(play_name)
-                elif play_focus == "attack":
-                    set_plays_attack.append(play_name)
-                elif play_focus == "outside":
-                    set_plays_outside.append(play_name)
+                if str(play.get("_id")) in SEEDED_OFFENSE_PLAY_IDS:
+                    motion_plays.append(play)
+            elif play_type == "set_play" and str(play.get("_id")) in SEEDED_OFFENSE_PLAY_IDS:
+                set_plays.append(play)
         
-        # Standard + SF seeded offense set (alpha first-load behavior).
-        standard_seed_plays = {
-            "3-2 Motion",
-            "4-1 Motion",
-            "5-0 Motion",
-            "Base Post Play",
-            "Pick & Roll (Lower Wing)",
-            "Double Screen For SG",
+        available_play_ids = {
+            str(play["_id"])
+            for play in plays_by_name.values()
+            if play.get("_id")
         }
-        sf_seed_plays = {
-            "SF Back Door",
-            "SF Isolation",
-            "SF Misdirection Three",
-        }
-        seeded_offense_plays = standard_seed_plays | sf_seed_plays
 
-        def _apply_even_distribution(target: dict, eligible_plays: list[str]) -> None:
+        def _filter_existing_play_ids(play_ids: list[str] | set[str]) -> list[str]:
+            return [play_id for play_id in play_ids if play_id in available_play_ids]
+
+        def _apply_even_distribution(target: dict, eligible_plays: list[dict]) -> None:
             if not eligible_plays:
                 return
-            eligible_plays = sorted(eligible_plays)
+            eligible_plays = sorted(
+                [play for play in eligible_plays if play.get("_id")],
+                key=lambda play: play.get("name", ""),
+            )
             count = len(eligible_plays)
             base = 100 // count
             remainder = 100 - (base * count)
-            for idx, play_name in enumerate(eligible_plays):
-                target[play_name] = base + (1 if idx < remainder else 0)
+            for idx, play in enumerate(eligible_plays):
+                target[str(play["_id"])] = base + (1 if idx < remainder else 0)
 
-        _apply_even_distribution(
-            playbook_settings["motion"],
-            [p for p in motion_plays if p in seeded_offense_plays],
-        )
-        _apply_even_distribution(
-            playbook_settings["set_play_inside"],
-            [p for p in set_plays_inside if p in seeded_offense_plays],
-        )
-        _apply_even_distribution(
-            playbook_settings["set_play_attack"],
-            [p for p in set_plays_attack if p in seeded_offense_plays],
-        )
-        _apply_even_distribution(
-            playbook_settings["set_play_outside"],
-            [p for p in set_plays_outside if p in seeded_offense_plays],
-        )
+        _apply_even_distribution(playbook_settings["motion"], motion_plays)
+        _apply_even_distribution(playbook_settings["set_plays"], set_plays)
 
-        playbook_settings["fast_break"] = {
+        playbook_settings["fast_breaks"] = {
             "covert_release": 33,
             "rim_runner": 33,
             "triangle": 34,
         }
         
-        # Zone defense: Even distribution across all zone defenses
-        # Zone defenses are hardcoded: "2-3 Zone", "3-2 Zone", "1-3-1 Zone"
-        zone_defenses = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        # Zone defense: Even distribution across supported zone IDs.
+        zone_defenses = ["zone_23", "zone_32", "zone_131"]
         if zone_defenses:
             percentage_per_defense = 100.0 / len(zone_defenses)
             remainder = 100.0
@@ -533,95 +704,41 @@ def initialize_playbook_settings():
                     playbook_settings["zone_defense"][defense_name] = round(percentage_per_defense)
                     remainder -= round(percentage_per_defense)
         
-        # Man defense: "Man" gets 100% (only one man defense exists)
-        playbook_settings["man_defense"]["Man"] = 100
+        # Man defense: only normal is active for now.
+        playbook_settings["man_defense"]["man_normal"] = 100
+        playbook_settings["man_defense"]["man_pressure"] = 0
+        playbook_settings["man_defense"]["man_loose"] = 0
         
         # Initialize position filters with play assignments
         logger.info("🔍 [INITIALIZE PLAYBOOK] Starting position filter population...")
         
-        # ✅ PERFORMANCE: Pass plays_map to avoid redundant DB queries
-        # Standard: All basic plays
-        standard_plays = [
-            # Motion
-            "3-2 Motion",
-            "4-1 Motion",
-            "5-0 Motion",
-            # Set Play Inside
-            "Base Post Play",
-            # Set Play Attack
-            "Pick & Roll (Lower Wing)",
-            # Set Play Outside
-            "Double Screen For SG"
-        ]
-        standard_play_ids = get_play_ids_by_names(standard_plays, plays_map=plays_by_name)
+        # Keep legacy position filters stable by play_id so UI labels can change safely.
+        standard_play_ids = _filter_existing_play_ids(POSITION_FILTER_PLAY_IDS["standard"])
         playbook_settings["position_filters"]["standard"] = standard_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] Standard position filter populated with {len(standard_play_ids)} play_ids")
         
         # PF: Power Forward specific plays
-        pf_plays = [
-            # Motion
-            "PF Post Motion",
-            # Set Play Inside
-            "PF Post Up",
-            # Set Play Attack
-            "PF High Post Drive",
-            # Set Play Outside
-            "PF Corner Shot",
-            "PF Quick Jumper"
-        ]
-        pf_play_ids = get_play_ids_by_names(pf_plays, plays_map=plays_by_name)
+        pf_play_ids = _filter_existing_play_ids(POSITION_FILTER_PLAY_IDS["PF"])
         playbook_settings["position_filters"]["PF"] = pf_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] PF position filter populated with {len(pf_play_ids)} play_ids")
         
         # PG: Point Guard specific plays
-        pg_plays = [
-            # Set Play Inside
-            "PG Post Up",
-            # Set Play Attack
-            "PG Wrap-Around",
-            # Set Play Outside
-            "PG Wing Three"
-        ]
-        pg_play_ids = get_play_ids_by_names(pg_plays, plays_map=plays_by_name)
+        pg_play_ids = _filter_existing_play_ids(POSITION_FILTER_PLAY_IDS["PG"])
         playbook_settings["position_filters"]["PG"] = pg_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] PG position filter populated with {len(pg_play_ids)} play_ids")
         
         # SG: Shooting Guard specific plays
-        sg_plays = [
-            # Set Play Inside
-            "SG Pass & Cut",
-            # Set Play Attack
-            "SG Pick & Roll",
-            # Set Play Outside
-            "SG Wheel Three"
-        ]
-        sg_play_ids = get_play_ids_by_names(sg_plays, plays_map=plays_by_name)
+        sg_play_ids = _filter_existing_play_ids(POSITION_FILTER_PLAY_IDS["SG"])
         playbook_settings["position_filters"]["SG"] = sg_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] SG position filter populated with {len(sg_play_ids)} play_ids")
         
         # SF: Small Forward specific plays
-        sf_plays = [
-            # Set Play Inside
-            "SF Back Door",
-            # Set Play Attack
-            "SF Isolation",
-            # Set Play Outside
-            "SF Misdirection Three"
-        ]
-        sf_play_ids = get_play_ids_by_names(sf_plays, plays_map=plays_by_name)
+        sf_play_ids = _filter_existing_play_ids(POSITION_FILTER_PLAY_IDS["SF"])
         playbook_settings["position_filters"]["SF"] = sf_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] SF position filter populated with {len(sf_play_ids)} play_ids")
         
         # C: Center specific plays
-        c_plays = [
-            # Set Play Inside
-            "C Post Iso",
-            # Set Play Attack
-            "C High Post Clear Out",
-            # Set Play Outside
-            "C Screen & Three"
-        ]
-        c_play_ids = get_play_ids_by_names(c_plays, plays_map=plays_by_name)
+        c_play_ids = _filter_existing_play_ids(POSITION_FILTER_PLAY_IDS["C"])
         playbook_settings["position_filters"]["C"] = c_play_ids
         logger.info(f"✅ [INITIALIZE PLAYBOOK] C position filter populated with {len(c_play_ids)} play_ids")
         
@@ -632,18 +749,15 @@ def initialize_playbook_settings():
         # Return minimal defaults on error
         return {
             "motion": {},
-            "set_play_inside": {},
-            "set_play_attack": {},
-            "set_play_outside": {},
-            "fast_break": {
+            "set_plays": {},
+            "fast_breaks": {
                 "covert_release": 33,
                 "rim_runner": 33,
                 "triangle": 34,
             },
-            "zone_defense": {"2-3 Zone": 100},
-            "man_defense": {"Man": 100},
-            "slot_assignments": {},
-            "motion_dropdowns": {},
+            "zone_defense": {"zone_23": 100, "zone_32": 0, "zone_131": 0},
+            "man_defense": {"man_normal": 100, "man_pressure": 0, "man_loose": 0},
+            "pc_order": {"offense": [], "defense": []},
             "position_filters": {
                 "standard": [],
                 "PG": [],
@@ -654,8 +768,8 @@ def initialize_playbook_settings():
             },
             "even_distribution_all": True,
             "_meta": {
-                "seed_version": "alpha_v1",
                 "user_saved": False,
+                "schema_version": 2,
             },
         }
 
@@ -1653,16 +1767,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc (for single mode only; franchise/tournament use single source: FTD or tournament doc)
+                            # Find matching team_id in the game doc. Franchise gameplay should
+                            # read the frozen game snapshot once the game exists.
                             for tid, team_obj in game_teams.items():
                                 doc_name = (team_obj.get("name") or "").strip()
                                 master_name = (user_team_name or "").strip()
                                 if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Single source of truth: franchise/tournament never use game doc for playbooks
-                                    if mode not in ["franchise", "tournament"]:
-                                        doc = game_doc
-                                        load_from_game_doc = True
+                                    doc = game_doc
+                                    load_from_game_doc = True
                                     break
             except Exception as e:
                 logger.warning(f"🔍 [GET PLAYBOOKS] Game doc path failed: {e!r}")
@@ -1750,44 +1863,23 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
-            # ✅ Franchise in-game: game doc has playbook_settings but not the full plays structure; merge plays from FTD
+            # Franchise gameplay should read only from the game snapshot once the
+            # game exists. Do not silently merge FTD or cached populated plays here,
+            # because that masks init/snapshot bugs and causes UI/runtime drift.
             if mode == "franchise":
-                _pl = team_obj.get("plays") or {}
-                _n = len(_pl) if isinstance(_pl, dict) else 0
-                if (not _pl or _n == 0):
-                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: entering FTD merge block (team_obj plays count={_n})")
-                else:
-                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: skipping FTD merge (team_obj already has {_n} plays)")
-            if mode == "franchise" and (not team_obj.get("plays") or len(team_obj.get("plays", {})) == 0):
-                franchise_doc = collection.find_one(
-                    {"_id": ObjectId(doc_id)},
-                    {"user_team_id": 1, "user_team_object_id": 1}
-                )
-                if franchise_doc:
-                    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-                    if user_team_object_id:
-                        try:
-                            ftd_doc = franchise_team_data_collection.find_one(
-                                {"franchise_id": ObjectId(doc_id), "team_id": ObjectId(user_team_object_id)},
-                                {"plays": 1}
-                            )
-                            if ftd_doc and ftd_doc.get("plays"):
-                                team_obj["plays"] = ftd_doc["plays"]
-                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from FTD (count={len(ftd_doc['plays'])})")
-                            else:
-                                team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                                logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (FTD missing or empty)")
-                        except Exception as ex:
-                            team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                            logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (FTD lookup error: {ex!r})")
-                    else:
-                        team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                        logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (no user_team_object_id)")
-                else:
-                    team_obj["plays"] = _get_cached_populated_plays(mode="franchise")
-                    logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: set plays from cache (franchise_doc not found)")
+                current_plays = team_obj.get("plays") or {}
+                if not isinstance(current_plays, dict):
+                    current_plays = {}
+                    team_obj["plays"] = current_plays
+                if len(current_plays) == 0:
+                    logger.warning(
+                        "⚠️ [GET PLAYBOOKS] franchise+game_doc missing plays snapshot for team_id=%s game_id=%s",
+                        authoritative_team_id,
+                        game_id,
+                    )
         elif mode == "franchise":
-            # ✅ FTD: Load playbook_settings from FTD collection instead of franchise doc
+            # Franchise FCC / pregame reads use FTD as the authoritative master source.
+            # Gameplay with game_id should use the game doc snapshot instead of mixing sources.
             from BackEnd.db import franchise_team_data_collection
             try:
                 team_object_id = ObjectId(authoritative_team_id)
@@ -1797,7 +1889,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             logger.warning(f"🔍 [GET PLAYBOOKS] franchise FTD lookup: doc_id={doc_id!r}, authoritative_team_id={authoritative_team_id!r}, team_object_id={team_object_id}")
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
-                {"playbook_settings": 1, "plays": 1}
+                {"playbook_settings": 1, "plays": 1, "scouting_data": 1, "players": 1}
             )
             
             if ftd_doc:
@@ -1806,7 +1898,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 logger.warning(f"🔍 [GET PLAYBOOKS] FTD found: playbook_settings keys={list(pb.keys())[:12] if pb else []}, plays count={len(pl)}")
                 team_obj = {
                     "playbook_settings": pb,
-                    "plays": pl
+                    "plays": pl,
+                    "scouting_data": ftd_doc.get("scouting_data", {}),
+                    "players": ftd_doc.get("players", []),
                 }
             else:
                 logger.warning(f"🔍 [GET PLAYBOOKS] FTD not found for franchise_id={doc_id!r} team_id={authoritative_team_id!r}, creating new FTD entry")
@@ -1857,7 +1951,9 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 
                 team_obj = {
                     "playbook_settings": playbook_settings,
-                    "plays": populated_plays
+                    "plays": populated_plays,
+                    "scouting_data": scouting_data,
+                    "players": [],
                 }
             
             actual_team_id = authoritative_team_id
@@ -2029,51 +2125,50 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         if mode == "franchise" and load_from_game_doc:
             logger.warning(f"🔍 [GET PLAYBOOKS] franchise+game_doc: before response build, team_obj plays count={len(plays)}, response built from team_obj")
         
-        # Organize plays by type and focus
+        # Organize plays by type and focus.
         motion_plays = []
-        set_plays_inside = []
-        set_plays_attack = []
-        set_plays_outside = []
+        set_plays = []
+        legacy_set_plays_inside = []
+        legacy_set_plays_attack = []
+        legacy_set_plays_outside = []
         
-        for play_name, play_data in plays.items():
+        player_name_lookup = _build_player_name_lookup(team_obj)
+        scouting_data = (team_obj or {}).get("scouting_data", {})
+        defense_scouting = scouting_data.get("defense", {}) if isinstance(scouting_data, dict) else {}
+
+        for play_key, play_data, display_name in iter_team_plays(plays):
             play_type = play_data.get("play_type", "")
             play_focus = play_data.get("play_focus", "")
+            play_summary = {
+                "name": display_name,
+                "play_id": play_data.get("play_id"),
+                "play_type": play_type,
+                "play_focus": play_focus,
+                "effectiveness": play_data.get("effectiveness", 0),
+                "momentum": play_data.get("momentum", 0),
+                "cloaking": play_data.get("cloaking", 0),
+                "top_scorer": _get_top_scorer_label(play_data, player_name_lookup),
+            }
             
             if play_type == "motion":
-                motion_plays.append({
-                    "name": play_name,
-                    "play_id": play_data.get("play_id"),
-                    "play_type": play_type,
-                    "play_focus": play_focus
-                })
+                play_summary["motion_focus"] = play_data.get("motion_focus")
+                motion_plays.append(play_summary)
             elif play_type == "set_play":
+                play_summary["target_shooter"] = play_data.get("target_shooter")
+                set_plays.append(play_summary)
                 if play_focus == "inside":
-                    set_plays_inside.append({
-                        "name": play_name,
-                        "play_id": play_data.get("play_id"),
-                        "play_type": play_type,
-                        "play_focus": play_focus
-                    })
+                    legacy_set_plays_inside.append(play_summary)
                 elif play_focus == "attack":
-                    set_plays_attack.append({
-                        "name": play_name,
-                        "play_id": play_data.get("play_id"),
-                        "play_type": play_type,
-                        "play_focus": play_focus
-                    })
+                    legacy_set_plays_attack.append(play_summary)
                 elif play_focus == "outside":
-                    set_plays_outside.append({
-                        "name": play_name,
-                        "play_id": play_data.get("play_id"),
-                        "play_type": play_type,
-                        "play_focus": play_focus
-                    })
+                    legacy_set_plays_outside.append(play_summary)
         
         # Sort plays by name for consistency
         motion_plays.sort(key=lambda x: x["name"])
-        set_plays_inside.sort(key=lambda x: x["name"])
-        set_plays_attack.sort(key=lambda x: x["name"])
-        set_plays_outside.sort(key=lambda x: x["name"])
+        set_plays.sort(key=lambda x: x["name"])
+        legacy_set_plays_inside.sort(key=lambda x: x["name"])
+        legacy_set_plays_attack.sort(key=lambda x: x["name"])
+        legacy_set_plays_outside.sort(key=lambda x: x["name"])
         
         # Reload team_obj from latest doc so playbook_settings/plays are current.
         if mode == "franchise" and not load_from_game_doc:
@@ -2103,7 +2198,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             teams = doc.get("teams", {}) if doc else {}
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
-        # Get playbook settings (percentages, slot assignments, motion dropdowns, and position filters)
+        # Get playbook settings.
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
         # If GameManager not available, use load_team_settings_from_doc() (same logic as game start)
         if mode == "single" and use_gamemanager_settings and gm:
@@ -2148,8 +2243,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             # ✅ FIX: Loading from game doc - team_obj already has playbook_settings; doc has canonical keys.
             # Using extract_team_settings with request team_id (ObjectId) would fail.
             pb = team_obj.get("playbook_settings") or {}
-            slot_count = len(pb.get("slot_assignments", {}))
-            logger.warning(f"🔍 [GET PLAYBOOKS] Using game doc team_obj for playbook_settings (load_from_game_doc=True), slot_assignments={slot_count}")
+            pc_order_count = len((pb.get("pc_order", {}) or {}).get("offense", []))
+            logger.warning(f"🔍 [GET PLAYBOOKS] Using game doc team_obj for playbook_settings (load_from_game_doc=True), pc_order.offense={pc_order_count}")
             playbook_settings = team_obj.get("playbook_settings", {})
         else:
             # Tournament/franchise master doc - use extract (doc has ObjectId keys)
@@ -2171,8 +2266,25 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             else:
                 playbook_settings = team_obj.get("playbook_settings", {})
         
-        slot_assignments = playbook_settings.get("slot_assignments", {}) if playbook_settings else {}
-        motion_dropdowns = playbook_settings.get("motion_dropdowns", {}) if playbook_settings else {}
+        plays_by_id, plays_by_name = build_play_lookups_from_team_plays(plays)
+        simplified_playbook_settings = build_simplified_playbook_settings(
+            playbook_settings,
+            plays_by_id,
+            plays_by_name,
+        )
+        legacy_playbook_settings = build_legacy_playbook_settings_view(
+            simplified_playbook_settings,
+            plays_by_id,
+            plays_by_name,
+        )
+        motion_dropdowns = normalize_motion_dropdowns_to_play_ids(
+            playbook_settings.get("motion_dropdowns", {}) if playbook_settings else {},
+            plays_by_id,
+            plays_by_name,
+        )
+        for play_summary in motion_plays:
+            if play_summary.get("motion_focus") is None:
+                play_summary["motion_focus"] = motion_dropdowns.get(str(play_summary.get("play_id") or ""))
         
         # Get position filters (merge with defaults if missing)
         default_position_filters = {
@@ -2190,41 +2302,76 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             if key not in position_filters:
                 position_filters[key] = []
         
-        # ✅ DEBUG: Log extracted percentages to see what we're returning
-        # Get saved playbook percentages (motion, set_play, zone_defense)
-        motion_percentages = playbook_settings.get("motion", {}) if playbook_settings else {}
-        set_play_inside_percentages = playbook_settings.get("set_play_inside", {}) if playbook_settings else {}
-        set_play_attack_percentages = playbook_settings.get("set_play_attack", {}) if playbook_settings else {}
-        set_play_outside_percentages = playbook_settings.get("set_play_outside", {}) if playbook_settings else {}
-        fast_break_percentages = playbook_settings.get("fast_break", {}) if playbook_settings else {}
-        zone_defense_percentages = playbook_settings.get("zone_defense", {}) if playbook_settings else {}
-        man_defense_percentages = playbook_settings.get("man_defense", {}) if playbook_settings else {}
-        
-        # Get even_distribution_all flag (defaults to False if not set)
-        even_distribution_all = playbook_settings.get("even_distribution_all", False)
-        playbook_meta = playbook_settings.get("_meta", {}) if playbook_settings else {}
-        if not isinstance(playbook_meta, dict):
-            playbook_meta = {}
+        motion_percentages = simplified_playbook_settings.get("motion", {})
+        set_play_percentages = simplified_playbook_settings.get("set_plays", {})
+        fast_break_percentages = simplified_playbook_settings.get("fast_breaks", {})
+        zone_defense_percentages = simplified_playbook_settings.get("zone_defense", {})
+        man_defense_percentages = simplified_playbook_settings.get("man_defense", {})
+        pc_order = simplified_playbook_settings.get("pc_order", {"offense": [], "defense": []})
+        even_distribution_all = playbook_settings.get("even_distribution_all", False) if playbook_settings else False
+        playbook_meta = simplified_playbook_settings.get("_meta", {})
         
         return {
             "motion": motion_plays,
-            "set_play_inside": set_plays_inside,
-            "set_play_attack": set_plays_attack,
-            "set_play_outside": set_plays_outside,
-            "slot_assignments": slot_assignments,
+            "set_plays": set_plays,
+            "fast_breaks": [
+                {"id": "triangle", "name": "Triangle"},
+                {"id": "rim_runner", "name": "Rim Runner"},
+                {"id": "covert_release", "name": "Covert Release"},
+            ],
+            "man_defense_rows": [
+                {
+                    "id": defense_id,
+                    "name": defense_name,
+                    "effectiveness": (defense_scouting.get(defense_name, {}) if isinstance(defense_scouting.get(defense_name, {}), dict) else {}).get("effectiveness", 0),
+                    "is_active": defense_id == "man_normal",
+                }
+                for defense_id, defense_name in MAN_DEFENSE_ID_TO_NAME.items()
+            ],
+            "zone_defense_rows": [
+                {
+                    "id": defense_id,
+                    "name": defense_name,
+                    "effectiveness": (defense_scouting.get(defense_name, {}) if isinstance(defense_scouting.get(defense_name, {}), dict) else {}).get("effectiveness", 0),
+                    "is_active": True,
+                }
+                for defense_id, defense_name in ZONE_DEFENSE_ID_TO_NAME.items()
+            ],
+            "pc_order": pc_order,
             "motion_dropdowns": motion_dropdowns,
             "position_filters": position_filters,
             "even_distribution_all": even_distribution_all,
             "playbook_meta": playbook_meta,
-            "playbook_percentages": {
+            "simple_playbook_percentages": {
                 "motion": motion_percentages,
-                "set_play_inside": set_play_inside_percentages,
-                "set_play_attack": set_play_attack_percentages,
-                "set_play_outside": set_play_outside_percentages,
-                "fast_break": fast_break_percentages,
+                "set_plays": set_play_percentages,
+                "fast_breaks": fast_break_percentages,
                 "zone_defense": zone_defense_percentages,
-                "man_defense": man_defense_percentages
-            }
+                "man_defense": man_defense_percentages,
+            },
+            "playbook_percentages": {
+                "motion": legacy_playbook_settings.get("motion", {}),
+                "set_play_inside": legacy_playbook_settings.get("set_play_inside", {}),
+                "set_play_attack": legacy_playbook_settings.get("set_play_attack", {}),
+                "set_play_outside": legacy_playbook_settings.get("set_play_outside", {}),
+                "fast_break": legacy_playbook_settings.get("fast_break", {}),
+                "zone_defense": legacy_playbook_settings.get("zone_defense", {}),
+                "man_defense": legacy_playbook_settings.get("man_defense", {}),
+            },
+            # Backward-compatible fields for the old Playbooks frontend until the UI rewrite lands.
+            "set_play_inside": legacy_set_plays_inside,
+            "set_play_attack": legacy_set_plays_attack,
+            "set_play_outside": legacy_set_plays_outside,
+            "slot_assignments": legacy_playbook_settings.get("slot_assignments", {}),
+            "legacy_playbook_percentages": {
+                "motion": legacy_playbook_settings.get("motion", {}),
+                "set_play_inside": legacy_playbook_settings.get("set_play_inside", {}),
+                "set_play_attack": legacy_playbook_settings.get("set_play_attack", {}),
+                "set_play_outside": legacy_playbook_settings.get("set_play_outside", {}),
+                "fast_break": legacy_playbook_settings.get("fast_break", {}),
+                "zone_defense": legacy_playbook_settings.get("zone_defense", {}),
+                "man_defense": legacy_playbook_settings.get("man_defense", {}),
+            },
         }
     
     except HTTPException:
@@ -2246,7 +2393,8 @@ class PlaybookSettingsRequest(BaseModel):
     franchise_id: Optional[str] = None
     tournament_id: Optional[str] = None
     game_id: Optional[str] = None
-    playbook_settings: dict  # { "motion": {...}, "set_play_inside": {...}, etc. }
+    playbook_settings: dict
+    play_updates: Optional[dict] = None
 
 
 @router.post("/api/playbooks")
@@ -2257,18 +2405,61 @@ def save_playbooks(request: PlaybookSettingsRequest):
     """
     from BackEnd.utils.team_settings_manager import save_team_settings
     
-    logger.warning(
-        f"🔍 [SAVE PLAYBOOKS] request: mode={request.mode!r}, team_id={request.team_id!r}, "
-        f"franchise_id={request.franchise_id!r}, tournament_id={request.tournament_id!r}, game_id={request.game_id!r}, "
-        f"playbook_keys={list((request.playbook_settings or {}).keys())[:12]}"
-    )
     try:
-        # Mark settings as user-saved so alpha defaults only apply to first-time/unconfigured playbooks.
-        playbook_settings = dict(request.playbook_settings or {})
+        # Normalize incoming data to the simplified canonical structure.
+        incoming_playbook_settings = dict(request.playbook_settings or {})
+        from BackEnd.db import plays_collection
+
+        universal_plays = list(plays_collection.find({}, {"_id": 1, "name": 1}))
+        plays_by_id, plays_by_name = build_play_lookups_from_universal_plays(universal_plays)
+
+        playbook_settings = build_simplified_playbook_settings(
+            incoming_playbook_settings,
+            plays_by_id,
+            plays_by_name,
+        )
+        playbook_settings["motion"] = normalize_percentage_map_to_play_ids(
+            playbook_settings.get("motion", {}),
+            plays_by_id,
+            plays_by_name,
+        )
+        playbook_settings["set_plays"] = normalize_percentage_map_to_play_ids(
+            playbook_settings.get("set_plays", {}),
+            plays_by_id,
+            plays_by_name,
+        )
+        playbook_settings["fast_breaks"] = normalize_string_keyed_map(
+            playbook_settings.get("fast_breaks", {}),
+            {"Triangle": "triangle", "Rim Runner": "rim_runner", "Covert Release": "covert_release"},
+        )
+        playbook_settings["zone_defense"] = normalize_string_keyed_map(
+            playbook_settings.get("zone_defense", {}),
+            {"2-3 Zone": "zone_23", "3-2 Zone": "zone_32", "1-3-1 Zone": "zone_131"},
+        )
+        playbook_settings["man_defense"] = normalize_string_keyed_map(
+            playbook_settings.get("man_defense", {}),
+            {"Man": "man_normal", "Man Pressure": "man_pressure", "Man Loose": "man_loose"},
+        )
+        playbook_settings["pc_order"] = normalize_pc_order(
+            playbook_settings.get("pc_order", {}),
+            plays_by_id,
+            plays_by_name,
+        )
+        if isinstance(incoming_playbook_settings.get("position_filters"), dict):
+            playbook_settings["position_filters"] = incoming_playbook_settings.get("position_filters", {})
+        playbook_settings["even_distribution_all"] = bool(incoming_playbook_settings.get("even_distribution_all", False))
         playbook_meta = playbook_settings.get("_meta", {})
         if not isinstance(playbook_meta, dict):
             playbook_meta = {}
         playbook_meta["user_saved"] = True
+        playbook_meta["schema_version"] = 2
+        if request.mode == "franchise" and request.franchise_id and not request.game_id:
+            from BackEnd.db import franchises_collection
+            franchise_doc = franchises_collection.find_one(
+                {"_id": ObjectId(request.franchise_id)},
+                {"week": 1}
+            ) or {}
+            playbook_meta["saved_for_week"] = int(franchise_doc.get("week", 1) or 1)
         playbook_settings["_meta"] = playbook_meta
 
         # ✅ UNIFIED: Use unified save function for consistent team_id resolution
@@ -2286,12 +2477,72 @@ def save_playbooks(request: PlaybookSettingsRequest):
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save playbook settings")
+
+        play_updates = request.play_updates or {}
+        if isinstance(play_updates, dict) and play_updates:
+            current_plays, plays_team_id = _load_current_team_plays_for_save(
+                request.mode,
+                request.team_id,
+                franchise_id=request.franchise_id,
+                tournament_id=request.tournament_id,
+                game_id=request.game_id,
+            )
+
+            plays_changed = False
+            for _play_key, play_data, _display_name in iter_team_plays(current_plays):
+                play_id = str(play_data.get("play_id") or "")
+                if not play_id or play_id not in play_updates:
+                    continue
+                update_data = play_updates.get(play_id) or {}
+                if play_data.get("play_type") == "motion" and "motion_focus" in update_data:
+                    next_focus = update_data.get("motion_focus")
+                    normalized_focus = next_focus if next_focus in {"inside", "attack", "outside"} else None
+                    if play_data.get("motion_focus") != normalized_focus:
+                        play_data["motion_focus"] = normalized_focus
+                        plays_changed = True
+                if play_data.get("play_type") == "set_play" and "target_shooter" in update_data:
+                    next_target = update_data.get("target_shooter")
+                    normalized_target = next_target if next_target in {"PG", "SG", "SF", "PF", "C"} else play_data.get("target_shooter")
+                    if play_data.get("target_shooter") != normalized_target:
+                        play_data["target_shooter"] = normalized_target
+                        plays_changed = True
+
+            if plays_changed:
+                plays_success, _, _ = save_team_settings(
+                    settings_type="plays",
+                    settings_data=current_plays,
+                    team_id=request.team_id,
+                    mode=request.mode,
+                    game_id=request.game_id,
+                    franchise_id=request.franchise_id,
+                    tournament_id=request.tournament_id,
+                    validate_fn=None,
+                    apply_to_gamemanager=False,
+                )
+                if not plays_success:
+                    raise HTTPException(status_code=500, detail="Failed to save play configuration")
+
+                if request.game_id:
+                    try:
+                        from BackEnd.api.api import ongoing_games
+                        gm = ongoing_games.get(request.game_id)
+                        if gm:
+                            if gm.home_team.team_id == plays_team_id or gm.home_team.name == request.team_id:
+                                gm.home_team.plays = dict(current_plays)
+                            elif gm.away_team.team_id == plays_team_id or gm.away_team.name == request.team_id:
+                                gm.away_team.plays = dict(current_plays)
+                    except Exception:
+                        pass
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         
         # ✅ PHASE 1.3: Telemetry - Log state write (after successful save)
-        slot_count = len(playbook_settings.get("slot_assignments", {})) if playbook_settings else 0
-        logger.warning(f"🟢 [STATE-WRITE] [save_playbooks] playbook_settings to backend | team_id={actual_team_id}, slot_assignments={slot_count}, endpoint=/api/playbooks")
+        offense_pc_count = len((playbook_settings.get("pc_order", {}) or {}).get("offense", []))
+        defense_pc_count = len((playbook_settings.get("pc_order", {}) or {}).get("defense", []))
+        logger.warning(
+            f"🟢 [STATE-WRITE] [save_playbooks] playbook_settings to backend | "
+            f"team_id={actual_team_id}, pc_order.offense={offense_pc_count}, pc_order.defense={defense_pc_count}, endpoint=/api/playbooks"
+        )
         
         return {"success": True, "message": "Playbook settings saved successfully"}
     

@@ -17,12 +17,23 @@ const teams = [
   "South Lancaster"
 ];
 
+const taglines = {
+  'Bentley-Truman': 'Top-Shelf Talent',
+  'Lancaster': 'Muscle & Defense',
+  'Four Corners': 'Hustle & Attitude',
+  'Ocean City': 'Sharpshooters Galore',
+  'Morristown': 'Perfectly Balanced',
+  'Little York': 'Wicked Smart',
+  'Xavien': 'Youthful Exuberance',
+  'South Lancaster': 'Us vs The World'
+};
+
 function createButtons() {
   const container = document.getElementById("team-container");
   teams.forEach(team => {
     const btn = document.createElement("button");
     btn.className = "team-button";
-    btn.innerHTML = `<img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}"><span>${team}</span>`;
+    btn.innerHTML = `<img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}"><span>${taglines[team] || team}</span>`;
     btn.addEventListener("click", () => {
       playSound("click-beep.wav");
       selectTeam(team);

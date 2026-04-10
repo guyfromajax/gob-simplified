@@ -8,6 +8,7 @@ from bson import ObjectId
 
 from BackEnd.db import teams_collection, players_collection
 from BackEnd.utils.roster_builder import build_roster_players, ATTR_KEYS as SCOUTING_CORE_ATTR_KEYS
+from BackEnd.utils.team_play_utils import iter_team_plays
 
 
 def extract_plays_from_game_document(
@@ -82,20 +83,22 @@ def extract_plays_from_game_document(
     
     # Calculate total playcalls for usage %
     total_playcalls = 0
-    for play_name, play_data in team_plays.items():
+    for _play_key, play_data, _display_name in iter_team_plays(team_plays):
         game_stats = play_data.get("game_stats", {})
         times_run = game_stats.get("times_run", 0)
         total_playcalls += times_run
     
     # Build plays array
-    for play_name, play_data in team_plays.items():
+    for play_key, play_data, display_name in iter_team_plays(team_plays):
         game_stats = play_data.get("game_stats", {})
         times_run = game_stats.get("times_run", 0)
         successes = game_stats.get("successes", 0)
         
         if times_run > 0:  # Only include plays that were actually run
             plays_data.append({
-                "name": play_name,
+                "play_id": play_data.get("play_id"),
+                "name": display_name,
+                "play_key": play_key,
                 "times_run": times_run,
                 "successes": successes,
                 "total_playcalls": total_playcalls
@@ -258,4 +261,3 @@ def load_tournament_roster_for_scouting(
         }
 
     return build_roster_players(pids_with_core, mode_overrides, core_players_dict, team_name)
-

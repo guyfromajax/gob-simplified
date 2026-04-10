@@ -29,6 +29,26 @@
   color: #1f2937;
 }
 
+#franchise-container #top-center .team-stats {
+  width: 100%;
+  max-width: 320px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 24px;
+  justify-items: center;
+  align-items: center;
+  text-align: center;
+  margin: 0 auto;
+}
+
+#franchise-container #top-center .team-stats > div {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
 @media (max-width: 600px) {
   #franchise-container #top-left {
     height: 150px;
@@ -100,6 +120,12 @@
   background: #f0f7ff;
   border-color: #345a94;
   transform: translateY(-1px);
+}
+
+#franchise-container #playbooks-franchise.secondary-btn.needs-playbook-save {
+  box-shadow: 0 0 0 4px rgba(255, 212, 59, 0.28), 0 0 30px rgba(255, 215, 64, 0.9);
+  border-color: #e3b500;
+  color: #9b7300;
 }
 
 /* Scouting Report - Gray fill */

@@ -29,6 +29,7 @@ let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
 let commandCenterTopDataCache = null;
+let playbooksWeekSavedCache = null;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
@@ -37,6 +38,16 @@ const recruitSortState = { key: 'rt', direction: 'desc' };
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
     window.location.reload();
+  }
+});
+
+window.addEventListener('focus', () => {
+  maybeRefreshPlaybooksButtonState();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    maybeRefreshPlaybooksButtonState();
   }
 });
 
@@ -119,12 +130,10 @@ function populateTop(data) {
       textElement.textContent = `${chemistryValue} / 25`;
     }
   }
-  document.getElementById('stat-offense').textContent = `Offense: ${data.offense || '--'}`;
-  document.getElementById('stat-defense').textContent = `Defense: ${data.defense || '--'}`;
-  document.getElementById('stat-athleticism').textContent = `Athleticism: ${data.athleticism || '--'}`;
-  document.getElementById('stat-intangibles').textContent = `Intangibles: ${data.intangibles || '--'}`;
-  document.getElementById('stat-prestige').textContent = `Prestige: ${data.prestige || '--'}`;
-  document.getElementById('stat-rank').textContent = `Nat'l Rank: ${data.rank || '--'}`;
+  const prestigeEl = document.getElementById('stat-prestige');
+  const rankEl = document.getElementById('stat-rank');
+  if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
+  if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
 }
 
 let standingsDataCache = null;
@@ -257,6 +266,44 @@ function buildResourceUrl(page, extraParams) {
   params.set('return_url', getCurrentRelativeUrl());
   if (extraParams) Object.keys(extraParams).forEach(k => params.set(k, extraParams[k]));
   return `/${page}?${params.toString()}`;
+}
+
+async function updatePlaybooksButtonState(topData) {
+  const playbooksBtn = document.getElementById('playbooks-franchise');
+  if (!playbooksBtn || !franchiseId || !userTeamId) return;
+  const currentWeek = Number(topData?.week || 1);
+  const data = await fetchJSON(
+    `${API_CONFIG.buildUrl('/api/playbooks')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`
+  );
+  const savedForWeek = Number(data?.playbook_meta?.saved_for_week || 0);
+  playbooksWeekSavedCache = savedForWeek;
+  const needsSave = savedForWeek !== currentWeek;
+  playbooksBtn.classList.toggle('needs-playbook-save', needsSave);
+  if (needsSave) {
+    playbooksBtn.title = "Playbooks have not been set for this week's game.";
+    playbooksBtn.setAttribute('aria-label', "Playbooks have not been set for this week's game.");
+  } else {
+    playbooksBtn.removeAttribute('title');
+    playbooksBtn.removeAttribute('aria-label');
+  }
+}
+
+async function maybeRefreshPlaybooksButtonState() {
+  if (!commandCenterTopDataCache || !franchiseId || !userTeamId) return;
+  const storageKey = `playbooks_saved_refresh:${franchiseId}:${userTeamId}`;
+  let shouldRefresh = false;
+  try {
+    shouldRefresh = window.sessionStorage.getItem(storageKey) === '1';
+  } catch (error) {
+    shouldRefresh = false;
+  }
+  if (!shouldRefresh) return;
+  await updatePlaybooksButtonState(commandCenterTopDataCache);
+  try {
+    window.sessionStorage.removeItem(storageKey);
+  } catch (error) {
+    // ignore storage cleanup failures
+  }
 }
 
 function bindResourcesLinks() {
@@ -1283,6 +1330,7 @@ async function init() {
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
   updateAwardsButton(topData);
+  await updatePlaybooksButtonState(topData);
   maybeShowChampionshipCompleteModal(topData);
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
@@ -1828,7 +1876,7 @@ function wireFccNavButtons() {
       params.set('team_id', userTeamId);
       params.set('from', 'franchise-command-center');
       params.set('return_url', getCurrentRelativeUrl());
-      window.location.href = `/playbooks.html?${params.toString()}`;
+      window.location.href = `/playbook-report.html?${params.toString()}`;
     });
   }
 }
@@ -2141,11 +2189,12 @@ function renderPlaybookSummary() {
   
   for (const [play_name, play_data] of Object.entries(plays_data)) {
     if (typeof play_data === 'object' && play_data !== null) {
+      const resolvedName = play_data.name || play_name;
       const play_type = play_data.play_type || '';
       if (play_type === 'motion') {
-        motion_plays.push({ name: play_name, ...play_data });
+        motion_plays.push({ ...play_data, name: resolvedName, display_name: resolvedName, play_key: play_name });
       } else if (play_type === 'set_play') {
-        set_plays.push({ name: play_name, ...play_data });
+        set_plays.push({ ...play_data, name: resolvedName, display_name: resolvedName, play_key: play_name });
       }
     }
   }
@@ -2184,7 +2233,7 @@ function renderPlaybookSummary() {
   if (motion_plays.length > 0) {
     motion_plays.forEach(play => {
       // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
-      const playRow = createPlayRow(play.name, play, null, players);
+      const playRow = createPlayRow(play.display_name || play.name, play, null, players);
       offenseSection.appendChild(playRow);
     });
   }
@@ -2192,7 +2241,7 @@ function renderPlaybookSummary() {
   if (set_plays.length > 0) {
     set_plays.forEach(play => {
       // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
-      const playRow = createPlayRow(play.name, play, null, players);
+      const playRow = createPlayRow(play.display_name || play.name, play, null, players);
       offenseSection.appendChild(playRow);
     });
   }
@@ -2242,6 +2291,9 @@ function createPlayRow(playName, playData, change, players = []) {
   
   const row = document.createElement('div');
   row.className = 'playbook-row';
+  if (playData && typeof playData === 'object' && playData.play_id) {
+    row.dataset.playId = playData.play_id;
+  }
   
   // Play name
   const nameDiv = document.createElement('div');
@@ -2516,6 +2568,7 @@ let upcomingOpponentId = null;
 function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
+  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
   
   // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-26) and EOS Tournament (weeks 27-34)
   // Also show during preseason (week 0 or undefined) if there's a schedule
@@ -2547,14 +2600,24 @@ function updateScoutingButton(data) {
     })
     .then(res => res.json())
     .then(matchup => {
+      upcomingOpponent = null;
+      upcomingOpponentId = null;
       if (matchup && matchup.home && matchup.away) {
-        // Determine opponent
-        if (userTeamName === matchup.home) {
+        // Prefer API-sourced team identity, then fall back to ObjectId match.
+        if (resolvedUserTeamName === matchup.home) {
           upcomingOpponent = matchup.away;
           upcomingOpponentId = matchup.away_id;
-        } else if (userTeamName === matchup.away) {
+        } else if (resolvedUserTeamName === matchup.away) {
           upcomingOpponent = matchup.home;
           upcomingOpponentId = matchup.home_id;
+        } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
+          if (String(userTeamId) === String(matchup.home_id)) {
+            upcomingOpponent = matchup.away;
+            upcomingOpponentId = matchup.away_id;
+          } else if (String(userTeamId) === String(matchup.away_id)) {
+            upcomingOpponent = matchup.home;
+            upcomingOpponentId = matchup.home_id;
+          }
         }
         
         if (upcomingOpponent) {

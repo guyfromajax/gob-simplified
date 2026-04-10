@@ -203,15 +203,23 @@ def _apply_regular_season_rank_prestige_updates(
             home_state["prestige"] = new_winner_prestige
             away_state["prestige"] = new_loser_prestige
 
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    results_snapshot = dict(franchise_doc.get("results", {}) or {})
+    results_snapshot[str(completed_week)] = week_results
+    standings_data = calculate_franchise_standings(results_snapshot, team_state_by_id)
+
     ranking_inputs: list[dict[str, Any]] = []
     for team_id, state in team_state_by_id.items():
         games_played = int(state.get("sos_games_played", 0) or 0)
         sos_avg = SOS_AVG_DEFAULT if games_played <= 0 else float(state.get("sos_rank_sum", 0) or 0) / games_played
         state["sos_avg"] = sos_avg
+        team_standings = standings_data.get(team_id, {"W": 0, "L": 0})
         ranking_inputs.append({
             "team_id": team_id,
             "prestige": int(state.get("prestige", 0) or 0),
             "total_player_attrs": int(state.get("total_player_attrs", 0) or 0),
+            "team_wins": int(team_standings.get("W", 0) or 0),
             "sos_avg": sos_avg,
         })
 

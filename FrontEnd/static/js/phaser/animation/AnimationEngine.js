@@ -1294,10 +1294,21 @@ export class AnimationEngine {
 
       if (stealerRaw && stealerSprite) {
         if (stealerSprite) {
-          const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
+          const {
+            attachBallToPlayer,
+            setCurrentOwner,
+            clearPendingOwner,
+          } = await import('./BallControllerAdapter.js');
+          const { setBallHolderId } = await import('./ballAnimationSimple.js');
           attachBallToPlayer(this.scene, context.ballSprite, stealerSprite, {
             reason: 'steal_handler_post_skeleton'
           });
+          // Make STEAL end ownership authoritative so stale pass pending owner
+          // cannot reclaim the victim at turn boundary.
+          setCurrentOwner(this.scene, String(stealerRaw));
+          clearPendingOwner(this.scene);
+          setBallHolderId(this.scene, String(stealerRaw));
+          this.scene.passInFlight = false;
           console.log('✅ [STEAL HANDLER] Ball attached to stealer after skeleton animation', {
             stealerId: stealerRaw
           });

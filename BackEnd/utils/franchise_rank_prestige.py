@@ -74,19 +74,27 @@ def calculate_ranking_score(
     prestige: int,
     total_player_attrs: int,
     week: int,
+    team_wins: int = 0,
     sos_avg: float = SOS_AVG_DEFAULT,
 ) -> float:
     if week <= 0:
         return prestige + (total_player_attrs * 0.10)
     if week == 1:
-        return prestige + (total_player_attrs * 0.04)
+        return prestige + (total_player_attrs * 0.04) + (100 * team_wins)
     if week == 2:
-        return prestige + (total_player_attrs * 0.03)
+        return prestige + (total_player_attrs * 0.03) + (100 * team_wins)
     if week == 3:
-        return prestige + (total_player_attrs * 0.02)
+        return prestige + (total_player_attrs * 0.02) + (100 * team_wins)
     if week == 4:
-        return prestige + (total_player_attrs * 0.01)
-    return prestige + ((129 - sos_avg) * 4)
+        return prestige + (total_player_attrs * 0.01) + (100 * team_wins)
+    sos_score = (129 - sos_avg) * 4
+    if 5 <= week <= 8:
+        return (0.75 * prestige) + (100 * team_wins) + sos_score
+    if 9 <= week <= 12:
+        return (0.5 * prestige) + (80 * team_wins) + sos_score
+    if 13 <= week <= 26:
+        return (0.25 * prestige) + (60 * team_wins) + sos_score
+    return (0.25 * prestige) + (60 * team_wins) + sos_score
 
 
 def rank_teams_for_week(
@@ -103,6 +111,7 @@ def rank_teams_for_week(
             prestige=int(team.get("prestige", 0) or 0),
             total_player_attrs=int(team.get("total_player_attrs", 0) or 0),
             week=week,
+            team_wins=int(team.get("team_wins", 0) or 0),
             sos_avg=float(team.get("sos_avg", SOS_AVG_DEFAULT) or SOS_AVG_DEFAULT),
         )
         entry["_previous_rank"] = int(previous_rank_by_team.get(team_id, 999))

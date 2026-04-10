@@ -1,24 +1,38 @@
 # Statistics System
 
-## OREB putback-miss rebound stats (fix)
+## Play Identity Update
 
-**Bug (fixed):** When a shot missed → OREB → putback attempt → **miss** → someone grabbed the rebound, that rebounder’s OREB or DREB was never recorded (100% of the time). Other stats (e.g. FGA/FGM on a later putback make) were correct.
+Play statistics are now treated as `play_id`-first at the logic layer, with `name` remaining display text.
 
-**Cause:** The rebound stat was recorded in `shared.resolve_offensive_rebound()` on the player returned by `determine_rebounder()` (a lineup reference). Deltas and persistence use `team.get_all_players()` (roster). When lineup and roster were different object instances for the same player, or when the later lookup by ID in `turn_manager` failed, the stat never appeared on the canonical roster player used for deltas.
+Current behavior:
+- gameplay and training summary code carry `play_id` alongside play display name
+- season stat rollups write to the actual stored team-play key
+- runtime can still tolerate legacy name-keyed team `plays` maps
 
-**Fix:**
+Implication:
+- play renames should no longer break the main stat aggregation paths that were updated during the playbooks migration
 
-1. **`BackEnd/utils/shared.py`**  
-   After `determine_rebounder()` returns, we resolve the **canonical roster player** with `new_team.get_player_by_id(str(pid))` and call `record_stat(new_stat)` on that player (fallback: record on the lineup player if lookup fails). Rebound event `rebounderId` is set from the same normalized ID.
+## Training Report / Playbook Summary
 
-2. **`BackEnd/models/turn_manager.py`**  
-   - Lookup uses normalized ID comparison (`str(player_id) == str(rebounder_id)`) and a fallback via `off_team.get_player_by_id(rebounder_id_str) or def_team.get_player_by_id(rebounder_id_str)` so we always get the right `new_rebounder` for `pending_oreb`, result text, etc.  
-   - We **do not** call `record_stat` again in turn_manager; the stat is recorded only once in shared.py on the canonical player, avoiding double-count.
+Training report play deltas now resolve against `play_id`.
 
-Result: OREB/DREB are recorded on the same roster instance used for deltas and persistence, so putback-miss rebounds are always reflected in stats.
+The report payload includes:
+- `plays_data`
+- `plays_effectiveness_changes`
 
----
+`plays_effectiveness_changes` is keyed by `play_id` when available.
+The frontend resolves those deltas against each play row using `play_id` first and display name only as fallback.
 
-## PIP vs fast break points
+## DREB / OREB Putback Fix
 
-**PIP** (Points in Paint) does **not** include fast-break field goals; those increment **FB_PTS** only. See `docs/docs_1_systems/00_General_Systems/Statistics_System.md` (PIP and Fast Break sections) and `BackEnd/models/shot_manager.py` (`pip_stat_eligible`).
+The rebound fix remains in place:
+- putback-miss rebounds are recorded on the canonical roster player instance
+- rebound persistence uses the normalized player identity path
+
+This fix is independent of the play identity migration.
+
+## Scope
+
+This feature doc is only the migration-specific supplement.
+For broader gameplay stat rules, see:
+- `docs/docs_1_systems/00_General_Systems/Statistics_System.md`

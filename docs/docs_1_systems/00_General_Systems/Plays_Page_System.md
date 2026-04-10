@@ -1,285 +1,54 @@
-## Plays Page System ✅ **IMPLEMENTED** (January 2025)
+## Plays Page System
 
-**Base Constants**
+## Overview
 
-1. **Page Location**: `FrontEnd/static/play-details.html`
-2. **API Endpoint**: `GET /api/play/{play_name}` - Fetches play data including skeleton and copy
-3. **Data Source**: `plays_collection` in MongoDB (universal collection)
-4. **Play Types**: Motion Plays (continuous loop) and Set Plays (restart after completion)
-5. **Animation**: Auto-starts on page load, uses same system as Play Builder v2
+The Play Details page renders a single offensive play and its animation/copy.
 
-**Plays Page System Flow (6 Steps)**
+Primary frontend:
+- `FrontEnd/static/play-details.html`
 
-1. **Page Load** - Extract `play_name` from URL parameters
-2. **Data Fetch** - Fetch play data from `/api/play/{play_name}` endpoint
-3. **Skeleton Loading** - Load appropriate skeleton based on play type (Motion: `base_loop`, Set Play: `successful` variant)
-4. **Copy Display** - Display play copy text (`copy_1`, `copy_2`, `copy_3`) in info containers
-5. **Animation Start** - Auto-start animation with continuous loop behavior
-6. **Back Navigation** - Stop animation and navigate to page specified by `backTo` parameter
+Primary backend:
+- `BackEnd/api/play_routes.py`
 
-**Long Form Documentation**
+## Current Fetch Rules
 
-### Overview
+Preferred fetch path:
+- `GET /api/plays/{play_id}`
 
-The Plays Page System provides detailed views for individual plays, displaying play animations and descriptive content. Each play has its own dedicated page that shows the play's animation and information.
+Compatibility fetch path:
+- `GET /api/play/{play_name_or_id}`
 
-**Location:** `FrontEnd/static/play-details.html`  
-**Purpose:** Display play details, animations, and information  
-**Status:** ✅ Fully implemented with auto-animating play visualization and dynamic back navigation
+Navigation from Playbooks now prefers `play_id` and still includes `play_name` as fallback.
 
-### Navigation
+## URL Parameters
 
-**Entry Point:**
-- Play names in the Playbooks page are clickable links (except "To Be Added" placeholders)
-- Clicking a play name navigates to `/play-details.html` with:
-  - `play_name` parameter (URL encoded)
-  - `backTo` parameter (explicitly set to `playbooks.html` or other source page)
-  - All context parameters (mode, team_id, game_id/tournament_id/franchise_id, quarter, lineup, etc.)
-  - `from` parameter (preserved for target page's back navigation)
+Current details-page identity parameters:
+- `play_id`
+- `play_name` fallback
 
-**Back Navigation:**
-- Back button (top-left) navigates to page specified by `backTo` parameter
-- Defaults to `playbooks.html` if `backTo` parameter is missing (backward compatibility)
-- Stops animation before navigation to prevent conflicts
-- Preserves all game context parameters using `TimeoutNavigationHelper`
+The page loads by `play_id` when present.
+It only falls back to `play_name` if `play_id` is missing.
 
-### Layout Structure
+## Skeleton Loading
 
-**Header:**
-- **Play Name:** Centered, large gold font (2.5rem), with text shadow
-- **Play Type:** Centered, smaller font (1.2rem), muted color (Motion or Set Play)
+Motion plays:
+- use `skeletons.base_loop`
 
-**2-Column Layout:**
-- **Left Column (50% width):**
-  - Three horizontal info containers
-  - Each container has:
-    - Title (gold color, 1.1rem): "Play Description", "Key Concepts", "Usage Tips"
-    - Content area displaying play copy text (`copy_1`, `copy_2`, `copy_3`)
-  - Containers are vertically centered as a unit, middle-aligned with animation container
-  
-- **Right Column (50% width):**
-  - Court animation container
-  - Same dimensions and styling as Play Builder v2 animation container
-  - Centered horizontally and vertically within its column
-  - Uses environment-aware court image path (supports localhost and Netlify)
+Set plays:
+- use `skeletons.successful`
+- tolerate both direct `steps` and `versions`
 
-### Animation System
+## Rename Safety
 
-**Auto-Start Behavior:**
-- Animation begins automatically on page load
-- No user interaction required
-- Fetches play data from `/api/play/{play_name}` endpoint
-- Loads appropriate skeleton based on play type:
-  - **Motion Plays:** Uses `base_loop` skeleton (supports `versions` array format or direct `steps` array)
-  - **Set Plays:** Uses `successful` variant, version v0 from `versions` array (or direct `steps` for backward compatibility)
+The Details page is now mostly rename-safe because:
+- navigation prefers `play_id`
+- fetch prefers `play_id`
 
-**Animation Controls:**
-- **Pause/Resume Button:** Located below the animation container, horizontally centered
-- Button text changes: "⏸️ Pause" when playing, "▶️ Resume" when paused
-- Button styling changes: Blue gradient when playing, green gradient when paused
-- Clicking pauses/resumes the animation at the current step
-- Animation state persists when paused (can resume from same step)
+Remaining compatibility behavior:
+- the page still accepts `play_name`
+- the compatibility route still resolves names
 
-**Animation Logic:**
-- Reuses animation system from Play Builder v2:
-  - Same constants (court coordinates, positions, ball-handling actions)
-  - Same rendering logic (`renderCourtVisualization()`)
-  - Same step-by-step animation (`animateNextStep()`)
-  - Player icons positioned using percentage-based coordinates
-  - Ball sprite follows ball handler or pass/shoot actions
-  - Smooth transitions between steps (1 second delay per step)
+## Related Docs
 
-**Motion Play Animation:**
-- Continuous loop behavior
-- When reaching final step, loops back to step 0
-- Runs indefinitely until page is closed or navigation occurs
-
-**Set Play Animation:**
-- Runs animation from start to finish
-- Pauses for 2 seconds after completion
-- Restarts from step 0
-- Repeats continuously
-
-**Player Rendering:**
-- Player icons positioned at court locations based on skeleton step data
-- Icons animate smoothly between positions using CSS transitions
-- Ball sprite follows ball handler or shows pass/shoot animations
-- Position offsets applied for screen actions (collision handling)
-
-### Data Flow
-
-**Page Load:**
-1. Extract `play_name` from URL parameters
-2. Fetch play data from `/api/play/{play_name}` endpoint
-3. Display play name and type in header
-4. Load skeleton data:
-   - **Motion:** `base_loop` (checks for `versions` array format first, falls back to direct `steps` array)
-   - **Set Play:** `successful` variant, version v0 from `versions` array (or direct `steps` for backward compatibility)
-5. Load and display copy text (`copy_1`, `copy_2`, `copy_3`) in info containers
-6. Initialize animation state
-7. Auto-start animation
-
-**Animation Loop:**
-1. Process current step's `pos_actions` data
-2. Update player positions and actions
-3. Render court visualization with player icons and ball
-4. Move to next step after 1 second delay
-5. Handle looping logic (Motion: loop to 0, Set Play: pause then restart)
-
-### Copy Display
-
-**Data Structure:**
-- Play copy stored in `copy` field of play document
-- Format: `{ "copy_1": "...", "copy_2": "...", "copy_3": "..." }`
-- Optional field (may be `null` or missing)
-
-**Display Logic:**
-- Checks for `playData.copy` object
-- Handles both object format (`copy_1`, `copy_2`, `copy_3`) and array format
-- Displays copy text in three info containers: "Play Description", "Key Concepts", "Usage Tips"
-- Shows placeholder "Copy Goes Here" if copy data is missing
-
-### Responsive Design
-
-**Desktop:**
-- 2-column grid layout
-- All content fits above the fold
-- Left column containers vertically centered
-- Animation container centered in right column
-
-**Mobile/Tablet:**
-- Stacks vertically (right column first, then left column)
-- Animation container remains full width
-- Info containers stack below animation
-- Maintains readability and usability
-
-### Key Files
-
-**Frontend:**
-- `FrontEnd/static/play-details.html` - Main page structure and animation logic
-- `FrontEnd/static/playbooks.js` - Navigation integration (clickable play names, sets `backTo` parameter)
-- `FrontEnd/static/js/shared/timeoutNavigationHelper.js` - Parameter building for navigation
-
-**Backend:**
-- `BackEnd/api/play_routes.py` - `GET /api/play/{play_name}` endpoint
-
-**API Endpoints:**
-- `GET /api/play/{play_name}` - Fetch play data for details page (returns play document with skeletons and copy)
-
-### Back Button Nav ✅ **IMPLEMENTED** (January 2025)
-
-**Purpose:**
-Dynamic back navigation system that allows the play details page to navigate back to any source page, making it future-proof for new entry points.
-
-**Implementation:**
-
-1. **Navigation TO Play Details:**
-   - Source page (e.g., `playbooks.js`) sets `backTo` parameter when navigating to play-details
-   - Example: `params.set('backTo', 'playbooks.html')`
-   - This explicitly tells play-details where to navigate back to
-
-2. **Back Button Click:**
-   - `goBack()` function in `play-details.html` checks for `backTo` parameter
-   - If `backTo` exists: Navigates to that page
-   - If `backTo` missing: Defaults to `playbooks.html` (backward compatibility)
-   - Stops animation before navigation to prevent conflicts/freezes
-   - Preserves all game context parameters using `TimeoutNavigationHelper`
-
-3. **Animation Handling:**
-   - `stopAnimation()` called at start of `goBack()` function
-   - Prevents animation loop from blocking navigation
-   - Clears animation intervals and resets animation state
-
-4. **Parameter Preservation:**
-   - Uses `TimeoutNavigationHelper.buildGameNavigationParams()` to preserve all game context
-   - Preserves `from` parameter for target page's own back navigation
-   - Maintains game state across navigation (quarter, game_id, lineup, etc.)
-
-**Benefits:**
-- **Explicit:** Source page explicitly sets where to go back to
-- **Dynamic:** Works from any entry point (playbooks, game-plan, command center, etc.)
-- **Future-Proof:** New entry points just need to set `backTo` parameter
-- **Backward Compatible:** Defaults to `playbooks.html` if `backTo` is missing
-
-**Example Usage:**
-```javascript
-// From playbooks.js (current)
-params.set('backTo', 'playbooks.html');
-
-// Future: from game-plan.html
-params.set('backTo', 'game-plan.html');
-
-// Future: from command center
-params.set('backTo', 'franchise-command-center.html');
-```
-
-**Key Files:**
-- `FrontEnd/static/play-details.html` - `goBack()` function (lines 402-459)
-- `FrontEnd/static/playbooks.js` - `navigateToPlayDetails()` function (sets `backTo` parameter)
-
-### FCP/HCT Skeleton Builders ✅ **IMPLEMENTED** (January 2025)
-
-**Purpose:**
-Frontend builder tools for creating and managing Full Court Press (FCP) and Half Court Trap (HCT) animation skeletons. These builders allow administrators to create animation sequences that are used during FCP/HCT gameplay scenarios.
-
-**Location:**
-- **FCP Builder:** `FrontEnd/static/fcp-skeletons.html`
-- **HCT Builder:** `FrontEnd/static/hct-skeletons.html`
-- **Access:** Available via Netlify at `/fcp-skeletons.html` and `/hct-skeletons.html`
-
-**Data Storage:**
-- **Database:** `gob-staging` (for safe testing before production migration)
-- **Collections:** `fcp_skeletons`, `hct_skeletons`
-- **Safety:** All new skeletons save to staging first, then can be manually migrated to `gob` production database
-
-**Skeleton Variants:**
-- **Base Variant:** Used for non-shot outcomes (HCO, fouls, turnovers, steals)
-  - Backend uses stopper system to truncate and append final action
-  - Previously called "HCO" variant (renamed for clarity)
-- **Shot Variant:** Used when FCP/HCT results in a shot attempt
-  - Full skeleton animation plays through to shot action
-
-**Builder Features:**
-
-1. **Variant Management:**
-   - Two variant buttons: "Base" and "Shot"
-   - Each variant can have multiple versions (v1, v2, v3, etc.)
-   - Engine randomly selects from available versions for each variant
-   - Legacy variants removed (o_foul, d_foul, dead_ball_turnover, steal) - now handled by stopper system
-
-2. **Skeleton Creation:**
-   - Step-by-step animation builder
-   - Court visualization with player positioning
-   - Ball handler and action assignment per step
-   - Animation preview functionality
-   - Save/load existing skeletons
-
-3. **Version Support:**
-   - Each variant supports multiple versions
-   - Structure: `variants.base.versions[v1, v2, ...]` or `variants.shot.versions[v1, v2, ...]`
-   - Backend randomly selects from available versions during gameplay
-
-4. **Backward Compatibility:**
-   - Load function maps old variant names (hco, o_foul, d_foul, etc.) to `base` variant
-   - Ensures old skeletons continue to work after refactor
-
-**API Endpoints:**
-- `GET /fcp-skeletons.html` - Serves FCP builder page
-- `GET /hct-skeletons.html` - Serves HCT builder page
-- `GET /api/fcp-skeletons` - Fetch all FCP skeletons from staging
-- `POST /api/fcp-skeletons` - Create/update FCP skeleton in staging
-- `GET /api/hct-skeletons` - Fetch all HCT skeletons from staging
-- `POST /api/hct-skeletons` - Create/update HCT skeleton in staging
-
-**Integration with Gameplay:**
-- Backend retrieves skeletons via `get_fcp_skeleton()` and `get_hct_skeleton()` in `phase_resolution.py`
-- Skeleton selection based on result type (base for non-shot, shot for shot attempts)
-- Stopper system truncates base skeletons at strategic points for fouls/turnovers/steals
-- See `FCP_HCT_System.md` for full resolution logic
-
-**Key Files:**
-- `FrontEnd/static/fcp-skeletons.html` - FCP skeleton builder UI and logic
-- `FrontEnd/static/hct-skeletons.html` - HCT skeleton builder UI and logic
-- `BackEnd/api/skeleton_routes.py` - API routes for FCP/HCT skeleton management
-- `BackEnd/engine/phase_resolution.py` - Skeleton retrieval and stopper system logic
-
+- `docs/docs_1_systems/06_GMO_Supporting_Systems/Play_Builder_System.md`
+- `docs/docs_1_systems/06_GMO_Supporting_Systems/Playbooks_Page.md`

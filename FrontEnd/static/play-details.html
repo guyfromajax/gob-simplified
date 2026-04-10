@@ -354,9 +354,71 @@
     let currentBallHandler = null;
     let isShotAnimating = false; // Track if shot animation is in progress
 
+    function getAssignmentSpot(posAction) {
+      if (!posAction) return null;
+      return posAction.spot || posAction.location || null;
+    }
+
+    function getSetPlayAliasMap(targetShooter) {
+      if (!targetShooter || !POSITIONS.includes(targetShooter)) {
+        return null;
+      }
+
+      const remainingPositions = POSITIONS.filter(pos => pos !== targetShooter);
+      return {
+        target_shooter: targetShooter,
+        pos1: remainingPositions[0],
+        pos2: remainingPositions[1],
+        pos3: remainingPositions[2],
+        pos4: remainingPositions[3]
+      };
+    }
+
+    function normalizeSkeletonSteps(rawSteps, playData, playType) {
+      if (!Array.isArray(rawSteps)) {
+        return [];
+      }
+
+      if (playType !== 'Set Play') {
+        return rawSteps;
+      }
+
+      const aliasMap = getSetPlayAliasMap(playData?.target_shooter);
+      if (!aliasMap) {
+        return rawSteps;
+      }
+
+      return rawSteps.map(step => {
+        if (!step || !step.pos_actions) {
+          return step;
+        }
+
+        const remappedPosActions = {};
+        let hasAliasKeys = false;
+
+        Object.entries(step.pos_actions).forEach(([key, value]) => {
+          const mappedKey = aliasMap[key] || key;
+          if (mappedKey !== key) {
+            hasAliasKeys = true;
+          }
+          remappedPosActions[mappedKey] = value;
+        });
+
+        if (!hasAliasKeys) {
+          return step;
+        }
+
+        return {
+          ...step,
+          pos_actions: remappedPosActions
+        };
+      });
+    }
+
     // Get play name and team info from URL
     const urlParams = new URLSearchParams(window.location.search);
     const playName = urlParams.get('play_name');
+    const playId = urlParams.get('play_id');
     const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
     
     // Team name to court image mapping (normalize team name)
@@ -518,14 +580,16 @@
     
     // Load play data from API
     async function loadPlayData() {
-      if (!playName) {
+      if (!playName && !playId) {
         document.getElementById('play-name').textContent = 'Play Not Found';
         return;
       }
 
       try {
-        const encodedPlayName = encodeURIComponent(playName);
-        const response = await fetch(API_CONFIG.buildUrl(`/api/play/${encodedPlayName}`));
+        const playUrl = playId
+          ? API_CONFIG.buildUrl(`/api/plays/${encodeURIComponent(playId)}`)
+          : API_CONFIG.buildUrl(`/api/play/${encodeURIComponent(playName)}`);
+        const response = await fetch(playUrl);
         
         if (!response.ok) {
           throw new Error(`Failed to load play: ${response.status}`);
@@ -554,18 +618,18 @@
               const firstVersion = baseLoop.versions.find(v => v.steps && v.steps.length > 0);
               const selectedVersion = v0Version || firstVersion;
               if (selectedVersion && selectedVersion.steps) {
-                playState.skeleton = { steps: selectedVersion.steps };
+                playState.skeleton = { steps: normalizeSkeletonSteps(selectedVersion.steps, playData, playType) };
               } else {
                 console.error('Motion play base_loop has versions but none have steps');
               }
             } 
             // Check for old format: direct steps array
             else if (baseLoop.steps && Array.isArray(baseLoop.steps)) {
-              playState.skeleton = baseLoop;
+              playState.skeleton = { ...baseLoop, steps: normalizeSkeletonSteps(baseLoop.steps, playData, playType) };
             } 
             // Check if base_loop is an array of steps directly (unlikely but possible)
             else if (Array.isArray(baseLoop)) {
-              playState.skeleton = { steps: baseLoop };
+              playState.skeleton = { steps: normalizeSkeletonSteps(baseLoop, playData, playType) };
             } 
             else {
               console.error('Motion play base_loop structure not recognized:', baseLoop);
@@ -582,17 +646,17 @@
               // Find v0 version
               const v0Version = successfulVariant.versions.find(v => v.version === 'v0');
               if (v0Version && v0Version.steps) {
-                playState.skeleton = { steps: v0Version.steps };
+                playState.skeleton = { steps: normalizeSkeletonSteps(v0Version.steps, playData, playType) };
               } else {
                 // Fallback to first version if v0 not found
                 const firstVersion = successfulVariant.versions.find(v => v.steps && v.steps.length > 0);
                 if (firstVersion) {
-                  playState.skeleton = { steps: firstVersion.steps };
+                  playState.skeleton = { steps: normalizeSkeletonSteps(firstVersion.steps, playData, playType) };
                 }
               }
             } else if (successfulVariant.steps) {
               // Old format: direct steps array
-              playState.skeleton = { steps: successfulVariant.steps };
+              playState.skeleton = { steps: normalizeSkeletonSteps(successfulVariant.steps, playData, playType) };
             }
           }
         }
@@ -719,8 +783,10 @@
       // Process step data
       POSITIONS.forEach(pos => {
         if (step.pos_actions && step.pos_actions[pos]) {
+          const assignmentSpot = getAssignmentSpot(step.pos_actions[pos]);
           currentStepAssignments[pos] = {
-            location: step.pos_actions[pos].location,
+            location: assignmentSpot,
+            spot: assignmentSpot,
             action: step.pos_actions[pos].action
           };
 
@@ -1035,4 +1101,3 @@
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
 </body>
 </html>
-

@@ -28,8 +28,8 @@ All logic below applies only when **quarter ≥ 4**. Evaluate the time-band tabl
 
 **Time Remaining 0:01 – 0:30**
 - If Score Delta ≥ 1 → Slow It Down = True
-- Else if Score Delta < -1 and > -9 → Quick Shot = True  
-  - If Score Delta < -2: Outside Shot Chance = 100%  
+- Else if Score Delta < -3 and > -9 → Quick Shot = True  
+  - If Score Delta < -3: Outside Shot Chance = 100%  
   - Else: run normal playcall logic
 - Force Foul: True if 0 < Score Delta < 9, else False
 
@@ -123,5 +123,6 @@ At **turn end** (or at specific animation moments), the system announces shot re
 **Q4 (and OT):**
 - If Slow It Down is true and Force Foul is false: produce a **FINAL_HOLD** turn. The offense and defense get into Starting Alignments, and the offense holds the ball until the clock reaches 0 (`time_elapsed = time_remaining`). No shot is attempted. Quarter (or game) ends after this turn.
 - If Slow It Down is true and Force Foul is true: execute the Force Foul (existing logic); no special Final Turn alignment for that possession.
-- If Quick Shot: treat as a normal quick shot turn (no Final Turn alignment or play execution).
+- If Quick Shot: treat as a normal quick shot turn (no Final Turn alignment or play execution). In the last 30 seconds, this applies only when the offense is trailing by **more than 3**.
 - If not Slow It Down, and not Quick Shot, and not Force Foul: treat as the same final shot logic as above (trailing or tied; a team leading should never enter this instance).
+  - Special case: if the offense is trailing by **exactly 3** in a Final Shot situation, the shot type is forced to **Outside**. The shooter does not use the Attack / drive-to-basket branch.

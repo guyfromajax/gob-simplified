@@ -1452,7 +1452,7 @@ function wireLineupNavButtons() {
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', async () => {
       playSound('positive-beep.wav');
-      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbooks.html');
+      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbook-report.html');
       const currentUrlParams = new URLSearchParams(window.location.search);
       let currentGameId = currentUrlParams.get('game_id');
       const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
@@ -1518,8 +1518,9 @@ function wireLineupNavButtons() {
         myTeamSide: myTeamSide
       });
       params.set('from', 'lineup');
+      params.set('return_url', getCurrentRelativeUrl());
       if (DEBUG) params.set('debug', '1');
-      window.location.href = `/playbooks.html?${params.toString()}`;
+      window.location.href = `/playbook-report.html?${params.toString()}`;
     });
   }
   const boxBtn = document.getElementById('box-score-button');

@@ -451,13 +451,15 @@ This system documents data persistence across all three game modes when users ar
 **Complete Playbook Settings Object:**
 ```javascript
 {
-  "motion": { "Play Name": percentage (0-100), ... },
-  "set_play_inside": { "Play Name": percentage (0-100), ... },
-  "set_play_attack": { "Play Name": percentage (0-100), ... },
-  "set_play_outside": { "Play Name": percentage (0-100), ... },
+  "motion": { "play_id": percentage (0-100), ... },
+  "set_play_inside": { "play_id": percentage (0-100), ... },
+  "set_play_attack": { "play_id": percentage (0-100), ... },
+  "set_play_outside": { "play_id": percentage (0-100), ... },
   "zone_defense": { "Defense Name": percentage (0-100), ... },
   "man_defense": { "Defense Name": percentage (0-100), ... },
-  "slot_assignments": { "playId": slotNumber, ... },
+  "slot_assignments": {
+    "1": { "section": "motion", "playId": "play_id", "playName": "display name" }
+  },
   "motion_dropdowns": { "playId": dropdownValue, ... },
   "position_filters": { "standard": [...], "PG": [...], ... },
   "even_distribution_all": boolean
@@ -469,6 +471,7 @@ This system documents data persistence across all three game modes when users ar
 - Plays data structure must be preserved through training to prevent empty containers
 - Defense plays come from hardcoded `DEFENSE_PLAY_DATA` (not from database), so they always appear
 - Offense plays come from database `plays` object, so structure must be maintained
+- Offensive persistence is now `play_id`-first; play names are display values only
 
 ---
 
@@ -520,13 +523,13 @@ This system documents data persistence across all three game modes when users ar
 - This ensures ALL plays from database are matched, not just the first N that were initialized in state
 
 **Matching Strategy:**
-- **Database/API Storage:** Uses **play names** as keys (`{"Base Post Play": 50, "SG Pass & Cut": 50}`)
-- **Frontend State:** Uses **generated IDs** like `set-inside-1`, `set-inside-2` based on array index
+- **Database/API Storage:** Offensive maps now use **`play_id`** keys
+- **Frontend State:** Tracks `playId` plus display name
 - **Matching Process:**
-  1. Iterate through ALL plays in `playData` (not just state sections)
-  2. For each play, find or create state entry by `playId`
-  3. Look up saved percentage using `play.name` as key
-  4. Apply percentage to state entry
+  1. Iterate through ALL plays in `playData`
+  2. Find or create the state entry by `playId`
+  3. Look up saved percentage using `play_id`
+  4. Fall back to display name only for legacy compatibility
 
 **Files Changed:**
 - `FrontEnd/static/playbooks.js` (lines 505-622)
@@ -534,9 +537,9 @@ This system documents data persistence across all three game modes when users ar
 **Related Documentation:**
 - `docs/To Do/play_percentage_persistence.md` - Complete analysis and fix documentation
 
-**Future Enhancement:**
-- Consider using `play_id` (database ID) instead of play names for more robust matching
-- This would prevent issues if play names change in database
+**Current State:**
+- That future enhancement is now implemented for offensive playbook persistence
+- `play_name` remains only as a compatibility fallback in some older payloads
 
 ---
 

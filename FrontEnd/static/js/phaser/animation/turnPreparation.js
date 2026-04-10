@@ -14,6 +14,13 @@ import { updatePlaycallCenter } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { syncSpriteAttributesFromPlayerEnergy } from "../utils/syncPlayerSpriteAttributes.js";
 import { isBonusFreeThrowFoulTurn } from "../utils/foulAnnouncementClassifier.js";
+import {
+  getBallController,
+  getCurrentOwner,
+  attachBallToPlayer,
+  setCurrentOwner,
+  clearPendingOwner,
+} from "./BallControllerAdapter.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
 /**
@@ -42,6 +49,50 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   
   // Set turn.index (required for context)
   turn.index = turnIndex;
+
+  // Steal ownership continuity probe (next turn start).
+  // If a previous STEAL turn saved a checkpoint, compare owner continuity before this turn runs.
+  if (scene?.__stealOwnershipCheckpoint) {
+    let controllerOwnerId = null;
+    let controllerOwnerPlayerId = null;
+    let controllerAttached = null;
+    let controllerInFlight = null;
+    try {
+      const ballController = getBallController();
+      controllerOwnerId = ballController?.getCurrentOwnerId?.() ?? null;
+      controllerOwnerPlayerId = ballController?.currentOwner?.playerId ?? null;
+      controllerAttached = ballController?.isAttached ?? null;
+      controllerInFlight = ballController?.isInFlight ?? null;
+    } catch (_) {
+      // Best-effort debug probe; never affect flow.
+    }
+    const ownerByAdapter = getCurrentOwner(scene);
+    const checkpoint = scene.__stealOwnershipCheckpoint;
+    console.log("[STEAL OWNERSHIP][NEXT TURN START]", {
+      previousStealTurnId: checkpoint.turnId ?? null,
+      previousStealTurnIndex: checkpoint.turnIndex ?? null,
+      expectedStealerId: checkpoint.expectedStealerId ?? null,
+      ownerAtStealTurnEnd: checkpoint.ownerAtStealTurnEnd ?? null,
+      ownerAtNextTurnStart: ownerByAdapter ?? null,
+      ownerAtNextTurnStartController: controllerOwnerId ?? controllerOwnerPlayerId ?? null,
+      continuityOk:
+        checkpoint.expectedStealerId != null
+          ? String(ownerByAdapter ?? "") === String(checkpoint.expectedStealerId)
+          : null,
+      currentTurnId: turn?.turn_count ?? turn?.id ?? null,
+      currentTurnIndex: turnIndex ?? null,
+      currentResultType: turn?.result_type ?? null,
+      currentPlayType: turn?.current_turn ?? turn?.play_type ?? null,
+      currentNextPlayType: turn?.next_play_type ?? null,
+      currentOffenseTeamId: turn?.offense_team_id ?? null,
+      currentPossessionTeamId: turn?.possession_team_id ?? null,
+      sceneOffenseTeamId: scene?.offenseTeamId ?? null,
+      passInFlight: scene?.passInFlight ?? null,
+      ballControllerAttached: controllerAttached,
+      ballControllerInFlight: controllerInFlight,
+    });
+    scene.__stealOwnershipCheckpoint = null;
+  }
 
   // AG-based movement: align sprite.attributes.AG with this turn’s NG (engine rescaling) before tweens run
   if (turn.player_energy && scene.playerSprites) {
@@ -303,5 +354,68 @@ export async function finalizeTurnAfterAnimation({
   // Update debug score if function provided
   if (updateDebugScore && turnIndex !== undefined) {
     updateDebugScore(turn, { turnIndex, possessionId });
+  }
+
+  // Steal ownership continuity probe (turn end).
+  // Save authoritative owner snapshot at the STEAL boundary for the next turn-start comparison.
+  if (turn?.result_type === "STEAL") {
+    let controllerOwnerId = null;
+    let controllerOwnerPlayerId = null;
+    let controllerAttached = null;
+    let controllerInFlight = null;
+    try {
+      const ballController = getBallController();
+      controllerOwnerId = ballController?.getCurrentOwnerId?.() ?? null;
+      controllerOwnerPlayerId = ballController?.currentOwner?.playerId ?? null;
+      controllerAttached = ballController?.isAttached ?? null;
+      controllerInFlight = ballController?.isInFlight ?? null;
+    } catch (_) {
+      // Best-effort debug probe; never affect flow.
+    }
+    const expectedStealerId =
+      turn?.stealerId ??
+      turn?.stealer_id ??
+      turn?.defender_id ??
+      turn?.events?.find?.((e) => String(e?.event_type || "").toUpperCase() === "STEAL")?.stealer_id ??
+      turn?.events?.find?.((e) => String(e?.event_type || "").toUpperCase() === "STEAL")?.stealerId ??
+      null;
+    let ownerByAdapter = getCurrentOwner(scene);
+    // Steal boundary guard: if ownership drifted off the stealer by turn end,
+    // force authoritative ownership now to prevent next-turn teleport.
+    if (expectedStealerId != null && String(ownerByAdapter ?? "") !== String(expectedStealerId)) {
+      const stealerSprite = scene?.playerSprites?.[String(expectedStealerId)] || null;
+      if (stealerSprite && scene?.ballSprite) {
+        attachBallToPlayer(scene, scene.ballSprite, stealerSprite, {
+          reason: "steal_turn_end_guard",
+        });
+        setCurrentOwner(scene, String(expectedStealerId));
+        clearPendingOwner(scene);
+        scene.passInFlight = false;
+        try {
+          const { setBallHolderId } = await import('./ballAnimationSimple.js');
+          setBallHolderId(scene, String(expectedStealerId));
+        } catch (_) {
+          // best-effort state mirror
+        }
+        ownerByAdapter = getCurrentOwner(scene);
+      }
+    }
+    const snapshot = {
+      turnId: turn?.turn_count ?? turn?.id ?? null,
+      turnIndex: turnIndex ?? turn?.index ?? null,
+      expectedStealerId: expectedStealerId != null ? String(expectedStealerId) : null,
+      ownerAtStealTurnEnd: ownerByAdapter ?? null,
+      ownerAtStealTurnEndController: controllerOwnerId ?? controllerOwnerPlayerId ?? null,
+      resultType: turn?.result_type ?? null,
+      nextPlayType: turn?.next_play_type ?? null,
+      offenseTeamId: turn?.offense_team_id ?? null,
+      possessionTeamId: turn?.possession_team_id ?? null,
+      sceneOffenseTeamId: scene?.offenseTeamId ?? null,
+      passInFlight: scene?.passInFlight ?? null,
+      ballControllerAttached: controllerAttached,
+      ballControllerInFlight: controllerInFlight,
+    };
+    scene.__stealOwnershipCheckpoint = snapshot;
+    console.log("[STEAL OWNERSHIP][TURN END]", snapshot);
   }
 }

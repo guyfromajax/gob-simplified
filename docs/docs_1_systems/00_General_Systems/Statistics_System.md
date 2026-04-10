@@ -34,6 +34,10 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 **Status:** ✅ Fully implemented for all game situations  
 **Scope:** All player stats, team stats, and scouting data
 
+**Current Play Identity Note:**
+- offensive play statistics and training-report deltas now treat `play_id` as the canonical play identity when matching persisted offensive play data
+- play `name` remains display text in reports and UI
+
 ### Stat Initialization
 
 **Player-Level Stats:**

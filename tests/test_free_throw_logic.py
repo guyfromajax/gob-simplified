@@ -174,3 +174,57 @@ def test_missed_final_ft_dreb_no_fast_break_while_flag_disabled(monkeypatch):
     assert result.get("rebound_type") == "DREB"
     assert result.get("next_play_type") == "HCO"
     assert game.game_state["offensive_state"] == "HCO"
+
+
+def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):
+    game, shooter = _setup_game(one_and_one=False)
+    shooter.attributes["FT"] = 1
+    shooter.attributes["CH"] = 1
+    shooter.attributes["MO"] = 0
+
+    offense_pg = game.offense_team.lineup["PG"]
+    defense_c = game.defense_team.lineup["C"]
+    offense_pg_id = getattr(offense_pg, "player_id", None)
+    defense_c_id = getattr(defense_c, "player_id", None)
+    assert offense_pg_id and defense_c_id
+
+    # Ensure starting coords are different from animation endpoints.
+    offense_pg.coords = {"x": 15, "y": 10}
+    defense_c.coords = {"x": 90, "y": 40}
+    expected_pg_end = {"x": 74, "y": 25}
+    expected_c_end = {"x": 89, "y": 19}
+
+    ft_anims = [
+        {
+            "playerId": offense_pg_id,
+            "end": expected_pg_end,
+            "movement": [],
+        },
+        {
+            "playerId": defense_c_id,
+            "end": expected_c_end,
+            "movement": [],
+        },
+        {
+            "playerId": "ball",
+            "end": {"x": 91, "y": 25},
+            "movement": [],
+        },
+    ]
+
+    def fake_determine_rebounder(g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+        # Critical assertion: coords are already synced from FT animation endpoints.
+        assert offense_pg.coords == expected_pg_end
+        assert defense_c.coords == expected_c_end
+        return defense_c, game.defense_team, "DREB"
+
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.random.randint",
+        lambda a, b: 100 if (a, b) == (1, 100) else 1,
+    )
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.determine_rebounder", fake_determine_rebounder)
+    monkeypatch.setattr(Animator, "capture_free_throw_animation", lambda *args, **kwargs: ft_anims)
+
+    result = resolve_free_throw_logic(game)
+    assert result.get("rebound_type") == "DREB"

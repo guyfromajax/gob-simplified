@@ -328,22 +328,12 @@ async function loadTrainingReport() {
       // If neither round nor week provided, backend will determine from training_status
     }
     
-    console.log('🔍 [TRAINING REPORT] Loading with params:', Object.fromEntries(params.entries()));
-    
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/training-report')}?${params.toString()}`);
     if (!response.ok) {
       throw new Error(`Failed to load training report: ${response.statusText}`);
     }
     
     reportData = await response.json();
-    console.log('🔍 [TRAINING REPORT] Loaded data:', reportData);
-    console.log('🔍 [TRAINING REPORT] Players count:', reportData.players?.length || 0);
-    console.log('🔍 [TRAINING REPORT] Player changes:', reportData.player_changes);
-    console.log('🔍 [TRAINING REPORT] Has plays_data:', !!reportData.plays_data, 'Keys:', reportData.plays_data ? Object.keys(reportData.plays_data) : 'none');
-    console.log('🔍 [TRAINING REPORT] Has scouting_data:', !!reportData.scouting_data, 'Keys:', reportData.scouting_data ? Object.keys(reportData.scouting_data) : 'none');
-    console.log('🔍 [TRAINING REPORT] Has plays_effectiveness_changes:', !!reportData.plays_effectiveness_changes, reportData.plays_effectiveness_changes);
-    console.log('🔍 [TRAINING REPORT] Has defenses_effectiveness_changes:', !!reportData.defenses_effectiveness_changes, reportData.defenses_effectiveness_changes);
-    
     renderPage();
   } catch (error) {
     console.error('Error loading training report:', error);
@@ -985,22 +975,11 @@ function renderPlaybookSummary() {
   
   const plays_data = reportData.plays_data || {};
   const scouting_data = reportData.scouting_data || {};
-  const plays_changes = reportData.plays_effectiveness_changes || {};
+  const plays_changes = buildTrainingReportPlayChangesLookup(
+    plays_data,
+    reportData.plays_effectiveness_changes || {}
+  );
   const defenses_changes = reportData.defenses_effectiveness_changes || {};
-  
-  console.log('📚 [PLAYBOOK SUMMARY] Rendering playbook summary');
-  console.log('📚 [PLAYBOOK SUMMARY] plays_data:', plays_data);
-  console.log('📚 [PLAYBOOK SUMMARY] scouting_data:', scouting_data);
-  console.log('📚 [PLAYBOOK SUMMARY] plays_changes:', plays_changes);
-  console.log('📚 [PLAYBOOK SUMMARY] defenses_changes:', defenses_changes);
-  
-  // Debug logging
-  console.log('📊 [PLAYBOOK SUMMARY] reportData keys:', Object.keys(reportData));
-  console.log('📊 [PLAYBOOK SUMMARY] plays_data:', plays_data);
-  console.log('📊 [PLAYBOOK SUMMARY] scouting_data:', scouting_data);
-  console.log('📊 [PLAYBOOK SUMMARY] plays_changes:', plays_changes);
-  console.log('📊 [PLAYBOOK SUMMARY] defenses_changes:', defenses_changes);
-  console.log('📊 [PLAYBOOK SUMMARY] Number of plays:', Object.keys(plays_data).length);
   
   // Organize plays by type
   const motion_plays = [];
@@ -1010,9 +989,9 @@ function renderPlaybookSummary() {
     if (typeof play_data === 'object' && play_data !== null) {
       const play_type = play_data.play_type || '';
       if (play_type === 'motion') {
-        motion_plays.push({ name: play_name, ...play_data });
+        motion_plays.push(buildTrainingReportPlayEntry(play_name, play_data));
       } else if (play_type === 'set_play') {
-        set_plays.push({ name: play_name, ...play_data });
+        set_plays.push(buildTrainingReportPlayEntry(play_name, play_data));
       }
     }
   }
@@ -1052,8 +1031,13 @@ function renderPlaybookSummary() {
   // Motion Plays
   if (motion_plays.length > 0) {
     motion_plays.forEach(play => {
+      const resolvedChange = getTrainingReportPlayChange(plays_changes, play);
       // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(play.name, play, plays_changes[play.name] || 0);
+      const playRow = createPlayRow(
+        play.display_name || play.name,
+        play,
+        resolvedChange
+      );
       offenseSection.appendChild(playRow);
     });
   }
@@ -1061,8 +1045,13 @@ function renderPlaybookSummary() {
   // Set Plays
   if (set_plays.length > 0) {
     set_plays.forEach(play => {
+      const resolvedChange = getTrainingReportPlayChange(plays_changes, play);
       // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(play.name, play, plays_changes[play.name] || 0);
+      const playRow = createPlayRow(
+        play.display_name || play.name,
+        play,
+        resolvedChange
+      );
       offenseSection.appendChild(playRow);
     });
   }
@@ -1103,6 +1092,157 @@ function renderPlaybookSummary() {
   container.appendChild(defenseSection);
 }
 
+function looksLikeTrainingReportObjectId(value) {
+  return typeof value === 'string' && /^[a-f0-9]{24}$/i.test(value.trim());
+}
+
+function normalizeTrainingReportPlayId(value) {
+  if (value == null) return null;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const objectIdMatch = trimmed.match(/^ObjectId\((['"]?)([a-f0-9]{24})\1\)$/i);
+    if (objectIdMatch) {
+      return objectIdMatch[2];
+    }
+
+    return trimmed;
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.$oid === 'string' && value.$oid.trim()) {
+      return value.$oid.trim();
+    }
+    if (typeof value.play_id === 'string' && value.play_id.trim()) {
+      return value.play_id.trim();
+    }
+    if (typeof value.playId === 'string' && value.playId.trim()) {
+      return value.playId.trim();
+    }
+    if (typeof value._id === 'string' && value._id.trim()) {
+      return value._id.trim();
+    }
+    if (typeof value.id === 'string' && value.id.trim()) {
+      return value.id.trim();
+    }
+  }
+
+  const coerced = String(value).trim();
+  return coerced && coerced !== '[object Object]' ? coerced : null;
+}
+
+function normalizeTrainingReportChangeValue(value) {
+  if (value == null) return 0;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (typeof value === 'object') {
+    const numericKeys = ['$numberInt', '$numberLong', '$numberDouble', '$numberDecimal'];
+    for (const key of numericKeys) {
+      if (typeof value[key] === 'string') {
+        const parsed = Number(value[key]);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  const fallback = Number(value);
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
+function buildTrainingReportPlayEntry(playKey, playData) {
+  const resolvedName = playData.name || playKey;
+  const resolvedPlayId =
+    normalizeTrainingReportPlayId(playData.play_id) ||
+    normalizeTrainingReportPlayId(playData.playId) ||
+    normalizeTrainingReportPlayId(playData._id) ||
+    normalizeTrainingReportPlayId(playData.id) ||
+    (looksLikeTrainingReportObjectId(playKey) ? playKey : null);
+
+  return {
+    ...playData,
+    name: resolvedName,
+    display_name: resolvedName,
+    play_key: playKey,
+    play_id: resolvedPlayId
+  };
+}
+
+function buildTrainingReportPlayChangesLookup(playsData, rawChanges) {
+  const lookup = {};
+
+  if (rawChanges && typeof rawChanges === 'object') {
+    Object.entries(rawChanges).forEach(([rawKey, rawValue]) => {
+      lookup[rawKey] = normalizeTrainingReportChangeValue(rawValue);
+
+      const normalizedKey = normalizeTrainingReportPlayId(rawKey);
+      if (normalizedKey && !(normalizedKey in lookup)) {
+        lookup[normalizedKey] = lookup[rawKey];
+      }
+    });
+  }
+
+  Object.entries(playsData || {}).forEach(([playKey, playData]) => {
+    if (!playData || typeof playData !== 'object') return;
+
+    const playEntry = buildTrainingReportPlayEntry(playKey, playData);
+    const candidateKeys = [
+      playEntry.play_id,
+      playEntry.name,
+      playEntry.display_name,
+      playEntry.play_key
+    ].filter(Boolean);
+
+    let resolvedChange;
+    for (const key of candidateKeys) {
+      if (Object.prototype.hasOwnProperty.call(lookup, key)) {
+        resolvedChange = lookup[key];
+        break;
+      }
+    }
+
+    if (resolvedChange == null) return;
+
+    candidateKeys.forEach((key) => {
+      lookup[key] = resolvedChange;
+    });
+  });
+
+  return lookup;
+}
+
+function getTrainingReportPlayChange(playsChanges, play) {
+  if (!playsChanges || !play) return 0;
+
+  const candidates = [
+    normalizeTrainingReportPlayId(play.play_id),
+    normalizeTrainingReportPlayId(play.playId),
+    normalizeTrainingReportPlayId(play._id),
+    normalizeTrainingReportPlayId(play.id),
+    play.name,
+    play.play_key
+  ].filter(Boolean);
+
+  for (const key of candidates) {
+    if (Object.prototype.hasOwnProperty.call(playsChanges, key)) {
+      return normalizeTrainingReportChangeValue(playsChanges[key]);
+    }
+  }
+
+  return 0;
+}
+
 function createPlayRow(playName, playData, change) {
   // playData can be an object with effectiveness, momentum, cloaking, or just a number (effectiveness)
   // Handle both formats for backward compatibility
@@ -1112,6 +1252,12 @@ function createPlayRow(playName, playData, change) {
   
   const row = document.createElement('div');
   row.className = 'playbook-row';
+  if (playData && typeof playData === 'object') {
+    const normalizedPlayId = normalizeTrainingReportPlayId(playData.play_id || playData.playId || playData._id || playData.id);
+    if (normalizedPlayId) {
+      row.dataset.playId = normalizedPlayId;
+    }
+  }
   
   // Play name
   const nameDiv = document.createElement('div');
@@ -1211,12 +1357,41 @@ function renderTrainingNotes() {
   // Structured sections: { title, body } (Training_Notes_System.md)
   const first = training_notes[0];
   if (first && typeof first === 'object' && first.title != null) {
+    const sectionMap = new Map();
     training_notes.forEach(function (section) {
+      sectionMap.set(section.title || '', section);
+    });
+
+    const orderedTitles = [
+      'Training Camp MVP',
+      'Training Camp Co-MVPs',
+      'Practice Player Of The Week',
+      'Practice Players Of The Week',
+      'Biggest Concern',
+      'Biggest Concerns',
+      'Biggest Regression',
+      'Most Positive Locker Room Influence',
+      'Strong Cumulative Increase',
+      'Concerning Progression',
+      'Concerning Regression',
+      'Strongest Offensive Plays',
+      'Strongest Defensive Set',
+      'Fast Break Readiness',
+      'Press/Trap Readiness',
+      'Player Energy Levels'
+    ];
+
+    orderedTitles.forEach(function (title) {
+      const section = sectionMap.get(title);
+      if (!section) return;
       const wrap = document.createElement('div');
       wrap.className = 'training-note-section';
+      if (section.title === 'Player Energy Levels') {
+        wrap.classList.add('training-note-section-wide');
+      }
       const h3 = document.createElement('h3');
       h3.className = 'training-note-section-title';
-      h3.textContent = section.title || '';
+      h3.textContent = section.title === 'Player Energy Levels' ? 'Miscellaneous Notes' : (section.title || '');
       const body = document.createElement('div');
       body.className = 'training-note-section-body';
       const text = section.body != null ? String(section.body) : '';

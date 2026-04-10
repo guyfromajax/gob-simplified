@@ -5,6 +5,7 @@
  */
 
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
+import { gridToPixels } from '../utils/gridToPixels.js';
 
 /**
  * Detect if a pass is happening at a specific step
@@ -43,8 +44,11 @@ export function detectPassAtStep(animations, stepIndex) {
         timestamp: step?.timestamp
       });
       
-      // Find receiver (player with action === "receive" at same step)
-      const receiverAnim = animations.find(otherAnim => {
+      const passTimestamp = step?.timestamp;
+
+      // Primary lookup: receiver at same movement index
+      let receiverStepIndex = stepIndex;
+      let receiverAnim = animations.find(otherAnim => {
         if (otherAnim.playerId === anim.playerId) return false; // Skip passer
         const otherMovement = otherAnim.movement;
         if (!otherMovement || stepIndex >= otherMovement.length) return false;
@@ -61,13 +65,41 @@ export function detectPassAtStep(animations, stepIndex) {
         }
         return false;
       });
+
+      // Fallback lookup for sparse movement arrays:
+      // match receiver by the same timestamp as the passer's pass step.
+      if (!receiverAnim && Number.isFinite(Number(passTimestamp))) {
+        for (const otherAnim of animations) {
+          if (otherAnim.playerId === anim.playerId) continue;
+          const otherMovement = Array.isArray(otherAnim.movement) ? otherAnim.movement : [];
+          const fallbackIdx = otherMovement.findIndex((ms) =>
+            ms?.action === "receive" &&
+            Number(ms?.timestamp) === Number(passTimestamp)
+          );
+          if (fallbackIdx >= 0) {
+            receiverAnim = otherAnim;
+            receiverStepIndex = fallbackIdx;
+            debugInfo.receiversFound.push({
+              playerId: otherAnim.playerId?.substring(0, 8) || 'unknown',
+              action: "receive",
+              timestamp: passTimestamp,
+              via: "timestamp_fallback"
+            });
+            break;
+          }
+        }
+      }
       
       if (receiverAnim) {
+        const receiverMovement = Array.isArray(receiverAnim.movement) ? receiverAnim.movement : [];
+        const receiverStep = receiverMovement[receiverStepIndex];
         const result = {
           passerId: anim.playerId,
           receiverId: receiverAnim.playerId,
           stepIndex,
-          timestamp: step.timestamp
+          timestamp: step.timestamp,
+          receiverStepIndex,
+          receiverCoords: receiverStep?.coords || null
         };
         
         // 🔍 DEBUG: Log pass detection for step 16 (3-2 Motion bug)
@@ -187,15 +219,28 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
   }
   
   const { getBallDuration } = await import('./ballTween.js');
+  const receiverGrid = passInfo?.receiverCoords;
+  const receiverTargetPx =
+    receiverGrid &&
+    Number.isFinite(Number(receiverGrid.x)) &&
+    Number.isFinite(Number(receiverGrid.y))
+      ? gridToPixels(
+          Number(receiverGrid.x),
+          Number(receiverGrid.y),
+          scene.game.config.width,
+          scene.game.config.height
+        )
+      : { x: receiverSprite.x, y: receiverSprite.y };
   const passDuration = getBallDuration(
     ballSprite,
-    receiverSprite.x,
-    receiverSprite.y
+    receiverTargetPx.x,
+    receiverTargetPx.y
   );
   
   await runPass(scene, {
     fromId: passInfo.passerId,
     toId: passInfo.receiverId,
+    endCoords: receiverTargetPx,
     duration: passDuration,
     easing: "Sine.easeInOut",
     stepIndex: passInfo.stepIndex // 🔍 DEBUG: Pass stepIndex for debugging

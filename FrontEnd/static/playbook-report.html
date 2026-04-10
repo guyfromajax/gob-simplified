@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playbook Settings - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+  <link rel="stylesheet" href="/playbook-report.css">
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <div class="playbook-report-page">
+    <header class="report-header">
+      <button id="back-btn" class="report-btn report-btn-back" type="button">Back</button>
+
+      <div class="report-title-wrap">
+        <h1>Playbook Settings</h1>
+        <p id="report-subhead">vs Opponent</p>
+      </div>
+
+      <div class="report-actions">
+        <button id="edit-btn" class="report-btn report-btn-primary" type="button">Edit Playbooks</button>
+      </div>
+    </header>
+
+    <main class="report-main">
+      <section class="report-card report-grid-2">
+        <div class="report-column">
+          <div class="report-section-head">
+            <h2>Offense</h2>
+            <p>plays in orange are also in Playcall Center</p>
+          </div>
+          <div class="report-subsection">
+            <h3>Motion</h3>
+            <div id="offense-motion-list" class="report-list"></div>
+          </div>
+          <div class="report-subsection">
+            <h3>Set Plays</h3>
+            <div id="offense-set-list" class="report-list"></div>
+          </div>
+        </div>
+
+        <div class="report-column">
+          <div class="report-section-head">
+            <h2>Defense</h2>
+            <p>plays in orange are also in Playcall Center</p>
+          </div>
+          <div class="report-subsection">
+            <h3>Man</h3>
+            <div id="defense-man-list" class="report-list"></div>
+          </div>
+          <div class="report-subsection">
+            <h3>Zone</h3>
+            <div id="defense-zone-list" class="report-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="report-card report-grid-2">
+        <div class="report-column">
+          <div class="report-section-head">
+            <h2>Fast Breaks</h2>
+          </div>
+          <div id="fast-break-list" class="report-list"></div>
+        </div>
+
+        <div class="report-column">
+          <div class="report-section-head">
+            <h2>Press / Trap</h2>
+          </div>
+          <div class="report-placeholder">Coming Soon</div>
+        </div>
+      </section>
+
+      <section class="report-card report-grid-2">
+        <div class="report-column">
+          <div class="report-section-head">
+            <h2>Offense Playcall Center</h2>
+          </div>
+          <div id="pc-offense-list" class="report-list report-list-ordered"></div>
+        </div>
+
+        <div class="report-column">
+          <div class="report-section-head">
+            <h2>Defense Playcall Center</h2>
+          </div>
+          <div id="pc-defense-list" class="report-list report-list-ordered"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/timeoutNavigationHelper.js"></script>
+  <script src="/playbook-report.js"></script>
+</body>
+</html>

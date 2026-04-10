@@ -9,8 +9,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Choose Game Mode</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <title>Coach's Home Base</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/mode-select.css">
 </head>
 <body>
@@ -20,149 +20,93 @@
   <!-- End Google Tag Manager (noscript) -->
   <!-- Auth bar (logo | Alpha badge | YT, X, account) is injected by authBarInit when not present -->
 
-  <h1 id="page-title">CHOOSE YOUR GAME MODE</h1>
-  
   <!-- Alpha Disclaimer (shown when IS_ALPHA=true). Copy source: docs/Website_Copy/alpha-box-copy.md -->
   <div id="alpha-disclaimer" class="alpha-disclaimer">
     <div class="alpha-disclaimer-title">ALPHA RELEASE</div>
     <p class="alpha-disclaimer-text">
-      <strong>April 6 Update</strong> Added AG-based player speed. Added more Fast Break plays. Added more realistic & detailed fouls. Tighter sync of game clock to animation and game logic. Fixed player clamping. Player and ball location have greater impact on player decision making and situation outcomes.
+      <strong>April 9 Update</strong> Sunset Single Game & Tournament modes (for now anyway -- 99% of you were playing Franchise mode anyway :). Added customizable and more intuitive playbooks. Improved national rankings logic. Fixed a handful of bugs.
     </p>
   </div>
-  <div class="mode-wrapper">
-  <!-- ⏸️ TABLED: Resume Last Game Section - Exact game state restoration -->
-  <!-- TODO: Revisit after Phase 1.3+ and site go-live priorities complete -->
-  <!-- See: docs/To Do/resume_last_game_exact_state.md -->
-  <!--
-  <div id="resume-game-section" class="resume-game-section" style="display: none;">
-    <h2>Continue Your Game</h2>
-    <div class="resume-game-card">
-      <div class="resume-game-info">
-        <div class="resume-teams" id="resume-teams"></div>
-        <div class="resume-score" id="resume-score"></div>
-        <div class="resume-quarter" id="resume-quarter"></div>
-      </div>
-      <button id="resume-game-btn" class="resume-button">Resume Game</button>
-    </div>
-  </div>
-  -->
-  <div class="mode-container">
-    <div class="mode-card">
-      <div class="mode-card-icon">
-        <img src="/images/modes/scrimmage.png" alt="" role="presentation" />
-      </div>
-      <h2 class="mode-card-title">Scrimmage</h2>
-      <p class="mode-card-descriptor">Quick one-off game</p>
-      <button id="scrimmage-btn" class="play-button">PLAY NOW</button>
-    </div>
-    <div class="mode-card mode-card-tournament">
-      <div class="mode-card-icon">
-        <img src="/images/modes/tournament.png" alt="" role="presentation" />
-      </div>
-      <h2 class="mode-card-title">Tournament</h2>
-      <p class="mode-card-descriptor">Run a full bracket</p>
-      <!-- Current instance: team name (bold, primary colors) + round to play next -->
-      <div id="tournament-instance" class="mode-instance" style="display: none;" data-instance-accent="">
-        <div class="instance-copy">
-          <div id="tournament-instance-team" class="instance-team-name"></div>
-          <div id="tournament-instance-round" class="instance-round"></div>
-        </div>
-        <img id="tournament-instance-logo" class="instance-logo" alt="" />
-      </div>
-      <div id="tournament-no-instance" class="mode-no-instance">No Tournament Saved</div>
-      <div class="mode-actions">
-        <button id="tournament-play-now-btn" class="play-now-btn" style="display: none;">Play Now</button>
-        <button id="tournament-new-btn" class="new-mode-btn">New Tournament</button>
-      </div>
-    </div>
-    <div class="mode-card mode-card-franchise">
-      <div class="mode-card-icon">
-        <img src="/images/modes/franchise.png" alt="" role="presentation" />
-      </div>
-      <h2 class="mode-card-title">Franchise</h2>
-      <p class="mode-card-descriptor">Manage your program</p>
-      <!-- Current instance: team name (bold, primary colors) + week/phase -->
-      <div id="franchise-instance" class="mode-instance" style="display: none;" data-instance-accent="">
-        <div class="instance-copy">
-          <div id="franchise-instance-team" class="instance-team-name"></div>
-          <div id="franchise-instance-status" class="instance-round"></div>
-        </div>
-        <img id="franchise-instance-logo" class="instance-logo" alt="" />
-      </div>
-      <div id="franchise-no-instance" class="mode-no-instance">No Franchise Saved</div>
-      <div class="mode-actions">
-        <button id="franchise-play-now-btn" class="play-now-btn" style="display: none;">Play Now</button>
-        <button id="franchise-new-btn" class="new-mode-btn">New Franchise</button>
-      </div>
-    </div>
-  </div>
-  <h2 id="scout-title">SCOUT TEAMS</h2>
-  <div id="team-grid">
-    <button class="team-button" data-team="Bentley-Truman">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/bentley_truman/bentley_truman_banner_primary.jpg" alt="Bentley-Truman">
-      </div>
-      <div class="team-tagline">Top-Shelf Talent</div>
-    </button>
-    <button class="team-button" data-team="Lancaster">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/lancaster/lancaster_banner_primary.jpg" alt="Lancaster">
-      </div>
-      <div class="team-tagline">Muscle & Defense</div>
-    </button>
-    <button class="team-button" data-team="Four Corners">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/four_corners/four_corners_banner_primary.jpg" alt="Four Corners">
-      </div>
-      <div class="team-tagline">Hustle & Attitude</div>
-    </button>
-    <button class="team-button" data-team="Ocean City">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/ocean_city/ocean_city_banner_primary.jpg" alt="Ocean City">
-      </div>
-      <div class="team-tagline">Sharpshooters Galore</div>
-    </button>
-    <button class="team-button" data-team="Morristown">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/morristown/morristown_banner_primary.jpg" alt="Morristown">
-      </div>
-      <div class="team-tagline">Perfectly Balanced</div>
-    </button>
-    <button class="team-button" data-team="Little York">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/little_york/little_york_banner_primary.jpg" alt="Little York">
-      </div>
-      <div class="team-tagline">Wicked Smart</div>
-    </button>
-    <button class="team-button" data-team="Xavien">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/xavien/xavien_banner_primary.jpg" alt="Xavien">
-      </div>
-      <div class="team-tagline">Youthful Exuberance</div>
-    </button>
-    <button class="team-button" data-team="South Lancaster">
-      <div class="team-button-logo-stage">
-        <img src="/images/teams/south_lancaster/south_lancaster_banner_primary.jpg" alt="South Lancaster">
-      </div>
-      <div class="team-tagline">Us vs The World</div>
-    </button>
-  </div>
-  </div>
 
-  <!-- New Tournament confirmation (when user has existing tournament) -->
-  <div id="new-tournament-modal" class="confirm-modal" style="display: none;">
-    <div class="confirm-modal-content">
-      <h2 class="confirm-modal-title">New Tournament</h2>
-      <p class="confirm-modal-text">Creating a new tournament will delete your existing one. This cannot be undone.</p>
-      <label class="confirm-modal-checkbox">
-        <input type="checkbox" id="new-tournament-dont-show-again">
-        <span>Don't show this again</span>
-      </label>
-      <div class="confirm-modal-actions">
-        <button id="new-tournament-modal-cancel" class="confirm-modal-cancel">Cancel</button>
-        <button id="new-tournament-modal-confirm" class="confirm-modal-confirm">New Tournament</button>
+  <div class="mode-wrapper">
+    <section class="franchise-home-section">
+      <div id="franchise-home-slot" class="franchise-home-slot">
+        <div id="franchise-empty-card" class="franchise-home-card franchise-home-card-empty">
+          <h2 class="franchise-empty-title">Start Your Coaching Journey</h2>
+          <p class="franchise-empty-subline">Choose a program and start building something special.</p>
+          <button id="franchise-new-btn" class="franchise-empty-cta">Find Your Program</button>
+        </div>
+
+        <div id="franchise-play-now-btn" class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" style="display: none;">
+          <div class="franchise-card-media">
+            <img id="franchise-card-banner" class="franchise-card-banner" alt="">
+          </div>
+          <div class="franchise-card-content">
+            <div class="franchise-card-grid">
+              <div class="franchise-chip">
+                <div class="franchise-chip-label">Week</div>
+                <div id="franchise-card-week" class="franchise-chip-value">1</div>
+              </div>
+              <div class="franchise-chip">
+                <div class="franchise-chip-label">Record</div>
+                <div id="franchise-card-record" class="franchise-chip-value">0-0</div>
+              </div>
+              <div class="franchise-chip">
+                <div class="franchise-chip-label">Rank</div>
+                <div id="franchise-card-rank" class="franchise-chip-value">-</div>
+              </div>
+              <div class="franchise-chip">
+                <div class="franchise-chip-label">Next Opponent</div>
+                <div id="franchise-card-next" class="franchise-chip-value franchise-chip-value-small">TBD</div>
+              </div>
+            </div>
+            <div class="franchise-card-cta">Enter Franchise →</div>
+          </div>
+        </div>
+        <button id="franchise-delete-link" class="franchise-delete-link" type="button" style="display: none;">
+          Delete existing franchise and start a new one
+        </button>
       </div>
-    </div>
+    </section>
+
+    <section class="scout-section">
+      <h2 id="scout-title">Scout The Programs</h2>
+      <p class="scout-subtitle">Study the rosters before you commit.</p>
+      <div id="team-grid">
+        <button class="team-button" data-team="Bentley-Truman">
+          <img src="/images/teams/bentley_truman/bentley_truman_banner_primary.jpg" alt="Bentley-Truman">
+          <div class="team-tagline">Top-Shelf Talent</div>
+        </button>
+        <button class="team-button" data-team="Lancaster">
+          <img src="/images/teams/lancaster/lancaster_banner_primary.jpg" alt="Lancaster">
+          <div class="team-tagline">Muscle & Defense</div>
+        </button>
+        <button class="team-button" data-team="Four Corners">
+          <img src="/images/teams/four_corners/four_corners_banner_primary.jpg" alt="Four Corners">
+          <div class="team-tagline">Hustle & Attitude</div>
+        </button>
+        <button class="team-button" data-team="Ocean City">
+          <img src="/images/teams/ocean_city/ocean_city_banner_primary.jpg" alt="Ocean City">
+          <div class="team-tagline">Sharpshooters Galore</div>
+        </button>
+        <button class="team-button" data-team="Morristown">
+          <img src="/images/teams/morristown/morristown_banner_primary.jpg" alt="Morristown">
+          <div class="team-tagline">Perfectly Balanced</div>
+        </button>
+        <button class="team-button" data-team="Little York">
+          <img src="/images/teams/little_york/little_york_banner_primary.jpg" alt="Little York">
+          <div class="team-tagline">Wicked Smart</div>
+        </button>
+        <button class="team-button" data-team="Xavien">
+          <img src="/images/teams/xavien/xavien_banner_primary.jpg" alt="Xavien">
+          <div class="team-tagline">Youthful Exuberance</div>
+        </button>
+        <button class="team-button" data-team="South Lancaster">
+          <img src="/images/teams/south_lancaster/south_lancaster_banner_primary.jpg" alt="South Lancaster">
+          <div class="team-tagline">Us vs The World</div>
+        </button>
+      </div>
+    </section>
   </div>
 
   <!-- New Franchise confirmation (when user has existing franchise) -->

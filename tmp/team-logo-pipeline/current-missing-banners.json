@@ -1,0 +1,427 @@
+{
+  "teamCount": 128,
+  "existingBannerCount": 58,
+  "missingBannerCount": 70,
+  "missingTeams": [
+    {
+      "id": 33,
+      "team": "Harding Central",
+      "mascot": "Spartans",
+      "slug": "harding_central"
+    },
+    {
+      "id": 34,
+      "team": "Upper Peninsula",
+      "mascot": "Huskies",
+      "slug": "upper_peninsula"
+    },
+    {
+      "id": 35,
+      "team": "Mynsk",
+      "mascot": "Cougars",
+      "slug": "mynsk"
+    },
+    {
+      "id": 37,
+      "team": "Hardwood Fields",
+      "mascot": "Rams",
+      "slug": "hardwood_fields"
+    },
+    {
+      "id": 39,
+      "team": "North Columbus",
+      "mascot": "Falcons",
+      "slug": "north_columbus"
+    },
+    {
+      "id": 44,
+      "team": "Sacred Heart",
+      "mascot": "Leopards",
+      "slug": "sacred_heart"
+    },
+    {
+      "id": 46,
+      "team": "Dillinger",
+      "mascot": "Wolves",
+      "slug": "dillinger"
+    },
+    {
+      "id": 65,
+      "team": "Hyde Methodist",
+      "mascot": "Raiders",
+      "slug": "hyde_methodist"
+    },
+    {
+      "id": 66,
+      "team": "Wash U Prep",
+      "mascot": "Knights",
+      "slug": "wash_u_prep"
+    },
+    {
+      "id": 67,
+      "team": "Lawrence",
+      "mascot": "Eagles",
+      "slug": "lawrence"
+    },
+    {
+      "id": 68,
+      "team": "Ozark Centre",
+      "mascot": "Devils",
+      "slug": "ozark_centre"
+    },
+    {
+      "id": 69,
+      "team": "Fielding",
+      "mascot": "Force",
+      "slug": "fielding"
+    },
+    {
+      "id": 70,
+      "team": "Iowa Academy",
+      "mascot": "Capitals",
+      "slug": "iowa_academy"
+    },
+    {
+      "id": 71,
+      "team": "Grupenberg",
+      "mascot": "Generals",
+      "slug": "grupenberg"
+    },
+    {
+      "id": 72,
+      "team": "Tri-Cities Prep",
+      "mascot": "Sorcerers",
+      "slug": "tri_cities_prep"
+    },
+    {
+      "id": 73,
+      "team": "HA Rushmore",
+      "mascot": "Saloon",
+      "slug": "ha_rushmore"
+    },
+    {
+      "id": 74,
+      "team": "Rodeo Circuit",
+      "mascot": "Clowns",
+      "slug": "rodeo_circuit"
+    },
+    {
+      "id": 75,
+      "team": "Mt Simmons",
+      "mascot": "Cobras",
+      "slug": "mt_simmons"
+    },
+    {
+      "id": 76,
+      "team": "Lewis Catholic",
+      "mascot": "Saints",
+      "slug": "lewis_catholic"
+    },
+    {
+      "id": 77,
+      "team": "Crofton",
+      "mascot": "Cardinals",
+      "slug": "crofton"
+    },
+    {
+      "id": 78,
+      "team": "Minot",
+      "mascot": "Engineers",
+      "slug": "minot"
+    },
+    {
+      "id": 79,
+      "team": "Tower Academy",
+      "mascot": "Royals",
+      "slug": "tower_academy"
+    },
+    {
+      "id": 80,
+      "team": "Two Rivers",
+      "mascot": "Pointers",
+      "slug": "two_rivers"
+    },
+    {
+      "id": 81,
+      "team": "Norman",
+      "mascot": "Tornados",
+      "slug": "norman"
+    },
+    {
+      "id": 82,
+      "team": "River's Edge",
+      "mascot": "Catfish",
+      "slug": "rivers_edge"
+    },
+    {
+      "id": 83,
+      "team": "Amarillo Tech",
+      "mascot": "Armadillos",
+      "slug": "amarillo_tech"
+    },
+    {
+      "id": 84,
+      "team": "Pan Handle Limited",
+      "mascot": "Steeds",
+      "slug": "pan_handle_limited"
+    },
+    {
+      "id": 85,
+      "team": "Ada",
+      "mascot": "Falcons",
+      "slug": "ada"
+    },
+    {
+      "id": 86,
+      "team": "Kenton",
+      "mascot": "Eagles",
+      "slug": "kenton"
+    },
+    {
+      "id": 87,
+      "team": "Reyes-Santiago",
+      "mascot": "Cacti",
+      "slug": "reyes_santiago"
+    },
+    {
+      "id": 88,
+      "team": "Stormwood",
+      "mascot": "Tigers",
+      "slug": "stormwood"
+    },
+    {
+      "id": 90,
+      "team": "Austin",
+      "mascot": "Wolves",
+      "slug": "austin"
+    },
+    {
+      "id": 91,
+      "team": "GP Prep School",
+      "mascot": "Elites",
+      "slug": "gp_prep_school"
+    },
+    {
+      "id": 92,
+      "team": "MiddleTEX",
+      "mascot": "Bucking Broncos",
+      "slug": "middletex"
+    },
+    {
+      "id": 93,
+      "team": "Abilene",
+      "mascot": "Scorpions",
+      "slug": "abilene"
+    },
+    {
+      "id": 94,
+      "team": "Chambless Global",
+      "mascot": "Raiders",
+      "slug": "chambless_global"
+    },
+    {
+      "id": 95,
+      "team": "Austin West",
+      "mascot": "Defenders",
+      "slug": "austin_west"
+    },
+    {
+      "id": 96,
+      "team": "Bayou District",
+      "mascot": "Airboats",
+      "slug": "bayou_district"
+    },
+    {
+      "id": 97,
+      "team": "Pike's Prep",
+      "mascot": "Climbers",
+      "slug": "pikes_prep"
+    },
+    {
+      "id": 98,
+      "team": "Desert Regional",
+      "mascot": "Mesas",
+      "slug": "desert_regional"
+    },
+    {
+      "id": 99,
+      "team": "East Rockies",
+      "mascot": "Mountain Lions",
+      "slug": "east_rockies"
+    },
+    {
+      "id": 100,
+      "team": "Circus Circus",
+      "mascot": "Ringmasters",
+      "slug": "circus_circus"
+    },
+    {
+      "id": 101,
+      "team": "Tucson",
+      "mascot": "Rattlesnakes",
+      "slug": "tucson"
+    },
+    {
+      "id": 102,
+      "team": "Barton Lutheran",
+      "mascot": "Panthers",
+      "slug": "barton_lutheran"
+    },
+    {
+      "id": 103,
+      "team": "Border Academy",
+      "mascot": "Swordsmen",
+      "slug": "border_academy"
+    },
+    {
+      "id": 104,
+      "team": "Southwest Miner",
+      "mascot": "Cowboys",
+      "slug": "southwest_miner"
+    },
+    {
+      "id": 105,
+      "team": "Rainier Central",
+      "mascot": "Patrol",
+      "slug": "rainier_central"
+    },
+    {
+      "id": 106,
+      "team": "Salem",
+      "mascot": "Woodchucks",
+      "slug": "salem"
+    },
+    {
+      "id": 107,
+      "team": "Swoosh",
+      "mascot": "Knights",
+      "slug": "swoosh"
+    },
+    {
+      "id": 108,
+      "team": "Seattle AAA",
+      "mascot": "Sound",
+      "slug": "seattle_aaa"
+    },
+    {
+      "id": 109,
+      "team": "Vancouver",
+      "mascot": "Bears",
+      "slug": "vancouver"
+    },
+    {
+      "id": 110,
+      "team": "Cardinal Conor",
+      "mascot": "Monarchs",
+      "slug": "cardinal_conor"
+    },
+    {
+      "id": 111,
+      "team": "Couer d'Alene",
+      "mascot": "Grizzlies",
+      "slug": "couer_dalene"
+    },
+    {
+      "id": 112,
+      "team": "Boise",
+      "mascot": "Mountaineers",
+      "slug": "boise"
+    },
+    {
+      "id": 113,
+      "team": "Valley High",
+      "mascot": "Orcas",
+      "slug": "valley_high"
+    },
+    {
+      "id": 114,
+      "team": "San Jose",
+      "mascot": "Kings",
+      "slug": "san_jose"
+    },
+    {
+      "id": 115,
+      "team": "Rancho Estrada",
+      "mascot": "Miners",
+      "slug": "rancho_estrada"
+    },
+    {
+      "id": 116,
+      "team": "Berkley",
+      "mascot": "Wasps",
+      "slug": "berkley"
+    },
+    {
+      "id": 117,
+      "team": "Hollywood Prep",
+      "mascot": "Cavalry",
+      "slug": "hollywood_prep"
+    },
+    {
+      "id": 118,
+      "team": "DeCatur Dei",
+      "mascot": "Pelicans",
+      "slug": "decatur_dei"
+    },
+    {
+      "id": 119,
+      "team": "West Ocean City",
+      "mascot": "Mariners",
+      "slug": "west_ocean_city"
+    },
+    {
+      "id": 120,
+      "team": "Huntington Canyon",
+      "mascot": "Rangers",
+      "slug": "huntington_canyon"
+    },
+    {
+      "id": 121,
+      "team": "Mahala Alou",
+      "mascot": "Sharks",
+      "slug": "mahala_alou"
+    },
+    {
+      "id": 122,
+      "team": "Pacific All-Stars",
+      "mascot": "Squad",
+      "slug": "pacific_all_stars"
+    },
+    {
+      "id": 123,
+      "team": "Juneau-Nome",
+      "mascot": "Fishermen",
+      "slug": "juneau_nome"
+    },
+    {
+      "id": 124,
+      "team": "Redwood High",
+      "mascot": "Owls",
+      "slug": "redwood_high"
+    },
+    {
+      "id": 125,
+      "team": "Grizzly Academy",
+      "mascot": "Patriots",
+      "slug": "grizzly_academy"
+    },
+    {
+      "id": 126,
+      "team": "Hana Road",
+      "mascot": "Waterfalls",
+      "slug": "hana_road"
+    },
+    {
+      "id": 127,
+      "team": "Cupertino",
+      "mascot": "Diamondbacks",
+      "slug": "cupertino"
+    },
+    {
+      "id": 128,
+      "team": "Melbourne Americas",
+      "mascot": "Breakers",
+      "slug": "melbourne_americas"
+    }
+  ]
+}

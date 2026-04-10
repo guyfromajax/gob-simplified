@@ -79,8 +79,9 @@ def save_team_settings(
             )
             
         elif mode == "franchise":
-            # ✅ PHASE 5.7: Use get_save_location_for_franchise_tournament to determine save location
-            # This checks if game is active and saves to game doc, otherwise saves to FTD
+            # Franchise playbook persistence is split intentionally:
+            # - FCC / pregame saves (no game_id) go to FTD, which is the franchise master source
+            # - in-game saves (with game_id) go to the game doc, which is the gameplay source
             from BackEnd.api.gameplan_routes import get_save_location_for_franchise_tournament
             collection, doc_id, is_game_doc = get_save_location_for_franchise_tournament(
                 mode=mode,
