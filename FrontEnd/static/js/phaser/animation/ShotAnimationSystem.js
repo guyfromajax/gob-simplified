@@ -1220,44 +1220,28 @@ export class ShotAnimationSystem {
     const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
     
     if (isShootingFoul) {
-      // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow from ballManager.js)
-      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+      // Route shooting-foul miss announcements through the central dispatcher so whistle SFX is universal.
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
 
       // Get foul player data from turnData (same pattern as AND-1)
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && this.scene) {
         const foulPlayerSprite = this.playerSprites?.[foulPlayerId];
         if (foulPlayerSprite) {
-          // Get team names
-          const homeTeamField = this.scene.simData?.home_team;
-          const awayTeamField = this.scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          const foulPlayerTeamId = foulPlayerSprite?.team_id;
-          const foulPlayerTeamName = foulPlayerTeamId === this.scene.homeTeamId ? homeTeamName : awayTeamName;
-
-          const foulPlayerData = {
-            playerId: foulPlayerId,
-            photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName,
-            secondaryColor: getSecondaryColorForTeam(this.scene, foulPlayerTeamId)
-          };
-          
           // Trigger foul effect
           const { triggerFoulEffect } = await import('./negativeActionEffects.js');
           triggerFoulEffect(this.scene, foulPlayerId);
           
-          // Show announcement with player data (matches AND-1 pattern)
-          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+          announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
         } else {
           // Fallback if sprite not found (matches AND-1 pattern)
           const { triggerFoulEffect } = await import('./negativeActionEffects.js');
           triggerFoulEffect(this.scene, foulPlayerId);
-          showAnnouncement("Shooting Foul!", 'neutral', null);
+          announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
         }
       } else {
         // Fallback if foulPlayerId not found (matches AND-1 pattern)
-        showAnnouncement("Shooting Foul!", 'neutral', null);
+        announceGameEvent('FOUL_SHOOTING', turnData, this.scene, {});
       }
     }
     

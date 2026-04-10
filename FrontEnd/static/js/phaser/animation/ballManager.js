@@ -567,31 +567,23 @@ export async function shootBall({
           if (foulPlayerId && scene) {
             const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
             if (foulPlayerSprite) {
-              const foulPlayerTeamId = foulPlayerSprite?.team_id;
-              const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-              
-              const foulPlayerData = {
-                playerId: foulPlayerId,
-                photo: foulPlayerSprite?.photo || null,
-                teamName: foulPlayerTeamName,
-                secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
-              };
-
               // Trigger foul effect
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
 
-              // Show announcement with player data (matches AND-1 pattern)
-              showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+              const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
             } else {
               // Fallback if sprite not found (matches AND-1 pattern)
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
-              showAnnouncement("Shooting Foul!", 'neutral', null);
+              const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
             }
           } else {
             // Fallback if foulPlayerId not found (matches AND-1 pattern)
-            showAnnouncement("Shooting Foul!", 'neutral', null);
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
           }
         }
         

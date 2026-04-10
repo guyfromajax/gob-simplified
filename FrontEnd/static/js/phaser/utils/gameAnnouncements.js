@@ -10,7 +10,7 @@
  *   announceGameEvent('PRESSURE_FCP', turnData, scene);
  */
 
-import { showAnnouncement, showAndOneAnnouncement } from './announcements.js';
+import { showAnnouncement, showAndOneAnnouncement, playAnnouncementSfx } from './announcements.js';
 import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import {
   pickOffensiveFoulAnnouncementText,
@@ -306,6 +306,7 @@ function handleShootingFoulAnnouncement(turnData, scene, context) {
     }
   }
 
+  playAnnouncementSfx('foul');
   showAnnouncement("Shooting Foul!", 'neutral', playerData);
 }
 
@@ -325,7 +326,8 @@ function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) 
     }
   }
 
-  const foulText = pickOffensiveFoulAnnouncementText(turnData);
+  const foulText = turnData?.otb_foul ? "Over The Back!" : pickOffensiveFoulAnnouncementText(turnData);
+  playAnnouncementSfx('foul');
   showAnnouncement(foulText, defenseTeam, playerData);
 
   // Trigger visual effect
@@ -350,7 +352,10 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
     }
   }
 
-  const foulText = pickDefensiveFoulAnnouncementText(turnData);
+  const foulText = turnData?.otb_foul
+    ? "Over The Back!"
+    : (turnData?.quick_foul ? "Quick Foul!" : pickDefensiveFoulAnnouncementText(turnData));
+  playAnnouncementSfx('foul');
   showAnnouncement(foulText, offenseTeam, playerData);
 
   // Trigger visual effect
@@ -375,6 +380,7 @@ function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
     }
   }
 
+  playAnnouncementSfx('foul');
   showAnnouncement("CHARGE!", defenseTeam, playerData);
 
   // Trigger visual effect
@@ -399,6 +405,7 @@ function handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam) {
     }
   }
 
+  playAnnouncementSfx('foul');
   showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
 
   // Trigger visual effect
@@ -486,6 +493,7 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
     turnoverText = typeMap[turnoverType] || "TURNOVER!";
   }
   
+  playAnnouncementSfx(turnoverText === 'Shot Clock Violation!' ? 'shot_clock_violation' : 'foul');
   showAnnouncement(turnoverText, offenseTeam, playerData);
 
   // Trigger visual effect
@@ -493,4 +501,3 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
     triggerTurnoverEffect(scene, victimId);
   }
 }
-

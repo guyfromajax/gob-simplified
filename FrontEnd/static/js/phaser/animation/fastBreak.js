@@ -2806,22 +2806,17 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         if (foulPlayerId && scene) {
           const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
           if (foulPlayerSprite) {
-            const teamsObj = scene.simData?.teams || {};
-            const homeId = scene.simData?.home_team_id;
-            const awayId = scene.simData?.away_team_id;
-            const homeTeamNameMiss = (homeId && teamsObj[homeId]?.name) || scene.simData?.home_team?.name || "Home";
-            const awayTeamNameMiss = (awayId && teamsObj[awayId]?.name) || scene.simData?.away_team?.name || "Away";
-            const foulPlayerTeamId = foulPlayerSprite?.team_id;
-            const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamNameMiss : awayTeamNameMiss;
-            const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
             triggerFoulEffect(scene, foulPlayerId);
-            showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
           } else {
             triggerFoulEffect(scene, foulPlayerId);
-            showAnnouncement("Shooting Foul!", 'neutral', null);
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
           }
         } else {
-          showAnnouncement("Shooting Foul!", 'neutral', null);
+          const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
         }
       }
       appendToTextScroll("Missed!");
@@ -3205,27 +3200,20 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
     const isShootingFoulOnMiss = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
     if (isShootingFoulOnMiss) {
-      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && scene) {
         const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
         if (foulPlayerSprite) {
-          const homeTeamField = scene.simData?.home_team;
-          const awayTeamField = scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          const foulPlayerTeamId = foulPlayerSprite?.team_id;
-          const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-          const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
           triggerFoulEffect(scene, foulPlayerId);
-          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
         } else {
           triggerFoulEffect(scene, foulPlayerId);
-          showAnnouncement("Shooting Foul!", 'neutral', null);
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
         }
       } else {
-        showAnnouncement("Shooting Foul!", 'neutral', null);
+        announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
       }
     }
     appendToTextScroll("Missed!");
