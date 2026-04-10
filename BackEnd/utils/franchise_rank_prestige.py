@@ -79,14 +79,21 @@ def calculate_ranking_score(
     if week <= 0:
         return prestige + (total_player_attrs * 0.10)
     if week == 1:
-        return prestige + (total_player_attrs * 0.04)
+        return prestige + (total_player_attrs * 0.04) + 100
     if week == 2:
-        return prestige + (total_player_attrs * 0.03)
+        return prestige + (total_player_attrs * 0.03) + 100
     if week == 3:
-        return prestige + (total_player_attrs * 0.02)
+        return prestige + (total_player_attrs * 0.02) + 100
     if week == 4:
-        return prestige + (total_player_attrs * 0.01)
-    return prestige + ((129 - sos_avg) * 4)
+        return prestige + (total_player_attrs * 0.01) + 100
+    sos_score = (129 - sos_avg) * 4
+    if 5 <= week <= 8:
+        return (0.75 * prestige) + 100 + sos_score
+    if 9 <= week <= 12:
+        return (0.5 * prestige) + 80 + sos_score
+    if 13 <= week <= 26:
+        return (0.25 * prestige) + 60 + sos_score
+    return (0.25 * prestige) + 60 + sos_score
 
 
 def rank_teams_for_week(

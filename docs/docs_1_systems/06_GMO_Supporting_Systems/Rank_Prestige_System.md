@@ -134,12 +134,15 @@ Purely ordinal. 128 teams sorted by ranking score descending after each regular-
 ```
 Preseason:   ranking_score = prestige + (total_attrs * 0.10)
 
-Week 1:      ranking_score = prestige + (total_attrs * 0.04)
-Week 2:      ranking_score = prestige + (total_attrs * 0.03)
-Week 3:      ranking_score = prestige + (total_attrs * 0.02)
-Week 4:      ranking_score = prestige + (total_attrs * 0.01)
+Week 1:      ranking_score = prestige + (total_attrs * 0.04) + (100 * team wins)
+Week 2:      ranking_score = prestige + (total_attrs * 0.03) + (100 * team wins)
+Week 3:      ranking_score = prestige + (total_attrs * 0.02) + (100 * team wins)
+Week 4:      ranking_score = prestige + (total_attrs * 0.01) + (100 * team wins)
 
-Weeks 5–26:  ranking_score = prestige + ((129 - sos_avg) * 4)
+Weeks 5–8:  ranking_score = (0.75 * prestige) + (100 * team wins) + ((129 - sos_avg) * 4)
+Weeks 9–12:  ranking_score = (0.5 * prestige) + (80 * team wins) + ((129 - sos_avg) * 4)
+Weeks 13–26:  ranking_score = (0.25 * prestige) + (60 * team wins) + ((129 - sos_avg) * 4)
+
 ```
 
 ### Phase Logic
@@ -215,16 +218,22 @@ def calculate_ranking_score(
     if week == 0:  # Preseason
         return prestige + (total_attrs * 0.10)
     elif week == 1:
-        return prestige + (total_attrs * 0.04)
+        return prestige + (total_attrs * 0.04) + (100 * team_wins)
     elif week == 2:
-        return prestige + (total_attrs * 0.03)
+        return prestige + (total_attrs * 0.03) + (100 * team_wins)
     elif week == 3:
-        return prestige + (total_attrs * 0.02)
+        return prestige + (total_attrs * 0.02) + (100 * team_wins)
     elif week == 4:
-        return prestige + (total_attrs * 0.01)
-    else:  # Weeks 5-26
+        return prestige + (total_attrs * 0.01) + (100 * team_wins)
+    elif 5 <= week <= 8:
         sos_score = (129 - sos_avg) * 4
-        return prestige + sos_score
+        return (0.75 * prestige) + (100 * team_wins) + sos_score
+    elif 9 <= week <= 12:
+        sos_score = (129 - sos_avg) * 4
+        return (0.5 * prestige) + (80 * team_wins) + sos_score
+    else:  # Weeks 13-26
+        sos_score = (129 - sos_avg) * 4
+        return (0.25 * prestige) + (60 * team_wins) + sos_score
 
 
 def generate_national_rankings(
