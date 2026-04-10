@@ -654,6 +654,14 @@ function rimRunnerSpriteGrid(sprite, width, height) {
   };
 }
 
+function rimRunnerLiveSpriteGrid(sprite, width, height) {
+  if (!sprite) return { x: 50, y: 25 };
+  return {
+    x: Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y),
+  };
+}
+
 function setRimRunnerSpriteGrid(sprite, gx, gy) {
   if (!sprite) return;
   sprite.gridX = gx;
@@ -1212,7 +1220,14 @@ async function animateRimRunnerOutletDeniedBeat(
 
   attachBallToPlayer(scene, ballSprite, passerSprite);
 
-  const pg = rimRunnerSpriteGrid(passerSprite, width, height);
+  // Derive the denied-outlet beat from the visible on-court locations, not the
+  // cached logical burst endpoints. This branch forks immediately after the burst
+  // receiver reaches the trigger spot, so cached gridX/gridY can get ahead of
+  // what is actually on screen and make the defender step / receiver cutback
+  // appear skipped.
+  const pg = rimRunnerLiveSpriteGrid(passerSprite, width, height);
+  const receiverLiveGrid = rimRunnerLiveSpriteGrid(recvSprite, width, height);
+  const defenderLiveGrid = defSprite ? rimRunnerLiveSpriteGrid(defSprite, width, height) : null;
   const defenderTarget = {
     x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X),
     y: Phaser.Math.Clamp(pg.y, GRID_MIN_Y, GRID_MAX_Y),
@@ -1222,8 +1237,8 @@ async function animateRimRunnerOutletDeniedBeat(
     receiverId: recvId,
     defenderId: defId,
     passerGrid: pg,
-    receiverGrid: rimRunnerSpriteGrid(recvSprite, width, height),
-    defenderGrid: defSprite ? rimRunnerSpriteGrid(defSprite, width, height) : null,
+    receiverGrid: receiverLiveGrid,
+    defenderGrid: defenderLiveGrid,
     defenderTarget,
   });
 
@@ -1315,7 +1330,7 @@ async function animateRimRunnerOutletDeniedBeat(
   logRrDenied(scene, "TRIGGER", {
     trigger: "receiver_cutback_reached",
     receiverTarget: recvTarget,
-    receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+    receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
     snapshotAtTrigger: captureRrLiveSnapshot(playerSprites, width, height),
   });
 
@@ -1346,7 +1361,7 @@ async function animateRimRunnerOutletDeniedBeat(
     synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
     attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_pass" });
     logRrDenied(scene, "PASS END", {
-      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
       snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
     });
   } else {
@@ -1354,7 +1369,7 @@ async function animateRimRunnerOutletDeniedBeat(
       reason: "rim_runner_outlet_denied_pass_recovery_failed",
     });
     logRrDenied(scene, "PASS END", {
-      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
       mode: "pass_recovery_failed",
       passerId,
       receiverId: recvId,
@@ -2124,8 +2139,8 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     // RR burst only owns the fork into outlet-denied. Once receiver reaches the
     // fork point, the dedicated denied branch becomes the sole owner.
     logRrDenied(scene, "BURST FORK", {
-      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
-      rrLive: rimRunnerSpriteGrid(rrSprite, width, height),
+      receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
+      rrLive: rimRunnerLiveSpriteGrid(rrSprite, width, height),
       outletDefenderId: sid(phase.outlet_defender_id),
       snapshot: captureRrLiveSnapshot(playerSprites, width, height),
     });
