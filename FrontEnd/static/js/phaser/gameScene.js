@@ -2749,6 +2749,13 @@ export function createGameScene(Phaser) {
             }
           };
           mergeClockContract(turn, turnData);
+          if (turn.home_score === undefined && turnData.home_score !== undefined) turn.home_score = turnData.home_score;
+          if (turn.away_score === undefined && turnData.away_score !== undefined) turn.away_score = turnData.away_score;
+          if (turn.clock === undefined && turnData.clock !== undefined) turn.clock = turnData.clock;
+          if (turn.time_remaining === undefined && turnData.time_remaining !== undefined) turn.time_remaining = turnData.time_remaining;
+          if (turn.shot_clock_remaining === undefined && turnData.shot_clock_remaining !== undefined) {
+            turn.shot_clock_remaining = turnData.shot_clock_remaining;
+          }
 
           // ✅ FIX: Check if this is the final turn of the quarter AFTER getting the turn
           // This ensures the final turn is animated before handling quarter completion
@@ -2815,6 +2822,13 @@ export function createGameScene(Phaser) {
               turnCount++;
               subTurn.index = turnCount;
               mergeClockContract(subTurn, turnData);
+              if (subTurn.home_score === undefined && turnData.home_score !== undefined) subTurn.home_score = turnData.home_score;
+              if (subTurn.away_score === undefined && turnData.away_score !== undefined) subTurn.away_score = turnData.away_score;
+              if (subTurn.clock === undefined && turnData.clock !== undefined) subTurn.clock = turnData.clock;
+              if (subTurn.time_remaining === undefined && turnData.time_remaining !== undefined) subTurn.time_remaining = turnData.time_remaining;
+              if (subTurn.shot_clock_remaining === undefined && turnData.shot_clock_remaining !== undefined) {
+                subTurn.shot_clock_remaining = turnData.shot_clock_remaining;
+              }
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
               const subTurnStartAtMs = Date.now();
               const boundaryGapMs = subTurnStartAtMs - previousSubTurnEndAtMs;

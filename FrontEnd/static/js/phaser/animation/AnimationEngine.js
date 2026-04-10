@@ -1168,10 +1168,18 @@ export class AnimationEngine {
     }
     // Final play of quarter: hold ball at rim (make) or bounce (miss), announce "It's Good" on make, then quarter end (no BIP/rebound)
     if (turnData.quarter_ends_after) {
-      if (context.onUpdate) context.onUpdate({ clock: '0:00' });
+      if (context.onUpdate) {
+        context.onUpdate({
+          home_score: turnData.home_score,
+          away_score: turnData.away_score,
+          clock: '0:00',
+          time_remaining: 0,
+          shot_clock_remaining: 0
+        });
+      }
       this._playFinalHoldAirhorn();
       const animationConfig = (await import('./animation_config.js')).default;
-      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
+      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
       if (turnData.result_type === 'MAKE') {
         const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
         announceGameEvent('SHOT_MAKE', turnData, this.scene, context);
