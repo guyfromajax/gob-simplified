@@ -29,6 +29,26 @@
   color: #1f2937;
 }
 
+#franchise-container #top-center .team-stats {
+  width: 100%;
+  max-width: 320px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 24px;
+  justify-items: center;
+  align-items: center;
+  text-align: center;
+  margin: 0 auto;
+}
+
+#franchise-container #top-center .team-stats > div {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
 @media (max-width: 600px) {
   #franchise-container #top-left {
     height: 150px;

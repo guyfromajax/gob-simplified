@@ -130,12 +130,10 @@ function populateTop(data) {
       textElement.textContent = `${chemistryValue} / 25`;
     }
   }
-  document.getElementById('stat-offense').textContent = `Offense: ${data.offense || '--'}`;
-  document.getElementById('stat-defense').textContent = `Defense: ${data.defense || '--'}`;
-  document.getElementById('stat-athleticism').textContent = `Athleticism: ${data.athleticism || '--'}`;
-  document.getElementById('stat-intangibles').textContent = `Intangibles: ${data.intangibles || '--'}`;
-  document.getElementById('stat-prestige').textContent = `Prestige: ${data.prestige || '--'}`;
-  document.getElementById('stat-rank').textContent = `Nat'l Rank: ${data.rank || '--'}`;
+  const prestigeEl = document.getElementById('stat-prestige');
+  const rankEl = document.getElementById('stat-rank');
+  if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
+  if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
 }
 
 let standingsDataCache = null;

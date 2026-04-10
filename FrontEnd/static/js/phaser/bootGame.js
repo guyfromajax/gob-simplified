@@ -2627,14 +2627,12 @@ async function initGame() {
   
   if (simFullBtn) {
     // ✅ FIX: Update button text based on quarter
-    // Q2-Q3: "Sim Rest Of Game"
-    // Q4+: Hide button (only show Play Quarter and Sim Quarter)
+    // Q1: "Sim Full Game"
+    // Q2+: "Sim Rest Of Game"
     const currentQuarter = Math.max(0, quarter);
-    if (currentQuarter >= 4) {
-      // Q4+: Hide "Sim Full Game"/"Sim Rest Of Game" button
-      simFullBtn.style.display = 'none';
-    } else if (currentQuarter >= 2) {
-      // Q2-Q3: Change text to "Sim Rest Of Game"
+    simFullBtn.style.display = '';
+    if (currentQuarter >= 2) {
+      // Q2+: Change text to "Sim Rest Of Game"
       simFullBtn.textContent = 'Sim Rest Of Game';
       simFullBtn.addEventListener('click', handleSimFullGame);
     } else {
@@ -2644,21 +2642,10 @@ async function initGame() {
     }
   }
   if (sim4Btn) {
-    // ✅ SIM QUARTER: Button works for Q1-Q4 (before game completes)
-    // Disabled when quarter > 4 (game already complete, in OT or finished)
-    // Note: Button should be enabled at Q4 start (quarter = 4), only disabled after Q4 completes
-    // ✅ FIX: Use Math.max(0, quarter) to handle pre-game screen (quarter = 0)
-    const currentQuarter = Math.max(0, quarter);
-    if (currentQuarter > 4) {
-      // Game is complete (in OT or finished) - disable button
-      sim4Btn.disabled = true;
-      sim4Btn.title = 'Game complete';
-    } else {
-      // Q1-Q4: Button enabled (can sim current quarter if at start, or next quarter if at break)
-      sim4Btn.disabled = false;
-      sim4Btn.title = `Sim Quarter ${currentQuarter + 1}`;
-      sim4Btn.addEventListener('click', handleSimQuarter);
-    }
+    // Keep Sim Quarter logic dormant for possible future reintroduction, but hide it from the UI for now.
+    sim4Btn.style.display = 'none';
+    sim4Btn.disabled = true;
+    sim4Btn.title = 'Unavailable';
   }
 }
 

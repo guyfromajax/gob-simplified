@@ -14,7 +14,13 @@ import { updatePlaycallCenter } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { syncSpriteAttributesFromPlayerEnergy } from "../utils/syncPlayerSpriteAttributes.js";
 import { isBonusFreeThrowFoulTurn } from "../utils/foulAnnouncementClassifier.js";
-import { getBallController, getCurrentOwner } from "./BallControllerAdapter.js";
+import {
+  getBallController,
+  getCurrentOwner,
+  attachBallToPlayer,
+  setCurrentOwner,
+  clearPendingOwner,
+} from "./BallControllerAdapter.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
 /**
@@ -373,7 +379,27 @@ export async function finalizeTurnAfterAnimation({
       turn?.events?.find?.((e) => String(e?.event_type || "").toUpperCase() === "STEAL")?.stealer_id ??
       turn?.events?.find?.((e) => String(e?.event_type || "").toUpperCase() === "STEAL")?.stealerId ??
       null;
-    const ownerByAdapter = getCurrentOwner(scene);
+    let ownerByAdapter = getCurrentOwner(scene);
+    // Steal boundary guard: if ownership drifted off the stealer by turn end,
+    // force authoritative ownership now to prevent next-turn teleport.
+    if (expectedStealerId != null && String(ownerByAdapter ?? "") !== String(expectedStealerId)) {
+      const stealerSprite = scene?.playerSprites?.[String(expectedStealerId)] || null;
+      if (stealerSprite && scene?.ballSprite) {
+        attachBallToPlayer(scene, scene.ballSprite, stealerSprite, {
+          reason: "steal_turn_end_guard",
+        });
+        setCurrentOwner(scene, String(expectedStealerId));
+        clearPendingOwner(scene);
+        scene.passInFlight = false;
+        try {
+          const { setBallHolderId } = await import('./ballAnimationSimple.js');
+          setBallHolderId(scene, String(expectedStealerId));
+        } catch (_) {
+          // best-effort state mirror
+        }
+        ownerByAdapter = getCurrentOwner(scene);
+      }
+    }
     const snapshot = {
       turnId: turn?.turn_count ?? turn?.id ?? null,
       turnIndex: turnIndex ?? turn?.index ?? null,
