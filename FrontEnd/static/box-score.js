@@ -1621,7 +1621,11 @@ function setupLockerRoomButton() {
   const period = urlParams.get('period');
   const startWithInbound = urlParams.get('start_with_inbound');
   const startingPossession = urlParams.get('starting_possession');
-  const isFinalGame = !!(gameData && urlParams.get('game_id') && gameData.is_final);
+  const isFinalGame = !!(
+    gameData &&
+    urlParams.get('game_id') &&
+    (gameData.is_final === true || Number(gameData.quarter) >= 5)
+  );
 
   const buildLineupBackUrl = () => {
     const helper = window.TimeoutNavigationHelper;
@@ -1712,7 +1716,7 @@ function setupLockerRoomButton() {
     return;
   }
 
-  if (gameData && urlParams.get('game_id') && !gameData.is_final) {
+  if (gameData && urlParams.get('game_id') && !isFinalGame) {
     const lineupUrl = buildLineupBackUrl();
     if (lineupUrl) {
       cleanButton.textContent = 'Back';
