@@ -262,6 +262,7 @@
       this.dragContext = null;
       this.modal = new ConfirmModal();
       this.draftStorageKey = this.buildDraftStorageKey();
+      this.draftRestoreFlagKey = this.buildDraftRestoreFlagKey();
 
       this.elements = {
         saveBtn: document.getElementById("save-btn"),
@@ -308,6 +309,18 @@
       return parts.join(":");
     }
 
+    buildDraftRestoreFlagKey() {
+      const parts = [
+        "playbooksDraftRestoreOnce",
+        this.context.mode || "single",
+        this.context.teamId || "",
+        this.context.franchiseId || "",
+        this.context.tournamentId || "",
+        this.context.gameId || "",
+      ];
+      return parts.join(":");
+    }
+
     persistDraftState() {
       try {
         window.sessionStorage.setItem(this.draftStorageKey, JSON.stringify(this.state));
@@ -316,8 +329,19 @@
       }
     }
 
+    markDraftForNextLoad() {
+      try {
+        window.sessionStorage.setItem(this.draftRestoreFlagKey, "1");
+      } catch (error) {
+        console.warn("Unable to mark playbooks draft for restore:", error);
+      }
+    }
+
     restoreDraftState() {
       try {
+        const shouldRestore = window.sessionStorage.getItem(this.draftRestoreFlagKey) === "1";
+        if (!shouldRestore) return;
+
         const raw = window.sessionStorage.getItem(this.draftStorageKey);
         if (!raw) return;
         const draft = JSON.parse(raw);
@@ -349,12 +373,19 @@
         this.syncSelectionFromPcOrder();
       } catch (error) {
         console.warn("Unable to restore playbooks draft:", error);
+      } finally {
+        try {
+          window.sessionStorage.removeItem(this.draftRestoreFlagKey);
+        } catch (storageError) {
+          console.warn("Unable to clear playbooks draft restore flag:", storageError);
+        }
       }
     }
 
     clearDraftState() {
       try {
         window.sessionStorage.removeItem(this.draftStorageKey);
+        window.sessionStorage.removeItem(this.draftRestoreFlagKey);
       } catch (error) {
         console.warn("Unable to clear playbooks draft:", error);
       }
@@ -511,6 +542,7 @@
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
           this.persistDraftState();
+          this.markDraftForNextLoad();
           window.location.href = buildPlayDetailsUrl(this.context, play);
         });
         this.bindPercentEvents(tr, play.id, "motion");
@@ -542,6 +574,7 @@
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
           this.persistDraftState();
+          this.markDraftForNextLoad();
           window.location.href = buildPlayDetailsUrl(this.context, play);
         });
         this.bindPercentEvents(tr, play.id, "setPlays");

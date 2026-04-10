@@ -70,6 +70,8 @@ def is_quick_shot(game, time_remaining_seconds):
     """
     True when Score Delta is in this band's Quick Shot range (Q4/OT).
     Per time-band table: quick_lo < delta < quick_hi.
+    Last 30 seconds special case: Quick Shot applies whenever the offense is
+    trailing by more than 3 (delta < -3), regardless of how large the deficit is.
     """
     if not is_situational_active(game.quarter):
         return False
@@ -81,6 +83,8 @@ def is_quick_shot(game, time_remaining_seconds):
     if quick_lo is None or quick_hi is None:
         return False
     delta = get_score_delta(game)
+    if tier.get("last_30_quick"):
+        return delta < quick_hi
     return quick_lo < delta < quick_hi
 
 
@@ -118,7 +122,7 @@ def get_situational_tempo_override(game, time_remaining_seconds):
 def get_situational_play_focus_override(game, time_remaining_seconds):
     """
     When Quick Shot is active, returns (outside_ratio, attack_ratio, inside_ratio) per time-band table.
-    Band 0:01-0:30: if Score Delta < -2 → 100% outside; else None (normal playcall). Other bands: fixed ratios.
+    Band 0:01-0:30: if Score Delta < -3 → 100% outside; else None (normal playcall). Other bands: fixed ratios.
     """
     if not is_quick_shot(game, time_remaining_seconds):
         return None
@@ -126,9 +130,9 @@ def get_situational_play_focus_override(game, time_remaining_seconds):
     if not tier:
         return None
     delta = get_score_delta(game)
-    # 0:01-0:30 band: only override when delta < -2 (100% outside); else normal logic
+    # 0:01-0:30 band: only override when delta < -3 (100% outside); else normal logic
     if tier.get("last_30_quick"):
-        below = tier.get("outside_if_delta_below", -2)
+        below = tier.get("outside_if_delta_below", -3)
         if delta >= below:
             return None
         return (1.0, 0.0, 0.0)
