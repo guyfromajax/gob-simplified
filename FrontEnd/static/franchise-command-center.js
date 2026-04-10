@@ -142,7 +142,9 @@ function buildTeamLink(t) {
   const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
   const teamLink = document.createElement('a');
   teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
-  teamLink.textContent = t.name;
+  const rank = Number(t?.natl_rank);
+  const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
+  teamLink.textContent = `${rankPrefix}${t.name}`;
   teamLink.style.color = '#4a90e2';
   teamLink.style.textDecoration = 'none';
   teamLink.style.cursor = 'pointer';
