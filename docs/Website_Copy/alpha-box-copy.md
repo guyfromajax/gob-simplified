@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **April 9 Update** Sunset Single Game & Tournament modes (for now anyway -- 99% of you were playing Franchise mode anyway :). Added customizable and more intuitive playbooks. Fixed a handful of bugs.
+- **April 9 Update** Sunset Single Game & Tournament modes (for now anyway -- 99% of you were playing Franchise mode anyway :). Added customizable and more intuitive playbooks. Improved national rankings logic. Fixed a handful of bugs.
 
 Source:
 - `FrontEnd/static/mode-select.html`
