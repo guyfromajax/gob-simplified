@@ -542,6 +542,79 @@ def _resolve_oreb_putback_defender(game, rebounder, def_lineup, basket_x):
     return None, False
 
 
+def resolve_over_the_back_foul(game, rebounder, rebound_team, opposing_lineup):
+    """
+    Evaluate over-the-back foul eligibility for a rebound battle.
+
+    Rules:
+    - Find the nearest opposing player to the rebounder.
+    - If that opponent is farther than 4 Euclidean distance away, no OTB foul is in play.
+    - Otherwise determine whether an offensive or defensive OTB foul is in play using
+      discipline-based thresholds, then an IQ gate, then a final 1-in-5 foul call.
+
+    Returns:
+        dict | None with:
+          foul_team: "OFFENSE" | "DEFENSE"
+          foul_player: Player
+          victim: Player
+          proximity: float
+    """
+    if rebounder is None or rebound_team is None or not opposing_lineup:
+        return None
+
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    rebounder_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
+
+    nearest_opponent = None
+    nearest_distance = float("inf")
+    for player in (opposing_lineup or {}).values():
+        if player is None:
+            continue
+        distance = _oreb_putback_distance(rebounder_coords, getattr(player, "coords", None) or {"x": 50, "y": 25})
+        if distance < nearest_distance:
+            nearest_distance = distance
+            nearest_opponent = player
+
+    if nearest_opponent is None or nearest_distance > 4:
+        return None
+
+    offense_candidate = rebounder if rebound_team == off_team else nearest_opponent
+    defense_candidate = rebounder if rebound_team == def_team else nearest_opponent
+
+    offense_threshold = 90 + off_team.team_attributes.get("discipline", 0)
+    defense_threshold = 10 - def_team.team_attributes.get("discipline", 0)
+    otb_roll = random.randint(1, 100)
+
+    if otb_roll > offense_threshold:
+        foul_team = "OFFENSE"
+        foul_player = offense_candidate
+        victim = defense_candidate
+    elif otb_roll < defense_threshold:
+        foul_team = "DEFENSE"
+        foul_player = defense_candidate
+        victim = offense_candidate
+    else:
+        return None
+
+    if foul_player is None or victim is None:
+        return None
+
+    second_roll = random.randint(1, 100)
+    if second_roll <= foul_player.attributes.get("IQ", 0):
+        return None
+
+    final_roll = random.randint(1, 5)
+    if final_roll != 1:
+        return None
+
+    return {
+        "foul_team": foul_team,
+        "foul_player": foul_player,
+        "victim": victim,
+        "proximity": nearest_distance,
+    }
+
+
 def resolve_offensive_rebound(game, rebounder):
     """Resolve an offensive rebound by choosing a putback or a kick-out.
 
@@ -562,6 +635,17 @@ def resolve_offensive_rebound(game, rebounder):
             "rebounderId": None,
             "timeElapsed": 0,
             "possession_flips": True,
+        }
+
+    otb = resolve_over_the_back_foul(game, rebounder, off_team, def_lineup)
+    if otb:
+        return {
+            "event_type": "OTB_FOUL",
+            "foul_team": otb["foul_team"],
+            "foul_player_id": getattr(otb["foul_player"], "player_id", None),
+            "victim_id": getattr(otb["victim"], "player_id", None),
+            "timeElapsed": random.randint(1, 5),
+            "position_snapshots": [],
         }
 
     if random.random() < 0.90:  # 90% putback attempt, 10% kickout

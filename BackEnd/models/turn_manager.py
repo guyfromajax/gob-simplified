@@ -3374,6 +3374,38 @@ class TurnManager:
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
         logging.warning(f"🔍 [RESOLVE_OREB_TURN] After resolve_offensive_rebound: event_type={oreb_event.get('event_type')}, result={oreb_event.get('result')}, has_rebound={'rebound' in oreb_event}")
+
+        if oreb_event.get("event_type") == "OTB_FOUL":
+            from BackEnd.engine.phase_resolution import resolve_non_shooting_foul
+
+            foul_player = (
+                off_team.get_player_by_id(str(oreb_event.get("foul_player_id")))
+                or def_team.get_player_by_id(str(oreb_event.get("foul_player_id")))
+            )
+            victim = (
+                off_team.get_player_by_id(str(oreb_event.get("victim_id")))
+                or def_team.get_player_by_id(str(oreb_event.get("victim_id")))
+            )
+            if foul_player and victim:
+                self.game.game_state["foul_team"] = oreb_event.get("foul_team", "OFFENSE")
+                foul_result = resolve_non_shooting_foul(
+                    {
+                        "ball_handler": victim,
+                        "defender": foul_player if oreb_event.get("foul_team") == "DEFENSE" else None,
+                        "foul_player": foul_player,
+                        "shooter": victim,
+                        "screener": None,
+                        "passer": None,
+                    },
+                    self.game,
+                    time_elapsed_override=oreb_event.get("timeElapsed"),
+                )
+                foul_result["otb_foul"] = True
+                foul_result["text"] = "Over the back!"
+                foul_result["current_turn"] = "OREB"
+                if oreb_event.get("position_snapshots"):
+                    foul_result["position_snapshots"] = oreb_event["position_snapshots"]
+                return foul_result
         
         if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
             self.logger.log("putbackStart")

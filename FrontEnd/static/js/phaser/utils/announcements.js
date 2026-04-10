@@ -351,7 +351,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
-      if (isBlockingFoul) {
+      if (turnData.otb_foul) {
+        showAnnouncement("Over The Back!", foulTeam === 'OFFENSE' ? defenseTeam : offenseTeam, playerData);
+      } else if (isBlockingFoul) {
         showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
       } else if (foulTeam === 'OFFENSE') {
         // Offensive foul - show in defense team color (they benefited)

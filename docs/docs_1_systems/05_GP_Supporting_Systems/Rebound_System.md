@@ -87,3 +87,23 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
     -else:
         rebound_team = OFFENSE
         rebounder = o_rebounder
+
+
+**Over The Back Fouls**
+On each rebound attempt we will calculate the possibility of over teh back fouls via the following logic
+
+-Identify one potential fouling player from each team. 
+    -use the rebounder from teh reboudnging team, and the player on the non-rebounding team who is cloest to the rebounder using Euclidian distance
+-If the closest player from the non-rebounding team is farther than 4 Euclidian distance from the rebounder, there is no Over The Back foul in play for either team
+-Offense Threahsold = 90 + offense team discipline value
+-Defense Threshold = 10 - defense team discipline value
+otb_foul = random.randint(1,100)
+-if otb_foul > Offense Threshold, o foul is in play, elif otb_foul < Defense Threshold, d foul in play, else no foul
+
+-if o foul or d foul in play
+    - second_roll = random.randint(1,100)
+    - if second_roll > potential fouling player's IQ from the in play foul team (offenssive potential fouler for o foul in play or defensive potential fouler for d foul in play), then foul_still_in_play = True, else foul_in_play = False
+    -if foul_still_in_play = True, final_roll = random.randint(1,5), 1 = foul, 2-5 = no foul
+
+-if there is an over the back foul called on the offense or the defense, it will end the turn there and negate any Putback attempt or kickout pass that would have been executed. We will process each like a standard non shooting d foul or non shooting o foul.
+-Announcement copy: "Over The Back!" with the fouling player's image through the announcement system

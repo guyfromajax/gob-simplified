@@ -164,8 +164,8 @@ THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 # Target averages per game:
 # - 60 field goal attempts per team per game
 # - Average target FG% of 45%
-STANDARD_D_FOUL = 94
-STANDARD_O_FOUL = 6
+STANDARD_D_FOUL = 95 #changed from 94 to accommodate over the back fouls
+STANDARD_O_FOUL = 5 #changed from 6 to accommodate over the back fouls
 HARD_STEAL = -135
 SOFT_STEAL = -35
 HARD_FOUL = 250

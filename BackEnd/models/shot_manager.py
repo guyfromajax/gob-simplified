@@ -40,6 +40,7 @@ from BackEnd.utils.shared import (
     calculate_charge,
     height_to_block_score,
     calculate_block_spot,
+    resolve_over_the_back_foul,
 )
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
@@ -1370,6 +1371,35 @@ class ShotManager:
 
                     result["ball_bounce_x"] = bounce_spot["x"]
                     result["ball_bounce_y"] = bounce_spot["y"]
+
+                    otb = resolve_over_the_back_foul(
+                        self.game,
+                        rebounder,
+                        rebound_team,
+                        d_rebounder_lineup if rebound_team == off_team else o_rebounder_lineup,
+                    )
+                    if otb:
+                        from BackEnd.engine.phase_resolution import resolve_non_shooting_foul
+
+                        self.game_state["foul_team"] = otb["foul_team"]
+                        foul_result = resolve_non_shooting_foul(
+                            {
+                                "ball_handler": otb["victim"],
+                                "defender": d_rebounder if rebound_team == off_team else rebounder,
+                                "foul_player": otb["foul_player"],
+                                "shooter": otb["victim"],
+                                "screener": None,
+                                "passer": None,
+                            },
+                            self.game,
+                        )
+                        foul_result["otb_foul"] = True
+                        foul_result["text"] = "Over the back!"
+                        foul_result["current_turn"] = "FAST_BREAK"
+                        foul_result["ball_bounce_x"] = bounce_spot["x"]
+                        foul_result["ball_bounce_y"] = bounce_spot["y"]
+                        return foul_result
+
                     self.game_state["last_rebound"] = stat
                     rebounder.record_stat(stat)
                     text += f"...{get_name_safe(rebounder)} grabs the rebound."
@@ -1502,6 +1532,33 @@ class ShotManager:
                     # Store bounce spot for frontend animation
                     result["ball_bounce_x"] = bounce_spot["x"]
                     result["ball_bounce_y"] = bounce_spot["y"]
+
+                    otb = resolve_over_the_back_foul(
+                        self.game,
+                        rebounder,
+                        rebound_team,
+                        d_rebounder_lineup if rebound_team == off_team else o_rebounder_lineup,
+                    )
+                    if otb:
+                        from BackEnd.engine.phase_resolution import resolve_non_shooting_foul
+
+                        self.game_state["foul_team"] = otb["foul_team"]
+                        foul_result = resolve_non_shooting_foul(
+                            {
+                                "ball_handler": otb["victim"],
+                                "defender": d_rebounder if rebound_team == off_team else rebounder,
+                                "foul_player": otb["foul_player"],
+                                "shooter": otb["victim"],
+                                "screener": None,
+                                "passer": None,
+                            },
+                            self.game,
+                        )
+                        foul_result["otb_foul"] = True
+                        foul_result["text"] = "Over the back!"
+                        foul_result["ball_bounce_x"] = bounce_spot["x"]
+                        foul_result["ball_bounce_y"] = bounce_spot["y"]
+                        return foul_result
                     
                     # Record rebound stat and update game state
                     self.game_state["last_rebound"] = stat
