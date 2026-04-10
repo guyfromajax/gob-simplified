@@ -1621,6 +1621,11 @@ function setupLockerRoomButton() {
   const period = urlParams.get('period');
   const startWithInbound = urlParams.get('start_with_inbound');
   const startingPossession = urlParams.get('starting_possession');
+  const isFinalGame = !!(
+    gameData &&
+    urlParams.get('game_id') &&
+    (gameData.is_final === true || Number(gameData.quarter) >= 5)
+  );
 
   const buildLineupBackUrl = () => {
     const helper = window.TimeoutNavigationHelper;
@@ -1648,7 +1653,7 @@ function setupLockerRoomButton() {
   
   // ✅ SS&S: Handle back navigation from lineup or game-plan screens
   // Both use TimeoutNavigationHelper to preserve timeout state
-  if (from === 'lineup' || from === 'game-plan') {
+  if (!isFinalGame && (from === 'lineup' || from === 'game-plan')) {
     cleanButton.textContent = 'Back';
     
     // Remove any existing event listeners by cloning the button
@@ -1711,7 +1716,7 @@ function setupLockerRoomButton() {
     return;
   }
 
-  if (gameData && urlParams.get('game_id') && !gameData.is_final) {
+  if (gameData && urlParams.get('game_id') && !isFinalGame) {
     const lineupUrl = buildLineupBackUrl();
     if (lineupUrl) {
       cleanButton.textContent = 'Back';
@@ -1764,6 +1769,8 @@ function setupLockerRoomButton() {
     navMode = 'single';
     lockerRoomUrl = '/mode-select.html';
   }
+
+  cleanButton.textContent = 'Back To Locker Room';
 
   cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();
