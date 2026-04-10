@@ -166,6 +166,25 @@
     return `${playDetailsPath}?${params.toString()}`;
   }
 
+  function buildPlaybookReportUrl(context) {
+    const params = new URLSearchParams();
+    params.set("mode", context.mode);
+    params.set("team_id", context.teamId);
+    if (context.franchiseId) params.set("franchise_id", context.franchiseId);
+    if (context.tournamentId) params.set("tournament_id", context.tournamentId);
+    if (context.gameId) params.set("game_id", context.gameId);
+    if (context.from) params.set("from", context.from);
+
+    const passthroughKeys = ["quarter", "period", "home", "away", "my_team", "return_url"];
+    passthroughKeys.forEach((key) => {
+      if (context.params.get(key)) {
+        params.set(key, context.params.get(key));
+      }
+    });
+
+    return `/playbook-report.html?${params.toString()}`;
+  }
+
   class ConfirmModal {
     constructor() {
       this.root = document.getElementById("confirm-modal");
@@ -979,12 +998,7 @@
     }
 
     handleBack() {
-      const returnUrl = this.params.get("return_url");
-      if (returnUrl) {
-        window.location.href = returnUrl;
-        return;
-      }
-      window.history.back();
+      window.location.href = buildPlaybookReportUrl(this.context);
     }
 
     showToast(message) {

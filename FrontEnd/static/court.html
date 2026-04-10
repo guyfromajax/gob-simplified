@@ -3303,6 +3303,7 @@
         const data = await response.json();
         
         const slotAssignments = data.slot_assignments || {};
+        const offensePcOrder = (((data || {}).pc_order || {}).offense || []);
         const motionDropdowns = data.motion_dropdowns || {};
         
         // ✅ DIAGNOSTIC: Log slot assignments structure
@@ -3418,82 +3419,91 @@
         // Clear existing play options
         scroller.innerHTML = '';
         
-        // Build ordered list based on slot assignments (1-6)
+        // Build ordered list based on canonical pc_order first, with legacy slot assignments as fallback.
         const orderedPlays = [];
         const usedPlayNames = new Set(); // Track which plays we've already added
-        
-        for (let slot = 1; slot <= 6; slot++) {
-          const assignment = slotAssignments[slot];
-          if (assignment) {
-            // Get play name from assignment
-            let playName = null;
-            let playFocus = null;
-            
+
+        const appendOrderedPlay = (rawRef, slotLabel) => {
+          if (!rawRef) return;
+
+          let playName = null;
+          let playFocus = null;
+          let assignment = null;
+          let playObj = null;
+          let resolvedPlayId = '';
+
+          if (typeof rawRef === 'string') {
+            resolvedPlayId = rawRef;
+            playName = playIdToName[rawRef] || rawRef;
+            playObj = playIdToPlay[rawRef] || playIdToPlay[playName] || null;
+            assignment = Object.values(slotAssignments).find((slotAssignment) =>
+              slotAssignment && (
+                slotAssignment.playId === rawRef ||
+                slotAssignment.playName === playName
+              )
+            ) || null;
+          } else if (typeof rawRef === 'object') {
+            assignment = rawRef;
+            resolvedPlayId = assignment.playId || '';
             if (assignment.playName) {
-              // ✅ Use playName if available (most reliable)
               playName = assignment.playName;
             } else if (assignment.playId) {
-              // ✅ Try to find play name from playId
-              // playId may be: frontend ID ("motion-1"), MongoDB ObjectId ("68fa42c33a0eec681847f886"), or play name
-              playName = playIdToName[assignment.playId];
-              if (!playName) {
-                // ✅ Fallback: try to find by matching playId to play_id (MongoDB ObjectId) or name
-                const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
-                const play = allPlays.find(p => 
-                  p.play_id === assignment.playId || 
-                  p.name === assignment.playId ||
-                  p.name === assignment.playName
-                );
-                playName = play ? play.name : null;
-              }
+              playName = playIdToName[assignment.playId] || assignment.playId;
             }
-            
-            if (!playName) {
-              console.warn(`⚠️ [PLAYCALL CENTER] Could not find play name for slot ${slot}, assignment:`, assignment);
-              console.warn(`⚠️ [PLAYCALL CENTER] Available playIdToName keys:`, Object.keys(playIdToName).slice(0, 10));
-              continue;
+            playObj = playIdToPlay[assignment.playId] || playIdToPlay[playName] || null;
+          }
+
+          if (!playName) {
+            console.warn(`⚠️ [PLAYCALL CENTER] Could not resolve play for ${slotLabel}:`, rawRef);
+            console.warn(`⚠️ [PLAYCALL CENTER] Available playIdToName keys:`, Object.keys(playIdToName).slice(0, 10));
+            return;
+          }
+
+          if (playObj) {
+            playFocus = playObj.play_focus || '';
+          }
+
+          if (assignment && assignment.section === 'motion') {
+            const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
+            if (dropdown !== '-') {
+              playFocus = dropdown;
             }
-            
-            // Get play focus from play object or assignment
-            const playObj = playIdToPlay[assignment.playId] || playIdToPlay[playName];
-            if (playObj) {
-              playFocus = playObj.play_focus || '';
+          }
+
+          const existingPlay = orderedPlays.find(p =>
+            p.getAttribute('data-play') === playName &&
+            (!playFocus || p.getAttribute('data-focus') === playFocus)
+          );
+
+          const playOption = existingPlay || createPlayOptionElement(
+            playName,
+            playFocus,
+            playObj?.play_id || resolvedPlayId || assignment?.playId || '',
+            playObj
+          );
+
+          orderedPlays.push(playOption);
+          usedPlayNames.add(playName);
+        };
+
+        if (Array.isArray(offensePcOrder) && offensePcOrder.length > 0) {
+          offensePcOrder.slice(0, MAX_OFFENSE_PC_ITEMS).forEach((playRef, index) => {
+            appendOrderedPlay(playRef, `pc_order.offense[${index}]`);
+          });
+        } else {
+          for (let slot = 1; slot <= MAX_OFFENSE_PC_ITEMS; slot++) {
+            const assignment = slotAssignments[slot];
+            if (assignment) {
+              appendOrderedPlay(assignment, `slot ${slot}`);
             }
-            
-            // For motion plays, use dropdown variant as focus
-            if (assignment.section === 'motion') {
-              const dropdown = assignment.dropdown || motionDropdowns[assignment.playId] || '-';
-              if (dropdown !== '-') {
-                playFocus = dropdown;
-              }
-            }
-            
-            // Create or find play option element
-            let playOption = null;
-            
-            // Check if we already created this play
-            const existingPlay = orderedPlays.find(p => 
-              p.getAttribute('data-play') === playName && 
-              (!playFocus || p.getAttribute('data-focus') === playFocus)
-            );
-            
-            if (existingPlay) {
-              playOption = existingPlay;
-            } else {
-              // Create new play option element
-              playOption = createPlayOptionElement(playName, playFocus, playObj?.play_id || assignment.playId || '', playObj);
-            }
-            
-            orderedPlays.push(playOption);
-            usedPlayNames.add(playName);
           }
         }
         
-        // If we have fewer than 6 plays, fill remaining slots with other available plays
-        if (orderedPlays.length < 6) {
+        // If we have fewer than MAX_OFFENSE_PC_ITEMS plays, fill remaining slots with other available plays
+        if (orderedPlays.length < MAX_OFFENSE_PC_ITEMS) {
           const allPlays = [...motionPlays, ...setPlayInside, ...setPlayAttack, ...setPlayOutside];
           for (const play of allPlays) {
-            if (orderedPlays.length >= 6) break;
+            if (orderedPlays.length >= MAX_OFFENSE_PC_ITEMS) break;
             if (!usedPlayNames.has(play.name)) {
               const playOption = createPlayOptionElement(play.name, play.play_focus || '', play.play_id || '', play);
               orderedPlays.push(playOption);
@@ -3619,7 +3629,7 @@
         }
       }
       
-      // Handle play selection (6-play scroller) - use event delegation for dynamically created elements
+      // Handle play selection - use event delegation for dynamically created elements
       const playScroller = document.getElementById('offense-play-scroller');
       if (playScroller) {
         playScroller.addEventListener('click', async (e) => {
@@ -3644,7 +3654,7 @@
           // ✅ Data Persistence: Persist this slot change to game document so presets survive timeout/reopen
           if (lastPlaybookDataForSave && playName && lastPlaybookDataForSave.requestContext) {
             const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
-            if (slotNum >= 1 && slotNum <= 6) {
+            if (slotNum >= 1 && slotNum <= MAX_OFFENSE_PC_ITEMS) {
               const section = lastPlaybookDataForSave.playNameToSection[playName] || 'set_play_inside';
               const slotKey = String(slotNum);
               const persistedPlayId = lastPlaybookDataForSave.playNameToPlayId[playName] || option.dataset.playId || playName;
@@ -3653,6 +3663,13 @@
                 playId: persistedPlayId,
                 playName: playName
               };
+              if (!lastPlaybookDataForSave.playbookPayload.pc_order) {
+                lastPlaybookDataForSave.playbookPayload.pc_order = { offense: [], defense: [] };
+              }
+              if (!Array.isArray(lastPlaybookDataForSave.playbookPayload.pc_order.offense)) {
+                lastPlaybookDataForSave.playbookPayload.pc_order.offense = [];
+              }
+              lastPlaybookDataForSave.playbookPayload.pc_order.offense[slotNum - 1] = persistedPlayId;
               const ctx = lastPlaybookDataForSave.requestContext;
               const body = {
                 mode: ctx.mode,
@@ -4395,6 +4412,7 @@
     }
 
     // ==================== SLOT-BASED PLAY NAVIGATION ====================
+    const MAX_OFFENSE_PC_ITEMS = 8;
     let currentPlayIndex = 0;
     let playOptions = []; // Will be populated after slot assignments are loaded
     // Persist 6-preset changes to game doc (Data Persistence: in-game changes saved to game document)

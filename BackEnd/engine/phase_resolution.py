@@ -3873,9 +3873,15 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     """
     import random
     from BackEnd.constants import ACTIONS
+    from BackEnd.utils import situational_logic as sl
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    # Shot type: 50% outside, 50% attack
-    shot_type = "Outside" if random.random() < 0.5 else "Attack"
+    # Shot type: 50% outside, 50% attack, except in Q4/OT when trailing by exactly 3:
+    # Final Shot must be an outside three-point attempt (no drive/attack branch).
+    delta = sl.get_score_delta(game)
+    if getattr(game, "quarter", None) is not None and int(getattr(game, "quarter", 0)) >= 4 and delta == -3:
+        shot_type = "Outside"
+    else:
+        shot_type = "Outside" if random.random() < 0.5 else "Attack"
     game_state["current_playcall"] = shot_type
     # Shooter: rank by SH (outside) or SC+AG (attack), weighted random 50/30/20/9/1
     weights = [0.50, 0.30, 0.20, 0.09, 0.01]
