@@ -3400,6 +3400,17 @@ class TurnManager:
                     self.game,
                     time_elapsed_override=oreb_event.get("timeElapsed"),
                 )
+                # OREB foul turns are returned directly to the API response, so they must not
+                # carry raw Player objects from resolve_non_shooting_foul().
+                foul_result["ball_handler"] = getattr(victim, "player_id", None)
+                foul_result["shooter"] = getattr(victim, "player_id", None)
+                foul_result["defender"] = (
+                    getattr(foul_player, "player_id", None)
+                    if oreb_event.get("foul_team") == "DEFENSE"
+                    else None
+                )
+                foul_result["screener"] = None
+                foul_result["passer"] = None
                 foul_result["otb_foul"] = True
                 foul_result["text"] = "Over the back!"
                 foul_result["current_turn"] = "OREB"
