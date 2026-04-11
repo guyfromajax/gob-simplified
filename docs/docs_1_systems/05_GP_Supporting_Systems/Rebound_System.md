@@ -103,7 +103,7 @@ otb_foul = random.randint(1,100)
 -if o foul or d foul in play
     - second_roll = random.randint(1,100)
     - if second_roll > potential fouling player's IQ from the in play foul team (offenssive potential fouler for o foul in play or defensive potential fouler for d foul in play), then foul_still_in_play = True, else foul_in_play = False
-    -if foul_still_in_play = True, final_roll = random.randint(1,5), 1 = foul, 2-5 = no foul
+    -if foul_still_in_play = True, final_roll = random.randint(1,2), 1 = foul, 2 = no foul
 
 -if there is an over the back foul called on the offense or the defense, it will end the turn there and negate any Putback attempt or kickout pass that would have been executed. We will process each like a standard non shooting d foul or non shooting o foul.
 -Announcement copy: "Over The Back!" with the fouling player's image through the announcement system

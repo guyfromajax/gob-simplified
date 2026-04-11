@@ -551,7 +551,7 @@ def resolve_over_the_back_foul(game, rebounder, rebound_team, opposing_lineup):
     - Find the nearest opposing player to the rebounder.
     - If that opponent is farther than 4 Euclidean distance away, no OTB foul is in play.
     - Otherwise determine whether an offensive or defensive OTB foul is in play using
-      discipline-based thresholds, then an IQ gate, then a final 1-in-5 foul call.
+      discipline-based thresholds, then an IQ gate, then a final 1-in-2 foul call.
 
     Returns:
         dict | None with:
@@ -604,7 +604,7 @@ def resolve_over_the_back_foul(game, rebounder, rebound_team, opposing_lineup):
     if second_roll <= foul_player.attributes.get("IQ", 0):
         return None
 
-    final_roll = random.randint(1, 5)
+    final_roll = random.randint(1, 2)
     if final_roll != 1:
         return None
 
