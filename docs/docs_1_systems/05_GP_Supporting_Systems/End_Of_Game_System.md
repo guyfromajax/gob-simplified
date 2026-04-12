@@ -197,6 +197,13 @@ The End of Game System handles game completion, displays final scores, and provi
 ### Franchise complete-week team id resolution (February 2026)
 
 - **Endpoint:** `POST /franchise/complete-week` (request body: `franchise_id`, `week`, `result: { team1_id, team2_id, team1_score, team2_score }`, optional `game_id`, optional `game_document`).
+- **Frontend week resolution:** `finalizeGame()` in `FrontEnd/static/js/phaser/finalizeGame.js` resolves `week` in this order before posting `complete-week`:
+  1. `window.location.search`
+  2. `localStorage.franchise_week`
+  3. `simData.week`
+  4. `simData.final_game_document.week`
+  5. backend franchise state fallback via `/franchise/command-center/data`, then `/franchise/state`
+- **Reason for backend fallback:** Prevent intermittent franchise EOG failures where command-center navigation context is incomplete at game end; if local/frontend week sources are missing, the finalizer recovers the authoritative current franchise week instead of silently skipping `/franchise/complete-week`.
 - **Team ids:** Backend normalizes `result.team1_id` and `result.team2_id` via `_normalize_team_id()` in `BackEnd/api/franchise_routes.py`:
   1. If the value is a valid ObjectId string, it is returned.
   2. Else lookup in universal `teams` by `_id`, `name`, or `code`; if found, return that document’s `_id`.

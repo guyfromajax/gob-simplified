@@ -4,6 +4,47 @@ const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
 // ✅ SS&S: Import shared status display utility
 import { showStatus, hideStatus } from './utils/statusDisplay.js';
 
+async function recoverFranchiseWeek(franchiseId) {
+  if (!franchiseId || typeof fetch !== 'function' || typeof API_CONFIG === 'undefined') {
+    return null;
+  }
+
+  const headers = {
+    ...(API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {}),
+    'Cache-Control': 'no-cache',
+  };
+
+  const endpoints = [
+    `/franchise/command-center/data?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`,
+    `/franchise/state?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`,
+  ];
+
+  for (const path of endpoints) {
+    try {
+      const res = await fetch(API_CONFIG.buildUrl(path), { headers, cache: 'no-store' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const recoveredWeek = parseInt(data?.week, 10);
+      if (Number.isInteger(recoveredWeek) && recoveredWeek >= 1) {
+        console.warn('[COMPLETE-WEEK TRACE] Recovered week from backend', {
+          franchiseId,
+          recoveredWeek,
+          source: path,
+        });
+        return recoveredWeek;
+      }
+    } catch (error) {
+      console.warn('[COMPLETE-WEEK TRACE] Failed to recover week from backend', {
+        franchiseId,
+        source: path,
+        error: error?.message || String(error),
+      });
+    }
+  }
+
+  return null;
+}
+
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
   console.warn('[COMPLETE-WEEK TRACE] finalizeGame ENTRY', { hasSimData: !!simData, franchiseId, tournamentId });
   // ✅ UNIFIED STRUCTURE: Extract team names with priority: unified structure > backward compatibility
@@ -82,6 +123,12 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   }
   if ((!week || Number.isNaN(week)) && simData?.final_game_document?.week != null) {
     week = parseInt(simData.final_game_document.week, 10);
+  }
+  if ((!week || Number.isNaN(week)) && franchiseId && !tournamentId) {
+    week = await recoverFranchiseWeek(franchiseId);
+    if (Number.isInteger(week) && week >= 1 && typeof localStorage !== 'undefined') {
+      localStorage.setItem('franchise_week', String(week));
+    }
   }
 
   // POST to /tournament/save-result if needed

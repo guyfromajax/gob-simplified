@@ -337,3 +337,77 @@ This is how well your team and work through your opponent's presses and traps. H
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
+
+
+**Team Attribute Impact on Gameplay**
+
+1. Shot Threshold
+- Determines the make/miss threshold for standard shot resolution.
+- Impacts fast-break shot thresholds during fast-break scoring sequences.
+- Impacts special late-game balancing shot-threshold overrides.
+- Combines with Home Crowd shot-threshold adjustments.
+
+2. Rebound Modifier
+- Impacts offensive-rebound outcomes.
+- Impacts defensive-rebound outcomes.
+- Impacts rebound resolution after missed standard shots.
+- Impacts rebound resolution after missed free throws.
+
+3. Offense Efficiency
+- Impacts half-court possession resolution on offense.
+- Helps determine offensive execution advantage during standard possession play.
+
+4. Defense Efficiency
+- Impacts half-court possession resolution on defense.
+- Helps determine defensive execution advantage during standard possession play.
+
+5. Fast Break Efficiency
+- Impacts fast-break offensive success.
+- Impacts rim-runner fast-break outlet and conversion sequences.
+- Impacts fast-break-specific shot-threshold overrides.
+
+6. P/T Efficiency
+- Impacts Full-Court Press defensive resolution.
+- Impacts Half-Court Trap defensive resolution.
+- Impacts defensive pressure success during press/trap gameplay events.
+
+7. Fight
+- Impacts offensive foul tendency.
+- Impacts defensive foul tendency.
+- Impacts turnover/foul calibration during possession resolution.
+- Impacts late-game balancing behavior for trailing teams.
+- Impacts fast-break shot-threshold adjustments against set defenders.
+- Impacts Full-Court Press resolution.
+- Impacts Half-Court Trap resolution.
+- Impacts block-attempt checks in shot resolution.
+
+8. Discipline
+- Impacts steal and turnover calibration during possession resolution.
+- Impacts dead-ball turnover calibration.
+- Impacts shot-foul likelihood in shot resolution.
+- Impacts late-game balancing behavior for leading teams.
+- Impacts turnover checks during gameplay resolution.
+- Impacts Full-Court Press resolution.
+- Impacts Half-Court Trap resolution.
+- Impacts violation / recalibration checks tied to offensive organization.
+- Impacts charge resolution.
+
+9. Momentum
+- No current direct gameplay impact in the working code.
+
+10. Team Chemistry
+- Impacts fast-break shot-threshold adjustments against set defenders.
+- Impacts Full-Court Press resolution.
+- Impacts Half-Court Trap resolution.
+- Impacts charge resolution.
+- Impacts lineup auto-selection / autoset-lineup pool behavior.
+- Impacts Home Crowd strength bands through the Home Crowd system.
+
+11. FB Opp Modifier
+- Impacts fast-break defensive success.
+- Impacts rim-runner fast-break outlet and conversion defense.
+
+12. P/T Opp Modifier
+- Impacts Full-Court Press offensive resistance.
+- Impacts Half-Court Trap offensive resistance.
+- Impacts offensive resistance to press/trap pressure during gameplay events.
