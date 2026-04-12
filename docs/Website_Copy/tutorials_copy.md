@@ -90,21 +90,21 @@ Similar to Player Attributes, these traits evolve throughout the season. Winning
 
 **Shooting**
 
-Represents your team's collective confidence and rhythm as shooters. High Shooting teams trust their spacing, step into open looks decisively, and maintain composure when shots aren't falling early. Success fuels it. Poor selection and cold stretches can slowly chip away at it.
+Represents your team’s collective confidence in its ability to score. High Shooting teams trust their identity, step into opportunities with conviction, and keep believing even when the ball is not dropping early. Strong offensive performances build it. Cold stretches and poor shot quality can chip away at it over time.
 
 **Offense**
 
-Reflects how effectively your team executes its offensive structure before the shot is taken. Ball movement, spacing, timing, and decision-making all flow through this attribute. Running varied schemes sharpens it. Becoming predictable puts it on tape — and makes execution harder.
+Reflects how well your team executes the Xs and Os of its offense before the shot goes up. Ball movement, spacing, timing, screening, and decision-making all flow through this attribute. Running a varied attack sharpens it. Becoming too predictable makes execution harder as opponents adjust.
 
 Offense and Shooting work together. One creates the opportunity. The other converts it.
 
 **Fast Breaks**
 
-Determines how efficiently your team turns defense into immediate offense. Outlet decisions, lane discipline, and transition awareness all contribute. Teams that push with intention sharpen this trait. Reckless transition play can blunt it over time.
+Reflects how well your team executes in transition. Outlet decisions, lane discipline, pace recognition, and finishing before the defense gets set all feed this attribute. Teams that run with purpose sharpen it. Predictable or sloppy transition habits wear it down over time.
 
 **Fight**
 
-Represents your team's competitive edge. High Fight teams embrace physical play, respond to runs with resilience, and perform with urgency when trailing. Winning builds it. Adversity tests it. This trait defines how your team responds when the game turns hostile.
+Represents your team’s competitive edge. High Fight teams embrace physical play, respond to adversity with resilience, and play with urgency when trailing. Winning strengthens it. Losses and drift can wear it down. This trait helps define how your team responds when the game turns hostile.
 
 **Momentum**
 
@@ -112,33 +112,33 @@ An in-game amplifier. Momentum builds during strong stretches and can temporaril
 
 **Fast Break Defense**
 
-Determines how quickly and effectively your team regains structure in transition. Stopping the ball, identifying matchups, and protecting the rim all matter. Teams that prioritize transition awareness see this grow over time.
+Reflects how well your team defends fast breaks and transition offense. Stopping the ball, identifying matchups, protecting the rim, and cutting off easy lanes all matter. Focused transition defense sharpens it. Letting opponents run freely wears it down.
 
 ### Column 2 — Dropdowns
 
 **Rebounding**
 
-Measures how consistently your team finishes possessions. Strong Rebounding teams anticipate misses, secure position early, and treat loose balls as momentum plays. Over time, disciplined fundamentals and physical commitment strengthen this trait — while lapses in effort weaken it.
+Represents your team’s collective belief in its ability to win the glass. Strong Rebounding teams anticipate misses, secure position early, and treat loose balls like winning plays. Physical commitment and execution strengthen it over time. Getting controlled on the boards weakens it.
 
 **Defense**
 
-Captures your team's cohesion and discipline on the defensive end. Rotations, help positioning, communication, and overall structure are all influenced here. Teams that consistently defend with purpose see this grow. Breakdowns and careless play gradually erode it.
+Reflects how well your team executes the Xs and Os of its defense. Rotations, closeouts, communication, help timing, and overall structure are all influenced here. Defending with purpose strengthens it. Repetition, predictability, and breakdowns gradually erode it.
 
 **Press/Trap**
 
-Measures your team's ability to apply structured pressure. Timing, coordination, and controlled aggression all matter. Repeated, predictable pressure schemes may lose effectiveness as opponents adjust. Strategic variety keeps this sharp.
+Reflects how well your team executes full-court presses and half-court traps. Timing, coordination, controlled aggression, and live-ball disruption all matter. Dedicated pressure work sharpens it. Overuse and predictability make it easier for opponents to solve.
 
 **Discipline**
 
-Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight — aggression without structure becomes chaos.
+Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and stay composed late in games. It balances Fight well. Aggression without structure becomes chaos.
 
 **Team Chemistry**
 
-The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see it directly — but you will feel it in tight games.
+The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see it directly, but you will feel it in tight games.
 
 **Press/Trap Breaks**
 
-Measures your team's composure under pressure. Spacing discipline, passing clarity, and decision-making against traps all feed this attribute. Teams that regularly face and solve pressure become sharper. Panic erodes it.
+Reflects how well your team handles the pressure of presses and traps. Spacing discipline, passing clarity, ball security, and calm decision-making all feed this attribute. Teams that consistently solve pressure sharpen it. Panic and rushed execution wear it down.
 
 ---
 
