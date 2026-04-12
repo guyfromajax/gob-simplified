@@ -38,12 +38,11 @@ from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
-    calculate_fb_opp_modifier_change,
-    calculate_pt_opp_modifier_change,
 )
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 from BackEnd.utils.position_ratings import compute_position_ratings
+from BackEnd.utils.team_play_utils import iter_team_plays
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
@@ -668,9 +667,82 @@ def update_team_attributes_after_game(
         str(game_doc.get("_id")),
         eog_inputs,
     )
+
+    def _resolve_game_team_obj(team_id_label: str, team_name: str) -> dict:
+        if not isinstance(teams_obj, dict):
+            return {}
+        candidates = [
+            team_id_label,
+            team_name,
+            str(team_name).replace("-", "_").replace(" ", "_").upper() if team_name else None,
+        ]
+        for key in candidates:
+            if key and isinstance(teams_obj.get(key), dict):
+                return teams_obj.get(key, {})
+        lowered = {str(k).lower(): v for k, v in teams_obj.items()}
+        for key in candidates:
+            if key:
+                val = lowered.get(str(key).lower())
+                if isinstance(val, dict):
+                    return val
+        return {}
+
+    def _stat_bucket(entry: Any) -> dict:
+        if not isinstance(entry, dict):
+            return {}
+        game_stats = entry.get("game_stats")
+        if isinstance(game_stats, dict):
+            return game_stats
+        season_stats = entry.get("season_stats")
+        if isinstance(season_stats, dict):
+            return season_stats
+        return entry
+
+    def _max_share_from_counts(counts: list[int]) -> float:
+        positive_counts = [int(count) for count in counts if int(count) > 0]
+        if not positive_counts:
+            return 0.0
+        total = sum(positive_counts)
+        return max(positive_counts) / total if total > 0 else 0.0
+
+    def _offensive_play_usage(team_obj: dict) -> int:
+        total = 0
+        for _play_key, play_data, _display_name in iter_team_plays(team_obj.get("plays", {})):
+            total += int((play_data.get("game_stats", {}) or {}).get("times_run", 0) or 0)
+        return total
+
+    def _defensive_play_max_share(team_obj: dict) -> float:
+        defense = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
+        counts = [
+            int((_stat_bucket(defense.get(key, {}))).get("used", 0) or 0)
+            for key in ("Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+        ]
+        return _max_share_from_counts(counts)
+
+    def _fast_break_usage(team_obj: dict) -> tuple[int, float]:
+        offense = (team_obj.get("scouting", {}) or {}).get("offense", {}) or {}
+        fb_plays = offense.get("fast_break_plays", {}) or {}
+        counts = [
+            int((fb_plays.get(key, {}) or {}).get("A", 0) or 0)
+            for key in ("covert_release", "rim_runner", "triangle", "after_steal")
+        ]
+        return sum(counts), _max_share_from_counts(counts)
+
+    home_team_obj = _resolve_game_team_obj(canonical_home_team_id, home_team_name)
+    away_team_obj = _resolve_game_team_obj(canonical_away_team_id, away_team_name)
     
     # Calculate attribute changes for each team. team_object_id = ObjectId for FTD; team_id_label = string for logging.
-    def calculate_attr_changes(team_object_id, team_id_label, is_winner, team_totals, opponent_totals, team_scouting, opponent_scouting):
+    def calculate_attr_changes(
+        team_object_id,
+        team_id_label,
+        is_winner,
+        team_totals,
+        opponent_totals,
+        team_scouting,
+        opponent_scouting,
+        team_obj,
+        opponent_team_obj,
+    ):
         """Calculate attribute changes for a team."""
         changes = {}
         
@@ -682,6 +754,12 @@ def update_team_attributes_after_game(
         # Calculate TREB
         treb = team_totals.get("DREB", 0) + team_totals.get("OREB", 0)
         opp_treb = opponent_totals.get("DREB", 0) + opponent_totals.get("OREB", 0)
+        offensive_play_count = _offensive_play_usage(team_obj)
+        defensive_max_share = _defensive_play_max_share(team_obj)
+        _team_fb_total, team_fb_max_share = _fast_break_usage(team_obj)
+        opponent_fb_total, _ = _fast_break_usage(opponent_team_obj)
+        team_pt_total = int(team_scouting.get("pt_total_attempts", 0) or 0)
+        opponent_pt_total = int(opponent_scouting.get("pt_total_attempts", 0) or 0)
         
         # ✅ FTD: Get current team attributes from FTD collection (keyed by ObjectId)
         ftd_doc = franchise_team_data_collection.find_one(
@@ -740,39 +818,30 @@ def update_team_attributes_after_game(
             },
         )
         
-        # shot_threshold: winning team by FG%; losing team by FG% (different ranges)
+        # shot_threshold is a golf score: lower is better, higher is worse.
         if is_winner:
             if fg_pct > 50:
-                changes["shot_threshold"] = random.randint(-20, -10)   # −(10 to 20)
+                changes["shot_threshold"] = random.randint(-10, -5)
             elif fg_pct > 45:
-                changes["shot_threshold"] = random.randint(-10, 0)    # −(0 to 10)
+                changes["shot_threshold"] = random.randint(-5, 5)
             else:
-                changes["shot_threshold"] = random.randint(0, 10)     # +(0 to 10)
+                changes["shot_threshold"] = random.randint(5, 15)
         else:
             if fg_pct > 50:
-                changes["shot_threshold"] = random.randint(-15, -5)   # −(5 to 15)
+                changes["shot_threshold"] = random.randint(0, 5)
             elif fg_pct > 45:
-                changes["shot_threshold"] = random.randint(-5, 0)    # −(0 to 5)
+                changes["shot_threshold"] = random.randint(5, 10)
             else:
-                changes["shot_threshold"] = random.randint(0, 15)     # +(0 to 15)
+                changes["shot_threshold"] = random.randint(10, 25)
         
-        # discipline: both teams same criteria — if team (F+TO) < opponent (F+TO) then +(0,1), else −(1 to 3)
         team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
-        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
-        discipline_branch = "f_plus_to_ge_opp"
-        if team_f_plus_to < opp_f_plus_to:
-            discipline_branch = "f_plus_to_lt_opp"
+        opp_f_plus_to_with_buffer = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0) + 8
+        if team_f_plus_to < opp_f_plus_to_with_buffer:
             changes["discipline"] = random.randint(0, 1)
+        elif team_f_plus_to > opp_f_plus_to_with_buffer:
+            changes["discipline"] = random.randint(-3, -2)
         else:
-            changes["discipline"] = random.randint(-3, -1)
-        logger.warning(
-            "🧪 [EOG-BRANCH] team=%s attr=discipline branch=%s team_f_plus_to=%s opp_f_plus_to=%s raw_change=%s",
-            str(team_id_label),
-            discipline_branch,
-            team_f_plus_to,
-            opp_f_plus_to,
-            changes.get("discipline"),
-        )
+            changes["discipline"] = random.randint(-1, 0)
         
         # fight: winning +(0, 1), losing +(−3 to −1)
         if is_winner:
@@ -781,18 +850,26 @@ def update_team_attributes_after_game(
             changes["fight"] = random.randint(-3, -1)
         
         # rebound_modifier
-        if treb > (opp_treb + 5):
-            changes["rebound_modifier"] = random.uniform(0, 0.1)
-        elif treb < (opp_treb - 5):
-            changes["rebound_modifier"] = random.uniform(-0.1, 0)
+        if treb > (opp_treb + 8):
+            changes["rebound_modifier"] = random.randint(0, 5) / 100.0
+        elif treb < (opp_treb - 8):
+            changes["rebound_modifier"] = -random.randint(10, 20) / 100.0
         else:
-            changes["rebound_modifier"] = random.uniform(-0.05, 0.05)
+            changes["rebound_modifier"] = -random.randint(5, 10) / 100.0
         
-        # offensive_efficiency: both teams +(−2, −1)
-        changes["offensive_efficiency"] = random.randint(-2, -1)
-        
-        # defensive_efficiency: both teams +(−2, −1)
-        changes["defensive_efficiency"] = random.randint(-2, -1)
+        if offensive_play_count > 12:
+            changes["offensive_efficiency"] = random.randint(-2, -1)
+        elif offensive_play_count > 7:
+            changes["offensive_efficiency"] = random.randint(-3, -2)
+        else:
+            changes["offensive_efficiency"] = random.randint(-4, -3)
+
+        if defensive_max_share > 0.49:
+            changes["defensive_efficiency"] = random.randint(-4, -3)
+        elif defensive_max_share > 0.39:
+            changes["defensive_efficiency"] = random.randint(-3, -2)
+        else:
+            changes["defensive_efficiency"] = random.randint(-2, -1)
         
         if is_distant_sim:
             changes["fb_efficiency"] = random.randint(-2, 1)
@@ -808,43 +885,33 @@ def update_team_attributes_after_game(
                 changes.get("pt_opp_modifier"),
             )
         else:
-            # fb_efficiency
-            if team_scouting["fb_rate"] > 60:
-                changes["fb_efficiency"] = random.randint(0, 1)
+            if team_fb_max_share > 0.60:
+                changes["fb_efficiency"] = random.randint(-4, -3)
+            elif team_fb_max_share > 0.50:
+                changes["fb_efficiency"] = random.randint(-3, -2)
             else:
                 changes["fb_efficiency"] = random.randint(-2, -1)
-            
-            # fb_opp_modifier
-            changes["fb_opp_modifier"] = calculate_fb_opp_modifier_change(opponent_scouting)
-            logger.warning(
-                "🧪 [EOG-BRANCH] team=%s attr=fb_opp_modifier opp_fb_rate=%.2f opp_fb_entries=%s raw_change=%s",
-                str(team_id_label),
-                float(opponent_scouting.get("fb_rate", 0)),
-                opponent_scouting.get("fb_entries", 0),
-                changes.get("fb_opp_modifier"),
-            )
-            
-            # pt_efficiency
-            if team_scouting["pt_combined_rate"] > 60:
-                changes["pt_efficiency"] = random.randint(1, 2)
-            elif team_scouting["pt_combined_rate"] < 30:
-                changes["pt_efficiency"] = random.randint(-3, -1)
+
+            if opponent_fb_total > 20:
+                changes["fb_opp_modifier"] = random.randint(-4, -3)
+            elif opponent_fb_total > 10:
+                changes["fb_opp_modifier"] = random.randint(-3, -2)
             else:
-                changes["pt_efficiency"] = random.randint(-1, 0)
-            
-            # pt_opp_modifier
-            changes["pt_opp_modifier"] = calculate_pt_opp_modifier_change(opponent_scouting)
-            logger.warning(
-                "🧪 [EOG-BRANCH] team=%s attr=pt_opp_modifier opp_pt_rate=%.2f opp_pt_attempts=%s opp_hct=%s/%s opp_fcp=%s/%s raw_change=%s",
-                str(team_id_label),
-                float(opponent_scouting.get("pt_combined_rate", 0)),
-                opponent_scouting.get("pt_total_attempts", 0),
-                opponent_scouting.get("hct_success", 0),
-                opponent_scouting.get("hct_used", 0),
-                opponent_scouting.get("fcp_success", 0),
-                opponent_scouting.get("fcp_used", 0),
-                changes.get("pt_opp_modifier"),
-            )
+                changes["fb_opp_modifier"] = random.randint(-2, -1)
+
+            if team_pt_total > 20:
+                changes["pt_efficiency"] = random.randint(-4, -3)
+            elif team_pt_total > 15:
+                changes["pt_efficiency"] = random.randint(-3, -2)
+            else:
+                changes["pt_efficiency"] = random.randint(-2, -1)
+
+            if opponent_pt_total > 20:
+                changes["pt_opp_modifier"] = random.randint(-4, -3)
+            elif opponent_pt_total > 10:
+                changes["pt_opp_modifier"] = random.randint(-3, -2)
+            else:
+                changes["pt_opp_modifier"] = random.randint(-2, -1)
         
         # team_chemistry
         score_delta = winner_score - loser_score
@@ -854,14 +921,14 @@ def update_team_attributes_after_game(
             elif score_delta < 10:
                 changes["team_chemistry"] = random.randint(1, 3)
             else:
-                changes["team_chemistry"] = random.randint(1, 4)
+                changes["team_chemistry"] = random.randint(2, 4)
         else:
             if score_delta < 4:
                 changes["team_chemistry"] = random.randint(-2, -1)
             elif score_delta < 10:
-                changes["team_chemistry"] = random.randint(-3, -1)
+                changes["team_chemistry"] = random.randint(-4, -2)
             else:
-                changes["team_chemistry"] = random.randint(-6, -2)
+                changes["team_chemistry"] = random.randint(-6, -4)
 
         # Apply changes and clamp to valid ranges
         ftd_update = {}
@@ -910,11 +977,11 @@ def update_team_attributes_after_game(
     
     home_changes = calculate_attr_changes(
         home_oid, home_team_id, home_is_winner, home_totals, away_totals,
-        home_scouting, away_scouting
+        home_scouting, away_scouting, home_team_obj, away_team_obj
     ) if home_oid else {}
     away_changes = calculate_attr_changes(
         away_oid, away_team_id, away_is_winner, away_totals, home_totals,
-        away_scouting, home_scouting
+        away_scouting, home_scouting, away_team_obj, home_team_obj
     ) if away_oid else {}
     
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculated changes - home_changes keys: {list(home_changes.keys())}, away_changes keys: {list(away_changes.keys())}")

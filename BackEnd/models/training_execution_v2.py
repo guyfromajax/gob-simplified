@@ -619,6 +619,15 @@ def apply_training_points(
         team_ch_bump = random.randint(1, 3)
         cur_ch = team.get("team_chemistry", 0)
         team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + team_ch_bump))
+
+    # Flat team-attribute bonuses from coaching focus, beyond normal gain amplification.
+    if archetype == "culture-builder" and "fight" in team:
+        fight_lo, fight_hi = TEAM_ATTR_CLAMPS["fight"]
+        team["fight"] = max(fight_lo, min(fight_hi, team.get("fight", 0) + random.randint(0, 1)))
+
+    if archetype == "authoritarian" and "discipline" in team:
+        disc_lo, disc_hi = TEAM_ATTR_CLAMPS["discipline"]
+        team["discipline"] = max(disc_lo, min(disc_hi, team.get("discipline", 0) + random.randint(0, 1)))
     
     # Apply team training points
     for category, allocation_data in normalized_allocations.items():
@@ -669,11 +678,10 @@ def apply_training_points(
     # Sum all contributions, round (0.5 rounds up, <0.5 rounds down), then apply
     # This must happen BEFORE breaks effect so breaks can multiply these gains
     for team_attr, total_points in team_attr_contributions.items():
-        if total_points > 0:
+        if total_points >= 0:
             # Round: 0.5 rounds up, <0.5 rounds down
             rounded_points = int(total_points + 0.5) if total_points >= 0.5 else int(total_points)
-            if rounded_points > 0:
-                _apply_team_training_points(team, team_attr, rounded_points, archetype, sub_option)
+            _apply_team_training_points(team, team_attr, rounded_points, archetype, sub_option)
     
     # Momentum score (amplifier only, from coaching focus)
     # Amplifier: += random.randint(1,5)
@@ -1059,50 +1067,55 @@ def _normalize_allocations(allocations: Dict) -> Dict:
 def _apply_team_training_points(team: dict, team_attr: str, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to a team attribute.
-    
-    Team attributes (standard) doc ranges:
-    - 0 points: += random.randint(-2, 0)
-    - 1 point: += random.randint(1, 2)
-    - 2 points: += random.randint(2, 3)
-    - 3 points: += random.randint(2, 5)
-    - 4 points: += random.randint(2, 6)
-    - 5 points: += random.randint(2, 7)
     """
     if team_attr not in TEAM_ATTR_CLAMPS:
         return
-    
-    # Handle 0 points range
-    if points == 0:
-        decrease = random.randint(-2, 0)
-        current_val = team.get(team_attr, 0)
-        team[team_attr] = current_val + decrease
-        # Clamp
-        lower, upper = TEAM_ATTR_CLAMPS[team_attr]
-        team[team_attr] = max(lower, min(upper, team[team_attr]))
-        return
-    
-    # Get base delta from doc ranges
-    if points == 1:
-        delta = random.randint(1, 2)
-    elif points == 2:
-        delta = random.randint(2, 3)
-    elif points == 3:
-        delta = random.randint(2, 5)
-    elif points == 4:
-        delta = random.randint(2, 6)
-    elif points == 5:
-        delta = random.randint(2, 7)
+
+    standard_ranges = {
+        0: (-2, -1),
+        1: (1, 2),
+        2: (2, 3),
+        3: (3, 4),
+        4: (3, 6),
+        5: (3, 7),
+    }
+    discipline_fight_ranges = {
+        0: (-3, -1),
+        1: (1, 2),
+        2: (2, 3),
+        3: (2, 5),
+        4: (2, 6),
+        5: (2, 7),
+    }
+    chemistry_ranges = {
+        0: (-3, -1),
+        1: (1, 2),
+        2: (2, 3),
+        3: (3, 4),
+        4: (3, 6),
+        5: (3, 7),
+    }
+
+    if team_attr in {"fight", "discipline"}:
+        ranges = discipline_fight_ranges
+    elif team_attr == "team_chemistry":
+        ranges = chemistry_ranges
     else:
-        delta = random.randint(2, 7)
-    
+        ranges = standard_ranges
+
+    points_bucket = max(0, min(5, int(points)))
+    low, high = ranges[points_bucket]
+    delta = random.randint(low, high)
+
     # Apply focus amplifier if this attribute is amplified by the selected focus
-    if _should_amplify_team_attr(team_attr, archetype, sub_option):
+    if delta > 0 and _should_amplify_team_attr(team_attr, archetype, sub_option):
         focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
         delta = int(delta * focus_multiplier)
-    
-    # Apply to team
+
     current_val = team.get(team_attr, 0)
     team[team_attr] = current_val + delta
+    lower, upper = TEAM_ATTR_CLAMPS[team_attr]
+    team[team_attr] = max(lower, min(upper, team[team_attr]))
 
 
 def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None, source: str = "technical_drills"):
@@ -1116,57 +1129,40 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         sub_option: Optional coaching focus sub-option
         source: "technical_drills" or "scrimmages" - determines which range to use
     
-    Technical Drills ranges (in 0.01 increments). See Training_System.md.
-    - 0 points: -= random.randint(1, 5) / 100.0 (-0.05 to -0.01)
-    - 1 point: += random.randint(0, 3) / 100.0 (0.00 to 0.03)
-    - 2 points: += random.randint(3, 7) / 100.0 (0.03 to 0.07)
-    - 3 points: += random.randint(4, 10) / 100.0 (0.04 to 0.10)
-    - 4 points: += random.randint(4, 12) / 100.0 (0.04 to 0.12)
-    - 5 points: += random.randint(4, 14) / 100.0 (0.04 to 0.14)
-    
-    Scrimmages ranges (in 0.01 increments):
-    - 1 point: +0.01 to +0.03
-    - 2 points: +0.02 to +0.05
-    - 3 points: +0.03 to +0.08
-    - 4 points: +0.03 to +0.09
-    - 5 points: +0.03 to +0.10
+    Technical Drills ranges (in 0.01 increments).
+    - 1-2 points: +0.00 to +0.03
+    - 3-4 points: +0.03 to +0.07
+    - 5 points: +0.04 to +0.10
+
+    Scrimmages ranges (in 0.01 increments).
+    - 1-2 points: -0.03 to +0.03
+    - 3-4 points: +0.02 to +0.05
+    - 5 points: +0.03 to +0.07
     """
     # Get base increase based on source and points
     if source == "technical_drills":
-        if points == 0:
-            increase = -random.randint(1, 5) / 100.0  # -0.05 to -0.01
-        elif points == 1:
-            increase = random.randint(0, 3) / 100.0  # 0.00 to 0.03
-        elif points == 2:
-            increase = random.randint(3, 7) / 100.0  # 0.03 to 0.07
-        elif points == 3:
-            increase = random.randint(4, 10) / 100.0  # 0.04 to 0.10
-        elif points == 4:
-            increase = random.randint(4, 12) / 100.0  # 0.04 to 0.12
-        elif points == 5:
-            increase = random.randint(4, 14) / 100.0  # 0.04 to 0.14
+        if points in (1, 2):
+            increase = random.randint(0, 3) / 100.0
+        elif points in (3, 4):
+            increase = random.randint(3, 7) / 100.0
+        elif points >= 5:
+            increase = random.randint(4, 10) / 100.0
         else:
-            increase = random.randint(4, 14) / 100.0  # Default to 5-point range
+            increase = 0.0
     else:  # scrimmages
-        if points == 0:
-            increase = -random.randint(3, 9) / 100.0  # -0.09 to -0.03
-        elif points == 1:
-            increase = random.randint(-3, 3) / 100.0  # -0.03 to 0.03
-        elif points == 2:
-            increase = random.randint(2, 5) / 100.0  # 0.02 to 0.05
-        elif points == 3:
-            increase = random.randint(3, 7) / 100.0  # 0.03 to 0.07
-        elif points == 4:
-            increase = random.randint(3, 8) / 100.0  # 0.03 to 0.08
-        elif points == 5:
-            increase = random.randint(3, 9) / 100.0  # 0.03 to 0.09
+        if points in (1, 2):
+            increase = random.randint(-3, 3) / 100.0
+        elif points in (3, 4):
+            increase = random.randint(2, 5) / 100.0
+        elif points >= 5:
+            increase = random.randint(3, 7) / 100.0
         else:
-            increase = random.randint(3, 9) / 100.0  # Default to 5-point range
+            increase = 0.0
     
     final_increase = increase
     
     # Apply focus amplifier if rebound_modifier is amplified by the selected focus
-    if _should_amplify_team_attr("rebound_modifier", archetype, sub_option):
+    if final_increase > 0 and _should_amplify_team_attr("rebound_modifier", archetype, sub_option):
         focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
         final_increase = final_increase * focus_multiplier
     
@@ -1323,8 +1319,8 @@ def _apply_breaks_effect(
     - 0: random.choice([0.85, 0.9, 0.95]) - applied to all positive increments
     - 1: random.choice([0.9, 0.95, 1, 1, 1])
     - 2: random.choice([1, 1, 1.05, 1.1])
-    - 3: random.choice([1, 1.05, 1.1])
-    - 4: random.choice([1, 1.05, 1.1, 1.1]), and team chemistry += random.randint(-1,1), discipline += random.randint(-2,0), fight += random.randint(-2,0)
+    - 3: random.choice([1, 1.05, 1.1]), and team chemistry += random.randint(-1,1)
+    - 4: random.choice([1, 1.05, 1.1, 1.1]), and team chemistry += random.randint(-2,2), discipline += random.randint(-2,0), fight += random.randint(-2,0)
     - 5: random.choice([1, 1.05, 1.1, 1.15]), and team chemistry += random.randint(-3,3), discipline += random.randint(-3,-1), fight += random.randint(-3,-1)
     
     Note: Only applies to positive increments (gains), not losses.
@@ -1338,10 +1334,15 @@ def _apply_breaks_effect(
         multiplier = random.choice([1, 1, 1.05, 1.1])
     elif breaks_points == 3:
         multiplier = random.choice([1, 1.05, 1.1])
+        team["team_chemistry"] += random.randint(-1, 1)
+        team["team_chemistry"] = max(
+            TEAM_ATTR_CLAMPS["team_chemistry"][0],
+            min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
+        )
     elif breaks_points == 4:
         multiplier = random.choice([1, 1.05, 1.1, 1.1])
         # Also adjust team chemistry, discipline, and fight
-        team["team_chemistry"] += random.randint(-1, 1)
+        team["team_chemistry"] += random.randint(-2, 2)
         team["team_chemistry"] = max(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
