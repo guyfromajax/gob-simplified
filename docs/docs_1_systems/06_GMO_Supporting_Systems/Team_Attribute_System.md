@@ -145,3 +145,4 @@ When team objects are created in Single Game, Tournament, or Franchise modes, th
 - `BackEnd/models/training_execution_v2.py` - `_apply_team_training_points()` (lines 685-726)
   - Applies training point allocations to team attributes
 
+**Team Attribute Faucets & Sinks**
