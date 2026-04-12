@@ -90,21 +90,19 @@ Similar to Player Attributes, these traits evolve throughout the season. Winning
 
 **Shooting**
 
-Represents your team’s collective confidence in its ability to score. High Shooting teams trust their identity, step into opportunities with conviction, and keep believing even when the ball is not dropping early. Strong offensive performances build it. Cold stretches and poor shot quality can chip away at it over time.
+This is your team’s intangible mindset when it comes to converting baskets. It reflects your team’s overall belief in its identity as a group that scores points. This is a compounding attribute that can rise or fall based on in-game performance and training activities.
 
 **Offense**
 
-Reflects how well your team executes the Xs and Os of its offense before the shot goes up. Ball movement, spacing, timing, screening, and decision-making all flow through this attribute. Running a varied attack sharpens it. Becoming too predictable makes execution harder as opponents adjust.
-
-Offense and Shooting work together. One creates the opportunity. The other converts it.
+This is how well your team executes the Xs and Os of its offense: running plays, setting screens, making reads, and getting open. It affects how cleanly your offense operates as a unit, independent of raw talent. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through diverse play-calling and offense-focused training activities.
 
 **Fast Breaks**
 
-Reflects how well your team executes in transition. Outlet decisions, lane discipline, pace recognition, and finishing before the defense gets set all feed this attribute. Teams that run with purpose sharpen it. Predictable or sloppy transition habits wear it down over time.
+This is how well your team executes in transition: pushing the pace, picking the right moments to run, and converting opportunities before the defense can get set. It affects both how often your team generates fast-break chances and how effectively it finishes them. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed fast-break install, a balanced fast-break playbook, and dedicated fast-break training activities.
 
 **Fight**
 
-Represents your team’s competitive edge. High Fight teams embrace physical play, respond to adversity with resilience, and play with urgency when trailing. Winning strengthens it. Losses and drift can wear it down. This trait helps define how your team responds when the game turns hostile.
+Represents your team’s competitive edge. High Fight teams have great resilience, handle adverse situations well, and perform with urgency when trailing. This is a compounding attribute that can rise or fall based on in-game performance and training activities.
 
 **Momentum**
 
@@ -112,33 +110,33 @@ An in-game amplifier. Momentum builds during strong stretches and can temporaril
 
 **Fast Break Defense**
 
-Reflects how well your team defends fast breaks and transition offense. Stopping the ball, identifying matchups, protecting the rim, and cutting off easy lanes all matter. Focused transition defense sharpens it. Letting opponents run freely wears it down.
+This is how well your team defends fast breaks and transition offense. It is about containing pace, cutting off passing lanes, and not allowing easy transition baskets. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed fast-break defense install and film study of your opponent.
 
 ### Column 2 — Dropdowns
 
 **Rebounding**
 
-Represents your team’s collective belief in its ability to win the glass. Strong Rebounding teams anticipate misses, secure position early, and treat loose balls like winning plays. Physical commitment and execution strengthen it over time. Getting controlled on the boards weakens it.
+This is your team’s intangible mindset when it comes to rebounding. It reflects your team’s overall belief in its identity as a group that gets more rebounds than its opponent. This is a compounding attribute that can rise or fall based on in-game performance and training activities.
 
 **Defense**
 
-Reflects how well your team executes the Xs and Os of its defense. Rotations, closeouts, communication, help timing, and overall structure are all influenced here. Defending with purpose strengthens it. Repetition, predictability, and breakdowns gradually erode it.
+This is how well your team executes the Xs and Os of its defense: rotating on time, closing out, communicating switches, and making life difficult for the offense. Raw athleticism only takes you so far; this is what separates a disciplined unit from a collection of individuals. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through diverse play-calling and defense-focused training activities.
 
 **Press/Trap**
 
-Reflects how well your team executes full-court presses and half-court traps. Timing, coordination, controlled aggression, and live-ball disruption all matter. Dedicated pressure work sharpens it. Overuse and predictability make it easier for opponents to solve.
+This is how well your team executes full-court presses and half-court traps: timing the traps, cutting off passing lanes, and turning defensive pressure into live-ball turnovers. It affects both how often your team disrupts the opponent’s offense and how effectively it converts that pressure into scoring opportunities. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed press/trap install, a disciplined approach to how often you deploy it, and dedicated press/trap training activities.
 
 **Discipline**
 
-Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and stay composed late in games. It balances Fight well. Aggression without structure becomes chaos.
+Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight very well. Aggression without structure becomes chaos. This is a compounding attribute that can rise or fall based on in-game performance and training activities.
 
 **Team Chemistry**
 
-The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see it directly, but you will feel it in tight games.
+The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see the impact of this attribute directly, but you will definitely feel it. This is a compounding attribute that can rise or fall based on in-game performance and training activities.
 
 **Press/Trap Breaks**
 
-Reflects how well your team handles the pressure of presses and traps. Spacing discipline, passing clarity, ball security, and calm decision-making all feed this attribute. Teams that consistently solve pressure sharpen it. Panic and rushed execution wear it down.
+This is how well your team works through your opponent’s presses and traps. Handling the pressure of these disruptive defenses is key to avoiding the many mistakes they can cause. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed press/trap offense install and film study of your opponent.
 
 ---
 
