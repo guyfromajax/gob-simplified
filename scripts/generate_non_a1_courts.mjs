@@ -38,8 +38,8 @@ const THREE_POINT_RIGHT = {
 const FREE_THROW_LEFT_BBOX = { x1: 684, y1: 859, x2: 1044, y2: 1219, start: 248, end: 112 };
 const FREE_THROW_RIGHT_BBOX = { x1: 2288, y1: 859, x2: 2648, y2: 1219, start: 68, end: 292 };
 const CENTER = { x: 1666, y: 1042 };
-const LANE_LEFT_RECT = { x1: 150, y1: 816, x2: 824, y2: 1262 };
-const LANE_RIGHT_RECT = { x1: 2509, y1: 816, x2: 3183, y2: 1262 };
+const LANE_LEFT_RECT = { x1: 150, y1: 816, x2: 872, y2: 1262 };
+const LANE_RIGHT_RECT = { x1: 2452, y1: 816, x2: 3183, y2: 1262 };
 const LANE_OUTSIDE_HASHES_LEFT_X = [458, 558, 658, 758];
 const LANE_OUTSIDE_HASHES_RIGHT_X = [2575, 2675, 2775, 2875];
 const LANE_OUTSIDE_HASH_TOP = { y1: 782, y2: 816 };
@@ -254,6 +254,7 @@ function drawCourtLinework({ base, outfile }) {
     "-fill", "none",
     "-stroke", COLORS.line,
     "-strokewidth", "8",
+    "-draw", `rectangle ${FLOOR.x1},${FLOOR.y1} ${FLOOR.x2},${FLOOR.y2}`,
     "-draw", `line ${CENTER.x},${FLOOR.y1} ${CENTER.x},${FLOOR.y2}`,
     "-draw", `path 'M ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.topY} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.bottomY}'`,
     "-draw", `path 'M ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.topY} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.bottomY}'`,
@@ -349,13 +350,13 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   if (existsSync(LEFT_BASKET_ALPHA) && existsSync(RIGHT_BASKET_ALPHA)) {
     const args = [
       withLinework,
-      LEFT_BASKET_ALPHA, "-geometry", "+126+892", "-compose", "over", "-composite",
-      RIGHT_BASKET_ALPHA, "-geometry", "+3042+892", "-compose", "over", "-composite",
+      LEFT_BASKET_ALPHA, "-geometry", "+126+922", "-compose", "over", "-composite",
+      RIGHT_BASKET_ALPHA, "-geometry", "+3042+922", "-compose", "over", "-composite",
     ];
     if (existsSync(LEFT_BACKBOARD_OVERLAY) && existsSync(RIGHT_BACKBOARD_OVERLAY)) {
       args.push(
-        LEFT_BACKBOARD_OVERLAY, "-geometry", "+132+895", "-compose", "over", "-composite",
-        RIGHT_BACKBOARD_OVERLAY, "-geometry", "+3051+895", "-compose", "over", "-composite",
+        LEFT_BACKBOARD_OVERLAY, "-geometry", "+132+994", "-compose", "over", "-composite",
+        RIGHT_BACKBOARD_OVERLAY, "-geometry", "+3051+994", "-compose", "over", "-composite",
       );
     }
     if (existsSync(LEFT_RIMNET_OVERLAY) && existsSync(RIGHT_RIMNET_OVERLAY)) {
