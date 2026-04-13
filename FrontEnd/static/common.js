@@ -28,6 +28,18 @@ var TEAM_ASSET_SPEC = {
   banner_primary: { ext: 'jpg', fallbackSlug: 'general' }
 };
 
+// Temporary animation-validation override: route A1 home courts to one proof court.
+var TEMP_PROOF_COURT_SLUGS = {
+  bentley_truman: true,
+  lancaster: true,
+  four_corners: true,
+  morristown: true,
+  ocean_city: true,
+  little_york: true,
+  xavien: true,
+  south_lancaster: true
+};
+
 /**
  * Build path for a team asset. Uses team_slug if provided, else derives from team name.
  * @param {string} teamNameOrSlug - Team display name or team_slug (from API)
@@ -40,6 +52,9 @@ function getTeamAssetPath(teamNameOrSlug, assetKey) {
     : nameToTeamSlug(teamNameOrSlug);
   var spec = TEAM_ASSET_SPEC[assetKey];
   if (!spec) return '/images/teams/general/general_logo_square.png';
+  if (assetKey === 'court' && TEMP_PROOF_COURT_SLUGS[slug]) {
+    return '/images/teams/general/general_court_proof.jpg';
+  }
   var useSlug = slug || spec.fallbackSlug;
   var base = '/images/teams/' + useSlug + '/' + useSlug + '_' + assetKey + '.' + spec.ext;
   return base;

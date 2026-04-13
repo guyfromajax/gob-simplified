@@ -1,0 +1,129 @@
+{
+  "source_asset": "FrontEnd/static/images/teams/bentley_truman/bentley_truman_court.jpg",
+  "canvas": {
+    "width": 3333,
+    "height": 2083
+  },
+  "runtime_anchors": {
+    "away_rim": {
+      "x": 300,
+      "y": 1042
+    },
+    "home_rim": {
+      "x": 3033,
+      "y": 1042
+    },
+    "away_top_key": {
+      "x": 1200,
+      "y": 1042
+    },
+    "home_top_key": {
+      "x": 2133,
+      "y": 1042
+    },
+    "clamp_bounds_px": {
+      "left": 167,
+      "right": 3166,
+      "top": 83,
+      "bottom": 2041
+    }
+  },
+  "regions": {
+    "border_left": {
+      "x1": 0,
+      "y1": 0,
+      "x2": 190,
+      "y2": 2083
+    },
+    "border_right": {
+      "x1": 3143,
+      "y1": 0,
+      "x2": 3333,
+      "y2": 2083
+    },
+    "center_logo": {
+      "x1": 1325,
+      "y1": 689,
+      "x2": 2006,
+      "y2": 1348
+    },
+    "left_upper_secondary": {
+      "x1": 420,
+      "y1": 245,
+      "x2": 980,
+      "y2": 760
+    },
+    "left_lower_secondary": {
+      "x1": 430,
+      "y1": 1325,
+      "x2": 985,
+      "y2": 1835
+    },
+    "right_upper_secondary": {
+      "x1": 2348,
+      "y1": 245,
+      "x2": 2908,
+      "y2": 760
+    },
+    "right_lower_secondary": {
+      "x1": 2348,
+      "y1": 1325,
+      "x2": 2908,
+      "y2": 1835
+    },
+    "center_wordmark": {
+      "x1": 350,
+      "y1": 620,
+      "x2": 2980,
+      "y2": 1520
+    },
+    "right_of_center_wordmark": {
+      "x1": 1650,
+      "y1": 725,
+      "x2": 2625,
+      "y2": 1460
+    },
+    "left_paint": {
+      "x1": 150,
+      "y1": 672,
+      "x2": 1085,
+      "y2": 1411
+    },
+    "right_paint": {
+      "x1": 2248,
+      "y1": 672,
+      "x2": 3183,
+      "y2": 1411
+    },
+    "center_circle_zone": {
+      "x1": 1140,
+      "y1": 515,
+      "x2": 2193,
+      "y2": 1568
+    },
+    "midcourt_neutral_strip": {
+      "x1": 1075,
+      "y1": 420,
+      "x2": 2258,
+      "y2": 1663
+    },
+    "left_basket_overlay": {
+      "x1": 0,
+      "y1": 620,
+      "x2": 360,
+      "y2": 1470
+    },
+    "right_basket_overlay": {
+      "x1": 2973,
+      "y1": 620,
+      "x2": 3333,
+      "y2": 1470
+    }
+  },
+  "notes": [
+    "Mask artifacts are Bentley-Truman-derived first-pass extraction assets.",
+    "Border and placement-slot masks are deterministic rectangle masks.",
+    "Paint masks are color-extracted from bounded crops to avoid center-logo contamination.",
+    "Hardwood split masks are not extracted yet; they need a more deliberate shape pass."
+  ]
+}
