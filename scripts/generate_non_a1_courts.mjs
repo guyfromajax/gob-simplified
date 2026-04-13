@@ -28,7 +28,7 @@ const FLOOR_EDGE_TOP_Y = 208;
 const FLOOR_EDGE_BOTTOM_Y = 1878;
 const THREE_POINT_LEFT = {
   startX: 96,
-  controlX: 1120,
+  controlX: 1112,
   topY: 308,
   bottomY: 1770,
 };
