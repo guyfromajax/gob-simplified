@@ -297,6 +297,8 @@ function drawPaintLinework({ base, outfile }) {
     "-draw", `rectangle ${LANE_RIGHT_RECT.x1},${LANE_RIGHT_RECT.y1} ${LANE_RIGHT_RECT.x2},${LANE_RIGHT_RECT.y2}`,
     "-draw", `arc ${LEFT_HALF_CIRCLE.x1},${LEFT_HALF_CIRCLE.y1} ${LEFT_HALF_CIRCLE.x2},${LEFT_HALF_CIRCLE.y2} 270,90`,
     "-draw", `arc ${RIGHT_HALF_CIRCLE.x1},${RIGHT_HALF_CIRCLE.y1} ${RIGHT_HALF_CIRCLE.x2},${RIGHT_HALF_CIRCLE.y2} 90,270`,
+    "-draw", `stroke-dasharray 40,62 stroke-dashoffset 20 arc ${LEFT_HALF_CIRCLE.x1},${LEFT_HALF_CIRCLE.y1} ${LEFT_HALF_CIRCLE.x2},${LEFT_HALF_CIRCLE.y2} 90,270`,
+    "-draw", `stroke-dasharray 40,62 stroke-dashoffset 20 arc ${RIGHT_HALF_CIRCLE.x1},${RIGHT_HALF_CIRCLE.y1} ${RIGHT_HALF_CIRCLE.x2},${RIGHT_HALF_CIRCLE.y2} 270,90`,
     outfile,
   ]);
 }
