@@ -53,8 +53,10 @@ const THREE_POINT_LINE_RIGHT = {
 const FREE_THROW_LEFT_BBOX = { x1: 684, y1: 859, x2: 1044, y2: 1219, start: 248, end: 112 };
 const FREE_THROW_RIGHT_BBOX = { x1: 2288, y1: 859, x2: 2648, y2: 1219, start: 68, end: 292 };
 const CENTER = { x: 1666, y: 1042 };
-const LANE_LEFT_RECT = { x1: 150, y1: 816, x2: 872, y2: 1262 };
-const LANE_RIGHT_RECT = { x1: 2452, y1: 816, x2: 3183, y2: 1262 };
+const LANE_LEFT_RECT = { x1: 150, y1: 806, x2: 872, y2: 1271 };
+const LANE_RIGHT_RECT = { x1: 2452, y1: 806, x2: 3183, y2: 1271 };
+const LEFT_HALF_CIRCLE = { x1: 641, y1: 808, x2: 1103, y2: 1269 };
+const RIGHT_HALF_CIRCLE = { x1: 2221, y1: 808, x2: 2683, y2: 1269 };
 const LANE_OUTSIDE_HASHES_LEFT_X = [458, 558, 658, 758];
 const LANE_OUTSIDE_HASHES_RIGHT_X = [2575, 2675, 2775, 2875];
 const LANE_OUTSIDE_HASH_TOP = { y1: 782, y2: 816 };
@@ -274,6 +276,31 @@ function drawLaneRects({ base, color, outfile }) {
   ]);
 }
 
+function drawHalfCircleCaps({ base, color, outfile }) {
+  run([
+    base,
+    "-fill", color,
+    "-stroke", "none",
+    "-draw", `ellipse ${(LEFT_HALF_CIRCLE.x1 + LEFT_HALF_CIRCLE.x2) / 2},${(LEFT_HALF_CIRCLE.y1 + LEFT_HALF_CIRCLE.y2) / 2} ${(LEFT_HALF_CIRCLE.x2 - LEFT_HALF_CIRCLE.x1) / 2},${(LEFT_HALF_CIRCLE.y2 - LEFT_HALF_CIRCLE.y1) / 2} 270,90`,
+    "-draw", `ellipse ${(RIGHT_HALF_CIRCLE.x1 + RIGHT_HALF_CIRCLE.x2) / 2},${(RIGHT_HALF_CIRCLE.y1 + RIGHT_HALF_CIRCLE.y2) / 2} ${(RIGHT_HALF_CIRCLE.x2 - RIGHT_HALF_CIRCLE.x1) / 2},${(RIGHT_HALF_CIRCLE.y2 - RIGHT_HALF_CIRCLE.y1) / 2} 90,270`,
+    outfile,
+  ]);
+}
+
+function drawPaintLinework({ base, outfile }) {
+  run([
+    base,
+    "-fill", "none",
+    "-stroke", COLORS.line,
+    "-strokewidth", "8",
+    "-draw", `rectangle ${LANE_LEFT_RECT.x1},${LANE_LEFT_RECT.y1} ${LANE_LEFT_RECT.x2},${LANE_LEFT_RECT.y2}`,
+    "-draw", `rectangle ${LANE_RIGHT_RECT.x1},${LANE_RIGHT_RECT.y1} ${LANE_RIGHT_RECT.x2},${LANE_RIGHT_RECT.y2}`,
+    "-draw", `arc ${LEFT_HALF_CIRCLE.x1},${LEFT_HALF_CIRCLE.y1} ${LEFT_HALF_CIRCLE.x2},${LEFT_HALF_CIRCLE.y2} 270,90`,
+    "-draw", `arc ${RIGHT_HALF_CIRCLE.x1},${RIGHT_HALF_CIRCLE.y1} ${RIGHT_HALF_CIRCLE.x2},${RIGHT_HALF_CIRCLE.y2} 90,270`,
+    outfile,
+  ]);
+}
+
 function drawCourtLinework({ base, outfile }) {
   run([
     base,
@@ -349,17 +376,14 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   const primary = hex(team.primary_color, "#2a2a2a");
   const secondary = hex(team.secondary_color, "#f2f2f2");
   const laneColor = resolveAssignmentColor({ token: laneKey, primary, secondary, insideWood, outsideWood });
-  const halfCircleColor = resolveAssignmentColor({ token: halfCircleKey, primary, secondary, insideWood, outsideWood });
+  const effectiveHalfCircleKey = team.slug === "abilene" ? "primary" : halfCircleKey;
+  const halfCircleColor = resolveAssignmentColor({ token: effectiveHalfCircleKey, primary, secondary, insideWood, outsideWood });
   const oobColor = resolveAssignmentColor({ token: oobKey, primary, secondary, insideWood, outsideWood });
 
   const base = path.join(WORKDIR, `${team.slug}_base.jpg`);
   const withWood = path.join(WORKDIR, `${team.slug}_with_wood.jpg`);
-  const withHalfLeft = path.join(WORKDIR, `${team.slug}_with_half_left.jpg`);
-  const withBothHalf = path.join(WORKDIR, `${team.slug}_with_both_half.jpg`);
+  const withHalfCaps = path.join(WORKDIR, `${team.slug}_with_half_caps.jpg`);
   const withLanes = path.join(WORKDIR, `${team.slug}_with_lanes.jpg`);
-  const leftPaintOutline = path.join(WORKDIR, `${team.slug}_left_paint_outline.png`);
-  const rightPaintOutline = path.join(WORKDIR, `${team.slug}_right_paint_outline.png`);
-  const withLeftOutline = path.join(WORKDIR, `${team.slug}_with_left_outline.jpg`);
   const withPaintOutlines = path.join(WORKDIR, `${team.slug}_with_paint_outlines.jpg`);
   const withLinework = path.join(WORKDIR, `${team.slug}_with_linework.jpg`);
   const withBoardExtensions = path.join(WORKDIR, `${team.slug}_with_board_extensions.jpg`);
@@ -367,26 +391,9 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
 
   run(["-size", `${CANVAS.w}x${CANVAS.h}`, `xc:${oobColor}`, base]);
   drawWoodBase({ base, outsideWood, insideWood, outfile: withWood });
-  applyMaskedColor({ base: withWood, mask: LEFT_PAINT_MASK, color: halfCircleColor, outfile: withHalfLeft });
-  applyMaskedColor({ base: withHalfLeft, mask: RIGHT_PAINT_MASK, color: halfCircleColor, outfile: withBothHalf });
-  drawLaneRects({ base: withBothHalf, color: laneColor, outfile: withLanes });
-
-  run([
-    LEFT_PAINT_MASK,
-    "-alpha", "extract",
-    "-threshold", "1%",
-    "-morphology", "EdgeOut", "Diamond",
-    leftPaintOutline,
-  ]);
-  run([
-    RIGHT_PAINT_MASK,
-    "-alpha", "extract",
-    "-threshold", "1%",
-    "-morphology", "EdgeOut", "Diamond",
-    rightPaintOutline,
-  ]);
-  applyMaskedColor({ base: withLanes, mask: leftPaintOutline, color: COLORS.line, outfile: withLeftOutline });
-  applyMaskedColor({ base: withLeftOutline, mask: rightPaintOutline, color: COLORS.line, outfile: withPaintOutlines });
+  drawHalfCircleCaps({ base: withWood, color: halfCircleColor, outfile: withHalfCaps });
+  drawLaneRects({ base: withHalfCaps, color: laneColor, outfile: withLanes });
+  drawPaintLinework({ base: withLanes, outfile: withPaintOutlines });
 
   drawCourtLinework({ base: withPaintOutlines, outfile: withLinework });
   drawBackboardHeightExtensions({ base: withLinework, outfile: withBoardExtensions });
