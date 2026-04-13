@@ -21,6 +21,7 @@ const ASSIGNMENT_REPORT = path.join(TMP_DIR, "non_a1_court_assignments.json");
 
 const CANVAS = { w: 3333, h: 2083 };
 const FLOOR = { x1: 75, y1: 60, x2: 3258, y2: 2023 };
+const OOB_LINE_BOUNDS = { x1: 150, y1: 60, x2: 3183, y2: 2023 };
 const FLOOR_EDGE_TOP_Y = 208;
 const FLOOR_EDGE_BOTTOM_Y = 1878;
 const THREE_POINT_LEFT = {
@@ -223,13 +224,13 @@ function applyMaskedColor({ base, mask, color, outfile }) {
 }
 
 function drawWoodBase({ base, outsideWood, insideWood, outfile }) {
-  const leftPath = `M ${FLOOR.x1},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${FLOOR.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
-  const rightPath = `M ${FLOOR.x2},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${FLOOR.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const leftPath = `M ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const rightPath = `M ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
   run([
     base,
     "-fill", outsideWood,
     "-stroke", "none",
-    "-draw", `rectangle ${FLOOR.x1},${FLOOR.y1} ${FLOOR.x2},${FLOOR.y2}`,
+    "-draw", `rectangle ${OOB_LINE_BOUNDS.x1},${OOB_LINE_BOUNDS.y1} ${OOB_LINE_BOUNDS.x2},${OOB_LINE_BOUNDS.y2}`,
     "-fill", insideWood,
     "-draw", `path '${leftPath}'`,
     "-draw", `path '${rightPath}'`,
@@ -254,7 +255,7 @@ function drawCourtLinework({ base, outfile }) {
     "-fill", "none",
     "-stroke", COLORS.line,
     "-strokewidth", "8",
-    "-draw", `rectangle ${FLOOR.x1},${FLOOR.y1} ${FLOOR.x2},${FLOOR.y2}`,
+    "-draw", `rectangle ${OOB_LINE_BOUNDS.x1},${OOB_LINE_BOUNDS.y1} ${OOB_LINE_BOUNDS.x2},${OOB_LINE_BOUNDS.y2}`,
     "-draw", `line ${CENTER.x},${FLOOR.y1} ${CENTER.x},${FLOOR.y2}`,
     "-draw", `path 'M ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.topY} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.bottomY}'`,
     "-draw", `path 'M ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.topY} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.bottomY}'`,
