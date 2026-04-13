@@ -21,7 +21,9 @@ const ASSIGNMENT_REPORT = path.join(TMP_DIR, "non_a1_court_assignments.json");
 
 const CANVAS = { w: 3333, h: 2083 };
 const FLOOR = { x1: 75, y1: 60, x2: 3258, y2: 2023 };
-const OOB_LINE_BOUNDS = { x1: 150, y1: 104, x2: 3183, y2: 1978 };
+const OOB_LINE_BOUNDS = { x1: 150, y1: 84, x2: 3183, y2: 1998 };
+const TOP_HORIZONTAL_OOB_Y = 158;
+const BOTTOM_HORIZONTAL_OOB_Y = 1924;
 const FLOOR_EDGE_TOP_Y = 208;
 const FLOOR_EDGE_BOTTOM_Y = 1878;
 const THREE_POINT_LEFT = {
@@ -113,6 +115,17 @@ const COLORS = {
   backboardOuter: "#d7dde8",
   backboardInner: "#f6f7fb",
   support: "#1b1b1b",
+  backboardGlass: "rgba(82,95,122,0.45)",
+};
+
+const LEFT_BACKBOARD_EXT = {
+  outer: { x1: 166, y1: 882, x2: 196, y2: 1212 },
+  glass: { x1: 172, y1: 888, x2: 190, y2: 1206 },
+};
+
+const RIGHT_BACKBOARD_EXT = {
+  outer: { x1: 3137, y1: 882, x2: 3167, y2: 1212 },
+  glass: { x1: 3143, y1: 888, x2: 3161, y2: 1206 },
 };
 
 function run(args) {
@@ -242,7 +255,7 @@ function drawWoodBase({ base, outsideWood, insideWood, outfile }) {
     base,
     "-fill", outsideWood,
     "-stroke", "none",
-    "-draw", `rectangle ${OOB_LINE_BOUNDS.x1},${OOB_LINE_BOUNDS.y1} ${OOB_LINE_BOUNDS.x2},${OOB_LINE_BOUNDS.y2}`,
+    "-draw", `rectangle ${OOB_LINE_BOUNDS.x1},${TOP_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${BOTTOM_HORIZONTAL_OOB_Y}`,
     "-fill", insideWood,
     "-draw", `path '${leftPath}'`,
     "-draw", `path '${rightPath}'`,
@@ -267,8 +280,11 @@ function drawCourtLinework({ base, outfile }) {
     "-fill", "none",
     "-stroke", COLORS.line,
     "-strokewidth", "8",
-    "-draw", `rectangle ${OOB_LINE_BOUNDS.x1},${OOB_LINE_BOUNDS.y1} ${OOB_LINE_BOUNDS.x2},${OOB_LINE_BOUNDS.y2}`,
-    "-draw", `line ${CENTER.x},${OOB_LINE_BOUNDS.y1} ${CENTER.x},${OOB_LINE_BOUNDS.y2}`,
+    "-draw", `line ${OOB_LINE_BOUNDS.x1},${TOP_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${TOP_HORIZONTAL_OOB_Y}`,
+    "-draw", `line ${OOB_LINE_BOUNDS.x1},${BOTTOM_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${BOTTOM_HORIZONTAL_OOB_Y}`,
+    "-draw", `line ${OOB_LINE_BOUNDS.x1},${TOP_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x1},${BOTTOM_HORIZONTAL_OOB_Y}`,
+    "-draw", `line ${OOB_LINE_BOUNDS.x2},${TOP_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${BOTTOM_HORIZONTAL_OOB_Y}`,
+    "-draw", `line ${CENTER.x},${TOP_HORIZONTAL_OOB_Y} ${CENTER.x},${BOTTOM_HORIZONTAL_OOB_Y}`,
     "-draw", `path 'M ${THREE_POINT_LINE_LEFT.startX},${THREE_POINT_LINE_LEFT.topY} Q ${THREE_POINT_LINE_LEFT.controlX},${THREE_POINT_LINE_LEFT.topY} ${THREE_POINT_LINE_LEFT.controlX},1042 Q ${THREE_POINT_LINE_LEFT.controlX},${THREE_POINT_LINE_LEFT.bottomY} ${THREE_POINT_LINE_LEFT.startX},${THREE_POINT_LINE_LEFT.bottomY}'`,
     "-draw", `path 'M ${THREE_POINT_LINE_RIGHT.startX},${THREE_POINT_LINE_RIGHT.topY} Q ${THREE_POINT_LINE_RIGHT.controlX},${THREE_POINT_LINE_RIGHT.topY} ${THREE_POINT_LINE_RIGHT.controlX},1042 Q ${THREE_POINT_LINE_RIGHT.controlX},${THREE_POINT_LINE_RIGHT.bottomY} ${THREE_POINT_LINE_RIGHT.startX},${THREE_POINT_LINE_RIGHT.bottomY}'`,
     "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_TOP.y2}`,
@@ -287,6 +303,20 @@ function drawCourtLinework({ base, outfile }) {
     "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[1]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[1]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
     "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[2]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[2]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
     "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[3]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[3]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    outfile,
+  ]);
+}
+
+function drawBackboardHeightExtensions({ base, outfile }) {
+  run([
+    base,
+    "-fill", COLORS.backboardOuter,
+    "-stroke", "none",
+    "-draw", `rectangle ${LEFT_BACKBOARD_EXT.outer.x1},${LEFT_BACKBOARD_EXT.outer.y1} ${LEFT_BACKBOARD_EXT.outer.x2},${LEFT_BACKBOARD_EXT.outer.y2}`,
+    "-draw", `rectangle ${RIGHT_BACKBOARD_EXT.outer.x1},${RIGHT_BACKBOARD_EXT.outer.y1} ${RIGHT_BACKBOARD_EXT.outer.x2},${RIGHT_BACKBOARD_EXT.outer.y2}`,
+    "-fill", COLORS.backboardGlass,
+    "-draw", `rectangle ${LEFT_BACKBOARD_EXT.glass.x1},${LEFT_BACKBOARD_EXT.glass.y1} ${LEFT_BACKBOARD_EXT.glass.x2},${LEFT_BACKBOARD_EXT.glass.y2}`,
+    "-draw", `rectangle ${RIGHT_BACKBOARD_EXT.glass.x1},${RIGHT_BACKBOARD_EXT.glass.y1} ${RIGHT_BACKBOARD_EXT.glass.x2},${RIGHT_BACKBOARD_EXT.glass.y2}`,
     outfile,
   ]);
 }
@@ -332,7 +362,7 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   const withLeftOutline = path.join(WORKDIR, `${team.slug}_with_left_outline.jpg`);
   const withPaintOutlines = path.join(WORKDIR, `${team.slug}_with_paint_outlines.jpg`);
   const withLinework = path.join(WORKDIR, `${team.slug}_with_linework.jpg`);
-  const withBasketOverlays = path.join(WORKDIR, `${team.slug}_with_basket_overlays.jpg`);
+  const withBoardExtensions = path.join(WORKDIR, `${team.slug}_with_board_extensions.jpg`);
   const output = path.join(teamDir, `${team.slug}_court.jpg`);
 
   run(["-size", `${CANVAS.w}x${CANVAS.h}`, `xc:${oobColor}`, base]);
@@ -359,10 +389,11 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   applyMaskedColor({ base: withLeftOutline, mask: rightPaintOutline, color: COLORS.line, outfile: withPaintOutlines });
 
   drawCourtLinework({ base: withPaintOutlines, outfile: withLinework });
+  drawBackboardHeightExtensions({ base: withLinework, outfile: withBoardExtensions });
 
   if (existsSync(LEFT_BASKET_ALPHA) && existsSync(RIGHT_BASKET_ALPHA)) {
     const args = [
-      withLinework,
+      withBoardExtensions,
       LEFT_BASKET_ALPHA, "-geometry", "+126+922", "-compose", "over", "-composite",
       RIGHT_BASKET_ALPHA, "-geometry", "+3042+922", "-compose", "over", "-composite",
     ];
