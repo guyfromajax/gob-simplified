@@ -354,14 +354,14 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
     ];
     if (existsSync(LEFT_BACKBOARD_OVERLAY) && existsSync(RIGHT_BACKBOARD_OVERLAY)) {
       args.push(
-        LEFT_BACKBOARD_OVERLAY, "-geometry", "+132+887", "-compose", "over", "-composite",
-        RIGHT_BACKBOARD_OVERLAY, "-geometry", "+3051+887", "-compose", "over", "-composite",
+        LEFT_BACKBOARD_OVERLAY, "-geometry", "+132+895", "-compose", "over", "-composite",
+        RIGHT_BACKBOARD_OVERLAY, "-geometry", "+3051+895", "-compose", "over", "-composite",
       );
     }
     if (existsSync(LEFT_RIMNET_OVERLAY) && existsSync(RIGHT_RIMNET_OVERLAY)) {
       args.push(
-        LEFT_RIMNET_OVERLAY, "-geometry", "+190+907", "-compose", "over", "-composite",
-        RIGHT_RIMNET_OVERLAY, "-geometry", "+2923+907", "-compose", "over", "-composite",
+        LEFT_RIMNET_OVERLAY, "-geometry", "+190+930", "-compose", "over", "-composite",
+        RIGHT_RIMNET_OVERLAY, "-geometry", "+2923+930", "-compose", "over", "-composite",
       );
     }
     args.push("-quality", "92", output);
