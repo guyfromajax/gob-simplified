@@ -1,0 +1,48 @@
+{
+  "description": "Deterministic hardwood variant matrix for team court generation. Pair ordering is inside_3pt / outside_3pt.",
+  "tone_levels": {
+    "light": {
+      "status": "calibrated",
+      "hex": "#EAD8C6",
+      "reference_anchor": "Bentley-Truman outside 3-point hardwood"
+    },
+    "medium": {
+      "status": "calibrated",
+      "hex": "#DBB891",
+      "reference_anchor": "Standard A1 medium hardwood family"
+    },
+    "dark": {
+      "status": "calibrated",
+      "hex": "#CB9D76",
+      "reference_anchor": "Lancaster inside 3-point hardwood"
+    }
+  },
+  "distribution_percent": {
+    "medium_medium": 35,
+    "light_light": 5,
+    "dark_dark": 10,
+    "medium_light": 10,
+    "medium_dark": 10,
+    "light_dark": 5,
+    "light_medium": 10,
+    "dark_light": 5,
+    "dark_medium": 10
+  },
+  "variant_ordering_rule": "inside_3pt / outside_3pt",
+  "a1_reference_observations": {
+    "medium_medium": [
+      "four_corners",
+      "morristown",
+      "ocean_city",
+      "little_york",
+      "xavien",
+      "south_lancaster"
+    ],
+    "medium_dark": [
+      "lancaster"
+    ],
+    "medium_light": [
+      "bentley_truman"
+    ]
+  }
+}

@@ -122,6 +122,65 @@ These should be implemented as masks or layer fills, not regenerated:
 - optional alternate hardwood tone inside the 3-point area or designated interior zone
 - only used when a court is assigned the split-hardwood variant
 
+## Hardwood Variant System
+
+Hardwood tone assignment should be expressed as:
+
+- `inside 3-point line / outside 3-point line`
+
+The current A1 reference family supports three observed anchor cases:
+
+- `medium/medium`
+  - standard reference family
+  - used by most A1 courts
+- `medium/dark`
+  - Lancaster-style
+- `medium/light`
+  - Bentley-Truman-style
+
+For the full 128-team system, the approved deterministic hardwood matrix is:
+
+- `medium/medium`: `35%`
+- `light/light`: `5%`
+- `dark/dark`: `10%`
+- `medium/light`: `10%`
+- `medium/dark`: `10%`
+- `light/dark`: `5%`
+- `light/medium`: `10%`
+- `dark/light`: `5%`
+- `dark/medium`: `10%`
+
+Notes:
+
+- percentages sum to `100%`
+- these are assignment targets across the whole court set, not per conference
+- `inside/outside` ordering is mandatory and should never be inverted in data naming
+- `light`, `medium`, and `dark` must be calibrated off the existing A1 references before any full-batch export
+
+### Hardwood Tone Calibration
+
+The renderer should expose exactly three hardwood darkness levels:
+
+- `light`
+- `medium`
+- `dark`
+
+These are not arbitrary labels. They should be treated as locked palette values once calibrated.
+
+Calibration anchors:
+
+- `medium/medium`:
+  - use one of the standard A1 courts such as Four Corners, Morristown, Ocean City, Little York, Xavien, or South Lancaster
+- `medium/dark`:
+  - Lancaster
+- `medium/light`:
+  - Bentley-Truman
+
+Implementation rule:
+
+- once the three tone values are chosen, all 9 hardwood pairings must be produced by deterministic composition only
+- do not invent additional tone labels or intermediate “semi-dark” values unless the spec is intentionally revised
+
 ## Decorative Placement Zones
 
 These are first-pass normalized placement zones derived from the reference courts. They are intended as implementation boxes for deterministic composition.

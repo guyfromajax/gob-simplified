@@ -28,8 +28,7 @@ var TEAM_ASSET_SPEC = {
   banner_primary: { ext: 'jpg', fallbackSlug: 'general' }
 };
 
-// Temporary animation-validation override: route A1 home courts to one proof court.
-var TEMP_PROOF_COURT_SLUGS = {
+var TEMP_A1_COURT_OVERRIDE_SLUGS = {
   bentley_truman: true,
   lancaster: true,
   four_corners: true,
@@ -52,8 +51,8 @@ function getTeamAssetPath(teamNameOrSlug, assetKey) {
     : nameToTeamSlug(teamNameOrSlug);
   var spec = TEAM_ASSET_SPEC[assetKey];
   if (!spec) return '/images/teams/general/general_logo_square.png';
-  if (assetKey === 'court' && TEMP_PROOF_COURT_SLUGS[slug]) {
-    return '/images/teams/general/general_court_proof.jpg';
+  if (assetKey === 'court' && TEMP_A1_COURT_OVERRIDE_SLUGS[slug]) {
+    return '/images/teams/abilene/abilene_court.jpg';
   }
   var useSlug = slug || spec.fallbackSlug;
   var base = '/images/teams/' + useSlug + '/' + useSlug + '_' + assetKey + '.' + spec.ext;

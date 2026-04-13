@@ -13,6 +13,12 @@ const PROOF_DIR = path.join(TEMPLATE_DIR, "proofs");
 const WORK_DIR = path.join(TEMPLATE_DIR, "work");
 const TEAM_IMAGE_DIR = path.join(ROOT, "FrontEnd/static/images/teams");
 
+const TEAM_BRAND_RENDER_OVERRIDES = {
+  houston_jesuit: {
+    centerCrop: { width: 560, height: 640, gravity: "west", x: 10, y: 20 },
+  },
+};
+
 function run(cmd, args) {
   execFileSync(cmd, args, { stdio: "pipe" });
 }
@@ -77,6 +83,10 @@ function safeWordmark(teamName) {
   return String(teamName || "")
     .replace(/['.]/g, "")
     .toUpperCase();
+}
+
+function getBrandRenderConfig(team) {
+  return TEAM_BRAND_RENDER_OVERRIDES[team.slug] || {};
 }
 
 function makeBadge({ outfile, width, height, fill, stroke, text, textFill, pointsize }) {
@@ -383,6 +393,7 @@ function main() {
   const white = "#ffffff";
   const markText = initials(team.team, team.mascot);
   const wordmark = safeWordmark(team.team);
+  const brandConfig = getBrandRenderConfig(team);
 
   const output = path.join(PROOF_DIR, `${team.slug}_court_proof.jpg`);
   const stage1 = path.join(WORK_DIR, `${team.slug}_stage1.jpg`);
@@ -406,14 +417,14 @@ function main() {
       borderColor: white,
       borderWidth: 18,
       radius: 120,
-      crop: { width: 520, height: 620, gravity: "west" },
+      crop: brandConfig.centerCrop || { width: 760, height: 760, gravity: "west", x: 0, y: 0 },
     });
 
     makeTextChip({
       outfile: leftSecondaryChip,
       width: 420,
       height: 120,
-      fill: dark,
+      fill: primary,
       stroke: white,
       text: safeWordmark(team.team),
       textFill: secondary === "#ffffff" ? white : secondary,
@@ -426,7 +437,7 @@ function main() {
       outfile: rightSecondaryChip,
       width: 360,
       height: 120,
-      fill: dark,
+      fill: primary,
       stroke: white,
       text: safeWordmark(team.mascot),
       textFill: secondary === "#ffffff" ? white : secondary,

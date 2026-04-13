@@ -36,21 +36,24 @@ const THREE_POINT_RIGHT = {
 };
 const FREE_THROW_LEFT_BBOX = { x1: 684, y1: 859, x2: 1044, y2: 1219, start: 248, end: 112 };
 const FREE_THROW_RIGHT_BBOX = { x1: 2288, y1: 859, x2: 2648, y2: 1219, start: 68, end: 292 };
-const KEY_HASHES_LEFT_X = [398, 495, 594, 694];
-const KEY_HASHES_RIGHT_X = [2639, 2738, 2837, 2936];
-const KEY_HASH_TOP = { y1: 335, y2: 369 };
-const KEY_HASH_BOTTOM = { y1: 831, y2: 864 };
+const LANE_OUTSIDE_HASHES_LEFT_X = [458, 558, 658, 758];
+const LANE_OUTSIDE_HASHES_RIGHT_X = [2575, 2675, 2775, 2875];
+const LANE_OUTSIDE_HASH_TOP = { y1: 782, y2: 816 };
+const LANE_OUTSIDE_HASH_BOTTOM = { y1: 1262, y2: 1296 };
 const RIM_LEFT = { x: 300, y: 1042 };
 const RIM_RIGHT = { x: 3033, y: 1042 };
 const CENTER = { x: 1666, y: 1042 };
-const FLOOR_LINE_TOP = 210;
-const FLOOR_LINE_BOTTOM = 1874;
+
+const HARDWOOD_TONES = {
+  light: "#EAD8C6",
+  medium: "#DBB891",
+  dark: "#CB9D76",
+};
 
 const COLORS = {
   border: "#050505",
   line: "#6e675f",
   paint: "#8d9096",
-  wood: "#ecdbc9",
   rim: "#e35a4a",
   backboardOuter: "#d7dde8",
   backboardInner: "#f6f7fb",
@@ -66,19 +69,37 @@ function ensureDir(dir) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const get = (flag, fallback) => {
+    const idx = args.indexOf(flag);
+    return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
+  };
+  return {
+    insideTone: get("--inside-tone", "medium"),
+    outsideTone: get("--outside-tone", "medium"),
+    output: get("--output", path.join(OUTDIR, "master_clean_court_base.jpg")),
+  };
+}
+
+function resolveTone(name) {
+  const normalized = String(name || "").trim().toLowerCase();
+  const color = HARDWOOD_TONES[normalized];
+  if (!color) {
+    throw new Error(`Unknown hardwood tone: ${name}. Expected one of: ${Object.keys(HARDWOOD_TONES).join(", ")}`);
+  }
+  return color;
+}
+
 function applyMaskedColor({ base, mask, color, outfile }) {
   run([
     base,
     "(",
-    "-size",
-    `${CANVAS.w}x${CANVAS.h}`,
-    `xc:${color}`,
     mask,
-    "-alpha",
-    "off",
-    "-compose",
-    "CopyOpacity",
-    "-composite",
+    "-alpha", "off",
+    "-fill", color,
+    "-opaque", "white",
+    "-transparent", "black",
     ")",
     "-compose",
     "Over",
@@ -87,19 +108,84 @@ function applyMaskedColor({ base, mask, color, outfile }) {
   ]);
 }
 
+function makeFloorMask(outfile) {
+  run([
+    "-size",
+    `${CANVAS.w}x${CANVAS.h}`,
+    "xc:black",
+    "-fill",
+    "white",
+    "-draw",
+    `rectangle ${FLOOR.x1},${FLOOR.y1} ${FLOOR.x2},${FLOOR.y2}`,
+    outfile,
+  ]);
+}
+
+function makeInnerHardwoodMask(outfile) {
+  const leftPath = `M ${FLOOR.x1},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${FLOOR.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const rightPath = `M ${FLOOR.x2},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${FLOOR.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  run([
+    "-size",
+    `${CANVAS.w}x${CANVAS.h}`,
+    "xc:black",
+    "-fill",
+    "white",
+    "-draw",
+    `path '${leftPath}'`,
+    "-draw",
+    `path '${rightPath}'`,
+    outfile,
+  ]);
+}
+
+function makeOuterHardwoodMask({ floorMask, innerMask, outfile }) {
+  run([
+    floorMask,
+    innerMask,
+    "-compose",
+    "MinusSrc",
+    "-composite",
+    outfile,
+  ]);
+}
+
+function drawWoodBase({ base, outsideWood, insideWood, outfile }) {
+  const leftPath = `M ${FLOOR.x1},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${FLOOR.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const rightPath = `M ${FLOOR.x2},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${FLOOR.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
+
+  run([
+    base,
+    "-fill", outsideWood,
+    "-stroke", "none",
+    "-draw", `rectangle ${FLOOR.x1},${FLOOR.y1} ${FLOOR.x2},${FLOOR.y2}`,
+    "-fill", insideWood,
+    "-draw", `path '${leftPath}'`,
+    "-draw", `path '${rightPath}'`,
+    outfile,
+  ]);
+}
+
 function main() {
+  const opts = parseArgs();
+  const insideWood = resolveTone(opts.insideTone);
+  const outsideWood = resolveTone(opts.outsideTone);
+
   ensureDir(OUTDIR);
   ensureDir(WORKDIR);
 
   const base = path.join(WORKDIR, "base.jpg");
-  const withFloor = path.join(WORKDIR, "with_floor.jpg");
+  const floorMask = path.join(WORKDIR, "floor_mask.png");
+  const innerHardwoodMask = path.join(WORKDIR, "inner_hardwood_mask.png");
+  const outerHardwoodMask = path.join(WORKDIR, "outer_hardwood_mask.png");
+  const withWood = path.join(WORKDIR, "with_wood.jpg");
   const withLeftPaint = path.join(WORKDIR, "with_left_paint.jpg");
   const withBothPaints = path.join(WORKDIR, "with_both_paints.jpg");
   const leftPaintOutline = path.join(WORKDIR, "left_paint_outline.png");
   const rightPaintOutline = path.join(WORKDIR, "right_paint_outline.png");
   const withLeftOutline = path.join(WORKDIR, "with_left_outline.jpg");
   const withPaintOutlines = path.join(WORKDIR, "with_paint_outlines.jpg");
-  const output = path.join(OUTDIR, "master_clean_court_base.jpg");
+  const withBasketOverlays = path.join(WORKDIR, "with_basket_overlays.jpg");
+  const output = opts.output;
 
   run([
     "-size",
@@ -108,23 +194,13 @@ function main() {
     base,
   ]);
 
-  run([
-    base,
-    "(",
-    "-size",
-    `${FLOOR.x2 - FLOOR.x1}x${FLOOR.y2 - FLOOR.y1}`,
-    `xc:${COLORS.wood}`,
-    ")",
-    "-geometry",
-    `+${FLOOR.x1}+${FLOOR.y1}`,
-    "-compose",
-    "over",
-    "-composite",
-    withFloor,
-  ]);
+  makeFloorMask(floorMask);
+  makeInnerHardwoodMask(innerHardwoodMask);
+  makeOuterHardwoodMask({ floorMask, innerMask: innerHardwoodMask, outfile: outerHardwoodMask });
+  drawWoodBase({ base, outsideWood, insideWood, outfile: withWood });
 
   applyMaskedColor({
-    base: withFloor,
+    base: withWood,
     mask: LEFT_PAINT_MASK,
     color: COLORS.paint,
     outfile: withLeftPaint,
@@ -169,33 +245,27 @@ function main() {
     "-fill", "none",
     "-stroke", COLORS.line,
     "-strokewidth", "8",
-    "-draw", `line ${FLOOR.x1},${FLOOR_EDGE_TOP_Y} ${FLOOR.x2},${FLOOR_EDGE_TOP_Y}`,
-    "-draw", `line ${FLOOR.x1},${FLOOR_EDGE_BOTTOM_Y} ${FLOOR.x2},${FLOOR_EDGE_BOTTOM_Y}`,
     "-draw", `line ${CENTER.x},${FLOOR.y1} ${CENTER.x},${FLOOR.y2}`,
-    "-draw", `circle ${CENTER.x},${CENTER.y} ${CENTER.x},516`,
 
     "-draw", `path 'M ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.topY} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.bottomY}'`,
     "-draw", `path 'M ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.topY} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.bottomY}'`,
 
-    "-draw", `arc ${FREE_THROW_LEFT_BBOX.x1},${FREE_THROW_LEFT_BBOX.y1} ${FREE_THROW_LEFT_BBOX.x2},${FREE_THROW_LEFT_BBOX.y2} ${FREE_THROW_LEFT_BBOX.start},${FREE_THROW_LEFT_BBOX.end}`,
-    "-draw", `arc ${FREE_THROW_RIGHT_BBOX.x1},${FREE_THROW_RIGHT_BBOX.y1} ${FREE_THROW_RIGHT_BBOX.x2},${FREE_THROW_RIGHT_BBOX.y2} ${FREE_THROW_RIGHT_BBOX.start},${FREE_THROW_RIGHT_BBOX.end}`,
-
-    "-draw", `line ${KEY_HASHES_LEFT_X[0]},${KEY_HASH_TOP.y1} ${KEY_HASHES_LEFT_X[0]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[1]},${KEY_HASH_TOP.y1} ${KEY_HASHES_LEFT_X[1]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[2]},${KEY_HASH_TOP.y1} ${KEY_HASHES_LEFT_X[2]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[3]},${KEY_HASH_TOP.y1} ${KEY_HASHES_LEFT_X[3]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[0]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_LEFT_X[0]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[1]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_LEFT_X[1]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[2]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_LEFT_X[2]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_LEFT_X[3]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_LEFT_X[3]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[0]},${KEY_HASH_TOP.y1} ${KEY_HASHES_RIGHT_X[0]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[1]},${KEY_HASH_TOP.y1} ${KEY_HASHES_RIGHT_X[1]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[2]},${KEY_HASH_TOP.y1} ${KEY_HASHES_RIGHT_X[2]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[3]},${KEY_HASH_TOP.y1} ${KEY_HASHES_RIGHT_X[3]},${KEY_HASH_TOP.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[0]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_RIGHT_X[0]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[1]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_RIGHT_X[1]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[2]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_RIGHT_X[2]},${KEY_HASH_BOTTOM.y2}`,
-    "-draw", `line ${KEY_HASHES_RIGHT_X[3]},${KEY_HASH_BOTTOM.y1} ${KEY_HASHES_RIGHT_X[3]},${KEY_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[1]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[1]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[2]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[2]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[3]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[3]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[1]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[1]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[2]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[2]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[3]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[3]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[0]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[0]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[1]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[1]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[2]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[2]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[3]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[3]},${LANE_OUTSIDE_HASH_TOP.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[0]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[0]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[1]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[1]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[2]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[2]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
+    "-draw", `line ${LANE_OUTSIDE_HASHES_RIGHT_X[3]},${LANE_OUTSIDE_HASH_BOTTOM.y1} ${LANE_OUTSIDE_HASHES_RIGHT_X[3]},${LANE_OUTSIDE_HASH_BOTTOM.y2}`,
 
     "-quality", "92",
     output,
@@ -208,6 +278,31 @@ function main() {
       output,
       LEFT_BASKET_ALPHA, "-geometry", "+126+892", "-compose", "over", "-composite",
       RIGHT_BASKET_ALPHA, "-geometry", "+3042+892", "-compose", "over", "-composite",
+      withBasketOverlays,
+    ]);
+    run([
+      withBasketOverlays,
+      "-fill", "none",
+      "-stroke", COLORS.rim,
+      "-strokewidth", "8",
+      "-draw", `circle ${RIM_LEFT.x},${RIM_LEFT.y} ${RIM_LEFT.x + 46},${RIM_LEFT.y}`,
+      "-draw", `circle ${RIM_RIGHT.x},${RIM_RIGHT.y} ${RIM_RIGHT.x + 46},${RIM_RIGHT.y}`,
+      "-stroke", "#d9e2ef",
+      "-strokewidth", "2",
+      "-draw", `line ${RIM_LEFT.x - 24},${RIM_LEFT.y + 8} ${RIM_LEFT.x},${RIM_LEFT.y + 56}`,
+      "-draw", `line ${RIM_LEFT.x},${RIM_LEFT.y + 8} ${RIM_LEFT.x},${RIM_LEFT.y + 62}`,
+      "-draw", `line ${RIM_LEFT.x + 24},${RIM_LEFT.y + 8} ${RIM_LEFT.x},${RIM_LEFT.y + 56}`,
+      "-draw", `line ${RIM_LEFT.x - 38},${RIM_LEFT.y + 8} ${RIM_LEFT.x - 10},${RIM_LEFT.y + 66}`,
+      "-draw", `line ${RIM_LEFT.x + 38},${RIM_LEFT.y + 8} ${RIM_LEFT.x + 10},${RIM_LEFT.y + 66}`,
+      "-draw", `line ${RIM_RIGHT.x - 24},${RIM_RIGHT.y + 8} ${RIM_RIGHT.x},${RIM_RIGHT.y + 56}`,
+      "-draw", `line ${RIM_RIGHT.x},${RIM_RIGHT.y + 8} ${RIM_RIGHT.x},${RIM_RIGHT.y + 62}`,
+      "-draw", `line ${RIM_RIGHT.x + 24},${RIM_RIGHT.y + 8} ${RIM_RIGHT.x},${RIM_RIGHT.y + 56}`,
+      "-draw", `line ${RIM_RIGHT.x - 38},${RIM_RIGHT.y + 8} ${RIM_RIGHT.x - 10},${RIM_RIGHT.y + 66}`,
+      "-draw", `line ${RIM_RIGHT.x + 38},${RIM_RIGHT.y + 8} ${RIM_RIGHT.x + 10},${RIM_RIGHT.y + 66}`,
+      "-draw", `line ${RIM_LEFT.x - 18},${RIM_LEFT.y + 30} ${RIM_LEFT.x + 18},${RIM_LEFT.y + 30}`,
+      "-draw", `line ${RIM_LEFT.x - 10},${RIM_LEFT.y + 44} ${RIM_LEFT.x + 10},${RIM_LEFT.y + 44}`,
+      "-draw", `line ${RIM_RIGHT.x - 18},${RIM_RIGHT.y + 30} ${RIM_RIGHT.x + 18},${RIM_RIGHT.y + 30}`,
+      "-draw", `line ${RIM_RIGHT.x - 10},${RIM_RIGHT.y + 44} ${RIM_RIGHT.x + 10},${RIM_RIGHT.y + 44}`,
       "-quality", "92",
       output,
     ]);
