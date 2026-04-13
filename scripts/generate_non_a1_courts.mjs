@@ -29,14 +29,14 @@ const FLOOR_EDGE_BOTTOM_Y = 1878;
 const THREE_POINT_LEFT = {
   startX: 96,
   controlX: 1120,
-  topY: 210,
-  bottomY: 1874,
+  topY: 308,
+  bottomY: 1770,
 };
 const THREE_POINT_RIGHT = {
   startX: 3237,
   controlX: 2213,
-  topY: 210,
-  bottomY: 1874,
+  topY: 308,
+  bottomY: 1770,
 };
 const THREE_POINT_LINE_LEFT = {
   startX: OOB_LINE_BOUNDS.x1,
