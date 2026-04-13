@@ -21,7 +21,7 @@ const ASSIGNMENT_REPORT = path.join(TMP_DIR, "non_a1_court_assignments.json");
 
 const CANVAS = { w: 3333, h: 2083 };
 const FLOOR = { x1: 75, y1: 60, x2: 3258, y2: 2023 };
-const OOB_LINE_BOUNDS = { x1: 150, y1: 60, x2: 3183, y2: 2023 };
+const OOB_LINE_BOUNDS = { x1: 150, y1: 104, x2: 3183, y2: 1978 };
 const FLOOR_EDGE_TOP_Y = 208;
 const FLOOR_EDGE_BOTTOM_Y = 1878;
 const THREE_POINT_LEFT = {
@@ -35,6 +35,18 @@ const THREE_POINT_RIGHT = {
   controlX: 2213,
   topY: 210,
   bottomY: 1874,
+};
+const THREE_POINT_LINE_LEFT = {
+  startX: OOB_LINE_BOUNDS.x1,
+  controlX: THREE_POINT_LEFT.controlX,
+  topY: THREE_POINT_LEFT.topY,
+  bottomY: THREE_POINT_LEFT.bottomY,
+};
+const THREE_POINT_LINE_RIGHT = {
+  startX: OOB_LINE_BOUNDS.x2,
+  controlX: THREE_POINT_RIGHT.controlX,
+  topY: THREE_POINT_RIGHT.topY,
+  bottomY: THREE_POINT_RIGHT.bottomY,
 };
 const FREE_THROW_LEFT_BBOX = { x1: 684, y1: 859, x2: 1044, y2: 1219, start: 248, end: 112 };
 const FREE_THROW_RIGHT_BBOX = { x1: 2288, y1: 859, x2: 2648, y2: 1219, start: 68, end: 292 };
@@ -224,8 +236,8 @@ function applyMaskedColor({ base, mask, color, outfile }) {
 }
 
 function drawWoodBase({ base, outsideWood, insideWood, outfile }) {
-  const leftPath = `M ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
-  const rightPath = `M ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_TOP_Y} L ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const leftPath = `M ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_TOP_Y} L ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const rightPath = `M ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_TOP_Y} L ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
   run([
     base,
     "-fill", outsideWood,
@@ -256,9 +268,9 @@ function drawCourtLinework({ base, outfile }) {
     "-stroke", COLORS.line,
     "-strokewidth", "8",
     "-draw", `rectangle ${OOB_LINE_BOUNDS.x1},${OOB_LINE_BOUNDS.y1} ${OOB_LINE_BOUNDS.x2},${OOB_LINE_BOUNDS.y2}`,
-    "-draw", `line ${CENTER.x},${FLOOR.y1} ${CENTER.x},${FLOOR.y2}`,
-    "-draw", `path 'M ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.topY} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${THREE_POINT_LEFT.startX},${THREE_POINT_LEFT.bottomY}'`,
-    "-draw", `path 'M ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.topY} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${THREE_POINT_RIGHT.startX},${THREE_POINT_RIGHT.bottomY}'`,
+    "-draw", `line ${CENTER.x},${OOB_LINE_BOUNDS.y1} ${CENTER.x},${OOB_LINE_BOUNDS.y2}`,
+    "-draw", `path 'M ${THREE_POINT_LINE_LEFT.startX},${THREE_POINT_LINE_LEFT.topY} Q ${THREE_POINT_LINE_LEFT.controlX},${THREE_POINT_LINE_LEFT.topY} ${THREE_POINT_LINE_LEFT.controlX},1042 Q ${THREE_POINT_LINE_LEFT.controlX},${THREE_POINT_LINE_LEFT.bottomY} ${THREE_POINT_LINE_LEFT.startX},${THREE_POINT_LINE_LEFT.bottomY}'`,
+    "-draw", `path 'M ${THREE_POINT_LINE_RIGHT.startX},${THREE_POINT_LINE_RIGHT.topY} Q ${THREE_POINT_LINE_RIGHT.controlX},${THREE_POINT_LINE_RIGHT.topY} ${THREE_POINT_LINE_RIGHT.controlX},1042 Q ${THREE_POINT_LINE_RIGHT.controlX},${THREE_POINT_LINE_RIGHT.bottomY} ${THREE_POINT_LINE_RIGHT.startX},${THREE_POINT_LINE_RIGHT.bottomY}'`,
     "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[0]},${LANE_OUTSIDE_HASH_TOP.y2}`,
     "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[1]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[1]},${LANE_OUTSIDE_HASH_TOP.y2}`,
     "-draw", `line ${LANE_OUTSIDE_HASHES_LEFT_X[2]},${LANE_OUTSIDE_HASH_TOP.y1} ${LANE_OUTSIDE_HASHES_LEFT_X[2]},${LANE_OUTSIDE_HASH_TOP.y2}`,
