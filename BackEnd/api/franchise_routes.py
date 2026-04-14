@@ -1220,13 +1220,23 @@ def _normalize_team_id(team_id: str):
         return ObjectId(team_id)
     except Exception:
         doc = db.teams.find_one(
-            {"$or": [{"_id": team_id}, {"name": team_id}, {"code": team_id}]}
+            {"$or": [{"_id": team_id}, {"name": team_id}, {"code": team_id}, {"team_id": team_id}]}
         )
         if not doc:
-            # Fallback: canonical key (e.g. LANCASTER, SOUTH_LANCASTER) -> resolve via name (e.g. "Lancaster", "South Lancaster")
-            # Frontend may send canonical ids from game doc when URL params are missing (e.g. Play Quarter)
-            name_from_canonical = team_id.replace("_", " ").title()
-            doc = db.teams.find_one({"name": name_from_canonical})
+            # Fallback: canonical key (e.g. LANCASTER, SOUTH_LANCASTER, BENTLEY_TRUMAN)
+            # -> resolve via team name variants ("Lancaster", "South Lancaster", "Bentley-Truman").
+            # Frontend may send canonical ids from game doc when URL params are missing (e.g. Play Quarter).
+            canonical_base = str(team_id or "").strip()
+            candidate_names = []
+            if canonical_base:
+                candidate_names.extend([
+                    canonical_base.replace("_", " ").title(),
+                    canonical_base.replace("_", "-").title(),
+                ])
+            seen = set()
+            candidate_names = [name for name in candidate_names if name and not (name in seen or seen.add(name))]
+            if candidate_names:
+                doc = db.teams.find_one({"name": {"$in": candidate_names}})
         if not doc:
             raise HTTPException(status_code=400, detail=f"Unknown team id {team_id}")
         return doc["_id"]
