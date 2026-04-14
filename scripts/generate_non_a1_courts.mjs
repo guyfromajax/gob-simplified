@@ -130,6 +130,10 @@ const RIGHT_BACKBOARD_EXT = {
   glass: { x1: 3143, y1: 888, x2: 3161, y2: 1206 },
 };
 
+const ABILENE_FLOOR = {
+  maple: "#D8B180",
+};
+
 function run(args) {
   execFileSync("magick", args, { stdio: "pipe" });
 }
@@ -267,32 +271,39 @@ function drawWoodBase({ base, outsideWood, insideWood, outfile }) {
 
 function drawHardwoodFinish({ base, outfile, stem }) {
   const grainOverlay = path.join(WORKDIR, `${stem}_hardwood_grain.png`);
-  const sheenOverlay = path.join(WORKDIR, `${stem}_hardwood_sheen.png`);
   const grainDraws = [];
   const shortGrainDraws = [];
+  const plankBands = [];
   const fullWidthStartX = OOB_LINE_BOUNDS.x1 + 22;
   const fullWidthEndX = OOB_LINE_BOUNDS.x2 - 22;
 
-  for (let i = 0; i < 24; i += 1) {
-    const y = TOP_HORIZONTAL_OOB_Y + 46 + (i * 68);
+  for (let i = 0; i < 34; i += 1) {
+    const bandTop = TOP_HORIZONTAL_OOB_Y + 12 + (i * 52);
+    const bandBottom = Math.min(bandTop + 28 + ((i % 4) * 6), BOTTOM_HORIZONTAL_OOB_Y - 10);
+    const fill = i % 2 === 0 ? "rgba(255,248,238,0.055)" : "rgba(140,101,66,0.042)";
+    plankBands.push("-draw", `fill ${fill} stroke none rectangle ${OOB_LINE_BOUNDS.x1},${bandTop} ${OOB_LINE_BOUNDS.x2},${bandBottom}`);
+  }
+
+  for (let i = 0; i < 26; i += 1) {
+    const y = TOP_HORIZONTAL_OOB_Y + 38 + (i * 68);
     const c1 = CENTER.x - 520 + ((i % 5) * 28);
     const c2 = CENTER.x + 520 - ((i % 4) * 34);
     const y1 = y + ((i % 3) - 1) * 12;
     const y2 = y + ((i % 4) - 1.5) * 10;
-    const stroke = i % 3 === 0 ? "rgba(255,248,237,0.22)" : "rgba(150,108,70,0.14)";
-    const width = i % 5 === 0 ? 6 : 4;
+    const stroke = i % 3 === 0 ? "rgba(255,248,237,0.18)" : "rgba(145,104,68,0.12)";
+    const width = i % 5 === 0 ? 5 : 3;
     grainDraws.push("-stroke", stroke);
     grainDraws.push("-strokewidth", String(width));
     grainDraws.push("-draw", `path 'M ${fullWidthStartX},${y} Q ${c1},${y1} ${CENTER.x},${y + 6} Q ${c2},${y2} ${fullWidthEndX},${y + ((i % 2) * 6 - 3)}'`);
   }
 
-  for (let i = 0; i < 28; i += 1) {
+  for (let i = 0; i < 42; i += 1) {
     const startX = OOB_LINE_BOUNDS.x1 + 140 + ((i * 101) % 2350);
     const endX = Math.min(startX + 210 + ((i % 6) * 38), OOB_LINE_BOUNDS.x2 - 120);
     const y = TOP_HORIZONTAL_OOB_Y + 34 + ((i * 57) % (BOTTOM_HORIZONTAL_OOB_Y - TOP_HORIZONTAL_OOB_Y - 80));
     const c = startX + ((endX - startX) / 2);
     const bend = ((i % 5) - 2) * 10;
-    const stroke = i % 2 === 0 ? "rgba(255,246,233,0.14)" : "rgba(146,106,68,0.10)";
+    const stroke = i % 2 === 0 ? "rgba(255,246,233,0.12)" : "rgba(146,106,68,0.09)";
     shortGrainDraws.push("-stroke", stroke);
     shortGrainDraws.push("-strokewidth", i % 4 === 0 ? "3" : "2");
     shortGrainDraws.push("-draw", `path 'M ${startX},${y} Q ${c},${y + bend} ${endX},${y + ((i % 3) - 1) * 5}'`);
@@ -302,9 +313,7 @@ function drawHardwoodFinish({ base, outfile, stem }) {
     "-size", `${CANVAS.w}x${CANVAS.h}`,
     "xc:none",
     "-fill", "none",
-    "-draw", `fill rgba(255,255,255,0.035) rectangle ${OOB_LINE_BOUNDS.x1},${TOP_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${TOP_HORIZONTAL_OOB_Y + 250}`,
-    "-draw", `fill rgba(126,92,60,0.035) rectangle ${OOB_LINE_BOUNDS.x1},${TOP_HORIZONTAL_OOB_Y + 280} ${OOB_LINE_BOUNDS.x2},${TOP_HORIZONTAL_OOB_Y + 640}`,
-    "-draw", `fill rgba(255,255,255,0.028) rectangle ${OOB_LINE_BOUNDS.x1},${BOTTOM_HORIZONTAL_OOB_Y - 420} ${OOB_LINE_BOUNDS.x2},${BOTTOM_HORIZONTAL_OOB_Y - 210}`,
+    ...plankBands,
     ...grainDraws,
     ...shortGrainDraws,
     "-blur", "0x0.8",
@@ -312,22 +321,8 @@ function drawHardwoodFinish({ base, outfile, stem }) {
   ]);
 
   run([
-    "-size", `${CANVAS.w}x${CANVAS.h}`,
-    "xc:none",
-    "-fill", "rgba(255,255,255,0.12)",
-    "-stroke", "none",
-    "-draw", `ellipse ${CENTER.x},${BOTTOM_HORIZONTAL_OOB_Y - 170} 520,72 0,360`,
-    "-draw", `ellipse ${CENTER.x - 820},${BOTTOM_HORIZONTAL_OOB_Y - 225} 120,34 0,360`,
-    "-draw", `ellipse ${CENTER.x + 820},${BOTTOM_HORIZONTAL_OOB_Y - 225} 120,34 0,360`,
-    "-draw", `ellipse ${CENTER.x},${TOP_HORIZONTAL_OOB_Y + 175} 470,48 0,360`,
-    "-blur", "0x28",
-    sheenOverlay,
-  ]);
-
-  run([
     base,
     grainOverlay, "-compose", "Over", "-composite",
-    sheenOverlay, "-compose", "Over", "-composite",
     outfile,
   ]);
 }
@@ -440,11 +435,17 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   ensureDir(WORKDIR);
 
   const hardwood = HARDWOOD_VARIANTS[hardwoodKey];
-  const insideWood = HARDWOOD_TONES[hardwood.inside];
-  const outsideWood = HARDWOOD_TONES[hardwood.outside];
+  let insideWood = HARDWOOD_TONES[hardwood.inside];
+  let outsideWood = HARDWOOD_TONES[hardwood.outside];
   const primary = hex(team.primary_color, "#2a2a2a");
   const secondary = hex(team.secondary_color, "#f2f2f2");
-  const laneColor = resolveAssignmentColor({ token: laneKey, primary, secondary, insideWood, outsideWood });
+  if (team.slug === "abilene") {
+    insideWood = ABILENE_FLOOR.maple;
+    outsideWood = ABILENE_FLOOR.maple;
+  }
+  const laneColor = team.slug === "abilene"
+    ? primary
+    : resolveAssignmentColor({ token: laneKey, primary, secondary, insideWood, outsideWood });
   const effectiveHalfCircleKey = team.slug === "abilene" ? "primary" : halfCircleKey;
   const halfCircleColor = resolveAssignmentColor({ token: effectiveHalfCircleKey, primary, secondary, insideWood, outsideWood });
   const oobColor = resolveAssignmentColor({ token: oobKey, primary, secondary, insideWood, outsideWood });
