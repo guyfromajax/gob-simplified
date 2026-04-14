@@ -142,7 +142,14 @@ body {
 }
 
 #franchise-container #top-center .chemistry-bar-fill {
-  background: linear-gradient(90deg, #203464 0%, #27408e 45%, #4c6cc8 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(247, 148, 32, 1) 0%,
+    rgba(247, 148, 32, 0.9) 30%,
+    rgba(247, 148, 32, 0.8) 60%,
+    rgba(247, 148, 32, 0.7) 80%,
+    rgba(247, 148, 32, 0.55) 100%
+  );
 }
 
 #franchise-container #top-center .chemistry-bar-text {
