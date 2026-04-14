@@ -81,9 +81,9 @@ const HARDWOOD_VARIANTS = {
 };
 
 const LANE_DISTRIBUTION = {
-  primary: 80,
-  secondary: 15,
-  inside_hardwood: 5,
+  primary: 70,
+  secondary: 20,
+  inside_hardwood: 10,
 };
 
 const HALF_CIRCLE_DISTRIBUTION = {
@@ -98,6 +98,21 @@ const OOB_DISTRIBUTION = {
   black: 20,
   outside_hardwood: 10,
   inside_hardwood: 5,
+};
+
+const LINE_DISTRIBUTION = {
+  dark_grey: 25,
+  black: 25,
+  white: 25,
+  primary: 25,
+};
+
+const TEAM_LINE_OVERRIDES = {
+  abilene: "black",
+  grupenberg: "black",
+  queens_guard: "white",
+  southwest_miner: "black",
+  upstate: "black",
 };
 
 const A1_REFERENCE_SLUGS = new Set([
@@ -255,8 +270,8 @@ function applyMaskedColor({ base, mask, color, outfile }) {
 }
 
 function drawWoodBase({ base, outsideWood, insideWood, outfile }) {
-  const leftPath = `M ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_TOP_Y} L ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.topY} ${THREE_POINT_LEFT.controlX},1042 Q ${THREE_POINT_LEFT.controlX},${THREE_POINT_LEFT.bottomY} ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x1},${FLOOR_EDGE_BOTTOM_Y} Z`;
-  const rightPath = `M ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_TOP_Y} L ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_TOP_Y} Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.topY} ${THREE_POINT_RIGHT.controlX},1042 Q ${THREE_POINT_RIGHT.controlX},${THREE_POINT_RIGHT.bottomY} ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_BOTTOM_Y} L ${OOB_LINE_BOUNDS.x2},${FLOOR_EDGE_BOTTOM_Y} Z`;
+  const leftPath = `M ${OOB_LINE_BOUNDS.x1},${THREE_POINT_LINE_LEFT.topY} Q ${THREE_POINT_LINE_LEFT.controlX},${THREE_POINT_LINE_LEFT.topY} ${THREE_POINT_LINE_LEFT.controlX},1042 Q ${THREE_POINT_LINE_LEFT.controlX},${THREE_POINT_LINE_LEFT.bottomY} ${OOB_LINE_BOUNDS.x1},${THREE_POINT_LINE_LEFT.bottomY} L ${OOB_LINE_BOUNDS.x1},${THREE_POINT_LINE_LEFT.topY} Z`;
+  const rightPath = `M ${OOB_LINE_BOUNDS.x2},${THREE_POINT_LINE_RIGHT.topY} Q ${THREE_POINT_LINE_RIGHT.controlX},${THREE_POINT_LINE_RIGHT.topY} ${THREE_POINT_LINE_RIGHT.controlX},1042 Q ${THREE_POINT_LINE_RIGHT.controlX},${THREE_POINT_LINE_RIGHT.bottomY} ${OOB_LINE_BOUNDS.x2},${THREE_POINT_LINE_RIGHT.bottomY} L ${OOB_LINE_BOUNDS.x2},${THREE_POINT_LINE_RIGHT.topY} Z`;
   run([
     base,
     "-fill", outsideWood,
@@ -338,6 +353,35 @@ function drawLaneRects({ base, color, outfile }) {
   ]);
 }
 
+function compositeLaneHardwood({ base, source, outfile, stem }) {
+  const mask = path.join(WORKDIR, `${stem}_lane_hardwood_mask.png`);
+  const masked = path.join(WORKDIR, `${stem}_lane_hardwood_masked.png`);
+  run([
+    "-size", `${CANVAS.w}x${CANVAS.h}`,
+    "xc:black",
+    "-fill", "white",
+    "-stroke", "none",
+    "-draw", `rectangle ${LANE_LEFT_RECT.x1},${LANE_LEFT_RECT.y1} ${LANE_LEFT_RECT.x2},${LANE_LEFT_RECT.y2}`,
+    "-draw", `rectangle ${LANE_RIGHT_RECT.x1},${LANE_RIGHT_RECT.y1} ${LANE_RIGHT_RECT.x2},${LANE_RIGHT_RECT.y2}`,
+    mask,
+  ]);
+  run([
+    source,
+    mask,
+    "-alpha", "off",
+    "-compose", "CopyOpacity",
+    "-composite",
+    masked,
+  ]);
+  run([
+    base,
+    masked,
+    "-compose", "Over",
+    "-composite",
+    outfile,
+  ]);
+}
+
 function drawHalfCircleCaps({ base, color, outfile }) {
   run([
     base,
@@ -349,11 +393,40 @@ function drawHalfCircleCaps({ base, color, outfile }) {
   ]);
 }
 
-function drawPaintLinework({ base, outfile }) {
+function compositeHalfCircleHardwood({ base, source, outfile, stem }) {
+  const mask = path.join(WORKDIR, `${stem}_halfcircle_hardwood_mask.png`);
+  const masked = path.join(WORKDIR, `${stem}_halfcircle_hardwood_masked.png`);
+  run([
+    "-size", `${CANVAS.w}x${CANVAS.h}`,
+    "xc:black",
+    "-fill", "white",
+    "-stroke", "none",
+    "-draw", `ellipse ${(LEFT_HALF_CIRCLE.x1 + LEFT_HALF_CIRCLE.x2) / 2},${(LEFT_HALF_CIRCLE.y1 + LEFT_HALF_CIRCLE.y2) / 2} ${(LEFT_HALF_CIRCLE.x2 - LEFT_HALF_CIRCLE.x1) / 2},${(LEFT_HALF_CIRCLE.y2 - LEFT_HALF_CIRCLE.y1) / 2} 270,90`,
+    "-draw", `ellipse ${(RIGHT_HALF_CIRCLE.x1 + RIGHT_HALF_CIRCLE.x2) / 2},${(RIGHT_HALF_CIRCLE.y1 + RIGHT_HALF_CIRCLE.y2) / 2} ${(RIGHT_HALF_CIRCLE.x2 - RIGHT_HALF_CIRCLE.x1) / 2},${(RIGHT_HALF_CIRCLE.y2 - RIGHT_HALF_CIRCLE.y1) / 2} 90,270`,
+    mask,
+  ]);
+  run([
+    source,
+    mask,
+    "-alpha", "off",
+    "-compose", "CopyOpacity",
+    "-composite",
+    masked,
+  ]);
+  run([
+    base,
+    masked,
+    "-compose", "Over",
+    "-composite",
+    outfile,
+  ]);
+}
+
+function drawPaintLinework({ base, lineColor, outfile }) {
   run([
     base,
     "-fill", "none",
-    "-stroke", COLORS.line,
+    "-stroke", lineColor,
     "-strokewidth", "8",
     "-draw", `rectangle ${LANE_LEFT_RECT.x1},${LANE_LEFT_RECT.y1} ${LANE_LEFT_RECT.x2},${LANE_LEFT_RECT.y2}`,
     "-draw", `rectangle ${LANE_RIGHT_RECT.x1},${LANE_RIGHT_RECT.y1} ${LANE_RIGHT_RECT.x2},${LANE_RIGHT_RECT.y2}`,
@@ -365,11 +438,11 @@ function drawPaintLinework({ base, outfile }) {
   ]);
 }
 
-function drawCourtLinework({ base, outfile }) {
+function drawCourtLinework({ base, lineColor, outfile }) {
   run([
     base,
     "-fill", "none",
-    "-stroke", COLORS.line,
+    "-stroke", lineColor,
     "-strokewidth", "8",
     "-draw", `line ${OOB_LINE_BOUNDS.x1},${TOP_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${TOP_HORIZONTAL_OOB_Y}`,
     "-draw", `line ${OOB_LINE_BOUNDS.x1},${BOTTOM_HORIZONTAL_OOB_Y} ${OOB_LINE_BOUNDS.x2},${BOTTOM_HORIZONTAL_OOB_Y}`,
@@ -424,14 +497,39 @@ function resolveAssignmentColor({ token, primary, secondary, insideWood, outside
       return outsideWood;
     case "black":
       return "#050505";
+    case "white":
+      return "#F4F3EF";
+    case "dark_grey":
+      return COLORS.line;
     default:
       throw new Error(`Unknown color token: ${token}`);
   }
 }
 
-function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) {
+function resolveLineToken({ assignedToken, laneKey, halfCircleKey }) {
+  if (assignedToken !== "primary") return assignedToken;
+  if (laneKey === "primary" || halfCircleKey === "primary") {
+    if (laneKey === "secondary" || halfCircleKey === "secondary") {
+      return "dark_grey";
+    }
+    return "secondary";
+  }
+  return "primary";
+}
+
+function renderTeamCourt({
+  team,
+  hardwoodKey,
+  laneKey,
+  halfCircleKey,
+  oobKey,
+  lineKey,
+  outputOverride = null,
+  workStem = null,
+  disableAbileneMapleOverride = false,
+}) {
   const teamDir = path.join(TEAM_IMAGE_DIR, team.slug);
-  ensureDir(teamDir);
+  if (!outputOverride) ensureDir(teamDir);
   ensureDir(WORKDIR);
 
   const hardwood = HARDWOOD_VARIANTS[hardwoodKey];
@@ -439,7 +537,7 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   let outsideWood = HARDWOOD_TONES[hardwood.outside];
   const primary = hex(team.primary_color, "#2a2a2a");
   const secondary = hex(team.secondary_color, "#f2f2f2");
-  if (team.slug === "abilene") {
+  if (team.slug === "abilene" && !disableAbileneMapleOverride) {
     insideWood = ABILENE_FLOOR.maple;
     outsideWood = ABILENE_FLOOR.maple;
   }
@@ -449,25 +547,46 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
   const effectiveHalfCircleKey = team.slug === "abilene" ? "primary" : halfCircleKey;
   const halfCircleColor = resolveAssignmentColor({ token: effectiveHalfCircleKey, primary, secondary, insideWood, outsideWood });
   const oobColor = resolveAssignmentColor({ token: oobKey, primary, secondary, insideWood, outsideWood });
+  const effectiveLineToken = resolveLineToken({
+    assignedToken: TEAM_LINE_OVERRIDES[team.slug] || lineKey,
+    laneKey,
+    halfCircleKey: effectiveHalfCircleKey,
+  });
+  const lineColor = resolveAssignmentColor({
+    token: effectiveLineToken,
+    primary,
+    secondary,
+    insideWood,
+    outsideWood,
+  });
 
-  const base = path.join(WORKDIR, `${team.slug}_base.jpg`);
-  const withWood = path.join(WORKDIR, `${team.slug}_with_wood.jpg`);
-  const withHardwoodFinish = path.join(WORKDIR, `${team.slug}_with_hardwood_finish.jpg`);
-  const withHalfCaps = path.join(WORKDIR, `${team.slug}_with_half_caps.jpg`);
-  const withLanes = path.join(WORKDIR, `${team.slug}_with_lanes.jpg`);
-  const withPaintOutlines = path.join(WORKDIR, `${team.slug}_with_paint_outlines.jpg`);
-  const withLinework = path.join(WORKDIR, `${team.slug}_with_linework.jpg`);
-  const withBoardExtensions = path.join(WORKDIR, `${team.slug}_with_board_extensions.jpg`);
-  const output = path.join(teamDir, `${team.slug}_court.jpg`);
+  const stem = workStem || team.slug;
+  const base = path.join(WORKDIR, `${stem}_base.jpg`);
+  const withWood = path.join(WORKDIR, `${stem}_with_wood.jpg`);
+  const withHardwoodFinish = path.join(WORKDIR, `${stem}_with_hardwood_finish.jpg`);
+  const withHalfCaps = path.join(WORKDIR, `${stem}_with_half_caps.jpg`);
+  const withHalfCapsHardwood = path.join(WORKDIR, `${stem}_with_half_caps_hardwood.jpg`);
+  const withLanes = path.join(WORKDIR, `${stem}_with_lanes.jpg`);
+  const withLanesHardwood = path.join(WORKDIR, `${stem}_with_lanes_hardwood.jpg`);
+  const withPaintOutlines = path.join(WORKDIR, `${stem}_with_paint_outlines.jpg`);
+  const withLinework = path.join(WORKDIR, `${stem}_with_linework.jpg`);
+  const withBoardExtensions = path.join(WORKDIR, `${stem}_with_board_extensions.jpg`);
+  const output = outputOverride || path.join(teamDir, `${team.slug}_court.jpg`);
 
   run(["-size", `${CANVAS.w}x${CANVAS.h}`, `xc:${oobColor}`, base]);
   drawWoodBase({ base, outsideWood, insideWood, outfile: withWood });
-  drawHardwoodFinish({ base: withWood, outfile: withHardwoodFinish, stem: team.slug });
+  drawHardwoodFinish({ base: withWood, outfile: withHardwoodFinish, stem });
   drawHalfCircleCaps({ base: withHardwoodFinish, color: halfCircleColor, outfile: withHalfCaps });
-  drawLaneRects({ base: withHalfCaps, color: laneColor, outfile: withLanes });
-  drawPaintLinework({ base: withLanes, outfile: withPaintOutlines });
+  const halfCapsBase = halfCircleKey === "inside_hardwood"
+    ? (compositeHalfCircleHardwood({ base: withHalfCaps, source: withHardwoodFinish, outfile: withHalfCapsHardwood, stem }), withHalfCapsHardwood)
+    : withHalfCaps;
+  drawLaneRects({ base: halfCapsBase, color: laneColor, outfile: withLanes });
+  const lanesBase = laneKey === "inside_hardwood"
+    ? (compositeLaneHardwood({ base: withLanes, source: withHardwoodFinish, outfile: withLanesHardwood, stem }), withLanesHardwood)
+    : withLanes;
+  drawPaintLinework({ base: lanesBase, lineColor, outfile: withPaintOutlines });
 
-  drawCourtLinework({ base: withPaintOutlines, outfile: withLinework });
+  drawCourtLinework({ base: withPaintOutlines, lineColor, outfile: withLinework });
   drawBackboardHeightExtensions({ base: withLinework, outfile: withBoardExtensions });
 
   if (existsSync(LEFT_BASKET_ALPHA) && existsSync(RIGHT_BASKET_ALPHA)) {
@@ -524,6 +643,7 @@ function renderTeamCourt({ team, hardwoodKey, laneKey, halfCircleKey, oobKey }) 
     lane_fill: laneKey,
     half_circle_fill: halfCircleKey,
     oob_fill: oobKey,
+    line_fill: effectiveLineToken,
     output,
   };
 }
@@ -533,6 +653,27 @@ function main() {
   ensureDir(WORKDIR);
   const force = process.argv.includes("--force");
   const teamFilter = getArgValue("--team");
+  const renderTemplateVariants = process.argv.includes("--render-template-variants");
+
+  if (renderTemplateVariants) {
+    const abilene = parseTeams().find((team) => team.slug === "abilene");
+    const previewVariants = Object.keys(HARDWOOD_VARIANTS).filter((key) => key !== "medium_medium");
+    const report = previewVariants.map((hardwoodKey) =>
+      renderTeamCourt({
+        team: abilene,
+        hardwoodKey,
+        laneKey: "primary",
+        halfCircleKey: "primary",
+        oobKey: "outside_hardwood",
+        lineKey: "dark_grey",
+        outputOverride: path.join(TMP_DIR, `abilene_template_${hardwoodKey}.jpg`),
+        workStem: `abilene_template_${hardwoodKey}`,
+        disableAbileneMapleOverride: true,
+      })
+    );
+    process.stdout.write(`${report.length} template variants generated\n`);
+    return;
+  }
 
   const teams = parseTeams();
   const existing = existingCourtSlugs();
@@ -552,6 +693,7 @@ function main() {
   const laneAssignments = assignBuckets(eligible, LANE_DISTRIBUTION, "lane");
   const halfCircleAssignments = assignBuckets(eligible, HALF_CIRCLE_DISTRIBUTION, "half-circle");
   const oobAssignments = assignBuckets(eligible, OOB_DISTRIBUTION, "oob");
+  const lineAssignments = assignBuckets(eligible, LINE_DISTRIBUTION, "line");
 
   const report = targets
     .sort((a, b) => a.slug.localeCompare(b.slug))
@@ -562,6 +704,7 @@ function main() {
         laneKey: laneAssignments.get(team.slug),
         halfCircleKey: halfCircleAssignments.get(team.slug),
         oobKey: oobAssignments.get(team.slug),
+        lineKey: lineAssignments.get(team.slug),
       })
     );
 
