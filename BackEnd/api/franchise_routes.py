@@ -10,6 +10,7 @@ import math
 import random
 import re
 import uuid
+from copy import deepcopy
 from typing import Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
@@ -119,6 +120,18 @@ def _update_ftd_roster_state(
         {"franchise_id": franchise_id, "team_id": team_object_id},
         {"$set": update_fields},
     )
+
+
+def _reset_team_play_scorers_for_new_season(plays: dict[str, Any] | None) -> dict[str, Any]:
+    """Preserve team play config while clearing season-bound top-scorer tracking."""
+    reset_plays = deepcopy(plays or {})
+    for _play_key, play_data, _display_name in iter_team_plays(reset_plays):
+        if not isinstance(play_data, dict):
+            continue
+        season_stats = play_data.get("season_stats")
+        if isinstance(season_stats, dict):
+            season_stats["player_points"] = {}
+    return reset_plays
 
 
 def _apply_regular_season_rank_prestige_updates(
@@ -7245,6 +7258,7 @@ def finish_season(req: FinishSeasonRequest):
         next_ftd_state_by_team_id[team_id] = {
             "team_object_id": ftd_doc["team_id"],
             "players": ordered_roster,
+            "plays": _reset_team_play_scorers_for_new_season(existing_ftd.get("plays") or {}),
             "scholarship_players": sorted(scholarship_players, key=highest_rt, reverse=True),
             "training_squad_players": [],
             "playing_time_promise_players": pt_promise_players,
@@ -7291,6 +7305,7 @@ def finish_season(req: FinishSeasonRequest):
             {
                 "$set": {
                     "players": state["players"],
+                    "plays": state["plays"],
                     "scholarship_players": state["scholarship_players"],
                     "training_squad_players": state["training_squad_players"],
                     "playing_time_promise_players": state["playing_time_promise_players"],

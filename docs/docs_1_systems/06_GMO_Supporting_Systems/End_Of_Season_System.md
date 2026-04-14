@@ -64,6 +64,9 @@ When the user confirms `Go To Next Season`:
   - this includes anchor baselines for core attributes plus initialized `CH`, `EM`, `MO`, and `NG`, so week 1 training camp treats them like normal franchise players
 - career stats persist
 - season stats reset
+- each team's offensive play `season_stats.player_points` map is cleared
+  - this resets the Playbooks / FCC per-play top-scorer tracking for the new season
+  - play configuration and non-scorer play metadata remain intact
 - a new franchise-season schedule is generated
 - old FRD docs are deleted
 - 300 new recruits are generated for the next season
