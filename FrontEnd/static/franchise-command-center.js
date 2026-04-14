@@ -123,7 +123,7 @@ function populateTop(data) {
     
     if (fillElement) {
       const percentage = (chemistryValue / 25) * 100;
-      fillElement.style.width = `${percentage}%`;
+      fillElement.style.transform = `scaleX(${Math.max(0, Math.min(percentage / 100, 1))})`;
     }
     
     if (textElement) {
