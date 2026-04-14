@@ -31,13 +31,13 @@
   <div id="franchise-container">
     <div id="tournament-top">
       <div id="top-left">
-        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
+        <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
         <div class="left-info">
-          <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
           <div id="fcc-season-label" class="fcc-season-label">Season --</div>
         </div>
       </div>
       <div id="top-center">
+        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
         <div class="chemistry-label">Team Chemistry</div>
         <div class="chemistry-bar">
           <div class="chemistry-bar-fill"></div>
@@ -49,11 +49,6 @@
         </div>
       </div>
       <div id="top-right" class="right-controls">
-        <div class="secondary-buttons-group">
-          <button id="set-gameplan-franchise" class="secondary-btn">Set Game Plan</button>
-          <button id="playbooks-franchise" class="secondary-btn">Playbooks</button>
-          <button id="scouting-report-btn" class="secondary-btn" style="display: none;">Scouting Report</button>
-        </div>
         <div class="hero-buttons-group">
           <button id="play-now" class="hero-btn">Run Training</button>
           <button id="fcc-recruiting-btn" class="recruiting-access-btn is-dead" type="button" disabled>Recruiting Begins Week 20</button>
@@ -69,7 +64,10 @@
         <button data-tab="team-tab">Team</button>
         <button data-tab="recruits-tab">Recruits</button>
         <button data-tab="tournament-tab">Tournament</button>
-        <button data-tab="resources-tab">Coaching Resources</button>
+        <button data-tab="resources-tab">Resources</button>
+        <button id="scouting-report-btn" class="command-link-btn" type="button" style="display: none;">Scouting Report</button>
+        <button id="set-gameplan-franchise" class="command-link-btn" type="button">Game Plan</button>
+        <button id="playbooks-franchise" class="command-link-btn" type="button">Playbooks</button>
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
@@ -193,7 +191,7 @@
         </div>
       </div>
       <div id="resources-tab" class="tab-content">
-        <h3>Coaching Resources</h3>
+        <h3>Resources</h3>
         <div class="resources-grid">
           <a id="resources-standings" class="resources-btn" href="#">Standings</a>
           <a id="resources-stats" class="resources-btn" href="#">Stats</a>

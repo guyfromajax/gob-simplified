@@ -1,6 +1,6 @@
 /**
  * Shared tab management for Franchise and Tournament command centers (Phase 4.4).
- * Expects DOM: .tab-buttons button with data-tab, and .tab-content elements with id matching data-tab.
+ * Expects DOM: .tab-buttons elements with data-tab, and .tab-content elements with id matching data-tab.
  *
  * @param {Object} options
  * @param {string} options.defaultTab - Tab id to show when URL has no tab param (e.g. 'standings-tab' or 'bracket-tab').
@@ -10,7 +10,7 @@ function initCommandCenterTabs(options) {
   var defaultTab = options.defaultTab || 'standings-tab';
   var onTabShow = options.onTabShow || function () {};
 
-  var tabButtons = document.querySelectorAll('.tab-buttons button');
+  var tabButtons = document.querySelectorAll('.tab-buttons [data-tab]');
   var tabContents = document.querySelectorAll('.tab-content');
   if (!tabButtons.length || !tabContents.length) return;
 
@@ -31,6 +31,11 @@ function initCommandCenterTabs(options) {
     newUrl.searchParams.set('tab', tabName);
     window.history.pushState({}, '', newUrl);
   }
+
+  var hasMatchingTab = Array.prototype.some.call(tabButtons, function (b) {
+    return b.dataset.tab === activeTab;
+  });
+  if (!hasMatchingTab) activeTab = defaultTab;
 
   setActive(activeTab);
   onTabShow(activeTab);

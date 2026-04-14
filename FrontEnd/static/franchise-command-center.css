@@ -1,201 +1,355 @@
+:root {
+  --fcc-primary: #27408e;
+  --fcc-primary-deep: #1a2e71;
+  --fcc-panel: rgba(39, 64, 142, 0.26);
+  --fcc-panel-border: rgba(255, 255, 255, 0.18);
+  --fcc-text: #f7f9ff;
+  --fcc-muted: rgba(255, 255, 255, 0.72);
+  --fcc-metal: #999999;
+  --fcc-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.09) 0, rgba(255, 255, 255, 0.09) 4px, transparent 4px) 0 0 / 26px 26px,
+    radial-gradient(circle at 72% 36%, rgba(255, 255, 255, 0.07) 0, rgba(255, 255, 255, 0.07) 4px, transparent 4px) 0 0 / 26px 26px,
+    linear-gradient(124deg, rgba(255, 255, 255, 0.06) 0 17%, transparent 17% 36%, rgba(255, 255, 255, 0.04) 36% 54%, transparent 54% 100%),
+    linear-gradient(180deg, #3450a5 0%, #27408e 46%, #1a2b62 100%);
+  background-attachment: fixed;
+  color: var(--fcc-text);
+}
+
+#franchise-container {
+  position: relative;
+  width: min(1400px, calc(100vw - 24px));
+  margin: 18px auto 28px;
+  padding: 24px 18px 30px;
+  overflow: hidden;
+}
+
+#franchise-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.07) 0 9%, transparent 9% 24%, rgba(255, 255, 255, 0.04) 24% 40%, transparent 40% 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 28%),
+    rgba(7, 13, 36, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  box-shadow: var(--fcc-shadow);
+  pointer-events: none;
+}
+
+#franchise-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+#franchise-container #tournament-top {
+  background: transparent;
+  grid-template-columns: minmax(180px, 1fr) minmax(420px, 1.25fr) minmax(220px, 1fr);
+  gap: 20px;
+  padding: 0 4px 18px;
+  margin-bottom: 8px;
+  align-items: start;
+}
+
+#franchise-container #top-left,
+#franchise-container #top-center,
+#franchise-container #top-right.right-controls {
+  min-height: 178px;
+}
+
 #franchise-container #top-left {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  height: 200px;
-}
-
-#franchise-container #top-left .team-logo {
-  height: 70%;
-  width: auto;
-  margin-bottom: 10px;
-  object-fit: contain;
+  gap: 12px;
+  padding-top: 8px;
 }
 
 #franchise-container #top-left .left-info {
-  width: 100%;
+  width: auto;
   display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 16px;
-  font-weight: bold;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-weight: 700;
+}
+
+#franchise-container .mode-exit-btn {
+  min-width: 138px;
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+}
+
+#franchise-container .mode-exit-btn:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  color: #ffffff;
 }
 
 #franchise-container .fcc-season-label {
   font-family: 'Inter', sans-serif;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
-  color: #1f2937;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fcc-muted);
+}
+
+#franchise-container #top-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  gap: 8px;
+}
+
+#franchise-container #top-center .team-logo {
+  width: 50%;
+  max-width: 160px;
+  min-width: 112px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
+}
+
+#franchise-container #top-center .chemistry-label {
+  margin-bottom: 2px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fcc-muted);
+}
+
+#franchise-container #top-center .chemistry-bar {
+  width: min(100%, 320px);
+  height: 20px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.24), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
+}
+
+#franchise-container #top-center .chemistry-bar-fill {
+  background: linear-gradient(90deg, #203464 0%, #27408e 45%, #4c6cc8 100%);
+}
+
+#franchise-container #top-center .chemistry-bar-text {
+  color: #ffffff;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 #franchise-container #top-center .team-stats {
   width: 100%;
-  max-width: 320px;
+  max-width: 340px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 24px;
+  gap: 8px 20px;
   justify-items: center;
   align-items: center;
-  text-align: center;
   margin: 0 auto;
 }
 
 #franchise-container #top-center .team-stats > div {
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(10, 16, 42, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   font-family: 'Inter', sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #1f2937;
+  color: #ffffff;
   white-space: nowrap;
 }
 
-@media (max-width: 600px) {
-  #franchise-container #top-left {
-    height: 150px;
-  }
-}
-
-/* Top-right button hierarchy redesign */
 #franchise-container #top-right.right-controls {
   display: flex;
-  align-items: center;
-  justify-content: space-between; /* Secondary buttons on left, hero button on right - equal spacing */
-  gap: 12px; /* Gap between secondary buttons group and hero button */
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding-top: 2px;
 }
 
 #franchise-container .hero-buttons-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
 }
 
-/* Secondary buttons group (Set Game Plan, Playbooks, Scouting Report) */
-#franchise-container .secondary-buttons-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-/* Secondary buttons - exact same size for all three */
-#franchise-container .secondary-btn {
-  width: 140px; /* Fixed width - exact same for all */
-  height: 40px; /* Fixed height - exact same for all */
-  padding: 0; /* Remove padding to use fixed dimensions */
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  white-space: nowrap;
-  text-align: center;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-/* Set Game Plan - Blue fill */
-#franchise-container #set-gameplan-franchise.secondary-btn {
-  background: #4065af;
-  color: #fff;
-  border: none;
-}
-
-#franchise-container #set-gameplan-franchise.secondary-btn:hover {
-  background: #345a94;
-  transform: translateY(-1px);
-}
-
-/* Playbooks - White fill, blue text and border */
-#franchise-container #playbooks-franchise.secondary-btn {
-  background: #ffffff;
-  color: #4065af;
-  border: 1px solid #4065af;
-}
-
-#franchise-container #playbooks-franchise.secondary-btn:hover {
-  background: #f0f7ff;
-  border-color: #345a94;
-  transform: translateY(-1px);
-}
-
-#franchise-container #playbooks-franchise.secondary-btn.needs-playbook-save {
-  box-shadow: 0 0 0 4px rgba(255, 212, 59, 0.28), 0 0 30px rgba(255, 215, 64, 0.9);
-  border-color: #e3b500;
-  color: #9b7300;
-}
-
-/* Scouting Report - Gray fill */
-#franchise-container #scouting-report-btn.secondary-btn {
-  background: #9e9d9d;
-  color: #fff;
-  border: none;
-}
-
-#franchise-container #scouting-report-btn.secondary-btn:hover {
-  background: #8a8989;
-  transform: translateY(-1px);
-}
-
-/* Hero button (Run Training) - visually dominant */
 #franchise-container .hero-btn {
-  background: #ff7a00; /* Orange hero color */
-  color: #fff;
+  min-width: 240px;
+  min-height: 58px;
+  padding: 14px 22px;
   border: none;
-  padding: 12px 24px; /* Larger padding than secondary buttons */
-  border-radius: 4px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #34ec27 0%, #49ff37 100%);
+  color: #07101f;
+  clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
   cursor: pointer;
   font-family: 'Bebas Neue', cursive;
-  font-size: 24px; /* Larger font size */
-  font-weight: 400;
-  white-space: nowrap;
+  font-size: 28px;
+  letter-spacing: 0.04em;
   text-align: center;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(255, 122, 0, 0.3); /* Subtle shadow for depth */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 70%;
-  min-width: 220px;
+  transition: transform 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.28);
 }
 
 #franchise-container .hero-btn:hover {
-  background: #ff8a1a; /* Slightly lighter orange on hover */
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 122, 0, 0.4);
+  filter: brightness(1.03);
 }
 
 #franchise-container .hero-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(255, 122, 0, 0.3);
+}
+
+#franchise-container .recruiting-access-btn,
+#franchise-container .fcc-recruiting-live-copy {
+  width: 240px;
+  text-align: center;
 }
 
 #franchise-container .recruiting-access-btn {
-  min-height: 40px;
-  border: none;
-  border-radius: 4px;
-  background: #2f8f46;
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
+  min-height: 38px;
   padding: 8px 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(10, 18, 44, 0.48);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
 }
 
 #franchise-container .recruiting-access-btn:hover:not(.is-dead) {
-  background: #358f58;
   transform: translateY(-1px);
+  background: rgba(22, 35, 80, 0.72);
+  color: #ffffff;
 }
 
 #franchise-container .recruiting-access-btn.is-dead,
 #franchise-container .recruiting-access-btn:disabled {
-  opacity: 0.45;
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.7);
   cursor: default;
+}
+
+#franchise-container .fcc-recruiting-live-copy {
+  margin-top: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.4;
+}
+
+#franchise-container #tournament-tabs {
+  padding: 6px 4px 0;
+}
+
+#franchise-container .tab-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  margin-bottom: 18px;
+}
+
+#franchise-container .tab-buttons button {
+  position: relative;
+  min-width: 120px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+  color: rgba(255, 255, 255, 0.88);
+  font-family: 'Bebas Neue', cursive;
+  font-size: 24px;
+  letter-spacing: 0.03em;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 12px 24px rgba(0, 0, 0, 0.16);
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+#franchise-container .tab-buttons button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent 45%);
+  pointer-events: none;
+}
+
+#franchise-container .tab-buttons button:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+}
+
+#franchise-container .tab-buttons button.active {
+  background: linear-gradient(180deg, #536bc3 0%, #27408e 100%);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+#franchise-container .tab-buttons .command-link-btn {
+  background: linear-gradient(180deg, rgba(153, 153, 153, 0.28), rgba(116, 116, 116, 0.18));
+}
+
+#franchise-container .tab-buttons .command-link-btn:hover {
+  background: linear-gradient(180deg, rgba(189, 189, 189, 0.38), rgba(116, 116, 116, 0.24));
+}
+
+#franchise-container #playbooks-franchise.needs-playbook-save {
+  border-color: rgba(255, 208, 38, 0.84);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(255, 208, 38, 0.36),
+    0 12px 24px rgba(0, 0, 0, 0.16),
+    0 0 28px rgba(255, 208, 38, 0.25);
+}
+
+#franchise-container .tab-content {
+  min-height: 300px;
+  padding: 24px 28px 28px;
+  border: 1px solid var(--fcc-panel-border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(8, 13, 34, 0.66), rgba(12, 18, 44, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+#franchise-container .tab-content > h3,
+#franchise-container .tab-content h2 {
+  color: #ffffff;
+}
+
+#franchise-container .tab-content h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 30px;
+  letter-spacing: 0.03em;
+}
+
+#franchise-container .tab-content a {
+  color: #ffffff;
 }
 
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
@@ -307,17 +461,6 @@
   color: #fff;
 }
 
-.fcc-recruiting-live-copy {
-  margin-top: 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  color: #2f8f46;
-  width: 70%;
-  min-width: 220px;
-  text-align: center;
-}
-
 .fcc-modal-btn-secondary,
 #close-sim-popup,
 #fcc-champ-box-score,
@@ -334,10 +477,10 @@
 }
 .rankings-toggle {
   padding: 8px 16px;
-  border-radius: 4px;
-  border: 1px solid #4065af;
-  background: #fff;
-  color: #4065af;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   cursor: pointer;
@@ -353,7 +496,7 @@
 }
 .rankings-list li {
   padding: 6px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   font-family: 'Inter', sans-serif;
 }
 
@@ -370,16 +513,16 @@
 }
 .standings-region-btn {
   padding: 8px 14px;
-  border-radius: 4px;
-  border: 1px solid #4065af;
-  background: #fff;
-  color: #4065af;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   cursor: pointer;
 }
 .standings-region-btn:hover {
-  background: #f0f7ff;
+  background: rgba(255, 255, 255, 0.14);
 }
 .standings-region-btn.active {
   background: #4065af;
@@ -395,7 +538,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0 0 8px 0;
-  color: #333;
+  color: #ffffff;
 }
 .standings-conference-table {
   width: 100%;
@@ -403,13 +546,14 @@
 }
 .standings-conference-table th,
 .standings-conference-table td {
-  padding: 6px 10px;
+  padding: 10px 10px;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
 }
 .standings-conference-table th {
   font-weight: 600;
-  color: #555;
+  color: rgba(255, 255, 255, 0.68);
 }
 #standings-tab .scroll-x {
   overflow-x: auto;
@@ -427,17 +571,17 @@
 .stats-scope-btn,
 .traits-scope-btn {
   padding: 8px 14px;
-  border-radius: 4px;
-  border: 1px solid #4065af;
-  background: #fff;
-  color: #4065af;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   cursor: pointer;
 }
 .stats-scope-btn:hover,
 .traits-scope-btn:hover {
-  background: #f0f7ff;
+  background: rgba(255, 255, 255, 0.14);
 }
 .stats-scope-btn.active,
 .traits-scope-btn.active {
@@ -462,17 +606,17 @@
 }
 .schedule-conference-btn {
   padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid #4065af;
-  background: #fff;
-  color: #4065af;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   cursor: pointer;
   font-size: 13px;
 }
 .schedule-conference-btn:hover {
-  background: #f0f7ff;
+  background: rgba(255, 255, 255, 0.14);
 }
 .schedule-conference-btn.active {
   background: #4065af;
@@ -483,10 +627,10 @@
 .standings-fcc-note {
   margin-bottom: 16px;
   font-size: 14px;
-  color: #555;
+  color: rgba(255, 255, 255, 0.74);
 }
 .standings-fcc-note a {
-  color: #4065af;
+  color: #ffffff;
   text-decoration: none;
 }
 .standings-fcc-note a:hover {
@@ -498,7 +642,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  max-width: 480px;
+  max-width: 720px;
   margin-top: 20px;
 }
 .resources-btn {
@@ -508,21 +652,22 @@
   width: 100%;
   min-height: 44px;
   padding: 12px 20px;
-  background: #4065af;
+  background: linear-gradient(180deg, #4b64ba 0%, #27408e 100%);
   color: #fff;
   font-family: 'Inter', sans-serif;
   font-weight: 700;
   font-size: 15px;
   text-align: center;
   text-decoration: none;
-  border-radius: 4px;
-  border: none;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
   box-sizing: border-box;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
 }
 .resources-btn:hover {
-  background: #345a94;
+  background: linear-gradient(180deg, #627ad0 0%, #2d49a3 100%);
   color: #fff;
   transform: translateY(-1px);
 }
@@ -538,7 +683,56 @@
 
 .resources-btn.is-dead:hover,
 .resources-btn[aria-disabled="true"]:hover {
-  background: #4065af;
+  background: linear-gradient(180deg, #4b64ba 0%, #27408e 100%);
   color: #fff;
   transform: none;
+}
+
+#franchise-container .tab-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#franchise-container .tab-content th,
+#franchise-container .tab-content td {
+  color: rgba(255, 255, 255, 0.88);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+#franchise-container .tab-content th {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+#franchise-container .tab-content tr:hover td {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+#franchise-container .tab-content table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#franchise-container .training-report-styled {
+  --color-bg: transparent;
+  --color-surface: rgba(255, 255, 255, 0.06);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-accent: #ffffff;
+  --color-accent-orange: #34ec27;
+  --color-accent-blue: #4c6cc8;
+  --color-text: rgba(255, 255, 255, 0.9);
+  --color-text-muted: rgba(255, 255, 255, 0.66);
+  --color-success: #34ec27;
+  --color-error: #ff6d6d;
+  --color-warning: #ffcd26;
+}
+
+#franchise-container .training-report-styled .team-section,
+#franchise-container .training-report-styled .playbook-summary-section,
+#franchise-container .training-report-styled .team-attr-item {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+#franchise-container .training-report-styled .chemistry-bar-text {
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
