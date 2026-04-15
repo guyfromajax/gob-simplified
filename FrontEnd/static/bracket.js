@@ -82,20 +82,25 @@
       img.classList.add('team-logo', 'bracket-logo');
       if (isUserTeam(teamId) || isUserTeam(teamNameVal)) img.classList.add('user-team');
       var tooltipText = getTooltip ? getTooltip(teamId, teamNameVal) : '';
+      var logoNode = img;
       if (tooltipText) {
-        img.title = tooltipText;
-        img.setAttribute('aria-label', tooltipText);
+        var tooltipHost = document.createElement('span');
+        tooltipHost.className = 'team-tooltip-host';
+        tooltipHost.setAttribute('data-team-tooltip', tooltipText);
+        tooltipHost.setAttribute('aria-label', tooltipText);
+        tooltipHost.appendChild(img);
+        logoNode = tooltipHost;
       }
       var scoreSpan = document.createElement('span');
       scoreSpan.className = 'score';
       scoreSpan.textContent = score !== undefined && score !== null ? score : '';
       if (side === 'left') {
         div.appendChild(label);
-        div.appendChild(img);
+        div.appendChild(logoNode);
         div.appendChild(scoreSpan);
       } else {
         div.appendChild(scoreSpan);
-        div.appendChild(img);
+        div.appendChild(logoNode);
         div.appendChild(label);
       }
       return div;

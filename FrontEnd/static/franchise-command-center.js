@@ -608,11 +608,14 @@ function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
     const teamEntry = getTeamRankingEntry(opponentId);
     const topScorer = getTopPlayerByAverage(opponentPlayers, (player) => getPlayerSeasonStats(player).PTS || 0);
     const topRebounder = getTopPlayerByAverage(opponentPlayers, (player) => getPlayerTotalRebounds(player));
+    const tooltipText = getTeamTooltipText(opponentName);
     body.innerHTML = `
       <div class="fcc-home-matchup-card">
         <div class="fcc-home-matchup-top">
           <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
-          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner" title="${escapeHomeHtml(getTeamTooltipText(opponentName))}" aria-label="${escapeHomeHtml(getTeamTooltipText(opponentName))}">
+          <span class="team-tooltip-host" data-team-tooltip="${escapeHomeHtml(tooltipText)}" aria-label="${escapeHomeHtml(tooltipText)}">
+            <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+          </span>
         </div>
         <div class="fcc-home-matchup-bottom">
           <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${teamEntry?.W || 0}-${teamEntry?.L || 0}`)}</div>

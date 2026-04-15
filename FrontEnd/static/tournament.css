@@ -380,6 +380,62 @@ h1, h2, h3, h4, h5, h6 {
   width: auto;
 }
 
+.team-tooltip-host {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+.team-tooltip-host::after {
+  content: attr(data-team-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(12, 16, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  z-index: 40;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.team-tooltip-host::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(12, 16, 24, 0.94) transparent transparent transparent;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  z-index: 39;
+}
+
+.team-tooltip-host:hover::after,
+.team-tooltip-host:hover::before,
+.team-tooltip-host:focus-within::after,
+.team-tooltip-host:focus-within::before {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* Connector line to next round */
 .round:not(.final) .matchup::after {
   display: none;

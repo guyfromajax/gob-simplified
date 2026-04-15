@@ -994,35 +994,66 @@ body {
 }
 
 .fcc-data-card-body {
-  padding: 6px 10px 10px;
+  padding: 0;
 }
 
 #franchise-container #roster-tab .scroll-x,
 #franchise-container #player-stats-tab .scroll-x {
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container #roster-tab .scroll-x::-webkit-scrollbar,
+#franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar {
+  height: 10px;
+}
+
+#franchise-container #roster-tab .scroll-x::-webkit-scrollbar-track,
+#franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container #roster-tab .scroll-x::-webkit-scrollbar-thumb,
+#franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
 }
 
 #franchise-container #roster-tab table.roster-table,
 #franchise-container #player-stats-tab table.stats-table {
   margin: 0;
   min-width: 1180px;
+  width: max-content;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 #franchise-container #roster-tab table.roster-table thead th,
 #franchise-container #player-stats-tab table.stats-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 10px 10px;
   color: rgba(255, 255, 255, 0.66);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-align: center;
+  border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
 }
 
 #franchise-container #roster-tab table.roster-table tbody td,
 #franchise-container #player-stats-tab table.stats-table tbody td {
+  padding: 9px 10px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
+  text-align: center;
+  border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: transparent;
 }
@@ -1035,6 +1066,31 @@ body {
 #franchise-container #roster-tab table.roster-table tbody tr:hover td,
 #franchise-container #player-stats-tab table.stats-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.04);
+}
+
+#franchise-container #roster-tab table.roster-table thead th:first-child,
+#franchise-container #player-stats-tab table.stats-table thead th:first-child,
+#franchise-container #roster-tab table.roster-table tbody td:first-child,
+#franchise-container #player-stats-tab table.stats-table tbody td:first-child {
+  text-align: left;
+  padding-left: 16px;
+}
+
+#franchise-container #roster-tab table.roster-table tbody td:first-child,
+#franchise-container #player-stats-tab table.stats-table tbody td:first-child {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+#franchise-container #roster-tab table.roster-table tbody td:first-child a,
+#franchise-container #player-stats-tab table.stats-table tbody td:first-child a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+#franchise-container #roster-tab table.roster-table tbody td:first-child a:hover,
+#franchise-container #player-stats-tab table.stats-table tbody td:first-child a:hover {
+  text-decoration: underline;
 }
 
 /* Stats and Team Traits scope toggles (Conference / Region / National) */
