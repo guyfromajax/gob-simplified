@@ -938,7 +938,7 @@ function updateSlotDisplay(slot) {
     else if (em >= 60) emoji = '😊';   // Big smile
     else if (em >= 40) emoji = '😐';   // Straight face
     else if (em >= 20) emoji = '😕';   // Slight frown
-    else emoji = '😞';                 // Sad face
+    else emoji = '😡';                 // Angry face
     
     // Get momentum (MO) - same pattern as energy: check attributes first, then fallback
     const momentum = player.attributes?.MO ?? player.MO ?? 0;

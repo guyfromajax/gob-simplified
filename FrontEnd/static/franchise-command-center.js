@@ -42,7 +42,7 @@ const FCC_DEFAULT_DEEP = '#1C2D60';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
 const HOME_EMOJI_BUCKETS = [
-  { emoji: '😞', min: 0, maxExclusive: 20 },
+  { emoji: '😡', min: 0, maxExclusive: 20 },
   { emoji: '😕', min: 20, maxExclusive: 40 },
   { emoji: '😐', min: 40, maxExclusive: 60 },
   { emoji: '😊', min: 60, maxExclusive: 80 },
@@ -519,7 +519,6 @@ function renderHomeStandingsCard() {
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.L ?? 0)}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PF ?? 0)}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PA ?? 0)}</span>
-      <span class="fcc-home-standings-next">${escapeHomeHtml(team.next || '')}</span>
     </div>
   `).join('');
 
@@ -531,7 +530,6 @@ function renderHomeStandingsCard() {
         <span class="fcc-home-standings-stat">L</span>
         <span class="fcc-home-standings-stat">PF</span>
         <span class="fcc-home-standings-stat">PA</span>
-        <span class="fcc-home-standings-next">Next</span>
       </div>
       <div class="fcc-home-list-scroll">${rows}</div>
     </div>
@@ -672,7 +670,17 @@ function renderHomeTeamStatsCard() {
     return;
   }
   const players = [...userRosterPlayersCache]
-    .sort((a, b) => getPlayerPpg(b) - getPlayerPpg(a))
+    .sort((a, b) => {
+      const bGp = getGamesPlayed(b);
+      const aGp = getGamesPlayed(a);
+      const bPpg = getPlayerPpg(b);
+      const aPpg = getPlayerPpg(a);
+      if (bGp === 0 && aGp === 0) {
+        return Number(b?.rt || 0) - Number(a?.rt || 0);
+      }
+      if (bPpg !== aPpg) return bPpg - aPpg;
+      return Number(b?.rt || 0) - Number(a?.rt || 0);
+    })
     .slice(0, 12);
   body.innerHTML = `
     <div class="fcc-home-team-stats">

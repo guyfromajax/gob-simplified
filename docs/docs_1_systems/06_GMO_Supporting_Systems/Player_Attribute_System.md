@@ -111,7 +111,7 @@ The first 12 attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT) are dis
   - **>= 60:** 😊 (Big smile) - Positive
   - **>= 40:** 😐 (Straight face) - Neutral
   - **>= 20:** 😕 (Slight frown) - Negative
-  - **< 20:** 😞 (Sad face) - Very negative
+  - **< 20:** 😡 (Angry face) - Very negative
 - **Purpose:** Visual representation of player emotional state
 - **Implementation:** Value converted to emoji during display rendering
 
@@ -172,4 +172,3 @@ The first 12 attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT) are dis
 - ✅ **Maintainability:** Single source of truth for attribute order
 - ✅ **Visual Clarity:** Special formatting for NG, EM, MO improves readability
 - ✅ **Scalability:** Easy to add new attributes while maintaining order
-

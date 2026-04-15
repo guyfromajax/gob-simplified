@@ -620,7 +620,7 @@ function getEmotionEmoji(em) {
   else if (emValue >= 60) return '😊';   // Big smile
   else if (emValue >= 40) return '😐';   // Straight face
   else if (emValue >= 20) return '😕';   // Slight frown
-  else return '😞';                      // Sad face
+  else return '😡';                      // Angry face
 }
 
 function createMomentumPill(mo) {

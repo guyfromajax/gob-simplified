@@ -888,8 +888,8 @@ export function createGameScene(Phaser) {
         if (em >= 80) emoji = '😎';        // Sunglasses
         else if (em >= 60) emoji = '😊';   // Big smile
         else if (em >= 40) emoji = '😐';   // Straight face
-        else if (em >= 20) emoji = '🙁';   // Frown
-        else emoji = '🤢';                  // Sick green face
+        else if (em >= 20) emoji = '😕';   // Slight frown
+        else emoji = '😡';                  // Angry face
         
         // Update tooltip content
         energyEl.textContent = `${ngPercent}%`;
