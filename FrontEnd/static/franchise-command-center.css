@@ -295,6 +295,9 @@ body {
 
 #franchise-container .fcc-placeholder-tab {
   min-height: 420px;
+}
+
+#franchise-container .fcc-placeholder-tab.active {
   display: flex;
   align-items: center;
   justify-content: center;
