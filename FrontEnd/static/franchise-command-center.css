@@ -352,15 +352,329 @@ body {
 
 .fcc-home-card-body {
   flex: 1;
+  min-height: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.fcc-home-empty {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100%;
   text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.fcc-home-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 126px;
+  overflow: auto;
+}
+
+.fcc-home-list-row,
+.fcc-home-recruit-row,
+.fcc-home-team-stats-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fcc-home-list-row:last-child,
+.fcc-home-recruit-row:last-child,
+.fcc-home-team-stats-row:last-child,
+.fcc-home-standings-row:last-child {
+  border-bottom: none;
+}
+
+.fcc-home-list-row {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+}
+
+.fcc-home-list-rank,
+.fcc-home-list-meta {
+  font-size: 12px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.72);
-  letter-spacing: 0.02em;
+}
+
+.fcc-home-list-main {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.fcc-home-standings {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.fcc-home-standings-row {
+  display: grid;
+  grid-template-columns: minmax(86px, 1.7fr) 24px 24px 32px 32px minmax(56px, 1fr);
+  gap: 4px;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fcc-home-standings-row-header {
+  min-height: 22px;
+  padding-top: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fcc-home-standings-team,
+.fcc-home-standings-next {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fcc-home-standings-team {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.fcc-home-standings-stat {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.fcc-home-standings-next {
+  text-align: right;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.fcc-home-matchup-card {
+  display: grid;
+  grid-template-rows: 33% 1fr;
+  height: 100%;
+}
+
+.fcc-home-matchup-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fcc-home-matchup-label {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 28px;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+}
+
+.fcc-home-matchup-logo {
+  max-width: 72%;
+  max-height: 42px;
+  object-fit: contain;
+}
+
+.fcc-home-matchup-bottom {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.fcc-home-detail-line {
+  font-size: 12px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.fcc-home-potg-line {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.fcc-home-final-score {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.fcc-home-final-score-at {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.fcc-home-score-strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.fcc-home-locker-room {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fcc-home-locker-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.fcc-home-chemistry-bar {
+  position: relative;
+  height: 22px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.fcc-home-chemistry-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(247, 148, 32, 0.18) 0%, rgba(247, 148, 32, 0.45) 45%, rgba(247, 148, 32, 0.85) 100%);
+  border-right: 1px solid rgba(255, 205, 38, 0.72);
+}
+
+.fcc-home-chemistry-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.fcc-home-attitude-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fcc-home-attitude-emojis,
+.fcc-home-attitude-counts,
+.fcc-home-attitude-rail {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  text-align: center;
+}
+
+.fcc-home-attitude-emojis span {
+  font-size: 18px;
+}
+
+.fcc-home-attitude-rail {
+  position: relative;
+  min-height: 12px;
+}
+
+.fcc-home-attitude-rail::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-50%);
+}
+
+.fcc-home-attitude-tick {
+  justify-self: center;
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.68);
+  position: relative;
+  z-index: 1;
+}
+
+.fcc-home-attitude-counts span {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.fcc-home-team-stats {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.fcc-home-team-stats-header,
+.fcc-home-team-stats-row {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.fcc-home-team-stats-header {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  min-height: 22px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.fcc-home-team-stats-header span:last-child,
+.fcc-home-team-stats-value {
+  text-align: right;
+}
+
+.fcc-home-team-stats-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.fcc-home-team-stats-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.fcc-home-recruit-row {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */

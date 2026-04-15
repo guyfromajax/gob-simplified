@@ -30,6 +30,10 @@ let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
 let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
+let userRosterPlayersCache = [];
+let userScheduleDataCache = null;
+let homeLastGameDataCache = null;
+const homeOpponentRosterCache = new Map();
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const FCC_DEFAULT_PRIMARY = '#27408E';
@@ -37,6 +41,13 @@ const FCC_DEFAULT_TOP = '#3551A5';
 const FCC_DEFAULT_DEEP = '#1C2D60';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
+const HOME_EMOJI_BUCKETS = [
+  { emoji: '😞', min: 0, maxExclusive: 20 },
+  { emoji: '😕', min: 20, maxExclusive: 40 },
+  { emoji: '😐', min: 40, maxExclusive: 60 },
+  { emoji: '😊', min: 60, maxExclusive: 80 },
+  { emoji: '😎', min: 80, maxExclusive: Infinity }
+];
 
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
@@ -358,6 +369,393 @@ function renderStandings(data, selectedRegion) {
   });
 }
 
+function escapeHomeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function getPlayerSeasonStats(player) {
+  return player?.stats?.season || {};
+}
+
+function getGamesPlayed(player) {
+  const stats = getPlayerSeasonStats(player);
+  return Number(stats.GP || 0) || 0;
+}
+
+function formatPerGame(total, gamesPlayed) {
+  if (!gamesPlayed) return '0.0';
+  return (Number(total || 0) / gamesPlayed).toFixed(1);
+}
+
+function getPlayerDisplayName(player) {
+  return `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || player?.name || 'Unknown';
+}
+
+function getPlayerTotalRebounds(player) {
+  const stats = getPlayerSeasonStats(player);
+  return Number(stats.TREB || ((stats.OREB || 0) + (stats.DREB || 0)) || 0);
+}
+
+function getTopPlayerByAverage(players, totalResolver) {
+  let best = null;
+  let bestAvg = -1;
+  (players || []).forEach((player) => {
+    const gp = getGamesPlayed(player);
+    if (!gp) return;
+    const average = Number(totalResolver(player) || 0) / gp;
+    if (average > bestAvg) {
+      best = player;
+      bestAvg = average;
+    }
+  });
+  return { player: best, average: bestAvg > -1 ? bestAvg : 0 };
+}
+
+function getPlayerPpg(player) {
+  return Number(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)));
+}
+
+function getScheduleDisplayName(teamId) {
+  if (!userScheduleDataCache) return '';
+  const display = userScheduleDataCache.team_display_name_map?.[teamId];
+  const fallback = userScheduleDataCache.team_name_map?.[teamId];
+  return display || fallback || '';
+}
+
+function getTeamRankingEntry(teamId) {
+  return (commandCenterTopDataCache?.rankings || []).find((entry) => String(entry.team_id) === String(teamId)) || null;
+}
+
+function getUserScheduleGames() {
+  const weeks = userScheduleDataCache?.schedule || [];
+  return weeks.flat().filter((game) => game && game.is_user_team);
+}
+
+function getOpponentIdFromGame(game) {
+  if (!game || !userTeamId) return null;
+  return String(game.home_team_id) === String(userTeamId) ? String(game.away_team_id) : String(game.home_team_id);
+}
+
+function getMatchupLabelForGame(game) {
+  if (!game || !userTeamId) return '';
+  return String(game.home_team_id) === String(userTeamId) ? 'vs' : '@';
+}
+
+function getNextUserGame() {
+  const currentWeek = Number(commandCenterTopDataCache?.week || 1);
+  return getUserScheduleGames().find((game) => Number(game.week || 0) >= currentWeek && game.status !== 'complete') || null;
+}
+
+function getLastCompletedUserGame() {
+  const currentWeek = Number(commandCenterTopDataCache?.week || 1);
+  const games = getUserScheduleGames()
+    .filter((game) => game.status === 'complete' && Number(game.week || 0) <= currentWeek)
+    .sort((a, b) => Number(b.week || 0) - Number(a.week || 0));
+  return games[0] || null;
+}
+
+async function fetchRosterWithStatsForTeam(teamId) {
+  if (!franchiseId || !teamId) return [];
+  if (homeOpponentRosterCache.has(teamId)) return homeOpponentRosterCache.get(teamId);
+  const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}`;
+  const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${encodeURIComponent(franchiseId)}`;
+  try {
+    const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
+    const players = result?.players || [];
+    homeOpponentRosterCache.set(teamId, players);
+    return players;
+  } catch (error) {
+    console.warn('Failed to load opponent roster for Home tab:', teamId, error);
+    return [];
+  }
+}
+
+async function ensureHomeScheduleData() {
+  if (userScheduleDataCache || !franchiseId) return userScheduleDataCache;
+  const params = new URLSearchParams();
+  params.set('franchise_id', franchiseId);
+  if (userConference != null) params.set('conference', String(userConference));
+  userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
+  return userScheduleDataCache;
+}
+
+async function ensureHomeLastGameData(game) {
+  if (!game?.game_id) return null;
+  if (homeLastGameDataCache && homeLastGameDataCache.game_id === game.game_id) return homeLastGameDataCache.data;
+  const data = await fetchJSON(`${API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(game.game_id)}`)}`);
+  if (data) {
+    homeLastGameDataCache = { game_id: game.game_id, data };
+  }
+  return data;
+}
+
+function createEmptyHomeState(message = 'N/A') {
+  return `<div class="fcc-home-empty">${escapeHomeHtml(message)}</div>`;
+}
+
+function renderHomeStandingsCard() {
+  const body = document.getElementById('home-standings-body');
+  if (!body) return;
+  if (!standingsDataCache?.standings || userConference == null) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+  const teams = standingsDataCache.standings
+    .filter((team) => Number(team.conference) === Number(userConference))
+    .sort((a, b) => (Number(b.W || 0) - Number(a.W || 0)) || (Number(b.differential || 0) - Number(a.differential || 0)));
+  if (!teams.length) {
+    body.innerHTML = createEmptyHomeState();
+    return;
+  }
+
+  const rows = teams.map((team) => `
+    <div class="fcc-home-standings-row">
+      <span class="fcc-home-standings-team">${escapeHomeHtml(team.name || '')}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.W ?? 0)}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.L ?? 0)}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PF ?? 0)}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PA ?? 0)}</span>
+      <span class="fcc-home-standings-next">${escapeHomeHtml(team.next || '')}</span>
+    </div>
+  `).join('');
+
+  body.innerHTML = `
+    <div class="fcc-home-standings">
+      <div class="fcc-home-standings-row fcc-home-standings-row-header">
+        <span class="fcc-home-standings-team">Team</span>
+        <span class="fcc-home-standings-stat">W</span>
+        <span class="fcc-home-standings-stat">L</span>
+        <span class="fcc-home-standings-stat">PF</span>
+        <span class="fcc-home-standings-stat">PA</span>
+        <span class="fcc-home-standings-next">Next</span>
+      </div>
+      <div class="fcc-home-list-scroll">${rows}</div>
+    </div>
+  `;
+}
+
+function renderHomeRankingsCard() {
+  const body = document.getElementById('home-rankings-body');
+  if (!body) return;
+  const rankings = (commandCenterTopDataCache?.rankings || []).slice(0, 10);
+  if (!rankings.length) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+  body.innerHTML = `
+    <div class="fcc-home-list-scroll">
+      ${rankings.map((team) => `
+        <div class="fcc-home-list-row">
+          <span class="fcc-home-list-rank">${escapeHomeHtml(team.natl_rank)}</span>
+          <span class="fcc-home-list-main">${escapeHomeHtml(team.team_name || '')}</span>
+          <span class="fcc-home-list-meta">${escapeHomeHtml(`${team.W || 0}-${team.L || 0}`)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  if (!game) {
+    body.innerHTML = createEmptyHomeState('N/A');
+    return;
+  }
+  const opponentId = getOpponentIdFromGame(game);
+  const matchupLabel = getMatchupLabelForGame(game);
+  const opponentName = userScheduleDataCache?.team_name_map?.[opponentId] || getScheduleDisplayName(opponentId) || 'Opponent';
+  const logoSrc = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(opponentName, 'banner_primary')
+    : '/images/teams/general/general_banner_primary.jpg';
+
+  if (bodyId === 'home-next-game-body') {
+    const teamEntry = getTeamRankingEntry(opponentId);
+    const topScorer = getTopPlayerByAverage(opponentPlayers, (player) => getPlayerSeasonStats(player).PTS || 0);
+    const topRebounder = getTopPlayerByAverage(opponentPlayers, (player) => getPlayerTotalRebounds(player));
+    body.innerHTML = `
+      <div class="fcc-home-matchup-card">
+        <div class="fcc-home-matchup-top">
+          <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
+          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+        </div>
+        <div class="fcc-home-matchup-bottom">
+          <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${teamEntry?.W || 0}-${teamEntry?.L || 0}`)}</div>
+          <div class="fcc-home-detail-line">Rank: ${escapeHomeHtml(teamEntry?.natl_rank || 'N/A')}</div>
+          <div class="fcc-home-detail-line">Top Scorer: ${escapeHomeHtml(topScorer.player ? `${getPlayerDisplayName(topScorer.player)}, ${topScorer.average.toFixed(1)}` : 'N/A')}</div>
+          <div class="fcc-home-detail-line">Top Rebounder: ${escapeHomeHtml(topRebounder.player ? `${getPlayerDisplayName(topRebounder.player)}, ${topRebounder.average.toFixed(1)}` : 'N/A')}</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const gameDoc = lastGameData?.game || null;
+  const awayName = getScheduleDisplayName(game.away_team_id) || gameDoc?.away_team?.name || 'Away';
+  const homeName = getScheduleDisplayName(game.home_team_id) || gameDoc?.home_team?.name || 'Home';
+  const awayScore = Number(game.away_score ?? gameDoc?.away_team?.score ?? 0);
+  const homeScore = Number(game.home_score ?? gameDoc?.home_team?.score ?? 0);
+  const awayBold = awayScore > homeScore ? 'fcc-home-score-strong' : '';
+  const homeBold = homeScore > awayScore ? 'fcc-home-score-strong' : '';
+
+  body.innerHTML = `
+    <div class="fcc-home-matchup-card">
+      <div class="fcc-home-matchup-top">
+        <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
+        <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+      </div>
+      <div class="fcc-home-matchup-bottom">
+        <div class="fcc-home-final-score">
+          <span class="${awayBold}">${escapeHomeHtml(`${awayName} (${awayScore})`)}</span>
+          <span class="fcc-home-final-score-at">at</span>
+          <span class="${homeBold}">${escapeHomeHtml(`${homeName} (${homeScore})`)}</span>
+        </div>
+        <div class="fcc-home-detail-line">Player of The Game: ${escapeHomeHtml(lastGameData?.potg?.name || 'N/A')}</div>
+        <div class="fcc-home-detail-line fcc-home-potg-line">
+          ${escapeHomeHtml(lastGameData?.potg ? `${lastGameData.potg.stats.pts} PTS  ${lastGameData.potg.stats.reb} REB  ${lastGameData.potg.stats.ast} AST  ${lastGameData.potg.stats.stl} STL  ${lastGameData.potg.stats.blk} BLK  ${lastGameData.potg.stats.defPct} DEF%` : 'N/A')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeLockerRoomCard() {
+  const body = document.getElementById('home-locker-room-body');
+  if (!body) return;
+  if (!teamData?.team_attributes || !userRosterPlayersCache.length) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+
+  const chemistry = Number(teamData.team_attributes.team_chemistry || 0);
+  const chemistryPercent = Math.max(0, Math.min(100, (chemistry / 25) * 100));
+  const attitudeCounts = HOME_EMOJI_BUCKETS.map((bucket) => {
+    const count = userRosterPlayersCache.filter((player) => {
+      const em = Number(player?.attributes?.EM || 0);
+      return em >= bucket.min && em < bucket.maxExclusive;
+    }).length;
+    return { ...bucket, count };
+  });
+
+  body.innerHTML = `
+    <div class="fcc-home-locker-room">
+      <div class="fcc-home-locker-label">Team Chemistry</div>
+      <div class="fcc-home-chemistry-bar">
+        <div class="fcc-home-chemistry-fill" style="width:${chemistryPercent}%"></div>
+        <div class="fcc-home-chemistry-text">${escapeHomeHtml(`${chemistry} / 25`)}</div>
+      </div>
+      <div class="fcc-home-locker-label">Player Attitudes</div>
+      <div class="fcc-home-attitude-scale">
+        <div class="fcc-home-attitude-emojis">
+          ${attitudeCounts.map((bucket) => `<span>${bucket.emoji}</span>`).join('')}
+        </div>
+        <div class="fcc-home-attitude-rail">
+          ${attitudeCounts.map(() => '<span class="fcc-home-attitude-tick"></span>').join('')}
+        </div>
+        <div class="fcc-home-attitude-counts">
+          ${attitudeCounts.map((bucket) => `<span>${bucket.count}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeTeamStatsCard() {
+  const body = document.getElementById('home-team-stats-body');
+  if (!body) return;
+  if (!userRosterPlayersCache.length) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+  const players = [...userRosterPlayersCache]
+    .sort((a, b) => getPlayerPpg(b) - getPlayerPpg(a))
+    .slice(0, 12);
+  body.innerHTML = `
+    <div class="fcc-home-team-stats">
+      <div class="fcc-home-team-stats-header">
+        <span>Player</span>
+        <span>PPG</span>
+      </div>
+      <div class="fcc-home-list-scroll">
+        ${players.map((player, index) => `
+          <div class="fcc-home-team-stats-row">
+            <span class="fcc-home-team-stats-name">${escapeHomeHtml(`${index + 1}. ${getPlayerDisplayName(player)}`)}</span>
+            <span class="fcc-home-team-stats-value">${escapeHomeHtml(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)))}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeRecruitingCard() {
+  const body = document.getElementById('home-recruiting-body');
+  if (!body) return;
+  if (!leanRecruitsDataCache.length) {
+    body.innerHTML = createEmptyHomeState('N/A');
+    return;
+  }
+  const recruits = [...leanRecruitsDataCache].sort((a, b) => Number(b.rt || 0) - Number(a.rt || 0));
+  body.innerHTML = `
+    <div class="fcc-home-list-scroll">
+      ${recruits.map((recruit) => `
+        <div class="fcc-home-recruit-row">
+          ${escapeHomeHtml(`${recruit.name}: ${recruit.archetype} ${recruit.height} ${recruit.weight ?? '--'} ${recruit.rt ?? '--'}`)}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderHomeNewsCard() {
+  const body = document.getElementById('home-news-body');
+  if (!body) return;
+  body.innerHTML = createEmptyHomeState('In Development');
+}
+
+async function renderHomeTab() {
+  renderHomeStandingsCard();
+  renderHomeRankingsCard();
+  renderHomeLockerRoomCard();
+  renderHomeTeamStatsCard();
+  renderHomeRecruitingCard();
+  renderHomeNewsCard();
+
+  const nextGame = getNextUserGame();
+  const lastGame = getLastCompletedUserGame();
+  const nextOpponentPlayers = nextGame ? await fetchRosterWithStatsForTeam(getOpponentIdFromGame(nextGame)) : [];
+  renderHomeMatchupCard('home-next-game-body', nextGame, nextOpponentPlayers, null);
+
+  let lastGamePayload = null;
+  if (lastGame?.game_id) {
+    const lastGameData = await ensureHomeLastGameData(lastGame);
+    if (lastGameData) {
+      try {
+        const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
+          ? window.API_CONFIG.getStaticPath()
+          : '';
+        const { calculatePlayerOfTheGame } = await import(`${staticBase}/js/shared/potg.js`);
+        lastGamePayload = {
+          game: lastGameData,
+          potg: calculatePlayerOfTheGame(lastGameData, { gameId: lastGame.game_id })
+        };
+      } catch (error) {
+        console.warn('Failed to compute Home tab POTG:', error);
+      }
+    }
+  }
+  renderHomeMatchupCard('home-last-game-body', lastGame, [], lastGamePayload);
+}
+
+async function loadHomeTabData() {
+  await ensureHomeScheduleData();
+  await renderHomeTab();
+}
+
 function bindStandingsRegionButtons() {
   document.querySelectorAll('.standings-region-btn').forEach(btn => {
     if (btn.dataset.bound) return;
@@ -588,6 +986,7 @@ function initFccRecruits(topData) {
     const recruitsTable = document.getElementById('fcc-recruits-table');
     if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
   }
+  void renderHomeTab();
 }
 
 let rankingsFullList = [];
@@ -901,6 +1300,7 @@ function renderTeam(data) {
   if (!data) {
     return;
   }
+  userRosterPlayersCache = data.players || [];
   const tbody = document.getElementById('team-body');
   if (!tbody) {
     return;
@@ -1032,6 +1432,7 @@ function renderTeam(data) {
   if (typeof RosterStatsRenderer !== 'undefined') {
     RosterStatsRenderer.renderRosterStats(data.players || []);
   }
+  void renderHomeTab();
 }
 
 // Store roster data for sorting
@@ -1480,6 +1881,7 @@ async function init() {
   standingsDataCache = standingsData;
   renderStandings(standingsData, 'A');
   bindResourcesLinks();
+  const homeTabDataPromise = loadHomeTabData();
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
@@ -1511,6 +1913,7 @@ async function init() {
     await loadTeamData();
     const loadTeamDataEndTime = performance.now();
     console.log(`⏱️ [PERF] loadTeamData() COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
+    await homeTabDataPromise;
     
     const initEndTime = performance.now();
     console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
@@ -2120,6 +2523,7 @@ async function loadTeamData() {
       renderTeamReport();
       renderPlaybookSummary();
     }
+    void renderHomeTab();
     
     const loadTeamDataEndTime = performance.now();
     console.log(`⏱️ [PERF] loadTeamData() function COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
