@@ -872,6 +872,8 @@ function bindResourcesLinks() {
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
   const standingsFullLink = document.getElementById('standings-full-link');
   if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
+  const teamStatsNavBtn = document.getElementById('team-stats-nav-btn');
+  if (teamStatsNavBtn) teamStatsNavBtn.dataset.route = `/team-stats.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
   if (rStandings) rStandings.href = `/standings.html${q()}`;
   const rStats = document.getElementById('resources-stats');

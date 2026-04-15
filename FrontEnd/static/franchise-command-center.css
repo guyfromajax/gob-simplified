@@ -1170,6 +1170,127 @@ body {
   text-decoration: underline;
 }
 
+body.team-stats-page #franchise-container .fcc-routed-page {
+  padding-top: 4px;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar {
+  height: 10px;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid {
+  width: max-content;
+  min-width: 1600px;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.group-row th {
+  padding: 12px 8px 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 11px 10px 10px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.sortable:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.active {
+  color: #fff;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead th.col-group-start,
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-group-start {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td {
+  padding: 9px 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td:first-child,
+body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th:first-child {
+  text-align: left;
+  padding-left: 16px;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td:first-child {
+  font-weight: 700;
+  color: #fff;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-w {
+  color: #9ee8b2;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-l {
+  color: #ffd26c;
+}
+
+body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-row td {
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* Resources tab: 3-column grid, buttons like Game Plan (blue fill, white bold) */
 .resources-grid {
   display: grid;

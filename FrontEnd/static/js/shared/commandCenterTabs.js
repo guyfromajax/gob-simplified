@@ -10,7 +10,7 @@ function initCommandCenterTabs(options) {
   var defaultTab = options.defaultTab || 'standings-tab';
   var onTabShow = options.onTabShow || function () {};
 
-  var tabButtons = document.querySelectorAll('.tab-buttons [data-tab]');
+  var tabButtons = document.querySelectorAll('.tab-buttons [data-tab], .tab-buttons [data-route]');
   var tabContents = document.querySelectorAll('.tab-content');
   if (!tabButtons.length || !tabContents.length) return;
 
@@ -50,6 +50,12 @@ function initCommandCenterTabs(options) {
 
   tabButtons.forEach(function (btn) {
     btn.addEventListener('click', function () {
+      var route = btn.dataset.route;
+      if (route) {
+        playSound('click-tiny.wav');
+        window.location.href = route;
+        return;
+      }
       var tabName = btn.dataset.tab;
       if (!tabName) return;
       playSound('click-tiny.wav');

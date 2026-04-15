@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Team Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tournament.css">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/command-center-team-styles.css">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+</head>
+<body class="team-stats-page">
+  <div id="franchise-container">
+    <div id="tournament-top">
+      <div id="top-left">
+        <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
+      </div>
+      <div id="top-center">
+        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
+        <div id="fcc-season-label" class="fcc-season-label">Season --</div>
+      </div>
+      <div id="top-right" class="right-controls">
+        <div class="hero-buttons-group">
+          <button id="play-now" class="hero-btn">Loading...</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tournament-tabs">
+      <div class="tab-buttons">
+        <button id="team-stats-home-btn" data-route="#">Home</button>
+        <button id="team-stats-roster-btn" data-route="#">Roster</button>
+        <button id="team-stats-player-stats-btn" data-route="#">Player Stats</button>
+        <button class="active">Team Stats</button>
+        <button id="team-stats-game-plan-btn" data-route="#">Game Plan</button>
+        <button id="team-stats-playbooks-btn" data-route="#">Playbooks</button>
+        <button id="team-stats-coaches-btn" data-route="#">Coaches</button>
+        <button id="team-stats-standings-btn" data-route="#">Standings</button>
+        <button id="team-stats-schedule-btn" data-route="#">Schedule</button>
+        <button id="team-stats-rankings-btn" data-route="#">Rankings</button>
+        <button id="team-stats-leaders-btn" data-route="#">Leaders</button>
+        <button id="team-stats-press-btn" data-route="#">Press</button>
+        <button id="team-stats-recruits-btn" data-route="#">Recruits</button>
+        <button id="team-stats-tasks-btn" data-route="#">Tasks</button>
+      </div>
+
+      <section class="fcc-routed-page">
+        <div class="stats-scope-toggle-wrap">
+          <button type="button" class="stats-scope-btn active" data-scope="conference">Conference</button>
+          <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
+          <button type="button" class="stats-scope-btn" data-scope="national">National</button>
+        </div>
+
+        <section class="fcc-data-card fcc-team-stats-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="stats-table fcc-team-stats-grid">
+              <thead>
+                <tr class="group-row">
+                  <th colspan="6"></th>
+                  <th colspan="3">Shooting</th>
+                  <th colspan="3">3-Point</th>
+                  <th colspan="3">Free Throws</th>
+                  <th colspan="3">Rebounding</th>
+                  <th colspan="5">Other</th>
+                  <th colspan="4">Defense</th>
+                </tr>
+                <tr class="col-row">
+                  <th class="sortable col-group-start" data-stat="team">Team <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="rank">Rank <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="W">W <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="L">L <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="PF">PF <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="PA">PA <span class="sort-arrow"></span></th>
+                  <th class="sortable col-group-start" data-stat="FGM">FGM <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="FGA">FGA <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="FG%">FG% <span class="sort-arrow"></span></th>
+                  <th class="sortable col-group-start" data-stat="3PTM">3PTM <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="3PTA">3PTA <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="3PT%">3PT% <span class="sort-arrow"></span></th>
+                  <th class="sortable col-group-start" data-stat="FTM">FTM <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="FTA">FTA <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="FT%">FT% <span class="sort-arrow"></span></th>
+                  <th class="sortable col-group-start" data-stat="DREB">DREB <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="OREB">OREB <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="TREB">TREB <span class="sort-arrow"></span></th>
+                  <th class="sortable col-group-start" data-stat="AST">AST <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="F">F <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="TO">TO <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="SCR_A">SCRA <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="SCR%">SCR% <span class="sort-arrow"></span></th>
+                  <th class="sortable col-group-start" data-stat="STL">STL <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="BLK">BLK <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="DEF_A">DEFA <span class="sort-arrow"></span></th>
+                  <th class="sortable" data-stat="DEF%">DEF% <span class="sort-arrow"></span></th>
+                </tr>
+              </thead>
+              <tbody id="teamstats-body">
+                <tr><td colspan="27">Loading team stats...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </div>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/accessDenied.js"></script>
+  <script src="/js/shared/analytics.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/commandCenterTabs.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
+  <script src="/team-stats.js"></script>
+</body>
+</html>
