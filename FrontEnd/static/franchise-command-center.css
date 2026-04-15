@@ -78,7 +78,7 @@ body {
   background: transparent;
   grid-template-columns: minmax(180px, 1fr) minmax(420px, 1.25fr) minmax(220px, 1fr);
   gap: 12px;
-  padding: 0 4px 8px;
+  padding: 0 4px 24px;
   margin-bottom: 0;
   align-items: start;
 }
@@ -187,7 +187,7 @@ body {
 }
 
 #franchise-container #tournament-tabs {
-  padding: 2px 4px 0;
+  padding: 6px 4px 0;
 }
 
 #franchise-container .tab-buttons {
