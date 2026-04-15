@@ -1850,7 +1850,7 @@ function wireFccNavButtons() {
   const setGameplanBtn = document.getElementById('set-gameplan-franchise');
   if (setGameplanBtn) {
     setGameplanBtn.addEventListener('click', () => {
-      playSound('positive-beep.wav');
+      playSound('click-tiny.wav');
       if (!franchiseId || !userTeamId) {
         alert('Franchise or user team not loaded');
         return;
@@ -1867,7 +1867,7 @@ function wireFccNavButtons() {
   const playbooksBtn = document.getElementById('playbooks-franchise');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', () => {
-      playSound('positive-beep.wav');
+      playSound('click-tiny.wav');
       if (!franchiseId || !userTeamId) {
         alert('Franchise or user team not loaded');
         return;
@@ -2641,7 +2641,7 @@ function updateScoutingButton(data) {
 }
 
 async function loadScoutingReport() {
-  playSound('positive-slide.wav');
+  playSound('click-tiny.wav');
   if (!upcomingOpponent || !franchiseId) {
     alert('No upcoming opponent found');
     return;
