@@ -1845,7 +1845,7 @@ playNowBtn.addEventListener('click', async () => {
   }
 });
 
-// Set Game Plan, Playbooks (and Scouting Report via loadScoutingReport) — wire on DOMContentLoaded so buttons exist
+// Legacy route buttons were removed from the FCC tab bar in favor of local placeholder tabs.
 function wireFccNavButtons() {
   const setGameplanBtn = document.getElementById('set-gameplan-franchise');
   if (setGameplanBtn) {
@@ -1918,17 +1918,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
-        }
-        if (tabName === 'tournament-tab') {
-          renderTournamentBracket();
-        }
-        if (tabName === 'team-tab') {
-          if (!teamData) {
-            loadTeamData();
-          } else {
-            renderTeamReport();
-            renderPlaybookSummary();
-          }
         }
       }
     });
