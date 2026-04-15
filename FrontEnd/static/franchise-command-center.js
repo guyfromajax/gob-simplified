@@ -119,6 +119,12 @@ function restoreFccSessionCache() {
   return !!(commandCenterTopDataCache || standingsDataCache || userRosterPlayersCache.length || teamData || userScheduleDataCache);
 }
 
+function invalidateHomeWeekSensitiveCaches() {
+  userScheduleDataCache = null;
+  homeLastGameDataCache = null;
+  homeOpponentRosterCache.clear();
+}
+
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
   qs.set('id', playerId);
@@ -2088,6 +2094,12 @@ async function init() {
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  const previousWeek = Number(commandCenterTopDataCache?.week || 0);
+  const nextWeek = Number(topData?.week || 0);
+  if (previousWeek && nextWeek && previousWeek !== nextWeek) {
+    console.warn('[FCC CACHE] Invalidating week-sensitive Home caches after week change', { previousWeek, nextWeek });
+    invalidateHomeWeekSensitiveCaches();
+  }
   commandCenterTopDataCache = topData;
   persistFccSessionCache();
   emitDisplayContextUpdate();
