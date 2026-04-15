@@ -23,6 +23,7 @@ let userTeamNameForLeaders = null; // Store user team name for leaderboard highl
 let userConference = null; // User team's conference (for Stats/Traits scope)
 let userRegion = null;    // User team's region (for Stats/Traits scope)
 let teamColorCache = null; // Cache for team primary colors
+let teamMetaByNameCache = null;
 let leadersDataCache = null;
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
@@ -446,6 +447,13 @@ function formatConferenceShortLabel(conference) {
   return `${regionLetter}${conferenceNumber}`;
 }
 
+function getTeamTooltipText(teamName) {
+  if (!teamName) return '';
+  const meta = teamMetaByNameCache?.[teamName] || null;
+  const mascot = String(meta?.mascot || '').trim();
+  return mascot ? `${teamName} ${mascot}` : String(teamName);
+}
+
 function getTeamRankingEntry(teamId) {
   return (commandCenterTopDataCache?.rankings || []).find((entry) => String(entry.team_id) === String(teamId)) || null;
 }
@@ -599,7 +607,7 @@ function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
       <div class="fcc-home-matchup-card">
         <div class="fcc-home-matchup-top">
           <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
-          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner" title="${escapeHomeHtml(getTeamTooltipText(opponentName))}" aria-label="${escapeHomeHtml(getTeamTooltipText(opponentName))}">
         </div>
         <div class="fcc-home-matchup-bottom">
           <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${teamEntry?.W || 0}-${teamEntry?.L || 0}`)}</div>
@@ -1048,12 +1056,18 @@ async function initializeTeamColorCache() {
     const res = await fetch(API_CONFIG.buildUrl('/teams'));
     const teamData = await res.json();
     teamColorCache = {};
+    teamMetaByNameCache = {};
     teamData.forEach(t => {
       teamColorCache[t.name] = t.primary_color;
+      teamMetaByNameCache[t.name] = {
+        mascot: t.mascot || '',
+        primary_color: t.primary_color || null,
+      };
     });
   } catch (err) {
     console.warn('Failed to load team colors:', err);
     teamColorCache = {};
+    teamMetaByNameCache = {};
   }
 }
 
@@ -3053,9 +3067,8 @@ async function renderTournamentBracket() {
           const meta = teamIdMetaMap[String(id)] || {};
           const teamName = meta.team || name || '';
           const mascot = meta.mascot || '';
-          const conferenceLabel = formatConferenceTooltipLabel(meta.conference);
-          if (!teamName || !mascot || !conferenceLabel) return '';
-          return `${teamName} ${mascot}, conference ${conferenceLabel}`;
+          if (!teamName) return '';
+          return mascot ? `${teamName} ${mascot}` : teamName;
         },
       });
     } else {
