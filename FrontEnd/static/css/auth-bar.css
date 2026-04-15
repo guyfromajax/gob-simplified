@@ -404,37 +404,78 @@ body.has-auth-bar {
   color: #111827;
 }
 
-.account-display-toggle {
-  display: inline-grid;
+.account-display-pill {
+  position: relative;
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  align-items: center;
+  width: min(320px, 100%);
+  min-height: 46px;
+  padding: 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #111827;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.account-display-option {
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #111827;
+.account-display-pill-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border-radius: 999px;
+  background: #27408e;
+  box-shadow: 0 6px 14px rgba(39, 64, 142, 0.2);
+  transition: transform 0.22s ease;
+}
+
+.account-display-pill.is-team-colors .account-display-pill-thumb {
+  transform: translateX(100%);
+}
+
+.account-display-pill-option {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
   font-size: 14px;
   font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  color: #4b5563;
+  transition: color 0.2s;
 }
 
-.account-display-option.active {
-  background: #27408e;
-  border-color: #27408e;
-  color: #fff;
+.account-display-pill:not(.is-team-colors) .account-display-pill-option-left,
+.account-display-pill.is-team-colors .account-display-pill-option-right {
+  color: #ffffff;
 }
 
-.account-display-option.is-dead,
-.account-display-option:disabled {
+.account-display-pill:hover {
+  border-color: #b7c0ce;
+}
+
+.account-display-pill.is-dead,
+.account-display-pill:disabled {
   background: #f3f4f6;
   border-color: #e5e7eb;
-  color: #9ca3af;
   cursor: default;
+}
+
+.account-display-pill.is-dead .account-display-pill-thumb,
+.account-display-pill:disabled .account-display-pill-thumb {
+  background: #cbd5e1;
+  box-shadow: none;
+}
+
+.account-display-pill.is-dead .account-display-pill-option,
+.account-display-pill:disabled .account-display-pill-option {
+  color: #9ca3af;
 }
 
 .account-display-help {

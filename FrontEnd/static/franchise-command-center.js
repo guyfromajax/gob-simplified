@@ -180,7 +180,7 @@ function getGobDisplayColorContext() {
   const teamPrimaryColor = normalizeHexColor(commandCenterTopDataCache?.primary_color);
   return {
     mode: 'franchise',
-    hasActiveFranchiseTeam: !!(franchiseId && userTeamId && teamPrimaryColor),
+    hasActiveFranchiseTeam: !!(franchiseId && (userTeamId || commandCenterTopDataCache?.team_id) && teamPrimaryColor),
     teamPrimaryColor: teamPrimaryColor
   };
 }

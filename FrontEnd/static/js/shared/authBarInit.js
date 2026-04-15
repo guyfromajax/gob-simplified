@@ -131,10 +131,11 @@
       '    </div>',
       '    <div class="account-settings-row">',
       '      <div class="account-settings-label">Display Toggle</div>',
-      '      <div class="account-display-toggle" role="group" aria-label="Display color toggle">',
-      '        <button type="button" id="display-toggle-default" class="account-display-option" data-display-color="default">Default</button>',
-      '        <button type="button" id="display-toggle-team-colors" class="account-display-option" data-display-color="team_colors">Team Colors</button>',
-      '      </div>',
+      '      <button type="button" id="account-display-pill" class="account-display-pill" aria-label="Display color toggle" aria-pressed="false">',
+      '        <span class="account-display-pill-thumb" aria-hidden="true"></span>',
+      '        <span class="account-display-pill-option account-display-pill-option-left">Default</span>',
+      '        <span class="account-display-pill-option account-display-pill-option-right">Team Colors</span>',
+      '      </button>',
       '      <div id="account-display-help" class="account-display-help"></div>',
       '    </div>',
       '  </div>',
@@ -491,21 +492,20 @@
   function refreshAccountSettingsModal() {
     var usernameEl = document.getElementById('account-settings-username');
     var helpEl = document.getElementById('account-display-help');
-    var defaultBtn = document.getElementById('display-toggle-default');
-    var teamColorsBtn = document.getElementById('display-toggle-team-colors');
-    if (!usernameEl || !helpEl || !defaultBtn || !teamColorsBtn) return;
+    var pill = document.getElementById('account-display-pill');
+    if (!usernameEl || !helpEl || !pill) return;
 
     var meData = authMeDataCache || window.__gobAuthMeData || {};
     var settings = normalizeAccountSettings(meData.account_settings);
     var displayColor = settings.display_color;
     var context = getDisplayContext();
-    var canUseTeamColors = !!(context && context.hasActiveFranchiseTeam && context.teamPrimaryColor);
+    var canUseTeamColors = !!(context && context.teamPrimaryColor && (context.hasActiveFranchiseTeam !== false));
     var effectiveDisplayColor = canUseTeamColors ? displayColor : 'default';
     usernameEl.textContent = meData.username || meData.email || 'Coach';
-    defaultBtn.classList.toggle('active', effectiveDisplayColor === 'default');
-    teamColorsBtn.classList.toggle('active', effectiveDisplayColor === 'team_colors');
-    teamColorsBtn.disabled = !canUseTeamColors;
-    teamColorsBtn.classList.toggle('is-dead', !canUseTeamColors);
+    pill.classList.toggle('is-team-colors', effectiveDisplayColor === 'team_colors');
+    pill.disabled = !canUseTeamColors;
+    pill.classList.toggle('is-dead', !canUseTeamColors);
+    pill.setAttribute('aria-pressed', effectiveDisplayColor === 'team_colors' ? 'true' : 'false');
     helpEl.textContent = canUseTeamColors
       ? ''
       : 'Team Colors is only available with an active franchise team.';
@@ -564,15 +564,15 @@
         if (e.target === backdrop) closeAccountSettingsModal();
       });
     }
-    ['default', 'team_colors'].forEach(function (value) {
-      var btn = document.querySelector('.account-display-option[data-display-color="' + value + '"]');
-      if (!btn || btn.dataset.bound) return;
-      btn.dataset.bound = '1';
-      btn.addEventListener('click', function () {
-        if (btn.disabled) return;
-        persistDisplayColor(value).catch(function () {});
+    var pill = document.getElementById('account-display-pill');
+    if (pill && !pill.dataset.bound) {
+      pill.dataset.bound = '1';
+      pill.addEventListener('click', function () {
+        if (pill.disabled) return;
+        var useTeamColors = !pill.classList.contains('is-team-colors');
+        persistDisplayColor(useTeamColors ? 'team_colors' : 'default').catch(function () {});
       });
-    });
+    }
     window.addEventListener('gob:display-context-updated', refreshAccountSettingsModal);
   }
 
