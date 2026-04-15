@@ -11,7 +11,17 @@
 
 body {
   background:
-    linear-gradient(180deg, #3450a5 0%, #27408e 46%, #1a2b62 100%);
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.05) 0 1px,
+      transparent 1px 20px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 20px
+    ),
+    #0d1120;
   background-attachment: fixed;
   color: var(--fcc-text);
 }
@@ -43,11 +53,16 @@ body {
   inset: 0;
   border-radius: 28px;
   background:
-    radial-gradient(circle at -10% 18%, transparent 0 180px, rgba(255, 255, 255, 0.08) 180px 183px, transparent 183px 255px, rgba(255, 255, 255, 0.05) 255px 258px, transparent 258px),
-    radial-gradient(circle at 20% 78%, transparent 0 210px, rgba(255, 255, 255, 0.06) 210px 213px, transparent 213px 300px, rgba(255, 255, 255, 0.04) 300px 303px, transparent 303px),
-    radial-gradient(circle at 72% 34%, transparent 0 170px, rgba(255, 255, 255, 0.07) 170px 173px, transparent 173px 244px, rgba(255, 255, 255, 0.045) 244px 247px, transparent 247px),
-    radial-gradient(circle at 108% 78%, transparent 0 190px, rgba(255, 255, 255, 0.07) 190px 193px, transparent 193px 280px, rgba(255, 255, 255, 0.045) 280px 283px, transparent 283px),
-    repeating-linear-gradient(132deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 21px);
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.06) 0 1px,
+      transparent 1px 20px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.045) 0 1px,
+      transparent 1px 20px
+    );
   opacity: 1;
   pointer-events: none;
 }
