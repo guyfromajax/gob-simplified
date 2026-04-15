@@ -554,7 +554,12 @@ function getNextUserGame() {
 function getLastCompletedUserGame() {
   const currentWeek = Number(commandCenterTopDataCache?.week || 1);
   const games = getUserScheduleGames()
-    .filter((game) => game.status === 'complete' && Number(game.week || 0) <= currentWeek)
+    .filter((game) => {
+      const week = Number(game.week || 0);
+      const hasRecordedScore = Number.isFinite(Number(game.away_score)) && Number.isFinite(Number(game.home_score));
+      const looksComplete = game.status === 'complete' || hasRecordedScore || !!game.game_id;
+      return looksComplete && week <= currentWeek;
+    })
     .sort((a, b) => Number(b.week || 0) - Number(a.week || 0));
   return games[0] || null;
 }
@@ -820,9 +825,20 @@ function renderHomeRecruitingCard() {
         <span class="fcc-home-recruiting-prestige">${escapeHomeHtml(`Prestige: ${prestige}`)}</span>
       </div>
       <div class="fcc-home-list-scroll">
+        <div class="fcc-home-recruit-header">
+          <span>Recruit</span>
+          <span>Archetype</span>
+          <span>HT</span>
+          <span>WT</span>
+          <span>RT</span>
+        </div>
         ${recruits.map((recruit) => `
           <div class="fcc-home-recruit-row">
-            ${escapeHomeHtml(`${recruit.name}: ${recruit.archetype} ${recruit.height} ${recruit.weight ?? '--'} ${recruit.rt ?? '--'}`)}
+            <span class="fcc-home-recruit-name">${escapeHomeHtml(recruit.name || '--')}</span>
+            <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
+            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
+            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
+            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.rt ?? '--')}</span>
           </div>
         `).join('')}
       </div>

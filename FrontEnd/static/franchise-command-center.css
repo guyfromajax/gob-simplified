@@ -586,8 +586,8 @@ body {
 }
 
 .fcc-home-matchup-logo {
-  max-width: 72%;
-  max-height: 42px;
+  max-width: 86.4%;
+  max-height: 50px;
   object-fit: contain;
 }
 
@@ -766,7 +766,10 @@ body {
 }
 
 .fcc-home-recruit-row {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 40px 40px 34px;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   line-height: 1.35;
 }
@@ -796,6 +799,44 @@ body {
 
 .fcc-home-recruiting-prestige {
   text-align: right;
+}
+
+.fcc-home-recruit-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 40px 40px 34px;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.fcc-home-recruit-name,
+.fcc-home-recruit-arch {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fcc-home-recruit-name {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+}
+
+.fcc-home-recruit-arch {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.fcc-home-recruit-stat {
+  text-align: right;
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
 }
 
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
