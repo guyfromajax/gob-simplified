@@ -1495,15 +1495,17 @@ function renderPlayerStatsTable(players) {
   function statValueForSort(entry, statKey) {
     const stats = entry.stats || {};
     if (statKey === 'name') return `${entry.raw?.last_name || ''} ${entry.raw?.first_name || ''}`.trim() || entry.raw?.name || '';
-    if (statKey === 'FG%') return stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA) : 0;
-    if (statKey === '3PT%') {
-      const attempts = stats['3PTA'] || stats.TPA || 0;
-      return attempts > 0 ? (((stats['3PTM'] || stats.TPM || 0) / attempts)) : 0;
+      if (statKey === 'FG%') return stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA) : 0;
+      if (statKey === '3PT%') {
+        const attempts = stats['3PTA'] || stats.TPA || 0;
+        return attempts > 0 ? (((stats['3PTM'] || stats.TPM || 0) / attempts)) : 0;
+      }
+      if (statKey === 'FT%') return stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA) : 0;
+      if (statKey === 'SCR%') return stats.SCR_A > 0 ? ((stats.SCR_S || 0) / stats.SCR_A) : 0;
+      if (statKey === 'DEF%') return stats.DEF_A > 0 ? ((stats.DEF_S || 0) / stats.DEF_A) : 0;
+      if (statKey === 'TREB') return stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0));
+      return Number(stats[statKey] || 0);
     }
-    if (statKey === 'FT%') return stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA) : 0;
-    if (statKey === 'TREB') return stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0));
-    return Number(stats[statKey] || 0);
-  }
 
   function renderRows(rows) {
     tbody.innerHTML = '';
@@ -1514,6 +1516,10 @@ function renderPlayerStatsTable(players) {
       const fgPct = stats.FGA > 0 ? (((stats.FGM || 0) / stats.FGA) * 100).toFixed(1) : '0.0';
       const threePct = tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
       const ftPct = stats.FTA > 0 ? (((stats.FTM || 0) / stats.FTA) * 100).toFixed(1) : '0.0';
+      const scrA = stats.SCR_A || 0;
+      const scrPct = scrA > 0 ? (((stats.SCR_S || 0) / scrA) * 100).toFixed(1) : '0.0';
+      const defA = stats.DEF_A || 0;
+      const defPct = defA > 0 ? (((stats.DEF_S || 0) / defA) * 100).toFixed(1) : '0.0';
 
       const tr = document.createElement('tr');
       tr.innerHTML =
@@ -1536,7 +1542,11 @@ function renderPlayerStatsTable(players) {
         '<td>' + (stats.BLK || 0) + '</td>' +
         '<td>' + (stats.F || 0) + '</td>' +
         '<td>' + (stats.MIN || 0) + '</td>' +
-        '<td>' + (stats.TO || 0) + '</td>';
+        '<td>' + (stats.TO || 0) + '</td>' +
+        '<td>' + scrA + '</td>' +
+        '<td>' + scrPct + '%</td>' +
+        '<td>' + defA + '</td>' +
+        '<td>' + defPct + '%</td>';
       tbody.appendChild(tr);
     });
   }
