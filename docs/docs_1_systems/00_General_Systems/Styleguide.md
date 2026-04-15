@@ -47,8 +47,8 @@ This document defines the core visual and interaction standards for Geeked-Out B
 ## Buttons
 
 ### Universal Button Shape
-- Standard button footprint: minimum `138px` width and `42px` height
-- Standard internal padding: `10px 18px`
+- Standard button footprint: minimum `138px` width and fixed `42px` height
+- Standard internal horizontal padding: `18px`
 - Standard corner radius: `10px`
 - Standard border: `1px solid rgba(255, 255, 255, 0.28)`
 - Standard top highlight: `inset 0 1px 0 rgba(255, 255, 255, 0.18)`

@@ -14,8 +14,8 @@
   align-items: center;
   justify-content: center;
   min-width: 138px;
-  min-height: 42px;
-  padding: 10px 18px;
+  height: 42px;
+  padding: 0 18px;
   margin-bottom: 20px;
   background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
   color: #fff;
