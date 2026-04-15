@@ -163,6 +163,7 @@ function populateTop(data) {
     const weekNumber = Number(data.week || 1);
     seasonLabelEl.textContent = `Season ${seasonNumber} / Week ${weekNumber}`;
   }
+  updateTopRecordLabel();
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -202,6 +203,19 @@ function populateTop(data) {
   const rankEl = document.getElementById('stat-rank');
   if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
   if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
+}
+
+function updateTopRecordLabel() {
+  const recordLabelEl = document.getElementById('fcc-record-label');
+  if (!recordLabelEl) return;
+  let wins = 0;
+  let losses = 0;
+  if (standingsDataCache?.standings?.length && userTeamId) {
+    const teamEntry = standingsDataCache.standings.find((team) => String(team.team_id || '') === String(userTeamId));
+    wins = Number(teamEntry?.W || 0);
+    losses = Number(teamEntry?.L || 0);
+  }
+  recordLabelEl.textContent = `Record: ${wins}-${losses}`;
 }
 
 function normalizeHexColor(value) {
@@ -381,6 +395,7 @@ function buildStandingsCard(titleText, teams) {
 function renderStandings(data, selectedRegion) {
   if (!data) return;
   const list = data.standings || [];
+  updateTopRecordLabel();
   list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
 
   const container = document.getElementById('standings-by-region');

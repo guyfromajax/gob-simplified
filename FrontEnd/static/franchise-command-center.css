@@ -117,13 +117,36 @@ body {
 }
 
 #franchise-container .fcc-season-label {
-  margin-top: 8px;
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--fcc-muted);
+}
+
+#franchise-container .fcc-meta-row {
+  margin-top: 8px;
+  width: 60%;
+  max-width: 168px;
+  min-width: 126px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+}
+
+#franchise-container .fcc-meta-row .fcc-season-label {
+  margin-top: 0;
+}
+
+#franchise-container .fcc-meta-row #fcc-season-label {
+  justify-self: start;
+  text-align: left;
+}
+
+#franchise-container .fcc-record-label {
+  justify-self: end;
+  text-align: right;
 }
 
 #franchise-container #top-center {
