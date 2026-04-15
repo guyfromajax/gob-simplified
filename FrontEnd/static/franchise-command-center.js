@@ -248,6 +248,71 @@ function buildTeamLink(t) {
   return teamLink;
 }
 
+function buildStandingsCard(titleText, teams) {
+  const card = document.createElement('section');
+  card.className = 'fcc-standings-card';
+
+  const title = document.createElement('div');
+  title.className = 'fcc-standings-card-title';
+  title.textContent = titleText;
+  card.appendChild(title);
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'fcc-standings-row fcc-standings-row-header';
+  headerRow.innerHTML = [
+    '<span class="fcc-standings-col-team">Team</span>',
+    '<span class="fcc-standings-col-stat">W</span>',
+    '<span class="fcc-standings-col-stat">L</span>',
+    '<span class="fcc-standings-col-stat">PF</span>',
+    '<span class="fcc-standings-col-stat">PA</span>',
+    '<span class="fcc-standings-col-next">Next</span>'
+  ].join('');
+  card.appendChild(headerRow);
+
+  const body = document.createElement('div');
+  body.className = 'fcc-standings-card-body';
+
+  teams.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'fcc-standings-row';
+
+    const teamCell = document.createElement('span');
+    teamCell.className = 'fcc-standings-col-team';
+    teamCell.appendChild(buildTeamLink(t));
+    row.appendChild(teamCell);
+
+    const wCell = document.createElement('span');
+    wCell.className = 'fcc-standings-col-stat';
+    wCell.textContent = t.W;
+    row.appendChild(wCell);
+
+    const lCell = document.createElement('span');
+    lCell.className = 'fcc-standings-col-stat';
+    lCell.textContent = t.L;
+    row.appendChild(lCell);
+
+    const pfCell = document.createElement('span');
+    pfCell.className = 'fcc-standings-col-stat';
+    pfCell.textContent = t.PF;
+    row.appendChild(pfCell);
+
+    const paCell = document.createElement('span');
+    paCell.className = 'fcc-standings-col-stat';
+    paCell.textContent = t.PA;
+    row.appendChild(paCell);
+
+    const nextCell = document.createElement('span');
+    nextCell.className = 'fcc-standings-col-next';
+    nextCell.textContent = t.next || '';
+    row.appendChild(nextCell);
+
+    body.appendChild(row);
+  });
+
+  card.appendChild(body);
+  return card;
+}
+
 function renderStandings(data, selectedRegion) {
   if (!data) return;
   const list = data.standings || [];
@@ -267,31 +332,7 @@ function renderStandings(data, selectedRegion) {
       if (teams.length === 0) return;
       const label = idx === 0 ? 'Your conference' : 'Sister conference';
       const subLabel = regionLabels[confNum] ? ` (Conf ${regionLabels[confNum]})` : '';
-      const heading = document.createElement('h4');
-      heading.className = 'standings-conference-heading';
-      heading.textContent = label + subLabel;
-      container.appendChild(heading);
-      const scrollWrap = document.createElement('div');
-      scrollWrap.className = 'scroll-x';
-      const table = document.createElement('table');
-      table.className = 'leaders-table standings-conference-table';
-      table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
-      const tbody = table.querySelector('tbody');
-      teams.forEach(t => {
-        const tr = document.createElement('tr');
-        const teamTd = document.createElement('td');
-        teamTd.appendChild(buildTeamLink(t));
-        tr.appendChild(teamTd);
-        tr.appendChild(document.createElement('td')).textContent = t.W;
-        tr.appendChild(document.createElement('td')).textContent = t.L;
-        tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
-        tr.appendChild(document.createElement('td')).textContent = t.PF;
-        tr.appendChild(document.createElement('td')).textContent = t.PA;
-        tr.appendChild(document.createElement('td')).textContent = t.next || '';
-        tbody.appendChild(tr);
-      });
-      scrollWrap.appendChild(table);
-      container.appendChild(scrollWrap);
+      container.appendChild(buildStandingsCard(label + subLabel, teams));
     });
     return;
   }
@@ -310,33 +351,7 @@ function renderStandings(data, selectedRegion) {
   confNumbers.forEach(confNum => {
     const teams = byConference[confNum];
     teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
-
-    const heading = document.createElement('h4');
-    heading.className = 'standings-conference-heading';
-    heading.textContent = `Conference ${selectedRegion}${confNum}`;
-    container.appendChild(heading);
-
-    const scrollWrap = document.createElement('div');
-    scrollWrap.className = 'scroll-x';
-    const table = document.createElement('table');
-    table.className = 'leaders-table standings-conference-table';
-    table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
-    const tbody = table.querySelector('tbody');
-    teams.forEach(t => {
-      const tr = document.createElement('tr');
-      const teamTd = document.createElement('td');
-      teamTd.appendChild(buildTeamLink(t));
-      tr.appendChild(teamTd);
-      tr.appendChild(document.createElement('td')).textContent = t.W;
-      tr.appendChild(document.createElement('td')).textContent = t.L;
-      tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
-      tr.appendChild(document.createElement('td')).textContent = t.PF;
-      tr.appendChild(document.createElement('td')).textContent = t.PA;
-      tr.appendChild(document.createElement('td')).textContent = t.next || '';
-      tbody.appendChild(tr);
-    });
-    scrollWrap.appendChild(table);
-    container.appendChild(scrollWrap);
+    container.appendChild(buildStandingsCard(`Conference ${selectedRegion}${confNum}`, teams));
   });
 
   document.querySelectorAll('.standings-region-btn').forEach(btn => {
