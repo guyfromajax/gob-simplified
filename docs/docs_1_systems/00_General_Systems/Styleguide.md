@@ -46,6 +46,16 @@ This document defines the core visual and interaction standards for Geeked-Out B
 
 ## Buttons
 
+### Universal Button Shape
+- Standard button footprint: minimum `138px` width and `42px` height
+- Standard internal padding: `10px 18px`
+- Standard corner radius: `10px`
+- Standard border: `1px solid rgba(255, 255, 255, 0.28)`
+- Standard top highlight: `inset 0 1px 0 rgba(255, 255, 255, 0.18)`
+- Standard motion: slight upward lift on hover and slight compression on press
+- This is the shared base shape for FCC navigation-adjacent buttons, action buttons, and standalone page return buttons
+- Color may change by button role, but the structural shape should remain consistent unless there is a clear reason to break the system
+
 ### Behavior
 - Buttons should feel responsive, deliberate, and restrained.
 - Hover states should use modest adjustments in brightness, border emphasis, and elevation.
