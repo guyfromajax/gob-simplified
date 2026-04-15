@@ -419,11 +419,31 @@ function getPlayerPpg(player) {
   return Number(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)));
 }
 
+function getPlayerRt(player) {
+  if (player?.rt != null) return Number(player.rt) || 0;
+  if (player?.position_ratings && typeof getBestPosition === 'function') {
+    try {
+      return Number(getBestPosition(player.position_ratings || {}).rating || 0);
+    } catch (error) {
+      return 0;
+    }
+  }
+  return 0;
+}
+
 function getScheduleDisplayName(teamId) {
   if (!userScheduleDataCache) return '';
   const display = userScheduleDataCache.team_display_name_map?.[teamId];
   const fallback = userScheduleDataCache.team_name_map?.[teamId];
   return display || fallback || '';
+}
+
+function formatConferenceShortLabel(conference) {
+  const numericConference = Number(conference);
+  if (!Number.isInteger(numericConference) || numericConference < 1 || numericConference > 16) return '';
+  const regionLetter = String.fromCharCode(65 + Math.floor((numericConference - 1) / 2));
+  const conferenceNumber = ((numericConference - 1) % 2) + 1;
+  return `${regionLetter}${conferenceNumber}`;
 }
 
 function getTeamRankingEntry(teamId) {
@@ -549,7 +569,7 @@ function renderHomeRankingsCard() {
       ${rankings.map((team) => `
         <div class="fcc-home-list-row">
           <span class="fcc-home-list-rank">${escapeHomeHtml(team.natl_rank)}</span>
-          <span class="fcc-home-list-main">${escapeHomeHtml(team.team_name || '')}</span>
+          <span class="fcc-home-list-main">${escapeHomeHtml(`${team.team_name || ''}${formatConferenceShortLabel(team.conference) ? ` (${formatConferenceShortLabel(team.conference)})` : ''}`)}</span>
           <span class="fcc-home-list-meta">${escapeHomeHtml(`${team.W || 0}-${team.L || 0}`)}</span>
         </div>
       `).join('')}
@@ -676,10 +696,10 @@ function renderHomeTeamStatsCard() {
       const bPpg = getPlayerPpg(b);
       const aPpg = getPlayerPpg(a);
       if (bGp === 0 && aGp === 0) {
-        return Number(b?.rt || 0) - Number(a?.rt || 0);
+        return getPlayerRt(b) - getPlayerRt(a);
       }
       if (bPpg !== aPpg) return bPpg - aPpg;
-      return Number(b?.rt || 0) - Number(a?.rt || 0);
+      return getPlayerRt(b) - getPlayerRt(a);
     })
     .slice(0, 12);
   body.innerHTML = `
