@@ -573,16 +573,16 @@ body {
 }
 
 .fcc-standings-card-body {
-  padding: 4px 12px 10px;
+  padding: 4px 10px 10px;
 }
 
 .fcc-standings-row {
   display: grid;
-  grid-template-columns: minmax(180px, 2fr) 56px 56px 74px 74px minmax(160px, 1.6fr);
+  grid-template-columns: minmax(150px, 1.9fr) 42px 42px 56px 56px minmax(110px, 1.25fr);
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 4px;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 2px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -591,14 +591,14 @@ body {
 }
 
 .fcc-standings-row-header {
-  min-height: 36px;
-  padding: 0 16px;
+  min-height: 32px;
+  padding: 0 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.66);
   font-family: 'Inter', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -610,7 +610,7 @@ body {
 
 .fcc-standings-col-team {
   font-family: 'Inter', sans-serif;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
 }
@@ -622,7 +622,7 @@ body {
 .fcc-standings-col-stat {
   text-align: center;
   font-family: 'Inter', sans-serif;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.88);
 }
@@ -630,7 +630,7 @@ body {
 .fcc-standings-col-next {
   text-align: right;
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.72);
 }

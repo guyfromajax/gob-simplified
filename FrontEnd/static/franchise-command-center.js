@@ -327,12 +327,11 @@ function renderStandings(data, selectedRegion) {
   const sisterConf = data.sister_conference;
   if (userConf != null && sisterConf != null && list.length > 0) {
     const regionLabels = { 1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2', 7: 'D1', 8: 'D2', 9: 'E1', 10: 'E2', 11: 'F1', 12: 'F2', 13: 'G1', 14: 'G2', 15: 'H1', 16: 'H2' };
-    [userConf, sisterConf].forEach((confNum, idx) => {
+    [userConf, sisterConf].forEach((confNum) => {
       const teams = list.filter(t => t.conference === confNum);
       if (teams.length === 0) return;
-      const label = idx === 0 ? 'Your conference' : 'Sister conference';
-      const subLabel = regionLabels[confNum] ? ` (Conf ${regionLabels[confNum]})` : '';
-      container.appendChild(buildStandingsCard(label + subLabel, teams));
+      const label = regionLabels[confNum] ? `Conference ${regionLabels[confNum]}` : `Conference ${confNum}`;
+      container.appendChild(buildStandingsCard(label, teams));
     });
     return;
   }
