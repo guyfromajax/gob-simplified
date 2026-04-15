@@ -556,8 +556,17 @@ function getLastCompletedUserGame() {
   const games = getUserScheduleGames()
     .filter((game) => {
       const week = Number(game.week || 0);
-      const hasRecordedScore = Number.isFinite(Number(game.away_score)) && Number.isFinite(Number(game.home_score));
-      const looksComplete = game.status === 'complete' || hasRecordedScore || !!game.game_id;
+      const awayScore = game.away_score;
+      const homeScore = game.home_score;
+      const hasRecordedScore =
+        awayScore !== null &&
+        awayScore !== undefined &&
+        homeScore !== null &&
+        homeScore !== undefined;
+      const hasRealFinalScore =
+        hasRecordedScore &&
+        (Number(awayScore) > 0 || Number(homeScore) > 0);
+      const looksComplete = game.status === 'complete' || hasRealFinalScore;
       return looksComplete && week <= currentWeek;
     })
     .sort((a, b) => Number(b.week || 0) - Number(a.week || 0));
@@ -827,7 +836,7 @@ function renderHomeRecruitingCard() {
       <div class="fcc-home-list-scroll">
         <div class="fcc-home-recruit-header">
           <span>Recruit</span>
-          <span>Archetype</span>
+          <span>Arch.</span>
           <span>HT</span>
           <span>WT</span>
           <span>RT</span>
