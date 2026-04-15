@@ -52,56 +52,19 @@ body {
     ),
     repeating-linear-gradient(
       132deg,
-      transparent 0 36px,
-      rgba(39, 64, 142, 0) 36px 38px,
+      transparent 0 34px,
+      rgba(39, 64, 142, 0) 34px 36px,
       transparent 38px 104px
     ),
     repeating-linear-gradient(
       132deg,
-      transparent 0 70px,
-      rgba(39, 64, 142, 0) 70px 72px,
-      transparent 72px 104px
+      transparent 0 68px,
+      rgba(39, 64, 142, 0) 68px 70px,
+      transparent 70px 104px
     ),
-    radial-gradient(ellipse 60px 6px at 86% 8.6%, rgba(153, 153, 153, 0.22) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 77% 8.54%, rgba(153, 153, 153, 0.22) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 69% 8.49%, rgba(153, 153, 153, 0.22) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 62% 8.44%, rgba(153, 153, 153, 0.22) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 56% 8.4%, rgba(153, 153, 153, 0.22) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 80% 13.6%, rgba(153, 153, 153, 0.2) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 71% 13.54%, rgba(153, 153, 153, 0.2) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 63% 13.49%, rgba(153, 153, 153, 0.2) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 56% 13.44%, rgba(153, 153, 153, 0.2) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 50% 13.4%, rgba(153, 153, 153, 0.2) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 74% 18.6%, rgba(153, 153, 153, 0.19) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 65% 18.54%, rgba(153, 153, 153, 0.19) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 57% 18.49%, rgba(153, 153, 153, 0.19) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 50% 18.44%, rgba(153, 153, 153, 0.19) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 44% 18.4%, rgba(153, 153, 153, 0.19) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 68% 23.6%, rgba(153, 153, 153, 0.18) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 59% 23.54%, rgba(153, 153, 153, 0.18) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 51% 23.49%, rgba(153, 153, 153, 0.18) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 44% 23.44%, rgba(153, 153, 153, 0.18) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 38% 23.4%, rgba(153, 153, 153, 0.18) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 62% 28.6%, rgba(153, 153, 153, 0.17) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 53% 28.54%, rgba(153, 153, 153, 0.17) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 45% 28.49%, rgba(153, 153, 153, 0.17) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 38% 28.44%, rgba(153, 153, 153, 0.17) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 32% 28.4%, rgba(153, 153, 153, 0.17) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 56% 33.6%, rgba(153, 153, 153, 0.16) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 47% 33.54%, rgba(153, 153, 153, 0.16) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 39% 33.49%, rgba(153, 153, 153, 0.16) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 32% 33.44%, rgba(153, 153, 153, 0.16) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 26% 33.4%, rgba(153, 153, 153, 0.16) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 50% 38.6%, rgba(153, 153, 153, 0.15) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 41% 38.54%, rgba(153, 153, 153, 0.15) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 33% 38.49%, rgba(153, 153, 153, 0.15) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 26% 38.44%, rgba(153, 153, 153, 0.15) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 20% 38.4%, rgba(153, 153, 153, 0.15) 0 99%, transparent 100%),
-    radial-gradient(ellipse 60px 6px at 44% 43.6%, rgba(153, 153, 153, 0.14) 0 99%, transparent 100%),
-    radial-gradient(ellipse 54px 5.4px at 35% 43.54%, rgba(153, 153, 153, 0.14) 0 99%, transparent 100%),
-    radial-gradient(ellipse 49px 4.9px at 27% 43.49%, rgba(153, 153, 153, 0.14) 0 99%, transparent 100%),
-    radial-gradient(ellipse 44px 4.4px at 20% 43.44%, rgba(153, 153, 153, 0.14) 0 99%, transparent 100%),
-    radial-gradient(ellipse 40px 4px at 14% 43.4%, rgba(153, 153, 153, 0.14) 0 99%, transparent 100%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='416' height='40' viewBox='0 0 416 40'%3E%3Cellipse cx='360' cy='5' rx='60' ry='0.6' fill='rgb(153,153,153)' fill-opacity='0.22'/%3E%3Cellipse cx='297' cy='5' rx='54' ry='0.54' fill='rgb(153,153,153)' fill-opacity='0.22'/%3E%3Cellipse cx='240' cy='5' rx='48.6' ry='0.486' fill='rgb(153,153,153)' fill-opacity='0.22'/%3E%3Cellipse cx='188' cy='5' rx='43.74' ry='0.4374' fill='rgb(153,153,153)' fill-opacity='0.22'/%3E%3Cellipse cx='141' cy='5' rx='39.366' ry='0.39366' fill='rgb(153,153,153)' fill-opacity='0.22'/%3E%3Cellipse cx='324' cy='15' rx='60' ry='0.6' fill='rgb(153,153,153)' fill-opacity='0.2'/%3E%3Cellipse cx='261' cy='15' rx='54' ry='0.54' fill='rgb(153,153,153)' fill-opacity='0.2'/%3E%3Cellipse cx='204' cy='15' rx='48.6' ry='0.486' fill='rgb(153,153,153)' fill-opacity='0.2'/%3E%3Cellipse cx='152' cy='15' rx='43.74' ry='0.4374' fill='rgb(153,153,153)' fill-opacity='0.2'/%3E%3Cellipse cx='105' cy='15' rx='39.366' ry='0.39366' fill='rgb(153,153,153)' fill-opacity='0.2'/%3E%3Cellipse cx='288' cy='25' rx='60' ry='0.6' fill='rgb(153,153,153)' fill-opacity='0.18'/%3E%3Cellipse cx='225' cy='25' rx='54' ry='0.54' fill='rgb(153,153,153)' fill-opacity='0.18'/%3E%3Cellipse cx='168' cy='25' rx='48.6' ry='0.486' fill='rgb(153,153,153)' fill-opacity='0.18'/%3E%3Cellipse cx='116' cy='25' rx='43.74' ry='0.4374' fill='rgb(153,153,153)' fill-opacity='0.18'/%3E%3Cellipse cx='69' cy='25' rx='39.366' ry='0.39366' fill='rgb(153,153,153)' fill-opacity='0.18'/%3E%3Cellipse cx='252' cy='35' rx='60' ry='0.6' fill='rgb(153,153,153)' fill-opacity='0.16'/%3E%3Cellipse cx='189' cy='35' rx='54' ry='0.54' fill='rgb(153,153,153)' fill-opacity='0.16'/%3E%3Cellipse cx='132' cy='35' rx='48.6' ry='0.486' fill='rgb(153,153,153)' fill-opacity='0.16'/%3E%3Cellipse cx='80' cy='35' rx='43.74' ry='0.4374' fill='rgb(153,153,153)' fill-opacity='0.16'/%3E%3Cellipse cx='33' cy='35' rx='39.366' ry='0.39366' fill='rgb(153,153,153)' fill-opacity='0.16'/%3E%3C/svg%3E");
+  background-repeat: repeat, repeat, repeat, repeat;
+  background-size: auto, auto, auto, 416px 40px;
   opacity: 1;
   pointer-events: none;
 }
