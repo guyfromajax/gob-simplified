@@ -570,9 +570,9 @@ body {
 }
 
 .fcc-home-matchup-top {
-  display: flex;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -590,6 +590,11 @@ body {
   max-width: 100%;
   max-height: 50px;
   object-fit: contain;
+  justify-self: end;
+}
+
+.fcc-home-matchup-top .team-tooltip-host {
+  justify-self: end;
 }
 
 .fcc-home-matchup-bottom {
