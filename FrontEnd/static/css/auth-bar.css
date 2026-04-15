@@ -41,38 +41,46 @@ body.has-auth-bar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, #e6c547 0%, #d4a84b 58%, #b8860b 100%);
-  border: 1px solid #000;
-  color: #000;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 2px 5px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(
+    180deg,
+    #f5e1a0 0%,
+    #f0d88a 18%,
+    #c89a37 54%,
+    #b88226 78%,
+    #d8b35b 100%
+  );
+  border: 1px solid #e2c06a;
+  color: #4f3412;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
   padding: 7px 14px;
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
   border-radius: 6px;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
   z-index: 1;
 }
 .auth-bar .tutorials-nav-btn::before {
   content: "";
   position: absolute;
   inset: 1px 1px auto 1px;
-  height: 48%;
+  height: 40%;
   border-radius: 5px 5px 9px 9px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04));
   pointer-events: none;
 }
 .auth-bar .tutorials-nav-btn:hover {
-  background: linear-gradient(160deg, #f0d054 0%, #e0b83d 58%, #c99a0d 100%);
-  border-color: #000;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
-    0 3px 8px rgba(0, 0, 0, 0.24);
+  background: linear-gradient(
+    180deg,
+    #f8e7b0 0%,
+    #f3dd94 18%,
+    #cea03d 54%,
+    #bd8829 78%,
+    #ddb862 100%
+  );
+  border-color: #e8c97c;
+  color: #432a0e;
 }
 
 /* Center: Alpha badge – keep column width when badge hidden so right stays right */
