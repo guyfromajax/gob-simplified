@@ -43,8 +43,8 @@ This represents a player's conditioning and willingness to fight through fatigue
 😎 happiest  
 😊 happy  
 😐 neutral  
-🙁 unhappy  
-🤢 disruptive
+😕 unhappy  
+😡 disruptive
 
 ### Column 2 — Dropdowns
 

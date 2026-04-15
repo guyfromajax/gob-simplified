@@ -427,7 +427,7 @@ After training is submitted, users are automatically redirected to the training 
       - >= 60: 😊 (Big smile)
       - >= 40: 😐 (Straight face)
       - >= 20: 😕 (Slight frown)
-      - < 20: 😞 (Sad face)
+      - < 20: 😡 (Angry face)
     - **MO:** Displayed with red/green horizontal pill visualization
       - Green fill on right side for positive momentum
       - Red fill on left side for negative momentum
