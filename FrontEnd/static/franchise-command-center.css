@@ -238,25 +238,16 @@ body {
     0 14px 24px rgba(0, 0, 0, 0.2);
 }
 
-#franchise-container .tab-buttons .command-link-btn {
-  background: linear-gradient(180deg, #6b6b6b 0%, #5a5a5a 100%);
-  border-color: #858585;
-}
-
-#franchise-container .tab-buttons .command-link-btn:hover {
-  background: linear-gradient(180deg, #797979 0%, #666666 100%);
-}
-
 #franchise-container #playbooks-franchise {
-  border-color: #858585;
+  border-color: #4d5e8f;
   color: #ffffff;
   box-shadow: none;
 }
 
 #franchise-container #playbooks-franchise.needs-playbook-save {
-  border-color: #858585;
+  border-color: #4d5e8f;
   color: #ffffff;
-  background: linear-gradient(180deg, #6b6b6b 0%, #5a5a5a 100%);
+  background: linear-gradient(180deg, #56627f 0%, #454f67 100%);
   box-shadow: none;
 }
 
