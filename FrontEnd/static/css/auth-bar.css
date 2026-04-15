@@ -134,6 +134,33 @@ body.has-auth-bar {
   gap: 10px;
 }
 
+.auth-bar .auth-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.auth-bar .auth-settings-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.auth-bar .auth-settings-btn:hover {
+  background: #f8fafc;
+  color: #ff7a00;
+  border-color: #ff7a00;
+}
+
 .auth-bar .auth-link {
   color: #1a1a1a;
   text-decoration: none;
@@ -300,6 +327,117 @@ body.has-auth-bar {
   color: #fff;
 }
 .feedback-modal-status {
+  min-height: 18px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.account-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10020;
+}
+
+.account-settings-backdrop.open {
+  display: flex;
+}
+
+.account-settings-modal {
+  width: min(460px, 92vw);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.account-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.account-settings-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.account-settings-close {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.account-settings-body {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.account-settings-row {
+  display: grid;
+  gap: 10px;
+}
+
+.account-settings-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.account-settings-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.account-display-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-display-option {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.account-display-option.active {
+  background: #27408e;
+  border-color: #27408e;
+  color: #fff;
+}
+
+.account-display-option.is-dead,
+.account-display-option:disabled {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: default;
+}
+
+.account-display-help {
   min-height: 18px;
   font-size: 12px;
   color: #6b7280;

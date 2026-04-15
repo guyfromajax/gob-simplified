@@ -1,5 +1,6 @@
 :root {
   --fcc-primary: #27408e;
+  --fcc-primary-top: #3551a5;
   --fcc-primary-deep: #1a2e71;
   --fcc-panel: rgba(39, 64, 142, 0.26);
   --fcc-panel-border: rgba(255, 255, 255, 0.18);
@@ -11,7 +12,7 @@
 
 body {
   background:
-    linear-gradient(180deg, #3551a5 0%, #27408e 42%, #1c2d60 100%);
+    linear-gradient(180deg, var(--fcc-primary-top) 0%, var(--fcc-primary) 42%, var(--fcc-primary-deep) 100%);
   background-attachment: fixed;
   color: var(--fcc-text);
 }

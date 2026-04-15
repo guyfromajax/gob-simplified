@@ -11,6 +11,8 @@
 (function () {
   'use strict';
 
+  var authMeDataCache = null;
+
   var PAGES_WITHOUT_AUTH_BAR = [
     // Gameplay / lineup
     'court.html',
@@ -102,6 +104,39 @@
       '  </div>',
       '  <div class="fte-footer">',
       '    <button type="button" id="fte-username-submit" class="fte-btn fte-btn-next">Continue</button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(backdrop);
+  }
+
+  function ensureAccountSettingsModal() {
+    if (document.getElementById('account-settings-backdrop')) return;
+    var backdrop = document.createElement('div');
+    backdrop.id = 'account-settings-backdrop';
+    backdrop.className = 'account-settings-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.setAttribute('aria-labelledby', 'account-settings-title');
+    backdrop.innerHTML = [
+      '<div class="account-settings-modal">',
+      '  <div class="account-settings-header">',
+      '    <h3 id="account-settings-title" class="account-settings-title">Account Settings</h3>',
+      '    <button type="button" id="account-settings-close" class="account-settings-close" aria-label="Close account settings">&times;</button>',
+      '  </div>',
+      '  <div class="account-settings-body">',
+      '    <div class="account-settings-row">',
+      '      <div class="account-settings-label">Username</div>',
+      '      <div id="account-settings-username" class="account-settings-value">-</div>',
+      '    </div>',
+      '    <div class="account-settings-row">',
+      '      <div class="account-settings-label">Display Toggle</div>',
+      '      <div class="account-display-toggle" role="group" aria-label="Display color toggle">',
+      '        <button type="button" id="display-toggle-default" class="account-display-option" data-display-color="default">Default</button>',
+      '        <button type="button" id="display-toggle-team-colors" class="account-display-option" data-display-color="team_colors">Team Colors</button>',
+      '      </div>',
+      '      <div id="account-display-help" class="account-display-help"></div>',
+      '    </div>',
       '  </div>',
       '</div>'
     ].join('');
@@ -330,7 +365,9 @@
       '    <a href="/signup.html" class="auth-link">Sign Up</a>',
       '  </div>',
       '  <div id="auth-logged-in" class="auth-status" style="display: none;">',
-      '    <span id="auth-user-email" class="auth-email"></span>',
+      '    <button type="button" id="auth-settings-btn" class="auth-settings-btn" aria-label="Account settings" title="Account settings">',
+      '      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>',
+      '    </button>',
       '    <button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button>',
       '  </div>',
       '</div>'
@@ -350,6 +387,26 @@
     right.insertBefore(btn, right.firstChild);
   }
 
+  function ensureSettingsButton() {
+    var loggedIn = document.getElementById('auth-logged-in');
+    if (!loggedIn) return;
+    var existing = document.getElementById('auth-settings-btn');
+    if (!existing) {
+      var settingsBtn = document.createElement('button');
+      settingsBtn.type = 'button';
+      settingsBtn.id = 'auth-settings-btn';
+      settingsBtn.className = 'auth-settings-btn';
+      settingsBtn.setAttribute('aria-label', 'Account settings');
+      settingsBtn.setAttribute('title', 'Account settings');
+      settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>';
+      var logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) loggedIn.insertBefore(settingsBtn, logoutBtn);
+      else loggedIn.appendChild(settingsBtn);
+    }
+    var authUserEmail = document.getElementById('auth-user-email');
+    if (authUserEmail) authUserEmail.style.display = 'none';
+  }
+
   function playNavSound(filename) {
     try {
       var a = new Audio('/sounds/' + encodeURIComponent(filename));
@@ -362,6 +419,7 @@
     var existing = document.getElementById('auth-bar');
     if (existing) {
       ensureFeedbackButton();
+      ensureSettingsButton();
       ensureTutorialsNavSound();
       document.body.classList.add('has-auth-bar');
       return;
@@ -369,7 +427,153 @@
     var bar = createAuthBarHTML();
     document.body.insertBefore(bar, document.body.firstChild);
     document.body.classList.add('has-auth-bar');
+    ensureSettingsButton();
     ensureTutorialsNavSound();
+  }
+
+  function getStoredAuthUser() {
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      var raw = localStorage.getItem('auth_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setStoredAuthUser(user) {
+    if (typeof localStorage === 'undefined' || !user) return;
+    try {
+      localStorage.setItem('auth_user', JSON.stringify(user));
+    } catch (e) {}
+  }
+
+  function normalizeAccountSettings(settings) {
+    var displayColor = settings && settings.display_color === 'team_colors' ? 'team_colors' : 'default';
+    return { display_color: displayColor };
+  }
+
+  function setAuthMeData(meData) {
+    if (!meData) return;
+    meData.account_settings = normalizeAccountSettings(meData.account_settings);
+    authMeDataCache = meData;
+    window.__gobAuthMeData = meData;
+    try {
+      window.dispatchEvent(new CustomEvent('gob:auth-me-loaded', { detail: meData }));
+    } catch (e) {}
+    var stored = getStoredAuthUser() || {};
+    stored.username = meData.username || stored.username || null;
+    stored.email = meData.email || stored.email || null;
+    stored.account_settings = meData.account_settings;
+    setStoredAuthUser(stored);
+  }
+
+  function emitAccountSettingsUpdated(settings) {
+    try {
+      window.dispatchEvent(new CustomEvent('gob:account-settings-updated', {
+        detail: { account_settings: normalizeAccountSettings(settings) }
+      }));
+    } catch (e) {}
+  }
+
+  function getDisplayContext() {
+    try {
+      if (typeof window.getGobDisplayColorContext === 'function') {
+        return window.getGobDisplayColorContext() || {};
+      }
+      if (window.__gobDisplayColorContext) {
+        return window.__gobDisplayColorContext;
+      }
+    } catch (e) {}
+    return {};
+  }
+
+  function refreshAccountSettingsModal() {
+    var usernameEl = document.getElementById('account-settings-username');
+    var helpEl = document.getElementById('account-display-help');
+    var defaultBtn = document.getElementById('display-toggle-default');
+    var teamColorsBtn = document.getElementById('display-toggle-team-colors');
+    if (!usernameEl || !helpEl || !defaultBtn || !teamColorsBtn) return;
+
+    var meData = authMeDataCache || window.__gobAuthMeData || {};
+    var settings = normalizeAccountSettings(meData.account_settings);
+    var displayColor = settings.display_color;
+    var context = getDisplayContext();
+    var canUseTeamColors = !!(context && context.hasActiveFranchiseTeam && context.teamPrimaryColor);
+    var effectiveDisplayColor = canUseTeamColors ? displayColor : 'default';
+    usernameEl.textContent = meData.username || meData.email || 'Coach';
+    defaultBtn.classList.toggle('active', effectiveDisplayColor === 'default');
+    teamColorsBtn.classList.toggle('active', effectiveDisplayColor === 'team_colors');
+    teamColorsBtn.disabled = !canUseTeamColors;
+    teamColorsBtn.classList.toggle('is-dead', !canUseTeamColors);
+    helpEl.textContent = canUseTeamColors
+      ? ''
+      : 'Team Colors is only available with an active franchise team.';
+  }
+
+  function closeAccountSettingsModal() {
+    var backdrop = document.getElementById('account-settings-backdrop');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+
+  function openAccountSettingsModal() {
+    refreshAccountSettingsModal();
+    var backdrop = document.getElementById('account-settings-backdrop');
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  function persistDisplayColor(displayColor) {
+    if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
+      return Promise.reject(new Error('API unavailable'));
+    }
+    return fetch(API_CONFIG.buildUrl('/api/auth/account-settings'), {
+      method: 'PATCH',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, API_CONFIG.getAuthHeaders()),
+      body: JSON.stringify({ display_color: displayColor })
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Unable to save setting');
+        return res.json();
+      })
+      .then(function (data) {
+        var nextSettings = normalizeAccountSettings(data.account_settings);
+        if (authMeDataCache) authMeDataCache.account_settings = nextSettings;
+        emitAccountSettingsUpdated(nextSettings);
+        setAuthMeData(Object.assign({}, authMeDataCache || {}, { account_settings: nextSettings }));
+        refreshAccountSettingsModal();
+        return data;
+      });
+  }
+
+  function initAccountSettingsModal() {
+    ensureAccountSettingsModal();
+    var settingsBtn = document.getElementById('auth-settings-btn');
+    var backdrop = document.getElementById('account-settings-backdrop');
+    var closeBtn = document.getElementById('account-settings-close');
+    if (settingsBtn && !settingsBtn.dataset.bound) {
+      settingsBtn.dataset.bound = '1';
+      settingsBtn.addEventListener('click', openAccountSettingsModal);
+    }
+    if (closeBtn && !closeBtn.dataset.bound) {
+      closeBtn.dataset.bound = '1';
+      closeBtn.addEventListener('click', closeAccountSettingsModal);
+    }
+    if (backdrop && !backdrop.dataset.bound) {
+      backdrop.dataset.bound = '1';
+      backdrop.addEventListener('click', function (e) {
+        if (e.target === backdrop) closeAccountSettingsModal();
+      });
+    }
+    ['default', 'team_colors'].forEach(function (value) {
+      var btn = document.querySelector('.account-display-option[data-display-color="' + value + '"]');
+      if (!btn || btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        persistDisplayColor(value).catch(function () {});
+      });
+    });
+    window.addEventListener('gob:display-context-updated', refreshAccountSettingsModal);
   }
 
   function ensureTutorialsNavSound() {
@@ -400,7 +604,6 @@
   function initAuthState() {
     var authLoggedOut = document.getElementById('auth-logged-out');
     var authLoggedIn = document.getElementById('auth-logged-in');
-    var authUserEmail = document.getElementById('auth-user-email');
     var logoutBtn = document.getElementById('logout-btn');
     if (!authLoggedOut && !authLoggedIn) return;
 
@@ -419,10 +622,16 @@
                 if (authLoggedOut) authLoggedOut.style.display = 'none';
                 if (authLoggedIn) authLoggedIn.style.display = 'flex';
                 res.json().then(function (meData) {
-                  if (authUserEmail) authUserEmail.textContent = meData.username || meData.email || user.email;
+                  setAuthMeData(meData);
+                  refreshAccountSettingsModal();
                   if (meData.fte === true) runFTE(meData);
                 }).catch(function () {
-                  if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+                  setAuthMeData({
+                    username: user.username || null,
+                    email: user.email || null,
+                    account_settings: user.account_settings || { display_color: 'default' }
+                  });
+                  refreshAccountSettingsModal();
                 });
               } else {
                 // Token invalid - clear and show logged-out state
@@ -447,7 +656,12 @@
           // API_CONFIG not available - show from localStorage but don't validate
           if (authLoggedOut) authLoggedOut.style.display = 'none';
           if (authLoggedIn) authLoggedIn.style.display = 'flex';
-          if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+          setAuthMeData({
+            username: user.username || null,
+            email: user.email || null,
+            account_settings: user.account_settings || { display_color: 'default' }
+          });
+          refreshAccountSettingsModal();
         }
       } catch (e) {
         if (typeof localStorage !== 'undefined') {
@@ -645,6 +859,7 @@
     ensureAuthBarStyles();
     injectAuthBar();
     injectFooter();
+    initAccountSettingsModal();
     initAuthState();
     initAlphaBadge();
     initFeedbackModal();

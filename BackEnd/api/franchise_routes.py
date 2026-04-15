@@ -2606,6 +2606,7 @@ def command_center_data(
         response["intangibles"] = team_doc.get("intangibles", "-")
         response["prestige"] = team_doc.get("prestige", "-")
         response["rank"] = team_doc.get("rank", "-")
+        response["primary_color"] = team_doc.get("primary_color", "#27408E")
         response["user_conference"] = team_doc.get("conference")
         response["user_region"] = team_doc.get("region", "")
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank

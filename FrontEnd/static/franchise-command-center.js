@@ -32,6 +32,9 @@ let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
+const FCC_DEFAULT_PRIMARY = '#27408E';
+const FCC_DEFAULT_TOP = '#3551A5';
+const FCC_DEFAULT_DEEP = '#1C2D60';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
 
@@ -135,6 +138,98 @@ function populateTop(data) {
   if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
   if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
 }
+
+function normalizeHexColor(value) {
+  const raw = String(value || '').trim();
+  if (!/^#?[0-9a-fA-F]{6}$/.test(raw)) return null;
+  return raw.startsWith('#') ? raw.toUpperCase() : ('#' + raw.toUpperCase());
+}
+
+function blendHexColors(baseHex, targetHex, ratio) {
+  const base = normalizeHexColor(baseHex);
+  const target = normalizeHexColor(targetHex);
+  if (!base || !target) return null;
+  const clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
+  const baseInt = parseInt(base.slice(1), 16);
+  const targetInt = parseInt(target.slice(1), 16);
+  const r = Math.round(((baseInt >> 16) & 255) * (1 - clamped) + ((targetInt >> 16) & 255) * clamped);
+  const g = Math.round(((baseInt >> 8) & 255) * (1 - clamped) + ((targetInt >> 8) & 255) * clamped);
+  const b = Math.round((baseInt & 255) * (1 - clamped) + (targetInt & 255) * clamped);
+  return '#' + [r, g, b].map((part) => part.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+function applyFccDisplayColor(displayColor, teamPrimaryColor) {
+  const root = document.documentElement;
+  const useTeamColor = displayColor === 'team_colors' && normalizeHexColor(teamPrimaryColor);
+  if (!root) return;
+  if (!useTeamColor) {
+    root.style.setProperty('--fcc-primary', FCC_DEFAULT_PRIMARY);
+    root.style.setProperty('--fcc-primary-top', FCC_DEFAULT_TOP);
+    root.style.setProperty('--fcc-primary-deep', FCC_DEFAULT_DEEP);
+    return;
+  }
+  const primary = normalizeHexColor(teamPrimaryColor);
+  const top = blendHexColors(primary, '#FFFFFF', 0.18) || FCC_DEFAULT_TOP;
+  const deep = blendHexColors(primary, '#000000', 0.34) || FCC_DEFAULT_DEEP;
+  root.style.setProperty('--fcc-primary', primary);
+  root.style.setProperty('--fcc-primary-top', top);
+  root.style.setProperty('--fcc-primary-deep', deep);
+}
+
+function getGobDisplayColorContext() {
+  const teamPrimaryColor = normalizeHexColor(commandCenterTopDataCache?.primary_color);
+  return {
+    mode: 'franchise',
+    hasActiveFranchiseTeam: !!(franchiseId && userTeamId && teamPrimaryColor),
+    teamPrimaryColor: teamPrimaryColor
+  };
+}
+
+window.getGobDisplayColorContext = getGobDisplayColorContext;
+
+function emitDisplayContextUpdate() {
+  try {
+    window.__gobDisplayColorContext = getGobDisplayColorContext();
+    window.dispatchEvent(new CustomEvent('gob:display-context-updated', {
+      detail: window.__gobDisplayColorContext
+    }));
+  } catch (error) {}
+}
+
+function syncFccDisplayColorFromAccountSettings(meData) {
+  const displayColor = meData?.account_settings?.display_color === 'team_colors' ? 'team_colors' : 'default';
+  applyFccDisplayColor(displayColor, commandCenterTopDataCache?.primary_color);
+}
+
+async function hydrateFccDisplayColorPreference() {
+  if (window.__gobAuthMeData) {
+    syncFccDisplayColorFromAccountSettings(window.__gobAuthMeData);
+    return;
+  }
+  if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
+    applyFccDisplayColor('default');
+    return;
+  }
+  try {
+    const response = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
+    if (!response.ok) {
+      applyFccDisplayColor('default');
+      return;
+    }
+    const meData = await response.json();
+    syncFccDisplayColorFromAccountSettings(meData);
+  } catch (error) {
+    applyFccDisplayColor('default');
+  }
+}
+
+window.addEventListener('gob:auth-me-loaded', (event) => {
+  syncFccDisplayColorFromAccountSettings(event.detail || {});
+});
+
+window.addEventListener('gob:account-settings-updated', (event) => {
+  syncFccDisplayColorFromAccountSettings(event.detail || {});
+});
 
 let standingsDataCache = null;
 
@@ -1284,11 +1379,13 @@ async function init() {
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
   commandCenterTopDataCache = topData;
+  emitDisplayContextUpdate();
 
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
     userTeamId = topData.team_id;
     localStorage.setItem('franchise_user_team_id', userTeamId);
+    emitDisplayContextUpdate();
   }
   
   // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /franchise/team-data
@@ -1313,6 +1410,7 @@ async function init() {
   }
   
   populateTop(topData);
+  await hydrateFccDisplayColorPreference();
   initFccRecruits(topData);
   
   // Store user team name and scope keys (used by roster/team if needed)
