@@ -17,51 +17,44 @@
       align-items: start;
     }
 
-    .standings-region-group {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      align-items: start;
-    }
-
-    .standings-region-group .fcc-standings-card {
+    .standings-all-regions .fcc-standings-card {
       flex: none;
       max-width: none;
       min-width: 0;
     }
 
-    .standings-region-group .fcc-standings-card-title {
+    .standings-all-regions .fcc-standings-card-title {
       padding: 10px 12px 8px;
       font-size: 18px;
     }
 
-    .standings-region-group .fcc-standings-card-body {
+    .standings-all-regions .fcc-standings-card-body {
       padding: 4px 8px 8px;
     }
 
-    .standings-region-group .fcc-standings-row {
+    .standings-all-regions .fcc-standings-row {
       grid-template-columns: minmax(112px, 1.65fr) 34px 34px 42px 42px minmax(82px, 1fr);
       gap: 4px;
       min-height: 30px;
       padding: 0 1px;
     }
 
-    .standings-region-group .fcc-standings-row-header {
+    .standings-all-regions .fcc-standings-row-header {
       min-height: 28px;
       padding: 0 10px;
       font-size: 10px;
       letter-spacing: 0.04em;
     }
 
-    .standings-region-group .fcc-standings-col-team {
+    .standings-all-regions .fcc-standings-col-team {
       font-size: 11px;
     }
 
-    .standings-region-group .fcc-standings-col-stat {
+    .standings-all-regions .fcc-standings-col-stat {
       font-size: 11px;
     }
 
-    .standings-region-group .fcc-standings-col-next {
+    .standings-all-regions .fcc-standings-col-next {
       font-size: 10px;
     }
   </style>
@@ -187,16 +180,12 @@
         byConference[c].push(t);
       });
       const confNumbers = Object.keys(byConference).map(Number).sort(function (a, b) { return a - b; });
-      const regionGroup = document.createElement('section');
-      regionGroup.className = 'standings-region-group';
 
       confNumbers.forEach(function (confNum) {
         const teams = byConference[confNum];
         teams.sort(function (a, b) { return (b.W - a.W) || (b.differential - a.differential); });
-        regionGroup.appendChild(buildStandingsCard('Conference ' + region + confNum, teams));
+        layout.appendChild(buildStandingsCard('Conference ' + region + confNum, teams));
       });
-
-      layout.appendChild(regionGroup);
     });
 
     container.appendChild(layout);
