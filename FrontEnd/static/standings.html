@@ -33,7 +33,7 @@
     }
 
     .standings-all-regions .fcc-standings-row {
-      grid-template-columns: minmax(112px, 1.65fr) 34px 34px 42px 42px minmax(82px, 1fr);
+      grid-template-columns: minmax(132px, 1.9fr) 38px 38px 48px 48px;
       gap: 4px;
       min-height: 30px;
       padding: 0 1px;
@@ -54,9 +54,6 @@
       font-size: 11px;
     }
 
-    .standings-all-regions .fcc-standings-col-next {
-      font-size: 10px;
-    }
   </style>
 </head>
 <body>
@@ -113,8 +110,7 @@
       '<span class="fcc-standings-col-stat">W</span>',
       '<span class="fcc-standings-col-stat">L</span>',
       '<span class="fcc-standings-col-stat">PF</span>',
-      '<span class="fcc-standings-col-stat">PA</span>',
-      '<span class="fcc-standings-col-next">Next</span>'
+      '<span class="fcc-standings-col-stat">PA</span>'
     ].join('');
     card.appendChild(headerRow);
 
@@ -149,11 +145,6 @@
       paCell.className = 'fcc-standings-col-stat';
       paCell.textContent = t.PA;
       row.appendChild(paCell);
-
-      const nextCell = document.createElement('span');
-      nextCell.className = 'fcc-standings-col-next';
-      nextCell.textContent = t.next || '';
-      row.appendChild(nextCell);
 
       body.appendChild(row);
     });
