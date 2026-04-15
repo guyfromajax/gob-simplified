@@ -133,7 +133,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
-  column-gap: 18px;
+  column-gap: 36px;
 }
 
 #franchise-container .fcc-meta-row .fcc-season-label {
