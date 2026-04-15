@@ -130,7 +130,7 @@
       '      <div id="account-settings-username" class="account-settings-value">-</div>',
       '    </div>',
       '    <div class="account-settings-row">',
-      '      <div class="account-settings-label">Display Toggle</div>',
+      '      <div class="account-settings-label">Display</div>',
       '      <button type="button" id="account-display-pill" class="account-display-pill" aria-label="Display color toggle" aria-pressed="false">',
       '        <span class="account-display-pill-thumb" aria-hidden="true"></span>',
       '        <span class="account-display-pill-option account-display-pill-option-left">Default</span>',
