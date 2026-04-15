@@ -244,6 +244,37 @@ body {
     0 14px 24px rgba(0, 0, 0, 0.2);
 }
 
+#franchise-container .tab-buttons button[data-tab="tutorials-tab"] {
+  background: linear-gradient(
+    180deg,
+    #f5e1a0 0%,
+    #f0d88a 18%,
+    #c89a37 54%,
+    #b88226 78%,
+    #d8b35b 100%
+  );
+  border-color: #e2c06a;
+  color: #4f3412;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+#franchise-container .tab-buttons button[data-tab="tutorials-tab"]::before {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04));
+}
+
+#franchise-container .tab-buttons button[data-tab="tutorials-tab"]:hover {
+  background: linear-gradient(
+    180deg,
+    #f8e7b0 0%,
+    #f3dd94 18%,
+    #cea03d 54%,
+    #bd8829 78%,
+    #ddb862 100%
+  );
+  border-color: #e8c97c;
+  color: #432a0e;
+}
+
 #franchise-container #playbooks-franchise {
   border-color: #667183;
   color: #ffffff;
