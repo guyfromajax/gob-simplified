@@ -356,13 +356,16 @@ body {
   background: linear-gradient(180deg, #797979 0%, #666666 100%);
 }
 
-#franchise-container #playbooks-franchise.needs-playbook-save {
-  border-color: rgba(255, 208, 38, 0.84);
+#franchise-container #playbooks-franchise {
+  border-color: #858585;
   color: #ffffff;
   box-shadow: none;
 }
 
-#franchise-container #playbooks-franchise {
+#franchise-container #playbooks-franchise.needs-playbook-save {
+  border-color: #858585;
+  color: #ffffff;
+  background: linear-gradient(180deg, #6b6b6b 0%, #5a5a5a 100%);
   box-shadow: none;
 }
 
@@ -423,7 +426,7 @@ body {
   flex-direction: column;
 }
 
-.fcc-home-card h3 {
+#franchise-container #home-tab .fcc-home-card h3 {
   margin: 0 0 18px;
   color: #ffffff;
   font-size: 16px;
