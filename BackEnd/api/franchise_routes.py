@@ -2254,14 +2254,32 @@ def complete_week(req: CompleteWeekRequest):
                 home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
                 away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
                 home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-                sim_res, distant_game_id = _persist_distant_franchise_game(
-                    franchise_id=franchise_id,
-                    week=req.week,
-                    away_team_object_id=away_id,
-                    home_team_object_id=home_id,
-                    away_score=away_score,
-                    home_score=home_score,
-                )
+                try:
+                    sim_res, distant_game_id = _persist_distant_franchise_game(
+                        franchise_id=franchise_id,
+                        week=req.week,
+                        away_team_object_id=away_id,
+                        home_team_object_id=home_id,
+                        away_score=away_score,
+                        home_score=home_score,
+                    )
+                except Exception:
+                    logger.exception(
+                        "❌ [COMPLETE-WEEK] EOS distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s",
+                        req.franchise_id,
+                        req.week,
+                        away_id,
+                        home_id,
+                    )
+                    sim_res = _save_game_result(
+                        away_id,
+                        home_id,
+                        away_score,
+                        home_score,
+                        req.week,
+                        franchise_id=req.franchise_id,
+                    )
+                    distant_game_id = ""
                 results.append({
                     "away_id": sim_res["team1_id"],
                     "home_id": sim_res["team2_id"],
@@ -2301,14 +2319,34 @@ def complete_week(req: CompleteWeekRequest):
             home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
             away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-            sim_res, _distant_game_id = _persist_distant_franchise_game(
-                franchise_id=franchise_id,
-                week=req.week,
-                away_team_object_id=away_id,
-                home_team_object_id=home_id,
-                away_score=away_score,
-                home_score=home_score,
-            )
+            try:
+                sim_res, _distant_game_id = _persist_distant_franchise_game(
+                    franchise_id=franchise_id,
+                    week=req.week,
+                    away_team_object_id=away_id,
+                    home_team_object_id=home_id,
+                    away_score=away_score,
+                    home_score=home_score,
+                )
+            except Exception:
+                logger.exception(
+                    "❌ [COMPLETE-WEEK] Regular-season distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s user_conference=%s away_conf=%s home_conf=%s",
+                    req.franchise_id,
+                    req.week,
+                    away_id,
+                    home_id,
+                    user_conference,
+                    away_conf,
+                    home_conf,
+                )
+                sim_res = _save_game_result(
+                    away_id,
+                    home_id,
+                    away_score,
+                    home_score,
+                    req.week,
+                    franchise_id=req.franchise_id,
+                )
             results.append({
                 "away_id": sim_res["team1_id"],
                 "home_id": sim_res["team2_id"],
@@ -2388,7 +2426,15 @@ def complete_week(req: CompleteWeekRequest):
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
     _apply_complete_week_recruiting_lean_updates(franchise_doc, req.week, results)
-    _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, req.week, results)
+    try:
+        _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, req.week, results)
+    except Exception:
+        logger.exception(
+            "❌ [COMPLETE-WEEK] Rank/prestige update failed; continuing with franchise week/results persistence. franchise_id=%s week=%s results_count=%s",
+            req.franchise_id,
+            req.week,
+            len(results),
+        )
     
     # Reset training status for next week
     next_week = req.week + 1
@@ -2464,6 +2510,14 @@ def complete_week(req: CompleteWeekRequest):
             else:
                 next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(req.week) + 1]
             update_fields["week"] = next_week
+    logger.warning(
+        "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
+        req.franchise_id,
+        req.week,
+        update_fields.get("week"),
+        len(results),
+        sorted(update_fields.keys()),
+    )
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": update_fields},
