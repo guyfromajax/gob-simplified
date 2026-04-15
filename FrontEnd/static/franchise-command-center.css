@@ -204,8 +204,8 @@ body {
   min-width: 0;
   min-height: 44px;
   padding: 0 20px;
-  border: 1px solid #4d5e8f;
-  background: linear-gradient(180deg, #56627f 0%, #454f67 100%);
+  border: 1px solid #667183;
+  background: linear-gradient(180deg, #5b6470 0%, #454d58 100%);
   color: #ffffff;
   font-family: 'Bebas Neue', cursive;
   font-size: 24px;
@@ -231,13 +231,13 @@ body {
 
 #franchise-container .tab-buttons button:hover {
   transform: translateY(-2px);
-  background: linear-gradient(180deg, #63708d 0%, #4d5871 100%);
+  background: linear-gradient(180deg, #68727f 0%, #505966 100%);
 }
 
 #franchise-container .tab-buttons button.active {
   transform: translateY(-2px);
-  background: linear-gradient(180deg, #5d77cf 0%, #27408e 100%);
-  border-color: #8fa8ec;
+  background: linear-gradient(180deg, #8794a6 0%, #657285 100%);
+  border-color: #b9c4d3;
   color: #ffffff;
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.32),
@@ -245,15 +245,15 @@ body {
 }
 
 #franchise-container #playbooks-franchise {
-  border-color: #4d5e8f;
+  border-color: #667183;
   color: #ffffff;
   box-shadow: none;
 }
 
 #franchise-container #playbooks-franchise.needs-playbook-save {
-  border-color: #4d5e8f;
+  border-color: #667183;
   color: #ffffff;
-  background: linear-gradient(180deg, #56627f 0%, #454f67 100%);
+  background: linear-gradient(180deg, #5b6470 0%, #454d58 100%);
   box-shadow: none;
 }
 
@@ -268,8 +268,8 @@ body {
   border: 1px solid var(--fcc-panel-border);
   border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 18%),
-    linear-gradient(180deg, rgba(8, 13, 34, 0.66), rgba(12, 18, 44, 0.72));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 18%),
+    linear-gradient(180deg, rgba(24, 29, 38, 0.88), rgba(16, 20, 28, 0.92));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
@@ -334,8 +334,8 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 20%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, rgba(40, 46, 56, 0.92), rgba(28, 33, 42, 0.94));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 18px 36px rgba(0, 0, 0, 0.14);
