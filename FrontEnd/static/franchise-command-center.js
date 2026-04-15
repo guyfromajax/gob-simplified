@@ -726,12 +726,15 @@ function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
   const homeScore = Number(game.home_score ?? gameDoc?.home_team?.score ?? 0);
   const awayBold = awayScore > homeScore ? 'fcc-home-score-strong' : '';
   const homeBold = homeScore > awayScore ? 'fcc-home-score-strong' : '';
+  const tooltipText = getTeamTooltipText(opponentName);
 
   body.innerHTML = `
     <div class="fcc-home-matchup-card">
       <div class="fcc-home-matchup-top">
         <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
-        <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+        <span class="team-tooltip-host" data-team-tooltip="${escapeHomeHtml(tooltipText)}" aria-label="${escapeHomeHtml(tooltipText)}">
+          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+        </span>
       </div>
       <div class="fcc-home-matchup-bottom">
         <div class="fcc-home-final-score">
