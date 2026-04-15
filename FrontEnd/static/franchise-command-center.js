@@ -928,8 +928,8 @@ function bindResourcesLinks() {
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
   const standingsFullLink = document.getElementById('standings-full-link');
   if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
-  const teamStatsNavBtn = document.getElementById('team-stats-nav-btn');
-  if (teamStatsNavBtn) teamStatsNavBtn.dataset.route = `/team-stats.html${q()}`;
+  const statsNavBtn = document.getElementById('stats-nav-btn');
+  if (statsNavBtn) statsNavBtn.dataset.route = `/team-stats.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
   if (rStandings) rStandings.href = `/standings.html${q()}`;
   const rStats = document.getElementById('resources-stats');
@@ -940,6 +940,8 @@ function bindResourcesLinks() {
   if (rTraits) rTraits.href = `/team-traits.html${q()}`;
   const rRankings = document.getElementById('resources-rankings');
   if (rRankings) rRankings.href = `/rankings.html${q()}`;
+  const homeRankingsFullLink = document.getElementById('home-rankings-full-link');
+  if (homeRankingsFullLink) homeRankingsFullLink.href = `/rankings.html${q()}`;
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');

@@ -49,13 +49,13 @@
         <button data-tab="home-tab" class="active">Home</button>
         <button data-tab="roster-tab">Roster</button>
         <button data-tab="player-stats-tab">Player Stats</button>
-        <button id="team-stats-nav-btn" data-route="#">Team Stats</button>
+        <button data-tab="team-stats-tab">Team Measures</button>
         <button data-tab="game-plan-tab">Game Plan</button>
         <button data-tab="playbooks-tab">Playbooks</button>
         <button data-tab="coaches-tab">Scouting Report</button>
         <button data-tab="standings-tab">Standings</button>
         <button data-tab="schedule-tab">Schedule</button>
-        <button data-tab="rankings-tab">Rankings</button>
+        <button id="stats-nav-btn" data-route="#">Stats</button>
         <button data-tab="awards-tab">Leaders</button>
         <button data-tab="press-tab">Press</button>
         <button data-tab="recruits-tab">Recruits</button>
@@ -80,7 +80,10 @@
             <div id="home-recruiting-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
-            <h3>National Rankings</h3>
+            <div class="fcc-home-card-head">
+              <h3>National Rankings</h3>
+              <a id="home-rankings-full-link" class="fcc-home-card-link" href="#">See All Rankings</a>
+            </div>
             <div id="home-rankings-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
@@ -215,10 +218,10 @@
           </table>
         </div>
       </div>
-      <div id="schedule-tab" class="tab-content fcc-placeholder-tab">
+      <div id="team-stats-tab" class="tab-content fcc-placeholder-tab">
         <div class="fcc-placeholder-body">In Development</div>
       </div>
-      <div id="rankings-tab" class="tab-content fcc-placeholder-tab">
+      <div id="schedule-tab" class="tab-content fcc-placeholder-tab">
         <div class="fcc-placeholder-body">In Development</div>
       </div>
       <div id="awards-tab" class="tab-content fcc-placeholder-tab">

@@ -350,6 +350,31 @@ body {
   letter-spacing: 0.08em;
 }
 
+#franchise-container #home-tab .fcc-home-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+#franchise-container #home-tab .fcc-home-card-head h3 {
+  margin: 0;
+}
+
+#franchise-container #home-tab .fcc-home-card-link {
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+}
+
+#franchise-container #home-tab .fcc-home-card-link:hover {
+  text-decoration: underline;
+}
+
 .fcc-home-card-body {
   flex: 1;
   min-height: 0;
