@@ -635,6 +635,24 @@ body {
   color: rgba(255, 255, 255, 0.72);
 }
 
+.fcc-standings-footer-link-wrap {
+  width: 46%;
+  margin-top: 10px;
+}
+
+.fcc-standings-full-link {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.fcc-standings-full-link:hover {
+  text-decoration: underline;
+}
+
 /* Stats and Team Traits scope toggles (Conference / Region / National) */
 .stats-scope-toggle-wrap,
 .traits-scope-toggle-wrap {

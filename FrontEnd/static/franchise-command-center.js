@@ -428,6 +428,8 @@ function bindResourcesLinks() {
   };
   const standingsLink = document.getElementById('standings-resources-link');
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
+  const standingsFullLink = document.getElementById('standings-full-link');
+  if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
   if (rStandings) rStandings.href = `/standings.html${q()}`;
   const rStats = document.getElementById('resources-stats');

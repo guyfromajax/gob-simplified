@@ -13,7 +13,7 @@
   display: inline-block;
   padding: 10px 20px;
   margin-bottom: 20px;
-  background: #e67e22;
+  background: #F79420;
   color: #fff;
   font-weight: 700;
   font-size: 14px;
@@ -24,7 +24,7 @@
   transition: background 0.2s ease, transform 0.2s ease;
 }
 .back-to-locker-room:hover {
-  background: #d35400;
+  background: #de8214;
   color: #fff;
   transform: translateY(-1px);
 }
