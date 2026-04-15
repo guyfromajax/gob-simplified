@@ -149,6 +149,13 @@ Use:
 - in-memory cache for the current page lifecycle
 - `sessionStorage` for repeat visits within the same browser session
 
+For FCC specifically:
+
+- cache the FCC shell payload for the current franchise session
+- cache summary data needed to quickly rebuild FCC on return
+- reuse that cached payload immediately when the user returns from a routed FCC page
+- let fresh network calls quietly revalidate after the cached view is already visible
+
 Do not rely on broad global caches by default.
 
 ### Invalidation
@@ -197,6 +204,15 @@ This improves:
 ### Return behavior
 
 Deeper FCC pages should preserve return context so the user returns to the correct command-center state rather than a generic landing point.
+
+### Return-speed rule
+
+When a user returns to FCC from a routed FCC page:
+
+- allow normal browser back/forward cache restore when available
+- do not force FCC to reload on `pageshow`
+- prefer instant shell restore from browser/session cache
+- refresh only the data that may actually be stale
 
 ## UX Goals
 

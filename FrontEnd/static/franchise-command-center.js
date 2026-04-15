@@ -35,6 +35,7 @@ let userRosterPlayersCache = [];
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
 const homeOpponentRosterCache = new Map();
+const FCC_SESSION_CACHE_PREFIX = 'fcc-shell';
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
 const FCC_DEFAULT_PRIMARY = '#27408E';
@@ -50,10 +51,13 @@ const HOME_EMOJI_BUCKETS = [
   { emoji: '😎', min: 80, maxExclusive: Infinity }
 ];
 
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
-    window.location.reload();
-  }
+function hideFccLoadingOverlay() {
+  if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+}
+
+window.addEventListener('pageshow', () => {
+  maybeRefreshPlaybooksButtonState();
 });
 
 window.addEventListener('focus', () => {
@@ -65,6 +69,55 @@ document.addEventListener('visibilitychange', () => {
     maybeRefreshPlaybooksButtonState();
   }
 });
+
+function getFccSessionCacheKey() {
+  return `${FCC_SESSION_CACHE_PREFIX}:${franchiseId || ''}`;
+}
+
+function readFccSessionCache() {
+  if (!franchiseId || typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(getFccSessionCacheKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn('Failed to read FCC session cache:', error);
+    return null;
+  }
+}
+
+function persistFccSessionCache() {
+  if (!franchiseId || typeof sessionStorage === 'undefined') return;
+  try {
+    const payload = {
+      topData: commandCenterTopDataCache || null,
+      standingsData: standingsDataCache || null,
+      rosterPlayers: Array.isArray(userRosterPlayersCache) ? userRosterPlayersCache : [],
+      teamData: teamData || null,
+      scheduleData: userScheduleDataCache || null,
+      lastGameDataCache: homeLastGameDataCache || null,
+      opponentRosters: Array.from(homeOpponentRosterCache.entries())
+    };
+    sessionStorage.setItem(getFccSessionCacheKey(), JSON.stringify(payload));
+  } catch (error) {
+    console.warn('Failed to persist FCC session cache:', error);
+  }
+}
+
+function restoreFccSessionCache() {
+  const cached = readFccSessionCache();
+  if (!cached) return false;
+  commandCenterTopDataCache = cached.topData || null;
+  standingsDataCache = cached.standingsData || null;
+  userRosterPlayersCache = Array.isArray(cached.rosterPlayers) ? cached.rosterPlayers : [];
+  teamData = cached.teamData || null;
+  userScheduleDataCache = cached.scheduleData || null;
+  homeLastGameDataCache = cached.lastGameDataCache || null;
+  homeOpponentRosterCache.clear();
+  (cached.opponentRosters || []).forEach(([teamId, players]) => {
+    if (teamId) homeOpponentRosterCache.set(String(teamId), players || []);
+  });
+  return !!(commandCenterTopDataCache || standingsDataCache || userRosterPlayersCache.length || teamData || userScheduleDataCache);
+}
 
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
@@ -500,6 +553,7 @@ async function fetchRosterWithStatsForTeam(teamId) {
     const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
     const players = result?.players || [];
     homeOpponentRosterCache.set(teamId, players);
+    persistFccSessionCache();
     return players;
   } catch (error) {
     console.warn('Failed to load opponent roster for Home tab:', teamId, error);
@@ -513,6 +567,7 @@ async function ensureHomeScheduleData() {
   params.set('franchise_id', franchiseId);
   if (userConference != null) params.set('conference', String(userConference));
   userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
+  persistFccSessionCache();
   return userScheduleDataCache;
 }
 
@@ -522,6 +577,7 @@ async function ensureHomeLastGameData(game) {
   const data = await fetchJSON(`${API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(game.game_id)}`)}`);
   if (data) {
     homeLastGameDataCache = { game_id: game.game_id, data };
+    persistFccSessionCache();
   }
   return data;
 }
@@ -1353,6 +1409,7 @@ function renderTeam(data) {
     return;
   }
   userRosterPlayersCache = data.players || [];
+  persistFccSessionCache();
   const tbody = document.getElementById('team-body');
   if (!tbody) {
     return;
@@ -1943,13 +2000,50 @@ async function init() {
   
   const initStartTime = performance.now();
   console.log('⏱️ [PERF] FCC init() START');
+  const restoredFromSession = restoreFccSessionCache();
   try {
+  if (restoredFromSession && commandCenterTopDataCache) {
+    emitDisplayContextUpdate();
+    if (commandCenterTopDataCache && commandCenterTopDataCache.team_id && !userTeamId) {
+      userTeamId = commandCenterTopDataCache.team_id;
+      localStorage.setItem('franchise_user_team_id', userTeamId);
+      emitDisplayContextUpdate();
+    }
+    populateTop(commandCenterTopDataCache);
+    void hydrateFccDisplayColorPreference();
+    initFccRecruits(commandCenterTopDataCache);
+    if (commandCenterTopDataCache.team) {
+      userTeamNameForLeaders = commandCenterTopDataCache.team;
+    }
+    userConference = commandCenterTopDataCache.user_conference != null ? commandCenterTopDataCache.user_conference : null;
+    userRegion = commandCenterTopDataCache.user_region != null && commandCenterTopDataCache.user_region !== '' ? commandCenterTopDataCache.user_region : null;
+    void initializeTeamColorCache();
+    updatePlayButton(commandCenterTopDataCache);
+    updateScoutingButton(commandCenterTopDataCache);
+    updateRecruitingButton(commandCenterTopDataCache);
+    updateAwardsButton(commandCenterTopDataCache);
+    void updatePlaybooksButtonState(commandCenterTopDataCache);
+    bindResourcesLinks();
+    if (standingsDataCache) renderStandings(standingsDataCache, 'A');
+    if (userRosterPlayersCache.length) renderTeam({ players: userRosterPlayersCache });
+    renderHomeStandingsCard();
+    renderHomeRankingsCard();
+    renderHomeLockerRoomCard();
+    renderHomeTeamStatsCard();
+    renderHomeRecruitingCard();
+    renderHomeNewsCard();
+    if (userScheduleDataCache) {
+      void renderHomeTab();
+    }
+    hideFccLoadingOverlay();
+  }
   const topDataStartTime = performance.now();
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
   commandCenterTopDataCache = topData;
+  persistFccSessionCache();
   emitDisplayContextUpdate();
 
   // ✅ SS&S: Resolve team_id from command center data if not already set
@@ -1973,6 +2067,7 @@ async function init() {
         if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
           topData.team_chemistry = teamData.team_attributes.team_chemistry;
           console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', topData.team_chemistry);
+          persistFccSessionCache();
         }
       }
     } catch (error) {
@@ -2033,6 +2128,7 @@ async function init() {
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   standingsDataCache = standingsData;
+  persistFccSessionCache();
   renderStandings(standingsData, 'A');
   bindResourcesLinks();
   const homeTabDataPromise = loadHomeTabData();
@@ -2064,16 +2160,23 @@ async function init() {
     // Load team data for Team tab
     const loadTeamDataStartTime = performance.now();
     console.log('⏱️ [PERF] loadTeamData() START');
-    await loadTeamData();
+    if (restoredFromSession && teamData) {
+      void loadTeamData();
+    } else {
+      await loadTeamData();
+    }
     const loadTeamDataEndTime = performance.now();
     console.log(`⏱️ [PERF] loadTeamData() COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
-    await homeTabDataPromise;
+    if (restoredFromSession && userScheduleDataCache) {
+      void homeTabDataPromise;
+    } else {
+      await homeTabDataPromise;
+    }
     
     const initEndTime = performance.now();
     console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
   } finally {
-    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
-    if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+    hideFccLoadingOverlay();
   }
 }
 
@@ -2667,6 +2770,7 @@ async function loadTeamData() {
       scouting_data: data.scouting_data || {},
       players: players
     };
+    persistFccSessionCache();
     
     // Log all team attribute values on page load
     console.log('📊 [TEAM ATTRIBUTES] All team attribute values:', teamData.team_attributes);
