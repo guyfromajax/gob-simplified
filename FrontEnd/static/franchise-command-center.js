@@ -1910,7 +1910,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)
   if (typeof CommandCenterTabs !== 'undefined') {
     CommandCenterTabs.initCommandCenterTabs({
-      defaultTab: 'standings-tab',
+      defaultTab: 'home-tab',
       onTabShow: (tabName) => {
         bindResourcesLinks();
         if (commandCenterTopDataCache) {
