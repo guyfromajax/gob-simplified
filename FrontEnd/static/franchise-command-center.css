@@ -586,7 +586,8 @@ body {
 }
 
 .fcc-home-matchup-logo {
-  max-width: 86.4%;
+  width: min(88%, 284px);
+  max-width: 100%;
   max-height: 50px;
   object-fit: contain;
 }
