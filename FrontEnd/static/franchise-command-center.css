@@ -127,12 +127,12 @@ body {
 
 #franchise-container .fcc-meta-row {
   margin-top: 8px;
-  width: 60%;
-  max-width: 168px;
-  min-width: 126px;
+  width: min(92%, 280px);
+  min-width: 220px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
+  column-gap: 18px;
 }
 
 #franchise-container .fcc-meta-row .fcc-season-label {
