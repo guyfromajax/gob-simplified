@@ -401,6 +401,11 @@ function getPlayerTotalRebounds(player) {
   return Number(stats.TREB || ((stats.OREB || 0) + (stats.DREB || 0)) || 0);
 }
 
+function getDisplayPlayerNameForStats(player) {
+  const base = `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || player?.name || '';
+  return typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player?.jersey, base) : base;
+}
+
 function getTopPlayerByAverage(players, totalResolver) {
   let best = null;
   let bestAvg = -1;
@@ -1469,12 +1474,104 @@ function renderTeam(data) {
       sortRosterTable(columnName, rosterSortDirection);
     });
   });
-  
-  // Also render player stats (shared module Phase 4.2)
-  if (typeof RosterStatsRenderer !== 'undefined') {
-    RosterStatsRenderer.renderRosterStats(data.players || []);
-  }
+  renderPlayerStatsTable(data.players || []);
   void renderHomeTab();
+}
+
+function renderPlayerStatsTable(players) {
+  const tbody = document.getElementById('player-stats-body');
+  const statsTable = document.querySelector('#player-stats-tab .stats-table');
+  if (!tbody || !statsTable) return;
+
+  const statsRows = (players || []).map((player) => ({
+    raw: player,
+    stats: getPlayerSeasonStats(player),
+    rt: getPlayerRt(player)
+  }));
+
+  function statValueForSort(entry, statKey) {
+    const stats = entry.stats || {};
+    if (statKey === 'name') return `${entry.raw?.last_name || ''} ${entry.raw?.first_name || ''}`.trim() || entry.raw?.name || '';
+    if (statKey === 'FG%') return stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA) : 0;
+    if (statKey === '3PT%') {
+      const attempts = stats['3PTA'] || stats.TPA || 0;
+      return attempts > 0 ? (((stats['3PTM'] || stats.TPM || 0) / attempts)) : 0;
+    }
+    if (statKey === 'FT%') return stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA) : 0;
+    if (statKey === 'TREB') return stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0));
+    return Number(stats[statKey] || 0);
+  }
+
+  function renderRows(rows) {
+    tbody.innerHTML = '';
+    rows.forEach((entry) => {
+      const stats = entry.stats || {};
+      const tpm = stats['3PTM'] || 0;
+      const tpa = stats['3PTA'] || stats.TPA || 0;
+      const fgPct = stats.FGA > 0 ? (((stats.FGM || 0) / stats.FGA) * 100).toFixed(1) : '0.0';
+      const threePct = tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
+      const ftPct = stats.FTA > 0 ? (((stats.FTM || 0) / stats.FTA) * 100).toFixed(1) : '0.0';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + getDisplayPlayerNameForStats(entry.raw) + '</td>' +
+        '<td>' + (stats.PTS || 0) + '</td>' +
+        '<td>' + (stats.FGM || 0) + '</td>' +
+        '<td>' + (stats.FGA || 0) + '</td>' +
+        '<td>' + fgPct + '%</td>' +
+        '<td>' + tpm + '</td>' +
+        '<td>' + tpa + '</td>' +
+        '<td>' + threePct + '%</td>' +
+        '<td>' + (stats.FTM || 0) + '</td>' +
+        '<td>' + (stats.FTA || 0) + '</td>' +
+        '<td>' + ftPct + '%</td>' +
+        '<td>' + (stats.DREB || 0) + '</td>' +
+        '<td>' + (stats.OREB || 0) + '</td>' +
+        '<td>' + (stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0))) + '</td>' +
+        '<td>' + (stats.AST || 0) + '</td>' +
+        '<td>' + (stats.STL || 0) + '</td>' +
+        '<td>' + (stats.BLK || 0) + '</td>' +
+        '<td>' + (stats.F || 0) + '</td>' +
+        '<td>' + (stats.MIN || 0) + '</td>' +
+        '<td>' + (stats.TO || 0) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function sortAndRender(statKey, direction) {
+    const sorted = [...statsRows].sort((a, b) => {
+      if (statKey === 'name') {
+        const cmp = statValueForSort(a, statKey).localeCompare(statValueForSort(b, statKey));
+        return direction === 'asc' ? cmp : -cmp;
+      }
+      const aVal = statValueForSort(a, statKey);
+      const bVal = statValueForSort(b, statKey);
+      if (aVal !== bVal) return direction === 'asc' ? aVal - bVal : bVal - aVal;
+      return direction === 'asc' ? a.rt - b.rt : b.rt - a.rt;
+    });
+    renderRows(sorted);
+  }
+
+  let activeSort = 'PTS';
+  let activeDirection = 'desc';
+  sortAndRender(activeSort, activeDirection);
+
+  statsTable.querySelectorAll('thead .sortable').forEach((header) => {
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const stat = newHeader.dataset.stat;
+      if (activeSort === stat) {
+        activeDirection = activeDirection === 'desc' ? 'asc' : 'desc';
+      } else {
+        activeSort = stat;
+        activeDirection = 'desc';
+      }
+      sortAndRender(activeSort, activeDirection);
+    });
+  });
 }
 
 // Store roster data for sorting

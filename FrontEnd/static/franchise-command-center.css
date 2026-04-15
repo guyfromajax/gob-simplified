@@ -981,6 +981,62 @@ body {
   text-decoration: underline;
 }
 
+.fcc-data-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 28px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.fcc-data-card-body {
+  padding: 6px 10px 10px;
+}
+
+#franchise-container #roster-tab .scroll-x,
+#franchise-container #player-stats-tab .scroll-x {
+  overflow-x: auto;
+}
+
+#franchise-container #roster-tab table.roster-table,
+#franchise-container #player-stats-tab table.stats-table {
+  margin: 0;
+  min-width: 1180px;
+}
+
+#franchise-container #roster-tab table.roster-table thead th,
+#franchise-container #player-stats-tab table.stats-table thead th {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+}
+
+#franchise-container #roster-tab table.roster-table tbody td,
+#franchise-container #player-stats-tab table.stats-table tbody td {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+#franchise-container #roster-tab table.roster-table tbody tr:nth-child(odd),
+#franchise-container #player-stats-tab table.stats-table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#franchise-container #roster-tab table.roster-table tbody tr:hover td,
+#franchise-container #player-stats-tab table.stats-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 /* Stats and Team Traits scope toggles (Conference / Region / National) */
 .stats-scope-toggle-wrap,
 .traits-scope-toggle-wrap {

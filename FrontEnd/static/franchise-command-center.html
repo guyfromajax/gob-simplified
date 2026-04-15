@@ -104,65 +104,68 @@
         </div>
       </div>
       <div id="roster-tab" class="tab-content">
-        <div class="scroll-x">
-          <table class="roster-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>POS</th>
-                <th>Year</th>
-                <th>Height</th>
-                <th>Weight</th>
-                <th>SC</th>
-                <th>SH</th>
-                <th>ID</th>
-                <th>OD</th>
-                <th>PS</th>
-                <th>BH</th>
-                <th>RB</th>
-                <th>AG</th>
-                <th>ST</th>
-                <th>ND</th>
-                <th>IQ</th>
-                <th>FT</th>
-                <th>RT</th>
-              </tr>
-            </thead>
-            <tbody id="team-body"></tbody>
-          </table>
-        </div>
-        <div class="scroll-x" style="margin-top: 20px;">
-          <table class="stats-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-stat="name">Player</th>
-                <th class="sortable" data-stat="PTS">PTS</th>
-                <th class="sortable" data-stat="FGM">FGM</th>
-                <th class="sortable" data-stat="FGA">FGA</th>
-                <th class="sortable" data-stat="FG%">FG%</th>
-                <th class="sortable" data-stat="3PTM">3PTM</th>
-                <th class="sortable" data-stat="TPA">3PTA</th>
-                <th class="sortable" data-stat="3PT%">3PT%</th>
-                <th class="sortable" data-stat="FTM">FTM</th>
-                <th class="sortable" data-stat="FTA">FTA</th>
-                <th class="sortable" data-stat="FT%">FT%</th>
-                <th class="sortable" data-stat="DREB">DREB</th>
-                <th class="sortable" data-stat="OREB">OREB</th>
-                <th class="sortable" data-stat="TREB">TREB</th>
-                <th class="sortable" data-stat="AST">AST</th>
-                <th class="sortable" data-stat="STL">STL</th>
-                <th class="sortable" data-stat="BLK">BLK</th>
-                <th class="sortable" data-stat="F">F</th>
-                <th class="sortable" data-stat="MIN">MIN</th>
-                <th class="sortable" data-stat="TO">TO</th>
-              </tr>
-            </thead>
-            <tbody id="roster-stats-body"></tbody>
-          </table>
-        </div>
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="roster-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>POS</th>
+                  <th>Year</th>
+                  <th>Height</th>
+                  <th>Weight</th>
+                  <th>SC</th>
+                  <th>SH</th>
+                  <th>ID</th>
+                  <th>OD</th>
+                  <th>PS</th>
+                  <th>BH</th>
+                  <th>RB</th>
+                  <th>AG</th>
+                  <th>ST</th>
+                  <th>ND</th>
+                  <th>IQ</th>
+                  <th>FT</th>
+                  <th>RT</th>
+                </tr>
+              </thead>
+              <tbody id="team-body"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
-      <div id="player-stats-tab" class="tab-content fcc-placeholder-tab">
-        <div class="fcc-placeholder-body">In Development</div>
+      <div id="player-stats-tab" class="tab-content">
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="stats-table">
+              <thead>
+                <tr>
+                  <th class="sortable" data-stat="name">Player</th>
+                  <th class="sortable" data-stat="PTS">PTS</th>
+                  <th class="sortable" data-stat="FGM">FGM</th>
+                  <th class="sortable" data-stat="FGA">FGA</th>
+                  <th class="sortable" data-stat="FG%">FG%</th>
+                  <th class="sortable" data-stat="3PTM">3PTM</th>
+                  <th class="sortable" data-stat="TPA">3PTA</th>
+                  <th class="sortable" data-stat="3PT%">3PT%</th>
+                  <th class="sortable" data-stat="FTM">FTM</th>
+                  <th class="sortable" data-stat="FTA">FTA</th>
+                  <th class="sortable" data-stat="FT%">FT%</th>
+                  <th class="sortable" data-stat="DREB">DREB</th>
+                  <th class="sortable" data-stat="OREB">OREB</th>
+                  <th class="sortable" data-stat="TREB">TREB</th>
+                  <th class="sortable" data-stat="AST">AST</th>
+                  <th class="sortable" data-stat="STL">STL</th>
+                  <th class="sortable" data-stat="BLK">BLK</th>
+                  <th class="sortable" data-stat="F">F</th>
+                  <th class="sortable" data-stat="MIN">MIN</th>
+                  <th class="sortable" data-stat="TO">TO</th>
+                </tr>
+              </thead>
+              <tbody id="player-stats-body"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
       <div id="team-stats-tab" class="tab-content fcc-placeholder-tab">
         <div class="fcc-placeholder-body">In Development</div>
