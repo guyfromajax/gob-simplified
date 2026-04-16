@@ -472,8 +472,10 @@ def _infer_box_score_team_side(team_key: str, home_team_id: str, away_team_id: s
 
 def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]]:
     if not isinstance(game_doc, dict):
+        logger.warning("🧭 [FCC-POTG] game_doc is not a dict; cannot calculate POTG")
         return None
 
+    selected_game_id = str(game_doc.get("_id") or game_doc.get("game_id") or "")
     home_team_id = str(game_doc.get("home_team_id") or "")
     away_team_id = str(game_doc.get("away_team_id") or "")
     teams_obj = game_doc.get("teams") or {}
@@ -494,8 +496,11 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
 
     candidates: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
+    players_source_count = 0
+    box_score_source_count = 0
 
     def upsert_player(raw: dict[str, Any], fallback_team: Optional[str] = None) -> None:
+        nonlocal players_source_count, box_score_source_count
         if not isinstance(raw, dict):
             return
         stats = raw.get("stats", {}).get("game") if isinstance(raw.get("stats"), dict) and isinstance(raw.get("stats", {}).get("game"), dict) else raw.get("stats", raw)
@@ -509,6 +514,10 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
         if dedupe_key in seen_keys:
             return
         seen_keys.add(dedupe_key)
+        if fallback_team:
+            box_score_source_count += 1
+        else:
+            players_source_count += 1
         candidates.append({
             "player_id": player_id,
             "name": name,
@@ -531,7 +540,21 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
             if isinstance(player_data, dict):
                 upsert_player(player_data, inferred_team)
 
+    logger.warning(
+        "🧭 [FCC-POTG] Selected game_id=%s home=%s away=%s has_players=%s top_box_score=%s nested_teams=%s candidate_count=%s from_players=%s from_box_score=%s",
+        selected_game_id,
+        home_team_name,
+        away_team_name,
+        isinstance(players, list) and len(players) > 0,
+        isinstance(game_doc.get("box_score"), dict) and bool(game_doc.get("box_score")),
+        isinstance(game_doc.get("teams"), dict) and bool(game_doc.get("teams")),
+        len(candidates),
+        players_source_count,
+        box_score_source_count,
+    )
+
     if not candidates:
+        logger.warning("🧭 [FCC-POTG] No POTG candidates found for game_id=%s", selected_game_id)
         return None
 
     scored: list[dict[str, Any]] = []
@@ -571,6 +594,17 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
 
     scored.sort(key=lambda item: (-item["score"], -item["stats"]["pts"], -item["stats"]["reb"], -item["stats"]["ast"]))
     top = scored[0]
+    logger.warning(
+        "🧭 [FCC-POTG] POTG resolved for game_id=%s winner=%s pts=%s reb=%s ast=%s stl=%s blk=%s defPct=%s",
+        selected_game_id,
+        top["name"],
+        top["stats"]["pts"],
+        top["stats"]["reb"],
+        top["stats"]["ast"],
+        top["stats"]["stl"],
+        top["stats"]["blk"],
+        top["stats"]["defPct"],
+    )
     return {
         "name": top["name"],
         "stats": top["stats"],
@@ -646,9 +680,35 @@ def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_s
                         {"team1_id": home_id, "team2_id": away_id},
                     ],
                 }))
+                logger.warning(
+                    "🧭 [FCC-LAST-GAME] franchise_id=%s week=%s user_team_id=%s matchup=%s/%s matched_docs=%s",
+                    str(franchise_doc.get("_id")),
+                    week,
+                    user_team_id_str,
+                    away_id,
+                    home_id,
+                    len(game_docs),
+                )
+                for doc in game_docs:
+                    teams_obj = doc.get("teams") if isinstance(doc.get("teams"), dict) else {}
+                    logger.warning(
+                        "🧭 [FCC-LAST-GAME] candidate_game_id=%s richness=%s quarter=%s is_final=%s has_players=%s top_box_score=%s nested_team_boxes=%s",
+                        str(doc.get("_id") or doc.get("game_id") or ""),
+                        _game_doc_richness_score(doc),
+                        doc.get("quarter"),
+                        doc.get("is_final"),
+                        isinstance(doc.get("players"), list) and len(doc.get("players")) > 0,
+                        isinstance(doc.get("box_score"), dict) and bool(doc.get("box_score")),
+                        any(isinstance(team_data, dict) and isinstance(team_data.get("box_score"), dict) and bool(team_data.get("box_score")) for team_data in teams_obj.values()),
+                    )
                 game_doc = None
                 if game_docs:
                     game_doc = max(game_docs, key=_game_doc_richness_score)
+                    logger.warning(
+                        "🧭 [FCC-LAST-GAME] selected_game_id=%s selected_richness=%s",
+                        str(game_doc.get("_id") or game_doc.get("game_id") or ""),
+                        _game_doc_richness_score(game_doc),
+                    )
                 return {
                     "week": week,
                     "away_team_id": away_id,
