@@ -218,6 +218,7 @@ class GameManager:
             "shooter": None,
             "free_throws": 0,
             "free_throws_remaining": 0,
+            "no_defender_shots": 0,
             "one_and_one": False,
             "last_ball_handler": None,
             "foul_team": None,

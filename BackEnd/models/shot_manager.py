@@ -509,6 +509,7 @@ class ShotManager:
         shooter_location_str = shooter_location if shooter_location else "unknown"
         
         charge_result = None
+        defense_applied_defenders = []
 
         if rim_unguarded_99:
             # Unguarded attempt in rim box: 99% make; skip defense, fouls, block recon, charge.
@@ -518,6 +519,10 @@ class ShotManager:
             shot_score = 0
             shot_score_pre_defense = 0
         else:
+            if has_contest and defender:
+                defense_applied_defenders.append(defender)
+                if second_defender:
+                    defense_applied_defenders.append(second_defender)
             # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
             # Use shot_type instead of playcall for shot score calculation
             # No contest → omit defensive scoring and shooting-foul rolls (still full offense / gravity).
@@ -879,6 +884,8 @@ class ShotManager:
                 logging.warning(f"   📊 Shot result unchanged: {'MADE' if made else 'MISS'} (calibration did not force change)")
 
         # Stat tracking (attempts)
+        if not defense_applied_defenders:
+            self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
@@ -1185,8 +1192,9 @@ class ShotManager:
         # ------------------------
         else:
             text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}."
-            if defender:
-                defender.record_stat("DEF_S")
+            for defense_player in defense_applied_defenders:
+                if defense_player:
+                    defense_player.record_stat("DEF_S")
 
             if d_foul:
                 # Shooting foul → free throws
@@ -2241,6 +2249,8 @@ class ShotManager:
 
         made = shot_score >= shot_threshold
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
+        if not defender:
+            self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
         shooter.record_stat("FGA")
 
         if made:

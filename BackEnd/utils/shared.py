@@ -691,6 +691,8 @@ def resolve_offensive_rebound(game, rebounder):
         else:
             made = random.randint(1, 100) < 100
 
+        if not contested:
+            game.game_state["no_defender_shots"] = int(game.game_state.get("no_defender_shots", 0) or 0) + 1
         rebounder.record_stat("FGA")
 
         event = {
@@ -767,7 +769,7 @@ def resolve_offensive_rebound(game, rebounder):
                     event["foul_count"] = foul_out_info["foul_count"]
                 return event
 
-            if defender:
+            if contested and defender:
                 defender.record_stat("DEF_S")
 
             # Unified geography-based rebound system for putback misses
