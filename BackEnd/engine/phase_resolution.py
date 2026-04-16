@@ -4216,6 +4216,46 @@ def resolve_half_court_offense_logic(game):
         successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
     
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
+
+    if result == "SHOT" and not is_motion_play and skeleton and "steps" in skeleton:
+        steps = skeleton.get("steps") or []
+        final_step = steps[-1] if steps else {}
+        final_pos_actions = final_step.get("pos_actions") or {}
+        final_events = final_step.get("events") or []
+        final_step_keys = list(final_pos_actions.keys())
+        final_step_actions = {
+            pos: {
+                "action": action_info.get("action"),
+                "location": action_info.get("location"),
+                "spot": action_info.get("spot"),
+            }
+            for pos, action_info in final_pos_actions.items()
+        }
+        any_shoot_steps = []
+        for step_index, step in enumerate(steps):
+            for pos, action_info in (step.get("pos_actions") or {}).items():
+                if (action_info.get("action") or "").lower().strip() == "shoot":
+                    any_shoot_steps.append(
+                        {
+                            "step_index": step_index,
+                            "pos": pos,
+                            "location": action_info.get("location"),
+                            "spot": action_info.get("spot"),
+                        }
+                    )
+        logging.warning(
+            "🧭 [HCO_SET_PLAY_VARIANT_TRACE] playcall=%s variant=%s intended_shooter_pos=%s derived_shooter=%s derived_shooter_pos=%s final_step_keys=%s final_step_actions=%s final_step_events=%s any_shoot_steps=%s step_count=%s",
+            off_call,
+            skeleton.get("_variant"),
+            intended_shooter_pos,
+            get_name_safe(roles.get("shooter")) if roles.get("shooter") else "NONE",
+            roles.get("shooter_pos"),
+            final_step_keys,
+            final_step_actions,
+            final_events,
+            any_shoot_steps,
+            len(steps),
+        )
     
     # ✅ FIX: For non-shot outcomes (steals, turnovers, fouls), override defender
     # to be based on ball handler's position, not shooter's position
