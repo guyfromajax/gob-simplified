@@ -1261,19 +1261,15 @@ body {
   text-decoration: underline;
 }
 
-#franchise-container #recruits-tab table.recruiting-table thead th:nth-child(2),
 #franchise-container #recruits-tab table.recruiting-table thead th:nth-child(3),
 #franchise-container #recruits-tab table.recruiting-table thead th:nth-child(20),
-#franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(2),
 #franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(3),
 #franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(20) {
   text-align: left;
 }
 
-#franchise-container #recruits-tab table.recruiting-table thead th:nth-child(2),
 #franchise-container #recruits-tab table.recruiting-table thead th:nth-child(3),
 #franchise-container #recruits-tab table.recruiting-table thead th:nth-child(20),
-#franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(2),
 #franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(3),
 #franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(20) {
   padding-left: 14px;
