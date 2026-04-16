@@ -3632,6 +3632,7 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     has a shoot action for the shooter. Used for HCO, FCP, and HCT so block
     reconciliation uses the correct shot location. Fast Break does not use this.
     """
+    _ensure_skeleton_shot_role_positions(game, roles)
     turn_type = game.game_state.get("offensive_state")
     if not skeleton or not roles:
         if turn_type == "HCO":
@@ -3717,6 +3718,43 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
             float(coords.get("x", 50)),
             float(coords.get("y", 25)),
         )
+
+
+def _ensure_skeleton_shot_role_positions(game, roles):
+    """
+    Normalize positional role fields for skeleton-driven shot turns.
+
+    HCO, FCP, and HCT all use player-object roles plus skeleton steps. This helper
+    backfills the matching *_pos fields so shared shot-spot logic, snapshots, and
+    downstream debugging operate on one consistent contract.
+    """
+    if not isinstance(roles, dict):
+        return roles
+
+    off_lineup = game.offense_team.lineup
+    def_lineup = game.defense_team.lineup
+
+    if roles.get("shooter_pos") is None and roles.get("shooter") is not None:
+        roles["shooter_pos"] = get_player_position(off_lineup, roles.get("shooter"))
+    if roles.get("passer_pos") is None and roles.get("passer") is not None:
+        roles["passer_pos"] = get_player_position(off_lineup, roles.get("passer"))
+    if roles.get("screener_pos") is None and roles.get("screener") is not None:
+        roles["screener_pos"] = get_player_position(off_lineup, roles.get("screener"))
+    if roles.get("defender_pos") is None and roles.get("defender") is not None:
+        roles["defender_pos"] = get_player_position(def_lineup, roles.get("defender"))
+    if roles.get("second_defender_pos") is None and roles.get("second_defender") is not None:
+        roles["second_defender_pos"] = get_player_position(def_lineup, roles.get("second_defender"))
+
+    ball_handler = roles.get("ball_handler")
+    if roles.get("ball_handler_pos") is None:
+        if ball_handler is not None:
+            roles["ball_handler_pos"] = get_player_position(off_lineup, ball_handler)
+        elif roles.get("passer_pos") is not None:
+            roles["ball_handler_pos"] = roles.get("passer_pos")
+        else:
+            roles["ball_handler_pos"] = roles.get("shooter_pos")
+
+    return roles
 
 
 def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_shot_step_index=None):
@@ -5543,11 +5581,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         shot_roles = {
             "ball_handler": passer,
+            "ball_handler_pos": passer_pos,
             "shooter": shooter,
+            "shooter_pos": shooter_pos,
             "passer": passer,
+            "passer_pos": passer_pos,
             "screener": None,
+            "screener_pos": None,
             "defender": defender,
         }
+        _ensure_skeleton_shot_role_positions(game, shot_roles)
         
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
@@ -6766,11 +6809,16 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         shot_roles = {
             "ball_handler": passer,
+            "ball_handler_pos": passer_pos,
             "shooter": shooter,
+            "shooter_pos": shooter_pos,
             "passer": passer,
+            "passer_pos": passer_pos,
             "screener": None,
+            "screener_pos": None,
             "defender": defender,
         }
+        _ensure_skeleton_shot_role_positions(game, shot_roles)
         
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
