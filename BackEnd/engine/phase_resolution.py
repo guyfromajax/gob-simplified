@@ -3654,15 +3654,14 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
             )
         return
     last_step = steps[-1]
-    pos_actions = last_step.get("pos_actions") or {}
-    last_step_keys = list(pos_actions.keys())
-    pa = pos_actions.get(shooter_pos)
+    last_step_pos_actions = last_step.get("pos_actions") or {}
+    last_step_keys = list(last_step_pos_actions.keys())
     final_step_shooter_pos = None
     final_step_shooter_action = None
     final_step_shot_event_by = None
     final_step_has_location = False
     final_step_has_spot = False
-    for pos, action_info in pos_actions.items():
+    for pos, action_info in last_step_pos_actions.items():
         action = (action_info.get("action") or "").lower().strip()
         if action == "shoot":
             final_step_shooter_pos = pos
@@ -3674,14 +3673,29 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         if event.get("type") == "shot":
             final_step_shot_event_by = event.get("by")
             break
-    if not pa or (pa.get("action") or "").lower().strip() != "shoot":
+
+    shoot_step = None
+    shoot_pos_actions = None
+    pa = None
+    matched_shoot_step_index = None
+    for step_index in range(len(steps) - 1, -1, -1):
+        candidate_step = steps[step_index]
+        candidate_pos_actions = candidate_step.get("pos_actions") or {}
+        candidate_action = candidate_pos_actions.get(shooter_pos)
+        if candidate_action and (candidate_action.get("action") or "").lower().strip() == "shoot":
+            shoot_step = candidate_step
+            shoot_pos_actions = candidate_pos_actions
+            pa = candidate_action
+            matched_shoot_step_index = step_index
+            break
+
+    if not pa:
         if turn_type == "HCO":
             logging.warning(
-                "🧭 [HCO_SHOT_SPOT_TRACE] status=skip reason=no_matching_final_step_shoot shooter=%s shooter_pos=%s last_step_keys=%s shooter_pos_action=%s final_step_shooter_pos=%s final_step_shooter_action=%s final_step_shot_event_by=%s final_step_has_location=%s final_step_has_spot=%s",
+                "🧭 [HCO_SHOT_SPOT_TRACE] status=skip reason=no_matching_shoot_step shooter=%s shooter_pos=%s last_step_keys=%s final_step_shooter_pos=%s final_step_shooter_action=%s final_step_shot_event_by=%s final_step_has_location=%s final_step_has_spot=%s",
                 get_name_safe(shooter),
                 shooter_pos,
                 last_step_keys,
-                pa.get("action") if pa else None,
                 final_step_shooter_pos,
                 final_step_shooter_action,
                 final_step_shot_event_by,

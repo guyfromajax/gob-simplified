@@ -672,14 +672,15 @@ def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_s
             away_id = str(result.get("away_id") or "")
             home_id = str(result.get("home_id") or "")
             if user_team_id_str in {away_id, home_id}:
-                game_docs = list(db.games.find({
+                exact_query = {
                     "week": week,
                     "franchise_id": str(franchise_doc.get("_id")),
                     "$or": [
                         {"team1_id": away_id, "team2_id": home_id},
                         {"team1_id": home_id, "team2_id": away_id},
                     ],
-                }))
+                }
+                game_docs = list(db.games.find(exact_query))
                 logger.warning(
                     "🧭 [FCC-LAST-GAME] franchise_id=%s week=%s user_team_id=%s matchup=%s/%s matched_docs=%s",
                     str(franchise_doc.get("_id")),
@@ -689,6 +690,34 @@ def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_s
                     home_id,
                     len(game_docs),
                 )
+                if not game_docs:
+                    fallback_docs = list(db.games.find({
+                        "week": week,
+                        "franchise_id": str(franchise_doc.get("_id")),
+                    }))
+                    target_ids = {away_id, home_id}
+                    filtered_docs = []
+                    for doc in fallback_docs:
+                        candidate_ids = {
+                            str(doc.get("team1_id") or ""),
+                            str(doc.get("team2_id") or ""),
+                            str(doc.get("home_team_id") or ""),
+                            str(doc.get("away_team_id") or ""),
+                        }
+                        teams_obj = doc.get("teams") if isinstance(doc.get("teams"), dict) else {}
+                        if isinstance(teams_obj, dict) and teams_obj:
+                            candidate_ids.update(str(key or "") for key in teams_obj.keys())
+                        candidate_ids.discard("")
+                        if target_ids.issubset(candidate_ids):
+                            filtered_docs.append(doc)
+                    game_docs = filtered_docs
+                    logger.warning(
+                        "🧭 [FCC-LAST-GAME] fallback lookup franchise_id=%s week=%s scanned_docs=%s fallback_matches=%s",
+                        str(franchise_doc.get("_id")),
+                        week,
+                        len(fallback_docs),
+                        len(game_docs),
+                    )
                 for doc in game_docs:
                     teams_obj = doc.get("teams") if isinstance(doc.get("teams"), dict) else {}
                     logger.warning(
