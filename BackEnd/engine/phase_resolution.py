@@ -3632,23 +3632,65 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     has a shoot action for the shooter. Used for HCO, FCP, and HCT so block
     reconciliation uses the correct shot location. Fast Break does not use this.
     """
+    turn_type = game.game_state.get("offensive_state")
     if not skeleton or not roles:
+        if turn_type == "HCO":
+            logging.warning("🧭 [HCO_SHOT_SPOT_TRACE] status=skip reason=missing_skeleton_or_roles")
         return
     steps = skeleton.get("steps") or []
     if not steps:
+        if turn_type == "HCO":
+            logging.warning("🧭 [HCO_SHOT_SPOT_TRACE] status=skip reason=no_steps")
         return
     shooter = roles.get("shooter")
     shooter_pos = roles.get("shooter_pos")
     if shooter is None or shooter_pos is None:
+        if turn_type == "HCO":
+            logging.warning(
+                "🧭 [HCO_SHOT_SPOT_TRACE] status=skip reason=missing_shooter_or_pos shooter=%s shooter_pos=%s",
+                get_name_safe(shooter) if shooter else "NONE",
+                shooter_pos,
+            )
         return
     last_step = steps[-1]
     pos_actions = last_step.get("pos_actions") or {}
+    last_step_keys = list(pos_actions.keys())
     pa = pos_actions.get(shooter_pos)
-    if not pa or pa.get("action") != "shoot":
+    final_step_shooter_pos = None
+    final_step_shooter_action = None
+    final_step_shot_event_by = None
+    final_step_has_location = False
+    final_step_has_spot = False
+    for pos, action_info in pos_actions.items():
+        action = (action_info.get("action") or "").lower().strip()
+        if action == "shoot":
+            final_step_shooter_pos = pos
+            final_step_shooter_action = action_info.get("action")
+            final_step_has_location = action_info.get("location") is not None
+            final_step_has_spot = action_info.get("spot") is not None
+            break
+    for event in last_step.get("events", []):
+        if event.get("type") == "shot":
+            final_step_shot_event_by = event.get("by")
+            break
+    if not pa or (pa.get("action") or "").lower().strip() != "shoot":
+        if turn_type == "HCO":
+            logging.warning(
+                "🧭 [HCO_SHOT_SPOT_TRACE] status=skip reason=no_matching_final_step_shoot shooter=%s shooter_pos=%s last_step_keys=%s shooter_pos_action=%s final_step_shooter_pos=%s final_step_shooter_action=%s final_step_shot_event_by=%s final_step_has_location=%s final_step_has_spot=%s",
+                get_name_safe(shooter),
+                shooter_pos,
+                last_step_keys,
+                pa.get("action") if pa else None,
+                final_step_shooter_pos,
+                final_step_shooter_action,
+                final_step_shot_event_by,
+                final_step_has_location,
+                final_step_has_spot,
+            )
         return
     from BackEnd.constants import HCO_STRING_SPOTS
     from BackEnd.utils.shared import get_away_player_coords
-    location = (pa.get("location") or "key").strip()
+    location = (pa.get("location") or pa.get("spot") or "key").strip()
     # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
     coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
     if coords == {"x": 50, "y": 25} and location.lower() != "key":
@@ -3661,6 +3703,20 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         coords = get_away_player_coords(coords)
     shooter.coords = coords
     roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
+    if turn_type == "HCO":
+        logging.warning(
+            "🧭 [HCO_SHOT_SPOT_TRACE] status=set shooter=%s shooter_pos=%s last_step_keys=%s shooter_pos_action=%s final_step_shooter_pos=%s final_step_shot_event_by=%s source_field=%s source_location=%s shot_spot=(%.1f,%.1f)",
+            get_name_safe(shooter),
+            shooter_pos,
+            last_step_keys,
+            pa.get("action"),
+            final_step_shooter_pos,
+            final_step_shot_event_by,
+            "location" if pa.get("location") is not None else ("spot" if pa.get("spot") is not None else "default"),
+            location,
+            float(coords.get("x", 50)),
+            float(coords.get("y", 25)),
+        )
 
 
 def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_shot_step_index=None):
@@ -4875,6 +4931,16 @@ def resolve_half_court_offense_logic(game):
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
     apply_coords_from_animations_list(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
+    logging.warning(
+        "🧭 [HCO_PRE_SHOT_TRACE] shooter=%s shooter_pos=%s shot_spot_present=%s shot_spot=%s intended_shooter_pos=%s play_type=%s variant=%s",
+        get_name_safe(roles.get("shooter")) if roles.get("shooter") else "NONE",
+        roles.get("shooter_pos"),
+        isinstance(roles.get("shot_spot"), dict),
+        roles.get("shot_spot"),
+        roles.get("intended_shooter_pos"),
+        game_state.get("offense_play_type"),
+        skeleton.get("_variant") if skeleton else None,
+    )
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
