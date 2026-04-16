@@ -686,24 +686,6 @@ def resolve_offensive_rebound(game, rebounder):
         foul_player = None
         made = False
         contested = bool(has_shot_defender and defender is not None)
-        logging.warning(
-            "🎯 [SHOT_COORD_DEBUG] turn_type=%s shot_type=oreb_putback shooter_xy=(%.1f,%.1f) shooter_coord_source=rebounder.coords has_contest=%s roles_defender=%s roles_defender_xy=(%.1f,%.1f) roles_second_defender=%s roles_second_defender_xy=(%.1f,%.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f all_defenders=%s",
-            game.game_state.get("offensive_state"),
-            shooter_x,
-            shooter_y,
-            contested,
-            get_name_safe(defender) if defender else "NONE",
-            float(defender_coords.get("x", 50)) if defender else -1.0,
-            float(defender_coords.get("y", 25)) if defender else -1.0,
-            "NONE",
-            -1.0,
-            -1.0,
-            get_name_safe(nearest_defender) if nearest_defender else "NONE",
-            float(nearest_distance) if nearest_distance is not None else -1.0,
-            float(nearest_dx) if nearest_dx is not None else -1.0,
-            float(nearest_dy) if nearest_dy is not None else -1.0,
-            "; ".join(all_defenders),
-        )
 
         if contested:
             from BackEnd.models.shot_manager import ShotManager
@@ -730,41 +712,10 @@ def resolve_offensive_rebound(game, rebounder):
 
         if not contested:
             game.game_state["no_defender_shots"] = int(game.game_state.get("no_defender_shots", 0) or 0) + 1
-            breakdown_key, breakdown_count = increment_no_defender_shot_breakdown(
+            increment_no_defender_shot_breakdown(
                 game.game_state,
                 game.game_state.get("offensive_state"),
                 "oreb_putback",
-            )
-            logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=oreb_putback current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s breakdown_key=%s breakdown_count=%s",
-                game.game_state.get("offensive_state"),
-                shooter_x,
-                shooter_y,
-                get_name_safe(nearest_defender) if nearest_defender else "NONE",
-                float(nearest_distance) if nearest_distance is not None else -1.0,
-                float(nearest_dx) if nearest_dx is not None else -1.0,
-                float(nearest_dy) if nearest_dy is not None else -1.0,
-                getattr(game, "game_id", None),
-                game.game_state["no_defender_shots"],
-                breakdown_key,
-                breakdown_count,
-            )
-            logging.error(
-                "🟠🟠🟠🟠🟠 [NO_DEFENDER_SHOT] 🟠🟠🟠🟠🟠 turn_type=%s shot_type=oreb_putback "
-                "shooter=%s shooter_xy=(%.1f,%.1f) shooter_coord_source=rebounder.coords "
-                "assigned_defender_count=0 contest_box_defender_count=0 nearest_defender=%s "
-                "nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s "
-                "🟠🟠🟠🟠🟠",
-                game.game_state.get("offensive_state"),
-                get_name_safe(rebounder),
-                shooter_x,
-                shooter_y,
-                get_name_safe(nearest_defender) if nearest_defender else "NONE",
-                float(nearest_distance) if nearest_distance is not None else -1.0,
-                float(nearest_dx) if nearest_dx is not None else -1.0,
-                float(nearest_dy) if nearest_dy is not None else -1.0,
-                getattr(game, "game_id", None),
-                game.game_state["no_defender_shots"],
             )
         rebounder.record_stat("FGA")
 

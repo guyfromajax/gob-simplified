@@ -50,7 +50,6 @@ try:
         summarize_game_state,
         format_height,
         format_player_display_name,
-        format_no_defender_shot_breakdown,
         deserialize_computer_timeouts,
         sanitize_turn_animation_payload,
     )
@@ -3828,15 +3827,6 @@ try:
             quarter_saving = db_summary.get('quarter', 'N/A')
             is_final_saving = db_summary.get('is_final', False)
             logging.info(f"💾 [SAVE] About to save game document: game_id={game_id} (ObjectId: {game_id_oid}), quarter={quarter_saving}, is_final={is_final_saving}, mode={mode}")
-            logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS PRE_SAVE] game_id=%s gm_value=%s db_summary_value=%s quarter=%s is_final=%s breakdown=%s",
-                game_id,
-                int(gm.game_state.get("no_defender_shots", 0) or 0),
-                int(db_summary.get("no_defender_shots", 0) or 0),
-                quarter_saving,
-                is_final_saving,
-                format_no_defender_shot_breakdown(db_summary.get("no_defender_shots_breakdown", {})),
-            )
             if quarter_saving == 4 or is_final_saving:
                 logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
             

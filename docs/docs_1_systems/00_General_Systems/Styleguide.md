@@ -96,6 +96,25 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Background atmosphere may shift with team-color mode.
 - Core data surfaces should remain neutral and readable across many possible team colors.
 
+## Page Background System
+
+### Core Brand Background
+- The FCC background is the core brand page design for Geeked-Out Basketball.
+- It should be used as the default shell treatment for command-center pages and major destination pages that should feel part of the same product space.
+
+### Composition
+- Base page atmosphere should use a vertical blue gradient anchored to `#27408E`, with a slightly lighter top and a deeper blue lower range.
+- The primary page shell should sit inside a large rounded container rather than relying on a flat full-bleed page.
+- That shell should use layered diagonal banding to create directional motion across the page.
+- The shell should also use a faint repeating ellipse / circular texture layer to reinforce the brand’s technical sports-sim feel.
+- Texture and banding should remain subtle enough that text and data surfaces stay easy to read.
+
+### Structural Rules
+- The shell should use a soft white border, large corner radius, and restrained shadow to separate it from the page background.
+- Foreground content must sit above the background layers at all times.
+- Background design should feel architectural and systemic, not decorative.
+- Core content surfaces inside the shell should remain neutral dark panels rather than inheriting the full blue atmospheric treatment.
+
 ## Theme Behavior
 
 ### Default Mode

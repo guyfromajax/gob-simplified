@@ -88,47 +88,9 @@ def _animation_transition_basket_xy(team, game):
     return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
 
 
-def _nearest_defender_debug_info(sx, sy, def_lineup):
-    nearest = None
-    nearest_distance = None
-    nearest_dx = None
-    nearest_dy = None
-    for p in (def_lineup or {}).values():
-        if p is None:
-            continue
-        c = getattr(p, "coords", None) or {}
-        px = float(c.get("x", 50))
-        py = float(c.get("y", 25))
-        dx = abs(px - sx)
-        dy = abs(py - sy)
-        distance = ((px - sx) ** 2 + (py - sy) ** 2) ** 0.5
-        if nearest_distance is None or distance < nearest_distance:
-            nearest = p
-            nearest_distance = distance
-            nearest_dx = dx
-            nearest_dy = dy
-    return {
-        "player": nearest,
-        "distance": nearest_distance,
-        "dx": nearest_dx,
-        "dy": nearest_dy,
-    }
-
-
 def _player_xy(player):
     c = getattr(player, "coords", None) or {}
     return float(c.get("x", 50)), float(c.get("y", 25))
-
-def _all_defender_coords_debug(def_lineup):
-    coords = []
-    for pos, player in (def_lineup or {}).items():
-        if player is None:
-            continue
-        c = getattr(player, "coords", None) or {}
-        coords.append(
-            f"{pos}:{get_name_safe(player)}=({float(c.get('x', 50)):.1f},{float(c.get('y', 25)):.1f})"
-        )
-    return coords
 
 
 def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
@@ -592,29 +554,6 @@ class ShotManager:
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
-        nearest_defender_info = _nearest_defender_debug_info(sx, sy, def_lineup)
-        nearest_defender = nearest_defender_info["player"]
-        logging.warning(
-            "🎯 [SHOT_COORD_DEBUG] turn_type=%s shot_type=%s shooter_xy=(%.1f,%.1f) shooter_coord_source=%s has_contest=%s roles_defender=%s roles_defender_xy=(%.1f,%.1f) roles_second_defender=%s roles_second_defender_xy=(%.1f,%.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f all_defenders=%s",
-            "FAST_BREAK" if roles.get("is_fast_break") else game_state.get("offensive_state"),
-            shot_type,
-            sx,
-            sy,
-            "shot_spot" if isinstance(roles.get("shot_spot"), dict) else "shooter.coords",
-            has_contest,
-            get_name_safe(defender) if defender else "NONE",
-            _player_xy(defender)[0] if defender else -1.0,
-            _player_xy(defender)[1] if defender else -1.0,
-            get_name_safe(second_defender) if second_defender else "NONE",
-            _player_xy(second_defender)[0] if second_defender else -1.0,
-            _player_xy(second_defender)[1] if second_defender else -1.0,
-            get_name_safe(nearest_defender) if nearest_defender else "NONE",
-            float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
-            float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
-            float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
-            "; ".join(_all_defender_coords_debug(def_lineup)),
-        )
-        
         charge_result = None
         defense_applied_defenders = []
 
@@ -993,46 +932,11 @@ class ShotManager:
         # Stat tracking (attempts)
         if not defense_applied_defenders:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
-            breakdown_key, breakdown_count = increment_no_defender_shot_breakdown(
+            increment_no_defender_shot_breakdown(
                 self.game_state,
                 self.game_state.get("offensive_state"),
                 shot_type,
             )
-            logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=%s current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s breakdown_key=%s breakdown_count=%s",
-                shot_type,
-                self.game_state.get("offensive_state"),
-                sx,
-                sy,
-                get_name_safe(nearest_defender) if nearest_defender else "NONE",
-                float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
-                float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
-                float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
-                getattr(self.game, "game_id", None),
-                self.game_state["no_defender_shots"],
-                breakdown_key,
-                breakdown_count,
-            )
-            if not defender and not second_defender:
-                logging.error(
-                    "🟠🟠🟠🟠🟠 [NO_DEFENDER_SHOT] 🟠🟠🟠🟠🟠 turn_type=%s shot_type=%s "
-                    "shooter=%s shooter_pos=%s shooter_xy=(%.1f,%.1f) shooter_coord_source=%s "
-                    "assigned_defender_count=0 nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f "
-                    "game_id=%s no_defender_shots=%s 🟠🟠🟠🟠🟠",
-                    "FAST_BREAK" if roles.get("is_fast_break") else self.game_state.get("offensive_state"),
-                    shot_type,
-                    get_name_safe(shooter),
-                    shooter_pos,
-                    sx,
-                    sy,
-                    "shot_spot" if isinstance(roles.get("shot_spot"), dict) else "shooter.coords",
-                    get_name_safe(nearest_defender) if nearest_defender else "NONE",
-                    float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
-                    float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
-                    float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
-                    getattr(self.game, "game_id", None),
-                    self.game_state["no_defender_shots"],
-                )
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
@@ -2398,18 +2302,10 @@ class ShotManager:
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
         if not defender:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
-            breakdown_key, breakdown_count = increment_no_defender_shot_breakdown(
+            increment_no_defender_shot_breakdown(
                 self.game_state,
                 self.game_state.get("offensive_state"),
                 "fast_break",
-            )
-            logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=fast_break current_turn=%s game_id=%s no_defender_shots=%s breakdown_key=%s breakdown_count=%s",
-                self.game_state.get("offensive_state"),
-                getattr(self.game, "game_id", None),
-                self.game_state["no_defender_shots"],
-                breakdown_key,
-                breakdown_count,
             )
         shooter.record_stat("FGA")
 
