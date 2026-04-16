@@ -638,14 +638,17 @@ def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_s
             away_id = str(result.get("away_id") or "")
             home_id = str(result.get("home_id") or "")
             if user_team_id_str in {away_id, home_id}:
-                game_doc = db.games.find_one({
+                game_docs = list(db.games.find({
                     "week": week,
                     "franchise_id": str(franchise_doc.get("_id")),
                     "$or": [
                         {"team1_id": away_id, "team2_id": home_id},
                         {"team1_id": home_id, "team2_id": away_id},
                     ],
-                })
+                }))
+                game_doc = None
+                if game_docs:
+                    game_doc = max(game_docs, key=_game_doc_richness_score)
                 return {
                     "week": week,
                     "away_team_id": away_id,

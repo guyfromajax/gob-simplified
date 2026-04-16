@@ -4393,11 +4393,17 @@ class TurnManager:
 
         return {
             "shooter": shooter,
+            "shooter_pos": shooter_pos,
             "screener": screener,
+            "screener_pos": screener_pos,
             "ball_handler": shooter,
+            "ball_handler_pos": shooter_pos,
             "passer": passer,
+            "passer_pos": passer_pos,
             "defender": defender,
+            "defender_pos": defender_pos,
             "second_defender": second_defender,  # Second defender if shooter has two defenders in zone
+            "second_defender_pos": second_defender_pos,
             "steps": steps,
             "skeleton": skeleton,  # Include skeleton for variant info
             "action_timeline": action_timeline,
