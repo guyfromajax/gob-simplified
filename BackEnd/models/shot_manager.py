@@ -87,19 +87,6 @@ def _animation_transition_basket_xy(team, game):
     return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
 
 
-def _defender_in_contest_range(sx, sy, def_lineup):
-    """True if any defensive lineup player lies within the contest bounding box around the shooter."""
-    for p in (def_lineup or {}).values():
-        if p is None:
-            continue
-        c = getattr(p, "coords", None) or {}
-        dx = abs(float(c.get("x", 50)) - sx)
-        dy = abs(float(c.get("y", 25)) - sy)
-        if dx <= CONTEST_DEFENDER_DX_MAX and dy <= CONTEST_DEFENDER_DY_MAX:
-            return True
-    return False
-
-
 def _nearest_defender_debug_info(sx, sy, def_lineup):
     nearest = None
     nearest_distance = None
@@ -127,6 +114,11 @@ def _nearest_defender_debug_info(sx, sy, def_lineup):
     }
 
 
+def _player_xy(player):
+    c = getattr(player, "coords", None) or {}
+    return float(c.get("x", 50)), float(c.get("y", 25))
+
+
 def _all_defender_coords_debug(def_lineup):
     coords = []
     for pos, player in (def_lineup or {}).items():
@@ -141,6 +133,115 @@ def _all_defender_coords_debug(def_lineup):
 
 def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
+
+
+def _build_shot_state_snapshot(game, roles, shooter, defender, second_defender, off_lineup, def_lineup, shot_type):
+    sx, sy = _shooter_xy_from_roles(roles, shooter)
+    shot_spot = roles.get("shot_spot") if isinstance(roles.get("shot_spot"), dict) else None
+    nearest_defender = _nearest_defender_debug_info(sx, sy, def_lineup)
+    defenders_in_contest_box = []
+    for pos, player in (def_lineup or {}).items():
+        if player is None:
+            continue
+        px, py = _player_xy(player)
+        dx = abs(px - sx)
+        dy = abs(py - sy)
+        if dx <= CONTEST_DEFENDER_DX_MAX and dy <= CONTEST_DEFENDER_DY_MAX:
+            defenders_in_contest_box.append(
+                {
+                    "pos": pos,
+                    "player_id": getattr(player, "player_id", None),
+                    "name": get_name_safe(player),
+                    "x": px,
+                    "y": py,
+                    "dx": dx,
+                    "dy": dy,
+                }
+            )
+
+    defender_x, defender_y = _player_xy(defender) if defender else (-1.0, -1.0)
+    second_defender_x, second_defender_y = _player_xy(second_defender) if second_defender else (-1.0, -1.0)
+
+    return {
+        "turn_type": "FAST_BREAK" if roles.get("is_fast_break") else game.game_state.get("offensive_state"),
+        "shot_type": shot_type,
+        "shooter": {
+            "player_id": getattr(shooter, "player_id", None),
+            "name": get_name_safe(shooter),
+            "pos": get_player_position(off_lineup, shooter),
+            "x": sx,
+            "y": sy,
+            "coord_source": "shot_spot" if shot_spot else "shooter.coords",
+        },
+        "shot_spot": {
+            "present": bool(shot_spot),
+            "x": float(shot_spot.get("x")) if shot_spot else None,
+            "y": float(shot_spot.get("y")) if shot_spot else None,
+        },
+        "primary_defender": {
+            "player_id": getattr(defender, "player_id", None) if defender else None,
+            "name": get_name_safe(defender) if defender else "NONE",
+            "pos": get_player_position(def_lineup, defender) if defender else None,
+            "x": defender_x,
+            "y": defender_y,
+        },
+        "secondary_defender": {
+            "player_id": getattr(second_defender, "player_id", None) if second_defender else None,
+            "name": get_name_safe(second_defender) if second_defender else "NONE",
+            "pos": get_player_position(def_lineup, second_defender) if second_defender else None,
+            "x": second_defender_x,
+            "y": second_defender_y,
+        },
+        "nearest_defender": {
+            "player_id": getattr(nearest_defender["player"], "player_id", None)
+            if nearest_defender["player"]
+            else None,
+            "name": get_name_safe(nearest_defender["player"])
+            if nearest_defender["player"]
+            else "NONE",
+            "pos": get_player_position(def_lineup, nearest_defender["player"])
+            if nearest_defender["player"]
+            else None,
+            "distance": float(nearest_defender["distance"])
+            if nearest_defender["distance"] is not None
+            else None,
+            "dx": float(nearest_defender["dx"]) if nearest_defender["dx"] is not None else None,
+            "dy": float(nearest_defender["dy"]) if nearest_defender["dy"] is not None else None,
+        },
+        "assigned_defender_count": int((1 if defender else 0) + (1 if second_defender else 0)),
+        "contest_box_defender_count": len(defenders_in_contest_box),
+        "contest_box_defenders": defenders_in_contest_box,
+        "has_assigned_defender": bool(defender or second_defender),
+        "has_contest_box_defender": bool(defenders_in_contest_box),
+        "all_defenders": _all_defender_coords_debug(def_lineup),
+    }
+
+
+def _emit_loud_no_defender_shot_log(snapshot, game_id, no_defender_shots=None):
+    shooter = snapshot.get("shooter", {})
+    nearest = snapshot.get("nearest_defender", {})
+    logging.error(
+        "🟠🟠🟠🟠🟠 [NO_DEFENDER_SHOT] 🟠🟠🟠🟠🟠 turn_type=%s shot_type=%s "
+        "shooter=%s shooter_pos=%s shooter_xy=(%.1f,%.1f) shooter_coord_source=%s "
+        "assigned_defender_count=%s contest_box_defender_count=%s "
+        "nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f "
+        "game_id=%s no_defender_shots=%s 🟠🟠🟠🟠🟠",
+        snapshot.get("turn_type"),
+        snapshot.get("shot_type"),
+        shooter.get("name"),
+        shooter.get("pos"),
+        float(shooter.get("x", -1.0)),
+        float(shooter.get("y", -1.0)),
+        shooter.get("coord_source"),
+        snapshot.get("assigned_defender_count"),
+        snapshot.get("contest_box_defender_count"),
+        nearest.get("name", "NONE"),
+        float(nearest.get("distance")) if nearest.get("distance") is not None else -1.0,
+        float(nearest.get("dx")) if nearest.get("dx") is not None else -1.0,
+        float(nearest.get("dy")) if nearest.get("dy") is not None else -1.0,
+        game_id,
+        no_defender_shots,
+    )
 
 
 class ShotManager:
@@ -533,9 +634,22 @@ class ShotManager:
         if game_state.pop("shot_at_one_second", False):
             shot_threshold += 100
 
-        sx, sy = _shooter_xy_from_roles(roles, shooter)
+        shot_state_snapshot = _build_shot_state_snapshot(
+            self.game,
+            roles,
+            shooter,
+            defender,
+            second_defender,
+            off_lineup,
+            def_lineup,
+            shot_type,
+        )
+        roles["shot_state_snapshot"] = shot_state_snapshot
+
+        sx = float(shot_state_snapshot["shooter"]["x"])
+        sy = float(shot_state_snapshot["shooter"]["y"])
         bx, by = _attacking_basket_xy(off_team, self.game)
-        has_contest = _defender_in_contest_range(sx, sy, def_lineup)
+        has_contest = bool(shot_state_snapshot["has_contest_box_defender"])
         rim_unguarded_99 = (
             _shot_in_rim_box(sx, sy, bx, by)
             and not has_contest
@@ -546,30 +660,26 @@ class ShotManager:
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
-        nearest_defender_info = _nearest_defender_debug_info(sx, sy, def_lineup)
-        shooter_coord_source = "shot_spot" if isinstance(roles.get("shot_spot"), dict) else "shooter.coords"
-
-        defender_coords = getattr(defender, "coords", None) or {}
-        second_defender_coords = getattr(second_defender, "coords", None) or {}
+        nearest_defender_info = shot_state_snapshot["nearest_defender"]
         logging.warning(
             "🎯 [SHOT_COORD_DEBUG] turn_type=%s shot_type=%s shooter_xy=(%.1f,%.1f) shooter_coord_source=%s has_contest=%s roles_defender=%s roles_defender_xy=(%.1f,%.1f) roles_second_defender=%s roles_second_defender_xy=(%.1f,%.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f all_defenders=%s",
-            "FAST_BREAK" if roles.get("is_fast_break") else self.game_state.get("offensive_state"),
-            shot_type,
+            shot_state_snapshot["turn_type"],
+            shot_state_snapshot["shot_type"],
             sx,
             sy,
-            shooter_coord_source,
+            shot_state_snapshot["shooter"]["coord_source"],
             has_contest,
-            get_name_safe(defender) if defender else "NONE",
-            float(defender_coords.get("x", 50)) if defender else -1.0,
-            float(defender_coords.get("y", 25)) if defender else -1.0,
-            get_name_safe(second_defender) if second_defender else "NONE",
-            float(second_defender_coords.get("x", 50)) if second_defender else -1.0,
-            float(second_defender_coords.get("y", 25)) if second_defender else -1.0,
-            get_name_safe(nearest_defender_info["player"]) if nearest_defender_info["player"] else "NONE",
+            shot_state_snapshot["primary_defender"]["name"],
+            float(shot_state_snapshot["primary_defender"]["x"]),
+            float(shot_state_snapshot["primary_defender"]["y"]),
+            shot_state_snapshot["secondary_defender"]["name"],
+            float(shot_state_snapshot["secondary_defender"]["x"]),
+            float(shot_state_snapshot["secondary_defender"]["y"]),
+            nearest_defender_info["name"],
             float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
             float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
             float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
-            "; ".join(_all_defender_coords_debug(def_lineup)),
+            "; ".join(shot_state_snapshot["all_defenders"]),
         )
         
         charge_result = None
@@ -720,6 +830,7 @@ class ShotManager:
                                 "next_play_type": "FREE_THROW",
                                 "shooter": shooter,
                             }
+                        result["shot_state_snapshot"] = shot_state_snapshot
                         return result
                     elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
                         # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
@@ -792,6 +903,7 @@ class ShotManager:
                         "resolution_step_index": timing_contract["resolution_step_index"],
                         "executed_step_count": timing_contract["executed_step_count"],
                     }
+                    result["shot_state_snapshot"] = shot_state_snapshot
                     return result
 
                 # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)
@@ -895,6 +1007,7 @@ class ShotManager:
                                 "team": blocking_foul_out_info["foul_player_team"],
                             }
                             result["foul_count"] = blocking_foul_out_info["foul_count"]
+                        result["shot_state_snapshot"] = shot_state_snapshot
                         return result
 
             made = shot_score >= shot_threshold
@@ -956,13 +1069,19 @@ class ShotManager:
                 self.game_state.get("offensive_state"),
                 sx,
                 sy,
-                get_name_safe(nearest_defender_info["player"]) if nearest_defender_info["player"] else "NONE",
+                nearest_defender_info["name"],
                 float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
                 float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
                 float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
                 getattr(self.game, "game_id", None),
                 self.game_state["no_defender_shots"],
             )
+            if not shot_state_snapshot["has_assigned_defender"]:
+                _emit_loud_no_defender_shot_log(
+                    shot_state_snapshot,
+                    getattr(self.game, "game_id", None),
+                    self.game_state["no_defender_shots"],
+                )
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
@@ -1934,6 +2053,7 @@ class ShotManager:
                     next_play_type,
                 )
 
+        result["shot_state_snapshot"] = shot_state_snapshot
         return result
 
     

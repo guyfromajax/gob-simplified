@@ -747,6 +747,23 @@ def resolve_offensive_rebound(game, rebounder):
                 getattr(game, "game_id", None),
                 game.game_state["no_defender_shots"],
             )
+            logging.error(
+                "🟠🟠🟠🟠🟠 [NO_DEFENDER_SHOT] 🟠🟠🟠🟠🟠 turn_type=%s shot_type=oreb_putback "
+                "shooter=%s shooter_xy=(%.1f,%.1f) shooter_coord_source=rebounder.coords "
+                "assigned_defender_count=0 contest_box_defender_count=0 nearest_defender=%s "
+                "nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s "
+                "🟠🟠🟠🟠🟠",
+                game.game_state.get("offensive_state"),
+                get_name_safe(rebounder),
+                shooter_x,
+                shooter_y,
+                get_name_safe(nearest_defender) if nearest_defender else "NONE",
+                float(nearest_distance) if nearest_distance is not None else -1.0,
+                float(nearest_dx) if nearest_dx is not None else -1.0,
+                float(nearest_dy) if nearest_dy is not None else -1.0,
+                getattr(game, "game_id", None),
+                game.game_state["no_defender_shots"],
+            )
         rebounder.record_stat("FGA")
 
         event = {
