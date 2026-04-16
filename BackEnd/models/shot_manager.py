@@ -1004,7 +1004,7 @@ class ShotManager:
                 self.game_state.get("offensive_state"),
                 sx,
                 sy,
-                nearest_defender_info["name"],
+                get_name_safe(nearest_defender) if nearest_defender else "NONE",
                 float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
                 float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
                 float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
