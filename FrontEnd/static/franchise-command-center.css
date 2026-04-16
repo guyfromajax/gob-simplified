@@ -128,12 +128,12 @@ body {
 
 #franchise-container .fcc-meta-row {
   margin-top: 8px;
-  width: min(92%, 280px);
-  min-width: 220px;
+  width: min(100%, 520px);
+  min-width: 420px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  column-gap: 36px;
+  column-gap: 44px;
 }
 
 #franchise-container .fcc-meta-row .fcc-season-label {
@@ -146,8 +146,13 @@ body {
 }
 
 #franchise-container .fcc-record-label {
-  justify-self: end;
-  text-align: right;
+  justify-self: center;
+  text-align: center;
+}
+
+#franchise-container .fcc-rank-label {
+  justify-self: start;
+  text-align: left;
 }
 
 #franchise-container #top-center {
@@ -1568,7 +1573,112 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+#franchise-container .fcc-team-measures-wrap .team-section {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 28px rgba(0, 0, 0, 0.12);
+}
+
+#franchise-container .training-report-styled .team-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+#franchise-container .training-report-styled .team-attr-item {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+#franchise-container .training-report-styled .attr-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+#franchise-container .training-report-styled .attr-pill {
+  position: relative;
+  width: 100%;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#franchise-container .training-report-styled .pill-center-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ffcd26;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+#franchise-container .training-report-styled .pill-fill-positive,
+#franchise-container .training-report-styled .pill-fill-negative {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+#franchise-container .training-report-styled .pill-fill-positive {
+  left: 50%;
+  background: #34ec27;
+}
+
+#franchise-container .training-report-styled .pill-fill-negative {
+  right: 50%;
+  background: #ff6d6d;
+}
+
+#franchise-container .training-report-styled .chemistry-bar-container {
+  position: relative;
+  width: 100%;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#franchise-container .training-report-styled .chemistry-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(247, 148, 32, 0.35) 0%, rgba(247, 148, 32, 0.72) 60%, #f79420 100%);
+}
+
 #franchise-container .training-report-styled .chemistry-bar-text {
   color: #ffffff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+#franchise-container .training-report-styled .plus-minus-indicator {
+  font-family: 'Inter', sans-serif;
+  font-size: 26px;
+  line-height: 1;
+}
+
+#franchise-container .training-report-styled .plus-minus-positive {
+  color: #34ec27;
+}
+
+#franchise-container .training-report-styled .plus-minus-negative {
+  color: #ff6d6d;
+}
+
+#franchise-container .training-report-styled .plus-minus-zero {
+  color: #ffcd26;
 }

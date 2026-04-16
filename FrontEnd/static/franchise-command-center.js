@@ -164,10 +164,14 @@ function populateTop(data) {
   const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
   const seasonLabelEl = document.getElementById('fcc-season-label');
+  const rankLabelEl = document.getElementById('fcc-rank-label');
   if (seasonLabelEl) {
     const seasonNumber = Number(data.current_season || 1);
     const weekNumber = Number(data.week || 1);
     seasonLabelEl.textContent = `Season ${seasonNumber} / Week ${weekNumber}`;
+  }
+  if (rankLabelEl) {
+    rankLabelEl.textContent = `National Rank: ${data.rank || '--'}`;
   }
   updateTopRecordLabel();
   console.log('Team logo URL:', logoSrc);
@@ -2724,6 +2728,9 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
         }
+        if (tabName === 'team-stats-tab') {
+          renderTeamReport();
+        }
       }
     });
   }
@@ -2736,13 +2743,13 @@ const TEAM_ATTR_NAMES = {
   'offensive_efficiency': 'Offense',
   'defensive_efficiency': 'Defense',
   'fb_efficiency': 'Fast Breaks',
-  'pt_efficiency': 'Press/Trap',
+  'pt_efficiency': 'Press/Traps',
   'fight': 'Fight',
   'discipline': 'Discipline',
   'momentum_score': 'Momentum',
   'team_chemistry': 'Team Chemistry',
   'fb_opp_modifier': 'Fast Break Defense',
-  'pt_opp_modifier': 'Press/Trap Breaks'
+  'pt_opp_modifier': 'P/T Offense'
 };
 
 let teamData = null;
@@ -2806,11 +2813,10 @@ async function loadTeamData() {
     // Log all team attribute values on page load
     console.log('📊 [TEAM ATTRIBUTES] All team attribute values:', teamData.team_attributes);
     
-    // Render if Team tab is active
-    const teamTab = document.getElementById('team-tab');
-    if (teamTab && teamTab.classList.contains('active')) {
+    // Render if Team Measures tab is active
+    const teamMeasuresTab = document.getElementById('team-stats-tab');
+    if (teamMeasuresTab && teamMeasuresTab.classList.contains('active')) {
       renderTeamReport();
-      renderPlaybookSummary();
     }
     void renderHomeTab();
     
