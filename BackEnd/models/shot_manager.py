@@ -886,6 +886,13 @@ class ShotManager:
         # Stat tracking (attempts)
         if not defense_applied_defenders:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
+            logging.warning(
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=%s current_turn=%s game_id=%s no_defender_shots=%s",
+                shot_type,
+                self.game_state.get("offensive_state"),
+                getattr(self.game, "game_id", None),
+                self.game_state["no_defender_shots"],
+            )
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
@@ -2251,6 +2258,12 @@ class ShotManager:
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
         if not defender:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
+            logging.warning(
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=fast_break current_turn=%s game_id=%s no_defender_shots=%s",
+                self.game_state.get("offensive_state"),
+                getattr(self.game, "game_id", None),
+                self.game_state["no_defender_shots"],
+            )
         shooter.record_stat("FGA")
 
         if made:

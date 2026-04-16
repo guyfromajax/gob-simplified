@@ -693,6 +693,12 @@ def resolve_offensive_rebound(game, rebounder):
 
         if not contested:
             game.game_state["no_defender_shots"] = int(game.game_state.get("no_defender_shots", 0) or 0) + 1
+            logging.warning(
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=oreb_putback current_turn=%s game_id=%s no_defender_shots=%s",
+                game.game_state.get("offensive_state"),
+                getattr(game, "game_id", None),
+                game.game_state["no_defender_shots"],
+            )
         rebounder.record_stat("FGA")
 
         event = {
@@ -1902,6 +1908,7 @@ def summarize_game_state(game, exclude_animations=True):
         "home_crowd_home_shot_threshold_delta": game.game_state.get("home_crowd_home_shot_threshold_delta"),
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         "user_team_side": game.game_state.get("user_team_side"),  # ✅ SS&S: Save user_team_side for persistent override checking
+        "no_defender_shots": int(game.game_state.get("no_defender_shots", 0) or 0),
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
