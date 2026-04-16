@@ -692,10 +692,37 @@ def resolve_offensive_rebound(game, rebounder):
             made = random.randint(1, 100) < 100
 
         if not contested:
+            nearest_defender = None
+            nearest_distance = None
+            nearest_dx = None
+            nearest_dy = None
+            shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
+            shooter_x = float(shooter_coords.get("x", 50))
+            shooter_y = float(shooter_coords.get("y", 25))
+            for candidate in (def_lineup or {}).values():
+                if candidate is None:
+                    continue
+                candidate_coords = getattr(candidate, "coords", None) or {"x": 50, "y": 25}
+                candidate_x = float(candidate_coords.get("x", 50))
+                candidate_y = float(candidate_coords.get("y", 25))
+                dx = abs(candidate_x - shooter_x)
+                dy = abs(candidate_y - shooter_y)
+                distance = ((candidate_x - shooter_x) ** 2 + (candidate_y - shooter_y) ** 2) ** 0.5
+                if nearest_distance is None or distance < nearest_distance:
+                    nearest_defender = candidate
+                    nearest_distance = distance
+                    nearest_dx = dx
+                    nearest_dy = dy
             game.game_state["no_defender_shots"] = int(game.game_state.get("no_defender_shots", 0) or 0) + 1
             logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=oreb_putback current_turn=%s game_id=%s no_defender_shots=%s",
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=oreb_putback current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s",
                 game.game_state.get("offensive_state"),
+                shooter_x,
+                shooter_y,
+                get_name_safe(nearest_defender) if nearest_defender else "NONE",
+                float(nearest_distance) if nearest_distance is not None else -1.0,
+                float(nearest_dx) if nearest_dx is not None else -1.0,
+                float(nearest_dy) if nearest_dy is not None else -1.0,
                 getattr(game, "game_id", None),
                 game.game_state["no_defender_shots"],
             )

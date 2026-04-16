@@ -100,6 +100,33 @@ def _defender_in_contest_range(sx, sy, def_lineup):
     return False
 
 
+def _nearest_defender_debug_info(sx, sy, def_lineup):
+    nearest = None
+    nearest_distance = None
+    nearest_dx = None
+    nearest_dy = None
+    for p in (def_lineup or {}).values():
+        if p is None:
+            continue
+        c = getattr(p, "coords", None) or {}
+        px = float(c.get("x", 50))
+        py = float(c.get("y", 25))
+        dx = abs(px - sx)
+        dy = abs(py - sy)
+        distance = ((px - sx) ** 2 + (py - sy) ** 2) ** 0.5
+        if nearest_distance is None or distance < nearest_distance:
+            nearest = p
+            nearest_distance = distance
+            nearest_dx = dx
+            nearest_dy = dy
+    return {
+        "player": nearest,
+        "distance": nearest_distance,
+        "dx": nearest_dx,
+        "dy": nearest_dy,
+    }
+
+
 def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
 
@@ -507,6 +534,7 @@ class ShotManager:
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
+        nearest_defender_info = _nearest_defender_debug_info(sx, sy, def_lineup)
         
         charge_result = None
         defense_applied_defenders = []
@@ -887,9 +915,15 @@ class ShotManager:
         if not defense_applied_defenders:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
             logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=%s current_turn=%s game_id=%s no_defender_shots=%s",
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=%s current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s",
                 shot_type,
                 self.game_state.get("offensive_state"),
+                sx,
+                sy,
+                get_name_safe(nearest_defender_info["player"]) if nearest_defender_info["player"] else "NONE",
+                float(nearest_defender_info["distance"]) if nearest_defender_info["distance"] is not None else -1.0,
+                float(nearest_defender_info["dx"]) if nearest_defender_info["dx"] is not None else -1.0,
+                float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
                 getattr(self.game, "game_id", None),
                 self.game_state["no_defender_shots"],
             )
