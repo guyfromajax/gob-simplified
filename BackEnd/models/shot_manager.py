@@ -51,8 +51,8 @@ from BackEnd.constants.fast_break_play_types import (
 )
 
 # Location-based contest / rim shortcuts (see Shot_System.md)
-CONTEST_DEFENDER_DX_MAX = 6
-CONTEST_DEFENDER_DY_MAX = 4
+CONTEST_DEFENDER_DX_MAX = 8
+CONTEST_DEFENDER_DY_MAX = 8
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
 
 
