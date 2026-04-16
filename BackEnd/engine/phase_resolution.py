@@ -1694,10 +1694,17 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Capture Fast Break animation first so fb_roles gets _bh_final_x/y (shot spot); set shooter coords for block reconciliation
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, hold_up, stopper_id)
+        apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             shooter.coords = shot_spot
             roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
+        roles["pre_shot_frame_meta"] = {
+            "frame_source": "fast_break_animation_sync",
+            "frame_sync_applied": True,
+            "animation_count": len(fb_animations or []),
+            "frame_note": "fb_logic_pre_resolve_shot",
+        }
 
         snap_roles = {**roles, "ball_handler": fb_roles.get("ball_handler")}
         fb_snap = build_fast_break_pre_shot_snapshot(
@@ -5023,6 +5030,12 @@ def resolve_half_court_offense_logic(game):
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
     apply_coords_from_animations_list(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
+    roles["pre_shot_frame_meta"] = {
+        "frame_source": "skeleton_animation_sync",
+        "frame_sync_applied": True,
+        "animation_count": len(animations or []),
+        "frame_note": "hco_pre_resolve_shot",
+    }
     logging.warning(
         "🧭 [HCO_PRE_SHOT_TRACE] shooter=%s shooter_pos=%s shot_spot_present=%s shot_spot=%s intended_shooter_pos=%s play_type=%s variant=%s",
         get_name_safe(roles.get("shooter")) if roles.get("shooter") else "NONE",
@@ -5609,6 +5622,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        shot_roles["pre_shot_frame_meta"] = {
+            "frame_source": "skeleton_animation_sync",
+            "frame_sync_applied": True,
+            "animation_count": len(animations or []),
+            "frame_note": "fcp_pre_resolve_shot",
+        }
         fcp_snap = build_skeleton_pre_resolve_shot_snapshot(
             game, off_lineup, def_lineup, skeleton, shot_roles, "FCP", "fcp_pre_resolve_shot"
         )
@@ -6837,6 +6856,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
         set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        shot_roles["pre_shot_frame_meta"] = {
+            "frame_source": "skeleton_animation_sync",
+            "frame_sync_applied": True,
+            "animation_count": len(animations or []),
+            "frame_note": "hct_pre_resolve_shot",
+        }
         hct_snap = build_skeleton_pre_resolve_shot_snapshot(
             game, off_lineup, def_lineup, skeleton, shot_roles, "HCT", "hct_pre_resolve_shot"
         )
