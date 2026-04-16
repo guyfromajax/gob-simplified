@@ -1141,13 +1141,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             rr.coords = shot_spot
             roles["shot_spot"] = shot_spot
-        roles["pre_shot_frame_meta"] = {
-            "frame_source": "fast_break_animation_sync",
-            "frame_sync_applied": True,
-            "animation_count": len(fb_animations or []),
-            "frame_note": "fb_rr_pre_resolve_shot",
-        }
-
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1201,12 +1194,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         if fb_roles.get("_bh_final_x") is not None:
             rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             roles["shot_spot"] = rr.coords
-        roles["pre_shot_frame_meta"] = {
-            "frame_source": "fast_break_animation_sync",
-            "frame_sync_applied": True,
-            "animation_count": len(fb_animations or []),
-            "frame_note": "fb_rr_pre_resolve_shot",
-        }
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1338,12 +1325,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     if fb_roles.get("_bh_final_x") is not None:
         rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         roles["shot_spot"] = rr.coords
-    roles["pre_shot_frame_meta"] = {
-        "frame_source": "fast_break_animation_sync",
-        "frame_sync_applied": True,
-        "animation_count": len(fb_animations or []),
-        "frame_note": "fb_rr_pre_resolve_shot",
-    }
     rr_snap_roles = {**roles, "ball_handler": ball_handler}
     rr_snap = build_fast_break_pre_shot_snapshot(
         game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
