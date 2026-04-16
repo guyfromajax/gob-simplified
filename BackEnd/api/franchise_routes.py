@@ -414,6 +414,250 @@ def _format_team_name_with_rank(
     return team_name
 
 
+def _canonical_team_name(value: str) -> str:
+    if not value:
+        return ""
+    return str(value).replace("-", "_").replace(" ", "_").upper()
+
+
+def _normalize_team_name(value: str) -> str:
+    return str(value or "").strip().lower()
+
+
+def _extract_game_box_score(game_doc: dict[str, Any]) -> dict[str, Any]:
+    box_score = game_doc.get("box_score")
+    if isinstance(box_score, dict) and box_score:
+        return box_score
+
+    result: dict[str, Any] = {}
+    teams_obj = game_doc.get("teams")
+    if isinstance(teams_obj, dict):
+        for team_key, team_data in teams_obj.items():
+            if isinstance(team_data, dict):
+                team_box = team_data.get("box_score")
+                if isinstance(team_box, dict) and team_box:
+                    result[str(team_key)] = team_box
+
+    if result:
+        return result
+
+    for team_side in ("home_team", "away_team"):
+        team_data = game_doc.get(team_side)
+        if isinstance(team_data, dict) and isinstance(team_data.get("box_score"), dict):
+            team_name = str(team_data.get("name") or team_side)
+            result[team_name] = team_data["box_score"]
+    return result
+
+
+def _infer_box_score_team_side(team_key: str, home_team_id: str, away_team_id: str, home_team_name: str, away_team_name: str) -> Optional[str]:
+    home_names = {
+        str(home_team_id or ""),
+        str(home_team_name or ""),
+        _canonical_team_name(home_team_name),
+        _normalize_team_name(home_team_name),
+    }
+    away_names = {
+        str(away_team_id or ""),
+        str(away_team_name or ""),
+        _canonical_team_name(away_team_name),
+        _normalize_team_name(away_team_name),
+    }
+    key_normalized = _normalize_team_name(team_key)
+    if team_key in home_names or key_normalized in home_names:
+        return "home"
+    if team_key in away_names or key_normalized in away_names:
+        return "away"
+    return None
+
+
+def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]]:
+    if not isinstance(game_doc, dict):
+        return None
+
+    home_team_id = str(game_doc.get("home_team_id") or "")
+    away_team_id = str(game_doc.get("away_team_id") or "")
+    teams_obj = game_doc.get("teams") or {}
+    home_team_obj = teams_obj.get(home_team_id, {}) if isinstance(teams_obj, dict) else {}
+    away_team_obj = teams_obj.get(away_team_id, {}) if isinstance(teams_obj, dict) else {}
+    if not home_team_obj and isinstance(game_doc.get("home_team"), dict):
+        home_team_obj = game_doc.get("home_team") or {}
+    if not away_team_obj and isinstance(game_doc.get("away_team"), dict):
+        away_team_obj = game_doc.get("away_team") or {}
+
+    home_team_name = str(home_team_obj.get("name") or (game_doc.get("home_team", {}) or {}).get("name") or "Home Team")
+    away_team_name = str(away_team_obj.get("name") or (game_doc.get("away_team", {}) or {}).get("name") or "Away Team")
+
+    score_map = game_doc.get("score") or {}
+    home_score = int(score_map.get(home_team_name, home_team_obj.get("score", 0)) or 0)
+    away_score = int(score_map.get(away_team_name, away_team_obj.get("score", 0)) or 0)
+    winning_team = "home" if home_score > away_score else ("away" if away_score > home_score else None)
+
+    candidates: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+
+    def upsert_player(raw: dict[str, Any], fallback_team: Optional[str] = None) -> None:
+        if not isinstance(raw, dict):
+            return
+        stats = raw.get("stats", {}).get("game") if isinstance(raw.get("stats"), dict) and isinstance(raw.get("stats", {}).get("game"), dict) else raw.get("stats", raw)
+        if not isinstance(stats, dict):
+            stats = raw
+        name = str(raw.get("name") or "").strip()
+        if not name:
+            return
+        player_id = str(raw.get("playerId") or raw.get("player_id") or raw.get("_id") or f"{fallback_team or 'unknown'}:{name}")
+        dedupe_key = f"{player_id}:{fallback_team or raw.get('team') or 'unknown'}"
+        if dedupe_key in seen_keys:
+            return
+        seen_keys.add(dedupe_key)
+        candidates.append({
+            "player_id": player_id,
+            "name": name,
+            "team": fallback_team or raw.get("team") or "",
+            "stats": stats,
+        })
+
+    players = game_doc.get("players")
+    if isinstance(players, list):
+        for player in players:
+            if isinstance(player, dict):
+                team = player.get("team")
+                upsert_player(player, team if team in {"home", "away"} else None)
+
+    for team_key, team_box in (_extract_game_box_score(game_doc) or {}).items():
+        if not isinstance(team_box, dict):
+            continue
+        inferred_team = _infer_box_score_team_side(str(team_key), home_team_id, away_team_id, home_team_name, away_team_name)
+        for player_data in team_box.values():
+            if isinstance(player_data, dict):
+                upsert_player(player_data, inferred_team)
+
+    if not candidates:
+        return None
+
+    scored: list[dict[str, Any]] = []
+    for player in candidates:
+        stats = player.get("stats") or {}
+        pts = int(stats.get("PTS", 0) or 0)
+        ast = int(stats.get("AST", 0) or 0)
+        reb = int(stats.get("TREB", (stats.get("OREB", 0) or 0) + (stats.get("DREB", 0) or 0)) or 0)
+        stl = int(stats.get("STL", 0) or 0)
+        blk = int(stats.get("BLK", 0) or 0)
+        def_a = int(stats.get("DEF_A", 0) or 0)
+        def_s = int(stats.get("DEF_S", 0) or 0)
+        def_pct = round((def_s / def_a) * 100) if def_a > 0 else 0
+        score = 2 * (pts + ast + reb + stl + blk)
+        if def_a > 10:
+            if def_pct > 80:
+                score += 15
+            elif def_pct > 60:
+                score += 10
+            elif def_pct > 40:
+                score += 5
+        if winning_team and player.get("team") == winning_team:
+            score += 3
+        scored.append({
+            "name": player["name"],
+            "team": player.get("team"),
+            "score": score,
+            "stats": {
+                "pts": pts,
+                "reb": reb,
+                "ast": ast,
+                "stl": stl,
+                "blk": blk,
+                "defPct": def_pct,
+            },
+        })
+
+    scored.sort(key=lambda item: (-item["score"], -item["stats"]["pts"], -item["stats"]["reb"], -item["stats"]["ast"]))
+    top = scored[0]
+    return {
+        "name": top["name"],
+        "stats": top["stats"],
+    }
+
+
+def _build_team_leader_summary(franchise_id: ObjectId, team_id: str) -> dict[str, Any]:
+    players = get_team_player_stats(str(franchise_id), team_id, scope="season", sort=None, direction="desc")
+    top_scorer: Optional[dict[str, Any]] = None
+    top_rebounder: Optional[dict[str, Any]] = None
+    top_scoring_avg = -1.0
+    top_rebounding_avg = -1.0
+
+    for player in players:
+        stats = player.get("stats") or {}
+        gp = int(stats.get("GP", 0) or 0)
+        if gp <= 0:
+            continue
+        pts_avg = float(stats.get("PTS", 0) or 0) / gp
+        reb_total = float(stats.get("TREB", ((stats.get("OREB", 0) or 0) + (stats.get("DREB", 0) or 0))) or 0)
+        reb_avg = reb_total / gp
+        player_name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip() or "Unknown"
+        if pts_avg > top_scoring_avg:
+            top_scoring_avg = pts_avg
+            top_scorer = {"name": player_name, "average": round(pts_avg, 1)}
+        if reb_avg > top_rebounding_avg:
+            top_rebounding_avg = reb_avg
+            top_rebounder = {"name": player_name, "average": round(reb_avg, 1)}
+
+    return {
+        "top_scorer": top_scorer,
+        "top_rebounder": top_rebounder,
+    }
+
+
+def _find_user_next_game(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
+    week = int(franchise_doc.get("week", 1) or 1)
+    eos_active = bool(
+        franchise_doc.get("eos_tournament_active")
+        and (franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament"))
+    )
+    if week in ft.EOS_WEEKS and eos_active:
+        for game in ft.get_eos_week_games(franchise_doc, week):
+            away_id = str(game.get("away_id") or "")
+            home_id = str(game.get("home_id") or "")
+            if user_team_id_str in {away_id, home_id}:
+                return {"week": week, "away_team_id": away_id, "home_team_id": home_id}
+
+    schedule = franchise_doc.get("schedule", []) or []
+    if week < 1 or week > len(schedule):
+        return None
+    for away_id, home_id in schedule[week - 1]:
+        away_str = str(away_id)
+        home_str = str(home_id)
+        if user_team_id_str in {away_str, home_str}:
+            return {"week": week, "away_team_id": away_str, "home_team_id": home_str}
+    return None
+
+
+def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
+    results = franchise_doc.get("results", {}) or {}
+    current_week = int(franchise_doc.get("week", 1) or 1)
+    for week in range(current_week - 1, 0, -1):
+        for result in list(results.get(str(week), []) or []):
+            away_id = str(result.get("away_id") or "")
+            home_id = str(result.get("home_id") or "")
+            if user_team_id_str in {away_id, home_id}:
+                game_doc = db.games.find_one({
+                    "week": week,
+                    "franchise_id": str(franchise_doc.get("_id")),
+                    "$or": [
+                        {"team1_id": away_id, "team2_id": home_id},
+                        {"team1_id": home_id, "team2_id": away_id},
+                    ],
+                })
+                return {
+                    "week": week,
+                    "away_team_id": away_id,
+                    "home_team_id": home_id,
+                    "away_score": int(result.get("away_score", 0) or 0),
+                    "home_score": int(result.get("home_score", 0) or 0),
+                    "game_id": str(game_doc.get("_id")) if game_doc and game_doc.get("_id") is not None else None,
+                    "game_doc": game_doc,
+                }
+    return None
+
+
 def _resolve_team_id_to_object_id(team_id: str):
     """Resolve team_id (canonical string e.g. MORRISTOWN, or ObjectId string) to ObjectId for FTD lookup. Returns None if not found."""
     import re
@@ -2711,13 +2955,66 @@ def command_center_data(
                     ]
                     rankings.sort(key=lambda x: x["natl_rank"])
                     response["rankings"] = rankings
+
+                    if team_id:
+                        next_game = _find_user_next_game(franchise_doc, str(team_id))
+                        if next_game:
+                            opponent_id = (
+                                str(next_game.get("away_team_id"))
+                                if str(next_game.get("home_team_id")) == str(team_id)
+                                else str(next_game.get("home_team_id"))
+                            )
+                            opponent_leaders = _build_team_leader_summary(fid, opponent_id)
+                            opponent_standings = standings_data.get(opponent_id, {}) or {}
+                            response["next_game_summary"] = {
+                                "matchup_label": "vs" if str(next_game.get("home_team_id")) == str(team_id) else "@",
+                                "opponent_team_id": opponent_id,
+                                "opponent_team_name": teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
+                                "record": {
+                                    "wins": int(opponent_standings.get("W", 0) or 0),
+                                    "losses": int(opponent_standings.get("L", 0) or 0),
+                                },
+                                "rank": int(natl_rank_by_team_id.get(opponent_id, 999) or 999),
+                                "top_scorer": opponent_leaders.get("top_scorer"),
+                                "top_rebounder": opponent_leaders.get("top_rebounder"),
+                            }
+                        else:
+                            response["next_game_summary"] = None
+
+                        last_game = _find_user_last_completed_game(franchise_doc, str(team_id))
+                        if last_game:
+                            away_id = str(last_game.get("away_team_id") or "")
+                            home_id = str(last_game.get("home_team_id") or "")
+                            game_doc = last_game.get("game_doc") or {}
+                            response["last_game_summary"] = {
+                                "matchup_label": "vs" if home_id == str(team_id) else "@",
+                                "opponent_team_id": away_id if home_id == str(team_id) else home_id,
+                                "opponent_team_name": teams_docs.get(away_id if home_id == str(team_id) else home_id, {}).get("name", team_name_by_id.get(away_id if home_id == str(team_id) else home_id, "Opponent")),
+                                "away_team_name": teams_docs.get(away_id, {}).get("name", team_name_by_id.get(away_id, away_id)),
+                                "home_team_name": teams_docs.get(home_id, {}).get("name", team_name_by_id.get(home_id, home_id)),
+                                "away_score": int(last_game.get("away_score", 0) or 0),
+                                "home_score": int(last_game.get("home_score", 0) or 0),
+                                "game_id": last_game.get("game_id"),
+                                "potg": _calculate_potg_summary(game_doc) if game_doc else None,
+                            }
+                        else:
+                            response["last_game_summary"] = None
+                    else:
+                        response["next_game_summary"] = None
+                        response["last_game_summary"] = None
                 else:
                     response["rankings"] = []
+                    response["next_game_summary"] = None
+                    response["last_game_summary"] = None
             except Exception as e:
                 logger.debug("rankings for FCC: %s", e)
                 response["rankings"] = []
+                response["next_game_summary"] = None
+                response["last_game_summary"] = None
         else:
             response["rankings"] = []
+            response["next_game_summary"] = None
+            response["last_game_summary"] = None
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed

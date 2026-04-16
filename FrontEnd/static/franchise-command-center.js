@@ -681,25 +681,21 @@ function renderHomeRankingsCard() {
   `;
 }
 
-function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
+function renderHomeMatchupCard(bodyId, summary) {
   const body = document.getElementById(bodyId);
   if (!body) return;
-  if (!game) {
+  if (!summary) {
     body.innerHTML = createEmptyHomeState('N/A');
     return;
   }
-  const opponentId = getOpponentIdFromGame(game);
-  const matchupLabel = getMatchupLabelForGame(game);
-  const opponentName = userScheduleDataCache?.team_name_map?.[opponentId] || getScheduleDisplayName(opponentId) || 'Opponent';
+  const opponentName = summary.opponent_team_name || 'Opponent';
+  const matchupLabel = summary.matchup_label || '';
   const logoSrc = typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(opponentName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
+  const tooltipText = getTeamTooltipText(opponentName);
 
   if (bodyId === 'home-next-game-body') {
-    const teamEntry = getTeamRankingEntry(opponentId);
-    const topScorer = getTopPlayerByAverage(opponentPlayers, (player) => getPlayerSeasonStats(player).PTS || 0);
-    const topRebounder = getTopPlayerByAverage(opponentPlayers, (player) => getPlayerTotalRebounds(player));
-    const tooltipText = getTeamTooltipText(opponentName);
     body.innerHTML = `
       <div class="fcc-home-matchup-card">
         <div class="fcc-home-matchup-top">
@@ -709,24 +705,22 @@ function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
           </span>
         </div>
         <div class="fcc-home-matchup-bottom">
-          <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${teamEntry?.W || 0}-${teamEntry?.L || 0}`)}</div>
-          <div class="fcc-home-detail-line">Rank: ${escapeHomeHtml(teamEntry?.natl_rank || 'N/A')}</div>
-          <div class="fcc-home-detail-line">Top Scorer: ${escapeHomeHtml(topScorer.player ? `${getPlayerDisplayName(topScorer.player)}, ${topScorer.average.toFixed(1)}` : 'N/A')}</div>
-          <div class="fcc-home-detail-line">Top Rebounder: ${escapeHomeHtml(topRebounder.player ? `${getPlayerDisplayName(topRebounder.player)}, ${topRebounder.average.toFixed(1)}` : 'N/A')}</div>
+          <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${summary.record?.wins || 0}-${summary.record?.losses || 0}`)}</div>
+          <div class="fcc-home-detail-line">Rank: ${escapeHomeHtml(summary.rank || 'N/A')}</div>
+          <div class="fcc-home-detail-line">Top Scorer: ${escapeHomeHtml(summary.top_scorer ? `${summary.top_scorer.name}, ${Number(summary.top_scorer.average || 0).toFixed(1)}` : 'N/A')}</div>
+          <div class="fcc-home-detail-line">Top Rebounder: ${escapeHomeHtml(summary.top_rebounder ? `${summary.top_rebounder.name}, ${Number(summary.top_rebounder.average || 0).toFixed(1)}` : 'N/A')}</div>
         </div>
       </div>
     `;
     return;
   }
 
-  const gameDoc = lastGameData?.game || null;
-  const awayName = getScheduleDisplayName(game.away_team_id) || gameDoc?.away_team?.name || 'Away';
-  const homeName = getScheduleDisplayName(game.home_team_id) || gameDoc?.home_team?.name || 'Home';
-  const awayScore = Number(game.away_score ?? gameDoc?.away_team?.score ?? 0);
-  const homeScore = Number(game.home_score ?? gameDoc?.home_team?.score ?? 0);
+  const awayName = summary.away_team_name || 'Away';
+  const homeName = summary.home_team_name || 'Home';
+  const awayScore = Number(summary.away_score || 0);
+  const homeScore = Number(summary.home_score || 0);
   const awayBold = awayScore > homeScore ? 'fcc-home-score-strong' : '';
   const homeBold = homeScore > awayScore ? 'fcc-home-score-strong' : '';
-  const tooltipText = getTeamTooltipText(opponentName);
 
   body.innerHTML = `
     <div class="fcc-home-matchup-card">
@@ -742,9 +736,9 @@ function renderHomeMatchupCard(bodyId, game, opponentPlayers, lastGameData) {
           <span class="fcc-home-final-score-at">at</span>
           <span class="${homeBold}">${escapeHomeHtml(`${homeName} (${homeScore})`)}</span>
         </div>
-        <div class="fcc-home-detail-line">Player of The Game: ${escapeHomeHtml(lastGameData?.potg?.name || 'N/A')}</div>
+        <div class="fcc-home-detail-line">Player of The Game: ${escapeHomeHtml(summary.potg?.name || 'N/A')}</div>
         <div class="fcc-home-detail-line fcc-home-potg-line">
-          ${escapeHomeHtml(lastGameData?.potg ? `${lastGameData.potg.stats.pts} PTS  ${lastGameData.potg.stats.reb} REB  ${lastGameData.potg.stats.ast} AST  ${lastGameData.potg.stats.stl} STL  ${lastGameData.potg.stats.blk} BLK  ${lastGameData.potg.stats.defPct} DEF%` : 'N/A')}
+          ${escapeHomeHtml(summary.potg ? `${summary.potg.stats.pts} PTS  ${summary.potg.stats.reb} REB  ${summary.potg.stats.ast} AST  ${summary.potg.stats.stl} STL  ${summary.potg.stats.blk} BLK  ${summary.potg.stats.defPct} DEF%` : 'N/A')}
         </div>
       </div>
     </div>
@@ -877,35 +871,11 @@ async function renderHomeTab() {
   renderHomeTeamStatsCard();
   renderHomeRecruitingCard();
   renderHomeNewsCard();
-
-  const nextGame = getNextUserGame();
-  const lastGame = getLastCompletedUserGame();
-  const nextOpponentPlayers = nextGame ? await fetchRosterWithStatsForTeam(getOpponentIdFromGame(nextGame)) : [];
-  renderHomeMatchupCard('home-next-game-body', nextGame, nextOpponentPlayers, null);
-
-  let lastGamePayload = null;
-  if (lastGame?.game_id) {
-    const lastGameData = await ensureHomeLastGameData(lastGame);
-    if (lastGameData) {
-      try {
-        const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
-          ? window.API_CONFIG.getStaticPath()
-          : '';
-        const { calculatePlayerOfTheGame } = await import(`${staticBase}/js/shared/potg.js`);
-        lastGamePayload = {
-          game: lastGameData,
-          potg: calculatePlayerOfTheGame(lastGameData, { gameId: lastGame.game_id })
-        };
-      } catch (error) {
-        console.warn('Failed to compute Home tab POTG:', error);
-      }
-    }
-  }
-  renderHomeMatchupCard('home-last-game-body', lastGame, [], lastGamePayload);
+  renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null);
+  renderHomeMatchupCard('home-last-game-body', commandCenterTopDataCache?.last_game_summary || null);
 }
 
 async function loadHomeTabData() {
-  await ensureHomeScheduleData();
   await renderHomeTab();
 }
 
