@@ -2262,6 +2262,47 @@ def _final_xy_from_animation_row(anim: Dict[str, Any]) -> Optional[Dict[str, flo
     return None
 
 
+def _is_away_offense_for_runtime_sync(game: Any, offense_team_id: Any = None) -> bool:
+    """
+    Determine whether the turn/animation being synced belongs to an away-offense context.
+
+    Runtime ``player.coords`` should remain in HOME orientation. Animation payloads may
+    be emitted in current/display orientation, so away-offense animation finals must be
+    normalized before they are written back into runtime state.
+    """
+    away_team = getattr(game, "away_team", None)
+    away_team_id = getattr(away_team, "team_id", None)
+    if offense_team_id is not None and away_team_id is not None:
+        return str(offense_team_id) == str(away_team_id)
+
+    offense_team = getattr(game, "offense_team", None)
+    offense_team_id = getattr(offense_team, "team_id", None)
+    if offense_team_id is not None and away_team_id is not None:
+        return str(offense_team_id) == str(away_team_id)
+
+    return False
+
+
+def _normalize_animation_coords_to_runtime_home(
+    game: Any,
+    coords: Dict[str, Any],
+    offense_team_id: Any = None,
+) -> Optional[Dict[str, float]]:
+    """
+    Convert animation/display-oriented coords into canonical HOME-oriented runtime coords.
+    """
+    if not isinstance(coords, dict):
+        return None
+    x, y = coords.get("x"), coords.get("y")
+    if x is None or y is None:
+        return None
+
+    normalized = {"x": float(x), "y": float(y)}
+    if _is_away_offense_for_runtime_sync(game, offense_team_id=offense_team_id):
+        normalized = get_away_player_coords(normalized)
+    return normalized
+
+
 def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]) -> None:
     """
     Apply final positions from an animation list to matching lineup players only.
@@ -2276,6 +2317,9 @@ def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]
         if pid is None:
             continue
         final = _final_xy_from_animation_row(anim)
+        if final is None:
+            continue
+        final = _normalize_animation_coords_to_runtime_home(game, final)
         if final is None:
             continue
         ns = _norm_player_id(pid)
@@ -2322,6 +2366,13 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
             if pid is None:
                 continue
             final = _final_xy_from_animation_row(anim)
+            if final is None:
+                continue
+            final = _normalize_animation_coords_to_runtime_home(
+                game,
+                final,
+                offense_team_id=turn_result.get("offense_team_id"),
+            )
             if final is None:
                 continue
             ns = _norm_player_id(pid)
