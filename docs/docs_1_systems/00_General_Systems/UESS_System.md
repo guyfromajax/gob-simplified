@@ -310,9 +310,29 @@ The snapshot is the authority for:
 - Every shot with zero assigned defenders emits a loud `NO_DEFENDER_SHOT` log.
 - No branch may silently resolve shot contest from ad hoc local coordinate state without snapshot source labeling.
 
+### HCO Shot-Defender Assignment Fallback
+
+For `HCO` shot attempts only:
+
+- if the shot reaches resolution with no assigned primary defender and no assigned secondary defender,
+- the engine may recover assignment from the legacy coverage system before shot resolution.
+
+Fallback order:
+
+- `Man`: recover the defender from the man-defense matchup assignment for the shooter's offensive position
+- `Zone`: recover the defender(s) from the zone-assignment data at the shot step
+
+Guardrails:
+
+- fallback assignment is for defender responsibility only
+- fallback assignment does not automatically set `has_contest=True`
+- contest remains a shot-time frame / proximity decision
+- every fallback assignment must emit a labeled runtime log
+
 ### Current Implementation Note
 
 - `ShotManager.resolve_shot()` now builds and stores `roles["shot_state_snapshot"]` as the authoritative pre-resolution shot snapshot for standard shot paths.
+- `HCO` now includes a narrow shot-defender fallback that reuses legacy man/zone assignment logic when a shot arrives at resolution with no assigned defender.
 - `OREB` putback flow emits equivalent no-defender diagnostics and should be migrated into the same payload shape if/when putback resolution is folded into the main shot resolver.
 
 ## Local Dev Strictness Policy

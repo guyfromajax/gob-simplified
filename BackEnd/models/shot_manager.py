@@ -165,6 +165,42 @@ def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
 
 
+def _resolve_hco_fallback_shot_defenders(game, roles, off_lineup, def_lineup, shooter, shooter_pos, shot_step_index):
+    if game.game_state.get("offensive_state") != "HCO":
+        return None, None, None
+
+    defense_call = game.game_state.get("defense_playcall", "Man")
+
+    from BackEnd.utils.defense_utils import is_zone_defense
+
+    if is_zone_defense(defense_call):
+        assignments_by_step = getattr(game, "zone_defender_assignments_by_step", {}) or {}
+        shot_step_assignments = assignments_by_step.get(shot_step_index, {}) if shot_step_index is not None else {}
+        shooter_id = getattr(shooter, "player_id", None)
+        defenders_on_shooter = [
+            def_pos for def_pos, guarded_player_id in shot_step_assignments.items()
+            if guarded_player_id == shooter_id
+        ]
+        primary = def_lineup.get(defenders_on_shooter[0]) if len(defenders_on_shooter) >= 1 else None
+        secondary = def_lineup.get(defenders_on_shooter[1]) if len(defenders_on_shooter) >= 2 else None
+        if primary or secondary:
+            return primary, secondary, "zone_shot_step_assignment"
+        return None, None, None
+
+    from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
+
+    defending_team_is_user = getattr(game.defense_team, "is_user_team", False)
+    defender_pos = get_defender_position_for_man_defense(
+        shooter_pos,
+        game.game_state,
+        defending_team_is_user=defending_team_is_user,
+    ) if shooter_pos else "PG"
+    primary = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+    if primary:
+        return primary, None, "man_matchup_assignment"
+    return None, None, None
+
+
 def _build_shot_state_snapshot(game, roles, shooter, defender, second_defender, off_lineup, def_lineup, shot_type):
     sx, sy = _shooter_xy_from_roles(roles, shooter)
     shot_spot = roles.get("shot_spot") if isinstance(roles.get("shot_spot"), dict) else None
@@ -560,6 +596,33 @@ class ShotManager:
         if has_double_team_at_shot and second_defender_id_at_shot:
             result["second_defender_id"] = second_defender_id_at_shot
             result["has_double_team"] = True
+
+        if not defender and not second_defender and game_state.get("offensive_state") == "HCO":
+            fallback_defender, fallback_second_defender, fallback_source = _resolve_hco_fallback_shot_defenders(
+                self.game,
+                roles,
+                off_lineup,
+                def_lineup,
+                shooter,
+                shooter_pos,
+                shot_step_index,
+            )
+            if fallback_defender or fallback_second_defender:
+                defender = fallback_defender or defender
+                second_defender = fallback_second_defender or second_defender
+                roles["defender"] = defender
+                roles["second_defender"] = second_defender
+                roles["shot_defender_fallback_source"] = fallback_source
+                logging.warning(
+                    "🛡️ [HCO_SHOT_DEFENDER_FALLBACK] source=%s shooter=%s shooter_pos=%s assigned_defender=%s assigned_second_defender=%s shot_step_index=%s defense_call=%s",
+                    fallback_source,
+                    get_name_safe(shooter),
+                    shooter_pos,
+                    get_name_safe(defender) if defender else "NONE",
+                    get_name_safe(second_defender) if second_defender else "NONE",
+                    shot_step_index,
+                    self.game_state.get("defense_playcall", "Man"),
+                )
 
         # Debug: Print shooter information with object ID
         # from BackEnd.constants import DEBUG
