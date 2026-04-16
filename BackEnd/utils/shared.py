@@ -514,69 +514,28 @@ def _oreb_putback_distance(a_coords, b_coords):
     return math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
 
 
-def _oreb_defender_is_at_least_as_close_to_basket(defender_x, shooter_x, basket_x):
-    if basket_x >= 50:
-        return defender_x >= shooter_x
-    return defender_x <= shooter_x
-
-
 def _resolve_oreb_putback_defender(game, rebounder, def_lineup, basket_x):
     """
     Resolve the shot defender for an OREB putback attempt.
 
-    Rules:
-    0. Only defenders within 10 Euclidean distance of the shooter are initially eligible.
-    1. Among those, defenders at least as close to the basket on the x-axis as the shooter
-       are immediate contest candidates.
-    2. If multiple immediate contest candidates exist, choose the one closest to the shooter;
-       ties are broken randomly.
-    3. If none qualify on x-axis, pick the closest initially eligible defender and run an IQ
-       read. On success, move that defender one x-grid closer to the basket than the shooter
-       and within +/-1 y of the shooter. On failure, the putback is uncontested.
+    Putbacks now always use the nearest defender as the shot defender.
+    Distance still influences the debug logs, but it no longer determines whether
+    a putback has a defender at all.
     """
     shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
-    shooter_x = float(shooter_coords.get("x", 50))
-    shooter_y = float(shooter_coords.get("y", 25))
 
-    eligible = []
+    nearest_defender = None
+    nearest_distance = None
     for defender in (def_lineup or {}).values():
         if defender is None:
             continue
         defender_coords = getattr(defender, "coords", None) or {"x": 50, "y": 25}
         distance = _oreb_putback_distance(shooter_coords, defender_coords)
-        if distance <= 10:
-            eligible.append((defender, defender_coords, distance))
+        if nearest_distance is None or distance < nearest_distance:
+            nearest_defender = defender
+            nearest_distance = distance
 
-    if not eligible:
-        return None, False
-
-    immediate = []
-    for defender, defender_coords, distance in eligible:
-        defender_x = float(defender_coords.get("x", 50))
-        if _oreb_defender_is_at_least_as_close_to_basket(defender_x, shooter_x, basket_x):
-            immediate.append((defender, defender_coords, distance))
-
-    if immediate:
-        min_distance = min(distance for _, _, distance in immediate)
-        tied = [item for item in immediate if abs(item[2] - min_distance) < 1e-9]
-        chosen, _, _ = random.choice(tied)
-        return chosen, True
-
-    min_distance = min(distance for _, _, distance in eligible)
-    tied = [item for item in eligible if abs(item[2] - min_distance) < 1e-9]
-    chosen, _, _ = random.choice(tied)
-
-    iq_roll = random.randint(1, 100)
-    if iq_roll <= chosen.attributes.get("IQ", 0):
-        new_x = shooter_x + 1 if basket_x >= 50 else shooter_x - 1
-        new_y = shooter_y + random.randint(-1, 1)
-        chosen.coords = {
-            "x": max(0, min(100, new_x)),
-            "y": max(0, min(50, new_y)),
-        }
-        return chosen, True
-
-    return None, False
+    return nearest_defender, nearest_defender is not None
 
 
 def resolve_over_the_back_foul(game, rebounder, rebound_team, opposing_lineup):
