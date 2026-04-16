@@ -69,6 +69,42 @@ def weighted_random_from_dict(weight_dict: dict) -> str:
     return random.choice(list(weight_dict.keys()))
 
 
+def increment_no_defender_shot_breakdown(game_state: dict, turn_type: str, shot_type: str) -> tuple[str, int]:
+    """Track no-defender shots by `turn_type|shot_type`."""
+    if not isinstance(game_state, dict):
+        return "UNKNOWN|unknown", 0
+
+    safe_turn_type = str(turn_type or "UNKNOWN")
+    safe_shot_type = str(shot_type or "unknown")
+    breakdown_key = f"{safe_turn_type}|{safe_shot_type}"
+    breakdown = game_state.get("no_defender_shots_breakdown")
+    if not isinstance(breakdown, dict):
+        breakdown = {}
+        game_state["no_defender_shots_breakdown"] = breakdown
+
+    breakdown[breakdown_key] = int(breakdown.get(breakdown_key, 0) or 0) + 1
+    return breakdown_key, breakdown[breakdown_key]
+
+
+def format_no_defender_shot_breakdown(breakdown: dict | None) -> str:
+    """Return a stable, readable `turn|shot=count` summary."""
+    if not isinstance(breakdown, dict) or not breakdown:
+        return "NONE"
+
+    items: list[tuple[str, int]] = []
+    for key, value in breakdown.items():
+        try:
+            items.append((str(key), int(value or 0)))
+        except (TypeError, ValueError):
+            continue
+
+    if not items:
+        return "NONE"
+
+    items.sort(key=lambda item: (-item[1], item[0]))
+    return ", ".join(f"{key}={count}" for key, count in items)
+
+
 def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_score):
     """
     Determines if help defense is triggered and applies a penalty to the shot_score.
@@ -735,8 +771,13 @@ def resolve_offensive_rebound(game, rebounder):
 
         if not contested:
             game.game_state["no_defender_shots"] = int(game.game_state.get("no_defender_shots", 0) or 0) + 1
+            breakdown_key, breakdown_count = increment_no_defender_shot_breakdown(
+                game.game_state,
+                game.game_state.get("offensive_state"),
+                "oreb_putback",
+            )
             logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=oreb_putback current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s",
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=oreb_putback current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s breakdown_key=%s breakdown_count=%s",
                 game.game_state.get("offensive_state"),
                 shooter_x,
                 shooter_y,
@@ -746,6 +787,8 @@ def resolve_offensive_rebound(game, rebounder):
                 float(nearest_dy) if nearest_dy is not None else -1.0,
                 getattr(game, "game_id", None),
                 game.game_state["no_defender_shots"],
+                breakdown_key,
+                breakdown_count,
             )
             logging.error(
                 "🟠🟠🟠🟠🟠 [NO_DEFENDER_SHOT] 🟠🟠🟠🟠🟠 turn_type=%s shot_type=oreb_putback "
@@ -1974,6 +2017,9 @@ def summarize_game_state(game, exclude_animations=True):
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         "user_team_side": game.game_state.get("user_team_side"),  # ✅ SS&S: Save user_team_side for persistent override checking
         "no_defender_shots": int(game.game_state.get("no_defender_shots", 0) or 0),
+        "no_defender_shots_breakdown": deepcopy(game.game_state.get("no_defender_shots_breakdown", {}))
+        if isinstance(game.game_state.get("no_defender_shots_breakdown", {}), dict)
+        else {},
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),

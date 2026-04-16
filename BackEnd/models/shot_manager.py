@@ -41,6 +41,7 @@ from BackEnd.utils.shared import (
     height_to_block_score,
     calculate_block_spot,
     resolve_over_the_back_foul,
+    increment_no_defender_shot_breakdown,
 )
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
@@ -1191,8 +1192,13 @@ class ShotManager:
         # Stat tracking (attempts)
         if not defense_applied_defenders:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
+            breakdown_key, breakdown_count = increment_no_defender_shot_breakdown(
+                self.game_state,
+                self.game_state.get("offensive_state"),
+                shot_type,
+            )
             logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=%s current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s",
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=%s current_turn=%s shooter_xy=(%.1f, %.1f) nearest_defender=%s nearest_distance=%.2f nearest_dx=%.2f nearest_dy=%.2f game_id=%s no_defender_shots=%s breakdown_key=%s breakdown_count=%s",
                 shot_type,
                 self.game_state.get("offensive_state"),
                 sx,
@@ -1203,6 +1209,8 @@ class ShotManager:
                 float(nearest_defender_info["dy"]) if nearest_defender_info["dy"] is not None else -1.0,
                 getattr(self.game, "game_id", None),
                 self.game_state["no_defender_shots"],
+                breakdown_key,
+                breakdown_count,
             )
             if not shot_state_snapshot["has_assigned_defender"]:
                 _emit_loud_no_defender_shot_log(
@@ -2576,11 +2584,18 @@ class ShotManager:
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
         if not defender:
             self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
+            breakdown_key, breakdown_count = increment_no_defender_shot_breakdown(
+                self.game_state,
+                self.game_state.get("offensive_state"),
+                "fast_break",
+            )
             logging.warning(
-                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=fast_break current_turn=%s game_id=%s no_defender_shots=%s",
+                "🟢 [NO_DEFENDER_SHOTS INCREMENT] shot_type=fast_break current_turn=%s game_id=%s no_defender_shots=%s breakdown_key=%s breakdown_count=%s",
                 self.game_state.get("offensive_state"),
                 getattr(self.game, "game_id", None),
                 self.game_state["no_defender_shots"],
+                breakdown_key,
+                breakdown_count,
             )
         shooter.record_stat("FGA")
 
