@@ -21,13 +21,16 @@
   <!-- End Google Tag Manager (noscript) -->
 
   <div class="resource-page-container fcc-brand-page-shell">
-    <header class="game-plan-page-header">
-      <img id="team-logo" alt="team logo" class="team-logo" hidden>
-      <h1 id="page-title">Set Your Game Plan</h1>
-    </header>
+    <div class="game-plan-page-header-wrap">
+      <a id="game-plan-back-link" class="back-to-locker-room brand-back-link game-plan-back-link" href="#" hidden>Back to Locker Room</a>
+    </div>
 
     <section class="fcc-data-card game-plan-card">
       <div class="fcc-data-card-body game-plan-card-body">
+        <header class="game-plan-page-header">
+          <img id="team-logo" alt="team logo" class="team-logo" hidden>
+          <h1 id="page-title">Set Your Game Plan</h1>
+        </header>
         <div class="sliders-container">
           <!-- Left Column: Offense -->
           <div class="slider-column">
@@ -168,14 +171,13 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="button-container">
-        <button id="btn-save-game-plan" class="btn btn-primary">Save Game Plan</button>
-        <button id="btn-back-to-lineup" class="btn btn-secondary" style="display: none;">Back To Lineup</button>
-        <button id="btn-nav-primary" class="btn btn-primary" style="display: none;">Play Game</button>
-        <button id="btn-cancel" class="btn btn-secondary">Cancel</button>
+        <!-- Action Buttons -->
+        <div class="button-container">
+          <button id="btn-save-game-plan" class="btn btn-save-game-plan">Save Game Plan</button>
+          <button id="btn-back-to-lineup" class="btn btn-secondary" style="display: none;">Back To Lineup</button>
+          <button id="btn-nav-primary" class="btn btn-primary" style="display: none;">Play Game</button>
+          <button id="btn-cancel" class="btn btn-secondary" style="display: none;">Cancel</button>
+        </div>
       </div>
     </section>
   </div>

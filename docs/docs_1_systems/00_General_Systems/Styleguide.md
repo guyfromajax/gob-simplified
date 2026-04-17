@@ -68,6 +68,13 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Navigation buttons should not compete visually with primary action buttons.
 - Button treatments should support information-dense screens without becoming noisy.
 
+### Back / Return Link Treatment
+- The standard `Back` / `Back to Locker Room` treatment should be a low-weight ghost or text link, not a filled button.
+- It should use a small left arrow followed by the label.
+- It should be left justified above the primary content container.
+- Copy should use subdued white or light grey in resting state and brighten modestly on hover.
+- It should remain clearly functional without competing with the page title or primary CTA.
+
 ## Tabs
 
 ### Behavior

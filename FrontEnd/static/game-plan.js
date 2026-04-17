@@ -865,6 +865,7 @@ async function init() {
   const btnNavPrimary = document.getElementById('btn-nav-primary'); // "Play Game" or "Back To Locker Room"
   const btnCancel = document.getElementById('btn-cancel');
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
+  const pageBackLink = document.getElementById('game-plan-back-link');
   const modalClose = document.getElementById('modal-close');
   
   // Check if lineup is valid (all 5 positions filled)
@@ -877,19 +878,20 @@ async function init() {
                                from === 'franchise-command-center';
   
   if (isFromCommandCenter) {
-    // From command center (FCC/TCC): show "Back To Locker Room" button, hide "Back To Lineup" and "Cancel"
-    if (btnNavPrimary) {
-      btnNavPrimary.textContent = 'Back To Locker Room';
-      btnNavPrimary.style.display = 'inline-block';
-      btnNavPrimary.addEventListener('click', () => {
-        console.log('🚀 [GAME-PLAN] btnNavPrimary (Back To Locker Room) CLICKED!');
+    // From command center (FCC/TCC): use page-level ghost back link, hide footer navigation buttons
+    if (pageBackLink) {
+      pageBackLink.hidden = false;
+      pageBackLink.addEventListener('click', (event) => {
+        event.preventDefault();
         playSound('x-back.mp3');
         navigateToCommandCenter();
       });
     }
+    if (btnNavPrimary) btnNavPrimary.style.display = 'none';
     if (btnBackToLineup) btnBackToLineup.style.display = 'none';
     if (btnCancel) btnCancel.style.display = 'none';
   } else {
+    if (pageBackLink) pageBackLink.hidden = true;
     // From lineup: show "Play Game" button and "Back To Lineup" button, hide "Cancel"
     if (btnNavPrimary) {
       btnNavPrimary.textContent = 'Play Game';
