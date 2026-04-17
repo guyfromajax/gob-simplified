@@ -831,15 +831,9 @@ function renderHomeTeamStatsCard() {
 function renderHomeRecruitingCard() {
   const body = document.getElementById('home-recruiting-body');
   if (!body) return;
-  const natlRank = commandCenterTopDataCache?.rank ?? '--';
-  const prestige = commandCenterTopDataCache?.prestige ?? '--';
   const recruits = [...leanRecruitsDataCache].sort((a, b) => Number(b.rt || 0) - Number(a.rt || 0));
   body.innerHTML = `
     <div class="fcc-home-recruiting">
-      <div class="fcc-home-recruiting-topline">
-        <span class="fcc-home-recruiting-rank">${escapeHomeHtml(`National Rank: ${natlRank}`)}</span>
-        <span class="fcc-home-recruiting-prestige">${escapeHomeHtml(`Prestige: ${prestige}`)}</span>
-      </div>
       <div class="fcc-home-list-scroll">
         <div class="fcc-home-recruit-header">
           <span>Recruit</span>
