@@ -1189,7 +1189,7 @@ body {
 #franchise-container #recruits-tab table.recruiting-table {
   margin: 0;
   min-width: 1180px;
-  width: max-content;
+  width: max(100%, 1180px);
   border-collapse: separate;
   border-spacing: 0;
 }

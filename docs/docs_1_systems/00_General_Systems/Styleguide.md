@@ -95,6 +95,7 @@ This document defines the core visual and interaction standards for Geeked-Out B
 ### Surface Rules
 - Background atmosphere may shift with team-color mode.
 - Core data surfaces should remain neutral and readable across many possible team colors.
+- For FCC data-heavy containers, if the data surface naturally occupies more than 50% of the available horizontal space, it should fill to the right edge of the container rather than leaving unused dead space.
 
 ## Page Background System
 
@@ -114,6 +115,8 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Foreground content must sit above the background layers at all times.
 - Background design should feel architectural and systemic, not decorative.
 - Core content surfaces inside the shell should remain neutral dark panels rather than inheriting the full blue atmospheric treatment.
+- Pages whose primary information sits inside a tile or tile system should keep the horizontal line layer in the background shell.
+- Pages whose primary information does not sit inside a tile system should remove the horizontal line layer and keep only the rest of the brand shell treatment.
 
 ## Theme Behavior
 
