@@ -1619,9 +1619,39 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   stroke-width: 1;
 }
 
+#franchise-container .tm-radar-ring:nth-of-type(2) {
+  stroke: rgba(52, 236, 39, 0.26);
+  stroke-width: 1.35;
+}
+
+#franchise-container .tm-radar-ring:nth-of-type(3) {
+  stroke: rgba(52, 236, 39, 0.16);
+  stroke-width: 1.1;
+}
+
+#franchise-container .tm-radar-ring-outer {
+  stroke: rgba(52, 236, 39, 0.72);
+  stroke-width: 2.45;
+}
+
 #franchise-container .tm-radar-ring-zero {
-  stroke: rgba(215, 231, 255, 0.34);
-  stroke-width: 1.75;
+  stroke: rgba(255, 205, 38, 0.62);
+  stroke-width: 2.2;
+}
+
+#franchise-container .tm-radar-ring:nth-of-type(5) {
+  stroke: rgba(255, 82, 82, 0.18);
+  stroke-width: 1.1;
+}
+
+#franchise-container .tm-radar-ring:nth-of-type(6) {
+  stroke: rgba(255, 82, 82, 0.3);
+  stroke-width: 1.35;
+}
+
+#franchise-container .tm-radar-ring-inner {
+  stroke: rgba(255, 82, 82, 0.78);
+  stroke-width: 2.45;
 }
 
 #franchise-container .tm-radar-axis {

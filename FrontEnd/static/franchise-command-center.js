@@ -2877,7 +2877,14 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
       const point = pointFor(axis.angle, ringValue);
       return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
     }).join(' ');
-    return `<polygon class="tm-radar-ring${ringValue === 0 ? ' tm-radar-ring-zero' : ''}" points="${points}" />`;
+    const ringClass = ringValue === 10
+      ? ' tm-radar-ring-outer'
+      : ringValue === 0
+        ? ' tm-radar-ring-zero'
+        : ringValue === -10
+          ? ' tm-radar-ring-inner'
+          : '';
+    return `<polygon class="tm-radar-ring${ringClass}" points="${points}" />`;
   }).join('');
 
   const axisLines = TEAM_MEASURES_RADAR_AXES.map((axis) => {
@@ -2897,10 +2904,8 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
 
   const valueLabels = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
     const point = pointFor(axis.angle, clampedValues[index], pointLabelRadius);
-    const pulseClass = Math.abs(values[index]) >= 7 ? ' is-pulsing' : '';
     return `
-      <circle class="tm-radar-point${pulseClass}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4.5" />
-      <text class="tm-radar-value" x="${point.x.toFixed(2)}" y="${(point.y - 12).toFixed(2)}" text-anchor="middle">${formatTeamAttrDisplayValue(axis.key, values[index])}</text>
+      <circle class="tm-radar-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4.5" />
     `;
   }).join('');
 
@@ -2966,7 +2971,6 @@ function buildTeamMeasuresLinearCardMarkup(title, attrKey, value) {
       <div class="tm-linear-bar${pulseClass}">
         ${fillMarkup}
         <div class="tm-linear-center"></div>
-        <div class="tm-linear-inline-value">${visual.displayValue}</div>
       </div>
     </div>
   `;
