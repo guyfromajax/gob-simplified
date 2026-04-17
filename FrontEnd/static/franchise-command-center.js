@@ -2916,7 +2916,7 @@ function mapGamePlanValue(key, rawValue) {
       return {
         0: 'Passive',
         1: 'Normal / Passive',
-        2: '50% Normal',
+        2: 'Normal',
         3: 'Normal / Aggressive',
         4: 'Aggressive'
       }[value];
