@@ -3278,6 +3278,197 @@ def _sister_conference(conference: int) -> int:
     return conference + 1 if conference % 2 == 1 else conference - 1
 
 
+def _schedule_game_key(week: int, away_id: Any, home_id: Any) -> tuple[int, str, str]:
+    away_str = str(away_id)
+    home_str = str(home_id)
+    low, high = sorted([away_str, home_str])
+    return (int(week), low, high)
+
+
+def _get_schedule_game_doc_map(franchise_id: str, max_week: int = 26) -> dict[tuple[int, str, str], dict[str, Any]]:
+    game_doc_map: dict[tuple[int, str, str], dict[str, Any]] = {}
+    cursor = db.games.find(
+        {
+            "franchise_id": str(franchise_id),
+            "week": {"$gte": 1, "$lte": int(max_week)},
+        },
+        {
+            "_id": 1,
+            "week": 1,
+            "team1_id": 1,
+            "team2_id": 1,
+            "team1_score": 1,
+            "team2_score": 1,
+            "home_team_id": 1,
+            "away_team_id": 1,
+        },
+    )
+    for doc in cursor:
+        week = doc.get("week")
+        team1_id = doc.get("team1_id") or doc.get("away_team_id")
+        team2_id = doc.get("team2_id") or doc.get("home_team_id")
+        if week is None or not team1_id or not team2_id:
+            continue
+        key = _schedule_game_key(int(week), team1_id, team2_id)
+        existing = game_doc_map.get(key)
+        if not existing:
+            game_doc_map[key] = doc
+            continue
+        existing_score = int(bool(existing.get("team1_score") is not None or existing.get("team2_score") is not None))
+        current_score = int(bool(doc.get("team1_score") is not None or doc.get("team2_score") is not None))
+        if current_score > existing_score:
+            game_doc_map[key] = doc
+    return game_doc_map
+
+
+def _build_season_schedule_payload(
+    franchise_id: str,
+    conference: Optional[int] = None,
+    user_team_only: bool = False,
+) -> dict[str, Any]:
+    franchise_doc = db.franchises.find_one(
+        {"_id": ObjectId(franchise_id)},
+        {
+            "schedule": 1,
+            "results": 1,
+            "eos_tournament": 1,
+            "eos_tournament_active": 1,
+            "conference_tournaments": 1,
+            "region_tournaments": 1,
+            "national_tournament": 1,
+            "user_team_id": 1,
+            "user_team_object_id": 1,
+            "_id": 1,
+        },
+    )
+    found = franchise_doc is not None
+    logger.info("season_schedule franchise_id=%s found=%s", franchise_id, found)
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    schedule = franchise_doc.get("schedule", [])
+    user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    team_id = user_team_object_id if user_team_object_id else None
+
+    training_reports = {}
+    if team_id and ObjectId.is_valid(team_id):
+        try:
+            ftd = franchise_team_data_collection.find_one(
+                {"franchise_id": ObjectId(franchise_id), "team_id": ObjectId(team_id)},
+                {"training_reports": 1},
+            )
+            if ftd:
+                training_reports = ftd.get("training_reports", {})
+        except Exception:
+            pass
+
+    team_docs = list(db.teams.find({}, {"_id": 1, "conference": 1, "name": 1, "mascot": 1}))
+    team_conferences = {str(t["_id"]): t.get("conference") for t in team_docs}
+    team_name_lookup = {str(t["_id"]): t.get("name", str(t["_id"])) for t in team_docs}
+    game_doc_map = _get_schedule_game_doc_map(franchise_id, 26)
+
+    weeks: list[list[dict[str, Any]]] = []
+    results_by_week = franchise_doc.get("results", {})
+    included_team_ids: set[str] = set()
+
+    for idx, games in enumerate(schedule, start=1):
+        week_games = []
+        week_results = {
+            (str(r["away_id"]), str(r["home_id"])): (r["away_score"], r["home_score"])
+            for r in results_by_week.get(str(idx), [])
+        }
+        for away_id, home_id in games:
+            away_str = str(away_id)
+            home_str = str(home_id)
+
+            if user_team_only and team_id and team_id not in {away_str, home_str}:
+                continue
+
+            if conference is not None:
+                away_conf = team_conferences.get(away_str)
+                home_conf = team_conferences.get(home_str)
+                if away_conf != conference and home_conf != conference:
+                    continue
+
+            res = week_results.get((away_str, home_str)) or week_results.get((home_str, away_str))
+            game_doc = game_doc_map.get(_schedule_game_key(idx, away_str, home_str))
+
+            if res:
+                away_score, home_score = res
+                status = "complete"
+            elif game_doc:
+                status = "complete"
+                if str(game_doc.get("team1_id")) == away_str:
+                    away_score = game_doc.get("team1_score")
+                    home_score = game_doc.get("team2_score")
+                elif str(game_doc.get("team2_id")) == away_str:
+                    away_score = game_doc.get("team2_score")
+                    home_score = game_doc.get("team1_score")
+                else:
+                    away_score = game_doc.get("team1_score")
+                    home_score = game_doc.get("team2_score")
+            else:
+                status = "scheduled"
+                away_score = None
+                home_score = None
+
+            has_training_report = bool(team_id and team_id in {away_str, home_str} and str(idx) in training_reports)
+            game_id = str(game_doc.get("_id")) if status == "complete" and game_doc and game_doc.get("_id") else None
+
+            week_games.append({
+                "week": idx,
+                "away_team_id": away_str,
+                "home_team_id": home_str,
+                "away_score": away_score,
+                "home_score": home_score,
+                "status": status,
+                "has_training_report": has_training_report,
+                "is_user_team": bool(team_id and team_id in {away_str, home_str}),
+                "game_id": game_id,
+                "away_conference": team_conferences.get(away_str),
+                "home_conference": team_conferences.get(home_str),
+            })
+            included_team_ids.add(away_str)
+            included_team_ids.add(home_str)
+        weeks.append(week_games)
+
+    team_name_map = {
+        team_id_str: team_name_lookup.get(team_id_str, team_id_str)
+        for team_id_str in included_team_ids
+    }
+    ftd_rank_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": ObjectId(franchise_id)},
+        {"team_id": 1, "natl_rank": 1},
+    ))
+    natl_rank_by_team_id = {
+        str(doc["team_id"]): int(doc.get("natl_rank", 999) or 999)
+        for doc in ftd_rank_docs
+        if doc.get("team_id")
+    }
+    team_display_name_map = {
+        team_id_str: _format_team_name_with_rank(team_id_str, team_name, natl_rank_by_team_id)
+        for team_id_str, team_name in team_name_map.items()
+    }
+
+    logger.info(
+        "season_schedule returning franchise_id=%s found=%s conference=%s user_team_only=%s weeks=%s",
+        franchise_id,
+        found,
+        conference,
+        user_team_only,
+        len(weeks),
+    )
+    return {
+        "schedule": weeks,
+        "team_id": team_id,
+        "team_name": user_team_name,
+        "team_conferences": team_conferences,
+        "team_name_map": team_name_map,
+        "team_display_name_map": team_display_name_map,
+        "conference": conference,
+    }
+
+
 @router.get("/franchise/standings")
 def standings(
     franchise_id: str,
@@ -3399,217 +3590,19 @@ def standings(
 
 
 @router.get("/franchise/schedule")
-def season_schedule(franchise_id: str, conference: Optional[int] = None):
-    import time
-    start_time = time.time()
-    # logger.info(f"⏱️ [PERF] /franchise/schedule START - franchise_id={franchise_id}")
-    
-    # ✅ PERFORMANCE: Only fetch needed fields (reduces from 402KB to ~30KB, 92% reduction)
-    db_query_start = time.time()
-    franchise_doc = db.franchises.find_one(
-        {"_id": ObjectId(franchise_id)},
-        {
-            "schedule": 1,
-            "results": 1,
-            "eos_tournament": 1,
-            "eos_tournament_active": 1,
-            "conference_tournaments": 1,
-            "region_tournaments": 1,
-            "national_tournament": 1,
-            "user_team_id": 1,
-            "user_team_object_id": 1,
-            "_id": 1
-        }
+def season_schedule(franchise_id: str, conference: Optional[int] = None, user_team_only: bool = False):
+    if conference is not None and (not isinstance(conference, int) or conference < 1 or conference > 16):
+        raise HTTPException(status_code=422, detail="conference must be an integer from 1 to 16")
+    return _build_season_schedule_payload(
+        franchise_id=franchise_id,
+        conference=conference,
+        user_team_only=bool(user_team_only),
     )
-    db_query_time = time.time() - db_query_start
-    # logger.info(f"⏱️ [PERF] /franchise/schedule DB query: {db_query_time:.3f}s")
-    
-    found = franchise_doc is not None
-    logger.info("season_schedule franchise_id=%s found=%s", franchise_id, found)
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-    schedule = franchise_doc.get("schedule", [])
 
-    # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
-    user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-    if not user_team_id or not user_team_object_id:
-        # Fallback: try to resolve from team name if user_team_object_id is missing
-        team_name = user_team_id
-        if team_name:
-            team_doc = db.teams.find_one({"name": team_name})
-            if team_doc:
-                team_id = str(team_doc["_id"])
-            else:
-                team_id = None
-        else:
-            team_id = None
-    else:
-        # Use franchise document's user_team_object_id directly (authoritative)
-        team_id = user_team_object_id
-        team_name = user_team_id
-    
-    # Get training reports for user's team from FTD
-    training_reports = {}
-    if team_id:
-        try:
-            ftd = franchise_team_data_collection.find_one(
-                {"franchise_id": ObjectId(franchise_id), "team_id": ObjectId(team_id)},
-                {"training_reports": 1}
-            )
-            if ftd:
-                training_reports = ftd.get("training_reports", {})
-        except Exception:
-            pass
 
-    weeks = []
-    results_by_week = franchise_doc.get("results", {})
-    included_team_ids = set()
-    for idx, games in enumerate(schedule, start=1):
-        week_games = []
-        week_results = {
-            (r["away_id"], r["home_id"]): (r["away_score"], r["home_score"])
-            for r in results_by_week.get(str(idx), [])
-        }
-        for away_id, home_id in games:
-            res = week_results.get((str(away_id), str(home_id))) or \
-                  week_results.get((str(home_id), str(away_id)))
-            game_doc = None  # ✅ SS&S: Initialize game_doc before conditional
-            if res:
-                away_score, home_score = res
-                status = "complete"
-                # ✅ SS&S: Try to find game_doc even when status comes from results
-                game_doc = db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": away_id, "team2_id": home_id}) or \
-                           db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": home_id, "team2_id": away_id})
-            else:
-                game_doc = db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": away_id, "team2_id": home_id}) or \
-                           db.games.find_one({"week": idx, "franchise_id": str(franchise_id), "team1_id": home_id, "team2_id": away_id})
-                if game_doc:
-                    status = "complete"
-                    if game_doc["team1_id"] == away_id:
-                        away_score = game_doc.get("team1_score")
-                        home_score = game_doc.get("team2_score")
-                    else:
-                        away_score = game_doc.get("team2_score")
-                        home_score = game_doc.get("team1_score")
-                else:
-                    status = "scheduled"
-                    away_score = None
-                    home_score = None
-            
-            # Check if this is the user's team's game and if training report exists
-            has_training_report = False
-            if team_id and (str(away_id) == team_id or str(home_id) == team_id):
-                has_training_report = str(idx) in training_reports
-            
-            # ✅ SS&S: Include game_id for completed games (needed for box score links)
-            game_id = None
-            if status == "complete" and game_doc:
-                game_id = str(game_doc.get("_id", ""))
-            
-            week_games.append({
-                "week": idx,
-                "away_team_id": str(away_id),
-                "home_team_id": str(home_id),
-                "away_score": away_score,
-                "home_score": home_score,
-                "status": status,
-                "has_training_report": has_training_report,
-                "is_user_team": str(away_id) == team_id or str(home_id) == team_id,
-                "game_id": game_id  # ✅ SS&S: Include game_id for box score links
-            })
-            included_team_ids.add(str(away_id))
-            included_team_ids.add(str(home_id))
-        weeks.append(week_games)
-
-    # ✅ EOS: Add tournament games (weeks 27–34) from conference / region / national
-    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
-    eos_has_state = bool(
-        franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
-    )
-    if eos_tournament_active and eos_has_state:
-        round_labels = {
-            27: "Conference R1", 28: "Conference R2", 29: "Conference Final",
-            30: "Region R1", 31: "Region Final",
-            32: "National QF", 33: "National SF", 34: "National Final",
-        }
-        for eos_week in ft.EOS_WEEKS:
-            week_games_meta = ft.get_eos_week_games(franchise_doc, eos_week, include_completed=True)
-            week_games = []
-            for g in week_games_meta:
-                away_id = g.get("away_id")
-                home_id = g.get("home_id")
-                if not away_id or not home_id:
-                    continue
-                away_str = str(away_id)
-                home_str = str(home_id)
-                score = g.get("score", {})
-                away_score = score.get("away")
-                home_score = score.get("home")
-                status = "complete" if g.get("winner") else "scheduled"
-                has_training_report = bool(team_id and (away_str == team_id or home_str == team_id) and str(eos_week) in training_reports)
-                week_games.append({
-                    "week": eos_week,
-                    "away_team_id": away_str,
-                    "home_team_id": home_str,
-                    "away_score": away_score,
-                    "home_score": home_score,
-                    "status": status,
-                    "has_training_report": has_training_report,
-                    "is_user_team": away_str == team_id or home_str == team_id,
-                    "game_id": g.get("game_id"),
-                    "is_tournament": True,
-                    "round": round_labels.get(eos_week, ""),
-                })
-                included_team_ids.add(away_str)
-                included_team_ids.add(home_str)
-            weeks.append(week_games)
-
-    team_docs = list(db.teams.find({}, {"_id": 1, "conference": 1, "name": 1, "mascot": 1}))
-    team_conferences = {str(t["_id"]): t.get("conference") for t in team_docs}
-    if conference is not None:
-        if not isinstance(conference, int) or conference < 1 or conference > 16:
-            raise HTTPException(status_code=422, detail="conference must be an integer from 1 to 16")
-        filtered_weeks = []
-        included_team_ids = set()
-        for week_games in weeks:
-            filtered_week_games = [
-                game for game in (week_games or [])
-                if team_conferences.get(game.get("away_team_id")) == conference
-                or team_conferences.get(game.get("home_team_id")) == conference
-            ]
-            for game in filtered_week_games:
-                included_team_ids.add(game.get("away_team_id"))
-                included_team_ids.add(game.get("home_team_id"))
-            filtered_weeks.append(filtered_week_games)
-        weeks = filtered_weeks
-
-    team_name_map = {
-        str(team_doc["_id"]): team_doc.get("name")
-        for team_doc in team_docs
-        if str(team_doc["_id"]) in included_team_ids
-    }
-    ftd_rank_docs = list(franchise_team_data_collection.find(
-        {"franchise_id": ObjectId(franchise_id)},
-        {"team_id": 1, "natl_rank": 1},
-    ))
-    natl_rank_by_team_id = {
-        str(doc["team_id"]): int(doc.get("natl_rank", 999) or 999)
-        for doc in ftd_rank_docs
-        if doc.get("team_id")
-    }
-    team_display_name_map = {
-        team_id: _format_team_name_with_rank(team_id, team_name, natl_rank_by_team_id)
-        for team_id, team_name in team_name_map.items()
-    }
-    logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
-    return {
-        "schedule": weeks,
-        "team_id": team_id,
-        "team_conferences": team_conferences,
-        "team_name_map": team_name_map,
-        "team_display_name_map": team_display_name_map,
-        "conference": conference,
-    }
+@router.get("/franchise/schedule/national")
+def national_schedule(franchise_id: str):
+    return _build_season_schedule_payload(franchise_id=franchise_id)
 
 
 def get_leaders(

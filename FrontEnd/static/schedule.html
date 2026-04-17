@@ -303,40 +303,25 @@
 
   Promise.all([
     fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
-    ...Array.from({ length: 16 }, (_, index) => fetchJSON(
-      API_CONFIG.buildUrl('/franchise/schedule')
-      + '?franchise_id=' + encodeURIComponent(franchiseId)
-      + '&conference=' + encodeURIComponent(index + 1)
-    ))
-  ]).then(([cc, ...conferencePayloads]) => {
-    const seen = new Set();
+    fetchJSON(API_CONFIG.buildUrl('/franchise/schedule/national') + '?franchise_id=' + encodeURIComponent(franchiseId))
+  ]).then(([cc, payload]) => {
     const allGamesByWeek = {};
+    const schedule = payload?.schedule || [];
+    const teamNameMap = payload?.team_name_map || {};
+    const teamDisplayMap = payload?.team_display_name_map || {};
 
-    conferencePayloads.forEach((payload, conferenceIndex) => {
-      const schedule = payload?.schedule || [];
-      const teamNameMap = payload?.team_name_map || {};
-      const teamDisplayMap = payload?.team_display_name_map || {};
-      schedule.forEach((weekGames, weekIndex) => {
-        const weekNumber = weekIndex + 1;
-        if (!Array.isArray(weekGames)) return;
-        if (!allGamesByWeek[weekNumber]) allGamesByWeek[weekNumber] = [];
-        weekGames.forEach((game, gameIndex) => {
-          const key = game.game_id
-            ? `gid:${game.game_id}`
-            : `wk:${weekNumber}|teams:${[String(game.away_team_id), String(game.home_team_id)].sort().join('|')}|round:${game.round || ''}|t:${game.is_tournament ? 1 : 0}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          allGamesByWeek[weekNumber].push({
-            ...game,
-            away_name: teamNameMap[game.away_team_id] || game.away_team_id,
-            home_name: teamNameMap[game.home_team_id] || game.home_team_id,
-            away_display_name: teamDisplayMap[game.away_team_id] || teamNameMap[game.away_team_id] || game.away_team_id,
-            home_display_name: teamDisplayMap[game.home_team_id] || teamNameMap[game.home_team_id] || game.home_team_id,
-            away_conference: Number(game.away_conference ?? (conferenceIndex + 1)),
-            home_conference: Number(game.home_conference ?? (conferenceIndex + 1))
-          });
-        });
-      });
+    schedule.forEach((weekGames, weekIndex) => {
+      const weekNumber = weekIndex + 1;
+      if (!Array.isArray(weekGames)) return;
+      allGamesByWeek[weekNumber] = weekGames.map((game) => ({
+        ...game,
+        away_name: teamNameMap[game.away_team_id] || game.away_team_id,
+        home_name: teamNameMap[game.home_team_id] || game.home_team_id,
+        away_display_name: teamDisplayMap[game.away_team_id] || teamNameMap[game.away_team_id] || game.away_team_id,
+        home_display_name: teamDisplayMap[game.home_team_id] || teamNameMap[game.home_team_id] || game.home_team_id,
+        away_conference: Number(game.away_conference),
+        home_conference: Number(game.home_conference)
+      }));
     });
 
     renderNationalSchedule(allGamesByWeek, Number(cc.user_conference));

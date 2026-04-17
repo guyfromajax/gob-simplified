@@ -635,7 +635,7 @@ async function ensureHomeScheduleData() {
   if (userScheduleDataCache || !franchiseId) return userScheduleDataCache;
   const params = new URLSearchParams();
   params.set('franchise_id', franchiseId);
-  if (userConference != null) params.set('conference', String(userConference));
+  params.set('user_team_only', '1');
   userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
   persistFccSessionCache();
   return userScheduleDataCache;
