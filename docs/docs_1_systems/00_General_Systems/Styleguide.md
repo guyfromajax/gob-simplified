@@ -115,8 +115,8 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Foreground content must sit above the background layers at all times.
 - Background design should feel architectural and systemic, not decorative.
 - Core content surfaces inside the shell should remain neutral dark panels rather than inheriting the full blue atmospheric treatment.
-- Pages whose primary information sits inside a tile or tile system should keep the horizontal line layer in the background shell.
-- Pages whose primary information does not sit inside a tile system should remove the horizontal line layer and keep only the rest of the brand shell treatment.
+- Pages whose primary information sits inside dark tiles or cards should keep the horizontal line layer in the background shell.
+- Pages whose primary information sits directly on the page shell, without dark tiles or cards holding that data, should remove the horizontal line layer and keep only the rest of the brand shell treatment.
 
 ## Theme Behavior
 
