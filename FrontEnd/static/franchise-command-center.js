@@ -2852,15 +2852,20 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
   const radius = 164;
   const labelRadius = 204;
   const pointLabelRadius = 18;
-  const ringValues = [2, 4, 6, 8, 10];
+  const ringValues = [10, 6.7, 3.3, 0, -3.3, -6.7, -10];
 
   const values = TEAM_MEASURES_RADAR_AXES.map((axis) => Number(teamAttrs?.[axis.key] || 0));
-  const magnitudes = values.map((value) => Math.max(0, Math.min(10, Math.abs(value))));
+  const clampedValues = values.map((value) => Math.max(-10, Math.min(10, value)));
   const dominantCount = values.filter((value) => Number(value) >= 7).length;
 
-  function pointFor(angleDeg, magnitude, extra = 0) {
+  function radiusForValue(value) {
+    const clamped = Math.max(-10, Math.min(10, Number(value) || 0));
+    return ((clamped + 10) / 20) * radius;
+  }
+
+  function pointFor(angleDeg, value, extra = 0) {
     const radians = (angleDeg * Math.PI) / 180;
-    const scaledRadius = (Math.max(0, magnitude) / 10) * radius + extra;
+    const scaledRadius = radiusForValue(value) + extra;
     return {
       x: center + Math.cos(radians) * scaledRadius,
       y: center + Math.sin(radians) * scaledRadius
@@ -2872,7 +2877,7 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
       const point = pointFor(axis.angle, ringValue);
       return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
     }).join(' ');
-    return `<polygon class="tm-radar-ring" points="${points}" />`;
+    return `<polygon class="tm-radar-ring${ringValue === 0 ? ' tm-radar-ring-zero' : ''}" points="${points}" />`;
   }).join('');
 
   const axisLines = TEAM_MEASURES_RADAR_AXES.map((axis) => {
@@ -2881,7 +2886,7 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
   }).join('');
 
   const shapePoints = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
-    const point = pointFor(axis.angle, magnitudes[index]);
+    const point = pointFor(axis.angle, clampedValues[index]);
     return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
   }).join(' ');
 
@@ -2891,7 +2896,7 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
   }).join('');
 
   const valueLabels = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
-    const point = pointFor(axis.angle, magnitudes[index], pointLabelRadius);
+    const point = pointFor(axis.angle, clampedValues[index], pointLabelRadius);
     const pulseClass = Math.abs(values[index]) >= 7 ? ' is-pulsing' : '';
     return `
       <circle class="tm-radar-point${pulseClass}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4.5" />
@@ -2958,10 +2963,10 @@ function buildTeamMeasuresLinearCardMarkup(title, attrKey, value) {
   return `
     <div class="tm-side-card-content">
       <div class="tm-side-card-label">${title}</div>
-      <div class="tm-side-card-value">${visual.displayValue}</div>
       <div class="tm-linear-bar${pulseClass}">
         ${fillMarkup}
         <div class="tm-linear-center"></div>
+        <div class="tm-linear-inline-value">${visual.displayValue}</div>
       </div>
     </div>
   `;
@@ -3075,10 +3080,10 @@ function getTeamAttrVisualConfig(attrKey, value) {
   let pulse = false;
 
   if (attrKey === 'shot_threshold') {
-    const deviation = value - 110;
+    const deviation = 110 - value;
     normalized = (deviation / 100) * 10;
     fillPercent = Math.min((Math.abs(deviation) / 100) * 50, 50);
-    pulse = Math.abs(deviation) >= 30;
+    pulse = Math.abs(110 - value) >= 30;
   } else if (attrKey === 'rebound_modifier') {
     const deviation = value - 0.2;
     normalized = (deviation / 0.2) * 10;

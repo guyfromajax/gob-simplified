@@ -1576,7 +1576,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 #franchise-container .fcc-team-measures-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
-  gap: 18px;
+  gap: 14px;
   align-items: stretch;
 }
 
@@ -1586,29 +1586,29 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 #franchise-container .fcc-team-measures-panel-body {
-  padding: 18px;
+  padding: 14px;
 }
 
 #franchise-container .fcc-team-measures-side {
   display: grid;
   grid-template-rows: 1fr 1fr 1.18fr;
-  gap: 18px;
+  gap: 14px;
 }
 
 #franchise-container .fcc-team-measures-side-card-chemistry .fcc-team-measures-panel-body {
-  min-height: 210px;
+  min-height: 178px;
 }
 
 #franchise-container .tm-radar-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 560px;
+  min-height: 470px;
 }
 
 #franchise-container .tm-radar-svg {
   width: 100%;
-  max-width: 620px;
+  max-width: 560px;
   height: auto;
   overflow: visible;
 }
@@ -1617,6 +1617,11 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   fill: none;
   stroke: rgba(153, 153, 153, 0.18);
   stroke-width: 1;
+}
+
+#franchise-container .tm-radar-ring-zero {
+  stroke: rgba(215, 231, 255, 0.34);
+  stroke-width: 1.75;
 }
 
 #franchise-container .tm-radar-axis {
@@ -1672,16 +1677,16 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   flex-direction: column;
   justify-content: center;
   height: 100%;
-  gap: 16px;
+  gap: 12px;
 }
 
 #franchise-container .tm-side-card-content-chemistry {
-  gap: 18px;
+  gap: 14px;
 }
 
 #franchise-container .tm-side-card-label {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.96);
@@ -1699,7 +1704,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 #franchise-container .tm-chemistry-bar {
   position: relative;
   width: 100%;
-  height: 36px;
+  height: 34px;
   border-radius: 999px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.06));
@@ -1736,6 +1741,28 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   right: 50%;
   background: linear-gradient(90deg, rgba(255, 109, 109, 0.96), rgba(255, 82, 82, 0.74));
   box-shadow: 0 0 10px rgba(255, 82, 82, 0.35), 0 0 18px rgba(255, 82, 82, 0.18);
+}
+
+#franchise-container .tm-linear-inline-value {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  min-width: 44px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(10, 16, 30, 0.54);
+  color: rgba(255, 255, 255, 0.96);
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #franchise-container .tm-chemistry-fill {
