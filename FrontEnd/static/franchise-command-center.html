@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Franchise Command Center</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/tournament.css">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/command-center-team-styles.css">
@@ -225,10 +225,23 @@
         </section>
       </div>
       <div id="team-stats-tab" class="tab-content">
-        <div class="training-report-styled fcc-team-measures-wrap">
-          <section class="team-section">
-            <div class="team-attributes-grid" id="team-attributes-grid"></div>
+        <div class="training-report-styled fcc-team-measures-layout">
+          <section class="fcc-data-card fcc-team-measures-radar-panel">
+            <div class="fcc-data-card-body fcc-team-measures-panel-body">
+              <div id="team-measures-radar"></div>
+            </div>
           </section>
+          <div class="fcc-team-measures-side">
+            <section class="fcc-data-card fcc-team-measures-side-card">
+              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-shooting"></div>
+            </section>
+            <section class="fcc-data-card fcc-team-measures-side-card">
+              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-rebounding"></div>
+            </section>
+            <section class="fcc-data-card fcc-team-measures-side-card fcc-team-measures-side-card-chemistry">
+              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-chemistry"></div>
+            </section>
+          </div>
         </div>
       </div>
       <div id="schedule-tab" class="tab-content fcc-placeholder-tab">

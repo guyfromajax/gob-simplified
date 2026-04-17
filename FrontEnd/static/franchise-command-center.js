@@ -2823,33 +2823,148 @@ async function loadTeamData() {
 
 function renderTeamReport() {
   if (!teamData) return;
-  
-  const grid = document.getElementById('team-attributes-grid');
-  if (!grid) return;
-  
-  grid.innerHTML = '';
-  
   const teamAttrs = teamData.team_attributes || {};
-  
-  const attrOrder = [
-    'shot_threshold',
-    'rebound_modifier',
-    'offensive_efficiency',
-    'defensive_efficiency',
-    'fb_efficiency',
-    'pt_efficiency',
-    'fight',
-    'discipline',
-    'momentum_score',
-    'team_chemistry',
-    'fb_opp_modifier',
-    'pt_opp_modifier'
-  ];
-  
-  attrOrder.forEach(attrKey => {
-    const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], 0);
-    if (item) grid.appendChild(item);
-  });
+  const radarHost = document.getElementById('team-measures-radar');
+  const shootingHost = document.getElementById('team-measure-shooting');
+  const reboundingHost = document.getElementById('team-measure-rebounding');
+  const chemistryHost = document.getElementById('team-measure-chemistry');
+  if (!radarHost || !shootingHost || !reboundingHost || !chemistryHost) return;
+
+  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(teamAttrs);
+  shootingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(teamAttrs.shot_threshold || 0));
+  reboundingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(teamAttrs.rebound_modifier || 0));
+  chemistryHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(teamAttrs.team_chemistry || 0));
+}
+
+const TEAM_MEASURES_RADAR_AXES = [
+  { key: 'offensive_efficiency', label: 'Offense', angle: -90 },
+  { key: 'fb_efficiency', label: 'Fast Breaks', angle: -45 },
+  { key: 'discipline', label: 'Discipline', angle: 0 },
+  { key: 'pt_efficiency', label: 'Press/Traps', angle: 45 },
+  { key: 'defensive_efficiency', label: 'Defense', angle: 90 },
+  { key: 'fb_opp_modifier', label: 'Fast Break Defense', angle: 135 },
+  { key: 'fight', label: 'Fight', angle: 180 },
+  { key: 'pt_opp_modifier', label: 'P/T Offense', angle: 225 }
+];
+
+function buildTeamMeasuresRadarMarkup(teamAttrs) {
+  const center = 250;
+  const radius = 164;
+  const labelRadius = 204;
+  const pointLabelRadius = 18;
+  const ringValues = [2, 4, 6, 8, 10];
+
+  const values = TEAM_MEASURES_RADAR_AXES.map((axis) => Number(teamAttrs?.[axis.key] || 0));
+  const magnitudes = values.map((value) => Math.max(0, Math.min(10, Math.abs(value))));
+  const dominantCount = values.filter((value) => Number(value) >= 7).length;
+
+  function pointFor(angleDeg, magnitude, extra = 0) {
+    const radians = (angleDeg * Math.PI) / 180;
+    const scaledRadius = (Math.max(0, magnitude) / 10) * radius + extra;
+    return {
+      x: center + Math.cos(radians) * scaledRadius,
+      y: center + Math.sin(radians) * scaledRadius
+    };
+  }
+
+  const ringPolygons = ringValues.map((ringValue) => {
+    const points = TEAM_MEASURES_RADAR_AXES.map((axis) => {
+      const point = pointFor(axis.angle, ringValue);
+      return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+    }).join(' ');
+    return `<polygon class="tm-radar-ring" points="${points}" />`;
+  }).join('');
+
+  const axisLines = TEAM_MEASURES_RADAR_AXES.map((axis) => {
+    const point = pointFor(axis.angle, 10);
+    return `<line class="tm-radar-axis" x1="${center}" y1="${center}" x2="${point.x.toFixed(2)}" y2="${point.y.toFixed(2)}" />`;
+  }).join('');
+
+  const shapePoints = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
+    const point = pointFor(axis.angle, magnitudes[index]);
+    return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+  }).join(' ');
+
+  const labels = TEAM_MEASURES_RADAR_AXES.map((axis) => {
+    const point = pointFor(axis.angle, 10, labelRadius - radius);
+    return `<text class="tm-radar-axis-label" x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}" text-anchor="middle" dominant-baseline="middle">${axis.label}</text>`;
+  }).join('');
+
+  const valueLabels = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
+    const point = pointFor(axis.angle, magnitudes[index], pointLabelRadius);
+    const pulseClass = Math.abs(values[index]) >= 7 ? ' is-pulsing' : '';
+    return `
+      <circle class="tm-radar-point${pulseClass}" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4.5" />
+      <text class="tm-radar-value" x="${point.x.toFixed(2)}" y="${(point.y - 12).toFixed(2)}" text-anchor="middle">${formatTeamAttrDisplayValue(axis.key, values[index])}</text>
+    `;
+  }).join('');
+
+  return `
+    <div class="tm-radar-wrap">
+      <svg class="tm-radar-svg" viewBox="0 0 500 500" role="img" aria-label="Team Measures radar chart">
+        <defs>
+          <filter id="tm-radar-outline-glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="tm-radar-point-glow" x="-200%" y="-200%" width="400%" height="400%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <g class="tm-radar-grid">
+          ${ringPolygons}
+          ${axisLines}
+        </g>
+        <polygon class="tm-radar-shape-fill" points="${shapePoints}" />
+        <polygon class="tm-radar-shape-outline${dominantCount >= 3 ? ' is-pulsing' : ''}" points="${shapePoints}" />
+        ${labels}
+        ${valueLabels}
+      </svg>
+    </div>
+  `;
+}
+
+function buildTeamMeasuresLinearCardMarkup(title, attrKey, value) {
+  const visual = getTeamAttrVisualConfig(attrKey, value);
+  if (attrKey === 'team_chemistry') {
+    const percentage = Math.max(0, Math.min((Number(value) / 25) * 100, 100));
+    const pulseClass = visual.pulse ? ' is-pulsing' : '';
+    return `
+      <div class="tm-side-card-content tm-side-card-content-chemistry">
+        <div class="tm-side-card-label">${title}</div>
+        <div class="tm-side-card-value">${visual.displayValue}</div>
+        <div class="tm-chemistry-bar${pulseClass}">
+          <div class="tm-chemistry-fill" style="width:${percentage}%; opacity:${0.2 + (percentage / 100) * 0.8};"></div>
+          <div class="tm-chemistry-text">${visual.displayValue}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const pulseClass = visual.pulse ? ' is-pulsing' : '';
+  const fillMarkup = visual.direction === 'positive'
+    ? `<div class="tm-linear-fill tm-linear-fill-positive" style="width:${visual.fillPercent}%"></div>`
+    : (visual.direction === 'negative'
+      ? `<div class="tm-linear-fill tm-linear-fill-negative" style="width:${visual.fillPercent}%"></div>`
+      : '');
+
+  return `
+    <div class="tm-side-card-content">
+      <div class="tm-side-card-label">${title}</div>
+      <div class="tm-side-card-value">${visual.displayValue}</div>
+      <div class="tm-linear-bar${pulseClass}">
+        ${fillMarkup}
+        <div class="tm-linear-center"></div>
+      </div>
+    </div>
+  `;
 }
 
 function createTeamAttrItem(attrKey, currentValue, change) {

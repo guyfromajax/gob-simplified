@@ -1573,22 +1573,217 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-#franchise-container .fcc-team-measures-wrap .team-section {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
-    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 14px 28px rgba(0, 0, 0, 0.12);
+#franchise-container .fcc-team-measures-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+  gap: 18px;
+  align-items: stretch;
 }
 
-#franchise-container .training-report-styled .team-attributes-grid {
+#franchise-container .fcc-team-measures-radar-panel,
+#franchise-container .fcc-team-measures-side-card {
+  min-height: 0;
+}
+
+#franchise-container .fcc-team-measures-panel-body {
+  padding: 18px;
+}
+
+#franchise-container .fcc-team-measures-side {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 14px;
+  grid-template-rows: 1fr 1fr 1.18fr;
+  gap: 18px;
+}
+
+#franchise-container .fcc-team-measures-side-card-chemistry .fcc-team-measures-panel-body {
+  min-height: 210px;
+}
+
+#franchise-container .tm-radar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 560px;
+}
+
+#franchise-container .tm-radar-svg {
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  overflow: visible;
+}
+
+#franchise-container .tm-radar-ring {
+  fill: none;
+  stroke: rgba(153, 153, 153, 0.18);
+  stroke-width: 1;
+}
+
+#franchise-container .tm-radar-axis {
+  stroke: rgba(153, 153, 153, 0.26);
+  stroke-width: 1;
+}
+
+#franchise-container .tm-radar-shape-fill {
+  fill: rgba(64, 101, 175, 0.3);
+}
+
+#franchise-container .tm-radar-shape-outline {
+  fill: none;
+  stroke: rgba(215, 231, 255, 0.92);
+  stroke-width: 2.25;
+  filter: url(#tm-radar-outline-glow);
+  filter: drop-shadow(0 0 10px rgba(64, 101, 175, 0.38));
+}
+
+#franchise-container .tm-radar-shape-outline.is-pulsing {
+  animation: tmRadarOutlinePulse 2.8s ease-in-out infinite;
+}
+
+#franchise-container .tm-radar-axis-label,
+#franchise-container .tm-radar-value {
+  fill: #ffffff;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+#franchise-container .tm-radar-axis-label {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#franchise-container .tm-radar-value {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#franchise-container .tm-radar-point {
+  fill: #ffffff;
+  opacity: 0.95;
+  filter: url(#tm-radar-point-glow);
+}
+
+#franchise-container .tm-radar-point.is-pulsing {
+  animation: tmRadarPointPulse 2.2s ease-in-out infinite;
+}
+
+#franchise-container .tm-side-card-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+#franchise-container .tm-side-card-content-chemistry {
+  gap: 18px;
+}
+
+#franchise-container .tm-side-card-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+#franchise-container .tm-side-card-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+}
+
+#franchise-container .tm-linear-bar,
+#franchise-container .tm-chemistry-bar {
+  position: relative;
+  width: 100%;
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container .tm-linear-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ffcd26;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+#franchise-container .tm-linear-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  transition: width 0.28s ease, opacity 0.28s ease;
+}
+
+#franchise-container .tm-linear-fill-positive {
+  left: 50%;
+  background: linear-gradient(90deg, rgba(73, 255, 55, 0.74), rgba(52, 236, 39, 0.96));
+  box-shadow: 0 0 10px rgba(52, 236, 39, 0.35), 0 0 18px rgba(52, 236, 39, 0.18);
+}
+
+#franchise-container .tm-linear-fill-negative {
+  right: 50%;
+  background: linear-gradient(90deg, rgba(255, 109, 109, 0.96), rgba(255, 82, 82, 0.74));
+  box-shadow: 0 0 10px rgba(255, 82, 82, 0.35), 0 0 18px rgba(255, 82, 82, 0.18);
+}
+
+#franchise-container .tm-chemistry-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(247, 148, 32, 0.35) 0%, rgba(247, 148, 32, 0.74) 60%, #f79420 100%);
+  box-shadow: 0 0 10px rgba(247, 148, 32, 0.35), 0 0 18px rgba(247, 148, 32, 0.18);
+  transition: width 0.28s ease, opacity 0.28s ease;
+}
+
+#franchise-container .tm-chemistry-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+#franchise-container .tm-linear-bar.is-pulsing .tm-linear-fill,
+#franchise-container .tm-chemistry-bar.is-pulsing .tm-chemistry-fill {
+  animation: fccAttrPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes tmRadarPointPulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes tmRadarOutlinePulse {
+  0%, 100% {
+    opacity: 0.82;
+    filter: drop-shadow(0 0 10px rgba(64, 101, 175, 0.34));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(64, 101, 175, 0.48));
+  }
 }
 
 #franchise-container .training-report-styled .team-attr-item {
