@@ -3,8 +3,8 @@
 
   const params = new URLSearchParams(window.location.search);
   const franchiseId = params.get('franchise_id');
-  let userTeamId = params.get('team_id');
-  let userTeamName = '';
+  const teamId = params.get('team_id');
+  const backBtn = document.getElementById('back-btn');
   let currentScope = 'conference';
   let teamStatsData = null;
   let resourceCache = null;
@@ -12,128 +12,24 @@
   let sortColumn = 'rank';
   let sortDirection = 'asc';
 
-  const playNowBtn = document.getElementById('play-now');
   const COLUMN_ORDER = ['team', 'rank', 'W', 'L', 'PF', 'PA', 'FGM', 'FGA', 'FG%', '3PTM', '3PTA', '3PT%', 'FTM', 'FTA', 'FT%', 'DREB', 'OREB', 'TREB', 'AST', 'F', 'TO', 'SCR_A', 'SCR%', 'STL', 'BLK', 'DEF_A', 'DEF%'];
   const COL_GROUP_START_INDEX = { 0: 1, 6: 1, 9: 1, 12: 1, 15: 1, 18: 1, 23: 1 };
   const STAT_MAP = { team: 'team', rank: 'rank', W: 'W', L: 'L', PF: 'PF', PA: 'PA', FGM: 'FGM', FGA: 'FGA', 'FG%': 'FG%', '3PTM': '3PTM', '3PTA': '3PTA', '3PT%': '3PT%', FTM: 'FTM', FTA: 'FTA', 'FT%': 'FT%', DREB: 'DREB', OREB: 'OREB', TREB: 'TREB', AST: 'AST', F: 'F', TO: 'TO', SCR_A: 'SCR_A', 'SCR%': 'SCR%', STL: 'STL', BLK: 'BLK', DEF_A: 'DEF_A', 'DEF%': 'DEF%' };
 
-  function playSound(filename) {
-    try {
-      const audio = new Audio('/sounds/' + encodeURIComponent(filename));
-      audio.volume = 0.7;
-      audio.play().catch(function () {});
-    } catch (error) {}
-  }
-
-  async function fetchJSON(url) {
-    try {
-      const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
-      if (res.status === 401 || res.status === 403) {
-        if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
-          AccessDenied.checkAccessDenied(res);
-        }
+  function fetchJSON(url) {
+    return fetch(url, { headers: API_CONFIG.getAuthHeaders() })
+      .then((res) => {
+        if (!res.ok) throw new Error('Request failed');
+        return res.json();
+      })
+      .catch((error) => {
+        console.error('Failed loading', url, error);
         return null;
-      }
-      if (!res.ok) throw new Error('Request failed');
-      return await res.json();
-    } catch (error) {
-      console.error('Failed loading', url, error);
-      return null;
-    }
-  }
-
-  function buildFccUrl(tabName) {
-    const next = new URLSearchParams();
-    if (franchiseId) next.set('franchise_id', franchiseId);
-    if (userTeamId) next.set('team_id', userTeamId);
-    if (tabName) next.set('tab', tabName);
-    return '/franchise-command-center.html?' + next.toString();
-  }
-
-  function buildModeUrl(pathname, extraParams) {
-    const next = new URLSearchParams();
-    next.set('mode', 'franchise');
-    if (franchiseId) next.set('franchise_id', franchiseId);
-    if (userTeamId) next.set('team_id', userTeamId);
-    next.set('return_url', getCurrentRelativeUrl());
-    Object.keys(extraParams || {}).forEach((key) => {
-      if (extraParams[key] != null && extraParams[key] !== '') next.set(key, extraParams[key]);
-    });
-    return pathname + '?' + next.toString();
-  }
-
-  function wireTopButtons() {
-    const exitBtn = document.getElementById('exit-franchise');
-    if (exitBtn) {
-      exitBtn.addEventListener('click', function () {
-        playSound('x-back.mp3');
-        window.location.href = '/mode-select.html';
       });
-    }
-
-    if (!playNowBtn) return;
-    playNowBtn.addEventListener('click', function () {
-      playSound('confirm-1.mp3');
-      window.location.href = buildFccUrl('home-tab');
-    });
-  }
-
-  function wireTabRoutes() {
-    const routes = {
-      'team-stats-home-btn': buildFccUrl('home-tab'),
-      'team-stats-roster-btn': buildFccUrl('roster-tab'),
-      'team-stats-player-stats-btn': buildFccUrl('player-stats-tab'),
-      'team-stats-team-measures-btn': buildFccUrl('team-stats-tab'),
-      'team-stats-game-plan-btn': buildModeUrl('/game-plan.html', { from: 'command_center' }),
-      'team-stats-playbooks-btn': buildModeUrl('/playbook-report.html', { from: 'franchise-command-center' }),
-      'team-stats-coaches-btn': buildFccUrl('coaches-tab'),
-      'team-stats-standings-btn': buildFccUrl('standings-tab'),
-      'team-stats-schedule-btn': buildFccUrl('schedule-tab'),
-      'team-stats-leaders-btn': buildFccUrl('awards-tab'),
-      'team-stats-press-btn': buildFccUrl('press-tab'),
-      'team-stats-recruits-btn': buildFccUrl('recruits-tab'),
-      'team-stats-tasks-btn': buildFccUrl('tutorials-tab')
-    };
-
-    Object.entries(routes).forEach(function ([id, route]) {
-      const btn = document.getElementById(id);
-      if (btn) {
-        btn.dataset.route = route;
-        btn.addEventListener('click', function () {
-          playSound('click-tiny.wav');
-          window.location.href = route;
-        });
-      }
-    });
-  }
-
-  function populateTop(data) {
-    if (!data) return;
-    userTeamName = data.team || userTeamName;
-    if (data.user_team_id != null) userTeamId = String(data.user_team_id);
-    const logo = document.getElementById('team-logo');
-    const season = document.getElementById('fcc-season-label');
-    if (logo) {
-      logo.src = typeof getTeamAssetPath === 'function'
-        ? getTeamAssetPath(data.team, 'banner_primary')
-        : '/images/teams/general/general_banner_primary.jpg';
-    }
-    if (season) {
-      season.textContent = `Season ${Number(data.current_season || 1)} / Week ${Number(data.week || 1)}`;
-    }
-    if (playNowBtn) {
-      if (data.cut_required) playNowBtn.textContent = 'Cut Players';
-      else if (Number(data.week || 1) === 35) playNowBtn.textContent = 'Recruiting';
-      else if (Number(data.week || 1) >= 36) playNowBtn.textContent = 'Go To Next Season';
-      else if (!data.training_completed) playNowBtn.textContent = (data.session_type || 'in-season') === 'preseason' ? 'Run Training Camp' : 'Run Training';
-      else playNowBtn.textContent = 'Play Next Game';
-    }
   }
 
   function cloneTeams(teams) {
-    return (teams || []).map(function (team) {
-      return { ...team, stats: { ...(team.stats || {}) } };
-    });
+    return (teams || []).map((team) => ({ ...team, stats: { ...(team.stats || {}) } }));
   }
 
   function getNumericNationalRank(team) {
@@ -154,7 +50,7 @@
   }
 
   function sortTeams(teams, statKey, direction) {
-    return cloneTeams(teams).sort(function (a, b) {
+    return cloneTeams(teams).sort((a, b) => {
       if (statKey === 'team') {
         const cmp = statValue(a, statKey).localeCompare(statValue(b, statKey));
         return direction === 'asc' ? cmp : -cmp;
@@ -174,11 +70,11 @@
       DREB: 0, OREB: 0, TREB: 0, AST: 0, F: 0, TO: 0, STL: 0, BLK: 0, DEF_A: 0, DEF_S: 0, SCR_A: 0, SCR_S: 0
     };
 
-    teams.forEach(function (team) {
+    teams.forEach((team) => {
       const stats = team.stats || {};
       const tr = document.createElement('tr');
       let html = '';
-      COLUMN_ORDER.forEach(function (key, index) {
+      COLUMN_ORDER.forEach((key, index) => {
         const groupStart = COL_GROUP_START_INDEX[index] ? ' col-group-start' : '';
         if (key === 'team') {
           html += '<td class="col-group-start">' + (team.team || '') + '</td>';
@@ -239,7 +135,7 @@
   }
 
   function updateSortHeaders() {
-    document.querySelectorAll('.fcc-team-stats-grid thead tr.col-row th.sortable').forEach(function (th) {
+    document.querySelectorAll('.fcc-team-stats-grid thead tr.col-row th.sortable').forEach((th) => {
       const stat = th.getAttribute('data-stat');
       const arrow = th.querySelector('.sort-arrow');
       th.classList.remove('active');
@@ -271,14 +167,14 @@
   }
 
   function bindScopeButtons() {
-    document.querySelectorAll('.stats-scope-btn').forEach(function (btn) {
+    document.querySelectorAll('.stats-scope-btn').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const scope = btn.getAttribute('data-scope') || 'conference';
         if (scope === currentScope) return;
         currentScope = scope;
         sortColumn = 'rank';
         sortDirection = 'asc';
-        document.querySelectorAll('.stats-scope-btn').forEach(function (other) {
+        document.querySelectorAll('.stats-scope-btn').forEach((other) => {
           other.classList.toggle('active', other.getAttribute('data-scope') === currentScope);
         });
         const tbody = document.getElementById('teamstats-body');
@@ -288,7 +184,7 @@
       });
     });
 
-    document.querySelectorAll('.fcc-team-stats-grid thead tr.col-row th.sortable').forEach(function (th) {
+    document.querySelectorAll('.fcc-team-stats-grid thead tr.col-row th.sortable').forEach((th) => {
       th.addEventListener('click', function () {
         const stat = th.getAttribute('data-stat');
         if (sortColumn === stat) {
@@ -313,15 +209,14 @@
       return;
     }
 
-    wireTopButtons();
-
-    const topData = await fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1');
-    if (topData) {
-      populateTop(topData);
-      resourceCache = window.ResourceCache.createResourceCache('fcc-team-stats', franchiseId, topData.current_season, topData.week);
+    if (backBtn && franchiseId && teamId) {
+      backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
     }
 
-    wireTabRoutes();
+    const topData = await fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId));
+    if (topData && window.ResourceCache && window.ResourceCache.createResourceCache) {
+      resourceCache = window.ResourceCache.createResourceCache('fcc-team-stats', franchiseId, topData.current_season, topData.week);
+    }
 
     teamStatsData = await loadScope(currentScope);
     if (!teamStatsData) {

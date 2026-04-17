@@ -59,7 +59,7 @@
         <button data-tab="coaches-tab">Scouting Report</button>
         <button data-tab="standings-tab">Standings</button>
         <button data-tab="schedule-tab">Schedule</button>
-        <button id="stats-nav-btn" data-route="#">Team Stats</button>
+        <button id="stats-nav-btn" data-tab="fcc-team-stats-summary-tab">Team Stats</button>
         <button data-tab="awards-tab">Leaders</button>
         <button data-tab="press-tab">Press</button>
         <button data-tab="recruits-tab">Recruits</button>
@@ -259,6 +259,60 @@
         </section>
         <div class="fcc-standings-footer-link-wrap">
           <a id="schedule-full-link" class="fcc-standings-full-link" href="#">Full national schedule here</a>
+        </div>
+      </div>
+      <div id="fcc-team-stats-summary-tab" class="tab-content">
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="stats-table fcc-team-stats-grid">
+              <thead>
+                <tr class="group-row">
+                  <th colspan="6"></th>
+                  <th colspan="3">Shooting</th>
+                  <th colspan="3">3-Point</th>
+                  <th colspan="3">Free Throws</th>
+                  <th colspan="3">Rebounding</th>
+                  <th colspan="5">Other</th>
+                  <th colspan="4">Defense</th>
+                </tr>
+                <tr class="col-row">
+                  <th class="col-group-start">Team</th>
+                  <th>Rank</th>
+                  <th>W</th>
+                  <th>L</th>
+                  <th>PF</th>
+                  <th>PA</th>
+                  <th class="col-group-start">FGM</th>
+                  <th>FGA</th>
+                  <th>FG%</th>
+                  <th class="col-group-start">3PTM</th>
+                  <th>3PTA</th>
+                  <th>3PT%</th>
+                  <th class="col-group-start">FTM</th>
+                  <th>FTA</th>
+                  <th>FT%</th>
+                  <th class="col-group-start">DREB</th>
+                  <th>OREB</th>
+                  <th>TREB</th>
+                  <th class="col-group-start">AST</th>
+                  <th>F</th>
+                  <th>TO</th>
+                  <th>SCRA</th>
+                  <th>SCR%</th>
+                  <th class="col-group-start">STL</th>
+                  <th>BLK</th>
+                  <th>DEFA</th>
+                  <th>DEF%</th>
+                </tr>
+              </thead>
+              <tbody id="fcc-team-stats-summary-body">
+                <tr><td colspan="27">Loading team stats...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <div class="fcc-team-stats-footer-link-wrap">
+          <a id="team-stats-full-link" class="fcc-standings-full-link" href="#">See all teams' stats here</a>
         </div>
       </div>
       <div id="awards-tab" class="tab-content fcc-placeholder-tab">

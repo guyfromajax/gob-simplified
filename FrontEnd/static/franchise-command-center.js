@@ -29,6 +29,7 @@ let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
+let fccTeamStatsSummaryCache = null;
 let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
 let userRosterPlayersCache = [];
@@ -1066,7 +1067,9 @@ function bindResourcesLinks() {
   const scheduleFullLink = document.getElementById('schedule-full-link');
   if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
   const statsNavBtn = document.getElementById('stats-nav-btn');
-  if (statsNavBtn) statsNavBtn.dataset.route = `/team-stats.html${q()}`;
+  if (statsNavBtn) statsNavBtn.dataset.route = '';
+  const teamStatsFullLink = document.getElementById('team-stats-full-link');
+  if (teamStatsFullLink) teamStatsFullLink.href = `/team-stats.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
   if (rStandings) rStandings.href = `/standings.html${q()}`;
   const rStats = document.getElementById('resources-stats');
@@ -1083,6 +1086,68 @@ function bindResourcesLinks() {
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');
   if (rAwards) rAwards.href = `/awards.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
+}
+
+function formatTeamStatsPercent(numerator, denominator) {
+  return denominator > 0 ? (((numerator || 0) / denominator) * 100).toFixed(1) + '%' : '0.0%';
+}
+
+async function ensureFccTeamStatsSummary() {
+  if (fccTeamStatsSummaryCache || !franchiseId) return fccTeamStatsSummaryCache;
+  fccTeamStatsSummaryCache = await fetchJSON(
+    `${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${encodeURIComponent(franchiseId)}&scope=conference`
+  );
+  return fccTeamStatsSummaryCache;
+}
+
+async function renderFccTeamStatsSummary() {
+  const tbody = document.getElementById('fcc-team-stats-summary-body');
+  if (!tbody) return;
+  if (!fccTeamStatsSummaryCache) {
+    tbody.innerHTML = '<tr><td colspan="27">Loading team stats...</td></tr>';
+  }
+  const payload = await ensureFccTeamStatsSummary();
+  const teams = payload?.teams || [];
+  if (!teams.length) {
+    tbody.innerHTML = '<tr><td colspan="27">Failed to load team stats.</td></tr>';
+    return;
+  }
+  const rows = teams.map((team) => {
+    const stats = team.stats || {};
+    const rank = Number(team?.natl_rank);
+    return `
+      <tr>
+        <td class="col-group-start">${escapeHomeHtml(team.team || '')}</td>
+        <td>${Number.isFinite(rank) && rank > 0 ? rank : '--'}</td>
+        <td class="col-w">${escapeHomeHtml(stats.W ?? 0)}</td>
+        <td class="col-l">${escapeHomeHtml(stats.L ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.PF ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.PA ?? 0)}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.FGM ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.FGA ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.FGM, stats.FGA))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats['3PTM'] ?? 0)}</td>
+        <td>${escapeHomeHtml(stats['3PTA'] ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats['3PTM'], stats['3PTA']))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.FTM ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.FTA ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.FTM, stats.FTA))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.DREB ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.OREB ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.TREB ?? 0)}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.AST ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.F ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.TO ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.SCR_A ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.SCR_S, stats.SCR_A))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.STL ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.BLK ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.DEF_A ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.DEF_S, stats.DEF_A))}</td>
+      </tr>
+    `;
+  }).join('');
+  tbody.innerHTML = rows;
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -2847,6 +2912,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'schedule-tab') {
           void renderScheduleTab();
+        }
+        if (tabName === 'fcc-team-stats-summary-tab') {
+          void renderFccTeamStatsSummary();
         }
         if (tabName === 'team-stats-tab') {
           renderTeamReport();

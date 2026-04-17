@@ -1158,7 +1158,8 @@ body {
 
 #franchise-container #roster-tab .scroll-x,
 #franchise-container #player-stats-tab .scroll-x,
-#franchise-container #recruits-tab .scroll-x {
+#franchise-container #recruits-tab .scroll-x,
+#franchise-container #fcc-team-stats-summary-tab .scroll-x {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -1167,26 +1168,30 @@ body {
 
 #franchise-container #roster-tab .scroll-x::-webkit-scrollbar,
 #franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar,
-#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar {
+#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar,
+#franchise-container #fcc-team-stats-summary-tab .scroll-x::-webkit-scrollbar {
   height: 10px;
 }
 
 #franchise-container #roster-tab .scroll-x::-webkit-scrollbar-track,
 #franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar-track,
-#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar-track {
+#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar-track,
+#franchise-container #fcc-team-stats-summary-tab .scroll-x::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.06);
 }
 
 #franchise-container #roster-tab .scroll-x::-webkit-scrollbar-thumb,
 #franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar-thumb,
-#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar-thumb {
+#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar-thumb,
+#franchise-container #fcc-team-stats-summary-tab .scroll-x::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.24);
   border-radius: 999px;
 }
 
 #franchise-container #roster-tab table.roster-table,
 #franchise-container #player-stats-tab table.stats-table,
-#franchise-container #recruits-tab table.recruiting-table {
+#franchise-container #recruits-tab table.recruiting-table,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table {
   margin: 0;
   min-width: 1180px;
   width: max(100%, 1180px);
@@ -1196,7 +1201,8 @@ body {
 
 #franchise-container #roster-tab table.roster-table thead th,
 #franchise-container #player-stats-tab table.stats-table thead th,
-#franchise-container #recruits-tab table.recruiting-table thead th {
+#franchise-container #recruits-tab table.recruiting-table thead th,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -1214,7 +1220,8 @@ body {
 
 #franchise-container #roster-tab table.roster-table tbody td,
 #franchise-container #player-stats-tab table.stats-table tbody td,
-#franchise-container #recruits-tab table.recruiting-table tbody td {
+#franchise-container #recruits-tab table.recruiting-table tbody td,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td {
   padding: 9px 10px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
@@ -1226,44 +1233,56 @@ body {
 
 #franchise-container #roster-tab table.roster-table tbody tr:nth-child(odd),
 #franchise-container #player-stats-tab table.stats-table tbody tr:nth-child(odd),
-#franchise-container #recruits-tab table.recruiting-table tbody tr:nth-child(odd) {
+#franchise-container #recruits-tab table.recruiting-table tbody tr:nth-child(odd),
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:nth-child(odd) {
   background: rgba(255, 255, 255, 0.03);
 }
 
 #franchise-container #roster-tab table.roster-table tbody tr:hover td,
 #franchise-container #player-stats-tab table.stats-table tbody tr:hover td,
-#franchise-container #recruits-tab table.recruiting-table tbody tr:hover td {
+#franchise-container #recruits-tab table.recruiting-table tbody tr:hover td,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.04);
 }
 
 #franchise-container #roster-tab table.roster-table thead th:first-child,
 #franchise-container #player-stats-tab table.stats-table thead th:first-child,
 #franchise-container #recruits-tab table.recruiting-table thead th:first-child,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table thead th:first-child,
 #franchise-container #roster-tab table.roster-table tbody td:first-child,
 #franchise-container #player-stats-tab table.stats-table tbody td:first-child,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child {
+#franchise-container #recruits-tab table.recruiting-table tbody td:first-child,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child {
   text-align: left;
   padding-left: 16px;
 }
 
 #franchise-container #roster-tab table.roster-table tbody td:first-child,
 #franchise-container #player-stats-tab table.stats-table tbody td:first-child,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child {
+#franchise-container #recruits-tab table.recruiting-table tbody td:first-child,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child {
   font-weight: 700;
   color: #ffffff;
 }
 
 #franchise-container #roster-tab table.roster-table tbody td:first-child a,
 #franchise-container #player-stats-tab table.stats-table tbody td:first-child a,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child a {
+#franchise-container #recruits-tab table.recruiting-table tbody td:first-child a,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a {
   color: #ffffff;
   text-decoration: none;
 }
 
 #franchise-container #roster-tab table.roster-table tbody td:first-child a:hover,
 #franchise-container #player-stats-tab table.stats-table tbody td:first-child a:hover,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child a:hover {
+#franchise-container #recruits-tab table.recruiting-table tbody td:first-child a:hover,
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a:hover {
   text-decoration: underline;
+}
+
+.fcc-team-stats-footer-link-wrap {
+  width: 100%;
+  margin-top: 10px;
 }
 
 #franchise-container .fcc-game-plan-card-body {
