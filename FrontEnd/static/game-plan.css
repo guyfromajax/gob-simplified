@@ -96,21 +96,8 @@ body {
   padding: 16px 18px 18px;
 }
 
-.column-title {
-  font-family: 'Bebas Neue', sans-serif;
-  display: inline-block;
-  width: fit-content;
-  font-size: 1.65rem;
-  letter-spacing: 0.03em;
-  color: #f7f9ff;
-  text-align: left;
-  margin-bottom: 12px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid #F79420;
-}
-
 .slider-group {
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -204,8 +191,8 @@ input[type="range"]::-moz-range-thumb {
 
 .strategy-slider-track {
   position: absolute;
-  left: 5%;
-  right: 5%;
+  left: calc(10% + 16px);
+  right: calc(10% + 16px);
   top: 50%;
   height: 6px;
   transform: translateY(-50%);
@@ -219,6 +206,7 @@ input[type="range"]::-moz-range-thumb {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: center;
+  padding: 0 10%;
 }
 
 .strategy-slider-node {
