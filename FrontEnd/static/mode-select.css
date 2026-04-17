@@ -6,6 +6,13 @@ body {
   color: #1f2937;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .mode-wrapper {
   width: min(1180px, 100%);
   margin: 0 auto;

@@ -393,7 +393,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         justify-content: center;
         min-height: 56px;
         transition: all 0.2s ease;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Bebas Neue', sans-serif;
         letter-spacing: 0.2px;
       }
 

@@ -6,6 +6,21 @@ body.has-auth-bar {
   padding-top: 72px;
 }
 
+.auth-bar button,
+.auth-bar [type="button"],
+.auth-bar [type="submit"],
+.auth-bar [type="reset"],
+.feedback-modal button,
+.feedback-modal [type="button"],
+.feedback-modal [type="submit"],
+.feedback-modal [type="reset"],
+.account-settings-modal button,
+.account-settings-modal [type="button"],
+.account-settings-modal [type="submit"],
+.account-settings-modal [type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .auth-bar {
   position: fixed;
   top: 0;

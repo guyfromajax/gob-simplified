@@ -1,4 +1,11 @@
 /* Scouting Report Modal Styles */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .scouting-modal {
   position: fixed;
   top: 0;

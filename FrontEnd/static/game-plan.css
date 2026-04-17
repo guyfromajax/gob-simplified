@@ -11,6 +11,13 @@ body {
   min-height: 100vh;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .resource-page-container.fcc-brand-page-shell {
   width: min(1400px, calc(100vw - 24px));
   padding: 22px 28px 24px;
@@ -292,7 +299,7 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;

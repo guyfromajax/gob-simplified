@@ -39,6 +39,13 @@ select {
   font: inherit;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .playbooks-page {
   width: min(1560px, calc(100vw - 32px));
   margin: 0 auto;

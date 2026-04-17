@@ -93,7 +93,7 @@ function ensureTimeoutPopupButtonStyles() {
             text-decoration: none;
             display: inline-block;
             transition: all 0.3s;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Bebas Neue', sans-serif;
         }
 
         .go-to-timeout-button {

@@ -39,6 +39,13 @@ body {
   line-height: 1.6;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .training-container {
   max-width: 1600px;
   margin: 0 auto;

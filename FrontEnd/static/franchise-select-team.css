@@ -6,6 +6,13 @@ body {
   padding-top: 70px;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 #page-title {
   font-family: 'Bebas Neue', cursive;
   font-size: 42px;

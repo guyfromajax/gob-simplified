@@ -3,6 +3,13 @@ body {
   margin: 20px;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 #team-header {
   display: flex;
   align-items: center;

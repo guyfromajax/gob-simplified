@@ -17,6 +17,13 @@ body {
   color: var(--fcc-text);
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 #franchise-container {
   position: relative;
   width: min(1400px, calc(100vw - 24px));

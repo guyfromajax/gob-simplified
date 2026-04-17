@@ -744,7 +744,7 @@ function addPopupStyles() {
             background: #ff9800;
             color: #fff;
             transition: background-color 0.2s ease;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Bebas Neue', sans-serif;
             letter-spacing: 0.3px;
         }
 
@@ -784,4 +784,3 @@ export function resetDontShowAgainFlag(gameId) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY_PREFIX + gameId);
     }
 }
-

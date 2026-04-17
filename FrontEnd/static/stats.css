@@ -21,6 +21,13 @@ body.stats-page {
   margin: 0;
 }
 
+.stats-page button,
+.stats-page input[type="button"],
+.stats-page input[type="submit"],
+.stats-page input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .stats-page .resource-page-container {
   font-family: 'Barlow', sans-serif;
   background: #0d0f14;
