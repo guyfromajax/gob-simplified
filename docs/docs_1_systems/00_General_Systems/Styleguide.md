@@ -142,6 +142,8 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Tables, scroll regions, placeholders, and empty states should follow the same neutral-surface system as panels.
 - Placeholder and in-development states should be centered, legible, and visually quiet.
 - Data-heavy views should favor clarity and scan speed over ornament.
+- Unless the data volume makes it impossible, pages and tabs should open with their primary content visible above the fold.
+- Above-the-fold fit should be achieved by reducing dead space and tightening panel composition before introducing scroll.
 
 ## Table / Data Grid System
 

@@ -50,6 +50,37 @@ const HOME_EMOJI_BUCKETS = [
   { emoji: '😊', min: 60, maxExclusive: 80 },
   { emoji: '😎', min: 80, maxExclusive: Infinity }
 ];
+const GENERIC_GAMEPLAN_SCALE = {
+  0: 'Never',
+  1: 'Less',
+  2: 'Normal',
+  3: 'More',
+  4: 'Most'
+};
+const GAMEPLAN_LABELS = {
+  offense: 'Offense',
+  inside: 'Inside',
+  attack: 'Attack',
+  outside: 'Outside',
+  fast_breaks: 'Fast Breaks',
+  defense: 'Defense',
+  aggression: 'Aggression',
+  hc_trap: 'Half-Court Trap',
+  fc_press: 'Full-Court Press',
+  rebounding: 'Rebounding'
+};
+const GAMEPLAN_DISPLAY_ORDER = [
+  'offense',
+  'defense',
+  'inside',
+  'aggression',
+  'attack',
+  'hc_trap',
+  'outside',
+  'fc_press',
+  'fast_breaks',
+  'rebounding'
+];
 
 function hideFccLoadingOverlay() {
   if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
@@ -2648,24 +2679,30 @@ playNowBtn.addEventListener('click', async () => {
   }
 });
 
+function navigateToGamePlan() {
+  playSound('click-tiny.wav');
+  if (!franchiseId || !userTeamId) {
+    alert('Franchise or user team not loaded');
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  params.set('from', 'command_center');
+  params.set('return_url', getCurrentRelativeUrl());
+  window.location.href = `/game-plan.html?${params.toString()}`;
+}
+
 // Legacy route buttons were removed from the FCC tab bar in favor of local placeholder tabs.
 function wireFccNavButtons() {
   const setGameplanBtn = document.getElementById('set-gameplan-franchise');
   if (setGameplanBtn) {
-    setGameplanBtn.addEventListener('click', () => {
-      playSound('click-tiny.wav');
-      if (!franchiseId || !userTeamId) {
-        alert('Franchise or user team not loaded');
-        return;
-      }
-      const params = new URLSearchParams();
-      params.set('mode', 'franchise');
-      params.set('franchise_id', franchiseId);
-      params.set('team_id', userTeamId);
-      params.set('from', 'command_center');
-      params.set('return_url', getCurrentRelativeUrl());
-      window.location.href = `/game-plan.html?${params.toString()}`;
-    });
+    setGameplanBtn.addEventListener('click', navigateToGamePlan);
+  }
+  const fccEditGamePlanBtn = document.getElementById('fcc-edit-game-plan-btn');
+  if (fccEditGamePlanBtn) {
+    fccEditGamePlanBtn.addEventListener('click', navigateToGamePlan);
   }
   const playbooksBtn = document.getElementById('playbooks-franchise');
   if (playbooksBtn) {
@@ -2722,6 +2759,9 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
         }
+        if (tabName === 'game-plan-tab') {
+          renderGamePlanSummary();
+        }
         if (tabName === 'team-stats-tab') {
           renderTeamReport();
         }
@@ -2756,13 +2796,17 @@ async function loadTeamData() {
   
   try {
     // First, ensure team objects exist (this will create them if missing)
+    let gamePlanData = null;
     try {
       // ✅ SS&S: Use ObjectId directly - backend accepts it
       const gameplanStartTime = performance.now();
       console.log('⏱️ [PERF] loadTeamData() calling /api/gameplan START');
-      await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
+      const gameplanResponse = await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
       const gameplanEndTime = performance.now();
       console.log(`⏱️ [PERF] loadTeamData() /api/gameplan: ${(gameplanEndTime - gameplanStartTime).toFixed(2)}ms`);
+      if (gameplanResponse.ok) {
+        gamePlanData = await gameplanResponse.json();
+      }
     } catch (error) {
       console.warn('Could not ensure team objects exist:', error);
     }
@@ -2800,7 +2844,8 @@ async function loadTeamData() {
       team_attributes: data.team_attributes || {},
       plays_data: data.plays_data || {},
       scouting_data: data.scouting_data || {},
-      players: players
+      players: players,
+      game_plan: gamePlanData || { strategy_settings: {} }
     };
     persistFccSessionCache();
     
@@ -2811,6 +2856,10 @@ async function loadTeamData() {
     const teamMeasuresTab = document.getElementById('team-stats-tab');
     if (teamMeasuresTab && teamMeasuresTab.classList.contains('active')) {
       renderTeamReport();
+    }
+    const gamePlanTab = document.getElementById('game-plan-tab');
+    if (gamePlanTab && gamePlanTab.classList.contains('active')) {
+      renderGamePlanSummary();
     }
     void renderHomeTab();
     
@@ -2834,6 +2883,79 @@ function renderTeamReport() {
   shootingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(teamAttrs.shot_threshold || 0));
   reboundingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(teamAttrs.rebound_modifier || 0));
   chemistryHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(teamAttrs.team_chemistry || 0));
+}
+
+function mapGamePlanValue(key, rawValue) {
+  const value = Math.max(0, Math.min(4, Number(rawValue ?? 2)));
+  switch (key) {
+    case 'offense':
+      return {
+        0: '100% Motion',
+        1: '75% Motion / 25% Set Plays',
+        2: '50% Motion / 50% Set Plays',
+        3: '75% Set Plays / 25% Motion',
+        4: '100% Set Plays'
+      }[value];
+    case 'defense':
+      return {
+        0: '100% Man',
+        1: '75% Man / 25% Zone',
+        2: '50% Man / 50% Zone',
+        3: '75% Zone / 25% Man',
+        4: '100% Zone'
+      }[value];
+    case 'fast_breaks':
+      return {
+        0: '100% Half Court Sets',
+        1: '75% Half Court Sets / 25% Fast Breaks',
+        2: '50% Half Court Sets / 50% Fast Breaks',
+        3: '75% Fast Breaks / 25% Half Court Sets',
+        4: '100% Fast Breaks'
+      }[value];
+    case 'aggression':
+      return {
+        0: 'Passive',
+        1: 'Normal / Passive',
+        2: '50% Normal',
+        3: 'Normal / Aggressive',
+        4: 'Aggressive'
+      }[value];
+    case 'rebounding':
+      return {
+        0: '100% Crash The Boards',
+        1: '75% Crash The Boards / 25% Get Back on D',
+        2: '50% Crash The Boards / 50% Get Back on D',
+        3: '75% Get Back on D / 25% Crash The Boards',
+        4: '100% Get Back on D'
+      }[value];
+    default:
+      return GENERIC_GAMEPLAN_SCALE[value] || 'Normal';
+  }
+}
+
+function buildGamePlanSummaryMarkup(strategySettings = {}) {
+  const items = GAMEPLAN_DISPLAY_ORDER.map((key) => {
+    const label = GAMEPLAN_LABELS[key];
+    const valueText = mapGamePlanValue(key, strategySettings?.[key]);
+    return `
+      <div class="fcc-game-plan-item">
+        <div class="fcc-game-plan-label">${label}</div>
+        <div class="fcc-game-plan-value">${valueText}</div>
+      </div>
+    `;
+  });
+  return items.join('');
+}
+
+function renderGamePlanSummary() {
+  const host = document.getElementById('fcc-game-plan-grid');
+  if (!host) return;
+  const strategySettings = teamData?.game_plan?.strategy_settings;
+  if (!strategySettings || typeof strategySettings !== 'object') {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Game plan settings are not available yet.</div>';
+    return;
+  }
+  host.innerHTML = buildGamePlanSummaryMarkup(strategySettings);
 }
 
 const TEAM_MEASURES_RADAR_AXES = [
