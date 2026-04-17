@@ -2903,10 +2903,7 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
   }).join('');
 
   const valueLabels = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
-    const point = pointFor(axis.angle, clampedValues[index], pointLabelRadius);
-    return `
-      <circle class="tm-radar-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4.5" />
-    `;
+    return '';
   }).join('');
 
   return `
@@ -2949,7 +2946,6 @@ function buildTeamMeasuresLinearCardMarkup(title, attrKey, value) {
     return `
       <div class="tm-side-card-content tm-side-card-content-chemistry">
         <div class="tm-side-card-label">${title}</div>
-        <div class="tm-side-card-value">${visual.displayValue}</div>
         <div class="tm-chemistry-bar${pulseClass}">
           <div class="tm-chemistry-fill" style="width:${percentage}%; opacity:${0.2 + (percentage / 100) * 0.8};"></div>
           <div class="tm-chemistry-text">${visual.displayValue}</div>
