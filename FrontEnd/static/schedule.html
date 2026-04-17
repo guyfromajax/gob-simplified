@@ -106,6 +106,45 @@
       border-bottom: 0;
     }
 
+    .schedule-expand-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 30px;
+      padding: 8px 2px 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .schedule-expand-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      background: none;
+      border: 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color 0.18s ease;
+    }
+
+    .schedule-expand-btn:hover {
+      color: #ffffff;
+    }
+
+    .schedule-expand-caret {
+      font-size: 12px;
+      line-height: 1;
+      transition: transform 0.18s ease;
+    }
+
+    .schedule-expand-btn[aria-expanded="true"] .schedule-expand-caret {
+      transform: rotate(180deg);
+    }
+
     .schedule-game-row a {
       color: #ffffff;
       text-decoration: none;
@@ -273,15 +312,40 @@
     return `<div class="schedule-game-row">${awayMarkup} at ${homeMarkup}${boxScore}</div>`;
   }
 
+  function buildWeekRowsMarkup(weekGames, returnUrl, weekNumber) {
+    if (!weekGames.length) {
+      return '<div class="schedule-game-row">No games scheduled.</div>';
+    }
+    const initialRows = weekGames.slice(0, 8).map((game) => buildGameRow(game, returnUrl)).join('');
+    if (weekGames.length <= 8) {
+      return initialRows;
+    }
+    const extraRows = weekGames.slice(8).map((game) => buildGameRow(game, returnUrl)).join('');
+    return `
+      ${initialRows}
+      <div class="schedule-expand-row">
+        <button
+          class="schedule-expand-btn"
+          type="button"
+          data-week-expand="${weekNumber}"
+          aria-expanded="false"
+          aria-controls="schedule-week-extra-${weekNumber}"
+        >
+          <span>See all games</span>
+          <span class="schedule-expand-caret">▾</span>
+        </button>
+      </div>
+      <div id="schedule-week-extra-${weekNumber}" hidden>${extraRows}</div>
+    `;
+  }
+
   function renderNationalSchedule(allGamesByWeek, userConference) {
     if (!scheduleContainer) return;
     const returnUrl = getCurrentRelativeUrl();
     const weekCards = [];
     for (let week = 1; week <= 26; week += 1) {
       const weekGames = sortGamesForWeek(allGamesByWeek[week] || [], userConference);
-      const rows = weekGames.length
-        ? weekGames.map((game) => buildGameRow(game, returnUrl)).join('')
-        : '<div class="schedule-game-row">No games scheduled.</div>';
+      const rows = buildWeekRowsMarkup(weekGames, returnUrl, week);
       weekCards.push(`
         <section class="schedule-week-card">
           <div class="schedule-week-title">Week ${week}</div>
@@ -299,6 +363,16 @@
 
   if (scheduleContainer) {
     scheduleContainer.innerHTML = '<div class="schedule-loading">Loading schedule...</div>';
+    scheduleContainer.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-week-expand]');
+      if (!button) return;
+      const week = button.getAttribute('data-week-expand');
+      const extra = document.getElementById(`schedule-week-extra-${week}`);
+      if (!extra) return;
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      extra.hidden = expanded;
+    });
   }
 
   Promise.all([
