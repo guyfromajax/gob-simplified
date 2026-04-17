@@ -2865,6 +2865,8 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   
   const item = document.createElement('div');
   item.className = 'team-attr-item';
+  const visual = getTeamAttrVisualConfig(attrKey, Number(currentValue) || 0);
+  if (visual.cardTone) item.dataset.tone = visual.cardTone;
   
   const label = document.createElement('div');
   label.className = 'attr-label';
@@ -2878,11 +2880,13 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   if (attrKey === 'team_chemistry') {
     const barContainer = document.createElement('div');
     barContainer.className = 'chemistry-bar-container';
+    if (visual.pulse) barContainer.classList.add('is-pulsing');
     
     const barFill = document.createElement('div');
     barFill.className = 'chemistry-bar-fill';
-    const percentage = (currentValue / 25) * 100;
+    const percentage = Math.max(0, Math.min((Number(currentValue) / 25) * 100, 100));
     barFill.style.width = `${percentage}%`;
+    barFill.style.opacity = String(0.2 + (percentage / 100) * 0.8);
     
     const barText = document.createElement('div');
     barText.className = 'chemistry-bar-text';
@@ -2891,41 +2895,6 @@ function createTeamAttrItem(attrKey, currentValue, change) {
     barContainer.appendChild(barFill);
     barContainer.appendChild(barText);
     item.appendChild(barContainer);
-  } else if (attrKey === 'fb_opp_modifier' || attrKey === 'pt_opp_modifier') {
-    const indicatorContainer = document.createElement('div');
-    indicatorContainer.className = 'plus-minus-container';
-    indicatorContainer.style.textAlign = 'center';
-    indicatorContainer.style.marginTop = 'var(--spacing-sm)';
-    
-    const indicator = document.createElement('span');
-    indicator.className = 'plus-minus-indicator';
-    indicator.style.fontWeight = '700';
-    
-    if (currentValue >= 10) {
-      indicator.textContent = '+++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 5) {
-      indicator.textContent = '++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 1) {
-      indicator.textContent = '+';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue === 0) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-zero';
-    } else if (currentValue >= -4) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-negative';
-    } else if (currentValue >= -9) {
-      indicator.textContent = '--';
-      indicator.className += ' plus-minus-negative';
-    } else {
-      indicator.textContent = '---';
-      indicator.className += ' plus-minus-negative';
-    }
-    
-    indicatorContainer.appendChild(indicator);
-    item.appendChild(indicatorContainer);
   } else {
     const pill = createPill(currentValue, attrKey);
     item.appendChild(pill);
@@ -2937,38 +2906,85 @@ function createTeamAttrItem(attrKey, currentValue, change) {
 function createPill(originalValue, attrKey) {
   const pill = document.createElement('div');
   pill.className = 'attr-pill';
+  const visual = getTeamAttrVisualConfig(attrKey, Number(originalValue) || 0);
+  if (visual.direction !== 'zero') {
+    pill.classList.add(`pill-${visual.direction}`);
+  }
+  if (visual.pulse) {
+    pill.classList.add('is-pulsing');
+  }
   
   const centerLine = document.createElement('div');
   centerLine.className = 'pill-center-line';
   pill.appendChild(centerLine);
-  
-  let maxValue = 10;
-  let value = originalValue;
-  
-  if (attrKey === 'shot_threshold') {
-    maxValue = 100; // Range is 10 to 210, center at 110, so max deviation is 100
-    value = 110 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
-  } else if (attrKey === 'rebound_modifier') {
-    maxValue = 0.2;
-    value = originalValue - 0.2; // Center at 0.2 (new range: 0.0-0.4)
-  }
-  
-  if (value > 0) {
+
+  if (visual.direction === 'positive') {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-positive';
-    const percentage = Math.min((value / maxValue) * 50, 50);
-    fill.style.width = `${percentage}%`;
+    fill.style.width = `${visual.fillPercent}%`;
     pill.insertBefore(fill, centerLine);
-  } else if (value < 0) {
+  } else if (visual.direction === 'negative') {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-negative';
-    const absValue = Math.abs(value);
-    const percentage = Math.min((absValue / maxValue) * 50, 50);
-    fill.style.width = `${percentage}%`;
+    fill.style.width = `${visual.fillPercent}%`;
     pill.insertBefore(fill, centerLine);
   }
+
+  const valueLabel = document.createElement('div');
+  valueLabel.className = 'pill-value show';
+  valueLabel.textContent = visual.displayValue;
+  pill.appendChild(valueLabel);
   
   return pill;
+}
+
+function formatTeamAttrDisplayValue(attrKey, value) {
+  const numericValue = Number(value) || 0;
+  if (attrKey === 'rebound_modifier') return numericValue.toFixed(2);
+  return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(1);
+}
+
+function getTeamAttrVisualConfig(attrKey, value) {
+  if (attrKey === 'team_chemistry') {
+    return {
+      direction: value > 0 ? 'positive' : 'zero',
+      fillPercent: Math.max(0, Math.min((value / 25) * 100, 100)),
+      displayValue: `${value} / 25`,
+      pulse: value <= 5 || value >= 22,
+      cardTone: value < 8 ? 'warning-negative' : (value > 20 ? 'warning-elite' : '')
+    };
+  }
+
+  let normalized = value;
+  let fillPercent = 0;
+  let pulse = false;
+
+  if (attrKey === 'shot_threshold') {
+    const deviation = value - 110;
+    normalized = (deviation / 100) * 10;
+    fillPercent = Math.min((Math.abs(deviation) / 100) * 50, 50);
+    pulse = Math.abs(deviation) >= 30;
+  } else if (attrKey === 'rebound_modifier') {
+    const deviation = value - 0.2;
+    normalized = (deviation / 0.2) * 10;
+    fillPercent = Math.min((Math.abs(deviation) / 0.2) * 50, 50);
+    pulse = Math.abs(deviation) >= 0.06;
+  } else {
+    fillPercent = Math.min((Math.abs(normalized) / 10) * 50, 50);
+    pulse = Math.abs(normalized) >= 7;
+  }
+
+  let cardTone = '';
+  if (normalized <= -6) cardTone = 'negative';
+  else if (normalized >= 6) cardTone = 'positive';
+
+  return {
+    direction: normalized > 0 ? 'positive' : (normalized < 0 ? 'negative' : 'zero'),
+    fillPercent,
+    displayValue: formatTeamAttrDisplayValue(attrKey, value),
+    pulse,
+    cardTone
+  };
 }
 
 function renderPlaybookSummary() {
