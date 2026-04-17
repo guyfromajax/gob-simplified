@@ -1589,6 +1589,12 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   padding: 12px;
 }
 
+#franchise-container .fcc-team-measures-side-card .fcc-team-measures-panel-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 #franchise-container .fcc-team-measures-side {
   display: grid;
   grid-template-rows: 1fr 1fr 1.08fr;
@@ -1677,6 +1683,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   flex-direction: column;
   justify-content: center;
   height: 100%;
+  width: 100%;
   gap: 10px;
 }
 
