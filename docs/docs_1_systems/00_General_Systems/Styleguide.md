@@ -143,6 +143,68 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Placeholder and in-development states should be centered, legible, and visually quiet.
 - Data-heavy views should favor clarity and scan speed over ornament.
 
+## Table / Data Grid System
+
+### Canonical References
+- The live FCC `Roster` grid is a canonical reference.
+- The live FCC `Player Stats` grid is a canonical reference.
+- The standalone `Rankings` page, after its contained-panel conversion, is a canonical reference.
+
+### Container Rules
+- Data grids should sit inside a dark contained panel rather than directly on the page shell.
+- The panel should use the standard neutral dark surface treatment:
+  - rounded corners
+  - soft border
+  - restrained inset highlight
+  - restrained outer shadow
+- Data grids should not appear as flat spreadsheets dropped onto the page.
+
+### Scroll And Width Rules
+- Data-heavy grids should use a horizontal scroll container when needed.
+- Scrollbars should be styled in the same subdued neutral treatment used on FCC data grids.
+- If a data grid naturally occupies more than 50% of the available horizontal width, it should expand to fill the available width before relying on scroll.
+- Minimum table width may still be used to preserve column legibility.
+
+### Header Row Rules
+- Header rows should be sticky when appropriate.
+- Header background should use a faint metallic / glass-like neutral treatment, not a flat fill.
+- Header text should use:
+  - `Inter`
+  - small size
+  - bold weight
+  - uppercase
+  - modest letter spacing
+- Header text color should be a muted white, lower contrast than the body rows.
+
+### Body Row Rules
+- Body rows should use subtle horizontal separators only.
+- Avoid full boxed cell borders or spreadsheet-style gridlines.
+- Alternate rows should use a very subtle neutral shade shift.
+- Hover states should slightly brighten the row background without becoming noisy.
+- Row density should support quick scan speed and high information density.
+
+### Alignment Rules
+- Text-heavy first columns should usually be left aligned.
+- Numeric/stat columns should usually be centered unless there is a specific readability reason to right align them.
+- Important text cells such as the first/name column should carry stronger weight than supporting cells.
+
+### Link Rules
+- Linked names inside grids should remain clearly readable on dark surfaces.
+- Links should not default to underlined in resting state.
+- Underline on hover is preferred over louder treatments.
+
+### Rankings-Specific Rules
+- Rankings pages should use the same contained panel and row system as FCC `Roster` and `Player Stats`.
+- Rankings-specific semantic text treatments should be preserved:
+  - previous win text in green
+  - previous loss text in red
+  - other result-specific emphasis only where meaningful
+
+### Design Intent
+- The system should read as a structured management-sim data surface.
+- It should feel contained, deliberate, and premium.
+- It should never drift into default browser table styling or Excel-sheet aesthetics.
+
 ## Audio Rules
 - UI click sounds should be consistent across equivalent interactions.
 - Navigation, action, and confirmation sounds should each follow a distinct pattern.

@@ -10,8 +10,55 @@
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <style>
+    .rankings-page-header {
+      margin-bottom: 10px;
+    }
+
+    .rankings-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      margin-bottom: 12px;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .rankings-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .rankings-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .rankings-page-title {
+      margin-bottom: 8px !important;
+    }
+
     .rankings-page-card {
-      margin-top: 8px;
+      margin-top: 0;
+    }
+
+    .rankings-page-card-head {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 12px 14px 0;
     }
 
     .rankings-page-card .scroll-x {
@@ -154,13 +201,17 @@
 </head>
 <body>
   <div class="resource-page-container fcc-brand-page-shell fcc-brand-page-shell-no-lines">
-    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
-    <h1>National Rankings</h1>
-    <div class="rankings-toggle-wrap">
-      <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
-      <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
+    <div class="rankings-page-header">
+      <a id="back-btn" class="back-to-locker-room rankings-back-link" href="#">Back to Locker Room</a>
+      <h1 class="rankings-page-title">National Rankings</h1>
     </div>
     <section class="fcc-data-card rankings-page-card">
+      <div class="rankings-page-card-head">
+        <div class="rankings-toggle-wrap">
+          <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
+          <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
+        </div>
+      </div>
       <div class="fcc-data-card-body scroll-x">
         <table id="rankings-table" class="leaders-table standings-conference-table rankings-results-table">
           <thead>
