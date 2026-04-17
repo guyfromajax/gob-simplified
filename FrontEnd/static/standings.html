@@ -10,6 +10,53 @@
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <style>
+    .standings-page-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .standings-page-header .brand-back-link {
+      justify-self: start;
+    }
+
+    .brand-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .brand-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .brand-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .standings-page-title {
+      margin: 0 !important;
+      text-align: center;
+    }
+
     .standings-all-regions {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -58,8 +105,11 @@
 </head>
 <body>
   <div class="resource-page-container fcc-brand-page-shell">
-    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
-    <h1>Conference Standings</h1>
+    <div class="standings-page-header">
+      <a id="back-btn" class="back-to-locker-room brand-back-link" href="#">Back to Locker Room</a>
+      <h1 class="standings-page-title">National Standings</h1>
+      <div></div>
+    </div>
     <div id="standings-by-region" class="standings-by-region"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
