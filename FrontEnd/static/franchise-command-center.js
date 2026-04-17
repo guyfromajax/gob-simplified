@@ -716,6 +716,89 @@ function renderHomeRankingsCard() {
   `;
 }
 
+function getScheduleGameForWeek(weekNumber) {
+  return getUserScheduleGames().find((game) => Number(game.week || 0) === Number(weekNumber)) || null;
+}
+
+function getScheduleRowMarkup(label, detail, detailClass = '') {
+  return `
+    <div class="fcc-schedule-row">
+      <span class="fcc-schedule-week">${escapeHomeHtml(label)}</span>
+      <span class="fcc-schedule-detail ${detailClass}">${escapeHomeHtml(detail)}</span>
+    </div>
+  `;
+}
+
+function formatScheduleGameDetail(game) {
+  if (!game) {
+    return { text: 'Open', className: '' };
+  }
+  const opponentId = getOpponentIdFromGame(game);
+  const opponentName = getScheduleDisplayName(opponentId) || 'TBD';
+  const matchupLabel = getMatchupLabelForGame(game);
+  const baseText = `${matchupLabel} ${opponentName}`;
+  const awayScore = Number(game.away_score ?? 0);
+  const homeScore = Number(game.home_score ?? 0);
+  const isComplete = game.status === 'complete' || (Number.isFinite(awayScore) && Number.isFinite(homeScore) && (awayScore > 0 || homeScore > 0));
+  if (!isComplete) {
+    return { text: baseText, className: 'is-pending' };
+  }
+  const userIsHome = String(game.home_team_id) === String(userTeamId);
+  const userScore = userIsHome ? homeScore : awayScore;
+  const oppScore = userIsHome ? awayScore : homeScore;
+  let className = 'is-complete-tie';
+  if (userScore > oppScore) className = 'is-complete-win';
+  else if (userScore < oppScore) className = 'is-complete-loss';
+  return {
+    text: `${baseText} ${userScore}-${oppScore}`,
+    className
+  };
+}
+
+function buildScheduleColumnMarkup(title, weeks, extraRows = []) {
+  const rows = weeks.map((weekNumber) => {
+    const game = getScheduleGameForWeek(weekNumber);
+    const detail = formatScheduleGameDetail(game);
+    return getScheduleRowMarkup(`Wk ${weekNumber}`, detail.text, detail.className);
+  });
+  extraRows.forEach((rowText) => {
+    rows.push(getScheduleRowMarkup('', rowText, 'is-tournament'));
+  });
+  return `
+    <section class="fcc-schedule-column">
+      <div class="fcc-schedule-column-head">${escapeHomeHtml(title)}</div>
+      <div class="fcc-schedule-column-body">${rows.join('')}</div>
+    </section>
+  `;
+}
+
+async function renderScheduleTab() {
+  const host = document.getElementById('fcc-schedule-grid');
+  if (!host) return;
+  if (!franchiseId) {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Schedule unavailable.</div>';
+    return;
+  }
+  if (!userScheduleDataCache) {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Loading schedule...</div>';
+  }
+  await ensureHomeScheduleData();
+  if (!userScheduleDataCache) {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Schedule unavailable.</div>';
+    return;
+  }
+  host.innerHTML = [
+    buildScheduleColumnMarkup('Weeks 1-7', [1, 2, 3, 4, 5, 6, 7]),
+    buildScheduleColumnMarkup('Weeks 8-14', [8, 9, 10, 11, 12, 13, 14]),
+    buildScheduleColumnMarkup('Weeks 15-21', [15, 16, 17, 18, 19, 20, 21]),
+    buildScheduleColumnMarkup('Weeks 22-26', [22, 23, 24, 25, 26], [
+      'Conference Tournaments',
+      'Region Tournaments',
+      'National Tournament'
+    ])
+  ].join('');
+}
+
 function renderHomeMatchupCard(bodyId, summary) {
   const body = document.getElementById(bodyId);
   if (!body) return;
@@ -2761,6 +2844,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'game-plan-tab') {
           renderGamePlanSummary();
+        }
+        if (tabName === 'schedule-tab') {
+          void renderScheduleTab();
         }
         if (tabName === 'team-stats-tab') {
           renderTeamReport();

@@ -1349,6 +1349,95 @@ body {
   transform: translateY(0);
 }
 
+#franchise-container .fcc-schedule-card-body {
+  padding: 12px 14px 14px;
+}
+
+#franchise-container .fcc-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#franchise-container .fcc-schedule-column {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
+    rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+#franchise-container .fcc-schedule-column-head {
+  padding: 10px 12px 8px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  color: #f7f9ff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
+
+#franchise-container .fcc-schedule-column-body {
+  padding: 2px 10px 4px;
+}
+
+#franchise-container .fcc-schedule-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 5px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container .fcc-schedule-row:last-child {
+  border-bottom: 0;
+}
+
+#franchise-container .fcc-schedule-week {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+#franchise-container .fcc-schedule-detail {
+  min-width: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#franchise-container .fcc-schedule-detail.is-complete-win {
+  color: #34EC27;
+}
+
+#franchise-container .fcc-schedule-detail.is-complete-loss {
+  color: #ff6d6d;
+}
+
+#franchise-container .fcc-schedule-detail.is-complete-tie {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+#franchise-container .fcc-schedule-detail.is-pending {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+#franchise-container .fcc-schedule-detail.is-tournament {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 #franchise-container #recruits-tab table.recruiting-table thead th:nth-child(3),
 #franchise-container #recruits-tab table.recruiting-table thead th:nth-child(20),
 #franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(3),
