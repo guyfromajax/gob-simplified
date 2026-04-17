@@ -3642,17 +3642,60 @@ def get_leaders(
         if allowed_team_names:
             team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
         pipeline.append({"$match": {"$or": team_filters}})
-    pipeline.extend([
-        {
-            "$project": {
-                "player_id": 1,
-                "meta": 1,
-                "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-            }
-        },
-        {"$sort": {"value": -1}},
-        {"$limit": limit},
-    ])
+
+    if stat in {"FG%", "DEF%"}:
+        numerator_field = "FGM" if stat == "FG%" else "DEF_S"
+        denominator_field = "FGA" if stat == "FG%" else "DEF_A"
+        pipeline.extend([
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                    "numerator": {"$ifNull": [f"${scope}.{numerator_field}", 0]},
+                    "denominator": {"$ifNull": [f"${scope}.{denominator_field}", 0]},
+                }
+            },
+            {
+                "$match": {
+                    "$expr": {
+                        "$and": [
+                            {"$gt": ["$gp", 0]},
+                            {"$gte": ["$denominator", {"$multiply": ["$gp", 5]}]},
+                        ]
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "value": {
+                        "$cond": [
+                            {"$gt": ["$denominator", 0]},
+                            {"$multiply": [{"$divide": ["$numerator", "$denominator"]}, 100]},
+                            0,
+                        ]
+                    },
+                    "tiebreak_volume": "$denominator",
+                }
+            },
+            {"$sort": {"value": -1, "tiebreak_volume": -1}},
+            {"$limit": limit},
+        ])
+    else:
+        pipeline.extend([
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                }
+            },
+            {"$sort": {"value": -1}},
+            {"$limit": limit},
+        ])
+
     agg = list(franchise_players_data_collection.aggregate(pipeline))
     aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
@@ -3665,7 +3708,7 @@ def get_leaders(
                 "first_name": meta.get("first_name", ""),
                 "last_name": meta.get("last_name", ""),
                 "team": meta.get("team", meta.get("team_id", "")),
-                "value": p.get("value", 0),
+                "value": round(float(p.get("value", 0) or 0), 1) if stat in {"FG%", "DEF%"} else p.get("value", 0),
             }
         )
     total_time = time.time() - start_time
@@ -3684,7 +3727,7 @@ def leaders(
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
     
-    categories = ["PTS", "AST", "3PTM", "REB", "BLK", "STL"]  # ✅ SS&S: Use standardized field name "3PTM" instead of "TPM"
+    categories = ["PTS", "3PTM", "AST", "BLK", "FG%", "REB", "STL", "DEF%"]
     allowed_team_ids: Optional[set[str]] = None
     allowed_team_names: Optional[set[str]] = None
     if view_scope in {"conference", "region"}:

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Leaders</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <style>
+    .leaders-page-header {
+      margin-bottom: 10px;
+    }
+
+    .leaders-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      margin-bottom: 12px;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .leaders-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .leaders-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .leaders-page-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 14px 0;
+    }
+
+    .leaders-page-title {
+      margin: 0 !important;
+    }
+
+    .leaders-page-card-body {
+      padding: 14px;
+    }
+
+    .leaders-page-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .leaders-page-card .leader-card {
+      min-width: 0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+        linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 14px 28px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+    }
+
+    .leaders-page-card .leader-card-header {
+      padding: 12px 14px 10px;
+      color: #ffffff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      line-height: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    }
+
+    .leaders-page-card .leader-card-list {
+      padding: 6px 14px 8px;
+    }
+
+    .leaders-page-card .leader-row {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 46px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .leaders-page-card .leader-row:last-child {
+      border-bottom: 0;
+    }
+
+    .leaders-page-card .leader-rank {
+      color: rgba(255, 255, 255, 0.72);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .leaders-page-card .leader-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .leaders-page-card .leader-name {
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .leaders-page-card .leader-team {
+      color: rgba(255, 255, 255, 0.64);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .leaders-page-card .leader-value {
+      color: rgba(255, 255, 255, 0.92);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .leaders-page-card .leader-card-empty {
+      padding: 18px 14px;
+      color: rgba(255, 255, 255, 0.72);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="resource-page-container fcc-brand-page-shell fcc-brand-page-shell-no-lines">
+    <div class="leaders-page-header">
+      <a id="back-btn" class="leaders-back-link" href="#">Back to Locker Room</a>
+    </div>
+    <section class="fcc-data-card leaders-page-card">
+      <div class="leaders-page-card-head">
+        <h1 class="leaders-page-title">Leaders</h1>
+        <div class="stats-scope-toggle-wrap">
+          <button type="button" class="stats-scope-btn active" data-scope="conference">Conference</button>
+          <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
+          <button type="button" class="stats-scope-btn" data-scope="national">National</button>
+        </div>
+      </div>
+      <div class="fcc-data-card-body leaders-page-card-body">
+        <div id="leaders-grid" class="leaders-page-grid">
+          <div class="leader-card"><div class="leader-card-empty">Loading leaders...</div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
+  <script src="/leaders.js"></script>
+</body>
+</html>

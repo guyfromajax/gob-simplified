@@ -1292,6 +1292,111 @@ input[type="reset"] {
   margin-top: 10px;
 }
 
+#franchise-container .fcc-leaders-card-body {
+  padding: 14px;
+}
+
+#franchise-container .fcc-leaders-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+#franchise-container .fcc-leader-card {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 28px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+#franchise-container .fcc-leader-card-header {
+  padding: 12px 14px 10px;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+}
+
+#franchise-container .fcc-leader-card-list {
+  padding: 6px 14px 8px;
+}
+
+#franchise-container .fcc-leader-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#franchise-container .fcc-leader-row:last-child {
+  border-bottom: 0;
+}
+
+#franchise-container .fcc-leader-rank {
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+#franchise-container .fcc-leader-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+#franchise-container .fcc-leader-name {
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#franchise-container .fcc-leader-team {
+  color: rgba(255, 255, 255, 0.64);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#franchise-container .fcc-leader-value {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#franchise-container .fcc-leader-card-empty {
+  padding: 18px 14px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
 #franchise-container .fcc-game-plan-card-body {
   padding: 12px 16px 14px;
 }

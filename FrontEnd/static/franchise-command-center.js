@@ -1070,6 +1070,8 @@ function bindResourcesLinks() {
   if (statsNavBtn) statsNavBtn.dataset.route = '';
   const teamStatsFullLink = document.getElementById('team-stats-full-link');
   if (teamStatsFullLink) teamStatsFullLink.href = `/team-stats.html${q()}`;
+  const leadersFullLink = document.getElementById('leaders-full-link');
+  if (leadersFullLink) leadersFullLink.href = `/leaders.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
   if (rStandings) rStandings.href = `/standings.html${q()}`;
   const rStats = document.getElementById('resources-stats');
@@ -1085,11 +1087,91 @@ function bindResourcesLinks() {
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');
-  if (rAwards) rAwards.href = `/awards.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
+  if (rAwards) rAwards.href = `/leaders.html${q()}`;
 }
 
 function formatTeamStatsPercent(numerator, denominator) {
   return denominator > 0 ? (((numerator || 0) / denominator) * 100).toFixed(1) + '%' : '0.0%';
+}
+
+const FCC_LEADER_CATEGORY_ORDER = ['PTS', '3PTM', 'AST', 'BLK', 'FG%', 'REB', 'STL', 'DEF%'];
+const FCC_LEADER_CATEGORY_LABELS = {
+  PTS: 'Points',
+  '3PTM': '3 PT Made',
+  AST: 'Assists',
+  BLK: 'Blocks',
+  'FG%': 'FG%',
+  REB: 'Rebounds',
+  STL: 'Steals',
+  'DEF%': 'DEF%',
+};
+
+function formatLeaderValue(category, value) {
+  if (value == null || value === '') return '--';
+  if (category === 'FG%' || category === 'DEF%') {
+    const numeric = Number(value);
+    return `${Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0'}%`;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, '') : String(value);
+}
+
+async function ensureConferenceLeaders() {
+  if (leadersDataCache || !franchiseId) return leadersDataCache;
+  leadersDataCache = await fetchJSON(
+    `${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${encodeURIComponent(franchiseId)}&scope=season&view_scope=conference&limit=5`
+  );
+  return leadersDataCache;
+}
+
+async function renderFccLeadersSummary() {
+  const grid = document.getElementById('fcc-leaders-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="fcc-leader-card"><div class="fcc-leader-card-empty">Loading leaders...</div></div>';
+  const data = await ensureConferenceLeaders();
+  if (!data) {
+    grid.innerHTML = '<div class="fcc-leader-card"><div class="fcc-leader-card-empty">Failed to load leaders.</div></div>';
+    return;
+  }
+  grid.innerHTML = '';
+  const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
+  FCC_LEADER_CATEGORY_ORDER.forEach((category) => {
+    const card = document.createElement('section');
+    card.className = 'fcc-leader-card';
+    const header = document.createElement('div');
+    header.className = 'fcc-leader-card-header';
+    header.textContent = FCC_LEADER_CATEGORY_LABELS[category] || category;
+    card.appendChild(header);
+    const list = document.createElement('div');
+    list.className = 'fcc-leader-card-list';
+    const leaders = Array.isArray(data[category]) ? data[category].slice(0, 5) : [];
+    if (!leaders.length) {
+      list.innerHTML = '<div class="fcc-leader-card-empty">No leaders available.</div>';
+    } else {
+      leaders.forEach((leader, index) => {
+        const row = document.createElement('div');
+        row.className = 'fcc-leader-row';
+        const isUserTeam = userTeamNameForLeaders && leader.team === userTeamNameForLeaders;
+        row.innerHTML = `
+          <div class="fcc-leader-rank">${index + 1}.</div>
+          <div class="fcc-leader-meta">
+            <div class="fcc-leader-name">${escapeHtml(leader.name || '--')}</div>
+            <div class="fcc-leader-team">${escapeHtml(leader.team || '--')}</div>
+          </div>
+          <div class="fcc-leader-value">${escapeHtml(formatLeaderValue(category, leader.value))}</div>
+        `;
+        if (isUserTeam && primaryColor) {
+          row.querySelectorAll('.fcc-leader-rank, .fcc-leader-name, .fcc-leader-team, .fcc-leader-value').forEach((el) => {
+            el.style.color = primaryColor;
+            el.style.fontWeight = '700';
+          });
+        }
+        list.appendChild(row);
+      });
+    }
+    card.appendChild(list);
+    grid.appendChild(card);
+  });
 }
 
 async function ensureFccTeamStatsSummary() {
@@ -2915,6 +2997,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'fcc-team-stats-summary-tab') {
           void renderFccTeamStatsSummary();
+        }
+        if (tabName === 'awards-tab') {
+          void renderFccLeadersSummary();
         }
         if (tabName === 'team-stats-tab') {
           renderTeamReport();
