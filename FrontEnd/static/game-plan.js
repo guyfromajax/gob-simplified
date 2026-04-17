@@ -254,6 +254,38 @@ function setHeader() {
   }
 }
 
+function ensureSliderVisual(slider) {
+  const wrapper = slider?.closest('.slider-wrapper');
+  if (!wrapper) return null;
+  let shell = wrapper.querySelector('.strategy-slider-shell');
+  if (shell) return shell;
+
+  shell = document.createElement('div');
+  shell.className = 'strategy-slider-shell';
+  shell.setAttribute('aria-hidden', 'true');
+  shell.innerHTML = `
+    <div class="strategy-slider-track"></div>
+    <div class="strategy-slider-nodes">
+      <span class="strategy-slider-node"></span>
+      <span class="strategy-slider-node"></span>
+      <span class="strategy-slider-node"></span>
+      <span class="strategy-slider-node"></span>
+      <span class="strategy-slider-node"></span>
+    </div>
+  `;
+  wrapper.appendChild(shell);
+  return shell;
+}
+
+function updateSliderVisual(slider, rawValue) {
+  const shell = ensureSliderVisual(slider);
+  if (!shell) return;
+  const value = Math.max(0, Math.min(4, Number(rawValue) || 0));
+  shell.querySelectorAll('.strategy-slider-node').forEach((node, index) => {
+    node.classList.toggle('is-selected', index === value);
+  });
+}
+
 function setupSliders() {
   // Setup all sliders (all save to strategy_settings)
   for (const [key, sliderId] of Object.entries(strategySliders)) {
@@ -261,10 +293,13 @@ function setupSliders() {
     const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
     
     if (slider && valueDisplay) {
+      ensureSliderVisual(slider);
+      updateSliderVisual(slider, slider.value);
       slider.addEventListener('input', (e) => {
         const value = parseInt(e.target.value, 10);
         valueDisplay.textContent = value;
         currentSettings.strategy_settings[key] = value;
+        updateSliderVisual(slider, value);
         markUnsavedChanges();
       });
       slider.addEventListener('change', () => {
@@ -428,6 +463,7 @@ async function loadSettings() {
       
       if (slider) slider.value = value;
       if (valueDisplay) valueDisplay.textContent = value;
+      if (slider) updateSliderVisual(slider, value);
     }
     
     // Store last saved settings for comparison
