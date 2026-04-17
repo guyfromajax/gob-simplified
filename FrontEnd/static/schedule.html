@@ -11,7 +11,14 @@
   <link rel="stylesheet" href="/resource-pages.css">
   <style>
     .schedule-page-header {
-      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .schedule-page-header .schedule-back-link {
+      justify-self: start;
     }
 
     .schedule-back-link {
@@ -45,19 +52,9 @@
       line-height: 1;
     }
 
-    .schedule-page-card-head {
-      display: flex;
-      justify-content: flex-start;
-      align-items: center;
-      padding: 12px 14px 0;
-    }
-
     .schedule-page-title {
       margin: 0 !important;
-    }
-
-    .schedule-page-card-body {
-      padding: 12px 14px 16px;
+      text-align: center;
     }
 
     .schedule-weeks-grid {
@@ -186,15 +183,10 @@
   <div class="resource-page-container fcc-brand-page-shell">
     <div class="schedule-page-header">
       <a id="back-btn" class="back-to-locker-room schedule-back-link" href="#">Back to Locker Room</a>
+      <h1 class="schedule-page-title">National Schedule</h1>
+      <div></div>
     </div>
-    <section class="fcc-data-card schedule-page-card">
-      <div class="schedule-page-card-head">
-        <h1 class="schedule-page-title">National Schedule</h1>
-      </div>
-      <div class="fcc-data-card-body schedule-page-card-body">
-        <div id="schedule-container" class="schedule-weeks-grid"></div>
-      </div>
-    </section>
+    <div id="schedule-container" class="schedule-weeks-grid"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
