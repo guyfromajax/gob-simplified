@@ -115,6 +115,63 @@
 
     .recruiting-region-table {
       width: max(100%, 1120px);
+      margin: 0;
+      min-width: 1120px;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .recruiting-region-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding: 12px 10px 10px;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    }
+
+    .recruiting-region-table tbody td {
+      padding: 9px 10px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: transparent;
+    }
+
+    .recruiting-region-table tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .recruiting-region-table tbody tr:hover td {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .recruiting-region-table thead th:first-child,
+    .recruiting-region-table tbody td:first-child,
+    .recruiting-region-table thead th:nth-child(2),
+    .recruiting-region-table tbody td:nth-child(2),
+    .recruiting-region-table thead th:last-child,
+    .recruiting-region-table tbody td:last-child {
+      text-align: left;
+    }
+
+    .recruiting-region-table thead th:first-child,
+    .recruiting-region-table tbody td:first-child {
+      padding-left: 16px;
+    }
+
+    .recruiting-region-table tbody td:first-child {
+      font-weight: 700;
+      color: #ffffff;
     }
 
     .recruiting-region-table thead th[data-sort-key] {

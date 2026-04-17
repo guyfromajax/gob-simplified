@@ -126,7 +126,6 @@
     return [
       '<thead><tr>',
       '<th data-sort-key="name">Name</th>',
-      '<th data-sort-key="homeRegion">Home Region</th>',
       '<th data-sort-key="archetype">Archetype</th>',
       '<th data-sort-key="height">HT</th>',
       '<th data-sort-key="weight">WT</th>',
@@ -147,6 +146,52 @@
       '<th data-sort-key="' + lastColKey + '">' + lastColLabel + '</th>',
       '</tr></thead>'
     ].join('');
+  }
+
+  function appendStandardRow(tbody, row, isWeek36) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = isWeek36 ? [
+      '<td>' + row.name + '</td>',
+      '<td>' + (row.archetype || '--') + '</td>',
+      '<td>' + (row.height || '--') + '</td>',
+      '<td>' + (row.weight != null ? row.weight : '--') + '</td>',
+      '<td>' + (row.pos || '--') + '</td>',
+      '<td>' + row.attrs.SC + '</td>',
+      '<td>' + row.attrs.SH + '</td>',
+      '<td>' + row.attrs.ID + '</td>',
+      '<td>' + row.attrs.OD + '</td>',
+      '<td>' + row.attrs.PS + '</td>',
+      '<td>' + row.attrs.BH + '</td>',
+      '<td>' + row.attrs.RB + '</td>',
+      '<td>' + row.attrs.AG + '</td>',
+      '<td>' + row.attrs.ST + '</td>',
+      '<td>' + row.attrs.ND + '</td>',
+      '<td>' + row.attrs.IQ + '</td>',
+      '<td>' + row.attrs.FT + '</td>',
+      '<td>' + (row.rt != null ? row.rt : '--') + '</td>',
+      '<td>' + row.signedDisplay + '</td>'
+    ].join('') : [
+      '<td>' + row.name + '</td>',
+      '<td>' + (row.archetype || '--') + '</td>',
+      '<td>' + (row.height || '--') + '</td>',
+      '<td>' + (row.weight != null ? row.weight : '--') + '</td>',
+      '<td>' + (row.pos || '--') + '</td>',
+      '<td>' + row.attrs.SC + '</td>',
+      '<td>' + row.attrs.SH + '</td>',
+      '<td>' + row.attrs.ID + '</td>',
+      '<td>' + row.attrs.OD + '</td>',
+      '<td>' + row.attrs.PS + '</td>',
+      '<td>' + row.attrs.BH + '</td>',
+      '<td>' + row.attrs.RB + '</td>',
+      '<td>' + row.attrs.AG + '</td>',
+      '<td>' + row.attrs.ST + '</td>',
+      '<td>' + row.attrs.ND + '</td>',
+      '<td>' + row.attrs.IQ + '</td>',
+      '<td>' + row.attrs.FT + '</td>',
+      '<td>' + (row.rt != null ? row.rt : '--') + '</td>',
+      '<td>' + (row.leanDisplay || '--') + '</td>'
+    ].join('');
+    tbody.appendChild(tr);
   }
 
   function buildRegionCard(region, rows, isWeek36) {
@@ -177,36 +222,9 @@
     REGION_ORDER.forEach(function (region) {
       var tbody = document.getElementById('recruiting-region-body-' + region);
       if (!tbody) return;
-      if (week === 36) {
-        grouped[region].forEach(function (row) {
-          var tr = document.createElement('tr');
-          tr.innerHTML = [
-            '<td>' + row.name + '</td>',
-            '<td>' + (row.homeRegion || '--') + '</td>',
-            '<td>' + (row.archetype || '--') + '</td>',
-            '<td>' + (row.height || '--') + '</td>',
-            '<td>' + (row.weight != null ? row.weight : '--') + '</td>',
-            '<td>' + (row.pos || '--') + '</td>',
-            '<td>' + row.attrs.SC + '</td>',
-            '<td>' + row.attrs.SH + '</td>',
-            '<td>' + row.attrs.ID + '</td>',
-            '<td>' + row.attrs.OD + '</td>',
-            '<td>' + row.attrs.PS + '</td>',
-            '<td>' + row.attrs.BH + '</td>',
-            '<td>' + row.attrs.RB + '</td>',
-            '<td>' + row.attrs.AG + '</td>',
-            '<td>' + row.attrs.ST + '</td>',
-            '<td>' + row.attrs.ND + '</td>',
-            '<td>' + row.attrs.IQ + '</td>',
-            '<td>' + row.attrs.FT + '</td>',
-            '<td>' + (row.rt != null ? row.rt : '--') + '</td>',
-            '<td>' + row.signedDisplay + '</td>'
-          ].join('');
-          tbody.appendChild(tr);
-        });
-      } else {
-        Recruiting.renderRecruitTableRows(tbody, grouped[region], {});
-      }
+      grouped[region].forEach(function (row) {
+        appendStandardRow(tbody, row, week === 36);
+      });
       if (typeof window.initAttributeTooltips === 'function') {
         window.initAttributeTooltips(tbody, ['td']);
       }
