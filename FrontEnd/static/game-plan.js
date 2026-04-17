@@ -182,7 +182,7 @@ function showSuccessPopup(message) {
   modal.className = 'gameplan-success-modal';
   modal.style.cssText = `
     background: #1a1a1a;
-    border: 2px solid #00ff00;
+    border: 2px solid #34EC27;
     border-radius: 8px;
     padding: 24px;
     max-width: 400px;
@@ -198,7 +198,7 @@ function showSuccessPopup(message) {
     font-size: 1.125rem;
     margin-bottom: 20px;
     font-weight: 600;
-    color: #00ff00;
+    color: #34EC27;
   `;
   
   // OK button
@@ -206,7 +206,7 @@ function showSuccessPopup(message) {
   okBtn.textContent = 'OK';
   okBtn.style.cssText = `
     padding: 10px 30px;
-    background: #00ff00;
+    background: #34EC27;
     color: #000;
     border: none;
     border-radius: 4px;
@@ -947,4 +947,3 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
