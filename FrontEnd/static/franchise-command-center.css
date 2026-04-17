@@ -204,7 +204,7 @@ input[type="reset"] {
   color: #07101f;
   backdrop-filter: blur(4px);
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -953,7 +953,7 @@ input[type="reset"] {
   border: none;
   border-radius: 6px;
   padding: 10px 16px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 700;
   cursor: pointer;
 }
@@ -986,7 +986,7 @@ input[type="reset"] {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1022,7 +1022,7 @@ input[type="reset"] {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1493,7 +1493,7 @@ input[type="reset"] {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1528,7 +1528,7 @@ input[type="reset"] {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 600;
   cursor: pointer;
   font-size: 13px;
@@ -1693,7 +1693,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   padding: 12px 20px;
   background: linear-gradient(180deg, #4b64ba 0%, #27408e 100%);
   color: #fff;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 700;
   font-size: 15px;
   text-align: center;
