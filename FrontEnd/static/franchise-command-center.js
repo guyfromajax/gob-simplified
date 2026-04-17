@@ -1063,6 +1063,8 @@ function bindResourcesLinks() {
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
   const standingsFullLink = document.getElementById('standings-full-link');
   if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
+  const scheduleFullLink = document.getElementById('schedule-full-link');
+  if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
   const statsNavBtn = document.getElementById('stats-nav-btn');
   if (statsNavBtn) statsNavBtn.dataset.route = `/team-stats.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
