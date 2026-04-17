@@ -2,5 +2,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue', sans-serif !important;
+  font-size: 27px !important;
+  letter-spacing: 1.5px !important;
 }

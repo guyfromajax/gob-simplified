@@ -42,6 +42,7 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - `Bebas Neue` is used for display text, tab labels, major section headers, and command-center headlines.
 - `Inter` is used for body copy, metadata, labels, tables, helper text, and supporting UI language.
 - `Bebas Neue` is the universal font for all buttons across the product.
+- Universal button typography uses a larger `Bebas Neue` treatment with positive tracking so the copy feels intentional and premium.
 - Display typography should feel bold, condensed, and game-native.
 - Supporting typography should remain clean, readable, and dense enough for management-sim interfaces.
 
@@ -60,6 +61,11 @@ This document defines the core visual and interaction standards for Geeked-Out B
 ### Behavior
 - Buttons should feel responsive, deliberate, and restrained.
 - All button copy uses `Bebas Neue`.
+- Button font size should satisfy both rules at once:
+- Horizontal: button text should fill approximately `60–70%` of the button's total width with comfortable equal padding on each side.
+- Vertical: cap height should sit at approximately `45–55%` of the button's total height with breathing room above and below.
+- If those two sizing rules are in tension, prioritize the vertical rule.
+- All button copy uses positive tracking between `1px` and `2px`.
 - Hover states should use modest adjustments in brightness, border emphasis, and elevation.
 - Press states should feel tactile through slight vertical compression or reduced lift.
 - Primary action buttons must be visually distinct from navigation buttons.
