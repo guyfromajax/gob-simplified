@@ -3865,6 +3865,19 @@ let upcomingOpponentId = null;
 let scoutingTabDataCache = null;
 let fccScoutingProjectedViewMode = 'attributes';
 
+function disableLegacyFccScoutingModal() {
+  const legacyModal = document.getElementById('scouting-report-modal');
+  if (legacyModal) legacyModal.remove();
+
+  const legacyScoutingButton = document.getElementById('scouting-report-btn');
+  if (legacyScoutingButton) {
+    legacyScoutingButton.style.display = 'none';
+    legacyScoutingButton.setAttribute('aria-hidden', 'true');
+  }
+}
+
+disableLegacyFccScoutingModal();
+
 async function resolveUpcomingOpponentFromMatchup(data) {
   const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
   const week = data?.week || data?.training_status?.current_week || 0;
