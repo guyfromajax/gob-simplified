@@ -1573,6 +1573,27 @@ input[type="reset"] {
   border-bottom: 1px solid rgba(247, 148, 32, 0.7);
 }
 
+#franchise-container .fcc-playbooks-inline-link {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.76);
+  border-radius: 10px;
+  padding: 0 12px;
+  min-height: 30px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+#franchise-container .fcc-playbooks-inline-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
 #franchise-container .fcc-playbooks-section-body {
   padding: 12px 0 0;
 }
@@ -1677,6 +1698,69 @@ input[type="reset"] {
   color: rgba(255, 255, 255, 0.78);
 }
 
+#franchise-container .fcc-playcall-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+
+#franchise-container .fcc-playcall-column {
+  min-width: 0;
+}
+
+#franchise-container .fcc-playcall-column-head {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  color: #F79420;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  border-bottom: 1px solid rgba(247, 148, 32, 0.7);
+}
+
+#franchise-container .fcc-playcall-slots {
+  display: grid;
+  gap: 8px;
+}
+
+#franchise-container .fcc-playcall-slot-card {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+#franchise-container .fcc-playcall-slot-line {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+#franchise-container .fcc-playcall-slot-number,
+#franchise-container .fcc-playcall-slot-detail,
+#franchise-container .fcc-playcall-slot-empty {
+  color: #9e9d9d;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+#franchise-container .fcc-playcall-slot-name {
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 @media (max-width: 1280px) {
   #franchise-container .fcc-scouting-measures-grid {
     grid-template-columns: 1fr;
@@ -1692,6 +1776,10 @@ input[type="reset"] {
 
   #franchise-container .fcc-playbooks-items {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #franchise-container .fcc-playcall-grid {
+    grid-template-columns: 1fr;
   }
 }
 

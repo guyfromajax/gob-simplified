@@ -158,6 +158,78 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Modal copy should remain concise and scannable.
 - Close behavior should be obvious and consistent.
 
+## Toast Notifications
+
+### Purpose
+- Toasts are the standard approval/confirmation pattern for successful save actions and similar lightweight confirmations.
+- Toasts should replace success modals when the user does not need to make a follow-up decision.
+- Toasts should confirm success without interrupting flow.
+
+### Placement
+- Toasts should be fixed to the bottom right of the viewport.
+- Standard offset: `22px` from the right edge and `22px` from the bottom edge.
+- Toasts must appear above all page content.
+
+### Container Treatment
+- Background: `rgba(28, 33, 43, 0.97)`
+- Border: `1px solid rgba(255, 255, 255, 0.14)`
+- Left accent border: `3px solid` status color
+- Corner radius: `12px`
+- Padding: `14px 18px`
+- Minimum width: `260px`
+- Maximum width: `320px`
+- Shadow: `0 10px 24px rgba(0, 0, 0, 0.3)`
+
+### Content Structure
+- Left: small status icon container
+- Center: text block
+- Right: dismiss control
+- The icon container should be:
+  - `20px` square
+  - circular
+  - lightly tinted with the accent color
+  - bordered with the accent color
+- Success icon should use a white checkmark.
+
+### Typography
+- Title:
+  - `Bebas Neue`
+  - `16px`
+  - full white
+  - letter spacing `0.04em`
+- Subline:
+  - `Inter Regular`
+  - `12px`
+  - `rgba(255, 255, 255, 0.54)`
+
+### Dismiss Control
+- Use a simple `×` character on the far right.
+- Resting color: `rgba(255, 255, 255, 0.3)`
+- Hover color: full white
+- Dismiss should reverse the entrance animation before removal.
+
+### Motion
+- Toasts should slide in from the right.
+- Entrance transition:
+  - from `transform: translateX(120%)`
+  - to `transform: translateX(0)`
+  - opacity `0` to `1`
+  - duration `220ms`
+  - easing `ease`
+- Exit should reverse the same motion.
+
+### Behavior
+- Toasts should auto-dismiss after `3 seconds`.
+- Only one toast should be visible at a time per page context.
+- If a new toast is triggered before the current one dismisses, reuse the existing toast and reset the timer rather than stacking.
+- Toasts should be used for save approvals such as:
+  - `Game Plan Saved`
+  - `Playbooks Saved`
+
+### Status Color Rules
+- Success toast accent color: action green `#34EC27`
+- Other statuses may use a different accent color when appropriate, but the structure and typography should remain the same.
+
 ## Data Surfaces
 - Tables, scroll regions, placeholders, and empty states should follow the same neutral-surface system as panels.
 - Placeholder and in-development states should be centered, legible, and visually quiet.

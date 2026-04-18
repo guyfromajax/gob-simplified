@@ -1272,22 +1272,27 @@ function buildFccPlaybooksItems(data, key) {
 
   if (key === 'motion') {
     items = (data?.motion || []).map((play) => ({
+      id: String(play?.play_id || ''),
       name: play?.name || 'Unknown',
       percentage: Number(percentages.motion?.[play?.play_id] || 0),
       effectiveness: Number(play?.effectiveness || 0),
-      top_scorer: play?.top_scorer || ''
+      top_scorer: play?.top_scorer || '',
+      motion_focus: play?.motion_focus || ''
     }));
   } else if (key === 'set_plays') {
     items = (data?.set_plays || []).map((play) => ({
+      id: String(play?.play_id || ''),
       name: play?.name || 'Unknown',
       percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
       effectiveness: Number(play?.effectiveness || 0),
-      top_scorer: play?.top_scorer || ''
+      top_scorer: play?.top_scorer || '',
+      target_shooter: play?.target_shooter || ''
     }));
   } else if (key === 'man_defense') {
     items = (data?.man_defense_rows || [])
       .filter((row) => row?.is_active !== false)
       .map((row) => ({
+        id: String(row?.id || ''),
         name: row?.name || 'Unknown',
         percentage: Number(percentages.man_defense?.[row?.id] || 0),
         effectiveness: Number(row?.effectiveness || 0),
@@ -1295,6 +1300,7 @@ function buildFccPlaybooksItems(data, key) {
       }));
   } else if (key === 'zone_defense') {
     items = (data?.zone_defense_rows || []).map((row) => ({
+      id: String(row?.id || ''),
       name: row?.name || 'Unknown',
       percentage: Number(percentages.zone_defense?.[row?.id] || 0),
       effectiveness: Number(row?.effectiveness || 0),
@@ -1302,6 +1308,7 @@ function buildFccPlaybooksItems(data, key) {
     }));
   } else if (key === 'fast_breaks') {
     items = (data?.fast_breaks || []).map((row) => ({
+      id: String(row?.id || ''),
       name: row?.name || 'Unknown',
       percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
       effectiveness: Number(row?.effectiveness || 0),
@@ -1319,6 +1326,92 @@ function getFccPlaybookEffClass(value) {
   if (numeric >= 70) return 'is-good';
   if (numeric >= 40) return 'is-mid';
   return 'is-low';
+}
+
+function getFccMotionFocusLabel(value) {
+  if (value === 'inside') return 'Inside';
+  if (value === 'attack') return 'Attack';
+  if (value === 'outside') return 'Outside';
+  return 'Balanced';
+}
+
+function buildFccPlaycallCenterMaps(data) {
+  const offense = new Map();
+  const defense = new Map();
+
+  (data?.motion || []).forEach((play) => {
+    offense.set(String(play?.play_id || ''), {
+      name: play?.name || 'Unknown',
+      detail: getFccMotionFocusLabel(play?.motion_focus || '')
+    });
+  });
+  (data?.set_plays || []).forEach((play) => {
+    offense.set(String(play?.play_id || ''), {
+      name: play?.name || 'Unknown',
+      detail: play?.target_shooter || ''
+    });
+  });
+  (data?.man_defense_rows || []).filter((row) => row?.is_active !== false).forEach((row) => {
+    defense.set(String(row?.id || ''), {
+      name: row?.name || 'Unknown',
+      detail: ''
+    });
+  });
+  (data?.zone_defense_rows || []).forEach((row) => {
+    defense.set(String(row?.id || ''), {
+      name: row?.name || 'Unknown',
+      detail: ''
+    });
+  });
+
+  return { offense, defense };
+}
+
+function buildFccPlaycallCenterListMarkup(label, entries, lookup) {
+  const rows = Array.from({ length: 8 }, (_, index) => {
+    const id = String(entries?.[index] || '');
+    const item = id ? lookup.get(id) : null;
+    return `
+      <article class="fcc-playcall-slot-card">
+        <div class="fcc-playcall-slot-line">
+          <span class="fcc-playcall-slot-number">${index + 1}.</span>
+          ${item
+            ? `<span class="fcc-playcall-slot-name">${escapePlaybookHtml(item.name)}</span>${item.detail ? ` <span class="fcc-playcall-slot-detail">&mdash; ${escapePlaybookHtml(item.detail)}</span>` : ''}`
+            : '<span class="fcc-playcall-slot-empty">Empty</span>'}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  return `
+    <div class="fcc-playcall-column">
+      <div class="fcc-playcall-column-head">${escapePlaybookHtml(label)}</div>
+      <div class="fcc-playcall-slots">${rows}</div>
+    </div>
+  `;
+}
+
+function buildFccPlaycallCenterSectionMarkup(data) {
+  const editLinkMarkup = `
+    <button id="fcc-edit-playcall-center-link" class="fcc-playbooks-inline-link" type="button">Edit in Playbooks</button>
+  `;
+  const pcOrder = data?.pc_order || { offense: [], defense: [] };
+  const lookup = buildFccPlaycallCenterMaps(data);
+
+  return `
+    <section class="fcc-playbooks-section fcc-playcall-section">
+      <div class="fcc-playbooks-section-head-wrap">
+        <div class="fcc-playbooks-section-head">Playcall Center</div>
+        ${editLinkMarkup}
+      </div>
+      <div class="fcc-playbooks-section-body">
+        <div class="fcc-playcall-grid">
+          ${buildFccPlaycallCenterListMarkup('Offense', pcOrder.offense || [], lookup.offense)}
+          ${buildFccPlaycallCenterListMarkup('Defense', pcOrder.defense || [], lookup.defense)}
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 function buildFccPlaybooksSectionMarkup(data, section) {
@@ -1376,12 +1469,26 @@ async function renderFccPlaybooksSummary() {
     return;
   }
 
-  host.innerHTML = FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('');
+  host.innerHTML = `${FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('')}${buildFccPlaycallCenterSectionMarkup(data)}`;
 
   const editBtn = document.getElementById('fcc-edit-playbooks-btn');
   if (editBtn && !editBtn.dataset.bound) {
     editBtn.dataset.bound = '1';
     editBtn.addEventListener('click', () => {
+      if (!franchiseId || !userTeamId) return;
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('team_id', userTeamId);
+      params.set('franchise_id', franchiseId);
+      params.set('return_url', getCurrentRelativeUrl());
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
+
+  const playcallEditLink = document.getElementById('fcc-edit-playcall-center-link');
+  if (playcallEditLink && !playcallEditLink.dataset.bound) {
+    playcallEditLink.dataset.bound = '1';
+    playcallEditLink.addEventListener('click', () => {
       if (!franchiseId || !userTeamId) return;
       const params = new URLSearchParams();
       params.set('mode', 'franchise');

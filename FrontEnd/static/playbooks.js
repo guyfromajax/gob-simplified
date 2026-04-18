@@ -82,6 +82,14 @@
     return value || "balanced";
   }
 
+  function displayMotionFocusLabel(value) {
+    const normalized = displayMotionFocus(value);
+    if (normalized === "inside") return "Inside";
+    if (normalized === "attack") return "Attack";
+    if (normalized === "outside") return "Outside";
+    return "Balanced";
+  }
+
   function buildPlayDetailsUrl(context, play) {
     const params = new URLSearchParams();
     params.set("mode", context.mode);
@@ -613,6 +621,7 @@
         slot.addEventListener("drop", (event) => this.handleDrop(event, listType, index));
 
         if (item) {
+          const detail = this.getPcItemDetail(item, listType);
           const row = document.createElement("div");
           row.className = "pc-slot-filled";
           row.draggable = true;
@@ -620,7 +629,7 @@
           row.dataset.listType = listType;
           row.innerHTML = `
             <span class="pc-drag-handle" aria-hidden="true">⋮⋮</span>
-            <span class="pc-slot-name">${item.name}</span>
+            <span class="pc-slot-name"><span class="pc-slot-number">${index + 1}.</span> <span class="pc-slot-primary">${item.name}</span>${detail ? ` <span class="pc-slot-detail">— ${detail}</span>` : ""}</span>
             <button class="pc-remove-btn" type="button" aria-label="Remove ${item.name}">×</button>
           `;
           row.addEventListener("dragstart", (event) => this.handleDragStart(event, listType, id));
@@ -637,7 +646,7 @@
           slot.classList.add("is-empty");
           const empty = document.createElement("div");
           empty.className = "pc-slot-empty";
-          empty.textContent = "Empty slot";
+          empty.innerHTML = `<span class="pc-slot-number">${index + 1}.</span> <span class="pc-slot-detail">Empty</span>`;
           slot.appendChild(empty);
         }
 
@@ -808,6 +817,7 @@
         if (!play) return;
         play.motion_focus = normalizeMotionFocus(select.value);
         this.state.evenDistributionAll = false;
+        this.renderPcLists();
       });
     }
 
@@ -820,7 +830,19 @@
         if (!play) return;
         play.target_shooter = select.value;
         this.state.evenDistributionAll = false;
+        this.renderPcLists();
       });
+    }
+
+    getPcItemDetail(item, listType) {
+      if (!item || listType !== "offense") return "";
+      if (Object.prototype.hasOwnProperty.call(item, "motion_focus")) {
+        return displayMotionFocusLabel(item.motion_focus);
+      }
+      if (Object.prototype.hasOwnProperty.call(item, "target_shooter")) {
+        return item.target_shooter || "";
+      }
+      return "";
     }
 
     bindPcCheckboxEvent(row, id, listType) {
