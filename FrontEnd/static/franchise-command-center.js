@@ -1273,29 +1273,34 @@ function buildFccPlaybooksItems(data, key) {
   if (key === 'motion') {
     items = (data?.motion || []).map((play) => ({
       name: play?.name || 'Unknown',
-      percentage: Number(percentages.motion?.[play?.play_id] || 0)
+      percentage: Number(percentages.motion?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0)
     }));
   } else if (key === 'set_plays') {
     items = (data?.set_plays || []).map((play) => ({
       name: play?.name || 'Unknown',
-      percentage: Number(percentages.set_plays?.[play?.play_id] || 0)
+      percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0)
     }));
   } else if (key === 'man_defense') {
     items = (data?.man_defense_rows || [])
       .filter((row) => row?.is_active !== false)
       .map((row) => ({
         name: row?.name || 'Unknown',
-        percentage: Number(percentages.man_defense?.[row?.id] || 0)
+        percentage: Number(percentages.man_defense?.[row?.id] || 0),
+        effectiveness: Number(row?.effectiveness || 0)
       }));
   } else if (key === 'zone_defense') {
     items = (data?.zone_defense_rows || []).map((row) => ({
       name: row?.name || 'Unknown',
-      percentage: Number(percentages.zone_defense?.[row?.id] || 0)
+      percentage: Number(percentages.zone_defense?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0)
     }));
   } else if (key === 'fast_breaks') {
     items = (data?.fast_breaks || []).map((row) => ({
       name: row?.name || 'Unknown',
-      percentage: Number(percentages.fast_breaks?.[row?.id] || 0)
+      percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0)
     }));
   }
 
@@ -1304,10 +1309,17 @@ function buildFccPlaybooksItems(data, key) {
     .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
 }
 
+function getFccPlaybookEffClass(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 70) return 'is-good';
+  if (numeric >= 40) return 'is-mid';
+  return 'is-low';
+}
+
 function buildFccPlaybooksSectionMarkup(data, section) {
   if (section.key === 'press_trap') {
     return `
-      <section class="fcc-playbooks-section-card">
+      <section class="fcc-playbooks-section">
         <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
         <div class="fcc-playbooks-section-body fcc-playbooks-placeholder-body">
           <div class="fcc-playbooks-placeholder-copy">In Development</div>
@@ -1319,15 +1331,18 @@ function buildFccPlaybooksSectionMarkup(data, section) {
   const items = buildFccPlaybooksItems(data, section.key);
   const bodyMarkup = items.length
     ? `<div class="fcc-playbooks-items">${items.map((item) => `
-        <div class="fcc-playbooks-item">
-          <div class="fcc-playbooks-item-name">${escapePlaybookHtml(item.name)}</div>
-          <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
-        </div>
+        <article class="fcc-playbooks-item-card">
+          <div class="fcc-playbooks-item-top">
+            <div class="fcc-playbooks-item-name">${escapePlaybookHtml(item.name)}</div>
+            <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
+          </div>
+          <div class="fcc-playbooks-item-eff ${getFccPlaybookEffClass(item.effectiveness)}">${escapePlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+        </article>
       `).join('')}</div>`
     : '<div class="fcc-playbooks-empty">No plays assigned.</div>';
 
   return `
-    <section class="fcc-playbooks-section-card">
+    <section class="fcc-playbooks-section">
       <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
       <div class="fcc-playbooks-section-body">${bodyMarkup}</div>
     </section>
