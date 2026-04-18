@@ -1116,6 +1116,15 @@ function formatLeaderValue(category, value) {
   return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, '') : String(value);
 }
 
+function escapeFccLeaderHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function ensureConferenceLeaders() {
   if (leadersDataCache || !franchiseId) return leadersDataCache;
   leadersDataCache = await fetchJSON(
@@ -1155,10 +1164,10 @@ async function renderFccLeadersSummary() {
         row.innerHTML = `
           <div class="fcc-leader-rank">${index + 1}.</div>
           <div class="fcc-leader-meta">
-            <div class="fcc-leader-name">${escapeHtml(leader.name || '--')}</div>
-            <div class="fcc-leader-team">${escapeHtml(leader.team || '--')}</div>
+            <div class="fcc-leader-name">${escapeFccLeaderHtml(leader.name || '--')}</div>
+            <div class="fcc-leader-team">${escapeFccLeaderHtml(leader.team || '--')}</div>
           </div>
-          <div class="fcc-leader-value">${escapeHtml(formatLeaderValue(category, leader.value))}</div>
+          <div class="fcc-leader-value">${escapeFccLeaderHtml(formatLeaderValue(category, leader.value))}</div>
         `;
         if (isUserTeam && primaryColor) {
           row.querySelectorAll('.fcc-leader-rank, .fcc-leader-name, .fcc-leader-team, .fcc-leader-value').forEach((el) => {
