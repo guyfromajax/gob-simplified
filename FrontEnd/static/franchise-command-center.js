@@ -1318,7 +1318,7 @@ function getFccPlaybookEffClass(value) {
 
 function buildFccPlaybooksSectionMarkup(data, section) {
   const editButtonMarkup = section.key === 'motion'
-    ? '<button id="fcc-edit-playbooks-btn" class="fcc-game-plan-edit-btn" type="button">Edit All Playbooks</button>'
+    ? '<button id="fcc-edit-playbooks-btn" class="fcc-game-plan-edit-btn" type="button">Edit Playbooks</button>'
     : '';
 
   if (section.key === 'press_trap') {
@@ -1363,6 +1363,15 @@ async function renderFccPlaybooksSummary() {
   const host = document.getElementById('fcc-playbooks-sections');
   if (!host) return;
 
+  host.innerHTML = '<div class="fcc-playbooks-empty">Loading playbook settings...</div>';
+  const data = await ensureFccPlaybooksSummary();
+  if (!data) {
+    host.innerHTML = '<div class="fcc-playbooks-empty">Failed to load playbook settings.</div>';
+    return;
+  }
+
+  host.innerHTML = FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('');
+
   const editBtn = document.getElementById('fcc-edit-playbooks-btn');
   if (editBtn && !editBtn.dataset.bound) {
     editBtn.dataset.bound = '1';
@@ -1376,15 +1385,6 @@ async function renderFccPlaybooksSummary() {
       window.location.href = `/playbooks.html?${params.toString()}`;
     });
   }
-
-  host.innerHTML = '<div class="fcc-playbooks-empty">Loading playbook settings...</div>';
-  const data = await ensureFccPlaybooksSummary();
-  if (!data) {
-    host.innerHTML = '<div class="fcc-playbooks-empty">Failed to load playbook settings.</div>';
-    return;
-  }
-
-  host.innerHTML = FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('');
 }
 
 function bindStatsAndTraitsScopeButtons() {
