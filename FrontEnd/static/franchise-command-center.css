@@ -1,7 +1,7 @@
 :root {
   --fcc-primary: #27408e;
-  --fcc-primary-top: #3551a5;
-  --fcc-primary-deep: #1a2e71;
+  --fcc-primary-top: #263d7a;
+  --fcc-primary-deep: #141f4a;
   --fcc-panel: rgba(39, 64, 142, 0.26);
   --fcc-panel-border: rgba(255, 255, 255, 0.18);
   --fcc-text: #f7f9ff;
@@ -12,7 +12,7 @@
 
 body {
   background:
-    linear-gradient(180deg, var(--fcc-primary-top) 0%, var(--fcc-primary) 42%, var(--fcc-primary-deep) 100%);
+    linear-gradient(180deg, var(--fcc-primary-top) 0%, #1e3068 42%, var(--fcc-primary-deep) 100%);
   background-attachment: fixed;
   color: var(--fcc-text);
 }
@@ -37,8 +37,8 @@ input[type="reset"] {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(125deg, transparent 0 10%, rgba(255, 255, 255, 0.05) 10% 18%, transparent 18% 34%, rgba(255, 255, 255, 0.04) 34% 42%, transparent 42% 58%, rgba(255, 255, 255, 0.035) 58% 66%, transparent 66% 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 28%),
+    linear-gradient(125deg, transparent 0 10%, rgba(255, 255, 255, 0.03) 10% 18%, transparent 18% 34%, rgba(255, 255, 255, 0.024) 34% 42%, transparent 42% 58%, rgba(255, 255, 255, 0.021) 58% 66%, transparent 66% 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 28%),
     rgba(7, 13, 36, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 28px;

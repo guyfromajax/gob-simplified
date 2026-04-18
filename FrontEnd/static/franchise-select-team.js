@@ -28,21 +28,79 @@ const taglines = {
   'South Lancaster': 'Us vs The World'
 };
 
+const teamContainer = document.getElementById("team-container");
+const errorHost = document.getElementById("team-select-error");
+const loadingOverlay = document.getElementById("team-select-loading");
+const loadingBanner = document.getElementById("team-select-loading-banner");
+const loadingSubline = document.getElementById("team-select-loading-subline");
+const backLink = document.getElementById("team-select-back-link");
+
+function buildReturnUrl() {
+  return window.location.pathname + window.location.search;
+}
+
+function hideError() {
+  if (!errorHost) return;
+  errorHost.hidden = true;
+  errorHost.textContent = "";
+}
+
+function showError(message) {
+  if (!errorHost) return;
+  errorHost.textContent = message;
+  errorHost.hidden = false;
+}
+
+function showLoading(team) {
+  if (!loadingOverlay || !loadingBanner || !loadingSubline) return;
+  loadingBanner.src = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(team, 'banner_primary')
+    : '/images/teams/general/general_banner_primary.jpg';
+  loadingBanner.alt = team;
+  loadingSubline.textContent = 'Getting ' + team + ' ready for the season...';
+  loadingOverlay.hidden = false;
+}
+
+function hideLoading() {
+  if (loadingOverlay) loadingOverlay.hidden = true;
+}
+
 function createButtons() {
-  const container = document.getElementById("team-container");
+  if (!teamContainer) return;
   teams.forEach(team => {
-    const btn = document.createElement("button");
-    btn.className = "team-button";
-    btn.innerHTML = `<img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}"><span>${taglines[team] || team}</span>`;
-    btn.addEventListener("click", () => {
-      playSound("click-beep.wav");
-      selectTeam(team);
-    });
-    container.appendChild(btn);
+    const card = document.createElement("div");
+    card.className = "team-card";
+    card.innerHTML = `
+      <div class="team-card-banner">
+        <img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}">
+        <div class="team-card-tagline">${taglines[team] || team}</div>
+        <div class="team-card-overlay">
+          <button class="team-card-action team-card-action-scout" type="button">Scout</button>
+          <button class="team-card-action team-card-action-select" type="button">Select</button>
+        </div>
+      </div>
+    `;
+    const scoutBtn = card.querySelector(".team-card-action-scout");
+    const selectBtn = card.querySelector(".team-card-action-select");
+    if (scoutBtn) {
+      scoutBtn.addEventListener("click", () => {
+        playSound("click-beep.wav");
+        window.location.href = '/team-roster-view.html?team_name=' + encodeURIComponent(team) + '&return_url=' + encodeURIComponent(buildReturnUrl());
+      });
+    }
+    if (selectBtn) {
+      selectBtn.addEventListener("click", () => {
+        playSound("click-beep.wav");
+        selectTeam(team);
+      });
+    }
+    teamContainer.appendChild(card);
   });
 }
 
 async function selectTeam(team) {
+  hideError();
+  showLoading(team);
   try {
     const headers = { ...API_CONFIG.getAuthHeaders(), "Content-Type": "application/json" };
     const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team?profile=1'), {
@@ -55,11 +113,6 @@ async function selectTeam(team) {
       try {
         const errBody = await res.json();
         if (errBody.detail) msg = errBody.detail;
-        if (res.status === 400 && typeof msg === 'string' && msg.includes('already have an active franchise')) {
-          alert(msg + "\n\nGo to the main menu and click \"New Franchise\" to delete your current one and start fresh.");
-          window.location.href = '/mode-select.html';
-          return;
-        }
       } catch (_) {}
       throw new Error(msg);
     }
@@ -69,7 +122,8 @@ async function selectTeam(team) {
     window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(data.franchise_id)}`;
   } catch (err) {
     console.error(err);
-    alert(err.message || "Unable to start franchise");
+    hideLoading();
+    showError(err.message || "Unable to start franchise");
   }
 }
 
@@ -81,5 +135,11 @@ document.addEventListener("DOMContentLoaded", function () {
     lobbyMusic.volume = 0.4;
     lobbyMusic.play().catch(function () {});
   } catch (e) {}
+  if (backLink) {
+    backLink.addEventListener("click", function (event) {
+      event.preventDefault();
+      window.location.href = '/mode-select.html';
+    });
+  }
   createButtons();
 });

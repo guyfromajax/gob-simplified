@@ -6,15 +6,35 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_v1';
+const COMMUNITY_LEADERBOARD_PLACEHOLDER = [
+  { rank: 1, username: 'Coach Atlas', geek_points: 100, is_current_user: false },
+  { rank: 2, username: 'Halfcourt Hero', geek_points: 94, is_current_user: false },
+  { rank: 3, username: 'ZoneBreaker22', geek_points: 90, is_current_user: false },
+  { rank: 4, username: 'Baseline Jamie', geek_points: 86, is_current_user: false },
+  { rank: 5, username: 'Coach Carter', geek_points: 83, is_current_user: false },
+  { rank: 6, username: 'GlassCleaner', geek_points: 81, is_current_user: false },
+  { rank: 7, username: 'ScoutTape', geek_points: 78, is_current_user: false },
+  { rank: 8, username: 'TempoSmith', geek_points: 74, is_current_user: false },
+  { rank: 9, username: 'OrangeClipboard', geek_points: 71, is_current_user: false },
+  { rank: 10, username: 'PressBreaker', geek_points: 68, is_current_user: false }
+];
+
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
 const franchiseDeleteLink = document.getElementById('franchise-delete-link');
 const franchiseEmptyCard = document.getElementById('franchise-empty-card');
 const franchiseCardBanner = document.getElementById('franchise-card-banner');
-const franchiseCardWeek = document.getElementById('franchise-card-week');
+const franchiseCardSeasonProgress = document.getElementById('franchise-card-season-progress');
 const franchiseCardRecord = document.getElementById('franchise-card-record');
 const franchiseCardRank = document.getElementById('franchise-card-rank');
+const franchiseCardPrestige = document.getElementById('franchise-card-prestige');
 const franchiseCardNext = document.getElementById('franchise-card-next');
+const franchiseCardCareerSummary = document.getElementById('franchise-card-career-summary');
+const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
+const alphaDisclaimer = document.getElementById('alpha-disclaimer');
+const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
+const leaderboardHost = document.getElementById('community-leaderboard');
 
 let currentFranchise = null;
 
@@ -60,20 +80,6 @@ function clearFranchiseLocalStorage() {
   localStorage.removeItem('game_away');
 }
 
-function franchiseStatusLabel(data) {
-  if (!data) return '--';
-  if (data.eos_tournament_active) {
-    if (data.eos_completed) return 'Offseason';
-    const r = data.eos_current_round || 1;
-    if (r === 1) return 'First Round';
-    if (r === 2) return 'Semis';
-    if (r === 3) return 'Championship';
-    return 'First Round';
-  }
-  const week = data.week != null ? data.week : 1;
-  return `Week ${week}`;
-}
-
 function getAuthHeaders() {
   try {
     return API_CONFIG.getAuthHeaders();
@@ -99,6 +105,15 @@ function safeText(value, fallback) {
   return text ? text : fallback;
 }
 
+function safeNumber(value, fallback) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function deriveCurrentSeason(commandCenterData) {
+  return safeNumber(commandCenterData && commandCenterData.current_season, 1);
+}
+
 function deriveRank(teamDoc, commandCenterData) {
   if (teamDoc) {
     const teamRank = teamDoc.natl_rank || teamDoc.rank || teamDoc.national_rank;
@@ -108,6 +123,16 @@ function deriveRank(teamDoc, commandCenterData) {
   }
   if (commandCenterData && commandCenterData.rank !== undefined && commandCenterData.rank !== null && commandCenterData.rank !== '-') {
     return String(commandCenterData.rank);
+  }
+  return '-';
+}
+
+function derivePrestige(teamDoc, commandCenterData) {
+  if (commandCenterData && commandCenterData.prestige !== undefined && commandCenterData.prestige !== null && String(commandCenterData.prestige).trim() !== '') {
+    return String(commandCenterData.prestige);
+  }
+  if (teamDoc && teamDoc.prestige !== undefined && teamDoc.prestige !== null && String(teamDoc.prestige).trim() !== '') {
+    return String(teamDoc.prestige);
   }
   return '-';
 }
@@ -132,6 +157,61 @@ function deriveNextOpponent(commandCenterData, teamName) {
   return safeText(teamEntry.next, 'TBD');
 }
 
+function deriveSeasonProgress(commandCenterData, franchiseData) {
+  const currentSeason = deriveCurrentSeason(commandCenterData);
+  const week = safeNumber(franchiseData && franchiseData.week, 1);
+  return 'Season ' + currentSeason + ' · Week ' + week + ' of 26';
+}
+
+function renderCareerSummary(commandCenterData) {
+  if (!franchiseCardCareerSummary) return;
+  const seasonCount = safeNumber(commandCenterData && commandCenterData.seasons_coached, deriveCurrentSeason(commandCenterData));
+  const careerBestRankRaw = commandCenterData && commandCenterData.career_best_rank;
+  const careerBestRank = (careerBestRankRaw !== undefined && careerBestRankRaw !== null && String(careerBestRankRaw).trim() !== '')
+    ? String(careerBestRankRaw)
+    : '--';
+  franchiseCardCareerSummary.textContent = 'Season ' + seasonCount + ' · Career Best: #' + careerBestRank;
+}
+
+function renderCommunityLeaderboard(currentUsername) {
+  if (!leaderboardHost) return;
+  const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
+  let entries = COMMUNITY_LEADERBOARD_PLACEHOLDER.slice();
+  if (currentUserNormalized && !entries.some(function (entry) { return entry.username.toLowerCase() === currentUserNormalized; })) {
+    entries = entries.slice(0, 9).concat([{
+      rank: 10,
+      username: currentUsername,
+      geek_points: 63,
+      is_current_user: true
+    }]);
+  }
+  const rows = entries.map(function (entry) {
+    const isCurrent = entry.is_current_user || (currentUserNormalized && entry.username.toLowerCase() === currentUserNormalized);
+    return `
+      <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
+        <div class="community-rank">${entry.rank}.</div>
+        <div class="community-username">${entry.username}</div>
+        <div class="community-score">${entry.geek_points}</div>
+      </div>
+    `;
+  }).join('');
+  leaderboardHost.innerHTML = rows || '<div class="community-leaderboard-empty">Leaderboard coming soon</div>';
+}
+
+function wireAlphaBanner() {
+  if (!alphaDisclaimer || !alphaDisclaimerDismiss) return;
+  alphaDisclaimerDismiss.addEventListener('click', function () {
+    try {
+      localStorage.setItem(ALPHA_DISMISS_STORAGE_KEY, '1');
+    } catch (e) {}
+    alphaDisclaimer.classList.add('is-dismissing');
+    window.setTimeout(function () {
+      alphaDisclaimer.classList.remove('visible', 'is-dismissing');
+      alphaDisclaimer.hidden = true;
+    }, 180);
+  });
+}
+
 function renderFranchiseEmptyState() {
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
@@ -146,13 +226,15 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
     franchiseCardBanner.src = getSquareLogoPath(teamName);
     franchiseCardBanner.alt = teamName;
   }
-  if (franchiseCardWeek) franchiseCardWeek.textContent = String(franchiseData.week || 1);
+  if (franchiseCardSeasonProgress) franchiseCardSeasonProgress.textContent = deriveSeasonProgress(commandCenterData, franchiseData);
   if (franchiseCardRecord) franchiseCardRecord.textContent = deriveRecord(commandCenterData, teamName);
   if (franchiseCardRank) franchiseCardRank.textContent = deriveRank(teamDoc, commandCenterData);
+  if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
+  renderCareerSummary(commandCenterData);
 
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
-  franchisePlayNowBtn.style.display = 'flex';
+  franchisePlayNowBtn.style.display = 'block';
   if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'inline';
 }
 
@@ -218,6 +300,14 @@ if (franchisePlayNowBtn) {
   });
 }
 
+if (franchiseEnterBtn) {
+  franchiseEnterBtn.addEventListener('click', function (event) {
+    event.stopPropagation();
+    playSound('click-strong.wav');
+    goToFranchiseCommandCenter();
+  });
+}
+
 if (franchiseNewBtn) {
   franchiseNewBtn.addEventListener('click', startNewFranchiseFlow);
 }
@@ -265,9 +355,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     const appConfig = await API_CONFIG.loadAppConfig();
     if (appConfig.isAlpha) {
       const alphaBadge = document.getElementById('alpha-badge');
-      const alphaDisclaimer = document.getElementById('alpha-disclaimer');
+      const isDismissed = typeof localStorage !== 'undefined' && localStorage.getItem(ALPHA_DISMISS_STORAGE_KEY) === '1';
       if (alphaBadge) alphaBadge.classList.add('visible');
-      if (alphaDisclaimer) alphaDisclaimer.classList.add('visible');
+      if (alphaDisclaimer && !isDismissed) {
+        alphaDisclaimer.hidden = false;
+        alphaDisclaimer.classList.add('visible');
+      }
       console.log('[ALPHA] Alpha mode enabled');
     }
   } catch (error) {
@@ -280,10 +373,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   const logoutBtn = document.getElementById('logout-btn');
   const authToken = localStorage.getItem('auth_token');
   const authUser = localStorage.getItem('auth_user');
+  let currentUsername = '';
+
+  wireAlphaBanner();
 
   if (authToken && authUser) {
     try {
       const user = JSON.parse(authUser);
+      currentUsername = user.username || user.email || '';
       if (authLoggedOut) authLoggedOut.style.display = 'none';
       if (authLoggedIn) authLoggedIn.style.display = 'flex';
       if (authUserEmail) authUserEmail.textContent = user.username || user.email;
@@ -292,6 +389,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (meRes.ok) {
         const meData = await meRes.json();
         if (meData.username && meData.username.trim()) {
+          currentUsername = meData.username;
           if (authUserEmail) authUserEmail.textContent = meData.username;
           const stored = JSON.parse(authUser);
           stored.username = meData.username;
@@ -312,6 +410,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  renderCommunityLeaderboard(currentUsername);
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {
       try {
@@ -323,39 +423,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (authLoggedIn) authLoggedIn.style.display = 'none';
     });
   }
-
-  const teamButtons = document.querySelectorAll('.team-button');
-  const franchiseHomeSlot = document.querySelector('.franchise-home-slot');
-  const teamGrid = document.getElementById('team-grid');
-  const syncTeamGridWidth = function () {
-    if (franchiseHomeSlot && teamGrid) {
-      teamGrid.style.width = franchiseHomeSlot.offsetWidth + 'px';
-    }
-  };
-  window.addEventListener('resize', syncTeamGridWidth);
-  syncTeamGridWidth();
-
-  const taglines = {
-    'Bentley-Truman': 'Top-Shelf Talent',
-    'Lancaster': 'Muscle & Defense',
-    'Four Corners': 'Hustle & Attitude',
-    'Ocean City': 'Sharpshooters Galore',
-    'Morristown': 'Perfectly Balanced',
-    'Little York': 'Wicked Smart',
-    'Xavien': 'Youthful Exuberance',
-    'South Lancaster': 'Us vs The World'
-  };
-
-  teamButtons.forEach(function (btn) {
-    const team = btn.dataset.team;
-    const taglineEl = btn.querySelector('.team-tagline');
-    if (taglineEl && taglines[team]) {
-      taglineEl.textContent = taglines[team];
-    }
-    btn.addEventListener('click', function () {
-      window.location.href = '/team-roster-view.html?team_name=' + encodeURIComponent(team) + '&return_url=' + encodeURIComponent(window.location.pathname);
-    });
-  });
 
   const headers = getAuthHeaders();
   const currentFranchiseData = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/current'), { headers: headers });
@@ -369,7 +436,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   if (!currentFranchise) {
     renderFranchiseEmptyState();
-    syncTeamGridWidth();
     return;
   }
 
@@ -381,5 +447,4 @@ document.addEventListener('DOMContentLoaded', async function () {
   const teamName = safeText(currentFranchise.user_team_id, '');
   const teamDoc = teamsByName[teamName] || null;
   renderFranchiseActiveState(currentFranchise, teamDoc, commandCenterData);
-  syncTeamGridWidth();
 });
