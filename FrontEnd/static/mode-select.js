@@ -6,25 +6,15 @@ function playSound(filename) {
   } catch (e) {}
 }
 
-const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_v1';
-const CAREER_SUMMARY_PLACEHOLDER = {
-  seasonsCoached: 1,
-  careerBestRank: '--'
-};
-
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
 const franchiseDeleteLink = document.getElementById('franchise-delete-link');
 const franchiseEmptyCard = document.getElementById('franchise-empty-card');
 const franchiseCardBanner = document.getElementById('franchise-card-banner');
-const franchiseCardSeasonProgress = document.getElementById('franchise-card-season-progress');
+const franchiseCardWeek = document.getElementById('franchise-card-week');
 const franchiseCardRecord = document.getElementById('franchise-card-record');
 const franchiseCardRank = document.getElementById('franchise-card-rank');
-const franchiseCardPrestige = document.getElementById('franchise-card-prestige');
 const franchiseCardNext = document.getElementById('franchise-card-next');
-const franchiseCardCareerSummary = document.getElementById('franchise-card-career-summary');
-const alphaDisclaimer = document.getElementById('alpha-disclaimer');
-const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 
 let currentFranchise = null;
 
@@ -109,21 +99,6 @@ function safeText(value, fallback) {
   return text ? text : fallback;
 }
 
-function safeNumber(value, fallback) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function deriveCurrentSeason(commandCenterData) {
-  return safeNumber(commandCenterData && commandCenterData.current_season, 1);
-}
-
-function deriveSeasonProgress(commandCenterData, franchiseData) {
-  const season = deriveCurrentSeason(commandCenterData);
-  const week = safeNumber(franchiseData && franchiseData.week, 1);
-  return 'Season ' + season + ' · Week ' + week + ' of 26';
-}
-
 function deriveRank(teamDoc, commandCenterData) {
   if (teamDoc) {
     const teamRank = teamDoc.natl_rank || teamDoc.rank || teamDoc.national_rank;
@@ -133,16 +108,6 @@ function deriveRank(teamDoc, commandCenterData) {
   }
   if (commandCenterData && commandCenterData.rank !== undefined && commandCenterData.rank !== null && commandCenterData.rank !== '-') {
     return String(commandCenterData.rank);
-  }
-  return '-';
-}
-
-function derivePrestige(teamDoc, commandCenterData) {
-  if (commandCenterData && commandCenterData.prestige !== undefined && commandCenterData.prestige !== null && String(commandCenterData.prestige).trim() !== '') {
-    return String(commandCenterData.prestige);
-  }
-  if (teamDoc && teamDoc.prestige !== undefined && teamDoc.prestige !== null && String(teamDoc.prestige).trim() !== '') {
-    return String(teamDoc.prestige);
   }
   return '-';
 }
@@ -167,16 +132,6 @@ function deriveNextOpponent(commandCenterData, teamName) {
   return safeText(teamEntry.next, 'TBD');
 }
 
-function renderCareerSummary(commandCenterData) {
-  if (!franchiseCardCareerSummary) return;
-  const seasonsCoached = safeNumber(commandCenterData && commandCenterData.seasons_coached, CAREER_SUMMARY_PLACEHOLDER.seasonsCoached);
-  const careerBestRankRaw = commandCenterData && commandCenterData.career_best_rank;
-  const careerBestRank = (careerBestRankRaw !== undefined && careerBestRankRaw !== null && String(careerBestRankRaw).trim() !== '')
-    ? String(careerBestRankRaw)
-    : CAREER_SUMMARY_PLACEHOLDER.careerBestRank;
-  franchiseCardCareerSummary.textContent = 'Season ' + seasonsCoached + ' · Career Best: #' + careerBestRank;
-}
-
 function renderFranchiseEmptyState() {
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
@@ -191,31 +146,14 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
     franchiseCardBanner.src = getSquareLogoPath(teamName);
     franchiseCardBanner.alt = teamName;
   }
-  if (franchiseCardSeasonProgress) franchiseCardSeasonProgress.textContent = deriveSeasonProgress(commandCenterData, franchiseData);
+  if (franchiseCardWeek) franchiseCardWeek.textContent = String(franchiseData.week || 1);
   if (franchiseCardRecord) franchiseCardRecord.textContent = deriveRecord(commandCenterData, teamName);
   if (franchiseCardRank) franchiseCardRank.textContent = deriveRank(teamDoc, commandCenterData);
-  if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
-  renderCareerSummary(commandCenterData);
 
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
   franchisePlayNowBtn.style.display = 'flex';
   if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'inline';
-}
-
-function wireAlphaDisclaimer() {
-  if (!alphaDisclaimer || !alphaDisclaimerDismiss) return;
-  alphaDisclaimerDismiss.addEventListener('click', function () {
-    try {
-      localStorage.setItem(ALPHA_DISMISS_STORAGE_KEY, '1');
-    } catch (e) {}
-    alphaDisclaimer.classList.add('is-dismissing');
-    window.setTimeout(function () {
-      alphaDisclaimer.classList.remove('visible', 'is-dismissing');
-      alphaDisclaimer.hidden = true;
-      alphaDisclaimer.remove();
-    }, 190);
-  });
 }
 
 function goToFranchiseCommandCenter() {
@@ -327,12 +265,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     const appConfig = await API_CONFIG.loadAppConfig();
     if (appConfig.isAlpha) {
       const alphaBadge = document.getElementById('alpha-badge');
-      const isDismissed = typeof localStorage !== 'undefined' && localStorage.getItem(ALPHA_DISMISS_STORAGE_KEY) === '1';
+      const alphaDisclaimer = document.getElementById('alpha-disclaimer');
       if (alphaBadge) alphaBadge.classList.add('visible');
-      if (alphaDisclaimer && !isDismissed) {
-        alphaDisclaimer.hidden = false;
-        alphaDisclaimer.classList.add('visible');
-      }
+      if (alphaDisclaimer) alphaDisclaimer.classList.add('visible');
       console.log('[ALPHA] Alpha mode enabled');
     }
   } catch (error) {
@@ -410,8 +345,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     'Xavien': 'Youthful Exuberance',
     'South Lancaster': 'Us vs The World'
   };
-
-  wireAlphaDisclaimer();
 
   teamButtons.forEach(function (btn) {
     const team = btn.dataset.team;
