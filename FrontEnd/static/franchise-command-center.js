@@ -2532,6 +2532,10 @@ async function init() {
   updateRecruitingButton(topData);
   updateAwardsButton(topData);
   await updatePlaybooksButtonState(topData);
+  const playbooksTab = document.getElementById('playbooks-tab');
+  if (playbooksTab && playbooksTab.classList.contains('active')) {
+    void renderFccPlaybooksSummary();
+  }
   maybeShowChampionshipCompleteModal(topData);
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
