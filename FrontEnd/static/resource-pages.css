@@ -12,7 +12,7 @@
   max-width: none;
   margin: 12px auto 18px;
   padding: 24px 28px 28px;
-  overflow: hidden;
+  overflow: clip;
   color: var(--fcc-text, #f7f9ff);
 }
 
