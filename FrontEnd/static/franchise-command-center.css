@@ -1413,9 +1413,14 @@ input[type="reset"] {
 
 #franchise-container .fcc-scouting-side-card {
   min-width: 0;
+  display: flex;
 }
 
 #franchise-container .fcc-scouting-side-card .tm-side-card-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
   padding: 18px 18px 16px;
 }
 
@@ -2141,12 +2146,18 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   min-height: 0;
 }
 
+#franchise-container .fcc-team-measures-side-card {
+  display: flex;
+}
+
 #franchise-container .fcc-team-measures-panel-body {
   padding: 12px;
 }
 
 #franchise-container .fcc-team-measures-side-card .fcc-team-measures-panel-body {
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
   align-items: center;
   justify-content: center;
 }
@@ -2235,11 +2246,14 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 #franchise-container .tm-side-card-content {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: 100%;
+  align-self: center;
+  min-height: 100%;
   width: 100%;
+  max-width: 100%;
   gap: 10px;
 }
 
@@ -2267,6 +2281,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 #franchise-container .tm-chemistry-bar {
   position: relative;
   width: 100%;
+  max-width: 100%;
   height: 32px;
   border-radius: 999px;
   overflow: hidden;
