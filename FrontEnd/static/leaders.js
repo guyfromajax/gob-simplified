@@ -61,7 +61,9 @@
 
     grid.innerHTML = '';
     CATEGORY_ORDER.forEach((category) => {
-      const leaders = Array.isArray(leadersData[category]) ? leadersData[category].slice(0, 10) : [];
+      const leaders = category === 'DEF%'
+        ? []
+        : (Array.isArray(leadersData[category]) ? leadersData[category].slice(0, 10) : []);
       const card = document.createElement('section');
       card.className = 'leader-card';
       const header = document.createElement('div');
@@ -141,7 +143,7 @@
       API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)
     );
     if (topData && window.ResourceCache && window.ResourceCache.createResourceCache) {
-      resourceCache = window.ResourceCache.createResourceCache('leaders', franchiseId, topData.current_season, topData.week);
+      resourceCache = window.ResourceCache.createResourceCache('leaders-v2', franchiseId, topData.current_season, topData.week);
     }
 
     leadersData = await loadScope(currentScope);
