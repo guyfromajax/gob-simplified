@@ -8,161 +8,171 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Playbook Settings - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/playbooks.css">
 </head>
 <body>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
-  <div class="playbooks-page">
-    <header class="page-shell-header">
-      <button id="back-btn" class="header-btn header-btn-back" type="button">Back</button>
+  <div class="resource-page-container fcc-brand-page-shell playbooks-resource-shell">
+    <div class="playbooks-page-header-wrap">
+      <a id="back-btn" class="back-to-locker-room brand-back-link playbooks-back-link" href="#">Back to Locker Room</a>
+    </div>
 
-      <div class="page-shell-title">
-        <h1>Playbook Settings</h1>
-        <p>Configure usage, focus, and Playcall Center order.</p>
-      </div>
+    <div class="playbooks-page">
+      <main class="playbooks-main">
+        <section class="fcc-data-card playbooks-page-card">
+          <div class="fcc-data-card-body playbooks-page-card-body">
+            <header class="playbooks-page-card-header">
+              <div class="playbooks-page-title">
+                <h1>Playbook Settings</h1>
+                <p>Configure usage, focus, and Playcall Center order.</p>
+              </div>
+              <div class="playbooks-page-actions">
+                <button id="save-btn" class="playbooks-action-btn playbooks-action-btn-primary" type="button" disabled>Save Playbooks</button>
+                <button id="even-all-btn" class="playbooks-action-btn playbooks-action-btn-secondary" type="button">Even Distribution - All</button>
+              </div>
+            </header>
 
-      <div class="page-shell-actions">
-        <button id="save-btn" class="header-btn header-btn-save" type="button" disabled>Save Playbooks</button>
-        <button id="even-all-btn" class="header-btn header-btn-secondary" type="button">Even Distribution - All</button>
-      </div>
-    </header>
+            <section class="settings-card" id="gameplay-lockout" hidden>
+              <div class="section-block">
+                <div class="section-heading">
+                  <h2>Playbooks Unavailable In Game</h2>
+                </div>
+                <p class="empty-state-copy">
+                  Playbooks can only be edited from the Franchise Command Center right now. In-game access will return later as a halftime-only adjustment flow.
+                </p>
+              </div>
+            </section>
 
-    <main class="playbooks-main">
-      <section class="settings-card" id="gameplay-lockout" hidden>
-        <div class="section-block">
-          <div class="section-heading">
-            <h2>Playbooks Unavailable In Game</h2>
-          </div>
-          <p class="empty-state-copy">
-            Playbooks can only be edited from the Franchise Command Center right now. In-game access will return later as a halftime-only adjustment flow.
-          </p>
-        </div>
-      </section>
+            <section class="settings-card">
+              <div class="section-block">
+                <div class="section-heading">
+                  <h2>Offense - Motion</h2>
+                  <div class="section-total" id="motion-total"></div>
+                </div>
+                <div class="table-wrap">
+                  <table class="playbook-table">
+                    <thead>
+                      <tr>
+                        <th class="col-name">Play</th>
+                        <th class="col-percent"><button class="sort-btn" type="button" data-section="motion" data-sort-key="percentage">%</button></th>
+                        <th class="col-control">Focus</th>
+                        <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="motion" data-sort-key="playcallCenter">Playcall Center</button></th>
+                        <th class="col-stat"><button class="sort-btn" type="button" data-section="motion" data-sort-key="effectiveness">Effectiveness</button></th>
+                        <th class="col-stat">Top Scorer</th>
+                      </tr>
+                    </thead>
+                    <tbody id="motion-rows"></tbody>
+                  </table>
+                </div>
+              </div>
 
-      <section class="settings-card">
-        <div class="section-block">
-          <div class="section-heading">
-            <h2>Offense - Motion</h2>
-            <div class="section-total" id="motion-total"></div>
-          </div>
-          <div class="table-wrap">
-            <table class="playbook-table">
-              <thead>
-                <tr>
-                  <th class="col-name">Play</th>
-                  <th class="col-percent"><button class="sort-btn" type="button" data-section="motion" data-sort-key="percentage">%</button></th>
-                  <th class="col-control">Focus</th>
-                  <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="motion" data-sort-key="playcallCenter">Playcall Center</button></th>
-                  <th class="col-stat"><button class="sort-btn" type="button" data-section="motion" data-sort-key="effectiveness">Effectiveness</button></th>
-                  <th class="col-stat">Top Scorer</th>
-                </tr>
-              </thead>
-              <tbody id="motion-rows"></tbody>
-            </table>
-          </div>
-        </div>
+              <div class="section-block">
+                <div class="section-heading">
+                  <h2>Offense - Set Plays</h2>
+                  <div class="section-total" id="set-plays-total"></div>
+                </div>
+                <div class="table-wrap">
+                  <table class="playbook-table">
+                    <thead>
+                      <tr>
+                        <th class="col-name"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="focus">Play</button></th>
+                        <th class="col-percent"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="percentage">%</button></th>
+                        <th class="col-control"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="target_shooter">Target Shooter</button></th>
+                        <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="playcallCenter">Playcall Center</button></th>
+                        <th class="col-stat"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="effectiveness">Effectiveness</button></th>
+                        <th class="col-stat">Top Scorer</th>
+                      </tr>
+                    </thead>
+                    <tbody id="set-plays-rows"></tbody>
+                  </table>
+                </div>
+              </div>
 
-        <div class="section-block">
-          <div class="section-heading">
-            <h2>Offense - Set Plays</h2>
-            <div class="section-total" id="set-plays-total"></div>
-          </div>
-          <div class="table-wrap">
-            <table class="playbook-table">
-              <thead>
-                <tr>
-                  <th class="col-name"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="focus">Play</button></th>
-                  <th class="col-percent"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="percentage">%</button></th>
-                  <th class="col-control"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="target_shooter">Target Shooter</button></th>
-                  <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="playcallCenter">Playcall Center</button></th>
-                  <th class="col-stat"><button class="sort-btn" type="button" data-section="setPlays" data-sort-key="effectiveness">Effectiveness</button></th>
-                  <th class="col-stat">Top Scorer</th>
-                </tr>
-              </thead>
-              <tbody id="set-plays-rows"></tbody>
-            </table>
-          </div>
-        </div>
+              <div class="section-grid section-grid-defense">
+                <div class="section-block">
+                  <div class="section-heading">
+                    <h2>Defense - Man</h2>
+                    <div class="section-total" id="man-defense-total"></div>
+                  </div>
+                  <div class="table-wrap">
+                    <table class="playbook-table">
+                      <thead>
+                        <tr>
+                          <th class="col-name">Play</th>
+                          <th class="col-percent"><button class="sort-btn" type="button" data-section="manDefense" data-sort-key="percentage">%</button></th>
+                          <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="manDefense" data-sort-key="playcallCenter">Playcall Center</button></th>
+                          <th class="col-stat"><button class="sort-btn" type="button" data-section="manDefense" data-sort-key="effectiveness">Effectiveness</button></th>
+                        </tr>
+                      </thead>
+                      <tbody id="man-defense-rows"></tbody>
+                    </table>
+                  </div>
+                </div>
 
-        <div class="section-grid section-grid-defense">
-          <div class="section-block">
-            <div class="section-heading">
-              <h2>Defense - Man</h2>
-              <div class="section-total" id="man-defense-total"></div>
-            </div>
-            <div class="table-wrap">
-              <table class="playbook-table">
-                <thead>
-                  <tr>
-                    <th class="col-name">Play</th>
-                    <th class="col-percent"><button class="sort-btn" type="button" data-section="manDefense" data-sort-key="percentage">%</button></th>
-                    <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="manDefense" data-sort-key="playcallCenter">Playcall Center</button></th>
-                    <th class="col-stat"><button class="sort-btn" type="button" data-section="manDefense" data-sort-key="effectiveness">Effectiveness</button></th>
-                  </tr>
-                </thead>
-                <tbody id="man-defense-rows"></tbody>
-              </table>
-            </div>
-          </div>
+                <div class="section-block">
+                  <div class="section-heading">
+                    <h2>Defense - Zone</h2>
+                    <div class="section-total" id="zone-defense-total"></div>
+                  </div>
+                  <div class="table-wrap">
+                    <table class="playbook-table">
+                      <thead>
+                        <tr>
+                          <th class="col-name">Play</th>
+                          <th class="col-percent"><button class="sort-btn" type="button" data-section="zoneDefense" data-sort-key="percentage">%</button></th>
+                          <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="zoneDefense" data-sort-key="playcallCenter">Playcall Center</button></th>
+                          <th class="col-stat"><button class="sort-btn" type="button" data-section="zoneDefense" data-sort-key="effectiveness">Effectiveness</button></th>
+                        </tr>
+                      </thead>
+                      <tbody id="zone-defense-rows"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
 
-          <div class="section-block">
-            <div class="section-heading">
-              <h2>Defense - Zone</h2>
-              <div class="section-total" id="zone-defense-total"></div>
-            </div>
-            <div class="table-wrap">
-              <table class="playbook-table">
-                <thead>
-                  <tr>
-                    <th class="col-name">Play</th>
-                    <th class="col-percent"><button class="sort-btn" type="button" data-section="zoneDefense" data-sort-key="percentage">%</button></th>
-                    <th class="col-control col-pcc-header"><button class="sort-btn" type="button" data-section="zoneDefense" data-sort-key="playcallCenter">Playcall Center</button></th>
-                    <th class="col-stat"><button class="sort-btn" type="button" data-section="zoneDefense" data-sort-key="effectiveness">Effectiveness</button></th>
-                  </tr>
-                </thead>
-                <tbody id="zone-defense-rows"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+              <div class="section-block">
+                <div class="section-heading">
+                  <h2>Fast Breaks</h2>
+                  <div class="section-total" id="fast-breaks-total"></div>
+                </div>
+                <div class="table-wrap table-wrap-compact">
+                  <table class="playbook-table playbook-table-compact">
+                    <thead>
+                      <tr>
+                        <th class="col-name">Play</th>
+                        <th class="col-percent"><button class="sort-btn" type="button" data-section="fastBreaks" data-sort-key="percentage">%</button></th>
+                      </tr>
+                    </thead>
+                    <tbody id="fast-breaks-rows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
 
-        <div class="section-block">
-          <div class="section-heading">
-            <h2>Fast Breaks</h2>
-            <div class="section-total" id="fast-breaks-total"></div>
+            <section class="settings-card pc-card">
+              <div class="pc-header">
+                <h2>Playcall Center</h2>
+                <p>drag &amp; drop to adjust the order</p>
+              </div>
+              <div class="pc-grid">
+                <div class="pc-column">
+                  <h3>Offense</h3>
+                  <div id="pc-order-offense" class="pc-list" data-list-type="offense"></div>
+                </div>
+                <div class="pc-column">
+                  <h3>Defense</h3>
+                  <div id="pc-order-defense" class="pc-list" data-list-type="defense"></div>
+                </div>
+              </div>
+            </section>
           </div>
-          <div class="table-wrap table-wrap-compact">
-            <table class="playbook-table playbook-table-compact">
-              <thead>
-                <tr>
-                  <th class="col-name">Play</th>
-                  <th class="col-percent"><button class="sort-btn" type="button" data-section="fastBreaks" data-sort-key="percentage">%</button></th>
-                </tr>
-              </thead>
-              <tbody id="fast-breaks-rows"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="settings-card pc-card">
-        <div class="pc-header">
-          <h2>Playcall Center</h2>
-          <p>drag &amp; drop to adjust the order</p>
-        </div>
-        <div class="pc-grid">
-          <div class="pc-column">
-            <h3>Offense</h3>
-            <div id="pc-order-offense" class="pc-list" data-list-type="offense"></div>
-          </div>
-          <div class="pc-column">
-            <h3>Defense</h3>
-            <div id="pc-order-defense" class="pc-list" data-list-type="defense"></div>
-          </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   </div>
 
   <div id="toast" class="toast" role="alert" aria-live="polite"></div>
@@ -176,12 +186,13 @@
         <span id="confirm-modal-checkbox-label">Don't show this pop up again.</span>
       </label>
       <div class="modal-actions">
-        <button id="confirm-cancel-btn" class="header-btn header-btn-secondary" type="button">Cancel</button>
-        <button id="confirm-accept-btn" class="header-btn header-btn-save" type="button">Save Anyway</button>
+        <button id="confirm-cancel-btn" class="playbooks-action-btn playbooks-action-btn-secondary" type="button">Cancel</button>
+        <button id="confirm-accept-btn" class="playbooks-action-btn playbooks-action-btn-primary" type="button">Save Anyway</button>
       </div>
     </div>
   </div>
 
+  <script src="/common.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/errorHandler.js"></script>

@@ -405,7 +405,10 @@
     }
 
     bindGlobalEvents() {
-      this.elements.backBtn.addEventListener("click", () => this.handleBack());
+      this.elements.backBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        this.handleBack();
+      });
       this.elements.saveBtn.addEventListener("click", () => this.handleSave());
       this.elements.evenAllBtn.addEventListener("click", () => this.handleEvenDistributionAll());
       document.querySelectorAll(".sort-btn").forEach((button) => {
@@ -1031,6 +1034,18 @@
     }
 
     handleBack() {
+      if (typeof resolveFranchiseLockerRoomUrl === "function") {
+        const resolvedUrl = resolveFranchiseLockerRoomUrl({
+          params: this.params,
+          franchiseId: this.context.franchiseId,
+          teamId: this.context.teamId,
+        });
+        if (resolvedUrl) {
+          window.location.href = resolvedUrl;
+          return;
+        }
+      }
+
       window.location.href = buildPlaybookReportUrl(this.context);
     }
 
