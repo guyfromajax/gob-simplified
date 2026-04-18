@@ -176,16 +176,19 @@ function renderCareerSummary(commandCenterData) {
 function renderCommunityLeaderboard(currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  let entries = COMMUNITY_LEADERBOARD_PLACEHOLDER.slice();
-  if (currentUserNormalized && !entries.some(function (entry) { return entry.username.toLowerCase() === currentUserNormalized; })) {
-    entries = entries.slice(0, 9).concat([{
-      rank: 10,
-      username: currentUsername,
-      geek_points: 63,
-      is_current_user: true
-    }]);
-  }
-  const rows = entries.map(function (entry) {
+  const topTen = COMMUNITY_LEADERBOARD_PLACEHOLDER.slice(0, 10);
+  const currentTopEntry = currentUserNormalized
+    ? topTen.find(function (entry) { return entry.username.toLowerCase() === currentUserNormalized; })
+    : null;
+  const currentPinnedEntry = (!currentTopEntry && currentUserNormalized)
+    ? {
+        rank: 37,
+        username: currentUsername,
+        geek_points: 63,
+        is_current_user: true
+      }
+    : null;
+  const rows = topTen.map(function (entry) {
     const isCurrent = entry.is_current_user || (currentUserNormalized && entry.username.toLowerCase() === currentUserNormalized);
     return `
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
@@ -195,7 +198,15 @@ function renderCommunityLeaderboard(currentUsername) {
       </div>
     `;
   }).join('');
-  leaderboardHost.innerHTML = rows || '<div class="community-leaderboard-empty">Leaderboard coming soon</div>';
+  const pinned = currentPinnedEntry ? `
+    <div class="community-leaderboard-separator"></div>
+    <div class="community-leaderboard-row is-current-user">
+      <div class="community-rank">${currentPinnedEntry.rank}.</div>
+      <div class="community-username">${currentPinnedEntry.username}</div>
+      <div class="community-score">${currentPinnedEntry.geek_points}</div>
+    </div>
+  ` : '';
+  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">Leaderboard coming soon</div>';
 }
 
 function wireAlphaBanner() {
@@ -228,7 +239,10 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   }
   if (franchiseCardSeasonProgress) franchiseCardSeasonProgress.textContent = deriveSeasonProgress(commandCenterData, franchiseData);
   if (franchiseCardRecord) franchiseCardRecord.textContent = deriveRecord(commandCenterData, teamName);
-  if (franchiseCardRank) franchiseCardRank.textContent = deriveRank(teamDoc, commandCenterData);
+  if (franchiseCardRank) {
+    const rank = deriveRank(teamDoc, commandCenterData);
+    franchiseCardRank.textContent = rank === '-' ? '-' : '#' + rank;
+  }
   if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
   renderCareerSummary(commandCenterData);

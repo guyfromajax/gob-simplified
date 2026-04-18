@@ -15,7 +15,7 @@ body.mode-select-page input[type="reset"] {
 }
 
 body.mode-select-page .mode-wrapper {
-  width: min(680px, 100%);
+  width: min(720px, 100%);
   margin: 0 auto;
 }
 
@@ -27,7 +27,7 @@ body.mode-select-page .alpha-disclaimer {
   align-items: center;
   gap: 14px;
   margin: 0 auto 28px;
-  width: min(680px, 100%);
+  width: min(720px, 100%);
   padding: 12px 18px;
   border-radius: 10px;
   background: rgba(28, 33, 43, 0.97);
@@ -86,7 +86,7 @@ body.mode-select-page .alpha-disclaimer-dismiss:hover {
 
 body.mode-select-page .community-section,
 body.mode-select-page .franchise-home-section {
-  margin-bottom: 28px;
+  margin-bottom: 42px;
 }
 
 body.mode-select-page .community-panel,
@@ -136,6 +136,10 @@ body.mode-select-page .community-leaderboard-row:nth-child(even) {
   background: rgba(255, 255, 255, 0.02);
 }
 
+body.mode-select-page .community-leaderboard-row:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
 body.mode-select-page .community-leaderboard-row.is-current-user {
   background: rgba(247, 148, 32, 0.08);
 }
@@ -160,6 +164,11 @@ body.mode-select-page .community-score {
   font-weight: 600;
   color: #ffffff;
   text-align: right;
+}
+
+body.mode-select-page .community-leaderboard-separator {
+  margin: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 body.mode-select-page .community-leaderboard-empty {
@@ -249,7 +258,7 @@ body.mode-select-page .franchise-card-content {
 
 body.mode-select-page .franchise-card-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -290,7 +299,10 @@ body.mode-select-page .franchise-enter-btn {
 }
 
 body.mode-select-page .franchise-delete-link {
+  display: block;
   margin-top: 12px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 0;
   border: 0;
   background: none;
