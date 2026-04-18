@@ -26,8 +26,9 @@ This document defines the core visual and interaction standards for Geeked-Out B
 ### Color Usage Rules
 - `#27408E` is the default shell anchor color for the product.
 - Neutral graphite and steel tones should carry most UI structure, especially tabs, panels, and content surfaces.
-- Green is reserved for high-priority actions.
+- Green (`#34EC27`) is reserved exclusively for gating actions that advance game state — `Play Next Game`, `Run Training Camp`, `Sim Next Round`, and equivalent actions.
 - Orange and hero blue are accent colors and should not be used as broad structural fills.
+- All other primary action buttons use orange (`#F79420`).
 - Team-color theming should primarily affect atmosphere and background expression, not core readability surfaces.
 
 ## Typography
@@ -72,7 +73,9 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Disabled and dead states must remain legible while clearly unavailable.
 
 ### Usage Rules
-- Action green is reserved for primary action buttons.
+- Primary action buttons that advance game state use action green (`#34EC27`).
+- Primary action buttons that save settings, configure preferences, or perform non-gating actions use orange (`#F79420`).
+- These two button types must remain visually distinct and semantically consistent across the entire product.
 - Navigation buttons should not compete visually with primary action buttons.
 - Button treatments should support information-dense screens without becoming noisy.
 

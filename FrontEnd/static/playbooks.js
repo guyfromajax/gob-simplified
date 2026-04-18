@@ -269,6 +269,7 @@
         saveBtn: document.getElementById("save-btn"),
         backBtn: document.getElementById("back-btn"),
         evenAllBtn: document.getElementById("even-all-btn"),
+        sectionsReadyIndicator: document.getElementById("sections-ready-indicator"),
         motionEvenBtn: document.getElementById("motion-even-btn"),
         setPlaysEvenBtn: document.getElementById("set-plays-even-btn"),
         manDefenseEvenBtn: document.getElementById("man-defense-even-btn"),
@@ -410,6 +411,7 @@
       });
       if (this.elements.saveBtn) this.elements.saveBtn.hidden = true;
       if (this.elements.evenAllBtn) this.elements.evenAllBtn.hidden = true;
+      if (this.elements.sectionsReadyIndicator) this.elements.sectionsReadyIndicator.hidden = true;
     }
 
     bindGlobalEvents() {
@@ -957,7 +959,13 @@
       applyTotalState(this.elements.manDefenseTotal, totals.manDefense);
       applyTotalState(this.elements.zoneDefenseTotal, totals.zoneDefense);
 
-      const allValid = Object.values(totals).every((total) => total === 100);
+      const validSections = Object.values(totals).filter((total) => total === 100).length;
+      const allValid = validSections === Object.keys(totals).length;
+      if (this.elements.sectionsReadyIndicator) {
+        this.elements.sectionsReadyIndicator.textContent = `${validSections} / 5 sections ready`;
+        this.elements.sectionsReadyIndicator.classList.toggle("valid", allValid);
+        this.elements.sectionsReadyIndicator.classList.toggle("invalid", !allValid);
+      }
       this.elements.saveBtn.disabled = !allValid;
     }
 
