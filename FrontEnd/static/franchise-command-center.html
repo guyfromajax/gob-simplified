@@ -191,8 +191,56 @@
       <div id="playbooks-tab" class="tab-content fcc-placeholder-tab">
         <div class="fcc-placeholder-body">In Development</div>
       </div>
-      <div id="coaches-tab" class="tab-content fcc-placeholder-tab">
-        <div class="fcc-placeholder-body">In Development</div>
+      <div id="coaches-tab" class="tab-content">
+        <div id="fcc-scouting-status" class="fcc-scouting-status">Loading scouting report...</div>
+        <div id="fcc-scouting-content" class="fcc-scouting-layout" style="display:none;">
+          <section class="fcc-data-card fcc-scouting-summary-card">
+            <div class="fcc-data-card-body fcc-scouting-summary-body">
+              <div class="fcc-scouting-opponent-label">Upcoming Opponent</div>
+              <div id="fcc-scouting-opponent-name" class="fcc-scouting-opponent-name">--</div>
+            </div>
+          </section>
+          <div class="fcc-scouting-grid">
+            <section class="fcc-data-card">
+              <div class="fcc-scouting-card-head">
+                <h3>Projected Starting Five</h3>
+                <div class="scouting-projected-toggle view-toggle fcc-scouting-projected-toggle" role="group" aria-label="Projected lineup columns">
+                  <button type="button" class="toggle-btn active" data-fcc-scouting-projected="attributes">Attributes</button>
+                  <button type="button" class="toggle-btn" data-fcc-scouting-projected="stats">Stats</button>
+                </div>
+              </div>
+              <div class="fcc-data-card-body scroll-x">
+                <div id="fcc-scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
+              </div>
+            </section>
+            <section class="fcc-data-card">
+              <div class="fcc-scouting-card-head">
+                <h3>Team Report</h3>
+              </div>
+              <div class="fcc-data-card-body fcc-scouting-team-body">
+                <div class="team-attributes-grid" id="fcc-scouting-team-attributes-grid"></div>
+              </div>
+            </section>
+          </div>
+          <section class="fcc-data-card">
+            <div class="fcc-scouting-card-head">
+              <h3>Play Usage (Last Game)</h3>
+            </div>
+            <div class="fcc-data-card-body scroll-x">
+              <table class="play-usage-table fcc-scouting-play-usage-table">
+                <thead>
+                  <tr>
+                    <th>Play Name</th>
+                    <th>Times Run</th>
+                    <th>Success Rate</th>
+                    <th>Usage %</th>
+                  </tr>
+                </thead>
+                <tbody id="fcc-play-usage-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </div>
       <div id="recruits-tab" class="tab-content">
         <h3>Recruits Leaning Your Way</h3>

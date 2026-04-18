@@ -1292,6 +1292,172 @@ input[type="reset"] {
   margin-top: 10px;
 }
 
+#franchise-container .fcc-scouting-status {
+  padding: 18px 6px 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#franchise-container .fcc-scouting-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#franchise-container .fcc-scouting-summary-body {
+  padding: 14px 16px 12px;
+}
+
+#franchise-container .fcc-scouting-opponent-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#franchise-container .fcc-scouting-opponent-name {
+  margin-top: 4px;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+#franchise-container .fcc-scouting-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+#franchise-container .fcc-scouting-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 0;
+}
+
+#franchise-container .fcc-scouting-card-head h3 {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+#franchise-container .fcc-scouting-team-body {
+  padding: 12px 14px 14px;
+}
+
+#franchise-container #fcc-scouting-team-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#franchise-container #coaches-tab .scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container #coaches-tab .scroll-x::-webkit-scrollbar {
+  height: 10px;
+}
+
+#franchise-container #coaches-tab .scroll-x::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container #coaches-tab .scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+
+#franchise-container #coaches-tab .scouting-projected-lineup-wrap {
+  padding: 0;
+}
+
+#franchise-container #coaches-tab .scouting-projected-table,
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table {
+  width: max(100%, 960px);
+  min-width: 960px;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+}
+
+#franchise-container #coaches-tab .scouting-projected-table thead th,
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 10px 10px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+}
+
+#franchise-container #coaches-tab .scouting-projected-table tbody td,
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody td {
+  padding: 9px 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(odd),
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#franchise-container #coaches-tab .scouting-projected-table tbody tr:hover td,
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#franchise-container #coaches-tab .scouting-projected-table th:first-child,
+#franchise-container #coaches-tab .scouting-projected-table td:first-child,
+#franchise-container #coaches-tab .scouting-projected-table th:nth-child(2),
+#franchise-container #coaches-tab .scouting-projected-table td:nth-child(2),
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table th:first-child,
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table td:first-child {
+  text-align: left;
+  padding-left: 16px;
+}
+
+#franchise-container #coaches-tab .scouting-projected-table tbody td:nth-child(2),
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody td:first-child {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+#franchise-container #coaches-tab .scouting-projected-empty {
+  padding: 18px 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 #franchise-container .fcc-leaders-card-body {
   padding: 14px;
 }

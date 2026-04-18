@@ -2993,6 +2993,9 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'game-plan-tab') {
           renderGamePlanSummary();
         }
+        if (tabName === 'coaches-tab') {
+          void renderScoutingTab();
+        }
         if (tabName === 'schedule-tab') {
           void renderScheduleTab();
         }
@@ -3859,77 +3862,164 @@ async function renderTournamentBracket() {
 // Scouting Report functionality
 let upcomingOpponent = null;
 let upcomingOpponentId = null;
+let scoutingTabDataCache = null;
+let fccScoutingProjectedViewMode = 'attributes';
+
+async function resolveUpcomingOpponentFromMatchup(data) {
+  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
+  const week = data?.week || data?.training_status?.current_week || 0;
+  const eosTournamentActive = data?.eos_tournament_active || false;
+  const eosTournament = data?.eos_tournament;
+
+  let userTeamEliminated = false;
+  if (eosTournamentActive && eosTournament && userTeamId && week >= 27) {
+    const bracket = eosTournament.bracket || {};
+    const allMatchups = [...(bracket.round1 || []), ...(bracket.round2 || []), ...(bracket.final || [])];
+    userTeamEliminated = !allMatchups.some((m) =>
+      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
+    );
+  }
+
+  const scoutingAvailable = data && ((week >= 0 && week <= 26) || (week >= 27 && week <= 34 && !userTeamEliminated));
+  if (!scoutingAvailable || !franchiseId) {
+    upcomingOpponent = null;
+    upcomingOpponentId = null;
+    return null;
+  }
+
+  try {
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: franchiseId })
+    });
+    if (!res.ok) throw new Error('Failed to resolve next game');
+    const matchup = await res.json();
+    upcomingOpponent = null;
+    upcomingOpponentId = null;
+    if (matchup && matchup.home && matchup.away) {
+      if (resolvedUserTeamName === matchup.home) {
+        upcomingOpponent = matchup.away;
+        upcomingOpponentId = matchup.away_id;
+      } else if (resolvedUserTeamName === matchup.away) {
+        upcomingOpponent = matchup.home;
+        upcomingOpponentId = matchup.home_id;
+      } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
+        if (String(userTeamId) === String(matchup.home_id)) {
+          upcomingOpponent = matchup.away;
+          upcomingOpponentId = matchup.away_id;
+        } else if (String(userTeamId) === String(matchup.away_id)) {
+          upcomingOpponent = matchup.home;
+          upcomingOpponentId = matchup.home_id;
+        }
+      }
+    }
+    return upcomingOpponent ? { name: upcomingOpponent, id: upcomingOpponentId } : null;
+  } catch (err) {
+    console.warn('Could not determine upcoming opponent:', err);
+    upcomingOpponent = null;
+    upcomingOpponentId = null;
+    return null;
+  }
+}
 
 function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
-  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
-  
-  // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-26) and EOS Tournament (weeks 27-34)
-  // Also show during preseason (week 0 or undefined) if there's a schedule
-  const week = data?.week || data?.training_status?.current_week || 0;
-  const eosTournamentActive = data?.eos_tournament_active || false;
-  const eosTournament = data?.eos_tournament;
-  
-  // Check if user team is eliminated from tournament
-  let userTeamEliminated = false;
-  if (eosTournamentActive && eosTournament && userTeamId && week >= 27) {
-    const bracket = eosTournament.bracket || {};
-    const round1 = bracket.round1 || [];
-    const round2 = bracket.round2 || [];
-    const final = bracket.final || [];
-    const allMatchups = [...round1, ...round2, ...final];
-    const userInMatchup = allMatchups.some(m => 
-      m.home_team === userTeamId || m.away_team === userTeamId
-    );
-    userTeamEliminated = !userInMatchup;
-  }
-  
-  // Show button if: (regular season weeks 0-26) OR (EOS Tournament weeks 27-34 and user not eliminated)
-  if (data && ((week >= 0 && week <= 26) || (week >= 27 && week <= 34 && !userTeamEliminated))) {
-    // Get upcoming opponent from play-next-game endpoint (now handles both regular season and EOS Tournament)
-    fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ franchise_id: franchiseId })
-    })
-    .then(res => res.json())
-    .then(matchup => {
-      upcomingOpponent = null;
-      upcomingOpponentId = null;
-      if (matchup && matchup.home && matchup.away) {
-        // Prefer API-sourced team identity, then fall back to ObjectId match.
-        if (resolvedUserTeamName === matchup.home) {
-          upcomingOpponent = matchup.away;
-          upcomingOpponentId = matchup.away_id;
-        } else if (resolvedUserTeamName === matchup.away) {
-          upcomingOpponent = matchup.home;
-          upcomingOpponentId = matchup.home_id;
-        } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
-          if (String(userTeamId) === String(matchup.home_id)) {
-            upcomingOpponent = matchup.away;
-            upcomingOpponentId = matchup.away_id;
-          } else if (String(userTeamId) === String(matchup.away_id)) {
-            upcomingOpponent = matchup.home;
-            upcomingOpponentId = matchup.home_id;
-          }
-        }
-        
-        if (upcomingOpponent) {
-          scoutingBtn.style.display = 'block';
-        } else {
-          scoutingBtn.style.display = 'none';
-        }
-      } else {
-        scoutingBtn.style.display = 'none';
-      }
-    })
-    .catch(err => {
-      console.warn('Could not determine upcoming opponent:', err);
-      scoutingBtn.style.display = 'none';
+  resolveUpcomingOpponentFromMatchup(data).then((result) => {
+    scoutingBtn.style.display = result ? 'block' : 'none';
+  });
+}
+
+function bindFccScoutingProjectedToggle() {
+  const wrap = document.querySelector('.fcc-scouting-projected-toggle');
+  if (!wrap || wrap.dataset.bound === '1') return;
+  wrap.dataset.bound = '1';
+  wrap.querySelectorAll('.toggle-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      fccScoutingProjectedViewMode = btn.getAttribute('data-fcc-scouting-projected') || 'attributes';
+      wrap.querySelectorAll('.toggle-btn').forEach((other) => {
+        other.classList.toggle('active', other === btn);
+      });
+      renderFccScoutingProjectedLineup();
     });
-  } else {
-    scoutingBtn.style.display = 'none';
+  });
+}
+
+function renderFccScoutingProjectedLineup() {
+  if (!scoutingTabDataCache) return;
+  if (fccScoutingProjectedViewMode === 'stats' && typeof renderProjectedStartingFiveStatsInto === 'function') {
+    renderProjectedStartingFiveStatsInto(
+      'fcc-scouting-projected-lineup',
+      scoutingTabDataCache.projected_starting_five || [],
+      scoutingTabDataCache.player_season_stats || {}
+    );
+    return;
+  }
+  if (typeof renderProjectedStartingFive === 'function') {
+    renderProjectedStartingFive(scoutingTabDataCache.projected_starting_five || [], {
+      containerId: 'fcc-scouting-projected-lineup',
+      tableClass: 'scouting-projected-table',
+      emptyClass: 'scouting-projected-empty',
+    });
+  }
+}
+
+async function renderScoutingTab() {
+  const status = document.getElementById('fcc-scouting-status');
+  const content = document.getElementById('fcc-scouting-content');
+  const opponentName = document.getElementById('fcc-scouting-opponent-name');
+  if (!status || !content || !opponentName) return;
+
+  status.style.display = 'block';
+  content.style.display = 'none';
+  status.textContent = 'Loading scouting report...';
+
+  const opponent = await resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache);
+  if (!opponent) {
+    status.textContent = 'No upcoming opponent available for scouting.';
+    return;
+  }
+
+  opponentName.textContent = opponent.name || '--';
+
+  try {
+    const authHeaders = API_CONFIG.getAuthHeaders();
+    const [teamDataRes, playUsageRes] = await Promise.all([
+      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders }),
+      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders })
+    ]);
+
+    if (!teamDataRes.ok) throw new Error('Failed to load team report');
+    if (!playUsageRes.ok) throw new Error('Failed to load play usage');
+
+    const teamData = await teamDataRes.json();
+    const playUsage = await playUsageRes.json();
+    scoutingTabDataCache = playUsage || {};
+    fccScoutingProjectedViewMode = 'attributes';
+    const wrap = document.querySelector('.fcc-scouting-projected-toggle');
+    if (wrap) {
+      wrap.querySelectorAll('.toggle-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-fcc-scouting-projected') === 'attributes');
+      });
+    }
+    bindFccScoutingProjectedToggle();
+    renderFccScoutingProjectedLineup();
+    if (typeof renderScoutingTeamReport === 'function' && typeof createTeamAttrItem === 'function') {
+      renderScoutingTeamReport(teamData.team_attributes || {}, createTeamAttrItem, 'fcc-scouting-team-attributes-grid');
+    }
+    if (typeof renderPlayUsage === 'function') {
+      renderPlayUsage(
+        playUsage.plays || [],
+        'No previous game data available. Opponent has not played a game yet this season.',
+        'fcc-play-usage-body'
+      );
+    }
+    status.style.display = 'none';
+    content.style.display = 'flex';
+  } catch (error) {
+    console.error('Error loading scouting report tab:', error);
+    status.textContent = `Error loading scouting report: ${error.message}`;
   }
 }
 
