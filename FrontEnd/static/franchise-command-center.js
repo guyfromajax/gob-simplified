@@ -1317,10 +1317,17 @@ function getFccPlaybookEffClass(value) {
 }
 
 function buildFccPlaybooksSectionMarkup(data, section) {
+  const editButtonMarkup = section.key === 'motion'
+    ? '<button id="fcc-edit-playbooks-btn" class="fcc-game-plan-edit-btn" type="button">Edit All Playbooks</button>'
+    : '';
+
   if (section.key === 'press_trap') {
     return `
       <section class="fcc-playbooks-section">
-        <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+        <div class="fcc-playbooks-section-head-wrap">
+          <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+          ${editButtonMarkup}
+        </div>
         <div class="fcc-playbooks-section-body fcc-playbooks-placeholder-body">
           <div class="fcc-playbooks-placeholder-copy">In Development</div>
         </div>
@@ -1343,7 +1350,10 @@ function buildFccPlaybooksSectionMarkup(data, section) {
 
   return `
     <section class="fcc-playbooks-section">
-      <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+      <div class="fcc-playbooks-section-head-wrap">
+        <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+        ${editButtonMarkup}
+      </div>
       <div class="fcc-playbooks-section-body">${bodyMarkup}</div>
     </section>
   `;

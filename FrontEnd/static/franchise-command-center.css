@@ -1544,23 +1544,6 @@ input[type="reset"] {
   padding: 12px 16px 14px;
 }
 
-#franchise-container .fcc-playbooks-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 14px;
-}
-
-#franchise-container .fcc-playbooks-main-title {
-  margin: 0;
-  color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 32px;
-  letter-spacing: 0.03em;
-  line-height: 1;
-}
-
 #franchise-container .fcc-playbooks-sections {
   display: grid;
   grid-template-columns: 1fr;
@@ -1569,6 +1552,13 @@ input[type="reset"] {
 
 #franchise-container .fcc-playbooks-section {
   min-width: 0;
+}
+
+#franchise-container .fcc-playbooks-section-head-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 #franchise-container .fcc-playbooks-section-head {
@@ -1703,7 +1693,7 @@ input[type="reset"] {
 }
 
 @media (max-width: 680px) {
-  #franchise-container .fcc-playbooks-top {
+  #franchise-container .fcc-playbooks-section-head-wrap {
     flex-direction: column;
     align-items: stretch;
   }
