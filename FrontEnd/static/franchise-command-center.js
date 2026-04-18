@@ -3364,17 +3364,17 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   
   if (attrKey === 'team_chemistry') {
     const barContainer = document.createElement('div');
-    barContainer.className = 'chemistry-bar-container';
+    barContainer.className = 'fcc-chemistry-bar-container';
     if (visual.pulse) barContainer.classList.add('is-pulsing');
     
     const barFill = document.createElement('div');
-    barFill.className = 'chemistry-bar-fill';
+    barFill.className = 'fcc-chemistry-bar-fill';
     const percentage = Math.max(0, Math.min((Number(currentValue) / 25) * 100, 100));
     barFill.style.width = `${percentage}%`;
     barFill.style.opacity = String(0.2 + (percentage / 100) * 0.8);
     
     const barText = document.createElement('div');
-    barText.className = 'chemistry-bar-text';
+    barText.className = 'fcc-chemistry-bar-text';
     barText.textContent = `${currentValue} / 25`;
     
     barContainer.appendChild(barFill);
