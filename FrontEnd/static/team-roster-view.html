@@ -11,7 +11,6 @@
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Team Roster</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tournament.css">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/command-center-team-styles.css">
@@ -80,26 +79,20 @@
     }
 
     .team-roster-page-header {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      position: relative;
+      display: flex;
+      justify-content: center;
       align-items: center;
-      gap: 18px;
       margin-bottom: 28px;
+      min-height: 84px;
     }
 
-    .team-roster-page-header > #back-button {
-      justify-self: start;
+    #back-button {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
       white-space: nowrap;
-    }
-
-    .team-roster-page-header > #team-banner {
-      justify-self: center;
-    }
-
-    .team-roster-page-header > .view-toggle {
-      justify-self: end;
-      margin-left: 0;
-      max-width: 100%;
     }
 
     #team-banner {
@@ -110,6 +103,43 @@
       border: 1px solid rgba(255, 255, 255, 0.16);
       box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+    }
+
+    .team-roster-view-toggle {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-flex;
+      gap: 0;
+      margin-left: 0;
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      overflow: hidden;
+      max-width: 100%;
+      background: rgba(18, 24, 43, 0.62);
+    }
+
+    .team-roster-view-toggle .view-toggle-btn {
+      padding: 10px 18px;
+      border: 0;
+      background: rgba(255, 255, 255, 0.95);
+      color: rgba(25, 25, 25, 0.78);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .team-roster-view-toggle .view-toggle-btn:hover {
+      background: #ffffff;
+      color: rgba(18, 18, 18, 0.92);
+    }
+
+    .team-roster-view-toggle .view-toggle-btn.active {
+      background: rgba(61, 55, 43, 0.92);
+      color: #ffffff;
     }
 
     .section-title {
@@ -267,18 +297,21 @@
       }
 
       .team-roster-page-header {
-        grid-template-columns: 1fr;
-        justify-items: center;
-      }
-
-      .team-roster-page-header > * {
-        grid-column: auto !important;
+        flex-direction: column;
+        gap: 14px;
+        min-height: 0;
       }
 
       #back-button,
-      .view-toggle,
+      .team-roster-view-toggle {
+        position: static;
+        transform: none;
+      }
+
+      #back-button,
+      .team-roster-view-toggle,
       #team-banner {
-        justify-self: center;
+        align-self: center;
       }
     }
 
@@ -315,7 +348,7 @@
       <img id="team-banner" src="/images/teams/general/general_banner_primary.jpg" alt="Team banner">
 
       <!-- View Toggle -->
-      <div class="view-toggle">
+      <div class="team-roster-view-toggle">
         <button class="view-toggle-btn active" data-view="grid">Grid View</button>
         <button class="view-toggle-btn" data-view="player">Player View</button>
       </div>
