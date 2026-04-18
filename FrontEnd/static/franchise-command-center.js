@@ -1274,13 +1274,15 @@ function buildFccPlaybooksItems(data, key) {
     items = (data?.motion || []).map((play) => ({
       name: play?.name || 'Unknown',
       percentage: Number(percentages.motion?.[play?.play_id] || 0),
-      effectiveness: Number(play?.effectiveness || 0)
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || ''
     }));
   } else if (key === 'set_plays') {
     items = (data?.set_plays || []).map((play) => ({
       name: play?.name || 'Unknown',
       percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
-      effectiveness: Number(play?.effectiveness || 0)
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || ''
     }));
   } else if (key === 'man_defense') {
     items = (data?.man_defense_rows || [])
@@ -1288,19 +1290,22 @@ function buildFccPlaybooksItems(data, key) {
       .map((row) => ({
         name: row?.name || 'Unknown',
         percentage: Number(percentages.man_defense?.[row?.id] || 0),
-        effectiveness: Number(row?.effectiveness || 0)
+        effectiveness: Number(row?.effectiveness || 0),
+        top_scorer: row?.top_scorer || ''
       }));
   } else if (key === 'zone_defense') {
     items = (data?.zone_defense_rows || []).map((row) => ({
       name: row?.name || 'Unknown',
       percentage: Number(percentages.zone_defense?.[row?.id] || 0),
-      effectiveness: Number(row?.effectiveness || 0)
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || ''
     }));
   } else if (key === 'fast_breaks') {
     items = (data?.fast_breaks || []).map((row) => ({
       name: row?.name || 'Unknown',
       percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
-      effectiveness: Number(row?.effectiveness || 0)
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || ''
     }));
   }
 
@@ -1344,6 +1349,7 @@ function buildFccPlaybooksSectionMarkup(data, section) {
             <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
           </div>
           <div class="fcc-playbooks-item-eff ${getFccPlaybookEffClass(item.effectiveness)}">${escapePlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+          ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="fcc-playbooks-item-top-scorer">${escapePlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
         </article>
       `).join('')}</div>`
     : '<div class="fcc-playbooks-empty">No plays assigned.</div>';
