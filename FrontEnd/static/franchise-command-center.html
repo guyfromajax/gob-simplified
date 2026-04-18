@@ -384,59 +384,6 @@
     </div>
   </div>
 
-  <!-- Scouting Report Modal -->
-  <div id="scouting-report-modal" class="scouting-modal" style="display: none;">
-    <div class="scouting-modal-content">
-      <div class="scouting-modal-header">
-        <h2 id="scouting-report-title">Scouting Report</h2>
-        <button class="scouting-modal-close">&times;</button>
-      </div>
-      <div class="scouting-modal-body">
-        <div id="scouting-loading" class="scouting-loading">Loading scouting report...</div>
-        <div id="scouting-content" style="display: none;">
-          <div class="training-report-styled">
-            <section class="projected-starting-five-section">
-              <div class="scouting-projected-header">
-                <h2>Projected Starting 5</h2>
-                <div class="scouting-projected-toggle view-toggle" role="group" aria-label="Projected lineup columns">
-                  <button type="button" class="toggle-btn active" data-scouting-projected="attributes">Attributes</button>
-                  <button type="button" class="toggle-btn" data-scouting-projected="stats">Stats</button>
-                </div>
-              </div>
-              <div id="scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
-            </section>
-          </div>
-          <!-- Team Report Section -->
-          <div class="training-report-styled">
-            <section class="team-section">
-              <h2>Team Report</h2>
-              <div class="team-attributes-grid" id="scouting-team-attributes-grid"></div>
-            </section>
-          </div>
-          
-          <!-- Play Usage Section -->
-          <section class="play-usage-section">
-            <h2>Play Usage (Last Game)</h2>
-            <div class="scroll-x">
-              <table class="play-usage-table" id="play-usage-table">
-                <thead>
-                  <tr>
-                    <th>Play Name</th>
-                    <th>Times Run</th>
-                    <th>Success Rate</th>
-                    <th>Usage %</th>
-                  </tr>
-                </thead>
-                <tbody id="play-usage-body">
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/accessDenied.js"></script>
   <script src="/js/shared/analytics.js"></script>
