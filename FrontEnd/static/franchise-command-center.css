@@ -1496,6 +1496,16 @@ input[type="reset"] {
   background: rgba(255, 255, 255, 0.03);
 }
 
+#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(even),
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(even) {
+  background: transparent;
+}
+
+#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(even) td,
+#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(even) td {
+  background: transparent;
+}
+
 #franchise-container #coaches-tab .scouting-projected-table tbody tr:hover td,
 #franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.04);
