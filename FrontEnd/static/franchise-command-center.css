@@ -1310,6 +1310,17 @@ input[type="reset"] {
   padding: 14px 16px 12px;
 }
 
+#franchise-container .fcc-scouting-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+}
+
+#franchise-container .fcc-scouting-summary-left {
+  min-width: 0;
+}
+
 #franchise-container .fcc-scouting-opponent-label {
   color: rgba(255, 255, 255, 0.6);
   font-family: 'Inter', sans-serif;
@@ -1328,11 +1339,30 @@ input[type="reset"] {
   line-height: 1;
 }
 
-#franchise-container .fcc-scouting-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
+#franchise-container .fcc-scouting-summary-right {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#franchise-container .fcc-scouting-rank-label {
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#franchise-container .fcc-scouting-rank-value {
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 #franchise-container .fcc-scouting-card-head {
@@ -1356,10 +1386,47 @@ input[type="reset"] {
   padding: 12px 14px 14px;
 }
 
-#franchise-container #fcc-scouting-team-attributes-grid {
+#franchise-container .fcc-scouting-measures-body {
+  padding: 14px;
+}
+
+#franchise-container .fcc-scouting-measures-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.82fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+#franchise-container .fcc-scouting-radar-host {
+  min-width: 0;
+}
+
+#franchise-container .fcc-scouting-radar-host .tm-radar-wrap {
+  min-height: 460px;
+}
+
+#franchise-container .fcc-scouting-side-cards {
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+#franchise-container .fcc-scouting-side-card {
+  min-width: 0;
+}
+
+#franchise-container .fcc-scouting-side-card .tm-side-card-content {
+  padding: 18px 18px 16px;
+}
+
+#franchise-container .fcc-scouting-side-card-chemistry .tm-side-card-content {
+  padding-top: 20px;
+  padding-bottom: 18px;
+}
+
+#franchise-container #coaches-tab .tm-side-card-label,
+#franchise-container #coaches-tab .tm-radar-axis-label {
+  font-size: 18px;
 }
 
 #franchise-container #coaches-tab .scroll-x {
@@ -1456,6 +1523,16 @@ input[type="reset"] {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
+}
+
+@media (max-width: 1280px) {
+  #franchise-container .fcc-scouting-measures-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #franchise-container .fcc-scouting-radar-host .tm-radar-wrap {
+    min-height: 420px;
+  }
 }
 
 #franchise-container .fcc-leaders-card-body {

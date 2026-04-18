@@ -573,6 +573,10 @@ function getTeamRankingEntry(teamId) {
   return (commandCenterTopDataCache?.rankings || []).find((entry) => String(entry.team_id) === String(teamId)) || null;
 }
 
+function getStandingsTeamEntry(teamId) {
+  return (standingsDataCache?.standings || []).find((entry) => String(entry.team_id || '') === String(teamId)) || null;
+}
+
 function getUserScheduleGames() {
   const weeks = userScheduleDataCache?.schedule || [];
   return weeks.flat().filter((game) => game && game.is_user_team);
@@ -3944,31 +3948,8 @@ function updateScoutingButton(data) {
   });
 }
 
-function bindFccScoutingProjectedToggle() {
-  const wrap = document.querySelector('.fcc-scouting-projected-toggle');
-  if (!wrap || wrap.dataset.bound === '1') return;
-  wrap.dataset.bound = '1';
-  wrap.querySelectorAll('.toggle-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      fccScoutingProjectedViewMode = btn.getAttribute('data-fcc-scouting-projected') || 'attributes';
-      wrap.querySelectorAll('.toggle-btn').forEach((other) => {
-        other.classList.toggle('active', other === btn);
-      });
-      renderFccScoutingProjectedLineup();
-    });
-  });
-}
-
 function renderFccScoutingProjectedLineup() {
   if (!scoutingTabDataCache) return;
-  if (fccScoutingProjectedViewMode === 'stats' && typeof renderProjectedStartingFiveStatsInto === 'function') {
-    renderProjectedStartingFiveStatsInto(
-      'fcc-scouting-projected-lineup',
-      scoutingTabDataCache.projected_starting_five || [],
-      scoutingTabDataCache.player_season_stats || {}
-    );
-    return;
-  }
   if (typeof renderProjectedStartingFive === 'function') {
     renderProjectedStartingFive(scoutingTabDataCache.projected_starting_five || [], {
       containerId: 'fcc-scouting-projected-lineup',
@@ -3978,11 +3959,26 @@ function renderFccScoutingProjectedLineup() {
   }
 }
 
+function renderFccScoutingMeasures(teamAttrs) {
+  const radarHost = document.getElementById('fcc-scouting-radar-host');
+  const shootingCard = document.getElementById('fcc-scouting-shooting-card');
+  const reboundingCard = document.getElementById('fcc-scouting-rebounding-card');
+  const chemistryCard = document.getElementById('fcc-scouting-chemistry-card');
+  if (!radarHost || !shootingCard || !reboundingCard || !chemistryCard) return;
+
+  const attrs = teamAttrs || {};
+  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(attrs);
+  shootingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(attrs.shot_threshold || 0));
+  reboundingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(attrs.rebound_modifier || 0));
+  chemistryCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(attrs.team_chemistry || 0));
+}
+
 async function renderScoutingTab() {
   const status = document.getElementById('fcc-scouting-status');
   const content = document.getElementById('fcc-scouting-content');
   const opponentName = document.getElementById('fcc-scouting-opponent-name');
-  if (!status || !content || !opponentName) return;
+  const opponentRank = document.getElementById('fcc-scouting-opponent-rank');
+  if (!status || !content || !opponentName || !opponentRank) return;
 
   status.style.display = 'block';
   content.style.display = 'none';
@@ -3994,7 +3990,15 @@ async function renderScoutingTab() {
     return;
   }
 
-  opponentName.textContent = opponent.name || '--';
+  const opponentTeamName = opponent.name || '--';
+  const standingsEntry = getStandingsTeamEntry(opponent.id);
+  const rankingEntry = getTeamRankingEntry(opponent.id);
+  const wins = Number(standingsEntry?.W || 0);
+  const losses = Number(standingsEntry?.L || 0);
+  const rank = Number(rankingEntry?.natl_rank || 0);
+
+  opponentName.textContent = `${opponentTeamName} (${wins}-${losses})`;
+  opponentRank.textContent = Number.isFinite(rank) && rank > 0 ? String(rank) : '--';
 
   try {
     const authHeaders = API_CONFIG.getAuthHeaders();
@@ -4009,18 +4013,8 @@ async function renderScoutingTab() {
     const teamData = await teamDataRes.json();
     const playUsage = await playUsageRes.json();
     scoutingTabDataCache = playUsage || {};
-    fccScoutingProjectedViewMode = 'attributes';
-    const wrap = document.querySelector('.fcc-scouting-projected-toggle');
-    if (wrap) {
-      wrap.querySelectorAll('.toggle-btn').forEach((btn) => {
-        btn.classList.toggle('active', btn.getAttribute('data-fcc-scouting-projected') === 'attributes');
-      });
-    }
-    bindFccScoutingProjectedToggle();
     renderFccScoutingProjectedLineup();
-    if (typeof renderScoutingTeamReport === 'function' && typeof createTeamAttrItem === 'function') {
-      renderScoutingTeamReport(teamData.team_attributes || {}, createTeamAttrItem, 'fcc-scouting-team-attributes-grid');
-    }
+    renderFccScoutingMeasures(teamData.team_attributes || {});
     if (typeof renderPlayUsage === 'function') {
       renderPlayUsage(
         playUsage.plays || [],

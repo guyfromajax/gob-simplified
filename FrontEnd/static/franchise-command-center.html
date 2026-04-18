@@ -196,32 +196,47 @@
         <div id="fcc-scouting-content" class="fcc-scouting-layout" style="display:none;">
           <section class="fcc-data-card fcc-scouting-summary-card">
             <div class="fcc-data-card-body fcc-scouting-summary-body">
-              <div class="fcc-scouting-opponent-label">Upcoming Opponent</div>
-              <div id="fcc-scouting-opponent-name" class="fcc-scouting-opponent-name">--</div>
-            </div>
-          </section>
-          <div class="fcc-scouting-grid">
-            <section class="fcc-data-card">
-              <div class="fcc-scouting-card-head">
-                <h3>Projected Starting Five</h3>
-                <div class="scouting-projected-toggle view-toggle fcc-scouting-projected-toggle" role="group" aria-label="Projected lineup columns">
-                  <button type="button" class="toggle-btn active" data-fcc-scouting-projected="attributes">Attributes</button>
-                  <button type="button" class="toggle-btn" data-fcc-scouting-projected="stats">Stats</button>
+              <div class="fcc-scouting-summary-row">
+                <div class="fcc-scouting-summary-left">
+                  <div class="fcc-scouting-opponent-label">Upcoming Opponent</div>
+                  <div id="fcc-scouting-opponent-name" class="fcc-scouting-opponent-name">--</div>
+                </div>
+                <div class="fcc-scouting-summary-right">
+                  <span class="fcc-scouting-rank-label">National Rank:</span>
+                  <span id="fcc-scouting-opponent-rank" class="fcc-scouting-rank-value">--</span>
                 </div>
               </div>
-              <div class="fcc-data-card-body scroll-x">
-                <div id="fcc-scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
+            </div>
+          </section>
+          <section class="fcc-data-card">
+            <div class="fcc-scouting-card-head">
+              <h3>Projected Starting Five</h3>
+            </div>
+            <div class="fcc-data-card-body scroll-x">
+              <div id="fcc-scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
+            </div>
+          </section>
+          <section class="fcc-data-card">
+            <div class="fcc-scouting-card-head">
+              <h3>Team Measures</h3>
+            </div>
+            <div class="fcc-data-card-body fcc-scouting-measures-body">
+              <div class="fcc-scouting-measures-grid">
+                <div id="fcc-scouting-radar-host" class="fcc-scouting-radar-host"></div>
+                <div class="fcc-scouting-side-cards">
+                  <section class="fcc-data-card fcc-scouting-side-card">
+                    <div id="fcc-scouting-shooting-card" class="tm-side-card-content"></div>
+                  </section>
+                  <section class="fcc-data-card fcc-scouting-side-card">
+                    <div id="fcc-scouting-rebounding-card" class="tm-side-card-content"></div>
+                  </section>
+                  <section class="fcc-data-card fcc-scouting-side-card fcc-scouting-side-card-chemistry">
+                    <div id="fcc-scouting-chemistry-card" class="tm-side-card-content tm-side-card-content-chemistry"></div>
+                  </section>
+                </div>
               </div>
-            </section>
-            <section class="fcc-data-card">
-              <div class="fcc-scouting-card-head">
-                <h3>Team Report</h3>
-              </div>
-              <div class="fcc-data-card-body fcc-scouting-team-body">
-                <div class="team-attributes-grid" id="fcc-scouting-team-attributes-grid"></div>
-              </div>
-            </section>
-          </div>
+            </div>
+          </section>
           <section class="fcc-data-card">
             <div class="fcc-scouting-card-head">
               <h3>Play Usage (Last Game)</h3>
