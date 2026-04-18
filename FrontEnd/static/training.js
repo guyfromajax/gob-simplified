@@ -164,6 +164,39 @@ allSliders.forEach(slider => {
   slider.dataset.prev = '0';
 });
 
+function ensureTrainingSliderVisual(slider) {
+  const wrapper = slider?.closest('.slider-container');
+  if (!wrapper) return null;
+  let shell = wrapper.querySelector('.training-slider-shell');
+  if (shell) return shell;
+
+  shell = document.createElement('div');
+  shell.className = 'training-slider-shell';
+  shell.setAttribute('aria-hidden', 'true');
+  shell.innerHTML = `
+    <div class="training-slider-track"></div>
+    <div class="training-slider-nodes">
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+    </div>
+  `;
+  wrapper.appendChild(shell);
+  return shell;
+}
+
+function updateTrainingSliderVisual(slider, rawValue) {
+  const shell = ensureTrainingSliderVisual(slider);
+  if (!shell) return;
+  const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
+  shell.querySelectorAll('.training-slider-node').forEach((node, index) => {
+    node.classList.toggle('is-selected', index === value);
+  });
+}
+
 /**
  * Utility: set slider value and update display/cache
  */
@@ -174,6 +207,7 @@ function setSliderValue(slider, value) {
   if (valueDisplay) {
     valueDisplay.textContent = value;
   }
+  updateTrainingSliderVisual(slider, value);
 }
 
 /**
@@ -412,6 +446,8 @@ function updatePointsRemaining() {
  * Handle slider input - prevent over-allocation
  */
 allSliders.forEach(slider => {
+  ensureTrainingSliderVisual(slider);
+  updateTrainingSliderVisual(slider, slider.value);
   slider.addEventListener('change', function() {
     playSound('click-tiny.wav');
   });
@@ -432,6 +468,7 @@ allSliders.forEach(slider => {
     if (valueDisplay) {
       valueDisplay.textContent = this.value;
     }
+    updateTrainingSliderVisual(this, this.value);
     
     // Store current value as previous
     this.dataset.prev = this.value;

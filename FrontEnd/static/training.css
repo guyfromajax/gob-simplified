@@ -721,3 +721,474 @@ input[type="reset"] {
   color: var(--color-text);
   cursor: pointer;
 }
+
+body.training-page {
+  margin: 0;
+  min-height: 100vh;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(180deg, #263d7a 0%, #1e3068 42%, #141f4a 100%);
+  color: #f4f6ff;
+}
+
+body.training-page .training-resource-shell {
+  width: min(1480px, calc(100vw - 24px));
+  padding: 28px 28px 32px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  min-height: auto;
+  color: #f4f6ff;
+}
+
+body.training-page .training-header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.94), rgba(30, 35, 44, 0.97));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 20px rgba(0, 0, 0, 0.16);
+  backdrop-filter: none;
+  position: sticky;
+  top: 10px;
+  z-index: 12;
+}
+
+body.training-page .page-title {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.2rem;
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  text-shadow: none;
+}
+
+body.training-page .header-center {
+  align-items: center;
+}
+
+body.training-page .points-display {
+  font-size: 14px;
+  font-weight: 500;
+  color: #9e9d9d;
+  letter-spacing: 0.01em;
+}
+
+body.training-page #points-remaining {
+  color: #ffffff;
+}
+
+body.training-page .back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.76);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+body.training-page .back-button::before {
+  content: "←";
+  font-size: 16px;
+  line-height: 1;
+}
+
+body.training-page .back-button:hover {
+  background: none;
+  color: #ffffff;
+  transform: translateX(-1px);
+}
+
+body.training-page .header-actions {
+  gap: 10px;
+}
+
+body.training-page .auto-train-button,
+body.training-page .submit-button,
+body.training-page .recruiting-invites-button,
+body.training-page .auto-train-modal-close,
+body.training-page .custom-focus-assign-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
+body.training-page .auto-train-button,
+body.training-page .recruiting-invites-button {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.84);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+
+body.training-page .submit-button,
+body.training-page .auto-train-modal-close,
+body.training-page .custom-focus-assign-btn {
+  background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
+  color: #ffffff;
+}
+
+body.training-page .auto-train-button:hover:not(:disabled),
+body.training-page .recruiting-invites-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+body.training-page .submit-button:hover:not(:disabled),
+body.training-page .auto-train-modal-close:hover,
+body.training-page .custom-focus-assign-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffb95b 0%, #ffa02f 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+body.training-page .main-content-grid,
+body.training-page .general-section,
+body.training-page .coaching-section {
+  grid-column: 1 / -1;
+}
+
+body.training-page .main-content-grid {
+  gap: 18px;
+  margin-bottom: 0;
+}
+
+body.training-page .content-section,
+body.training-page .general-section,
+body.training-page .coaching-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+body.training-page .section-header,
+body.training-page .coaching-title {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  text-align: left;
+}
+
+body.training-page .section-container,
+body.training-page .coaching-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 28px rgba(0, 0, 0, 0.12);
+}
+
+body.training-page .section-container {
+  min-height: 0;
+  padding: 18px 20px 20px;
+}
+
+body.training-page .coaching-section {
+  margin-top: 0;
+  padding: 18px 20px 20px;
+}
+
+body.training-page .content-columns,
+body.training-page .general-grid,
+body.training-page .archetypes-grid {
+  gap: 16px;
+}
+
+body.training-page .drill-group {
+  padding: 16px 16px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.training-page .drill-title {
+  margin: 0 0 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #F79420;
+  line-height: 1.2;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+body.training-page .drill-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 42px;
+  height: 1px;
+  background: rgba(247, 148, 32, 0.9);
+}
+
+body.training-page .slider-label {
+  gap: 8px;
+}
+
+body.training-page .label-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+body.training-page .slider-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+body.training-page .slider {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  flex: 1;
+  height: 42px;
+  margin: 0;
+  opacity: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+body.training-page .slider::-webkit-slider-runnable-track {
+  height: 42px;
+  background: transparent;
+}
+
+body.training-page .slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 42px;
+  height: 42px;
+  background: transparent;
+  border: 0;
+}
+
+body.training-page .slider::-moz-range-track {
+  height: 42px;
+  background: transparent;
+  border: 0;
+}
+
+body.training-page .slider::-moz-range-thumb {
+  width: 42px;
+  height: 42px;
+  background: transparent;
+  border: 0;
+}
+
+body.training-page .training-slider-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+body.training-page .training-slider-track {
+  position: absolute;
+  left: 21px;
+  right: 21px;
+  top: 50%;
+  height: 6px;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 999px;
+}
+
+body.training-page .training-slider-nodes {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+body.training-page .training-slider-node {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  background: center / contain no-repeat url("/images/buttons/black_gp_bball.svg");
+}
+
+body.training-page .training-slider-node.is-selected {
+  background-image: url("/images/buttons/orange_gp_bball.svg");
+}
+
+body.training-page .slider-value {
+  display: none;
+}
+
+body.training-page .playbook-mode-selection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.training-page .radio-group {
+  gap: 14px;
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+
+body.training-page .radio-label {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 13px;
+}
+
+body.training-page .archetypes-grid {
+  margin-top: 12px;
+}
+
+body.training-page .archetype-block {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+body.training-page .archetype-header {
+  background: none;
+  border-radius: 0;
+  padding: 0 0 8px;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+body.training-page .archetype-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 42px;
+  height: 1px;
+  background: rgba(247, 148, 32, 0.9);
+}
+
+body.training-page .archetype-name {
+  color: #F79420;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+body.training-page .archetype-option {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+body.training-page .archetype-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.training-page .custom-focus-modal-content,
+body.training-page .auto-train-modal-content {
+  background: rgba(28, 33, 43, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+}
+
+body.training-page .custom-focus-modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+}
+
+body.training-page .custom-focus-table-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.training-page .custom-focus-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+body.training-page .custom-focus-table thead th {
+  color: rgba(255, 255, 255, 0.66);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+}
+
+body.training-page .custom-focus-table th,
+body.training-page .custom-focus-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.training-page .custom-focus-table th:first-child,
+body.training-page .custom-focus-table td.player-cell {
+  background: rgba(24, 29, 41, 0.96);
+  color: #ffffff;
+}
+
+body.training-page .custom-focus-cancel-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  body.training-page .training-resource-shell {
+    width: calc(100vw - 12px);
+    padding: 20px 12px 24px;
+  }
+
+  body.training-page .training-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  body.training-page .header-actions {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  body.training-page .main-content-grid,
+  body.training-page .content-columns,
+  body.training-page .general-grid,
+  body.training-page .archetypes-grid {
+    grid-template-columns: 1fr;
+  }
+}
