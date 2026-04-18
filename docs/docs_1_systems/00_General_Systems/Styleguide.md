@@ -76,6 +76,8 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Primary action buttons that advance game state use action green (`#34EC27`).
 - Primary action buttons that save settings, configure preferences, or perform non-gating actions use orange (`#F79420`).
 - These two button types must remain visually distinct and semantically consistent across the entire product.
+- Any page with a primary action or save button must keep that button visible on screen at all times.
+- If page content is long enough to require vertical scrolling, the button's containing header or action bar must remain present on screen while the user scrolls.
 - Navigation buttons should not compete visually with primary action buttons.
 - Button treatments should support information-dense screens without becoming noisy.
 
