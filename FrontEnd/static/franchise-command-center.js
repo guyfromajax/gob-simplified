@@ -1253,7 +1253,8 @@ const FCC_PLAYBOOK_SECTION_ORDER = [
   { key: 'set_plays', label: 'Set Plays' },
   { key: 'man_defense', label: 'Man Defense' },
   { key: 'zone_defense', label: 'Zone Defense' },
-  { key: 'fast_breaks', label: 'Fast Breaks' }
+  { key: 'fast_breaks', label: 'Fast Breaks' },
+  { key: 'press_trap', label: 'Press/Trap' }
 ];
 
 function escapePlaybookHtml(value) {
@@ -1304,6 +1305,17 @@ function buildFccPlaybooksItems(data, key) {
 }
 
 function buildFccPlaybooksSectionMarkup(data, section) {
+  if (section.key === 'press_trap') {
+    return `
+      <section class="fcc-playbooks-section-card">
+        <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+        <div class="fcc-playbooks-section-body fcc-playbooks-placeholder-body">
+          <div class="fcc-playbooks-placeholder-copy">In Development</div>
+        </div>
+      </section>
+    `;
+  }
+
   const items = buildFccPlaybooksItems(data, section.key);
   const bodyMarkup = items.length
     ? `<div class="fcc-playbooks-items">${items.map((item) => `

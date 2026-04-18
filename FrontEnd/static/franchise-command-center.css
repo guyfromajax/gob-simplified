@@ -1595,6 +1595,21 @@ input[type="reset"] {
   padding: 12px 14px 14px;
 }
 
+#franchise-container .fcc-playbooks-placeholder-body {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#franchise-container .fcc-playbooks-placeholder-copy {
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
 #franchise-container .fcc-playbooks-items {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
