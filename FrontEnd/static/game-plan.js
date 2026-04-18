@@ -137,6 +137,8 @@ let currentSettings = {
 // Track unsaved changes
 let hasUnsavedChanges = false;
 let lastSavedSettings = null;
+let toastTimer = null;
+let toastHideTimer = null;
 
 // Slider mappings (note: all go to strategy_settings now for unified backend handling)
 const strategySliders = {
@@ -152,75 +154,57 @@ const strategySliders = {
   'rebounding': 'slider-rebounding'
 };
 
-function showToast(msg) {
+function dismissToast() {
   const toast = document.getElementById('toast');
   if (!toast) return;
-  toast.textContent = msg;
-  toast.hidden = false;
-  setTimeout(() => { toast.hidden = true; }, 2000);
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  if (toastHideTimer) {
+    clearTimeout(toastHideTimer);
+    toastHideTimer = null;
+  }
+  toast.classList.remove('visible');
+  toastHideTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, 220);
 }
 
-function showSuccessPopup(message) {
-  // Create modal overlay
-  const overlay = document.createElement('div');
-  overlay.className = 'gameplan-success-overlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
+function showToast(title, subtitle = '', options = {}) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  const accent = options.accentColor || '#34EC27';
+  const subline = subtitle ? `<div class="toast-subline">${subtitle}</div>` : '';
+  toast.innerHTML = `
+    <div class="toast-icon" style="--toast-accent: ${accent};">
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M5.1 10.4 8.3 13.6 14.9 7" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+    <div class="toast-copy">
+      <div class="toast-title">${title}</div>
+      ${subline}
+    </div>
+    <button class="toast-dismiss" type="button" aria-label="Dismiss notification">×</button>
   `;
-  
-  // Create modal
-  const modal = document.createElement('div');
-  modal.className = 'gameplan-success-modal';
-  modal.style.cssText = `
-    background: #1a1a1a;
-    border: 2px solid #34EC27;
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 400px;
-    width: 90%;
-    color: #fff;
-    text-align: center;
-  `;
-  
-  // Message
-  const messageEl = document.createElement('p');
-  messageEl.textContent = message;
-  messageEl.style.cssText = `
-    font-size: 1.125rem;
-    margin-bottom: 20px;
-    font-weight: 600;
-    color: #34EC27;
-  `;
-  
-  // OK button
-  const okBtn = document.createElement('button');
-  okBtn.textContent = 'OK';
-  okBtn.style.cssText = `
-    padding: 10px 30px;
-    background: #34EC27;
-    color: #000;
-    border: none;
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-  `;
-  okBtn.addEventListener('click', () => {
-    overlay.remove();
+  toast.style.setProperty('--toast-accent', accent);
+  toast.hidden = false;
+  toast.querySelector('.toast-dismiss')?.addEventListener('click', dismissToast, { once: true });
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  if (toastHideTimer) {
+    clearTimeout(toastHideTimer);
+    toastHideTimer = null;
+  }
+  requestAnimationFrame(() => {
+    toast.classList.add('visible');
   });
-  
-  modal.appendChild(messageEl);
-  modal.appendChild(okBtn);
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
+  toastTimer = setTimeout(() => {
+    dismissToast();
+  }, 3000);
 }
 
 function showModal(message) {
@@ -556,7 +540,7 @@ async function saveGamePlan() {
     lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
     hasUnsavedChanges = false;
     
-    showSuccessPopup('Game Plan Successfully Saved');
+    showToast('Game Plan Saved', 'Changes applied successfully');
   } catch (err) {
     console.error('Error saving settings:', err);
     showModal('An error occurred while saving. Please try again.');

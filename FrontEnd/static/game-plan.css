@@ -387,35 +387,91 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
 }
 
-#toast {
+.toast {
+  --toast-accent: #34EC27;
   position: fixed;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 24px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #49ff37 0%, #34EC27 100%);
-  color: #0f160f;
-  font-weight: 800;
-  font-size: 14px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  right: 22px;
+  bottom: 22px;
   z-index: 2000;
-  animation: slideUp 0.3s ease;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 12px;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 3px solid var(--toast-accent);
+  background: rgba(28, 33, 43, 0.97);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(120%);
+  transition: transform 220ms ease, opacity 220ms ease;
 }
 
-#toast[hidden] {
+.toast.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.toast[hidden] {
   display: none;
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 20px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.5px solid var(--toast-accent);
+  background: color-mix(in srgb, var(--toast-accent) 15%, transparent);
+}
+
+.toast-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.toast-copy {
+  min-width: 0;
+}
+
+.toast-title {
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.toast-subline {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.toast-dismiss {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.18s ease;
+}
+
+.toast-dismiss:hover {
+  color: #ffffff;
 }
 
 @media (max-width: 980px) {

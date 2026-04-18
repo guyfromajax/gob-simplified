@@ -23,65 +23,6 @@
     } catch (error) {}
   }
 
-  function showSuccessPopup(message) {
-    const overlay = document.createElement("div");
-    overlay.className = "gameplan-success-overlay";
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-    `;
-
-    const modal = document.createElement("div");
-    modal.className = "gameplan-success-modal";
-    modal.style.cssText = `
-      background: #1a1a1a;
-      border: 2px solid #00ff00;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 400px;
-      width: 90%;
-      color: #fff;
-      text-align: center;
-    `;
-
-    const messageEl = document.createElement("p");
-    messageEl.textContent = message;
-    messageEl.style.cssText = `
-      font-size: 1.125rem;
-      margin-bottom: 20px;
-      font-weight: 600;
-      color: #00ff00;
-    `;
-
-    const okBtn = document.createElement("button");
-    okBtn.textContent = "OK";
-    okBtn.style.cssText = `
-      padding: 10px 30px;
-      background: #00ff00;
-      color: #000;
-      border: none;
-      border-radius: 4px;
-      font-weight: 600;
-      cursor: pointer;
-    `;
-    okBtn.addEventListener("click", () => {
-      overlay.remove();
-    });
-
-    modal.appendChild(messageEl);
-    modal.appendChild(okBtn);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-  }
-
   function focusCode(value) {
     if (value === "attack") return "A";
     if (value === "inside") return "I";
@@ -260,6 +201,7 @@
       };
 
       this.toastTimer = null;
+      this.toastHideTimer = null;
       this.dragContext = null;
       this.modal = new ConfirmModal();
       this.draftStorageKey = this.buildDraftStorageKey();
@@ -1057,7 +999,7 @@
           throw new Error(`Save failed (${response.status})`);
         }
 
-        showSuccessPopup("Playbooks Successfully Saved");
+        this.showToast("Playbooks Saved", "Changes applied successfully");
         this.state.playbookMeta.user_saved = true;
         this.clearDraftState();
         if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {
@@ -1072,7 +1014,7 @@
         }
       } catch (error) {
         console.error("Failed to save playbooks:", error);
-        this.showToast("Failed to save playbooks");
+        this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });
       } finally {
         this.updateTotals();
       }
@@ -1109,16 +1051,54 @@
       window.location.href = buildPlaybookReportUrl(this.context);
     }
 
-    showToast(message) {
+    dismissToast() {
       const toast = this.elements.toast;
-      toast.textContent = message;
-      toast.classList.add("visible");
+      if (this.toastTimer) {
+        window.clearTimeout(this.toastTimer);
+        this.toastTimer = null;
+      }
+      if (this.toastHideTimer) {
+        window.clearTimeout(this.toastHideTimer);
+        this.toastHideTimer = null;
+      }
+      toast.classList.remove("visible");
+      this.toastHideTimer = window.setTimeout(() => {
+        toast.hidden = true;
+      }, 220);
+    }
+
+    showToast(title, subtitle = "", options = {}) {
+      const toast = this.elements.toast;
+      const accent = options.accentColor || "#34EC27";
+      const subline = subtitle ? `<div class="toast-subline">${subtitle}</div>` : "";
+      toast.innerHTML = `
+        <div class="toast-icon" style="--toast-accent: ${accent};">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M5.1 10.4 8.3 13.6 14.9 7" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+        <div class="toast-copy">
+          <div class="toast-title">${title}</div>
+          ${subline}
+        </div>
+        <button class="toast-dismiss" type="button" aria-label="Dismiss notification">×</button>
+      `;
+      toast.style.setProperty("--toast-accent", accent);
+      toast.hidden = false;
+      toast.querySelector(".toast-dismiss")?.addEventListener("click", () => this.dismissToast(), { once: true });
       if (this.toastTimer) {
         window.clearTimeout(this.toastTimer);
       }
+      if (this.toastHideTimer) {
+        window.clearTimeout(this.toastHideTimer);
+        this.toastHideTimer = null;
+      }
+      requestAnimationFrame(() => {
+        toast.classList.add("visible");
+      });
       this.toastTimer = window.setTimeout(() => {
-        toast.classList.remove("visible");
-      }, 2200);
+        this.dismissToast();
+      }, 3000);
     }
   }
 
@@ -1131,8 +1111,30 @@
       console.error("Failed to initialize playbooks page:", error);
       const toast = document.getElementById("toast");
       if (toast) {
-        toast.textContent = "Failed to load playbooks";
-        toast.classList.add("visible");
+        toast.innerHTML = `
+          <div class="toast-icon" style="--toast-accent: #F79420;">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M5.1 10.4 8.3 13.6 14.9 7" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </div>
+          <div class="toast-copy">
+            <div class="toast-title">Failed to load playbooks</div>
+          </div>
+          <button class="toast-dismiss" type="button" aria-label="Dismiss notification">×</button>
+        `;
+        toast.style.setProperty("--toast-accent", "#F79420");
+        toast.hidden = false;
+        toast.querySelector(".toast-dismiss")?.addEventListener("click", () => {
+          toast.classList.remove("visible");
+          window.setTimeout(() => { toast.hidden = true; }, 220);
+        }, { once: true });
+        requestAnimationFrame(() => {
+          toast.classList.add("visible");
+        });
+        window.setTimeout(() => {
+          toast.classList.remove("visible");
+          window.setTimeout(() => { toast.hidden = true; }, 220);
+        }, 3000);
       }
     }
   });

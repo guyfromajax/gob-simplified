@@ -765,27 +765,90 @@ input[type="reset"] {
 }
 
 .toast {
+  --toast-accent: #34EC27;
   position: fixed;
   right: 22px;
   bottom: 22px;
   z-index: 40;
-  min-width: 240px;
-  max-width: 360px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: rgba(17, 22, 39, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: var(--shadow);
-  color: var(--text);
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 12px;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 3px solid var(--toast-accent);
+  background: rgba(28, 33, 43, 0.97);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(10px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transform: translateX(120%);
+  transition: transform 220ms ease, opacity 220ms ease;
 }
 
 .toast.visible {
   opacity: 1;
-  transform: translateY(0);
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.5px solid var(--toast-accent);
+  background: color-mix(in srgb, var(--toast-accent) 15%, transparent);
+}
+
+.toast-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.toast-copy {
+  min-width: 0;
+}
+
+.toast-title {
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.toast-subline {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.toast-dismiss {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.18s ease;
+}
+
+.toast-dismiss:hover {
+  color: #ffffff;
 }
 
 .modal {
