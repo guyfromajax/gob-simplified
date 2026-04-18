@@ -245,6 +245,14 @@ body.mode-select-page .franchise-empty-icon svg {
   stroke-linejoin: round;
 }
 
+body.mode-select-page .franchise-empty-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  opacity: 1;
+}
+
 body.mode-select-page .franchise-empty-title {
   margin: 16px 0 0;
   font-family: 'Bebas Neue', sans-serif;
