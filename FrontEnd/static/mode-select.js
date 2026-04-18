@@ -25,6 +25,7 @@ const franchiseNewBtn = document.getElementById('franchise-new-btn');
 const franchiseDeleteLink = document.getElementById('franchise-delete-link');
 const franchiseEmptyCard = document.getElementById('franchise-empty-card');
 const franchiseCardBanner = document.getElementById('franchise-card-banner');
+const franchiseCardTeamName = document.getElementById('franchise-card-team-name');
 const franchiseCardSeasonProgress = document.getElementById('franchise-card-season-progress');
 const franchiseCardRecord = document.getElementById('franchise-card-record');
 const franchiseCardRank = document.getElementById('franchise-card-rank');
@@ -233,6 +234,7 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (!franchisePlayNowBtn) return;
 
   const teamName = safeText(franchiseData.user_team_id, 'Program');
+  if (franchiseCardTeamName) franchiseCardTeamName.textContent = teamName;
   if (franchiseCardBanner) {
     franchiseCardBanner.src = getSquareLogoPath(teamName);
     franchiseCardBanner.alt = teamName;
@@ -327,7 +329,10 @@ if (franchiseNewBtn) {
 }
 
 if (franchiseDeleteLink) {
-  franchiseDeleteLink.addEventListener('click', startNewFranchiseFlow);
+  franchiseDeleteLink.addEventListener('click', function (event) {
+    event.stopPropagation();
+    startNewFranchiseFlow();
+  });
 }
 
 if (newFranchiseModalCancel) {

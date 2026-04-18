@@ -182,24 +182,72 @@ body.mode-select-page .franchise-home-slot {
   width: 100%;
 }
 
+body.mode-select-page .franchise-home-card {
+  max-width: 720px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+body.mode-select-page .franchise-card-split {
+  display: grid;
+  grid-template-columns: 45% 55%;
+}
+
+body.mode-select-page .franchise-card-panel {
+  min-width: 0;
+}
+
+body.mode-select-page .franchise-card-panel-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d1124;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px 0 0 14px;
+}
+
+body.mode-select-page .franchise-card-panel-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px 20px;
+  background: rgba(42, 48, 58, 0.92);
+}
+
 body.mode-select-page .franchise-home-card-empty {
-  padding: 32px 28px;
-  text-align: center;
+  padding: 0;
+}
+
+body.mode-select-page .franchise-card-panel-media-empty {
+  min-height: 172px;
+}
+
+body.mode-select-page .franchise-card-panel-content-empty {
+  align-items: flex-start;
+}
+
+body.mode-select-page .franchise-empty-banner-placeholder {
+  width: 80%;
+  aspect-ratio: 2.83 / 1;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: transparent;
 }
 
 body.mode-select-page .franchise-empty-title {
-  margin: 0 0 10px;
+  margin: 0;
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 40px;
+  font-size: 22px;
   line-height: 1;
   color: #ffffff;
   letter-spacing: 0.03em;
 }
 
 body.mode-select-page .franchise-empty-subline {
-  margin: 0 0 24px;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 15px;
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 body.mode-select-page .franchise-empty-cta,
@@ -220,6 +268,8 @@ body.mode-select-page .franchise-enter-btn {
 }
 
 body.mode-select-page .franchise-empty-cta {
+  width: 100%;
+  margin-top: 14px;
   background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
   color: #ffffff;
 }
@@ -241,43 +291,62 @@ body.mode-select-page .franchise-home-card-active {
 }
 
 body.mode-select-page .franchise-card-media {
-  aspect-ratio: 16 / 5;
-  background: rgba(12, 18, 34, 0.65);
+  aspect-ratio: auto;
 }
 
 body.mode-select-page .franchise-card-banner {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: 2.83 / 1;
+  object-fit: contain;
   display: block;
 }
 
 body.mode-select-page .franchise-card-content {
-  padding: 20px 22px 18px;
+  padding: 0;
+}
+
+body.mode-select-page .franchise-card-team-name {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: 0.03em;
+}
+
+body.mode-select-page .franchise-card-season-line {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 body.mode-select-page .franchise-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 body.mode-select-page .franchise-chip {
   min-width: 0;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(17, 23, 38, 0.62);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 body.mode-select-page .franchise-chip-label {
-  margin-bottom: 5px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 body.mode-select-page .franchise-chip-value {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #ffffff;
 }
@@ -289,31 +358,33 @@ body.mode-select-page .franchise-chip-value-small {
 }
 
 body.mode-select-page .franchise-card-career-summary {
-  margin-top: 14px;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 13px;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 body.mode-select-page .franchise-enter-btn {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 body.mode-select-page .franchise-delete-link {
   display: block;
-  margin-top: 12px;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  margin-top: 8px;
   padding: 0;
   border: 0;
   background: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.38);
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 11px;
+  text-align: center;
   cursor: pointer;
+  transition: color 0.18s ease;
 }
 
 body.mode-select-page .franchise-delete-link:hover {
-  color: #ffb4b4;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 body.mode-select-page .confirm-modal {
@@ -415,7 +486,17 @@ body.mode-select-page .confirm-modal-confirm:hover {
     flex-wrap: wrap;
   }
 
-  body.mode-select-page .franchise-card-grid {
+  body.mode-select-page .franchise-card-split {
     grid-template-columns: 1fr;
+  }
+
+  body.mode-select-page .franchise-card-panel-media {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px 14px 0 0;
+  }
+
+  body.mode-select-page .franchise-card-panel-content {
+    padding: 16px 16px 18px;
   }
 }

@@ -33,45 +33,52 @@
     <section class="franchise-home-section">
       <div id="franchise-home-slot" class="franchise-home-slot">
         <div id="franchise-empty-card" class="franchise-home-card franchise-home-card-empty">
-          <h2 class="franchise-empty-title">Start Your Coaching Journey</h2>
-          <p class="franchise-empty-subline">Choose a program and build something special.</p>
-          <button id="franchise-new-btn" class="franchise-empty-cta">Find Your Program</button>
+          <div class="franchise-card-split">
+            <div class="franchise-card-panel franchise-card-panel-media franchise-card-panel-media-empty">
+              <div class="franchise-empty-banner-placeholder" aria-hidden="true"></div>
+            </div>
+            <div class="franchise-card-panel franchise-card-panel-content franchise-card-panel-content-empty">
+              <h2 class="franchise-empty-title">Start Your Coaching Journey</h2>
+              <p class="franchise-empty-subline">Choose a program and build something special.</p>
+              <button id="franchise-new-btn" class="franchise-empty-cta">Find Your Program</button>
+            </div>
+          </div>
         </div>
 
         <div id="franchise-play-now-btn" class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" style="display: none;">
-          <div class="franchise-card-media">
-            <img id="franchise-card-banner" class="franchise-card-banner" alt="">
-          </div>
-          <div class="franchise-card-content">
-            <div class="franchise-card-grid">
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Season Progress</div>
-                <div id="franchise-card-season-progress" class="franchise-chip-value franchise-chip-value-small">Season 1 · Week 1 of 26</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Record</div>
-                <div id="franchise-card-record" class="franchise-chip-value">0-0</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Rank</div>
-                <div id="franchise-card-rank" class="franchise-chip-value">-</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Prestige</div>
-                <div id="franchise-card-prestige" class="franchise-chip-value">-</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Next Opponent</div>
-                <div id="franchise-card-next" class="franchise-chip-value franchise-chip-value-small">TBD</div>
-              </div>
+          <div class="franchise-card-split">
+            <div class="franchise-card-panel franchise-card-panel-media">
+              <img id="franchise-card-banner" class="franchise-card-banner" alt="">
             </div>
-            <div id="franchise-card-career-summary" class="franchise-card-career-summary">Season 1 · Career Best: #--</div>
-            <button id="franchise-enter-btn" class="franchise-enter-btn" type="button">Enter Franchise →</button>
+            <div class="franchise-card-panel franchise-card-panel-content">
+              <div id="franchise-card-team-name" class="franchise-card-team-name">Program</div>
+              <div id="franchise-card-season-progress" class="franchise-card-season-line">Season 1 · Week 1 of 26</div>
+              <div class="franchise-card-grid">
+                <div class="franchise-chip">
+                  <div class="franchise-chip-label">Record</div>
+                  <div id="franchise-card-record" class="franchise-chip-value">0-0</div>
+                </div>
+                <div class="franchise-chip">
+                  <div class="franchise-chip-label">Rank</div>
+                  <div id="franchise-card-rank" class="franchise-chip-value">-</div>
+                </div>
+                <div class="franchise-chip">
+                  <div class="franchise-chip-label">Prestige</div>
+                  <div id="franchise-card-prestige" class="franchise-chip-value">-</div>
+                </div>
+                <div class="franchise-chip">
+                  <div class="franchise-chip-label">Next Opponent</div>
+                  <div id="franchise-card-next" class="franchise-chip-value franchise-chip-value-small">TBD</div>
+                </div>
+              </div>
+              <div id="franchise-card-career-summary" class="franchise-card-career-summary">Season 1 · Career Best: #--</div>
+              <button id="franchise-enter-btn" class="franchise-enter-btn" type="button">Enter Franchise →</button>
+              <button id="franchise-delete-link" class="franchise-delete-link" type="button">
+                Delete existing franchise and start a new one
+              </button>
+            </div>
           </div>
         </div>
-        <button id="franchise-delete-link" class="franchise-delete-link" type="button" style="display: none;">
-          Delete existing franchise and start a new one
-        </button>
       </div>
     </section>
 
