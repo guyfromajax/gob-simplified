@@ -1441,8 +1441,10 @@ function buildFccPlaybooksSectionMarkup(data, section) {
             <div class="fcc-playbooks-item-name">${escapePlaybookHtml(item.name)}</div>
             <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
           </div>
-          <div class="fcc-playbooks-item-eff ${getFccPlaybookEffClass(item.effectiveness)}">${escapePlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
-          ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="fcc-playbooks-item-top-scorer">${escapePlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
+          <div class="fcc-playbooks-item-meta">
+            <div class="fcc-playbooks-item-eff ${getFccPlaybookEffClass(item.effectiveness)}">${escapePlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+            ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="fcc-playbooks-item-top-scorer">${escapePlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
+          </div>
         </article>
       `).join('')}</div>`
     : '<div class="fcc-playbooks-empty">No plays assigned.</div>';
