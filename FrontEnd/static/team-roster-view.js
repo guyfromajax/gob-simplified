@@ -83,17 +83,12 @@ const ATTR_GROUPS = {
 document.addEventListener('DOMContentLoaded', async () => {
   setupBackButton();
   
-  // Set team name in header
-  const teamNameEl = document.getElementById('team-name');
   const teamBannerEl = document.getElementById('team-banner');
   if (teamName) {
-    teamNameEl.textContent = `${teamName} Roster`;
     if (teamBannerEl && typeof getTeamAssetPath === 'function') {
       teamBannerEl.src = getTeamAssetPath(teamName, 'banner_primary');
       teamBannerEl.alt = `${teamName} banner`;
     }
-  } else {
-    teamNameEl.textContent = 'Team Roster';
   }
   
   // Initialize view toggle
