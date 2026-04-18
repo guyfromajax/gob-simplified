@@ -1143,7 +1143,6 @@ async function renderFccLeadersSummary() {
     return;
   }
   grid.innerHTML = '';
-  const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
   FCC_LEADER_CATEGORY_ORDER.forEach((category) => {
     const card = document.createElement('section');
     card.className = 'fcc-leader-card';
@@ -1160,7 +1159,6 @@ async function renderFccLeadersSummary() {
       leaders.forEach((leader, index) => {
         const row = document.createElement('div');
         row.className = 'fcc-leader-row';
-        const isUserTeam = userTeamNameForLeaders && leader.team === userTeamNameForLeaders;
         row.innerHTML = `
           <div class="fcc-leader-rank">${index + 1}.</div>
           <div class="fcc-leader-meta">
@@ -1169,12 +1167,6 @@ async function renderFccLeadersSummary() {
           </div>
           <div class="fcc-leader-value">${escapeFccLeaderHtml(formatLeaderValue(category, leader.value))}</div>
         `;
-        if (isUserTeam && primaryColor) {
-          row.querySelectorAll('.fcc-leader-rank, .fcc-leader-name, .fcc-leader-team, .fcc-leader-value').forEach((el) => {
-            el.style.color = primaryColor;
-            el.style.fontWeight = '700';
-          });
-        }
         list.appendChild(row);
       });
     }
