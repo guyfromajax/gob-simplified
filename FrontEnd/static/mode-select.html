@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/mode-select.css">
 </head>
-<body>
+<body class="mode-select-page">
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -21,11 +21,12 @@
   <!-- Auth bar (logo | Alpha badge | YT, X, account) is injected by authBarInit when not present -->
 
   <!-- Alpha Disclaimer (shown when IS_ALPHA=true). Copy source: docs/Website_Copy/alpha-box-copy.md -->
-  <div id="alpha-disclaimer" class="alpha-disclaimer">
+  <div id="alpha-disclaimer" class="alpha-disclaimer" hidden>
     <div class="alpha-disclaimer-title">ALPHA RELEASE</div>
     <p class="alpha-disclaimer-text">
       <strong>April 9 Update</strong> Sunset Single Game & Tournament modes (for now anyway -- 99% of you were playing Franchise mode anyway :). Added customizable and more intuitive playbooks. Improved national rankings logic. Fixed a handful of bugs.
     </p>
+    <button id="alpha-disclaimer-dismiss" class="alpha-disclaimer-dismiss" type="button" aria-label="Dismiss alpha release notice">×</button>
   </div>
 
   <div class="mode-wrapper">
@@ -44,8 +45,8 @@
           <div class="franchise-card-content">
             <div class="franchise-card-grid">
               <div class="franchise-chip">
-                <div class="franchise-chip-label">Week</div>
-                <div id="franchise-card-week" class="franchise-chip-value">1</div>
+                <div class="franchise-chip-label">Season Progress</div>
+                <div id="franchise-card-season-progress" class="franchise-chip-value franchise-chip-value-progress">Season 1 · Week 1 of 26</div>
               </div>
               <div class="franchise-chip">
                 <div class="franchise-chip-label">Record</div>
@@ -56,10 +57,15 @@
                 <div id="franchise-card-rank" class="franchise-chip-value">-</div>
               </div>
               <div class="franchise-chip">
+                <div class="franchise-chip-label">Prestige</div>
+                <div id="franchise-card-prestige" class="franchise-chip-value">-</div>
+              </div>
+              <div class="franchise-chip">
                 <div class="franchise-chip-label">Next Opponent</div>
                 <div id="franchise-card-next" class="franchise-chip-value franchise-chip-value-small">TBD</div>
               </div>
             </div>
+            <div id="franchise-card-career-summary" class="franchise-card-career-summary">Season 1 · Career Best: #--</div>
             <div class="franchise-card-cta">Enter Franchise →</div>
           </div>
         </div>
@@ -75,34 +81,42 @@
       <div id="team-grid">
         <button class="team-button" data-team="Bentley-Truman">
           <img src="/images/teams/bentley_truman/bentley_truman_banner_primary.jpg" alt="Bentley-Truman">
+          <div class="team-name-overlay" aria-hidden="true">Bentley-Truman</div>
           <div class="team-tagline">Top-Shelf Talent</div>
         </button>
         <button class="team-button" data-team="Lancaster">
           <img src="/images/teams/lancaster/lancaster_banner_primary.jpg" alt="Lancaster">
+          <div class="team-name-overlay" aria-hidden="true">Lancaster</div>
           <div class="team-tagline">Muscle & Defense</div>
         </button>
         <button class="team-button" data-team="Four Corners">
           <img src="/images/teams/four_corners/four_corners_banner_primary.jpg" alt="Four Corners">
+          <div class="team-name-overlay" aria-hidden="true">Four Corners</div>
           <div class="team-tagline">Hustle & Attitude</div>
         </button>
         <button class="team-button" data-team="Ocean City">
           <img src="/images/teams/ocean_city/ocean_city_banner_primary.jpg" alt="Ocean City">
+          <div class="team-name-overlay" aria-hidden="true">Ocean City</div>
           <div class="team-tagline">Sharpshooters Galore</div>
         </button>
         <button class="team-button" data-team="Morristown">
           <img src="/images/teams/morristown/morristown_banner_primary.jpg" alt="Morristown">
+          <div class="team-name-overlay" aria-hidden="true">Morristown</div>
           <div class="team-tagline">Perfectly Balanced</div>
         </button>
         <button class="team-button" data-team="Little York">
           <img src="/images/teams/little_york/little_york_banner_primary.jpg" alt="Little York">
+          <div class="team-name-overlay" aria-hidden="true">Little York</div>
           <div class="team-tagline">Wicked Smart</div>
         </button>
         <button class="team-button" data-team="Xavien">
           <img src="/images/teams/xavien/xavien_banner_primary.jpg" alt="Xavien">
+          <div class="team-name-overlay" aria-hidden="true">Xavien</div>
           <div class="team-tagline">Youthful Exuberance</div>
         </button>
         <button class="team-button" data-team="South Lancaster">
           <img src="/images/teams/south_lancaster/south_lancaster_banner_primary.jpg" alt="South Lancaster">
+          <div class="team-name-overlay" aria-hidden="true">South Lancaster</div>
           <div class="team-tagline">Us vs The World</div>
         </button>
       </div>
