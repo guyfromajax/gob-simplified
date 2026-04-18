@@ -32,6 +32,7 @@ let signedRecruitsDataCache = [];
 let fccTeamStatsSummaryCache = null;
 let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
+let fccPlaybooksSummaryCache = null;
 let userRosterPlayersCache = [];
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
@@ -1187,6 +1188,16 @@ async function ensureFccTeamStatsSummary() {
   return fccTeamStatsSummaryCache;
 }
 
+async function ensureFccPlaybooksSummary() {
+  if (fccPlaybooksSummaryCache || !franchiseId || !userTeamId) return fccPlaybooksSummaryCache;
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  params.set('team_id', userTeamId);
+  params.set('franchise_id', franchiseId);
+  fccPlaybooksSummaryCache = await fetchJSON(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
+  return fccPlaybooksSummaryCache;
+}
+
 async function renderFccTeamStatsSummary() {
   const tbody = document.getElementById('fcc-team-stats-summary-body');
   if (!tbody) return;
@@ -1235,6 +1246,108 @@ async function renderFccTeamStatsSummary() {
     `;
   }).join('');
   tbody.innerHTML = rows;
+}
+
+const FCC_PLAYBOOK_SECTION_ORDER = [
+  { key: 'motion', label: 'Motion Plays' },
+  { key: 'set_plays', label: 'Set Plays' },
+  { key: 'man_defense', label: 'Man Defense' },
+  { key: 'zone_defense', label: 'Zone Defense' },
+  { key: 'fast_breaks', label: 'Fast Breaks' }
+];
+
+function escapePlaybookHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildFccPlaybooksItems(data, key) {
+  const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
+  let items = [];
+
+  if (key === 'motion') {
+    items = (data?.motion || []).map((play) => ({
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.motion?.[play?.play_id] || 0)
+    }));
+  } else if (key === 'set_plays') {
+    items = (data?.set_plays || []).map((play) => ({
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.set_plays?.[play?.play_id] || 0)
+    }));
+  } else if (key === 'man_defense') {
+    items = (data?.man_defense_rows || [])
+      .filter((row) => row?.is_active !== false)
+      .map((row) => ({
+        name: row?.name || 'Unknown',
+        percentage: Number(percentages.man_defense?.[row?.id] || 0)
+      }));
+  } else if (key === 'zone_defense') {
+    items = (data?.zone_defense_rows || []).map((row) => ({
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.zone_defense?.[row?.id] || 0)
+    }));
+  } else if (key === 'fast_breaks') {
+    items = (data?.fast_breaks || []).map((row) => ({
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.fast_breaks?.[row?.id] || 0)
+    }));
+  }
+
+  return items
+    .filter((item) => Number(item.percentage || 0) > 0)
+    .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
+}
+
+function buildFccPlaybooksSectionMarkup(data, section) {
+  const items = buildFccPlaybooksItems(data, section.key);
+  const bodyMarkup = items.length
+    ? `<div class="fcc-playbooks-items">${items.map((item) => `
+        <div class="fcc-playbooks-item">
+          <div class="fcc-playbooks-item-name">${escapePlaybookHtml(item.name)}</div>
+          <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
+        </div>
+      `).join('')}</div>`
+    : '<div class="fcc-playbooks-empty">No plays assigned.</div>';
+
+  return `
+    <section class="fcc-playbooks-section-card">
+      <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+      <div class="fcc-playbooks-section-body">${bodyMarkup}</div>
+    </section>
+  `;
+}
+
+async function renderFccPlaybooksSummary() {
+  const host = document.getElementById('fcc-playbooks-sections');
+  if (!host) return;
+
+  const editBtn = document.getElementById('fcc-edit-playbooks-btn');
+  if (editBtn && !editBtn.dataset.bound) {
+    editBtn.dataset.bound = '1';
+    editBtn.addEventListener('click', () => {
+      if (!franchiseId || !userTeamId) return;
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('team_id', userTeamId);
+      params.set('franchise_id', franchiseId);
+      params.set('return_url', getCurrentRelativeUrl());
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
+
+  host.innerHTML = '<div class="fcc-playbooks-empty">Loading playbook settings...</div>';
+  const data = await ensureFccPlaybooksSummary();
+  if (!data) {
+    host.innerHTML = '<div class="fcc-playbooks-empty">Failed to load playbook settings.</div>';
+    return;
+  }
+
+  host.innerHTML = FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('');
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -2996,6 +3109,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'game-plan-tab') {
           renderGamePlanSummary();
+        }
+        if (tabName === 'playbooks-tab') {
+          void renderFccPlaybooksSummary();
         }
         if (tabName === 'coaches-tab') {
           void renderScoutingTab();
