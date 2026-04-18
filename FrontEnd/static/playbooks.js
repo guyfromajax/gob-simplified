@@ -550,14 +550,14 @@
       this.state.motion.forEach((play) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>
+          <td class="play-name-cell">
             <button class="play-name-btn" type="button">${play.name}</button>
           </td>
-          <td>${this.renderPercentControl(play.id, play.percentage, "motion")}</td>
-          <td>${this.renderSelectControl(play.id, displayMotionFocus(play.motion_focus), MOTION_FOCUS_OPTIONS, "motion-focus-select")}</td>
+          <td class="percent-cell">${this.renderPercentControl(play.id, play.percentage, "motion")}</td>
+          <td class="control-cell">${this.renderSelectControl(play.id, displayMotionFocus(play.motion_focus), MOTION_FOCUS_OPTIONS, "motion-focus-select")}</td>
           <td class="checkbox-cell">${this.renderCheckbox(play.id, play.playcallCenter, "offense")}</td>
-          <td>${this.renderEffScore(play.effectiveness)}</td>
-          <td><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
+          <td class="eff-cell">${this.renderEffScore(play.effectiveness)}</td>
+          <td class="top-scorer-cell"><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
         `;
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
@@ -577,7 +577,7 @@
       this.state.setPlays.forEach((play) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>
+          <td class="play-name-cell">
             <button class="play-name-btn" type="button">
               <span class="play-name-inline">
                 <span>${play.name}</span>
@@ -585,11 +585,11 @@
               </span>
             </button>
           </td>
-          <td>${this.renderPercentControl(play.id, play.percentage, "setPlays")}</td>
-          <td>${this.renderSelectControl(play.id, play.target_shooter, TARGET_SHOOTER_OPTIONS.map((value) => ({ value, label: value })), "target-shooter-select")}</td>
+          <td class="percent-cell">${this.renderPercentControl(play.id, play.percentage, "setPlays")}</td>
+          <td class="control-cell">${this.renderSelectControl(play.id, play.target_shooter, TARGET_SHOOTER_OPTIONS.map((value) => ({ value, label: value })), "target-shooter-select")}</td>
           <td class="checkbox-cell">${this.renderCheckbox(play.id, play.playcallCenter, "offense")}</td>
-          <td>${this.renderEffScore(play.effectiveness)}</td>
-          <td><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
+          <td class="eff-cell">${this.renderEffScore(play.effectiveness)}</td>
+          <td class="top-scorer-cell"><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
         `;
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
@@ -609,8 +609,8 @@
       this.state.fastBreaks.forEach((row) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${row.name}</td>
-          <td>${this.renderPercentControl(row.id, row.percentage, "fastBreaks")}</td>
+          <td class="play-name-cell"><span class="play-name-text">${row.name}</span></td>
+          <td class="percent-cell">${this.renderPercentControl(row.id, row.percentage, "fastBreaks")}</td>
         `;
         this.bindPercentEvents(tr, row.id, "fastBreaks");
         this.elements.fastBreakRows.appendChild(tr);
@@ -629,14 +629,14 @@
           tr.classList.add("row-dead");
         }
         tr.innerHTML = `
-          <td>
+          <td class="play-name-cell">
             <span>${row.name}</span>
             ${row.isActive ? "" : '<span class="dead-pill">Coming Later</span>'}
           </td>
-          <td>${this.renderPercentControl(row.id, row.percentage, sectionKey, row.isActive === false)}</td>
+          <td class="percent-cell">${this.renderPercentControl(row.id, row.percentage, sectionKey, row.isActive === false)}</td>
           <td class="checkbox-cell">${this.renderCheckbox(row.id, row.playcallCenter, "defense", row.isActive === false)}</td>
-          <td>${this.renderEffScore(row.effectiveness)}</td>
-          <td><span class="${row.top_scorer === "N/A" ? "stat-muted" : ""}">${row.top_scorer}</span></td>
+          <td class="eff-cell">${this.renderEffScore(row.effectiveness)}</td>
+          <td class="top-scorer-cell"><span class="${row.top_scorer === "N/A" ? "stat-muted" : ""}">${row.top_scorer}</span></td>
         `;
         if (row.isActive) {
           this.bindPercentEvents(tr, row.id, sectionKey);
@@ -692,6 +692,7 @@
           });
           slot.appendChild(row);
         } else {
+          slot.classList.add("is-empty");
           const empty = document.createElement("div");
           empty.className = "pc-slot-empty";
           empty.textContent = "Empty slot";
@@ -782,7 +783,7 @@
     renderCheckbox(id, checked, listType, disabled = false) {
       const listFull = (this.state.pcOrder[listType] || []).length >= MAX_PC_ITEMS_PER_SIDE;
       const disabledForCapacity = listFull && !checked;
-      return `<div class="checkbox-wrap"><input class="control-check" type="checkbox" data-id="${id}" data-list-type="${listType}" ${checked ? "checked" : ""} ${(disabled || disabledForCapacity) ? "disabled" : ""}></div>`;
+      return `<label class="checkbox-wrap"><input class="control-check" type="checkbox" data-id="${id}" data-list-type="${listType}" ${checked ? "checked" : ""} ${(disabled || disabledForCapacity) ? "disabled" : ""}><span class="control-check-ui" aria-hidden="true"></span></label>`;
     }
 
     toggleSort(sectionKey, sortKey) {
