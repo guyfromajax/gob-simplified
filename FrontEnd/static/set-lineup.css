@@ -16,10 +16,14 @@ input[type="reset"] {
 .set-lineup-shell {
   --fcc-text: #f7f9ff;
   --fcc-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 24px);
+  overflow: hidden;
 }
 
 .lineup-banner-strip {
-  position: relative;
+  flex: 0 0 auto;
   margin: -24px -28px 0;
   min-height: 80px;
   max-height: 80px;
@@ -44,9 +48,7 @@ input[type="reset"] {
 }
 
 .lineup-context-bar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -155,9 +157,7 @@ input[type="reset"] {
 }
 
 .lineup-slots-section {
-  position: sticky;
-  top: 80px;
-  z-index: 10;
+  flex: 0 0 auto;
   display: grid;
   gap: 10px;
   margin: 0 -6px;
@@ -361,6 +361,7 @@ input[type="reset"] {
 
 .lineup-roster-section {
   display: grid;
+  flex: 1 1 auto;
   gap: 8px;
   margin-top: 0;
   margin-left: -28px;
@@ -370,8 +371,8 @@ input[type="reset"] {
   padding-right: 28px;
   border-top: 2px solid rgba(255,255,255,0.1);
   background: rgba(18, 22, 30, 0.96);
-  position: relative;
-  z-index: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .lineup-roster-label {
