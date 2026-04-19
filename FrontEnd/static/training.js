@@ -364,6 +364,7 @@ function renderCustomFocusTable() {
 
 function onCustomFocusCellClick(playerId, attrCode) {
   if (getPmModalMode() !== 'custom') return;
+  playSound('click-tiny.wav');
   if (!customFocusDraft[playerId]) customFocusDraft[playerId] = [];
   const sel = customFocusDraft[playerId];
   const idx = sel.indexOf(attrCode);
@@ -692,6 +693,7 @@ coachingRadios.forEach(radio => {
 document.querySelectorAll('input[name="pm-modal-mode"]').forEach(function (radio) {
   radio.addEventListener('change', function () {
     if (!this.checked) return;
+    playSound('click-tiny.wav');
     syncPmModalCustomHint();
     const mode = getPmModalMode();
     if (mode !== 'custom') {
