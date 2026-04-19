@@ -633,7 +633,7 @@ function autoAssignTraining() {
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     // Archetype must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
     const focusText = normalizedArchetype ? `${cleanFocus} (${normalizedArchetype})` : cleanFocus;
-    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>Assigned ${focusText} Focus`;
+    autoTrainModalMessage.innerHTML = `Training Lock In<br><span class="auto-train-modal-focus-line">Focus: ${focusText}</span>`;
     autoTrainModal.style.display = 'flex';
   }
 }
