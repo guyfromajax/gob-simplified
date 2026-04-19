@@ -62,6 +62,9 @@ input[type="reset"] {
 
 .header-left {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .page-title {
@@ -72,26 +75,20 @@ input[type="reset"] {
   margin-bottom: var(--spacing-sm);
 }
 
-.header-info {
+.header-meta-line {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.54);
+  text-align: left;
+  flex-wrap: wrap;
 }
 
-.info-item {
-  display: flex;
-  gap: var(--spacing-xs);
-  font-size: 1.1rem;
-}
-
-.info-label {
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.info-value {
-  color: var(--color-text);
-  font-weight: 500;
+.meta-sep {
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .locker-room-button {
@@ -762,43 +759,30 @@ body.training-report-page .header-left {
   width: 100%;
 }
 
-body.training-report-page .header-info {
-  display: block;
+body.training-report-page .header-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 6px;
-  white-space: nowrap;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.54);
   text-align: left;
   width: 100%;
   align-self: flex-start;
+  justify-content: flex-start;
+  white-space: nowrap;
 }
 
-body.training-report-page .info-item {
-  display: inline;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1.4;
-  padding-right: 0;
-  margin-right: 0;
-}
-
-body.training-report-page .info-item + .info-item::before {
-  content: "·";
-  position: static;
-  width: auto;
-  height: auto;
-  transform: none;
-  margin: 0 10px;
-  background: none;
-  color: rgba(255, 255, 255, 0.38);
-}
-
-body.training-report-page .info-label {
-  color: rgba(255, 255, 255, 0.54);
-  font-weight: 500;
-}
-
-body.training-report-page .info-value {
+body.training-report-page .header-meta-line #week-number,
+body.training-report-page .header-meta-line #upcoming-opponent,
+body.training-report-page .header-meta-line #training-focus {
   color: #ffffff;
   font-weight: 600;
+}
+
+body.training-report-page .meta-sep {
+  color: rgba(255, 255, 255, 0.25);
 }
 
 body.training-report-page .locker-room-button {
@@ -1582,16 +1566,8 @@ body.training-report-page .playbook-empty-state {
 }
 
 @media (max-width: 700px) {
-  body.training-report-page .header-info {
-    display: block;
-  }
-
-  body.training-report-page .info-item {
-    margin-bottom: 2px;
-  }
-
-  body.training-report-page .info-item + .info-item::before {
-    margin: 0 8px;
+  body.training-report-page .header-meta-line {
+    white-space: normal;
   }
 
   body.training-report-page .team-attributes-grid,
