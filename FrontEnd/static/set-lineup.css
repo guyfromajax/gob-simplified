@@ -161,9 +161,9 @@ input[type="reset"] {
   display: grid;
   gap: 10px;
   margin: 0 -6px;
-  padding: 14px 20px 12px;
-  background: rgba(22, 27, 37, 1);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 20px 16px;
+  background: rgba(22, 26, 36, 0.98);
+  border-bottom: 2px solid rgba(255,255,255,0.12);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
@@ -365,6 +365,7 @@ input[type="reset"] {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 2px solid rgba(255,255,255,0.1);
+  background: rgba(18, 22, 30, 0.96);
 }
 
 .lineup-roster-label {
