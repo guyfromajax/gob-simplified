@@ -7307,6 +7307,38 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
 
         projected_starting_five = compute_projected_starting_five(players) if players else []
 
+        try:
+            targeted_note_titles = {
+                "Practice Player Of The Week",
+                "Practice Players Of The Week",
+                "Biggest Regression",
+                "Most Positive Locker Room Influence",
+            }
+            note_debug = []
+            for note in (report_data.get("training_notes", []) or []):
+                if not isinstance(note, dict):
+                    continue
+                title = str(note.get("title", ""))
+                if title not in targeted_note_titles:
+                    continue
+                note_debug.append({
+                    "title": title,
+                    "body": note.get("body"),
+                    "player_id": note.get("player_id"),
+                    "player_ids": note.get("player_ids"),
+                })
+            logger.info(
+                "🧪 [TRAINING REPORT][NOTES] mode=%s doc_id=%s team_id=%s week=%s targeted_notes=%s player_count=%s",
+                mode,
+                str(doc_id),
+                str(authoritative_team_id),
+                week,
+                note_debug,
+                len(players),
+            )
+        except Exception as debug_exc:
+            logger.warning("⚠️ [TRAINING REPORT][NOTES] debug logging failed: %s", debug_exc)
+
         return {
             "status": "success",
             "week": week if mode == "franchise" else None,  # Only for franchise mode

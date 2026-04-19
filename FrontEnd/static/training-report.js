@@ -513,13 +513,14 @@ function getTrainingReportPlayerInitials(name) {
 }
 
 function getTrainingReportPlayerPortraitUrl(player) {
-  const staticPrefix = (window.API_CONFIG && typeof window.API_CONFIG.buildStaticPath === 'function')
-    ? window.API_CONFIG.buildStaticPath('')
-    : '';
   const playerId = player?.player_id || player?._id || player?.id || '';
   if (player?.photo) return player.photo;
-  if (playerId) return `${staticPrefix}/images/players/${playerId}.png`;
-  return `${staticPrefix}/images/players/generic_headshot.png`;
+  if (window.API_CONFIG && typeof window.API_CONFIG.buildStaticPath === 'function') {
+    return playerId
+      ? window.API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`)
+      : window.API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
+  }
+  return playerId ? `/images/players/${playerId}.png` : '/images/players/generic_headshot.png';
 }
 
 function normalizeTrainingReportText(value) {
@@ -563,13 +564,32 @@ function getTrainingNotePortraitPlayer(sectionOrTitle, text) {
         ...((Array.isArray(section.player_ids) ? section.player_ids : []).map((id) => String(id)))
       ]
     : [];
+  console.log('[TRAINING REPORT][NOTES] portrait lookup start', {
+    title,
+    body: String(text || ''),
+    player_id: section?.player_id || null,
+    player_ids: section?.player_ids || [],
+    report_player_count: players.length,
+  });
   if (playerIds.length) {
     const byId = new Map(players.map((player) => [
       String(player?.player_id || player?._id || player?.id || ''),
       player
     ]));
     const directMatch = playerIds.map((id) => byId.get(id)).find(Boolean);
-    if (directMatch) return directMatch;
+    if (directMatch) {
+      console.log('[TRAINING REPORT][NOTES] portrait direct id match', {
+        title,
+        matched_player: getTrainingReportPlayerName(directMatch),
+        matched_player_id: String(directMatch?.player_id || directMatch?._id || directMatch?.id || ''),
+      });
+      return directMatch;
+    }
+    console.warn('[TRAINING REPORT][NOTES] portrait id match failed', {
+      title,
+      requested_ids: playerIds,
+      available_ids_sample: players.slice(0, 12).map((player) => String(player?.player_id || player?._id || player?.id || '')),
+    });
   }
   const haystack = ` ${normalizeTrainingReportText(text)} `;
   let bestMatch = null;
@@ -581,6 +601,11 @@ function getTrainingNotePortraitPlayer(sectionOrTitle, text) {
     if (!bestMatch || matchedCandidate.length > normalizeTrainingReportText(getTrainingReportPlayerName(bestMatch)).length) {
       bestMatch = player;
     }
+  });
+  console.log('[TRAINING REPORT][NOTES] portrait text fallback result', {
+    title,
+    matched_player: bestMatch ? getTrainingReportPlayerName(bestMatch) : null,
+    matched_player_id: bestMatch ? String(bestMatch?.player_id || bestMatch?._id || bestMatch?.id || '') : null,
   });
   return bestMatch;
 }
@@ -604,8 +629,20 @@ function createTrainingNotePortrait(player, text) {
   const img = document.createElement('img');
   img.className = 'training-note-portrait';
   img.alt = playerName ? `${playerName} headshot` : 'Player headshot';
-  img.src = getTrainingReportPlayerPortraitUrl(player);
+  const portraitUrl = getTrainingReportPlayerPortraitUrl(player);
+  console.log('[TRAINING REPORT][NOTES] portrait render attempt', {
+    player_name: playerName,
+    player_id: String(player?.player_id || player?._id || player?.id || ''),
+    player_photo: player?.photo || null,
+    portrait_url: portraitUrl,
+  });
+  img.src = portraitUrl;
   img.onerror = function () {
+    console.warn('[TRAINING REPORT][NOTES] portrait image failed', {
+      player_name: playerName,
+      player_id: String(player?.player_id || player?._id || player?.id || ''),
+      attempted_url: portraitUrl,
+    });
     wrap.innerHTML = '';
     wrap.appendChild(fallback);
   };
@@ -1483,6 +1520,12 @@ function renderTrainingNotes() {
     orderedTitles.forEach(function (title) {
       const section = sectionMap.get(title);
       if (!section) return;
+      console.log('[TRAINING REPORT][NOTES] rendering section', {
+        title: section.title || '',
+        body: section.body || '',
+        player_id: section.player_id || null,
+        player_ids: section.player_ids || [],
+      });
       const wrap = document.createElement('div');
       wrap.className = 'training-note-section';
       const text = section.body != null ? String(section.body) : '';
