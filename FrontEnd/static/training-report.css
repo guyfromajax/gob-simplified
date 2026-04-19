@@ -1037,74 +1037,282 @@ body.training-report-page .training-notes-container {
   gap: 14px;
 }
 
-body.training-report-page .training-note-section {
-  min-height: 0;
-  padding: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  background: rgba(255,255,255,0.03);
-  transition: opacity 0.18s ease;
+body.training-report-page .training-notes-section {
+  display: grid;
+  gap: 16px;
 }
 
-body.training-report-page .training-note-section-title {
-  color: #F79420;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
+body.training-report-page .training-notes-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
 }
 
-body.training-report-page .training-note-section-body {
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
-body.training-report-page .training-note-section-media {
+body.training-report-page .training-notes-header-main {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 12px;
+  min-width: 0;
 }
 
-body.training-report-page .training-note-portrait-wrap {
-  flex: 0 0 auto;
-  order: 2;
+body.training-report-page .training-notes-header-accent {
+  flex: 0 0 3px;
+  width: 3px;
+  height: 32px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: #F79420;
 }
 
-body.training-report-page .training-note-portrait,
-body.training-report-page .training-note-portrait-fallback {
-  width: 48px;
-  height: 48px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.12);
+body.training-report-page .training-notes-header-copy {
+  min-width: 0;
 }
 
-body.training-report-page .training-note-portrait {
-  display: block;
-  object-fit: cover;
+body.training-report-page .training-notes-section h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+body.training-report-page .training-notes-section h2::after {
+  content: none;
+}
+
+body.training-report-page .training-notes-brief {
+  margin-top: 6px;
+  color: rgba(255,255,255,0.4);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+}
+
+body.training-report-page .training-notes-classification {
+  color: rgba(255,255,255,0.25);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  align-self: start;
+  padding-top: 6px;
+}
+
+body.training-report-page .training-notes-rule,
+body.training-report-page .training-notes-subrule {
+  width: 100%;
+  height: 1px;
   background: rgba(255,255,255,0.08);
 }
 
-body.training-report-page .training-note-portrait-fallback {
+body.training-report-page .training-notes-subrule {
+  background: rgba(255,255,255,0.06);
+}
+
+body.training-report-page .training-notes-container {
+  display: grid;
+  gap: 16px;
+}
+
+body.training-report-page .training-notes-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body.training-report-page .training-notes-hero-card {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--notes-accent-border);
+  border-left: 3px solid var(--notes-accent);
+  background: rgba(255,255,255,0.04);
+}
+
+body.training-report-page .training-notes-hero-card.is-muted {
+  --notes-accent: rgba(255,255,255,0.4);
+  --notes-accent-border: rgba(255,255,255,0.2);
+  --notes-accent-tint: rgba(255,255,255,0.08);
+}
+
+body.training-report-page .training-notes-hero-label {
+  color: var(--notes-accent);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+body.training-report-page .training-notes-hero-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+body.training-report-page .training-notes-hero-portrait {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+
+body.training-report-page .training-notes-hero-portrait-img,
+body.training-report-page .training-notes-hero-portrait-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+}
+
+body.training-report-page .training-notes-hero-portrait-img {
+  display: block;
+  object-fit: cover;
+  border: 1px solid var(--notes-accent-border);
+  background: rgba(255,255,255,0.08);
+}
+
+body.training-report-page .training-notes-hero-portrait-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.72);
+  border: 1.5px solid var(--notes-accent-border);
+  background: var(--notes-accent-tint);
+  color: var(--notes-accent);
   font-family: 'Inter', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body.training-report-page .training-notes-hero-portrait-fallback.is-muted {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.4);
+}
+
+body.training-report-page .training-notes-hero-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+body.training-report-page .training-notes-hero-name {
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+body.training-report-page .training-notes-hero-card.is-muted .training-notes-hero-name {
+  color: rgba(255,255,255,0.45);
+}
+
+body.training-report-page .training-notes-hero-meta {
+  color: rgba(255,255,255,0.45);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+body.training-report-page .training-notes-tactical-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.training-report-page .training-notes-tactical-pill {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+}
+
+body.training-report-page .training-notes-tactical-label {
+  flex: 0 1 42%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.38);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+body.training-report-page .training-notes-tactical-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
   font-weight: 600;
 }
 
-body.training-report-page .training-note-section-copy {
-  min-width: 0;
-  flex: 1 1 auto;
-  order: 1;
+body.training-report-page .training-notes-tactical-pill.is-muted .training-notes-tactical-value {
+  color: rgba(255,255,255,0.45);
+  font-weight: 400;
 }
 
-body.training-report-page .training-note-section.is-muted {
-  opacity: 0.55;
+body.training-report-page .training-notes-tactical-pill.is-positive .training-notes-tactical-value {
+  color: #34EC27;
+}
+
+body.training-report-page .training-notes-tactical-pill.is-negative .training-notes-tactical-value {
+  color: #ff6d6d;
+}
+
+body.training-report-page .training-notes-misc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.training-report-page .training-notes-misc-label {
+  flex: 0 0 auto;
+  color: rgba(255,255,255,0.3);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+body.training-report-page .training-notes-misc-value {
+  min-width: 0;
+  color: rgba(255,255,255,0.35);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: italic;
+}
+
+@media (max-width: 980px) {
+  body.training-report-page .training-notes-hero-grid,
+  body.training-report-page .training-notes-tactical-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.training-report-page .training-notes-header {
+    grid-template-columns: 1fr;
+  }
 }
 
 body.training-report-page .team-attributes-grid {
