@@ -1001,7 +1001,7 @@ body.training-page .slider-container {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 42px;
+  min-height: 60px;
 }
 
 body.training-page .slider {
@@ -1048,7 +1048,7 @@ body.training-page .training-slider-shell {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   pointer-events: none;
   z-index: 1;
 }
@@ -1070,6 +1070,7 @@ body.training-page .training-slider-nodes {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  top: 0;
 }
 
 body.training-page .training-slider-node {
@@ -1081,6 +1082,27 @@ body.training-page .training-slider-node {
 
 body.training-page .training-slider-node.is-selected {
   background-image: url("/images/buttons/orange_gp_bball.svg");
+}
+
+body.training-page .training-slider-scale {
+  position: absolute;
+  left: 21px;
+  right: 21px;
+  top: 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+body.training-page .training-slider-scale-value {
+  width: 42px;
+  flex: 0 0 42px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.58);
+  line-height: 1;
 }
 
 body.training-page .slider-value {

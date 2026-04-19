@@ -183,6 +183,14 @@ function ensureTrainingSliderVisual(slider) {
       <span class="training-slider-node"></span>
       <span class="training-slider-node"></span>
     </div>
+    <div class="training-slider-scale">
+      <span class="training-slider-scale-value">0</span>
+      <span class="training-slider-scale-value">1</span>
+      <span class="training-slider-scale-value">2</span>
+      <span class="training-slider-scale-value">3</span>
+      <span class="training-slider-scale-value">4</span>
+      <span class="training-slider-scale-value">5</span>
+    </div>
   `;
   wrapper.appendChild(shell);
   return shell;
