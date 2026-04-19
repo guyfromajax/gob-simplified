@@ -153,7 +153,7 @@ function buildOffenseRows(data) {
       value: Number((percentages.motion || {})[String(play.play_id)] || 0),
       highlight: offensePcIds.has(String(play.play_id)),
     }))
-    .filter((play) => play.value > 0 || play.highlight)
+    .filter((play) => play.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .map((play) => buildRow(play.label, formatPct(play.value), { highlight: play.highlight }));
 
@@ -163,7 +163,7 @@ function buildOffenseRows(data) {
       value: Number((percentages.set_plays || {})[String(play.play_id)] || 0),
       highlight: offensePcIds.has(String(play.play_id)),
     }))
-    .filter((play) => play.value > 0 || play.highlight)
+    .filter((play) => play.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .map((play) => buildRow(play.label, formatPct(play.value), { highlight: play.highlight }));
 
@@ -184,7 +184,7 @@ function buildDefenseRows(data) {
         highlight: defensePcIds.has(String(defense.id)),
       };
     })
-    .filter((defense) => defense.value > 0 || defense.highlight)
+    .filter((defense) => defense.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .map((defense) => buildRow(defense.label, formatPct(defense.value), { highlight: defense.highlight }));
 
@@ -197,7 +197,7 @@ function buildDefenseRows(data) {
         highlight: defensePcIds.has(String(defense.id)),
       };
     })
-    .filter((defense) => defense.value > 0 || defense.highlight)
+    .filter((defense) => defense.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .map((defense) => buildRow(defense.label, formatPct(defense.value), { highlight: defense.highlight }));
 
