@@ -1153,18 +1153,22 @@ body.training-page .archetypes-grid {
 body.training-page .archetype-block {
   background: rgba(42, 48, 58, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-left: 3px solid rgba(255, 255, 255, 0.2);
   border-radius: 14px;
-  padding: 16px;
+  padding: 0 16px 16px;
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 body.training-page .archetype-header {
-  background: none;
-  border-radius: 0;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  margin: -1px -16px 12px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px 14px 0 0;
   margin-bottom: 12px;
 }
 
@@ -1216,19 +1220,35 @@ body.training-page .archetype-option:hover span {
 }
 
 body.training-page .archetype-block[data-archetype="authoritarian"] {
-  border-left-color: #E05A3A;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 body.training-page .archetype-block[data-archetype="systems-coach"] {
-  border-left-color: #F5C518;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 body.training-page .archetype-block[data-archetype="player-maximizer"] {
-  border-left-color: #4CAF50;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 body.training-page .archetype-block[data-archetype="culture-builder"] {
-  border-left-color: #7B5EA7;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+body.training-page .archetype-block[data-archetype="authoritarian"] .archetype-header {
+  background: #C0392B;
+}
+
+body.training-page .archetype-block[data-archetype="systems-coach"] .archetype-header {
+  background: #D4A017;
+}
+
+body.training-page .archetype-block[data-archetype="player-maximizer"] .archetype-header {
+  background: #3A8C4A;
+}
+
+body.training-page .archetype-block[data-archetype="culture-builder"] .archetype-header {
+  background: #7B5EA7;
 }
 
 body.training-page .archetype-option {
