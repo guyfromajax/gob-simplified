@@ -1000,10 +1000,8 @@ body.training-page .label-text {
 body.training-page .slider-container {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  width: 100%;
-  min-height: 78px;
+  min-height: 60px;
 }
 
 body.training-page .slider {
@@ -1110,15 +1108,7 @@ body.training-page .training-slider-scale-value {
 }
 
 body.training-page .slider-value {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.64);
-  line-height: 1;
+  display: none;
 }
 
 body.training-page .playbook-mode-selection {
