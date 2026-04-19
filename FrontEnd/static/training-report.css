@@ -720,7 +720,7 @@ body.training-report-page .training-report-resource-shell {
 body.training-report-page .report-header {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: center;
+  align-items: start;
   position: sticky;
   top: 10px;
   z-index: 20;
