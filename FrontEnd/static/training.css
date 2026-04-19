@@ -1086,12 +1086,14 @@ body.training-page .training-slider-node.is-selected {
 
 body.training-page .training-slider-scale {
   position: absolute;
-  left: 21px;
-  right: 21px;
+  left: 0;
+  right: 0;
   top: 44px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 0 21px;
+  box-sizing: border-box;
 }
 
 body.training-page .training-slider-scale-value {
