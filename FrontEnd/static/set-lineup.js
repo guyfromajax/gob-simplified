@@ -301,6 +301,16 @@ const lineup = {};
 /** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
 let rimRunnerPlayerId = null;
 const playerMap = {};
+let lineupPlaybooksModalInitialized = false;
+let lineupPlaybooksModalCache = null;
+
+const LINEUP_PLAYBOOK_SECTION_ORDER = [
+  { key: 'motion', label: 'Motion Plays' },
+  { key: 'set_plays', label: 'Set Plays' },
+  { key: 'man_defense', label: 'Man Defense' },
+  { key: 'zone_defense', label: 'Zone Defense' },
+  { key: 'fast_breaks', label: 'Fast Breaks' },
+];
 
 function getRT(player) {
   const ratings = Object.values(player.position_ratings || {});
@@ -313,6 +323,160 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.hidden = false;
   setTimeout(() => { toast.hidden = true; }, 2000);
+}
+
+function escapeLineupPlaybookHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getLineupPlaybookEffClass(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 67) return 'is-high';
+  if (numeric >= 34) return 'is-mid';
+  return 'is-low';
+}
+
+function getLineupPlaybookUrl() {
+  const params = new URLSearchParams();
+  params.set('mode', modeParam || 'single');
+  if (userTeamIdParam) params.set('team_id', userTeamIdParam);
+  if (franchiseId) params.set('franchise_id', franchiseId);
+  if (tournamentId) params.set('tournament_id', tournamentId);
+  const currentGameId = new URLSearchParams(window.location.search).get('game_id');
+  if (currentGameId) params.set('game_id', currentGameId);
+  return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
+}
+
+async function fetchLineupPlaybooksData() {
+  const response = await fetch(getLineupPlaybookUrl(), { headers: API_CONFIG.getAuthHeaders() });
+  if (abortIfAccessDenied(response)) return null;
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json();
+}
+
+function buildLineupPlaybookItems(data, key) {
+  const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
+  let items = [];
+  if (key === 'motion') {
+    items = (data?.motion || []).map((play) => ({
+      id: String(play?.play_id || ''),
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.motion?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || '',
+    }));
+  } else if (key === 'set_plays') {
+    items = (data?.set_plays || []).map((play) => ({
+      id: String(play?.play_id || ''),
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || '',
+    }));
+  } else if (key === 'man_defense') {
+    items = (data?.man_defense_rows || [])
+      .filter((row) => row?.is_active !== false)
+      .map((row) => ({
+        id: String(row?.id || ''),
+        name: row?.name || 'Unknown',
+        percentage: Number(percentages.man_defense?.[row?.id] || 0),
+        effectiveness: Number(row?.effectiveness || 0),
+        top_scorer: row?.top_scorer || '',
+      }));
+  } else if (key === 'zone_defense') {
+    items = (data?.zone_defense_rows || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.zone_defense?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || '',
+    }));
+  } else if (key === 'fast_breaks') {
+    items = (data?.fast_breaks || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || '',
+    }));
+  }
+
+  return items
+    .filter((item) => Number(item.percentage || 0) > 0)
+    .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
+}
+
+function renderLineupPlaybooksModal(data) {
+  const host = document.getElementById('playbooks-modal-sections');
+  if (!host) return;
+  host.innerHTML = '';
+  LINEUP_PLAYBOOK_SECTION_ORDER.forEach((section) => {
+    const items = buildLineupPlaybookItems(data, section.key);
+    const sectionEl = document.createElement('section');
+    sectionEl.className = 'lineup-playbooks-section';
+    sectionEl.innerHTML = `
+      <div class="lineup-playbooks-head">${escapeLineupPlaybookHtml(section.label)}</div>
+      <div class="lineup-playbooks-items">
+        ${items.length ? items.map((item) => `
+          <article class="lineup-playbook-card">
+            <div class="lineup-playbook-card-top">
+              <div class="lineup-playbook-card-name">${escapeLineupPlaybookHtml(item.name)}</div>
+              <div class="lineup-playbook-card-pct">${escapeLineupPlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
+            </div>
+            <div class="lineup-playbook-card-meta">
+              <div class="lineup-playbook-card-eff ${getLineupPlaybookEffClass(item.effectiveness)}">${escapeLineupPlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+              ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="lineup-playbook-card-top-scorer">${escapeLineupPlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
+            </div>
+          </article>
+        `).join('') : '<div class="lineup-playbooks-empty">No plays assigned.</div>'}
+      </div>
+    `;
+    host.appendChild(sectionEl);
+  });
+}
+
+function closeLineupPlaybooksModal() {
+  const modal = document.getElementById('playbooks-modal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+async function openLineupPlaybooksModal() {
+  const modal = document.getElementById('playbooks-modal');
+  const host = document.getElementById('playbooks-modal-sections');
+  if (!modal || !host) return;
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+  host.innerHTML = '<div class="lineup-playbooks-empty">Loading playbook settings...</div>';
+  try {
+    lineupPlaybooksModalCache = await fetchLineupPlaybooksData();
+    if (!lineupPlaybooksModalCache) {
+      host.innerHTML = '<div class="lineup-playbooks-empty">Failed to load playbook settings.</div>';
+      return;
+    }
+    renderLineupPlaybooksModal(lineupPlaybooksModalCache);
+  } catch (error) {
+    console.error('[SET-LINEUP] Failed to load playbooks modal:', error);
+    host.innerHTML = '<div class="lineup-playbooks-empty">Failed to load playbook settings.</div>';
+  }
+}
+
+function initLineupPlaybooksModal() {
+  if (lineupPlaybooksModalInitialized) return;
+  lineupPlaybooksModalInitialized = true;
+  const closeBtn = document.getElementById('playbooks-modal-close');
+  const backdrop = document.getElementById('playbooks-modal-backdrop');
+  closeBtn?.addEventListener('click', closeLineupPlaybooksModal);
+  backdrop?.addEventListener('click', closeLineupPlaybooksModal);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeLineupPlaybooksModal();
+  });
 }
 
 async function loadRoster() {
@@ -605,7 +769,6 @@ function renderRoster() {
       displayPlayerName,
       bestPos,
       formatHeight(p.height),
-      p.weight ?? '--',
       Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10), 
       Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10), 
       Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10), 
@@ -621,7 +784,7 @@ function renderRoster() {
       Math.round((anchorAttrs.NG ?? 1.0) * 100),  // NG as percentage
       rt
     ];
-    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
+    const classes = ['', '', 'ht', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
     
     const ng = anchorAttrs.NG ?? 1.0;
     let energyBgColor;
@@ -686,7 +849,7 @@ function renderRoster() {
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
+      const columnNames = ['Player Name', 'Pos', 'HT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
       const columnName = columnNames[index];
       sortRoster(columnName);
     });
@@ -709,7 +872,6 @@ function sortRoster(columnName) {
     'Player Name': 'name',
     'Pos': 'pos',
     'HT': 'height',
-    'WT': 'weight',
     'SC': 'SC',
     'SH': 'SH',
     'ID': 'ID',
@@ -968,9 +1130,7 @@ function updateSlotDisplay(slot) {
     const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     const slotDisplayName =
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
-    const pidStr = String(playerId);
-    const rrChecked = rimRunnerPlayerId != null && String(rimRunnerPlayerId) === pidStr;
-    // Build slot content HTML (RR column after ENERGY, before remove button)
+    // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="${imgBase}${playerId}.png" 
@@ -992,9 +1152,6 @@ function updateSlotDisplay(slot) {
       </div>
       <div class="player-fouls">${fouls}</div>
       <div class="player-energy ${energyClass}">${energyPercent}%</div>
-      <div class="player-rim-runner">
-        <input type="checkbox" class="rim-runner-checkbox" data-player-id="${pidStr}" aria-label="Rim Runner for ${player.name.replace(/"/g, '&quot;')}" ${rrChecked ? 'checked' : ''} />
-      </div>
     `;
     
     slotContent.classList.remove('empty');
@@ -1009,7 +1166,7 @@ function updateSlotDisplay(slot) {
     slot.setAttribute('draggable', 'true');
   } else {
     // Empty slot
-    slotContent.innerHTML = '';
+    slotContent.innerHTML = '<span class="slot-empty-copy">Drag a player here</span>';
     slotContent.classList.add('empty');
     
     if (remove) {
@@ -1063,22 +1220,6 @@ function setupSlots() {
   
   const slotsContainer = document.getElementById('slots');
   if (!slotsContainer) return;
-
-  // Rim Runner: single-select checkboxes (column after Energy, before remove)
-  slotsContainer.addEventListener('change', (e) => {
-    const t = e.target;
-    if (!t || !t.classList || !t.classList.contains('rim-runner-checkbox')) return;
-    const pid = t.getAttribute('data-player-id');
-    if (!pid) return;
-    if (t.checked) {
-      rimRunnerPlayerId = pid;
-      slotsContainer.querySelectorAll('.rim-runner-checkbox').forEach((cb) => {
-        if (cb !== t) cb.checked = false;
-      });
-    } else if (String(rimRunnerPlayerId) === String(pid)) {
-      rimRunnerPlayerId = null;
-    }
-  });
 
   // Delegated dragstart on container
   slotsContainer.addEventListener('dragstart', (e) => {
@@ -1179,19 +1320,19 @@ function resolveTeam() {
 }
 
 async function setHeader() {
-  const title = document.getElementById('team-title');
-  if (!title) {
-    console.warn('[setHeader] team-title element not found');
-    return;
-  }
-  
-  // Determine user team and opponent team
+  const banner = document.getElementById('team-banner');
+  const bannerFallback = document.getElementById('team-banner-fallback');
+  const fallbackTitle = document.getElementById('team-title');
+  const scoreValueEl = document.getElementById('score-value');
+  const quarterValueEl = document.getElementById('quarter-value');
+  const timeValueEl = document.getElementById('time-value');
+  const scoreboardEl = document.getElementById('context-scoreboard');
+  const playBtn = document.getElementById('play-now');
+  if (!scoreValueEl || !quarterValueEl || !timeValueEl) return;
+
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
-  
-  console.log('[setHeader] Setting header:', { userTeamName, opponentTeamName, gameId });
-  
-  // Get scores: when resuming from timeout, prefer URL params (what user saw) then API
+
   let userTeamScore = 0;
   let opponentTeamScore = 0;
   let scoresFromUrl = false;
@@ -1229,76 +1370,57 @@ async function setHeader() {
     console.log('[setHeader] No gameId, using default scores (0)');
   }
   
-  // Update header format: "Set Your Lineup -- User Team Name: User Team Score -- Opponent Team Name: Opponent Team Score"
-  let headerText = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
-  
-  // ✅ COMPUTER TIMEOUT: Add bold red text if computer called timeout
-  const computerTimeout = urlParams.get('computer_timeout') === 'true';
-  const computerTeamName = urlParams.get('computer_team_name');
-  if (computerTimeout && computerTeamName) {
-    headerText += ` <span style="color: red; font-weight: bold; margin-left: 20px;">${computerTeamName} Called Timeout</span>`;
-  }
-  
-  // ✅ TIME REMAINING: Get clock from URL params and display to the right
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
   let clockTime = urlParams.get('clock');
-  
-  // ✅ QUARTER BREAK FIX: Detect quarter breaks reliably and always set correct clock
-  // Quarter break = NOT a timeout resume AND quarter > 1 (starting a new quarter)
   const currentQuarter = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
   const isQuarterBreak = !resumeFromTimeout && currentQuarter > 1;
-  
   if (isQuarterBreak) {
-    // During quarter breaks, always set clock to start of new quarter
-    // OT = 4:00, regular quarters = 8:00
     clockTime = currentQuarter > 4 ? '4:00' : '8:00';
-    console.log(`✅ QUARTER BREAK: Setting clock to ${clockTime} for Q${currentQuarter}`);
   } else if (!resumeFromTimeout && (!clockTime || clockTime === '0:00')) {
-    // Fallback: If not a timeout and clock is 0:00 or missing, show correct time for upcoming quarter
-    clockTime = currentQuarter > 4 ? '4:00' : '8:00'; // OT = 4:00, regular = 8:00
+    clockTime = currentQuarter > 4 ? '4:00' : '8:00';
   } else if (resumeFromTimeout && (!clockTime || clockTime === '')) {
-    // Step 3 fallback: when resuming from timeout and URL has no clock, use DB if we have gameData.
-    // Note: This may not fix wrong clock – DB was written at the same timeout save as the response,
-    // so it can be just as stale. If the header still shows wrong time, we may need to revisit.
     if (gameData && gameData.clock) {
       clockTime = gameData.clock;
-      console.log('[setHeader] Using clock from API (timeout resume, URL clock missing):', clockTime);
     }
   }
-  
-  // Format clock time (ensure MM:SS format)
+ 
+  let formattedClock = '--:--';
   if (clockTime) {
-    // Handle different clock formats (e.g., "8:00", "480" seconds, etc.)
-    let formattedClock = clockTime;
     if (!clockTime.includes(':')) {
-      // If it's just a number (seconds), convert to MM:SS
       const totalSeconds = parseInt(clockTime, 10);
       if (!isNaN(totalSeconds)) {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         formattedClock = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       }
+    } else {
+      formattedClock = clockTime;
     }
-    
-    // Add time remaining to the right of header content
-    headerText += ` <span style="margin-left: 20px; font-weight: bold;">Time: ${formattedClock}</span>`;
-    
-    // Add quarter display to the right of time remaining
-    // During quarter breaks, show the upcoming quarter (which is currentQuarter)
-    // During regular play, show the current quarter
-    const displayQuarter = currentQuarter;
-    headerText += ` <span style="margin-left: 10px; font-weight: bold;">Q${displayQuarter}</span>`;
   }
-  
-  title.innerHTML = headerText; // Use innerHTML to support the span element
-  console.log('[setHeader] Header updated to:', headerText);
-  
-  const logo = document.getElementById('team-logo');
-  if (logo) {
-    logo.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'logo_square') : '/images/teams/general/general_logo_square.png';
-    logo.alt = `${teamName} logo`;
-    logo.hidden = false;
-    logo.onerror = () => { logo.hidden = true; };
+
+  const bannerSrc = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(teamName, 'banner_primary')
+    : '/images/teams/general/general_banner_primary.jpg';
+  if (banner && bannerFallback && fallbackTitle) {
+    banner.src = bannerSrc;
+    banner.alt = `${teamName} banner`;
+    banner.hidden = false;
+    bannerFallback.hidden = true;
+    fallbackTitle.textContent = formatTeamName(teamName || 'Team');
+    banner.onerror = () => {
+      banner.hidden = true;
+      bannerFallback.hidden = false;
+    };
+  }
+
+  const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
+  scoreboardEl?.classList.toggle('is-pregame', isPregame);
+  scoreValueEl.textContent = `${userTeamScore} — ${opponentTeamScore}`;
+  quarterValueEl.textContent = isPregame ? 'Pre-Game' : `Q${currentQuarter}`;
+  timeValueEl.textContent = isPregame ? '--:--' : formattedClock;
+
+  if (playBtn) {
+    playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
   }
 }
 
@@ -1360,7 +1482,7 @@ function removeIneligiblePlayersFromLineup() {
           slotContent.classList.add('empty');
           slot.classList.remove('filled');
           slot.draggable = false;
-          const removeBtn = slot.querySelector('.remove-btn');
+          const removeBtn = slot.querySelector('.remove');
           if (removeBtn) removeBtn.hidden = true;
         }
         console.log(`✅ [FOUL-OUT] Cleared ${pos} slot display`);
@@ -1450,77 +1572,10 @@ function wireLineupNavButtons() {
   }
   const playbooksBtn = document.getElementById('playbooks-button');
   if (playbooksBtn) {
+    initLineupPlaybooksModal();
     playbooksBtn.addEventListener('click', async () => {
       playSound('positive-beep.wav');
-      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbook-report.html');
-      const currentUrlParams = new URLSearchParams(window.location.search);
-      let currentGameId = currentUrlParams.get('game_id');
-      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
-        initGameInProgress = true;
-        try {
-          const mode = modeParam || 'single';
-          const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
-          if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
-          else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
-          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
-            method: 'POST',
-            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(initPayload)
-          });
-          if (abortIfAccessDenied(initRes)) {
-            initGameInProgress = false;
-            return;
-          }
-          if (initRes.ok) {
-            const initData = await initRes.json();
-            currentGameId = initData.game_id;
-            currentUrlParams.set('game_id', currentGameId);
-            if (typeof history !== 'undefined' && history.replaceState) {
-              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
-            }
-          } else {
-            alert('Failed to initialize game. Please try again.');
-            initGameInProgress = false;
-            return;
-          }
-        } catch (err) {
-          console.error('❌ [SET-LINEUP] Error initializing game for Playbooks navigation:', err);
-          alert('Failed to initialize game. Please try again.');
-          initGameInProgress = false;
-          return;
-        }
-        initGameInProgress = false;
-      } else if (initGameInProgress) {
-        let waitCount = 0;
-        while (initGameInProgress && waitCount < 50) {
-          await new Promise(r => setTimeout(r, 100));
-          waitCount++;
-          currentGameId = new URLSearchParams(window.location.search).get('game_id');
-          if (currentGameId) break;
-        }
-        if (!currentGameId) {
-          alert('Game initialization is taking longer than expected. Please try again.');
-          return;
-        }
-      }
-      const helper = window.TimeoutNavigationHelper;
-      if (!helper) {
-        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
-        return;
-      }
-      const params = helper.buildGameNavigationParams({
-        sourceParams: currentUrlParams,
-        targetQuarter: quarter,
-        gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout,
-        lineup: lineup,
-        myTeamSide: myTeamSide
-      });
-      params.set('from', 'lineup');
-      params.set('return_url', getCurrentRelativeUrl());
-      if (DEBUG) params.set('debug', '1');
-      window.location.href = `/playbook-report.html?${params.toString()}`;
+      await openLineupPlaybooksModal();
     });
   }
   const boxBtn = document.getElementById('box-score-button');
@@ -1573,8 +1628,8 @@ async function init() {
     return;
   }
 
-  await setHeader();
   await loadRoster();
+  await setHeader();
   setupSlots(); // Setup slot event handlers (this clears slots/lineup)
   
   // Restore lineup from URL AFTER setupSlots (which clears the lineup)
@@ -2543,7 +2598,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const redirected = await redirectIfFranchiseGameplayAlreadyCommitted();
   if (redirected) return;
   init();
-  initViewToggle();
   
   // Initialize tooltips for table headers (th elements only)
   // Use a small delay to ensure thead is fully rendered

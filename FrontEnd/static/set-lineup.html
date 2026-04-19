@@ -26,113 +26,133 @@
   <!-- End Google Tag Manager (noscript) -->
 
   <div class="resource-page-container fcc-brand-page-shell set-lineup-shell">
-  <div id="team-header">
-    <div class="team-header-spacer" aria-hidden="true"></div>
-    <div class="team-header-center">
-      <img id="team-logo" alt="team logo" hidden>
-      <h1 id="team-title"></h1>
-    </div>
-
-    <!-- View Toggle -->
-    <div class="view-toggle">
-      <button class="view-toggle-btn active" data-view="grid">Grid View</button>
-      <button class="view-toggle-btn" data-view="player">Player View</button>
-    </div>
-  </div>
-
-  <div id="lineup-container">
-    <div id="lineup-main">
-      <!-- Header Row -->
-      <div class="lineup-header">
-        <div class="header-pos">POS</div>
-        <div class="header-image"></div>
-        <div class="header-name">NAME</div>
-        <div class="header-rating">POS RATING</div>
-        <div class="header-points">POINTS</div>
-        <div class="header-rebounds">REBOUNDS</div>
-        <div class="header-assists">ASSISTS</div>
-        <div class="header-def-pct">DEF %</div>
-        <div class="header-emotion">EMOTION</div>
-        <div class="header-momentum">MOMENTUM</div>
-        <div class="header-fouls">FOULS</div>
-        <div class="header-energy">ENERGY</div>
-        <div class="header-rim-runner">Rim<br />Runner</div>
+    <section class="lineup-banner-strip">
+      <img id="team-banner" class="team-banner-image" alt="" hidden>
+      <div id="team-banner-fallback" class="team-banner-fallback" hidden>
+        <span id="team-title">Team</span>
       </div>
-      
-      <!-- Lineup Slots -->
+    </section>
+
+    <section class="lineup-context-bar">
+      <div class="context-scoreboard" id="context-scoreboard">
+        <div class="context-stat" id="context-score-card">
+          <div class="context-stat-label">Score</div>
+          <div class="context-stat-value" id="score-value">0 — 0</div>
+        </div>
+        <div class="context-divider" aria-hidden="true"></div>
+        <div class="context-stat" id="context-quarter-card">
+          <div class="context-stat-label">Quarter</div>
+          <div class="context-stat-value is-accent" id="quarter-value">Pre-Game</div>
+        </div>
+        <div class="context-divider" aria-hidden="true"></div>
+        <div class="context-stat" id="context-time-card">
+          <div class="context-stat-label">Time</div>
+          <div class="context-stat-value" id="time-value">--:--</div>
+        </div>
+      </div>
+
+      <div class="context-actions">
+        <button id="autoset-lineup" class="lineup-btn lineup-btn-ghost" type="button">Autoset Lineup</button>
+        <button id="gameplan-optional" class="lineup-btn lineup-btn-orange" type="button">Game Plan</button>
+        <button id="playbooks-button" class="lineup-btn lineup-btn-ghost" type="button">Playbooks</button>
+        <button id="play-now" class="lineup-btn lineup-btn-green disabled" type="button">Play Game</button>
+      </div>
+    </section>
+
+    <section class="lineup-slots-section">
+      <div class="lineup-header">
+        <div class="header-pos">Pos</div>
+        <div class="header-image"></div>
+        <div class="header-name">Name</div>
+        <div class="header-rating">Pos Rating</div>
+        <div class="header-points">Pts</div>
+        <div class="header-rebounds">Reb</div>
+        <div class="header-assists">Ast</div>
+        <div class="header-def-pct">Def%</div>
+        <div class="header-emotion">Emotion</div>
+        <div class="header-momentum">Momentum</div>
+        <div class="header-fouls">Fouls</div>
+        <div class="header-energy">Energy</div>
+        <div class="header-remove"></div>
+      </div>
+
       <ul id="slots">
         <li class="slot" data-pos="PG">
           <div class="slot-pos">PG</div>
-          <div class="slot-content"></div>
-          <button class="remove" hidden>✕</button>
+          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+          <button class="remove" hidden aria-label="Remove player from PG">✕</button>
         </li>
         <li class="slot" data-pos="SG">
           <div class="slot-pos">SG</div>
-          <div class="slot-content"></div>
-          <button class="remove" hidden>✕</button>
+          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+          <button class="remove" hidden aria-label="Remove player from SG">✕</button>
         </li>
         <li class="slot" data-pos="SF">
           <div class="slot-pos">SF</div>
-          <div class="slot-content"></div>
-          <button class="remove" hidden>✕</button>
+          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+          <button class="remove" hidden aria-label="Remove player from SF">✕</button>
         </li>
         <li class="slot" data-pos="PF">
           <div class="slot-pos">PF</div>
-          <div class="slot-content"></div>
-          <button class="remove" hidden>✕</button>
+          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+          <button class="remove" hidden aria-label="Remove player from PF">✕</button>
         </li>
         <li class="slot" data-pos="C">
           <div class="slot-pos">C</div>
-          <div class="slot-content"></div>
-          <button class="remove" hidden>✕</button>
+          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+          <button class="remove" hidden aria-label="Remove player from C">✕</button>
         </li>
       </ul>
-      <p class="rim-runner-footnote">*if no Rim Runner is chosen, default will be used (player closest to basket).</p>
-    </div>
-    
-    <!-- Buttons (Vertically Stacked) -->
-    <div id="lineup-buttons">
-      <button id="play-now" class="lineup-btn disabled">PLAY GAME</button>
-      <button id="autoset-lineup" class="lineup-btn">AUTOSET LINEUP</button>
-      <button id="gameplan-optional" class="lineup-btn">GAME PLAN</button>
-      <button id="playbooks-button" class="lineup-btn">PLAYBOOKS</button>
-      <button id="box-score-button" class="lineup-btn">BOX SCORE</button>
-    </div>
-  </div>
-  <!-- Grid View -->
-  <div id="roster-table-container" class="view-content active">
-    <table class="roster-table">
-      <thead>
-        <tr>
-          <th>Player Name</th>
-          <th>Pos</th>
-          <th>HT</th>
-          <th>WT</th>
-          <th>SC</th>
-          <th>SH</th>
-          <th>ID</th>
-          <th>OD</th>
-          <th>PS</th>
-          <th>BH</th>
-          <th>RB</th>
-          <th>ST</th>
-          <th>AG</th>
-          <th>ND</th>
-          <th>IQ</th>
-          <th>FT</th>
-          <th>NG</th>
-          <th class="rt">RT</th>
-        </tr>
-      </thead>
-      <tbody id="roster-body"></tbody>
-    </table>
-    <p class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
+    </section>
+
+    <section class="lineup-roster-section">
+      <div class="lineup-roster-label">Roster — drag players into lineup slots above</div>
+      <div id="roster-table-container" class="roster-table-region active">
+        <div class="roster-table-scroll">
+          <table class="roster-table gob-data-grid">
+            <thead>
+              <tr>
+                <th>Player Name</th>
+                <th>Pos</th>
+                <th>HT</th>
+                <th>SC</th>
+                <th>SH</th>
+                <th>ID</th>
+                <th>OD</th>
+                <th>PS</th>
+                <th>BH</th>
+                <th>RB</th>
+                <th>ST</th>
+                <th>AG</th>
+                <th>ND</th>
+                <th>IQ</th>
+                <th>FT</th>
+                <th>NG</th>
+                <th class="rt">RT</th>
+              </tr>
+            </thead>
+            <tbody id="roster-body"></tbody>
+          </table>
+        </div>
+        <p class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
+      </div>
+    </section>
   </div>
 
-  <!-- Player View -->
-  <div id="player-view-container" class="view-content">
-    <div class="players-grid"></div>
-  </div>
+  <div id="playbooks-modal" class="lineup-modal" hidden>
+    <div id="playbooks-modal-backdrop" class="lineup-modal-backdrop"></div>
+    <div class="lineup-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="playbooks-modal-title">
+      <header class="lineup-modal-header">
+        <div class="lineup-modal-title-wrap">
+          <h2 id="playbooks-modal-title">Your Playbook</h2>
+          <p>Read-only reference during gameplay</p>
+        </div>
+        <button id="playbooks-modal-close" class="lineup-modal-close" type="button" aria-label="Close playbooks modal">✕</button>
+      </header>
+      <div class="lineup-modal-body">
+        <div id="playbooks-modal-sections" class="lineup-playbooks-sections"></div>
+      </div>
+    </div>
   </div>
 
   <div id="toast" hidden></div>
