@@ -1002,7 +1002,7 @@ body.training-page .slider-container {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 82px;
+  min-height: 74px;
 }
 
 body.training-page .slider {
@@ -1049,15 +1049,15 @@ body.training-page .training-slider-shell {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   pointer-events: none;
   z-index: 1;
 }
 
 body.training-page .training-slider-track {
   position: absolute;
-  left: 21px;
-  right: 21px;
+  left: 20px;
+  right: 20px;
   top: 50%;
   height: 6px;
   transform: translateY(-50%);
@@ -1075,9 +1075,9 @@ body.training-page .training-slider-nodes {
 }
 
 body.training-page .training-slider-node {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   background: center / contain no-repeat url("/images/buttons/black_gp_bball.svg");
 }
 
@@ -1089,17 +1089,17 @@ body.training-page .training-slider-scale {
   position: absolute;
   left: 0;
   right: 0;
-  top: 56px;
+  top: calc(50% + 26px);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 21px;
+  padding: 0 20px;
   box-sizing: border-box;
 }
 
 body.training-page .training-slider-scale-value {
-  width: 42px;
-  flex: 0 0 42px;
+  width: 40px;
+  flex: 0 0 40px;
   text-align: center;
   font-family: 'Inter', sans-serif;
   font-size: 11px;
