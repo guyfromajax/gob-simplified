@@ -1093,7 +1093,7 @@ body.training-page .training-slider-scale {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 0;
   box-sizing: border-box;
 }
 
