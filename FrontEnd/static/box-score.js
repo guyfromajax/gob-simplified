@@ -767,8 +767,6 @@ function renderPlayerStatsTable(team, players) {
       nameLink.className = 'player-name-link';
       nameLink.textContent = `${name}${jerseyDisplay}`;
       nameLink.style.cursor = 'pointer';
-      nameLink.style.color = '#0066cc';
-      nameLink.style.textDecoration = 'underline';
       nameLink.addEventListener('click', () => showSpecialStatsPopup(player));
       nameCell.appendChild(nameLink);
       

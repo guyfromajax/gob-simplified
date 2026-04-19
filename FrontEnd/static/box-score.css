@@ -606,3 +606,415 @@ h2 {
 .player-name-link:hover {
   color: #004499;
 }
+
+/* ===== April 2026 Brand Conversion ===== */
+body.box-score-page {
+  margin: 0;
+  min-height: 100vh;
+  padding: 0 0 28px;
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(180deg, #263d7a 0%, #1e3068 45%, #141f4a 100%);
+  color: #f4f6ff;
+}
+
+body.box-score-page .box-score-shell {
+  width: min(1440px, calc(100vw - 24px));
+  margin: 14px auto 20px;
+  padding: 78px 28px 28px;
+}
+
+body.box-score-page .locker-room-top-button {
+  position: fixed;
+  top: 24px;
+  left: 32px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  min-width: 0;
+  height: auto;
+  color: rgba(255, 255, 255, 0.76);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+body.box-score-page .locker-room-top-button::before {
+  content: '←';
+  margin-right: 8px;
+}
+
+body.box-score-page .locker-room-top-button:hover {
+  background: none;
+  color: #fff;
+  transform: translateX(-1px);
+  box-shadow: none;
+}
+
+body.box-score-page #box-score-container {
+  max-width: none;
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+body.box-score-page #box-score-header {
+  padding: 18px 20px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 16%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.94), rgba(30, 35, 44, 0.97));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+body.box-score-page #header-content {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+body.box-score-page .team-name {
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+body.box-score-page .score {
+  min-width: 54px;
+  font-size: 2.4rem;
+  color: #F79420;
+}
+
+body.box-score-page .at-symbol {
+  color: rgba(255,255,255,0.54);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+body.box-score-page section {
+  padding: 18px 20px;
+  margin-top: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+body.box-score-page section h2 {
+  margin-bottom: 14px;
+  font-size: 1.8rem;
+  letter-spacing: 0.03em;
+  color: #fff;
+  position: relative;
+  padding-bottom: 6px;
+}
+
+body.box-score-page section h2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100px;
+  height: 1px;
+  background: rgba(247, 148, 32, 0.9);
+}
+
+body.box-score-page #potg-section {
+  text-align: left;
+}
+
+body.box-score-page .potg-player-line {
+  font-family: 'Inter', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+body.box-score-page .potg-stats-line {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,0.66);
+  letter-spacing: 0.02em;
+}
+
+body.box-score-page #team-tabs {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+body.box-score-page .tab-button {
+  flex: 0 0 auto;
+  min-width: 148px;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.28);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  color: rgba(255,255,255,0.76);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+}
+
+body.box-score-page .tab-button:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03));
+  color: #fff;
+}
+
+body.box-score-page .tab-button.active {
+  background: linear-gradient(180deg, #fbb457 0%, #F79420 100%);
+  color: #181b20;
+  border-color: transparent;
+}
+
+body.box-score-page .team-content.active {
+  display: block;
+  margin-top: 18px;
+}
+
+body.box-score-page .player-stats-table,
+body.box-score-page .team-stats-table,
+body.box-score-page #quarter-scoring-table {
+  width: max(100%, 1120px);
+  min-width: 1120px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+}
+
+body.box-score-page #quarter-scoring-table {
+  min-width: 760px;
+}
+
+body.box-score-page .table-container {
+  overflow-x: auto;
+  margin-bottom: 0;
+  scrollbar-color: rgba(255,255,255,0.24) rgba(255,255,255,0.06);
+}
+
+body.box-score-page .table-container::-webkit-scrollbar {
+  height: 10px;
+}
+
+body.box-score-page .table-container::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.06);
+}
+
+body.box-score-page .table-container::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.24);
+  border-radius: 999px;
+}
+
+body.box-score-page .player-stats-table thead,
+body.box-score-page .team-stats-table thead,
+body.box-score-page #quarter-scoring-table thead {
+  background: transparent;
+}
+
+body.box-score-page .player-stats-table th,
+body.box-score-page .team-stats-table th,
+body.box-score-page #quarter-scoring-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 10px 10px;
+  text-align: center;
+  color: rgba(255,255,255,0.66);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+  white-space: nowrap;
+}
+
+body.box-score-page .player-stats-table td,
+body.box-score-page .team-stats-table td,
+body.box-score-page #quarter-scoring-table td {
+  padding: 10px;
+  text-align: center;
+  color: rgba(255,255,255,0.9);
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
+}
+
+body.box-score-page .player-stats-table tbody tr:nth-child(odd) td,
+body.box-score-page #quarter-scoring-table tbody tr:nth-child(odd) td {
+  background: rgba(255,255,255,0.03);
+}
+
+body.box-score-page .player-stats-table tbody tr:hover td,
+body.box-score-page #quarter-scoring-table tbody tr:hover td {
+  background: rgba(255,255,255,0.04);
+}
+
+body.box-score-page .player-stats-table th:first-child,
+body.box-score-page .player-stats-table td:first-child,
+body.box-score-page #quarter-scoring-table th:first-child,
+body.box-score-page #quarter-scoring-table td:first-child {
+  text-align: left;
+  padding-left: 14px;
+}
+
+body.box-score-page .team-stats-table td {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body.box-score-page .final-score {
+  background: rgba(255,255,255,0.06);
+  font-weight: 700;
+}
+
+body.box-score-page .team-name-cell {
+  font-weight: 700;
+  color: #fff;
+}
+
+body.box-score-page .special-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.box-score-page .special-stat-item {
+  padding: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+}
+
+body.box-score-page .special-stat-label {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body.box-score-page .special-stat-value {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+body.box-score-page .scouting-content {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+body.box-score-page .scouting-section {
+  margin-bottom: 18px;
+}
+
+body.box-score-page .scouting-section h3 {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #F79420;
+  margin-bottom: 12px;
+}
+
+body.box-score-page .scouting-subsection h4,
+body.box-score-page .scouting-item-label {
+  color: rgba(255,255,255,0.7);
+}
+
+body.box-score-page .scouting-item-value {
+  color: #fff;
+}
+
+body.box-score-page .attribute-changes-content {
+  padding: 0;
+}
+
+body.box-score-page .attribute-change-cell {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+}
+
+body.box-score-page .attribute-change-label {
+  color: rgba(255,255,255,0.54);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+body.box-score-page .attribute-change-value {
+  color: #fff;
+}
+
+body.box-score-page .player-name-link {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+body.box-score-page .player-name-link:hover {
+  color: #F79420;
+}
+
+body.box-score-page .special-stats-popup-content {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.96), rgba(26, 31, 40, 0.98));
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+  color: #fff;
+}
+
+body.box-score-page .special-stats-popup-header {
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+
+body.box-score-page .special-stats-popup-title,
+body.box-score-page .special-stats-row h3 {
+  color: #fff;
+}
+
+body.box-score-page .special-stats-label,
+body.box-score-page .special-stats-hint {
+  color: rgba(255,255,255,0.54);
+}
+
+body.box-score-page .special-stats-value {
+  color: #fff;
+}
+
+body.box-score-page .special-stats-popup-close {
+  color: rgba(255,255,255,0.5);
+}
+
+body.box-score-page .special-stats-popup-close:hover {
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  body.box-score-page .box-score-shell {
+    padding: 72px 18px 22px;
+  }
+
+  body.box-score-page .special-stats {
+    grid-template-columns: 1fr;
+  }
+}

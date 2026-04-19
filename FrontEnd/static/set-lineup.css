@@ -838,3 +838,376 @@ input[type="reset"] {
 #autoset-lineup:hover {
   background: #7b1fa2 !important;
 }
+
+/* ===== April 2026 Brand Conversion ===== */
+body.set-lineup-page {
+  margin: 0;
+  min-height: 100vh;
+  padding: 0 0 28px;
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(180deg, #263d7a 0%, #1e3068 45%, #141f4a 100%);
+  color: #f4f6ff;
+}
+
+body.set-lineup-page .set-lineup-shell {
+  width: min(1440px, calc(100vw - 24px));
+  margin: 14px auto 20px;
+  padding: 24px 28px 28px;
+}
+
+body.set-lineup-page #team-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+body.set-lineup-page .team-header-spacer {
+  min-width: 0;
+}
+
+body.set-lineup-page .team-header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  justify-self: center;
+}
+
+body.set-lineup-page #team-logo {
+  display: block;
+  max-width: 320px;
+  max-height: 104px;
+  height: auto;
+  width: auto;
+}
+
+body.set-lineup-page #team-title {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.1rem;
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  text-align: center;
+}
+
+body.set-lineup-page .view-toggle {
+  justify-self: end;
+  margin-left: 0;
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 10px;
+  background: rgba(18, 22, 29, 0.62);
+  overflow: hidden;
+}
+
+body.set-lineup-page .view-toggle-btn {
+  min-width: 132px;
+  min-height: 42px;
+  padding: 0 18px;
+  background: transparent;
+  color: rgba(255,255,255,0.76);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+
+body.set-lineup-page .view-toggle-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+body.set-lineup-page .view-toggle-btn.active {
+  background: linear-gradient(180deg, #fbb457 0%, #F79420 100%);
+  color: #171b20;
+}
+
+body.set-lineup-page #lineup-container {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 210px !important;
+  align-items: start !important;
+  gap: 18px !important;
+  margin: 0 !important;
+}
+
+body.set-lineup-page #lineup-main,
+body.set-lineup-page #roster-table-container,
+body.set-lineup-page #player-view-container {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+body.set-lineup-page #lineup-main {
+  padding: 18px;
+}
+
+body.set-lineup-page .lineup-header {
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  color: rgba(255,255,255,0.72);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+body.set-lineup-page .slot {
+  border: 1px dashed rgba(255,255,255,0.24) !important;
+  background: rgba(255,255,255,0.03) !important;
+  border-radius: 10px !important;
+}
+
+body.set-lineup-page .slot.filled {
+  border-style: solid !important;
+  border-color: rgba(247,148,32,0.45) !important;
+  background: rgba(255,255,255,0.05) !important;
+}
+
+body.set-lineup-page .slot.drag-over {
+  background: rgba(64, 101, 175, 0.18) !important;
+  border-color: rgba(64, 101, 175, 0.7) !important;
+}
+
+body.set-lineup-page .slot-pos,
+body.set-lineup-page .player-name,
+body.set-lineup-page .player-rating,
+body.set-lineup-page .player-points,
+body.set-lineup-page .player-rebounds,
+body.set-lineup-page .player-assists,
+body.set-lineup-page .player-def-pct,
+body.set-lineup-page .player-fouls {
+  color: #fff;
+}
+
+body.set-lineup-page .player-image-container {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+body.set-lineup-page .momentum-bar-container {
+  background-color: rgba(0,0,0,0.34);
+  border-color: rgba(255,255,255,0.1);
+}
+
+body.set-lineup-page .rim-runner-footnote,
+body.set-lineup-page .pos-note {
+  margin-top: 12px;
+  color: rgba(255,255,255,0.54);
+  font-size: 12px;
+  font-style: italic;
+}
+
+body.set-lineup-page #lineup-buttons {
+  position: sticky;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+}
+
+body.set-lineup-page .lineup-btn {
+  min-width: 138px;
+  min-height: 42px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+
+body.set-lineup-page .lineup-btn:hover:not(.disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
+body.set-lineup-page #play-now {
+  background: linear-gradient(180deg, #42f438 0%, #34EC27 100%);
+  color: #101510;
+}
+
+body.set-lineup-page #autoset-lineup {
+  background: linear-gradient(180deg, #fbb457 0%, #F79420 100%) !important;
+  color: #171b20;
+}
+
+body.set-lineup-page #gameplan-optional,
+body.set-lineup-page #playbooks-button,
+body.set-lineup-page #box-score-button {
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)) !important;
+  color: rgba(255,255,255,0.86);
+}
+
+body.set-lineup-page .lineup-btn.disabled {
+  opacity: 0.45;
+}
+
+body.set-lineup-page #roster-table-container,
+body.set-lineup-page #player-view-container {
+  margin-top: 18px;
+  padding: 18px;
+}
+
+body.set-lineup-page .roster-table {
+  width: max(100%, 1180px);
+  min-width: 1180px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+}
+
+body.set-lineup-page #roster-table-container {
+  overflow-x: auto;
+  scrollbar-color: rgba(255,255,255,0.24) rgba(255,255,255,0.06);
+}
+
+body.set-lineup-page #roster-table-container::-webkit-scrollbar {
+  height: 10px;
+}
+
+body.set-lineup-page #roster-table-container::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.06);
+}
+
+body.set-lineup-page #roster-table-container::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.24);
+  border-radius: 999px;
+}
+
+body.set-lineup-page .roster-table thead {
+  background: transparent;
+}
+
+body.set-lineup-page .roster-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 10px 10px;
+  color: rgba(255,255,255,0.66);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+}
+
+body.set-lineup-page .roster-table td {
+  padding: 10px;
+  color: rgba(255,255,255,0.9);
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
+}
+
+body.set-lineup-page .roster-table th:first-child,
+body.set-lineup-page .roster-table td:first-child {
+  text-align: left;
+  padding-left: 14px;
+}
+
+body.set-lineup-page .roster-table tbody tr:nth-child(odd) td {
+  background: rgba(255,255,255,0.03);
+}
+
+body.set-lineup-page .roster-table tbody tr:hover td {
+  background: rgba(255,255,255,0.04);
+}
+
+body.set-lineup-page .roster-table tbody tr.selected td {
+  opacity: 0.55;
+}
+
+body.set-lineup-page .player-card-front,
+body.set-lineup-page .player-card-back {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.96), rgba(30, 35, 44, 0.98));
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.22);
+}
+
+body.set-lineup-page .player-headshot-container,
+body.set-lineup-page .player-card-back,
+body.set-lineup-page .player-info-bar,
+body.set-lineup-page .attr-pill,
+body.set-lineup-page .attr-row {
+  background-color: transparent;
+}
+
+body.set-lineup-page .player-info-bar {
+  background: rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+body.set-lineup-page .player-name,
+body.set-lineup-page .attr-label,
+body.set-lineup-page .attr-value,
+body.set-lineup-page .player-physical {
+  color: #fff;
+}
+
+body.set-lineup-page .attr-section-title {
+  color: rgba(255,255,255,0.58);
+}
+
+body.set-lineup-page .flip-btn,
+body.set-lineup-page .position-rating-circle {
+  border-color: rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.92);
+}
+
+body.set-lineup-page #toast {
+  top: auto;
+  right: 22px;
+  bottom: 22px;
+  background: rgba(28, 33, 43, 0.97);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-left: 3px solid #34EC27;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 260px;
+  max-width: 320px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 1200px) {
+  body.set-lineup-page #lineup-container {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.set-lineup-page #lineup-buttons {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  body.set-lineup-page .set-lineup-shell {
+    padding: 20px 16px 22px;
+  }
+
+  body.set-lineup-page #team-header {
+    grid-template-columns: 1fr;
+  }
+
+  body.set-lineup-page .team-header-center,
+  body.set-lineup-page .view-toggle {
+    justify-self: center;
+  }
+
+  body.set-lineup-page #lineup-buttons {
+    grid-template-columns: 1fr;
+  }
+}

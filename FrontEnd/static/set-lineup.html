@@ -10,11 +10,12 @@
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Set Lineup</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/resource-pages.css" />
   <link rel="stylesheet" href="/tournament.css" />
   <link rel="stylesheet" href="/set-lineup.css" />
   <script src="/js/shared/pageLoadOverlay.js"></script>
 </head>
-<body>
+<body class="set-lineup-page">
   <!-- Page load overlay: hides stale/incomplete lineup until data and UI are ready -->
   <div id="page-load-overlay" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
     <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
@@ -24,17 +25,21 @@
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <div class="resource-page-container fcc-brand-page-shell set-lineup-shell">
   <div id="team-header">
-    <img id="team-logo" alt="team logo" hidden>
-    <h1 id="team-title" style="font-family: 'Bebas Neue', sans-serif;"></h1>
-    
+    <div class="team-header-spacer" aria-hidden="true"></div>
+    <div class="team-header-center">
+      <img id="team-logo" alt="team logo" hidden>
+      <h1 id="team-title"></h1>
+    </div>
+
     <!-- View Toggle -->
     <div class="view-toggle">
       <button class="view-toggle-btn active" data-view="grid">Grid View</button>
       <button class="view-toggle-btn" data-view="player">Player View</button>
     </div>
   </div>
-  
+
   <div id="lineup-container">
     <div id="lineup-main">
       <!-- Header Row -->
@@ -127,6 +132,7 @@
   <!-- Player View -->
   <div id="player-view-container" class="view-content">
     <div class="players-grid"></div>
+  </div>
   </div>
 
   <div id="toast" hidden></div>
