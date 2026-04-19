@@ -1045,6 +1045,46 @@ body.training-report-page .training-note-section-body {
   line-height: 1.45;
 }
 
+body.training-report-page .training-note-section-media {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+body.training-report-page .training-note-portrait-wrap {
+  flex: 0 0 auto;
+}
+
+body.training-report-page .training-note-portrait,
+body.training-report-page .training-note-portrait-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+body.training-report-page .training-note-portrait {
+  display: block;
+  object-fit: cover;
+  background: rgba(255,255,255,0.08);
+}
+
+body.training-report-page .training-note-portrait-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.72);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body.training-report-page .training-note-section-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 body.training-report-page .training-note-section.is-muted {
   opacity: 0.55;
 }

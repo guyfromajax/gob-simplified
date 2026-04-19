@@ -497,6 +497,82 @@ function isMutedTrainingNote(text) {
   );
 }
 
+function getTrainingReportPlayerName(player) {
+  return String(
+    player?.name ||
+    player?.player_name ||
+    player?.full_name ||
+    `${player?.first_name || ''} ${player?.last_name || ''}`
+  ).trim();
+}
+
+function getTrainingReportPlayerInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '—';
+  return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+}
+
+function getTrainingReportPlayerPortraitUrl(player) {
+  const staticPrefix = (window.API_CONFIG && typeof window.API_CONFIG.buildStaticPath === 'function')
+    ? window.API_CONFIG.buildStaticPath('')
+    : '';
+  const playerId = player?.player_id || player?._id || player?.id || '';
+  if (player?.photo) return player.photo;
+  if (playerId) return `${staticPrefix}/images/players/${playerId}.png`;
+  return `${staticPrefix}/images/players/generic_headshot.png`;
+}
+
+function getTrainingNotePortraitPlayer(title, text) {
+  const eligibleTitles = new Set([
+    'Practice Player Of The Week',
+    'Practice Players Of The Week',
+    'Biggest Regression',
+    'Most Positive Locker Room Influence'
+  ]);
+  if (!eligibleTitles.has(title)) return null;
+  const players = Array.isArray(reportData?.players) ? reportData.players : [];
+  const haystack = ` ${String(text || '').toLowerCase()} `;
+  let bestMatch = null;
+  players.forEach((player) => {
+    const name = getTrainingReportPlayerName(player);
+    if (!name) return;
+    const normalizedName = name.toLowerCase();
+    if (!haystack.includes(normalizedName)) return;
+    if (!bestMatch || normalizedName.length > getTrainingReportPlayerName(bestMatch).length) {
+      bestMatch = player;
+    }
+  });
+  return bestMatch;
+}
+
+function createTrainingNotePortrait(player, text) {
+  const playerName = getTrainingReportPlayerName(player) || String(text || '').trim();
+  const initials = getTrainingReportPlayerInitials(playerName);
+  const wrap = document.createElement('div');
+  wrap.className = 'training-note-portrait-wrap';
+
+  const fallback = document.createElement('div');
+  fallback.className = 'training-note-portrait-fallback';
+  fallback.textContent = initials;
+  fallback.setAttribute('aria-label', `${playerName || 'Player'} portrait placeholder`);
+
+  if (!player) {
+    wrap.appendChild(fallback);
+    return wrap;
+  }
+
+  const img = document.createElement('img');
+  img.className = 'training-note-portrait';
+  img.alt = playerName ? `${playerName} headshot` : 'Player headshot';
+  img.src = getTrainingReportPlayerPortraitUrl(player);
+  img.onerror = function () {
+    wrap.innerHTML = '';
+    wrap.appendChild(fallback);
+  };
+  wrap.appendChild(img);
+  return wrap;
+}
+
 function createPlayerNameCell(player) {
   const td = document.createElement('td');
   td.className = 'player-name-cell';
@@ -1393,8 +1469,27 @@ function renderTrainingNotes() {
         p.textContent = text || 'No Significant Updates';
         body.appendChild(p);
       }
-      wrap.appendChild(h3);
-      wrap.appendChild(body);
+      const portraitPlayer = getTrainingNotePortraitPlayer(section.title || '', text);
+      if (portraitPlayer || (
+        section.title === 'Practice Player Of The Week' ||
+        section.title === 'Practice Players Of The Week' ||
+        section.title === 'Biggest Regression' ||
+        section.title === 'Most Positive Locker Room Influence'
+      )) {
+        wrap.classList.add('training-note-section-with-portrait');
+        const media = document.createElement('div');
+        media.className = 'training-note-section-media';
+        const copy = document.createElement('div');
+        copy.className = 'training-note-section-copy';
+        copy.appendChild(h3);
+        copy.appendChild(body);
+        media.appendChild(createTrainingNotePortrait(portraitPlayer, text));
+        media.appendChild(copy);
+        wrap.appendChild(media);
+      } else {
+        wrap.appendChild(h3);
+        wrap.appendChild(body);
+      }
       container.appendChild(wrap);
     });
     return;
