@@ -957,6 +957,16 @@ body.training-page .archetypes-grid {
   gap: 16px;
 }
 
+body.training-page .team-drills-columns {
+  align-items: stretch;
+}
+
+body.training-page .team-drills-columns .content-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 body.training-page .drill-group {
   padding: 16px 16px 16px;
   border-radius: 12px;
@@ -1081,6 +1091,8 @@ body.training-page .playbook-mode-selection {
   margin-top: 22px;
   padding-top: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: center;
 }
 
 body.training-page .radio-group {
@@ -1161,17 +1173,8 @@ body.training-page .archetype-name {
   font-size: 1.45rem;
   line-height: 1;
   letter-spacing: 0.03em;
-}
-
-body.training-page .archetype-option {
-  position: relative;
-  padding: 0;
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.84);
-}
-
-body.training-page .archetype-option:hover {
-  background: transparent;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 body.training-page .archetype-option input[type="radio"] {
@@ -1215,20 +1218,39 @@ body.training-page .archetype-block[data-archetype="culture-builder"] {
   border-left-color: #7B5EA7;
 }
 
-body.training-page .archetype-block[data-archetype="authoritarian"] .archetype-name {
-  color: #E05A3A;
+body.training-page .archetype-option {
+  position: relative;
+  padding: 0;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.84);
 }
 
-body.training-page .archetype-block[data-archetype="systems-coach"] .archetype-name {
-  color: #F5C518;
+body.training-page .archetype-option:hover {
+  background: transparent;
 }
 
-body.training-page .archetype-block[data-archetype="player-maximizer"] .archetype-name {
-  color: #4CAF50;
+body.training-page .general-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
 }
 
-body.training-page .archetype-block[data-archetype="culture-builder"] .archetype-name {
-  color: #7B5EA7;
+body.training-page .scrimmages-group {
+  margin: 20px auto 0;
+  width: min(100%, 420px);
+  grid-column: 1 / -1;
+}
+
+body.training-page .scrimmages-group .slider-label {
+  align-items: center;
+}
+
+body.training-page .scrimmages-group .label-text {
+  text-align: center;
+}
+
+body.training-page .scrimmages-group .slider-container {
+  width: min(100%, 320px);
+  margin: 0 auto;
 }
 
 body.training-page .archetype-block[data-archetype="authoritarian"] .archetype-option input[type="radio"]:checked + span {
@@ -1332,5 +1354,9 @@ body.training-page .custom-focus-cancel-btn {
   body.training-page .general-grid,
   body.training-page .archetypes-grid {
     grid-template-columns: 1fr;
+  }
+
+  body.training-page .scrimmages-group {
+    width: 100%;
   }
 }
