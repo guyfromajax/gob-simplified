@@ -21,14 +21,15 @@ input[type="reset"] {
 .lineup-banner-strip {
   position: relative;
   margin: -24px -28px 0;
-  min-height: 168px;
+  min-height: 80px;
+  max-height: 80px;
   overflow: hidden;
 }
 
 .team-banner-image {
   display: block;
   width: 100%;
-  aspect-ratio: 6 / 1;
+  height: 80px;
   object-fit: cover;
   object-position: center;
 }
@@ -38,13 +39,8 @@ input[type="reset"] {
   align-items: center;
   justify-content: center;
   width: 100%;
-  aspect-ratio: 6 / 1;
+  height: 80px;
   background: rgba(13, 17, 36, 0.96);
-  color: #f7f9ff;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(2.4rem, 4vw, 4rem);
-  letter-spacing: 0.04em;
-  text-align: center;
 }
 
 .lineup-context-bar {
@@ -165,8 +161,8 @@ input[type="reset"] {
   display: grid;
   gap: 10px;
   margin: 0 -6px;
-  padding: 14px 20px 16px;
-  background: rgba(22, 27, 37, 0.97);
+  padding: 14px 20px 12px;
+  background: rgba(22, 27, 37, 1);
   border-bottom: 1px solid rgba(255,255,255,0.08);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
@@ -367,6 +363,8 @@ input[type="reset"] {
   display: grid;
   gap: 8px;
   margin-top: 16px;
+  padding-top: 12px;
+  border-top: 2px solid rgba(255,255,255,0.1);
 }
 
 .lineup-roster-label {

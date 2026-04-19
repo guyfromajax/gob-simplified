@@ -781,18 +781,11 @@ function renderRoster() {
       Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10), 
       Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10), 
       Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      Math.round((anchorAttrs.NG ?? 1.0) * 100),  // NG as percentage
+      Number((anchorAttrs.NG ?? 1.0).toFixed(2)),
       rt
     ];
     const classes = ['', '', 'ht', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
-    
-    const ng = anchorAttrs.NG ?? 1.0;
-    let energyBgColor;
-    if (ng > 0.89) energyBgColor = '#00aa00';      // Green
-    else if (ng >= 0.8) energyBgColor = '#cccc00'; // Yellow
-    else if (ng >= 0.7) energyBgColor = '#ff8800'; // Orange
-    else energyBgColor = '#cc0000';                // Red
-    
+
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
       
@@ -801,9 +794,7 @@ function renderRoster() {
         const link = document.createElement('a');
         applyPlayerDetailLinkBehavior(link, p._id);
         link.textContent = val ?? '--';
-        link.style.color = ng <= 0.89 ? '#fff' : 'inherit';
         link.style.textDecoration = 'none';
-        link.style.fontWeight = ng <= 0.89 ? 'bold' : 'normal';
         link.addEventListener('mouseenter', () => {
           link.style.textDecoration = 'underline';
         });
@@ -811,24 +802,11 @@ function renderRoster() {
           link.style.textDecoration = 'none';
         });
         td.appendChild(link);
-        
-        // Apply energy-based background color to player name cell (except green)
-        if (ng <= 0.89) {
-          td.style.backgroundColor = energyBgColor;
-        }
       } else {
       td.textContent = val ?? '--';
       }
       
       if (classes[idx]) td.classList.add(classes[idx]);
-      
-      // Apply energy-based background color to NG cell
-      if (classes[idx] === 'ng') {
-        td.style.backgroundColor = energyBgColor;
-        td.style.color = '#fff';  // White text on colored background
-        td.style.fontWeight = 'bold';
-        td.textContent = `${val}%`;  // Add % symbol
-      }
       
       tr.appendChild(td);
     });
@@ -1322,7 +1300,6 @@ function resolveTeam() {
 async function setHeader() {
   const banner = document.getElementById('team-banner');
   const bannerFallback = document.getElementById('team-banner-fallback');
-  const fallbackTitle = document.getElementById('team-title');
   const scoreValueEl = document.getElementById('score-value');
   const quarterValueEl = document.getElementById('quarter-value');
   const timeValueEl = document.getElementById('time-value');
@@ -1401,12 +1378,11 @@ async function setHeader() {
   const bannerSrc = typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(teamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
-  if (banner && bannerFallback && fallbackTitle) {
+  if (banner && bannerFallback) {
     banner.src = bannerSrc;
     banner.alt = `${teamName} banner`;
     banner.hidden = false;
     bannerFallback.hidden = true;
-    fallbackTitle.textContent = formatTeamName(teamName || 'Team');
     banner.onerror = () => {
       banner.hidden = true;
       bannerFallback.hidden = false;
