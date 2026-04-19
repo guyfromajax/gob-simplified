@@ -1108,10 +1108,24 @@ body.training-page .training-slider-scale-value {
   line-height: 1;
 }
 
+body.training-page .slider-stop-labels {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  width: 100%;
+  margin-top: 4px;
+}
+
+body.training-page .slider-stop-labels span {
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
 body.training-page .slider-value {
   position: absolute;
   top: 36px;
-  display: block;
+  display: none;
   text-align: center;
   width: auto;
   margin-top: 0;
