@@ -674,7 +674,46 @@ function createTrainingNotePortrait(player, text) {
     normalizedText === 'no significant updates' ||
     normalizedText === 'none'
   )) {
-  return null;
+    return null;
+  }
+
+  const playerName = getTrainingReportPlayerName(player) || String(text || '').trim();
+  const initials = getTrainingReportPlayerInitials(playerName);
+  const wrap = document.createElement('div');
+  wrap.className = 'training-note-portrait-wrap';
+
+  const fallback = document.createElement('div');
+  fallback.className = 'training-note-portrait-fallback';
+  fallback.textContent = initials;
+  fallback.setAttribute('aria-label', `${playerName || 'Player'} portrait placeholder`);
+
+  if (!player) {
+    wrap.appendChild(fallback);
+    return wrap;
+  }
+
+  const img = document.createElement('img');
+  img.className = 'training-note-portrait';
+  img.alt = playerName ? `${playerName} headshot` : 'Player headshot';
+  const portraitUrl = getTrainingReportPlayerPortraitUrl(player);
+  console.log('[TRAINING REPORT][NOTES] portrait render attempt', {
+    player_name: playerName,
+    player_id: String(player?.player_id || player?._id || player?.id || ''),
+    player_photo: player?.photo || null,
+    portrait_url: portraitUrl,
+  });
+  img.src = portraitUrl;
+  img.onerror = function () {
+    console.warn('[TRAINING REPORT][NOTES] portrait image failed', {
+      player_name: playerName,
+      player_id: String(player?.player_id || player?._id || player?.id || ''),
+      attempted_url: portraitUrl,
+    });
+    wrap.innerHTML = '';
+    wrap.appendChild(fallback);
+  };
+  wrap.appendChild(img);
+  return wrap;
 }
 
 function formatNoteAttributeToken(token) {
@@ -738,44 +777,6 @@ function createNotesHeroInitials(displayName, accentConfig, isMuted) {
   fallback.style.setProperty('--notes-accent-border', accentConfig.accentBorder);
   fallback.style.setProperty('--notes-accent-tint', accentConfig.accentTint);
   return fallback;
-}
-  const playerName = getTrainingReportPlayerName(player) || String(text || '').trim();
-  const initials = getTrainingReportPlayerInitials(playerName);
-  const wrap = document.createElement('div');
-  wrap.className = 'training-note-portrait-wrap';
-
-  const fallback = document.createElement('div');
-  fallback.className = 'training-note-portrait-fallback';
-  fallback.textContent = initials;
-  fallback.setAttribute('aria-label', `${playerName || 'Player'} portrait placeholder`);
-
-  if (!player) {
-    wrap.appendChild(fallback);
-    return wrap;
-  }
-
-  const img = document.createElement('img');
-  img.className = 'training-note-portrait';
-  img.alt = playerName ? `${playerName} headshot` : 'Player headshot';
-  const portraitUrl = getTrainingReportPlayerPortraitUrl(player);
-  console.log('[TRAINING REPORT][NOTES] portrait render attempt', {
-    player_name: playerName,
-    player_id: String(player?.player_id || player?._id || player?.id || ''),
-    player_photo: player?.photo || null,
-    portrait_url: portraitUrl,
-  });
-  img.src = portraitUrl;
-  img.onerror = function () {
-    console.warn('[TRAINING REPORT][NOTES] portrait image failed', {
-      player_name: playerName,
-      player_id: String(player?.player_id || player?._id || player?.id || ''),
-      attempted_url: portraitUrl,
-    });
-    wrap.innerHTML = '';
-    wrap.appendChild(fallback);
-  };
-  wrap.appendChild(img);
-  return wrap;
 }
 
 function createPlayerNameCell(player) {
