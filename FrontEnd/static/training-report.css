@@ -751,24 +751,25 @@ body.training-report-page .header-left {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: flex-start;
+  justify-self: start;
+  align-self: center;
   text-align: left;
   min-width: 0;
+  width: 100%;
 }
 
 body.training-report-page .header-info {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0;
+  display: block;
   margin-top: 6px;
   white-space: nowrap;
   text-align: left;
+  width: 100%;
+  align-self: flex-start;
 }
 
 body.training-report-page .info-item {
-  display: inline-flex;
-  align-items: center;
+  display: inline;
   gap: 6px;
   font-size: 13px;
   line-height: 1.4;
@@ -1371,7 +1372,7 @@ body.training-report-page .playbook-empty-state {
 
 @media (max-width: 700px) {
   body.training-report-page .header-info {
-    flex-wrap: nowrap;
+    display: block;
   }
 
   body.training-report-page .info-item {
