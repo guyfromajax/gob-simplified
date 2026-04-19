@@ -425,6 +425,15 @@ function updatePointsRemaining() {
   const remaining = TOTAL_POINTS - total;
   
   pointsRemainingEl.textContent = remaining;
+  const pointsDisplay = pointsRemainingEl.closest('.points-display');
+  if (pointsDisplay) {
+    pointsDisplay.classList.remove('is-low', 'is-empty');
+    if (remaining === 0) {
+      pointsDisplay.classList.add('is-empty');
+    } else if (remaining <= 5) {
+      pointsDisplay.classList.add('is-low');
+    }
+  }
   
   // Enable/disable submit button based on points allocation AND coaching focus selection
   const allPointsAllocated = remaining === 0;
