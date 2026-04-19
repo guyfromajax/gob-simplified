@@ -1001,7 +1001,8 @@ body.training-page .slider-container {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 60px;
+  width: 100%;
+  min-height: 82px;
 }
 
 body.training-page .slider {
@@ -1088,7 +1089,7 @@ body.training-page .training-slider-scale {
   position: absolute;
   left: 0;
   right: 0;
-  top: 44px;
+  top: 56px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1108,7 +1109,20 @@ body.training-page .training-slider-scale-value {
 }
 
 body.training-page .slider-value {
-  display: none;
+  position: absolute;
+  top: 36px;
+  display: block;
+  text-align: center;
+  width: auto;
+  margin-top: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
 }
 
 body.training-page .playbook-mode-selection {

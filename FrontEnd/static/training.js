@@ -205,6 +205,21 @@ function updateTrainingSliderVisual(slider, rawValue) {
   });
 }
 
+function updateTrainingSliderValuePosition(slider) {
+  const wrapper = slider?.closest('.slider-container');
+  if (!wrapper) return;
+  const valueSpan = wrapper.querySelector('.slider-value');
+  if (!valueSpan) return;
+  const min = Number(slider.min || 0);
+  const max = Number(slider.max || 0);
+  const current = Number(slider.value || 0);
+  const range = max - min;
+  const percent = range > 0 ? (current - min) / range : 0;
+  const thumbOffset = percent * slider.offsetWidth;
+  valueSpan.style.left = `${thumbOffset}px`;
+  valueSpan.style.transform = 'translateX(-50%)';
+}
+
 /**
  * Utility: set slider value and update display/cache
  */
@@ -216,6 +231,7 @@ function setSliderValue(slider, value) {
     valueDisplay.textContent = value;
   }
   updateTrainingSliderVisual(slider, value);
+  updateTrainingSliderValuePosition(slider);
 }
 
 /**
@@ -487,6 +503,7 @@ allSliders.forEach(slider => {
       valueDisplay.textContent = this.value;
     }
     updateTrainingSliderVisual(this, this.value);
+    updateTrainingSliderValuePosition(this);
     
     // Store current value as previous
     this.dataset.prev = this.value;
@@ -500,6 +517,13 @@ allSliders.forEach(slider => {
   if (valueDisplay) {
     valueDisplay.textContent = slider.value;
   }
+  updateTrainingSliderValuePosition(slider);
+});
+
+window.addEventListener('resize', function () {
+  allSliders.forEach(function (slider) {
+    updateTrainingSliderValuePosition(slider);
+  });
 });
 
 /**
