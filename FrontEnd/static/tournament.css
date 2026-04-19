@@ -526,8 +526,8 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 100%;
 }
 
-table.roster-table,
-table.stats-table {
+#tournament-container table.roster-table,
+#tournament-container table.stats-table {
   width: 100%;
   border-collapse: collapse;
   font-family: 'Inter', sans-serif;
@@ -535,37 +535,37 @@ table.stats-table {
 }
 
 /* Leaderboard tables share the same base styling */
-table.leaders-table {
+#tournament-container table.leaders-table {
   width: 100%;
   border-collapse: collapse;
   font-family: 'Inter', sans-serif;
   min-width: 600px;
 }
 
-table.roster-table th,
-table.roster-table td,
-table.stats-table th,
-table.stats-table td {
+#tournament-container table.roster-table th,
+#tournament-container table.roster-table td,
+#tournament-container table.stats-table th,
+#tournament-container table.stats-table td {
   border: 1px solid #ccc;
   padding: 4px 6px;
   text-align: center;
   font-size: 14px;
 }
 
-table.leaders-table th,
-table.leaders-table td {
+#tournament-container table.leaders-table th,
+#tournament-container table.leaders-table td {
   border: 1px solid #ccc;
   padding: 4px 6px;
   text-align: center;
   font-size: 14px;
 }
 
-table.roster-table tbody tr:nth-child(odd),
-table.stats-table tbody tr:nth-child(odd) {
+#tournament-container table.roster-table tbody tr:nth-child(odd),
+#tournament-container table.stats-table tbody tr:nth-child(odd) {
   background-color: #f9f9f9;
 }
 
-table.leaders-table tbody tr:nth-child(odd) {
+#tournament-container table.leaders-table tbody tr:nth-child(odd) {
   background-color: #f9f9f9;
 }
 

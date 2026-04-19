@@ -77,6 +77,114 @@
   z-index: 1;
 }
 
+/* Canonical GOB data-grid system.
+   Use this instead of page-local table styling for redesigned roster/stat surfaces. */
+.gob-data-grid-shell {
+  position: relative;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(31, 37, 52, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.gob-data-grid-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.06);
+}
+
+.gob-data-grid-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.gob-data-grid-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.gob-data-grid-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.gob-data-grid {
+  width: 100%;
+  min-width: var(--gob-data-grid-min-width, 960px);
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+}
+
+.gob-data-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 11px 10px;
+  color: rgba(255, 255, 255, 0.66);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+  white-space: nowrap;
+}
+
+.gob-data-grid tbody td {
+  padding: 9px 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+.gob-data-grid tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gob-data-grid tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.gob-data-grid thead th:first-child,
+.gob-data-grid tbody td:first-child,
+.gob-data-grid [data-align="left"] {
+  text-align: left;
+}
+
+.gob-data-grid thead th:first-child,
+.gob-data-grid tbody td:first-child {
+  padding-left: 16px;
+}
+
+.gob-data-grid tbody td:first-child,
+.gob-data-grid .gob-data-grid-name-cell {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.gob-data-grid tbody td:first-child a,
+.gob-data-grid .gob-data-grid-name-cell a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.gob-data-grid tbody td:first-child a:hover,
+.gob-data-grid .gob-data-grid-name-cell a:hover {
+  text-decoration: underline;
+}
+
 .resource-page-container.fcc-brand-page-shell h1 {
   color: #f7f9ff;
   font-family: 'Bebas Neue', cursive;

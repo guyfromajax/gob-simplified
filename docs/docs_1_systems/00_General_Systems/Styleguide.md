@@ -274,8 +274,12 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Body rows should use subtle horizontal separators only.
 - Avoid full boxed cell borders or spreadsheet-style gridlines.
 - Alternate rows should use a very subtle neutral shade shift.
+- Dark data grids must never use white or near-white zebra striping.
 - Hover states should slightly brighten the row background without becoming noisy.
 - Row density should support quick scan speed and high information density.
+
+### Implementation Rule
+- Redesigned resource pages and management surfaces should use the shared canonical GOB data-grid system rather than inheriting legacy table styling from older page-specific stylesheets.
 
 ### Alignment Rules
 - Text-heavy first columns should usually be left aligned.
