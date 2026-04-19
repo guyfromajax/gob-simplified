@@ -724,6 +724,9 @@ body.training-report-page .report-header {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
+  position: sticky;
+  top: 10px;
+  z-index: 20;
   gap: 16px;
   margin-bottom: 0;
   padding: 16px 18px;
