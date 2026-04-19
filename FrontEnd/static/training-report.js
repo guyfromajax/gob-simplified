@@ -611,6 +611,14 @@ function getTrainingNotePortraitPlayer(sectionOrTitle, text) {
 }
 
 function createTrainingNotePortrait(player, text) {
+  const normalizedText = normalizeTrainingReportText(text);
+  if (!player && (
+    !normalizedText ||
+    normalizedText === 'no significant updates' ||
+    normalizedText === 'none'
+  )) {
+    return null;
+  }
   const playerName = getTrainingReportPlayerName(player) || String(text || '').trim();
   const initials = getTrainingReportPlayerInitials(playerName);
   const wrap = document.createElement('div');
@@ -1566,7 +1574,10 @@ function renderTrainingNotes() {
         copy.className = 'training-note-section-copy';
         copy.appendChild(h3);
         copy.appendChild(body);
-        media.appendChild(createTrainingNotePortrait(portraitPlayer, text));
+        const portrait = createTrainingNotePortrait(portraitPlayer, text);
+        if (portrait) {
+          media.appendChild(portrait);
+        }
         media.appendChild(copy);
         wrap.appendChild(media);
       } else {
