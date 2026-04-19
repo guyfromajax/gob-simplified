@@ -370,7 +370,7 @@
         this.handleBack();
       });
       this.elements.saveBtn.addEventListener("click", () => this.handleSave());
-      this.elements.evenAllBtn.addEventListener("click", () => this.handleEvenDistributionAll());
+      this.elements.evenAllBtn?.addEventListener("click", () => this.handleEvenDistributionAll());
       this.elements.motionEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("motion"));
       this.elements.setPlaysEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("setPlays"));
       this.elements.manDefenseEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("manDefense"));
