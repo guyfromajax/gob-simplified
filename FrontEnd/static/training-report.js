@@ -546,7 +546,9 @@ function getTrainingReportPlayerNameCandidates(player) {
     .filter(Boolean);
 }
 
-function getTrainingNotePortraitPlayer(title, text) {
+function getTrainingNotePortraitPlayer(sectionOrTitle, text) {
+  const section = (sectionOrTitle && typeof sectionOrTitle === 'object') ? sectionOrTitle : null;
+  const title = section ? String(section.title || '') : String(sectionOrTitle || '');
   const eligibleTitles = new Set([
     'Practice Player Of The Week',
     'Practice Players Of The Week',
@@ -555,6 +557,20 @@ function getTrainingNotePortraitPlayer(title, text) {
   ]);
   if (!eligibleTitles.has(title)) return null;
   const players = Array.isArray(reportData?.players) ? reportData.players : [];
+  const playerIds = section
+    ? [
+        ...(section.player_id ? [String(section.player_id)] : []),
+        ...((Array.isArray(section.player_ids) ? section.player_ids : []).map((id) => String(id)))
+      ]
+    : [];
+  if (playerIds.length) {
+    const byId = new Map(players.map((player) => [
+      String(player?.player_id || player?._id || player?.id || ''),
+      player
+    ]));
+    const directMatch = playerIds.map((id) => byId.get(id)).find(Boolean);
+    if (directMatch) return directMatch;
+  }
   const haystack = ` ${normalizeTrainingReportText(text)} `;
   let bestMatch = null;
   players.forEach((player) => {
@@ -1493,7 +1509,7 @@ function renderTrainingNotes() {
         p.textContent = text || 'No Significant Updates';
         body.appendChild(p);
       }
-      const portraitPlayer = getTrainingNotePortraitPlayer(section.title || '', text);
+      const portraitPlayer = getTrainingNotePortraitPlayer(section, text);
       if (portraitPlayer || (
         section.title === 'Practice Player Of The Week' ||
         section.title === 'Practice Players Of The Week' ||
