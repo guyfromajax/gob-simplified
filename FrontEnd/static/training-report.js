@@ -249,6 +249,7 @@ function renderProjectedStartingFiveStats(rows) {
   });
   table.appendChild(tbody);
   el.appendChild(table);
+  enhanceProjectedStartingFiveTable();
 }
 
 function renderProjectedStartingFiveSection() {
@@ -264,6 +265,7 @@ function renderProjectedStartingFiveSection() {
       tableClass: 'training-projected-table',
       emptyClass: 'training-projected-empty',
     });
+    enhanceProjectedStartingFiveTable();
   }
 }
 
@@ -439,6 +441,79 @@ function renderHeader() {
   document.getElementById('training-focus').textContent = focusText;
 }
 
+function getReportWeekNumber() {
+  return Number(reportData?.week || week || 0);
+}
+
+function getExceptionalGainThreshold() {
+  return getReportWeekNumber() === 1 ? 10 : 5;
+}
+
+function getPlayerDisplayPosition(player) {
+  const validPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const direct = String(player?.position || '').toUpperCase().trim();
+  if (validPositions.includes(direct)) return direct;
+
+  const ratings = player?.position_ratings || {};
+  let bestPos = 'PG';
+  let bestVal = -Infinity;
+  validPositions.forEach((pos) => {
+    const value = Number(ratings[pos]) || 0;
+    if (value > bestVal) {
+      bestVal = value;
+      bestPos = pos;
+    }
+  });
+  return bestPos;
+}
+
+function getPracticePlayerOfWeekNames() {
+  const names = new Set();
+  const players = (reportData?.players || []).map((p) => String(p?.name || '').trim()).filter(Boolean);
+  const notes = reportData?.training_notes || [];
+  notes.forEach((section) => {
+    const title = typeof section === 'object' ? String(section.title || '') : '';
+    if (!/Practice Player(?:s)? Of The Week/i.test(title)) return;
+    const body = typeof section === 'object' ? String(section.body || '') : String(section || '');
+    const bodyLower = body.toLowerCase();
+    players.forEach((name) => {
+      if (bodyLower.includes(name.toLowerCase())) names.add(name);
+    });
+  });
+  return names;
+}
+
+function isMutedTrainingNote(text) {
+  const normalized = String(text || '').trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized === 'neutral' ||
+    /no significant updates/.test(normalized) ||
+    /no significant update/.test(normalized) ||
+    /no significant changes/.test(normalized) ||
+    /no significant change/.test(normalized) ||
+    /no notable updates/.test(normalized) ||
+    /no notable changes/.test(normalized)
+  );
+}
+
+function createPlayerNameCell(player) {
+  const td = document.createElement('td');
+  td.className = 'player-name-cell';
+
+  const badge = document.createElement('span');
+  badge.className = 'position-badge';
+  badge.textContent = getPlayerDisplayPosition(player);
+
+  const name = document.createElement('span');
+  name.className = 'player-name-text';
+  name.textContent = player.name || '—';
+
+  td.appendChild(badge);
+  td.appendChild(name);
+  return td;
+}
+
 function renderPlayersTable() {
   if (!reportData || !reportData.players) return;
   
@@ -481,9 +556,13 @@ function renderPlayersTable() {
   thead.appendChild(headerRow);
   
   // Build rows
+  const practicePlayers = getPracticePlayerOfWeekNames();
   getSortedPlayersForReport().forEach(player => {
     const row = document.createElement('tr');
-    row.appendChild(createCell(player.name));
+    if (practicePlayers.has(player.name)) {
+      row.classList.add('practice-player-highlight');
+    }
+    row.appendChild(createPlayerNameCell(player));
     
     if (currentView === 'attributes') {
       // Show current attribute values with tooltips
@@ -522,6 +601,8 @@ function renderPlayersTable() {
       });
       totalRow.appendChild(createChangeCell(total));
     });
+
+    totalRow.appendChild(createCell('—'));
     
     tbody.appendChild(totalRow);
   }
@@ -745,10 +826,14 @@ function positionAttributeTooltip(event) {
 
 function createChangeCell(change) {
   const td = document.createElement('td');
+  const exceptionalThreshold = getExceptionalGainThreshold();
   
-  if (change > 0) {
+  if (change >= exceptionalThreshold) {
     td.textContent = `+${change}`;
-    td.className = change > 5 ? 'change-gold' : 'change-positive';
+    td.className = 'change-gold';
+  } else if (change > 0) {
+    td.textContent = `+${change}`;
+    td.className = 'change-positive';
   } else if (change < 0) {
     td.textContent = change.toString();
     td.className = 'change-negative';
@@ -805,36 +890,25 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   
   const item = document.createElement('div');
   item.className = 'team-attr-item';
+  if (change === 0) item.classList.add('is-muted');
   
   const label = document.createElement('div');
   label.className = 'attr-label';
   
   const nameSpan = document.createElement('span');
+  nameSpan.className = 'attr-name';
   nameSpan.textContent = displayName;
   
   const changeSpan = document.createElement('span');
   changeSpan.className = 'attr-change';
   
   if (change !== 0) {
-    // Special handling for shot_threshold: negative change (decrease) is good, positive change (increase) is bad
-    if (attrKey === 'shot_threshold') {
-      // Invert: negative change (good) shows as green with +, positive change (bad) shows as red with -
-      const absChange = Math.abs(change);
-      if (change < 0) {
-        // Decrease is good - show as green with +
-        changeSpan.textContent = `+${absChange}`;
-        changeSpan.className += absChange > 5 ? ' change-gold' : ' change-positive';
-      } else {
-        // Increase is bad - show as red with -
-        changeSpan.textContent = `-${absChange}`;
-        changeSpan.className += ' change-negative';
-      }
-    } else if (attrKey === 'rebound_modifier') {
+    if (attrKey === 'rebound_modifier') {
       // Format rebound_modifier changes to 2 decimal places
       const formattedChange = change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2);
       changeSpan.textContent = formattedChange;
       if (change > 0) {
-        changeSpan.className += change > 5 ? ' change-gold' : ' change-positive';
+        changeSpan.className += change >= getExceptionalGainThreshold() ? ' change-gold' : ' change-positive';
       } else {
         changeSpan.className += ' change-negative';
       }
@@ -843,7 +917,7 @@ function createTeamAttrItem(attrKey, currentValue, change) {
       const formattedChange = change > 0 ? `+${change}` : change.toString();
       changeSpan.textContent = formattedChange;
       if (change > 0) {
-        changeSpan.className += change > 5 ? ' change-gold' : ' change-positive';
+        changeSpan.className += change >= getExceptionalGainThreshold() ? ' change-gold' : ' change-positive';
       } else {
         changeSpan.className += ' change-negative';
       }
@@ -875,42 +949,6 @@ function createTeamAttrItem(attrKey, currentValue, change) {
     barContainer.appendChild(barFill);
     barContainer.appendChild(barText);
     item.appendChild(barContainer);
-  } else if (attrKey === 'fb_opp_modifier' || attrKey === 'pt_opp_modifier') {
-    // +/- Design - centered, bold, no value shown
-    const indicatorContainer = document.createElement('div');
-    indicatorContainer.className = 'plus-minus-container';
-    indicatorContainer.style.textAlign = 'center';
-    indicatorContainer.style.marginTop = 'var(--spacing-sm)';
-    
-    const indicator = document.createElement('span');
-    indicator.className = 'plus-minus-indicator';
-    indicator.style.fontWeight = '700';
-    
-    if (currentValue >= 10) {
-      indicator.textContent = '+++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 5) {
-      indicator.textContent = '++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 1) {
-      indicator.textContent = '+';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue === 0) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-zero';
-    } else if (currentValue >= -4) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-negative';
-    } else if (currentValue >= -9) {
-      indicator.textContent = '--';
-      indicator.className += ' plus-minus-negative';
-    } else {
-      indicator.textContent = '---';
-      indicator.className += ' plus-minus-negative';
-    }
-    
-    indicatorContainer.appendChild(indicator);
-    item.appendChild(indicatorContainer);
   } else {
     // Red/Green Pill Design
     const pill = createPill(currentValue, attrKey);
@@ -952,12 +990,14 @@ function createPill(originalValue, attrKey) {
   if (value > 0) {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-positive';
+    if ((value / maxValue) >= 0.7) fill.classList.add('is-extreme');
     const percentage = Math.min((value / maxValue) * 50, 50); // Max 50% to the right
     fill.style.width = `${percentage}%`;
     pill.insertBefore(fill, centerLine);
   } else if (value < 0) {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-negative';
+    if ((Math.abs(value) / maxValue) >= 0.7) fill.classList.add('is-extreme');
     const absValue = Math.abs(value);
     const percentage = Math.min((absValue / maxValue) * 50, 50); // Max 50% to the left
     fill.style.width = `${percentage}%`;
@@ -1020,76 +1060,8 @@ function renderPlaybookSummary() {
   man_defenses.sort((a, b) => a.name.localeCompare(b.name));
   zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
   
-  // Render Offense section
-  const offenseSection = document.createElement('div');
-  offenseSection.className = 'playbook-category';
-  
-  const offenseTitle = document.createElement('h3');
-  offenseTitle.textContent = 'Offense';
-  offenseSection.appendChild(offenseTitle);
-  
-  // Motion Plays
-  if (motion_plays.length > 0) {
-    motion_plays.forEach(play => {
-      const resolvedChange = getTrainingReportPlayChange(plays_changes, play);
-      // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(
-        play.display_name || play.name,
-        play,
-        resolvedChange
-      );
-      offenseSection.appendChild(playRow);
-    });
-  }
-  
-  // Set Plays
-  if (set_plays.length > 0) {
-    set_plays.forEach(play => {
-      const resolvedChange = getTrainingReportPlayChange(plays_changes, play);
-      // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(
-        play.display_name || play.name,
-        play,
-        resolvedChange
-      );
-      offenseSection.appendChild(playRow);
-    });
-  }
-  
-  // Empty row
-  const emptyRow = document.createElement('div');
-  emptyRow.className = 'playbook-empty-row';
-  offenseSection.appendChild(emptyRow);
-  
-  container.appendChild(offenseSection);
-  
-  // Render Defense section
-  const defenseSection = document.createElement('div');
-  defenseSection.className = 'playbook-category';
-  
-  const defenseTitle = document.createElement('h3');
-  defenseTitle.textContent = 'Defense';
-  defenseSection.appendChild(defenseTitle);
-  
-  // Man Defenses
-  if (man_defenses.length > 0) {
-    man_defenses.forEach(defense => {
-      // Pass full defense object to access effectiveness, momentum, cloaking
-      const defenseRow = createPlayRow(defense.name, defense, defenses_changes[defense.name] || 0);
-      defenseSection.appendChild(defenseRow);
-    });
-  }
-  
-  // Zone Defenses
-  if (zone_defenses.length > 0) {
-    zone_defenses.forEach(defense => {
-      // Pass full defense object to access effectiveness, momentum, cloaking
-      const defenseRow = createPlayRow(defense.name, defense, defenses_changes[defense.name] || 0);
-      defenseSection.appendChild(defenseRow);
-    });
-  }
-  
-  container.appendChild(defenseSection);
+  container.appendChild(createPlaybookCategorySection('Offense', motion_plays.concat(set_plays), plays_changes));
+  container.appendChild(createPlaybookCategorySection('Defense', man_defenses.concat(zone_defenses), defenses_changes));
 }
 
 function looksLikeTrainingReportObjectId(value) {
@@ -1243,95 +1215,106 @@ function getTrainingReportPlayChange(playsChanges, play) {
   return 0;
 }
 
-function createPlayRow(playName, playData, change) {
-  // playData can be an object with effectiveness, momentum, cloaking, or just a number (effectiveness)
-  // Handle both formats for backward compatibility
+function createPlaybookCategorySection(title, items, changesLookup) {
+  const section = document.createElement('div');
+  section.className = 'playbook-category';
+
+  const header = document.createElement('div');
+  header.className = 'playbook-category-header';
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  header.appendChild(heading);
+  section.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'playbook-card-grid';
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'playbook-empty-state';
+    empty.textContent = 'No data available.';
+    grid.appendChild(empty);
+  } else {
+    items.forEach((item) => {
+      const change = title === 'Offense'
+        ? getTrainingReportPlayChange(changesLookup, item)
+        : normalizeTrainingReportChangeValue(changesLookup[item.name] || 0);
+      grid.appendChild(createPlayCard(item.display_name || item.name, item, change));
+    });
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+function createPlayCard(playName, playData, change) {
   const effectiveness = typeof playData === 'object' ? (playData.effectiveness || 0) : (playData || 0);
   const momentum = typeof playData === 'object' ? (playData.momentum || 0) : 0;
   const cloaking = typeof playData === 'object' ? (playData.cloaking || 0) : 0;
-  
+
   const row = document.createElement('div');
-  row.className = 'playbook-row';
+  row.className = 'playbook-card';
   if (playData && typeof playData === 'object') {
     const normalizedPlayId = normalizeTrainingReportPlayId(playData.play_id || playData.playId || playData._id || playData.id);
     if (normalizedPlayId) {
       row.dataset.playId = normalizedPlayId;
     }
   }
-  
-  // Play name
+
+  const top = document.createElement('div');
+  top.className = 'playbook-card-top';
+
   const nameDiv = document.createElement('div');
-  nameDiv.className = 'playbook-name';
+  nameDiv.className = 'playbook-card-name';
   nameDiv.textContent = playName;
-  row.appendChild(nameDiv);
-  
-  // Metrics container - holds all three bars
-  const metricsContainer = document.createElement('div');
-  metricsContainer.className = 'playbook-metrics-container';
-  
-  // Command (Effectiveness) - Blue, 0-100 scale
-  const commandMetric = createMetricBar('Command', effectiveness, 100, '#4a90e2', change);
-  metricsContainer.appendChild(commandMetric);
-  
-  // Momentum - Orange, 0-10 scale
-  const momentumMetric = createMetricBar('Momentum', momentum, 10, '#ff9800', null);
-  metricsContainer.appendChild(momentumMetric);
-  
-  // Cloaking - Purple, 0-10 scale
-  const cloakingMetric = createMetricBar('Cloaking', cloaking, 10, '#9c27b0', null);
-  metricsContainer.appendChild(cloakingMetric);
-  
-  row.appendChild(metricsContainer);
-  
+
+  const delta = document.createElement('div');
+  delta.className = 'playbook-card-delta';
+  if (change > 0) {
+    delta.textContent = `+${change}`;
+    delta.classList.add('is-positive');
+  } else if (change < 0) {
+    delta.textContent = String(change);
+    delta.classList.add('is-negative');
+  } else {
+    delta.textContent = '0';
+    delta.classList.add('is-zero');
+  }
+
+  top.appendChild(nameDiv);
+  top.appendChild(delta);
+  row.appendChild(top);
+
+  const bars = document.createElement('div');
+  bars.className = 'playbook-card-bars';
+  bars.appendChild(createPlaybookMetricCard('Command', effectiveness, 100, '#4065AF'));
+  bars.appendChild(createPlaybookMetricCard('Momentum', momentum, 10, '#F79420'));
+  bars.appendChild(createPlaybookMetricCard('Cloaking', cloaking, 10, '#7B5EA7'));
+  row.appendChild(bars);
+
   return row;
 }
 
-function createMetricBar(title, value, maxValue, color, change) {
+function createPlaybookMetricCard(title, value, maxValue, color) {
   const metricDiv = document.createElement('div');
-  metricDiv.className = 'playbook-metric';
-  
-  // Title
+  metricDiv.className = 'playbook-metric-card';
+
   const titleDiv = document.createElement('div');
   titleDiv.className = 'playbook-metric-title';
   titleDiv.textContent = title;
   metricDiv.appendChild(titleDiv);
-  
-  // Progress bar container
-  const progressContainer = document.createElement('div');
-  progressContainer.className = 'playbook-progress-container';
-  
+
   const progressBar = document.createElement('div');
   progressBar.className = 'playbook-progress-bar';
-  
+
   const progressFill = document.createElement('div');
   progressFill.className = 'playbook-progress-fill';
   progressFill.style.backgroundColor = color;
   const percentage = Math.min(100, (value / maxValue) * 100);
   progressFill.style.width = `${percentage}%`;
-  
+
   progressBar.appendChild(progressFill);
-  progressContainer.appendChild(progressBar);
-  metricDiv.appendChild(progressContainer);
-  
-  // Change indicator (only for Command/Effectiveness)
-  if (change !== null && change !== undefined) {
-    const changeDiv = document.createElement('div');
-    changeDiv.className = 'playbook-change';
-    
-    if (change > 0) {
-      changeDiv.textContent = `+${change}`;
-      changeDiv.style.color = '#4CAF50'; // Green
-    } else if (change < 0) {
-      changeDiv.textContent = `-${Math.abs(change)}`;
-      changeDiv.style.color = '#f44336'; // Red
-    } else {
-      changeDiv.textContent = '0';
-      changeDiv.style.color = '#ffffff'; // White
-    }
-    
-    metricDiv.appendChild(changeDiv);
-  }
-  
+  metricDiv.appendChild(progressBar);
   return metricDiv;
 }
 
@@ -1386,6 +1369,10 @@ function renderTrainingNotes() {
       if (!section) return;
       const wrap = document.createElement('div');
       wrap.className = 'training-note-section';
+      const text = section.body != null ? String(section.body) : '';
+      if (isMutedTrainingNote(text)) {
+        wrap.classList.add('is-muted');
+      }
       if (section.title === 'Player Energy Levels') {
         wrap.classList.add('training-note-section-wide');
       }
@@ -1394,7 +1381,6 @@ function renderTrainingNotes() {
       h3.textContent = section.title === 'Player Energy Levels' ? 'Miscellaneous Notes' : (section.title || '');
       const body = document.createElement('div');
       body.className = 'training-note-section-body';
-      const text = section.body != null ? String(section.body) : '';
       text.split('\n\n').forEach(function (para, i) {
         const p = document.createElement('p');
         p.className = 'training-note-section-p';
@@ -1420,5 +1406,26 @@ function renderTrainingNotes() {
     noteElement.className = 'training-note';
     noteElement.textContent = typeof note === 'string' ? note : JSON.stringify(note);
     container.appendChild(noteElement);
+  });
+}
+
+function enhanceProjectedStartingFiveTable() {
+  const table = document.querySelector('#training-projected-lineup table.training-projected-table');
+  if (!table) return;
+  const bodyRows = table.querySelectorAll('tbody tr');
+  bodyRows.forEach((row) => {
+    const posCell = row.children[0];
+    const playerCell = row.children[1];
+    if (posCell && !posCell.querySelector('.position-badge')) {
+      const text = posCell.textContent.trim();
+      posCell.textContent = '';
+      const badge = document.createElement('span');
+      badge.className = 'position-badge';
+      badge.textContent = text || '—';
+      posCell.appendChild(badge);
+    }
+    if (playerCell) {
+      playerCell.classList.add('projected-player-name-cell');
+    }
   });
 }
