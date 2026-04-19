@@ -1120,6 +1120,15 @@ body.set-lineup-page .roster-table tbody tr:nth-child(odd) td {
   background: rgba(255,255,255,0.03);
 }
 
+body.set-lineup-page .roster-table tbody tr:nth-child(odd),
+body.set-lineup-page .roster-table tbody tr:nth-child(even) {
+  background: transparent !important;
+}
+
+body.set-lineup-page .roster-table tbody tr:nth-child(even) td {
+  background: transparent;
+}
+
 body.set-lineup-page .roster-table tbody tr:hover td {
   background: rgba(255,255,255,0.04);
 }
