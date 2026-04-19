@@ -1146,6 +1146,28 @@ body.training-report-page .change-gold {
   font-weight: 700;
 }
 
+body.training-report-page .players-table td.change-zero {
+  color: #9e9d9d;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+body.training-report-page .players-table td.change-positive {
+  color: #34EC27;
+  font-weight: 700;
+}
+
+body.training-report-page .players-table td.change-negative {
+  color: #ff6d6d;
+  font-weight: 700;
+}
+
+body.training-report-page .players-table td.change-gold {
+  color: #F5C518;
+  font-weight: 700;
+}
+
 body.training-report-page .attr-pill {
   height: 36px;
   background: rgba(0,0,0,0.34);
