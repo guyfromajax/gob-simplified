@@ -749,32 +749,31 @@ body.training-report-page .page-title {
 
 body.training-report-page .header-info {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 body.training-report-page .info-item {
-  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
   line-height: 1.4;
-  padding-right: 14px;
-  margin-right: 14px;
+  padding-right: 0;
+  margin-right: 0;
 }
 
 body.training-report-page .info-item + .info-item::before {
-  content: "";
-  position: absolute;
-  left: -14px;
-  top: 50%;
-  width: 1px;
-  height: 12px;
-  transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.16);
+  content: "·";
+  position: static;
+  width: auto;
+  height: auto;
+  transform: none;
+  margin: 0 10px;
+  background: none;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 body.training-report-page .info-label {
@@ -1296,17 +1295,15 @@ body.training-report-page .playbook-empty-state {
 
 @media (max-width: 700px) {
   body.training-report-page .header-info {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   body.training-report-page .info-item {
-    padding-right: 0;
-    margin-right: 0;
+    margin-bottom: 2px;
   }
 
   body.training-report-page .info-item + .info-item::before {
-    display: none;
+    margin: 0 8px;
   }
 
   body.training-report-page .team-attributes-grid,
