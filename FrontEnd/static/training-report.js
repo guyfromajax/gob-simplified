@@ -522,6 +522,30 @@ function getTrainingReportPlayerPortraitUrl(player) {
   return `${staticPrefix}/images/players/generic_headshot.png`;
 }
 
+function normalizeTrainingReportText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getTrainingReportPlayerNameCandidates(player) {
+  const candidates = new Set();
+  const fullName = getTrainingReportPlayerName(player);
+  const firstName = String(player?.first_name || '').trim();
+  const lastName = String(player?.last_name || '').trim();
+  if (fullName) candidates.add(fullName);
+  if (firstName && lastName) {
+    candidates.add(`${firstName} ${lastName}`);
+    candidates.add(`${lastName}, ${firstName}`);
+  }
+  if (lastName) candidates.add(lastName);
+  return Array.from(candidates)
+    .map(normalizeTrainingReportText)
+    .filter(Boolean);
+}
+
 function getTrainingNotePortraitPlayer(title, text) {
   const eligibleTitles = new Set([
     'Practice Player Of The Week',
@@ -531,14 +555,14 @@ function getTrainingNotePortraitPlayer(title, text) {
   ]);
   if (!eligibleTitles.has(title)) return null;
   const players = Array.isArray(reportData?.players) ? reportData.players : [];
-  const haystack = ` ${String(text || '').toLowerCase()} `;
+  const haystack = ` ${normalizeTrainingReportText(text)} `;
   let bestMatch = null;
   players.forEach((player) => {
-    const name = getTrainingReportPlayerName(player);
-    if (!name) return;
-    const normalizedName = name.toLowerCase();
-    if (!haystack.includes(normalizedName)) return;
-    if (!bestMatch || normalizedName.length > getTrainingReportPlayerName(bestMatch).length) {
+    const candidates = getTrainingReportPlayerNameCandidates(player);
+    if (!candidates.length) return;
+    const matchedCandidate = candidates.find((candidate) => haystack.includes(` ${candidate} `) || haystack.includes(candidate));
+    if (!matchedCandidate) return;
+    if (!bestMatch || matchedCandidate.length > normalizeTrainingReportText(getTrainingReportPlayerName(bestMatch)).length) {
       bestMatch = player;
     }
   });
