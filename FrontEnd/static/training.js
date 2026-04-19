@@ -867,7 +867,7 @@ function collectTrainingData() {
     })(),
     
     // Playbook Training Mode
-    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'all-plays-even'
+    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks'
   };
 
   if (data.coaching_focus === 'player-maximizer-custom') {
