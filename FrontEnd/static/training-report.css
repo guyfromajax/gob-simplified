@@ -1048,11 +1048,13 @@ body.training-report-page .training-note-section-body {
 body.training-report-page .training-note-section-media {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
 body.training-report-page .training-note-portrait-wrap {
   flex: 0 0 auto;
+  order: 2;
 }
 
 body.training-report-page .training-note-portrait,
@@ -1083,6 +1085,7 @@ body.training-report-page .training-note-portrait-fallback {
 body.training-report-page .training-note-section-copy {
   min-width: 0;
   flex: 1 1 auto;
+  order: 1;
 }
 
 body.training-report-page .training-note-section.is-muted {
