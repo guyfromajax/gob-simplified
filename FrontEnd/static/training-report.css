@@ -1102,6 +1102,7 @@ body.training-report-page .training-notes-subrule {
 
 body.training-report-page .training-notes-container {
   display: grid;
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
