@@ -45,8 +45,8 @@ input[type="reset"] {
 
 .lineup-context-bar {
   position: sticky;
-  top: 12px;
-  z-index: 30;
+  top: 0;
+  z-index: 20;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -156,12 +156,12 @@ input[type="reset"] {
 
 .lineup-slots-section {
   position: sticky;
-  top: 86px;
-  z-index: 25;
+  top: 61px;
+  z-index: 10;
   display: grid;
   gap: 10px;
   margin: 0 -6px;
-  padding: 14px 20px 16px;
+  padding: 8px 20px 16px;
   background: rgba(22, 26, 36, 0.98);
   border-bottom: 2px solid rgba(255,255,255,0.12);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
@@ -366,6 +366,8 @@ input[type="reset"] {
   padding-top: 12px;
   border-top: 2px solid rgba(255,255,255,0.1);
   background: rgba(18, 22, 30, 0.96);
+  position: relative;
+  z-index: 1;
 }
 
 .lineup-roster-label {
