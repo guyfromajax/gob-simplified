@@ -131,14 +131,64 @@ const NOTES_HERO_CONFIG = [
   }
 ];
 
-const NOTES_TACTICAL_ORDER = [
+/** In-season tactical row title; camp week uses Concerning Progression (see training_notes.py). */
+const NOTES_TACTICAL_ORDER_BASE = [
   'Strong Cumulative Increase',
-  'Concerning Regression',
   'Strongest Defensive Set',
   'Strongest Offensive Plays',
   'Fast Break Readiness',
   'Press/Trap Readiness',
 ];
+
+function getConcerningTeamAttrNoteTitle(sectionMap) {
+  if (sectionMap.has('Concerning Progression')) return 'Concerning Progression';
+  return 'Concerning Regression';
+}
+
+function isTrainingCampReportNotes(sectionMap) {
+  return (
+    sectionMap.has('Concerning Progression') ||
+    sectionMap.has('Training Camp MVP') ||
+    sectionMap.has('Training Camp Co-MVPs')
+  );
+}
+
+function resolveHeroNoteSection(config, sectionMap) {
+  const isCamp = isTrainingCampReportNotes(sectionMap);
+  let order;
+  if (config.key === 'practice') {
+    order = isCamp
+      ? [
+          'Training Camp MVP',
+          'Training Camp Co-MVPs',
+          'Practice Player Of The Week',
+          'Practice Players Of The Week',
+        ]
+      : [
+          'Practice Player Of The Week',
+          'Practice Players Of The Week',
+          'Training Camp MVP',
+          'Training Camp Co-MVPs',
+        ];
+  } else if (config.key === 'regression') {
+    order = isCamp
+      ? ['Biggest Concern', 'Biggest Concerns', 'Biggest Regression']
+      : ['Biggest Regression', 'Biggest Concern', 'Biggest Concerns'];
+  } else {
+    order = config.titles;
+  }
+  const section =
+    order.map((t) => sectionMap.get(t)).find(Boolean) || {
+      title: order[0],
+      body: 'No Significant Updates',
+    };
+  return { section, order };
+}
+
+function buildNotesTacticalOrder(sectionMap) {
+  const concerning = getConcerningTeamAttrNoteTitle(sectionMap);
+  return [NOTES_TACTICAL_ORDER_BASE[0], concerning, ...NOTES_TACTICAL_ORDER_BASE.slice(1)];
+}
 
 // Coaching focus display names
 const FOCUS_DISPLAY = {
@@ -526,7 +576,12 @@ function getPracticePlayerOfWeekNames() {
   const notes = reportData?.training_notes || [];
   notes.forEach((section) => {
     const title = typeof section === 'object' ? String(section.title || '') : '';
-    if (!/Practice Player(?:s)? Of The Week/i.test(title)) return;
+    if (
+      !/Practice Player(?:s)? Of The Week/i.test(title) &&
+      !/Training Camp (?:Co-)?MVPs?/i.test(title)
+    ) {
+      return;
+    }
     const body = typeof section === 'object' ? String(section.body || '') : String(section || '');
     const bodyLower = body.toLowerCase();
     players.forEach((name) => {
@@ -610,8 +665,12 @@ function getTrainingNotePortraitPlayer(sectionOrTitle, text) {
   const eligibleTitles = new Set([
     'Practice Player Of The Week',
     'Practice Players Of The Week',
+    'Training Camp MVP',
+    'Training Camp Co-MVPs',
     'Biggest Regression',
-    'Most Positive Locker Room Influence'
+    'Biggest Concern',
+    'Biggest Concerns',
+    'Most Positive Locker Room Influence',
   ]);
   if (!eligibleTitles.has(title)) return null;
   const players = Array.isArray(reportData?.players) ? reportData.players : [];
@@ -736,12 +795,16 @@ function getTrainingNoteValueTone(title, body) {
   const text = String(body || '').trim();
   if (isMutedTrainingNote(text) || /^none$/i.test(text)) return 'muted';
   if (title === 'Strong Cumulative Increase') return 'positive';
-  if (title === 'Concerning Regression') return 'negative';
+  if (title === 'Concerning Regression' || title === 'Concerning Progression') return 'negative';
   return 'default';
 }
 
 function formatTrainingNoteValue(title, body) {
-  if (title === 'Strong Cumulative Increase' || title === 'Concerning Regression') {
+  if (
+    title === 'Strong Cumulative Increase' ||
+    title === 'Concerning Regression' ||
+    title === 'Concerning Progression'
+  ) {
     return formatNoteAttributeList(body);
   }
   return String(body || '').trim() || 'No Significant Updates';
@@ -1635,10 +1698,7 @@ function renderTrainingNotes() {
     heroGrid.className = 'training-notes-hero-grid';
 
     NOTES_HERO_CONFIG.forEach((config) => {
-      const section = config.titles.map((title) => sectionMap.get(title)).find(Boolean) || {
-        title: config.titles[0],
-        body: 'No Significant Updates',
-      };
+      const { section } = resolveHeroNoteSection(config, sectionMap);
       const text = section.body != null ? String(section.body).trim() : '';
       const muted = isMutedTrainingNote(text) || /^none$/i.test(text);
       const player = muted ? null : getTrainingNotePortraitPlayer(section, text);
@@ -1652,7 +1712,8 @@ function renderTrainingNotes() {
 
       const label = document.createElement('div');
       label.className = 'training-notes-hero-label';
-      label.textContent = config.label;
+      label.textContent =
+        config.key === 'locker' ? config.label : section.title || config.label;
 
       const body = document.createElement('div');
       body.className = 'training-notes-hero-body';
@@ -1691,7 +1752,7 @@ function renderTrainingNotes() {
 
     const tacticalGrid = document.createElement('div');
     tacticalGrid.className = 'training-notes-tactical-grid';
-    NOTES_TACTICAL_ORDER.forEach((title) => {
+    buildNotesTacticalOrder(sectionMap).forEach((title) => {
       const section = sectionMap.get(title) || { title, body: 'No Significant Updates' };
       const valueText = formatTrainingNoteValue(title, section.body);
       const tone = getTrainingNoteValueTone(title, section.body);
