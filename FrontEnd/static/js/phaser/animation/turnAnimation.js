@@ -1720,6 +1720,22 @@ async function runDefensiveReboundSetup({
       outletTarget.x,
       outletTarget.y
     );
+    const pickBounceGrid = (t) =>
+      t && typeof t.ball_bounce_x === "number" && typeof t.ball_bounce_y === "number"
+        ? { x: t.ball_bounce_x, y: t.ball_bounce_y }
+        : null;
+    const rebounderToOutletDeltaGrid = Phaser.Math.Distance.Between(
+      rebGridX,
+      rebGridY,
+      outletTarget.x,
+      outletTarget.y
+    );
+    const receiverToRebounderDeltaGrid = Phaser.Math.Distance.Between(
+      currentReceiverGrid.x,
+      currentReceiverGrid.y,
+      rebGridX,
+      rebGridY
+    );
     console.log("🏀 [DREB OUTLET DEBUG] receiver movement plan", {
       turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
       resultType: authorityTurn?.result_type ?? null,
@@ -1737,11 +1753,21 @@ async function runDefensiveReboundSetup({
         x: Number(outletTarget.x.toFixed(2)),
         y: Number(outletTarget.y.toFixed(2)),
       },
+      rebounderGridFromSprite: {
+        x: Number(rebGridX.toFixed(2)),
+        y: Number(rebGridY.toFixed(2)),
+      },
+      bounceGridAuthority: pickBounceGrid(authorityTurn),
+      bounceGridTurnData: pickBounceGrid(turnData),
+      bounceGridMissTurn: pickBounceGrid(missTurnForGetback),
       outletDeltaGrid: Number(outletDeltaGrid.toFixed(2)),
+      rebounderToOutletTargetDeltaGrid: Number(rebounderToOutletDeltaGrid.toFixed(2)),
+      receiverToRebounderDeltaGrid: Number(receiverToRebounderDeltaGrid.toFixed(2)),
       outletDurationMs: Math.round(outletDuration),
       contractReceiverId: contractReceiverId ?? null,
       contractPasserId: contractPasserId ?? null,
       contractReceiverTarget: contractReceiverTarget ?? null,
+      newOffenseBasket: newOffenseBasket ?? null,
     });
     logDrebHandoff("PASS PLAN", {
       rebounderId,

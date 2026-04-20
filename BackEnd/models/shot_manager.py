@@ -257,6 +257,21 @@ class ShotManager:
 
         target_x = max(4.0, min(97.0, reb_x + sign * random.randint(3, 6)))
         target_y = max(1.0, min(50.0, reb_y + random.randint(-6, 6)))
+        rebound_team_name = getattr(rebound_team, "name", None) or getattr(
+            rebound_team, "team_id", "?"
+        )
+        logging.info(
+            "[DREB_OUTLET_TARGET] rebound_team=%s rebounder_id=%s reb_xy=(%.2f,%.2f) "
+            "transition_basket_x=%.2f sign=%s target_xy=(%.2f,%.2f)",
+            rebound_team_name,
+            rebounder_id,
+            reb_x,
+            reb_y,
+            basket_x,
+            sign,
+            target_x,
+            target_y,
+        )
         return {
             "x": round(target_x, 2),
             "y": round(target_y, 2),
