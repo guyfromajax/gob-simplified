@@ -4,7 +4,13 @@ import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenPlayerTo, runPass, detachBall, getBallDuration } from "./ballTween.js";
 import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
+import {
+  HOME_RIM_COORDS,
+  AWAY_RIM_COORDS,
+  HOME_TOP_KEY,
+  AWAY_TOP_KEY,
+  getMadeShotSweetSpotGrid,
+} from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
 import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
@@ -2723,11 +2729,11 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   if (hasBlockSpotWithStopper) {
     shotTargetPxWithStopper = gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, width, height);
   } else {
-    const adjustedBasket = { ...basket };
-    if (turnData.result_type === "MAKE") {
-      adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
-    }
-    shotTargetPxWithStopper = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
+    const endGrid =
+      turnData.result_type === "MAKE"
+        ? getMadeShotSweetSpotGrid(isHomeOffense)
+        : basket;
+    shotTargetPxWithStopper = gridToPixels(endGrid.x, endGrid.y, width, height);
   }
   await animateShotToRim(scene, shotTargetPxWithStopper, {
     duration: animationConfig.fastBreak?.shotMs ?? 350,
@@ -3036,8 +3042,11 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const blockSpotGrid = { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y };
     shotTargetPx = gridToPixels(blockSpotGrid.x, blockSpotGrid.y, width, height);
   } else {
-    const adjustedBasket = { ...basket };
-    shotTargetPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
+    const endGrid =
+      turnData.result_type === "MAKE"
+        ? getMadeShotSweetSpotGrid(isHomeOffense)
+        : basket;
+    shotTargetPx = gridToPixels(endGrid.x, endGrid.y, width, height);
   }
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
   await animateShotToRim(scene, shotTargetPx, {

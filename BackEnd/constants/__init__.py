@@ -133,8 +133,10 @@ TURNOVER_CALC_DICT = {
 
 POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
 
-# Ball landing adjustment for made shots (grid units inward from the rim)
-MADE_SHOT_BALL_OFFSET = 1
+# Ball rest position after a make (grid coords, one step toward center from each hoop).
+# Must stay in sync with FrontEnd/static/js/phaser/animation/courtConstants.js
+MADE_SHOT_SWEET_SPOT_HOME_RIM = {"x": 90, "y": 25}  # hoop at HOME_RIM_COORDS (91)
+MADE_SHOT_SWEET_SPOT_AWAY_RIM = {"x": 10, "y": 25}  # hoop at AWAY_RIM_COORDS (9)
 
 # constants/strategy_factors.py
 AGGRESSION_FOUL_MULTIPLIER = {

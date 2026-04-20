@@ -19,7 +19,7 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS, getMadeShotSweetSpotGrid } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
 import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
@@ -783,10 +783,22 @@ export class ShotAnimationSystem {
     const shooterSprite = this.playerSprites[shotInfo.playerId];
     // BLOCK: animate ball to block spot instead of rim
     const isBlock = turnData.result_type === 'BLOCK';
-    const rimCoords = (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null)
-      ? gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, this.scene.game.config.width, this.scene.game.config.height)
-      : this.getRimCoordinates(turnData);
     const isMake = turnData.result_type === 'MAKE';
+    let flightTargetPixels;
+    if (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null) {
+      flightTargetPixels = gridToPixels(
+        turnData.ball_bounce_x,
+        turnData.ball_bounce_y,
+        this.scene.game.config.width,
+        this.scene.game.config.height
+      );
+    } else if (isMake) {
+      const isHomeTeam = shooterSprite?.team === 'home';
+      const g = getMadeShotSweetSpotGrid(isHomeTeam);
+      flightTargetPixels = gridToPixels(g.x, g.y, this.scene.game.config.width, this.scene.game.config.height);
+    } else {
+      flightTargetPixels = this.getRimCoordinates(turnData);
+    }
     
     // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
     // console.log('🎯 ShotAnimationSystem: Handling shot at step', {
@@ -810,7 +822,7 @@ export class ShotAnimationSystem {
     // console.log('🎯 ShotAnimationSystem: Shot started, new state:', this.ballController.getState());
     
     // Animate ball flight
-    await this.animateBallFlight(shooterSprite, rimCoords, turnData);
+    await this.animateBallFlight(shooterSprite, flightTargetPixels, turnData);
   }
 
   /**
