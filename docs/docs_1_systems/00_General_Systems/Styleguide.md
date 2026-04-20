@@ -156,48 +156,62 @@ This document defines the core visual and interaction standards for Geeked-Out B
 
 ### Two Modal Types
 
-GOB uses two distinct modal types. Every modal must be classified as one of these before implementation.
+GOB uses two distinct modal types. Every modal must be classified as one before implementation.
 
 #### Functional Modals
-Used for confirmations, warnings, settings changes, and destructive actions. The goal is clarity and speed — get the user to a decision and out.
+Used for confirmations, warnings, settings changes, and destructive actions. Goal is clarity and speed — get the user to a decision and out.
 
-**Examples:** Auto-Train confirmation, Delete Franchise confirmation, unsaved changes warning.
+**Canonical examples:**
+- Auto-Train confirmation (training.html) — first canonical implementation
+- In-game timeout confirmation
+- End of quarter confirmation
+- Delete Franchise confirmation
+- Unsaved changes warning
 
-**Design principles:**
-- Neutral dark surface: `background: rgba(28, 33, 43, 0.97)`
-- No background imagery — surface only
-- Compact, focused layout — title, supporting copy, action buttons
-- Max width: `440px`
+**Shared CSS classes:** `.gob-modal-overlay`, `.gob-modal-backdrop`, `.gob-modal-box`, `.gob-modal-accent`, `.gob-modal-body`, `.gob-modal-title`, `.gob-modal-subtitle`, `.gob-modal-actions`, `.gob-modal-btn-primary`, `.gob-modal-btn-secondary`, `.gob-modal-btn-dismiss`
+
+**Design rules:**
+- Surface: `rgba(22, 26, 36, 0.98)`
+- Backdrop: `rgba(0, 0, 0, 0.72)`
+- Accent bar: 3px top bar in `#F79420` (orange default), `#34EC27` (green for gating confirms), `#ff6d6d` (red for destructive)
+- Max width: `420px`
 - Border: `1px solid rgba(255,255,255,0.12)`
 - Border radius: `14px`
-- Primary action button follows standard color rules (orange for save/confirm, green for gating actions only)
-- Secondary/cancel action is ghost treatment
-- No decorative elements — function over atmosphere
+- Title: Bebas Neue 28px white
+- Subtitle/copy: Inter 14px `rgba(255,255,255,0.55)`
+- Single dismiss action: full-width ghost button
+- Two actions: primary `flex: 2` + secondary/cancel `flex: 1`
+- No background imagery
+- No decorative elements
 
 #### Moment Modals
-Used for emotionally significant events — game results, training report reveals, season milestones, recruiting outcomes. The goal is payoff — the user should feel the weight of the moment.
+Used for emotionally significant events — game results, training report reveals, season milestones, recruiting outcomes. Goal is payoff — the user should feel the weight of the moment.
 
-**Examples:** End of Game result, Training Camp complete, Season complete, major recruiting commit.
+**Canonical examples:**
+- End of Game result
+- Training Camp complete
+- Season complete
+- Major recruiting commit
 
-**Design principles:**
-- Dark atmospheric surface: `background: rgba(13, 17, 36, 0.97)`
-- Team banner or contextually relevant image as full-bleed background with darkening gradient overlay (see Franchise Card treatment for gradient spec)
-- Result or outcome is the visual hero — largest, most prominent element
-- W/L or success/failure badge in top-right using semantic color (green for positive, red for negative)
-- Player or subject of the moment gets a dedicated spotlight section with portrait
-- Wider layout permitted — max width `560px`
+**Design rules:**
+- Surface: `rgba(13, 17, 36, 0.97)`
+- Backdrop: `rgba(0, 0, 0, 0.72)`
+- Team banner or contextually relevant image as full-bleed background with darkening gradient overlay
+- Outcome is the visual hero — largest most prominent element
+- W/L or success/failure badge top-right using semantic color (green for positive, red for negative)
+- Subject of the moment gets portrait spotlight section
+- Max width: `560px`
 - Border: `1px solid rgba(255,255,255,0.12)`
 - Border radius: `16px`
-- Button row at bottom: primary action `flex: 2`, secondary action `flex: 1`
-- Motion: entrance should feel deliberate — consider a subtle scale-up from `0.96` to `1.0` over `200ms ease`
+- Button row: primary `flex: 2`, secondary `flex: 1`
+- Entrance: subtle scale from `0.96` to `1.0` over `200ms ease`
 
-### Shared Modal Rules
-- All modals use a backdrop: `background: rgba(0,0,0,0.65)`
-- Backdrop click dismisses Functional Modals; Moment Modals require explicit button action
-- ESC key dismisses Functional Modals
-- Close behavior must be obvious and consistent
-- Modal copy should remain concise and scannable
+### Shared Rules (Both Types)
+- Backdrop click dismisses Functional Modals only — Moment Modals require explicit button action
+- ESC dismisses Functional Modals only
 - Only one modal visible at a time
+- All button copy uses Bebas Neue
+- Toggle visibility via `.is-visible` class, not inline `display` style
 
 ## Toast Notifications
 

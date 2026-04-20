@@ -186,52 +186,6 @@ input[type="reset"] {
   box-shadow: none;
 }
 
-/* Auto-Train modal */
-.auto-train-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-
-.auto-train-modal-content {
-  background: #1f2a48;
-  padding: var(--spacing-lg);
-  border-radius: var(--radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  max-width: 420px;
-  width: 90%;
-  text-align: center;
-  border: 1px solid var(--color-border);
-}
-
-.auto-train-modal-content p {
-  margin-bottom: var(--spacing-md);
-  font-size: 1.1rem;
-  color: var(--color-text);
-}
-
-.auto-train-modal-close {
-  background: var(--color-accent-orange);
-  color: #fff;
-  border: none;
-  padding: 0.6rem 1.4rem;
-  border-radius: var(--radius);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.auto-train-modal-close:hover {
-  background: #ff8f26;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
-}
-
 /* Main Content: Player Drills and Team Drills */
 .main-content-grid {
   grid-column: 1 / -1;
@@ -844,7 +798,6 @@ body.training-page .header-actions {
 body.training-page .auto-train-button,
 body.training-page .submit-button,
 body.training-page .recruiting-invites-button,
-body.training-page .auto-train-modal-close,
 body.training-page .custom-focus-assign-btn {
   display: inline-flex;
   align-items: center;
@@ -867,7 +820,6 @@ body.training-page .recruiting-invites-button {
 }
 
 body.training-page .submit-button,
-body.training-page .auto-train-modal-close,
 body.training-page .custom-focus-assign-btn {
   background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
   color: #ffffff;
@@ -880,7 +832,6 @@ body.training-page .recruiting-invites-button:hover:not(:disabled) {
 }
 
 body.training-page .submit-button:hover:not(:disabled),
-body.training-page .auto-train-modal-close:hover,
 body.training-page .custom-focus-assign-btn:hover:not(:disabled) {
   background: linear-gradient(180deg, #ffb95b 0%, #ffa02f 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
@@ -1373,35 +1324,10 @@ body.training-page .archetype-block[data-archetype="culture-builder"] .archetype
   border-color: rgba(123, 94, 167, 0.94);
 }
 
-body.training-page .custom-focus-modal-content,
-body.training-page .auto-train-modal-content {
+body.training-page .custom-focus-modal-content {
   background: rgba(28, 33, 43, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 14px;
-}
-
-body.training-page .auto-train-modal-content {
-  text-align: center;
-}
-
-body.training-page #auto-train-modal-message {
-  margin-bottom: 18px;
-  text-align: center;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 2rem;
-  line-height: 1;
-  letter-spacing: 0.03em;
-  color: #ffffff;
-}
-
-body.training-page .auto-train-modal-focus-line {
-  display: block;
-  margin-top: 12px;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.76);
 }
 
 body.training-page .custom-focus-modal-title {

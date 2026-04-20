@@ -227,3 +227,155 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: #fff;
   transform: translateY(-1px);
 }
+
+/* ============================================
+   GOB FUNCTIONAL MODAL SYSTEM
+   Canonical reference: Auto-Train confirmation
+   Also used for: in-game timeout, end of quarter,
+   delete confirmation, unsaved changes warnings
+   ============================================ */
+
+.gob-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+.gob-modal-overlay.is-visible {
+  display: flex;
+}
+
+.gob-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.gob-modal-box {
+  position: relative;
+  z-index: 1;
+  width: min(420px, calc(100vw - 40px));
+  background: rgba(22, 26, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.gob-modal-accent {
+  height: 3px;
+  width: 100%;
+  flex-shrink: 0;
+  background: #F79420;
+}
+
+.gob-modal-accent.is-green {
+  background: #34EC27;
+}
+
+.gob-modal-accent.is-red {
+  background: #ff6d6d;
+}
+
+.gob-modal-body {
+  padding: 24px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gob-modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.gob-modal-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+}
+
+.gob-modal-actions {
+  display: flex;
+  gap: 10px;
+  padding: 0 28px 24px;
+  flex-shrink: 0;
+}
+
+.gob-modal-btn-primary {
+  appearance: none;
+  flex: 2;
+  height: 42px;
+  background: #F79420;
+  border: 1px solid rgba(247, 148, 32, 0.45);
+  border-radius: 10px;
+  color: #15181f;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.14s ease;
+}
+
+.gob-modal-btn-primary:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.gob-modal-btn-primary.is-green {
+  background: #34EC27;
+  border-color: rgba(52, 236, 39, 0.5);
+}
+
+.gob-modal-btn-secondary {
+  appearance: none;
+  flex: 1;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.gob-modal-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+.gob-modal-btn-dismiss {
+  appearance: none;
+  flex: 1;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.gob-modal-btn-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}

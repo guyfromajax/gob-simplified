@@ -109,9 +109,9 @@ const NOTES_HERO_CONFIG = [
     key: 'practice',
     titles: ['Practice Player Of The Week', 'Practice Players Of The Week'],
     label: 'Practice Player Of The Week',
-    accent: '#F79420',
-    accentBorder: 'rgba(247,148,32,0.4)',
-    accentTint: 'rgba(247,148,32,0.12)',
+    accent: '#34EC27',
+    accentBorder: 'rgba(52,236,39,0.3)',
+    accentTint: 'rgba(52,236,39,0.1)',
   },
   {
     key: 'regression',
@@ -125,9 +125,9 @@ const NOTES_HERO_CONFIG = [
     key: 'locker',
     titles: ['Most Positive Locker Room Influence'],
     label: 'Most Positive Locker Room Influence',
-    accent: '#34EC27',
-    accentBorder: 'rgba(52,236,39,0.3)',
-    accentTint: 'rgba(52,236,39,0.1)',
+    accent: '#F79420',
+    accentBorder: 'rgba(247,148,32,0.4)',
+    accentTint: 'rgba(247,148,32,0.12)',
   }
 ];
 

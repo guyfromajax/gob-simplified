@@ -12,7 +12,8 @@ const coachingRadios = document.querySelectorAll('input[name="coaching-focus"]')
 const offensePlaysRadios = document.querySelectorAll('input[name="offense-plays"]');
 const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"]');
 const autoTrainModal = document.getElementById('auto-train-modal');
-const autoTrainModalMessage = document.getElementById('auto-train-modal-message');
+const autoTrainModalTitle = document.getElementById('auto-train-modal-title');
+const autoTrainModalFocus = document.getElementById('auto-train-modal-focus');
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
 const customFocusModal = document.getElementById('custom-focus-modal');
 const customFocusThead = document.getElementById('custom-focus-thead');
@@ -587,7 +588,7 @@ function autoAssignTraining() {
   updatePointsRemaining();
 
   // 5) Show confirmation popup
-  if (autoTrainModal && autoTrainModalMessage) {
+  if (autoTrainModal && autoTrainModalTitle && autoTrainModalFocus) {
     // Normalize archetype names to exact format required
     const archetypeMap = {
       'authoritarian': 'Authoritarian',
@@ -633,8 +634,10 @@ function autoAssignTraining() {
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     // Archetype must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
     const focusText = normalizedArchetype ? `${cleanFocus} (${normalizedArchetype})` : cleanFocus;
-    autoTrainModalMessage.innerHTML = `Training Lock In<br><span class="auto-train-modal-focus-line">Focus: ${focusText}</span>`;
-    autoTrainModal.style.display = 'flex';
+    autoTrainModalTitle.textContent = 'Training Lock In';
+    autoTrainModalFocus.textContent = `Focus: ${focusText}`;
+    autoTrainModalFocus.hidden = false;
+    autoTrainModal.classList.add('is-visible');
   }
 }
 
@@ -644,7 +647,7 @@ if (autoTrainBtn) {
 if (autoTrainModalClose && autoTrainModal) {
   autoTrainModalClose.addEventListener('click', () => {
     playSound('click-tiny.wav');
-    autoTrainModal.style.display = 'none';
+    autoTrainModal.classList.remove('is-visible');
   });
 }
 
@@ -903,13 +906,15 @@ function playSound(filename) {
 }
 
 function showMessageModal(message, buttonLabel = 'Close') {
-  if (!autoTrainModal || !autoTrainModalMessage || !autoTrainModalClose) {
+  if (!autoTrainModal || !autoTrainModalTitle || !autoTrainModalFocus || !autoTrainModalClose) {
     alert(message);
     return;
   }
-  autoTrainModalMessage.textContent = message;
+  autoTrainModalTitle.textContent = message;
+  autoTrainModalFocus.textContent = '';
+  autoTrainModalFocus.hidden = true;
   autoTrainModalClose.textContent = buttonLabel;
-  autoTrainModal.style.display = 'flex';
+  autoTrainModal.classList.add('is-visible');
 }
 
 /**

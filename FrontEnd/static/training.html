@@ -390,10 +390,17 @@
   </div>
 
   <!-- Auto-Train confirmation modal -->
-  <div id="auto-train-modal" class="auto-train-modal">
-    <div class="auto-train-modal-content">
-      <p id="auto-train-modal-message">Training Lock In<br><span class="auto-train-modal-focus-line">Focus: Attributes 4–6 (Player Maximizer)</span></p>
-      <button id="auto-train-modal-close" class="auto-train-modal-close">Close</button>
+  <div id="auto-train-modal" class="gob-modal-overlay">
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box">
+      <div class="gob-modal-accent"></div>
+      <div class="gob-modal-body">
+        <div class="gob-modal-title" id="auto-train-modal-title">Training Lock In</div>
+        <div class="gob-modal-subtitle" id="auto-train-modal-focus">Focus: Attributes 4–6 (Player Maximizer)</div>
+      </div>
+      <div class="gob-modal-actions">
+        <button id="auto-train-modal-close" class="gob-modal-btn-dismiss">Close</button>
+      </div>
     </div>
   </div>
 
