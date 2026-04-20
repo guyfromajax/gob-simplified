@@ -184,14 +184,7 @@ body.mode-select-page .franchise-home-slot {
 
 body.mode-select-page .franchise-delete-row {
   width: min(720px, 100%);
-  margin: 0 auto;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0 0 14px 14px;
-  background: rgba(13, 17, 36, 0.6);
-  padding: 14px 20px;
-  text-align: center;
+  margin: 10px auto 0;
 }
 
 body.mode-select-page .franchise-home-card {
@@ -295,7 +288,7 @@ body.mode-select-page .franchise-enter-btn:hover {
 body.mode-select-page .franchise-home-card-active {
   position: relative;
   min-height: 220px;
-  border-radius: 14px 14px 0 0;
+  border-radius: 14px;
   overflow: hidden;
   background-color: #0d1124;
   background-size: cover;

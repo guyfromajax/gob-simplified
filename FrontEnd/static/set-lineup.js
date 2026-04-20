@@ -802,21 +802,13 @@ function renderRoster() {
         td.className = 'player-name-cell';
         const wrap = document.createElement('div');
         wrap.className = 'player-name-wrap';
-        const link = document.createElement('a');
-        applyPlayerDetailLinkBehavior(link, p._id);
-        link.textContent = val ?? '--';
-        link.className = 'player-name-link';
-        link.style.textDecoration = 'none';
-        link.addEventListener('mouseenter', () => {
-          link.style.textDecoration = 'underline';
-        });
-        link.addEventListener('mouseleave', () => {
-          link.style.textDecoration = 'none';
-        });
+        const nameText = document.createElement('span');
+        nameText.textContent = val ?? '--';
+        nameText.className = 'player-name-link';
         const rtSpan = document.createElement('span');
         rtSpan.className = 'inline-rt';
         rtSpan.textContent = rt ?? '--';
-        wrap.appendChild(link);
+        wrap.appendChild(nameText);
         wrap.appendChild(rtSpan);
         td.appendChild(wrap);
       } else {
@@ -2465,7 +2457,7 @@ renderRoster = function() {
           if (!selectedIds.includes(p._id)) {
             const assigned = fillNextSlot(p._id);
             if (assigned) {
-              playSound('click-tiny.wav');
+              playSound('click-soft.mp3');
             }
           }
         });
