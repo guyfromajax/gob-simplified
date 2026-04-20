@@ -2412,25 +2412,35 @@ function assignToSlot(pos, playerId) {
   return true;
 }
 
+function getHighestOpenSlotPosition() {
+  const renderedSlots = Array.from(document.querySelectorAll('#slots .slot[data-pos]'));
+  for (const slot of renderedSlots) {
+    const pos = slot.dataset.pos;
+    if (pos && !lineup[pos]) {
+      return pos;
+    }
+  }
+
+  const fallbackPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  return fallbackPositions.find(pos => !lineup[pos]) || null;
+}
+
 function fillNextSlot(playerId) {
   const player = playerMap[playerId];
   
   // Check if player is ineligible (fouled out)
   if (player && (player.ineligible || player.fouled_out)) {
     showToast(`${player.name} has fouled out and cannot play`);
-    return;
+    return false;
   }
-  
-  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-  
-  for (const pos of positions) {
-    if (!lineup[pos]) {
-      const success = assignToSlot(pos, playerId);
-      if (success) return;
-    }
+
+  const openPos = getHighestOpenSlotPosition();
+  if (openPos) {
+    return assignToSlot(openPos, playerId);
   }
-  
+
   showToast('All positions filled');
+  return false;
 }
 
 // Update renderRoster to mark selected rows
@@ -2453,8 +2463,10 @@ renderRoster = function() {
       if (!p.ineligible && !p.fouled_out) {
         row.addEventListener('click', (e) => {
           if (!selectedIds.includes(p._id)) {
-            playSound('click-soft.mp3');
-            fillNextSlot(p._id);
+            const assigned = fillNextSlot(p._id);
+            if (assigned) {
+              playSound('click-tiny.wav');
+            }
           }
         });
       } else if (p.ineligible || p.fouled_out) {

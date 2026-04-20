@@ -597,6 +597,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   background: transparent;
   transition: background 0.14s ease, opacity 0.14s ease;
   vertical-align: top;
+  position: relative;
 }
 
 .roster-table tbody tr:nth-child(odd) td {
@@ -652,11 +653,31 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .roster-table tr.selected td {
-  opacity: 0.4;
+  background: rgba(255,255,255,0.03) !important;
+  color: rgba(255,255,255,0.32);
+}
+
+.roster-table tr.selected td::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 16, 23, 0.56);
+  pointer-events: none;
 }
 
 .roster-table tr.selected td:first-child {
   box-shadow: inset 3px 0 0 rgba(247,148,32,0.8);
+}
+
+.roster-table tr.selected {
+  cursor: not-allowed;
+}
+
+.roster-table tr.selected td:first-child,
+.roster-table tr.selected td:first-child a,
+.roster-table tr.selected td.rt,
+.roster-table tr.selected .inline-rt {
+  color: rgba(255,255,255,0.52);
 }
 
 .roster-table tr.ineligible td {
