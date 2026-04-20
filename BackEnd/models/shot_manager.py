@@ -56,6 +56,9 @@ CONTEST_DEFENDER_DX_MAX = 8
 CONTEST_DEFENDER_DY_MAX = 8
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
 
+# DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
+DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
+
 
 def _shooter_xy_from_roles(roles, shooter):
     shot_spot = roles.get("shot_spot")
@@ -238,19 +241,39 @@ class ShotManager:
                 return player
         return None
 
-    def _build_dreb_outlet_receiver_target(self, rebound_team, rebounder_id):
+    def _build_dreb_outlet_receiver_target(self, rebound_team, rebounder_id, ball_bounce=None):
         """
         Build unit-specific receive target for DREB->halfcourt outlet.
 
         This target is not the generic shot-turn animation end. It is a dedicated
         receive spot near the rebounder, biased toward the new attacking basket.
+
+        When ``ball_bounce`` is provided and ``rebounder.coords`` disagree with it by
+        more than ``DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD`` on x, passer position
+        is re-anchored near the bounce so the outlet matches where the board was secured
+        (avoids stale defensive-shell coords).
         """
         rebounder = self._resolve_lineup_player_by_id(rebound_team, rebounder_id)
         if rebounder is None:
             return None
         rebounder_coords = getattr(rebounder, "coords", None) or {}
-        reb_x = float(rebounder_coords.get("x", 50))
-        reb_y = float(rebounder_coords.get("y", 25))
+        raw_reb_x = float(rebounder_coords.get("x", 50))
+        raw_reb_y = float(rebounder_coords.get("y", 25))
+        reb_x = raw_reb_x
+        reb_y = raw_reb_y
+        anchor_source = "rebounder_coords"
+
+        if ball_bounce is not None:
+            bx = ball_bounce.get("x") if isinstance(ball_bounce, dict) else None
+            by = ball_bounce.get("y") if isinstance(ball_bounce, dict) else None
+            if bx is not None and by is not None:
+                bx = float(bx)
+                by = float(by)
+                if abs(raw_reb_x - bx) > DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD:
+                    reb_x = float(max(4.0, min(97.0, bx + random.randint(-3, 3))))
+                    reb_y = float(max(1.0, min(50.0, by + random.randint(-5, 5))))
+                    anchor_source = "ball_bounce_corrected"
+
         # Use transition animation basket orientation (matches frontend).
         basket_x, _basket_y = _animation_transition_basket_xy(rebound_team, self.game)
         sign = 1 if basket_x > reb_x else -1
@@ -261,12 +284,17 @@ class ShotManager:
             rebound_team, "team_id", "?"
         )
         logging.info(
-            "[DREB_OUTLET_TARGET] rebound_team=%s rebounder_id=%s reb_xy=(%.2f,%.2f) "
-            "transition_basket_x=%.2f sign=%s target_xy=(%.2f,%.2f)",
+            "[DREB_OUTLET_TARGET] rebound_team=%s rebounder_id=%s raw_reb_xy=(%.2f,%.2f) "
+            "passer_xy_used=(%.2f,%.2f) anchor=%s bounce_xy=%s transition_basket_x=%.2f "
+            "sign=%s target_xy=(%.2f,%.2f)",
             rebound_team_name,
             rebounder_id,
+            raw_reb_x,
+            raw_reb_y,
             reb_x,
             reb_y,
+            anchor_source,
+            ball_bounce,
             basket_x,
             sign,
             target_x,
@@ -278,7 +306,7 @@ class ShotManager:
             "source": "shot_manager_dreb_outlet_receiver_target",
         }
 
-    def _build_dreb_outlet_pass_contract(self, rebound_team, rebounder_id):
+    def _build_dreb_outlet_pass_contract(self, rebound_team, rebounder_id, ball_bounce=None):
         """Build explicit outlet-pass contract consumed by frontend DREB setup."""
         passer_id = rebounder_id
         if passer_id is None:
@@ -287,7 +315,9 @@ class ShotManager:
         receiver_id = self._resolve_dreb_outlet_receiver(rebound_team, passer_id)
         if passer_id is None or receiver_id is None:
             return None
-        receiver_target = self._build_dreb_outlet_receiver_target(rebound_team, passer_id)
+        receiver_target = self._build_dreb_outlet_receiver_target(
+            rebound_team, passer_id, ball_bounce=ball_bounce
+        )
         return {
             "passer_id": passer_id,
             "receiver_id": receiver_id,
@@ -1906,9 +1936,17 @@ class ShotManager:
         next_play_type = str(result.get("next_play_type") or "").upper()
         rebound_type = str(result.get("rebound_type") or "").upper()
         if rebound_type == "DREB" and next_play_type in {"HCO", "HCT", "FCP"}:
+            ball_bounce = None
+            bx, by = result.get("ball_bounce_x"), result.get("ball_bounce_y")
+            if bx is not None and by is not None:
+                try:
+                    ball_bounce = {"x": float(bx), "y": float(by)}
+                except (TypeError, ValueError):
+                    ball_bounce = None
             contract = self._build_dreb_outlet_pass_contract(
                 rebound_team=def_team,
                 rebounder_id=result.get("rebounderId"),
+                ball_bounce=ball_bounce,
             )
             if contract:
                 result["dreb_outlet_pass"] = contract
