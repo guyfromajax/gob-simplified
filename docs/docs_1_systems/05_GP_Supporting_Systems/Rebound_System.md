@@ -7,6 +7,18 @@ A unified system that handles rebound logic for all missed shot instances.
 
 **Note - we need to animate rebounders into position during shot attempt**
 
+## Free Throw Miss Rebounds
+
+When the **last** free throw is missed, rebound selection runs in `resolve_free_throw_logic` (`BackEnd/engine/phase_resolution.py`) after **`apply_coords_from_animations_list`** updates player `coords` from the FT lane / setup animation. Rebounding uses **`determine_rebounder`** in `BackEnd/utils/shared.py` with the same bounce spot as today (`calculate_bounce_spot` from the attacked basket).
+
+### X-distance eligibility (FT only)
+
+- **Constant:** `FREE_THROW_REBOUND_MAX_X_DELTA = 20` (x grid units) in `BackEnd/utils/shared.py`.
+- **Rule:** Before choosing the closest player to the bounce on each team, the pool is filtered to players with **|coords.x − bounce_x| ≤ 20**. Players farther than **20** x-spots from the bounce (using coords at FT attempt time) are **not** eligible to be that team’s rebound candidate.
+- **Y:** The gate uses **x only**; y is unchanged from existing closest-to-bounce logic.
+- **Fallback:** If no one on **either** team passes the filter, the engine logs a warning and runs **`determine_rebounder`** again on **full lineups** (no x gate) so a rebound is always assigned.
+- **Scope:** Only **missed last FT** passes `max_x_delta_from_bounce` into `determine_rebounder`. HCO, fast break, and OREB putback-miss rebounds do **not** use this gate unless called with the same keyword explicitly in the future.
+
 ## OREB Putback Shot Defender
 
 OREB putbacks now use a proximity-qualified shot defender system instead of the old weighted-by-position shortcut.

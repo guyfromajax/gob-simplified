@@ -1957,6 +1957,26 @@ def resolve_free_throw_logic(game):
                 bounce_spot,
                 max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
             )
+
+            anim_list = animations if isinstance(animations, list) else []
+            player_anim_count = sum(
+                1
+                for a in anim_list
+                if isinstance(a, dict) and str(a.get("playerId")) != "ball"
+            )
+            x_gate_fallback = bool(game_state.pop("_ft_rebound_x_gate_fallback", False))
+            logging.info(
+                "[FT_REBOUND] miss_last_ft full_sim=%s no_lane=%s anim_total=%s player_anim=%s "
+                "bounce_x=%s x_gate_fallback=%s stat=%s rebounder_id=%s",
+                bool(game.game_state.get("_is_full_simulation")),
+                bool(game_state.get("no_lane")),
+                len(anim_list),
+                player_anim_count,
+                bounce_spot.get("x"),
+                x_gate_fallback,
+                stat,
+                getattr(rebounder, "player_id", None),
+            )
             
             game_state["last_rebound"] = stat
             game_state["last_rebounder"] = rebounder

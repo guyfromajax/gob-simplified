@@ -1148,6 +1148,9 @@ def determine_rebounder(
         penalize_player_ids = set()
 
     if max_x_delta_from_bounce is not None:
+        gs_diag = getattr(game, "game_state", None)
+        if isinstance(gs_diag, dict):
+            gs_diag.pop("_ft_rebound_x_gate_fallback", None)
         bx = bounce_spot.get("x", 50)
         off_use = _filter_lineup_by_max_x_delta_from_bounce(
             off_lineup, bx, max_x_delta_from_bounce
@@ -1162,6 +1165,8 @@ def determine_rebounder(
                 max_x_delta_from_bounce,
                 bx,
             )
+            if isinstance(gs_diag, dict):
+                gs_diag["_ft_rebound_x_gate_fallback"] = True
             off_use, def_use = off_lineup, def_lineup
     else:
         off_use, def_use = off_lineup, def_lineup
