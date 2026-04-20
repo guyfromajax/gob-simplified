@@ -984,6 +984,33 @@ def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
     return {"x": bounce_x, "y": bounce_y}
 
 
+# Free throw miss: only players within this many x-grid units of the bounce may rebound.
+FREE_THROW_REBOUND_MAX_X_DELTA = 20
+
+
+def _filter_lineup_by_max_x_delta_from_bounce(lineup, bounce_x, max_x_delta):
+    """Keep players whose |coords.x - bounce_x| <= max_x_delta (FT lane / rim-adjacent)."""
+    if not lineup or max_x_delta is None:
+        return lineup
+    try:
+        bx = float(bounce_x)
+        mxd = float(max_x_delta)
+    except (TypeError, ValueError):
+        return lineup
+    filtered = {}
+    for pos, player in lineup.items():
+        if player is None:
+            continue
+        c = getattr(player, "coords", None) or {}
+        try:
+            px = float(c.get("x", 50))
+        except (TypeError, ValueError):
+            px = 50.0
+        if abs(px - bx) <= mxd:
+            filtered[pos] = player
+    return filtered
+
+
 def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_player_ids=None):
     """
     Choose the player closest to the bounce spot (geography-based).
@@ -1085,7 +1112,14 @@ def default_rebounder_dict():
         "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
     }
 
-def determine_rebounder(game, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+def determine_rebounder(
+    game,
+    bounce_spot=None,
+    exclude_player_ids=None,
+    penalize_player_ids=None,
+    *,
+    max_x_delta_from_bounce=None,
+):
     """
     Determine rebounder using geography-based system (closest to bounce spot).
     
@@ -1094,6 +1128,9 @@ def determine_rebounder(game, bounce_spot=None, exclude_player_ids=None, penaliz
         bounce_spot: Optional dict with "x" and "y" keys. If None, calculates from basket.
         exclude_player_ids: Optional set of player_ids to exclude (e.g., shooter)
         penalize_player_ids: Optional set of player_ids to penalize by 20% distance (e.g., shooter, putback player)
+        max_x_delta_from_bounce: If set (e.g. FREE_THROW_REBOUND_MAX_X_DELTA), only players with
+            |coords.x - bounce_x| <= this value are eligible per team. If that removes everyone on
+            both teams, falls back to full lineups with a warning.
     
     Returns:
         tuple: (rebounder, team, stat) where stat is "DREB" or "OREB"
@@ -1109,24 +1146,43 @@ def determine_rebounder(game, bounce_spot=None, exclude_player_ids=None, penaliz
     
     if penalize_player_ids is None:
         penalize_player_ids = set()
+
+    if max_x_delta_from_bounce is not None:
+        bx = bounce_spot.get("x", 50)
+        off_use = _filter_lineup_by_max_x_delta_from_bounce(
+            off_lineup, bx, max_x_delta_from_bounce
+        )
+        def_use = _filter_lineup_by_max_x_delta_from_bounce(
+            def_lineup, bx, max_x_delta_from_bounce
+        )
+        if not off_use and not def_use:
+            logging.warning(
+                "determine_rebounder: max_x_delta_from_bounce=%s excluded all players "
+                "(bounce_x=%s); falling back to full lineups",
+                max_x_delta_from_bounce,
+                bx,
+            )
+            off_use, def_use = off_lineup, def_lineup
+    else:
+        off_use, def_use = off_lineup, def_lineup
     
     # Choose closest player from each team (with penalty for shooter/putback player)
-    o_rebounder = choose_rebounder(off_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
-    d_rebounder = choose_rebounder(def_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
+    o_rebounder = choose_rebounder(off_use, bounce_spot, exclude_player_ids, penalize_player_ids)
+    d_rebounder = choose_rebounder(def_use, bounce_spot, exclude_player_ids, penalize_player_ids)
     
     # Handle edge cases
     if o_rebounder is None and d_rebounder is None:
         # No rebounders from either team - find closest player to bounce spot from all players
         logging.warning("determine_rebounder: No valid rebounders found, using closest player from all players")
         all_players_lineup = {}
-        # Combine both lineups
+        # Combine both lineups (full — excludes/empty pool edge case)
         for pos, player in off_lineup.items():
             if player is not None:
                 all_players_lineup[f"O_{pos}"] = player
         for pos, player in def_lineup.items():
             if player is not None:
                 all_players_lineup[f"D_{pos}"] = player
-        
+
         closest_player = choose_rebounder(all_players_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
         
         if closest_player is None:

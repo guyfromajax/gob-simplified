@@ -697,6 +697,20 @@ class GameManager:
                 break
         _perf["oreb_loop"] = (_time.time() - _t0) * 1000
 
+        # OTB foul from resolve_offensive_rebound() means no putback/kickout was resolved on the
+        # OREB turn. The MISS (or BLOCK) turn still carries embedded OREB; the client otherwise
+        # defaults to a forced putback animation. Flag the prior shot turn so the frontend skips it.
+        if len(self.turns) >= 2:
+            _last = self.turns[-1]
+            _prev = self.turns[-2]
+            if (
+                _last.get("result_type") == "FOUL"
+                and _last.get("otb_foul")
+                and _prev.get("rebound_type") == "OREB"
+                and _prev.get("result_type") in ("MISS", "BLOCK")
+            ):
+                _prev["suppress_oreb_putback_animation"] = True
+
         # Log breakdown on sample turns during full_sim to see what drives user-game slowness
         if self.game_state.get("_is_full_simulation") and (
             self.macro_turn_count <= 3 or self.macro_turn_count % 10 == 0

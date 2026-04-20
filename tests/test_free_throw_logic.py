@@ -159,7 +159,9 @@ def test_missed_final_ft_dreb_no_fast_break_while_flag_disabled(monkeypatch):
     shooter.attributes["MO"] = 0
     dreb_c = game.defense_team.lineup["C"]
 
-    def fake_determine_rebounder(g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+    def fake_determine_rebounder(
+        g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **kwargs
+    ):
         return dreb_c, game.defense_team, "DREB"
 
     monkeypatch.setattr(
@@ -212,7 +214,9 @@ def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):
         },
     ]
 
-    def fake_determine_rebounder(g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+    def fake_determine_rebounder(
+        g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **kwargs
+    ):
         # Critical assertion: coords are already synced from FT animation endpoints.
         assert offense_pg.coords == expected_pg_end
         assert defense_c.coords == expected_c_end

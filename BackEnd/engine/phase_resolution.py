@@ -34,6 +34,7 @@ from BackEnd.utils.shared import (
     unpack_game_context,
     calculate_bounce_spot,
     determine_rebounder,
+    FREE_THROW_REBOUND_MAX_X_DELTA,
     apply_coords_from_animations_list,
 )
 from BackEnd.utils.position_snapshot_ledger import (
@@ -1950,8 +1951,12 @@ def resolve_free_throw_logic(game):
             basket_x = 9 if is_away_offense else 91
             bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
             
-            # Use unified system to determine rebounder
-            rebounder, rebound_team, stat = determine_rebounder(game, bounce_spot)
+            # Closest-to-bounce among players within |x - bounce_x| <= threshold (post-FT anim coords).
+            rebounder, rebound_team, stat = determine_rebounder(
+                game,
+                bounce_spot,
+                max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
+            )
             
             game_state["last_rebound"] = stat
             game_state["last_rebounder"] = rebounder

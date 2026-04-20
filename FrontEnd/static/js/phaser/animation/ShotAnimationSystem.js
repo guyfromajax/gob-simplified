@@ -1689,7 +1689,9 @@ export class ShotAnimationSystem {
     // ✅ DEBUG: Check what turns are coming next
     const currentTurnIndex = this.scene.currentTurn || 0;
     const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
-    const nextNextTurn = this.scene.simData?.turns?.[currentTurnIndex + 2];
+    const otbNegatesOrebFollowup =
+      Boolean(turnData?.suppress_oreb_putback_animation) ||
+      (nextTurn?.result_type === 'FOUL' && Boolean(nextTurn?.otb_foul));
     
     // ✅ REMOVED: Offensive rebound logging (cluttering console)
     
@@ -1734,10 +1736,28 @@ export class ShotAnimationSystem {
         decisionType,
         hasKickoutEvent,
         isPutbackAttempt,
+        otbNegatesOrebFollowup,
       },
     });
 
     const actionStartMs = Date.now();
+    if (otbNegatesOrebFollowup) {
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.phase.otb_negates_putback_kickout',
+        advanceTrigger: 'OTB foul follows; no putback or kickout',
+        visualSettleTrigger: 'rebound secure only',
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: actionStartMs,
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          fromBackendFlag: Boolean(turnData?.suppress_oreb_putback_animation),
+          nextTurnOtb: nextTurn?.result_type === 'FOUL' && Boolean(nextTurn?.otb_foul),
+        },
+      });
+      return;
+    }
     if (decisionType === 'kickout') {
       await this.executeKickoutPass(rebounderSprite, turnData);
       this.enforceOrebUnitContract({
