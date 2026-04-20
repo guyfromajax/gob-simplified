@@ -2111,18 +2111,6 @@ export class ShotAnimationSystem {
     const isHomeTeam = shooterSprite?.team === 'home';
     let gridRimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
     
-    // ✅ FIX: Adjust rim position for made shots (1 grid unit closer to shooter)
-    // This matches the adjustment in ballManager.js and fastBreak.js
-    // Home team (shoots at x=91): reduce by 1 → 90
-    // Away team (shoots at x=9): increase by 1 → 10
-    const isMake = turnData.result_type === 'MAKE' || turnData.result_type === 'PUTBACK_MAKE';
-    if (isMake) {
-      gridRimCoords = {
-        ...gridRimCoords,
-        x: isHomeTeam ? gridRimCoords.x - 1 : gridRimCoords.x + 1
-      };
-    }
-    
     // Convert grid coordinates to pixel coordinates (like the old system does)
     const pixelRimCoords = gridToPixels(
       gridRimCoords.x,

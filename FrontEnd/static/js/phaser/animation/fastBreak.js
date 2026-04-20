@@ -3036,11 +3036,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const blockSpotGrid = { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y };
     shotTargetPx = gridToPixels(blockSpotGrid.x, blockSpotGrid.y, width, height);
   } else {
-    // ✅ FIX: Adjust rim position for made shots (1 grid unit closer to shooter)
     const adjustedBasket = { ...basket };
-    if (turnData.result_type === "MAKE") {
-      adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
-    }
     shotTargetPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   }
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate

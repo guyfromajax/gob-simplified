@@ -310,13 +310,8 @@ export async function shootBall({
     showAnnouncement("DOUBLE TEAM!", 'neutral', null);
   }
   
-  // Adjust landing position for made shots
-  // Home team (attacks away basket x=91): reduce by 1 → 90
-  // Away team (attacks home basket x=9): increase by 1 → 10
+  // Keep made shots on the true rim coordinates for visual evaluation.
   const adjustedRimCoords = { ...rimCoords };
-  if (result === "MAKE") {
-    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - 1 : rimCoords.x + 1;
-  }
   
   const rim = gridToPixels(
     adjustedRimCoords.x,

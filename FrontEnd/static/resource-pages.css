@@ -16,6 +16,10 @@
   color: var(--fcc-text, #f7f9ff);
 }
 
+body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-shell {
+  padding-top: 0;
+}
+
 .resource-page-container.fcc-brand-page-shell::before {
   content: "";
   position: absolute;

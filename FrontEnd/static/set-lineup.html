@@ -32,109 +32,103 @@
     </section>
 
     <section class="lineup-context-bar">
-      <div class="context-scoreboard" id="context-scoreboard">
-        <div class="context-stat" id="context-score-card">
-          <div class="context-stat-label">Score</div>
-          <div class="context-stat-value" id="score-value">0 — 0</div>
-        </div>
-        <div class="context-divider" aria-hidden="true"></div>
-        <div class="context-stat" id="context-quarter-card">
-          <div class="context-stat-label">Quarter</div>
-          <div class="context-stat-value is-accent" id="quarter-value">Pre-Game</div>
-        </div>
-        <div class="context-divider" aria-hidden="true"></div>
-        <div class="context-stat" id="context-time-card">
-          <div class="context-stat-label">Time</div>
-          <div class="context-stat-value" id="time-value">--:--</div>
+      <div class="game-state-pill">
+        <div class="context-scoreboard" id="context-scoreboard">
+          <span class="context-team-name" id="score-home-team">HOME</span>
+          <span class="context-stat-value" id="score-home-value">0</span>
+          <span class="context-score-separator">—</span>
+          <span class="context-stat-value" id="score-away-value">0</span>
+          <span class="context-team-name" id="score-away-team">AWAY</span>
+          <span class="context-inline-separator" aria-hidden="true"></span>
+          <span class="context-inline-value context-inline-value-quarter" id="quarter-value">Pre-Game</span>
+          <span class="context-inline-separator" aria-hidden="true"></span>
+          <span class="context-inline-value" id="time-value">--:--</span>
+          <span id="score-value" hidden></span>
         </div>
       </div>
 
       <div class="context-actions">
-        <button id="autoset-lineup" class="lineup-btn lineup-btn-ghost" type="button">Autoset Lineup</button>
         <button id="gameplan-optional" class="lineup-btn lineup-btn-orange" type="button">Game Plan</button>
         <button id="playbooks-button" class="lineup-btn lineup-btn-ghost" type="button">Playbooks</button>
-        <button id="play-now" class="lineup-btn lineup-btn-green disabled" type="button">Play Game</button>
       </div>
     </section>
 
-    <section class="lineup-slots-section">
-      <div class="lineup-header">
-        <div class="header-pos">Pos</div>
-        <div class="header-image"></div>
-        <div class="header-name">Name</div>
-        <div class="header-rating">Pos Rating</div>
-        <div class="header-points">Pts</div>
-        <div class="header-rebounds">Reb</div>
-        <div class="header-assists">Ast</div>
-        <div class="header-def-pct">Def%</div>
-        <div class="header-emotion">Emotion</div>
-        <div class="header-momentum">Momentum</div>
-        <div class="header-fouls">Fouls</div>
-        <div class="header-energy">Energy</div>
-        <div class="header-remove"></div>
+    <div class="lineup-main">
+      <div class="lineup-left-panel">
+        <section class="lineup-roster-section">
+          <div class="lineup-roster-label">Roster — click or drag to assign</div>
+          <div id="roster-table-container" class="roster-table-region active">
+            <div class="roster-table-scroll">
+              <table class="roster-table gob-data-grid">
+                <thead>
+                  <tr>
+                    <th class="player-header-cell"><span>Player Name</span><span>RT</span></th>
+                    <th>Pos</th>
+                    <th>HT</th>
+                    <th>WT</th>
+                    <th>SC</th>
+                    <th>SH</th>
+                    <th>ID</th>
+                    <th>OD</th>
+                    <th>PS</th>
+                    <th>BH</th>
+                    <th>RB</th>
+                    <th>ST</th>
+                    <th>AG</th>
+                    <th>ND</th>
+                    <th>IQ</th>
+                    <th>FT</th>
+                    <th>NG</th>
+                  </tr>
+                </thead>
+                <tbody id="roster-body"></tbody>
+              </table>
+            </div>
+            <p class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
+          </div>
+        </section>
       </div>
 
-      <ul id="slots">
-        <li class="slot" data-pos="PG">
-          <div class="slot-pos">PG</div>
-          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-          <button class="remove" hidden aria-label="Remove player from PG">✕</button>
-        </li>
-        <li class="slot" data-pos="SG">
-          <div class="slot-pos">SG</div>
-          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-          <button class="remove" hidden aria-label="Remove player from SG">✕</button>
-        </li>
-        <li class="slot" data-pos="SF">
-          <div class="slot-pos">SF</div>
-          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-          <button class="remove" hidden aria-label="Remove player from SF">✕</button>
-        </li>
-        <li class="slot" data-pos="PF">
-          <div class="slot-pos">PF</div>
-          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-          <button class="remove" hidden aria-label="Remove player from PF">✕</button>
-        </li>
-        <li class="slot" data-pos="C">
-          <div class="slot-pos">C</div>
-          <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-          <button class="remove" hidden aria-label="Remove player from C">✕</button>
-        </li>
-      </ul>
-    </section>
-
-    <section class="lineup-roster-section">
-      <div class="lineup-roster-label">Roster — drag players into lineup slots above</div>
-      <div id="roster-table-container" class="roster-table-region active">
-        <div class="roster-table-scroll">
-          <table class="roster-table gob-data-grid">
-            <thead>
-              <tr>
-                <th>Player Name</th>
-                <th>Pos</th>
-                <th>HT</th>
-                <th>SC</th>
-                <th>SH</th>
-                <th>ID</th>
-                <th>OD</th>
-                <th>PS</th>
-                <th>BH</th>
-                <th>RB</th>
-                <th>ST</th>
-                <th>AG</th>
-                <th>ND</th>
-                <th>IQ</th>
-                <th>FT</th>
-                <th>NG</th>
-                <th class="rt">RT</th>
-              </tr>
-            </thead>
-            <tbody id="roster-body"></tbody>
-          </table>
+      <div class="lineup-right-panel">
+        <section class="lineup-slots-section">
+          <div class="lineup-slots-label">Starting Five</div>
+          <ul id="slots">
+            <li class="slot" data-pos="PG">
+              <div class="slot-pos">PG</div>
+              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+              <button class="remove" hidden aria-label="Remove player from PG">✕</button>
+            </li>
+            <li class="slot" data-pos="SG">
+              <div class="slot-pos">SG</div>
+              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+              <button class="remove" hidden aria-label="Remove player from SG">✕</button>
+            </li>
+            <li class="slot" data-pos="SF">
+              <div class="slot-pos">SF</div>
+              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+              <button class="remove" hidden aria-label="Remove player from SF">✕</button>
+            </li>
+            <li class="slot" data-pos="PF">
+              <div class="slot-pos">PF</div>
+              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+              <button class="remove" hidden aria-label="Remove player from PF">✕</button>
+            </li>
+            <li class="slot" data-pos="C">
+              <div class="slot-pos">C</div>
+              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
+              <button class="remove" hidden aria-label="Remove player from C">✕</button>
+            </li>
+          </ul>
+        </section>
+        <div class="lineup-left-footer">
+          <button id="autoset-lineup" class="lineup-btn lineup-btn-ghost" type="button">Autoset Lineup</button>
         </div>
-        <p class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
       </div>
-    </section>
+    </div>
+
+    <div class="lineup-bottom-bar">
+      <button id="play-now" class="lineup-btn lineup-btn-green disabled" type="button">Play Game</button>
+    </div>
   </div>
 
   <div id="playbooks-modal" class="lineup-modal" hidden>

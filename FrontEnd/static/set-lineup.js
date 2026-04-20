@@ -735,6 +735,14 @@ function renderRoster() {
   
   // ✅ PERFORMANCE FIX: Use DocumentFragment to batch DOM updates (single reflow)
   const fragment = document.createDocumentFragment();
+
+  function getEnergyClass(ngValue) {
+    const percent = Math.round((ngValue ?? 1.0) * 100);
+    if (percent >= 90) return 'high';
+    if (percent >= 80) return 'medium';
+    if (percent >= 70) return 'low';
+    return 'critical';
+  }
   
   rosterDataForSorting.forEach(p => {
     const tr = document.createElement('tr');
@@ -762,38 +770,42 @@ function renderRoster() {
     }
     // Use anchor attributes (don't show energy-scaled values)
     const anchorAttrs = p.attributes || {};
-    
+
     const displayPlayerName =
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
+    const ngValue = anchorAttrs.NG ?? 1.0;
+    const weightValue = p.weight != null && p.weight !== '' ? p.weight : '--';
     const cells = [
       displayPlayerName,
       bestPos,
       formatHeight(p.height),
-      Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10), 
+      weightValue,
+      Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_OD ?? anchorAttrs.OD ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_PS ?? anchorAttrs.PS ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_BH ?? anchorAttrs.BH ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_RB ?? anchorAttrs.RB ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_PS ?? anchorAttrs.PS ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_BH ?? anchorAttrs.BH ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_RB ?? anchorAttrs.RB ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_ST ?? anchorAttrs.ST ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_AG ?? anchorAttrs.AG ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_AG ?? anchorAttrs.AG ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      Number((anchorAttrs.NG ?? 1.0).toFixed(2)),
-      rt
+      `${Math.round(ngValue * 100)}%`
     ];
-    const classes = ['', '', 'ht', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
+    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', `ng ${getEnergyClass(ngValue)}`];
 
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
-      
-      // Make player name a clickable link
-      if (idx === 0) {  // First cell is player name
+      if (idx === 0) {
+        td.className = 'player-name-cell';
+        const wrap = document.createElement('div');
+        wrap.className = 'player-name-wrap';
         const link = document.createElement('a');
         applyPlayerDetailLinkBehavior(link, p._id);
         link.textContent = val ?? '--';
+        link.className = 'player-name-link';
         link.style.textDecoration = 'none';
         link.addEventListener('mouseenter', () => {
           link.style.textDecoration = 'underline';
@@ -801,15 +813,19 @@ function renderRoster() {
         link.addEventListener('mouseleave', () => {
           link.style.textDecoration = 'none';
         });
-        td.appendChild(link);
+        const rtSpan = document.createElement('span');
+        rtSpan.className = 'inline-rt';
+        rtSpan.textContent = rt ?? '--';
+        wrap.appendChild(link);
+        wrap.appendChild(rtSpan);
+        td.appendChild(wrap);
       } else {
-      td.textContent = val ?? '--';
+        td.textContent = val ?? '--';
       }
-      
-      if (classes[idx]) td.classList.add(classes[idx]);
-      
+      if (classes[idx]) td.className = classes[idx];
       tr.appendChild(td);
     });
+
     // ✅ PERFORMANCE FIX: Append to fragment instead of tbody (batched update)
     fragment.appendChild(tr);
   });
@@ -827,7 +843,7 @@ function renderRoster() {
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
+      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG'];
       const columnName = columnNames[index];
       sortRoster(columnName);
     });
@@ -850,6 +866,7 @@ function sortRoster(columnName) {
     'Player Name': 'name',
     'Pos': 'pos',
     'HT': 'height',
+    'WT': 'weight',
     'SC': 'SC',
     'SH': 'SH',
     'ID': 'ID',
@@ -1114,22 +1131,30 @@ function updateSlotDisplay(slot) {
         <img class="player-image" src="${imgBase}${playerId}.png" 
              onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
-      <div class="player-name">${slotDisplayName}</div>
-      <div class="player-rating">${rating}</div>
-      <div class="player-points">${points}</div>
-      <div class="player-rebounds">${rebounds}</div>
-      <div class="player-assists">${assists}</div>
-      <div class="player-def-pct">${defPct}%</div>
-      <div class="player-emotion">${emoji}</div>
-      <div class="player-momentum">
-        <div class="momentum-bar-container">
-          <div class="momentum-bar-left" style="width: ${leftWidth}"></div>
-          <div class="momentum-bar-center"></div>
-          <div class="momentum-bar-right" style="width: ${rightWidth}"></div>
+      <div class="slot-info">
+        <div class="slot-row-1">
+          <div class="player-name">${slotDisplayName}</div>
+          <div class="player-rating">RT: ${rating}</div>
+        </div>
+        <div class="slot-row-2">
+          <div class="slot-stat"><span class="slot-stat-label">PTS</span><span class="player-points">${points}</span></div>
+          <div class="slot-stat"><span class="slot-stat-label">REB</span><span class="player-rebounds">${rebounds}</span></div>
+          <div class="slot-stat"><span class="slot-stat-label">AST</span><span class="player-assists">${assists}</span></div>
+          <div class="slot-stat"><span class="slot-stat-label">DEF%</span><span class="player-def-pct">${defPct}%</span></div>
+          <div class="slot-stat slot-stat-momentum">
+            <span class="slot-stat-label">MO</span>
+            <div class="player-momentum">
+              <div class="momentum-bar-container">
+                <div class="momentum-bar-left" style="width: ${leftWidth}"></div>
+                <div class="momentum-bar-center"></div>
+                <div class="momentum-bar-right" style="width: ${rightWidth}"></div>
+              </div>
+            </div>
+          </div>
+          <div class="slot-stat"><span class="slot-stat-label">F</span><span class="player-fouls${fouls >= 3 ? ' danger' : ''}">${fouls}</span></div>
+          <div class="slot-stat"><span class="slot-stat-label">ENG</span><span class="player-energy ${energyClass}">${energyPercent}%</span></div>
         </div>
       </div>
-      <div class="player-fouls">${fouls}</div>
-      <div class="player-energy ${energyClass}">${energyPercent}%</div>
     `;
     
     slotContent.classList.remove('empty');
@@ -1300,12 +1325,15 @@ function resolveTeam() {
 async function setHeader() {
   const banner = document.getElementById('team-banner');
   const bannerFallback = document.getElementById('team-banner-fallback');
-  const scoreValueEl = document.getElementById('score-value');
+  const scoreHomeTeamEl = document.getElementById('score-home-team');
+  const scoreAwayTeamEl = document.getElementById('score-away-team');
+  const scoreHomeValueEl = document.getElementById('score-home-value');
+  const scoreAwayValueEl = document.getElementById('score-away-value');
   const quarterValueEl = document.getElementById('quarter-value');
   const timeValueEl = document.getElementById('time-value');
   const scoreboardEl = document.getElementById('context-scoreboard');
   const playBtn = document.getElementById('play-now');
-  if (!scoreValueEl || !quarterValueEl || !timeValueEl) return;
+  if (!quarterValueEl || !timeValueEl) return;
 
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
@@ -1391,7 +1419,12 @@ async function setHeader() {
 
   const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
   scoreboardEl?.classList.toggle('is-pregame', isPregame);
-  scoreValueEl.textContent = `${userTeamScore} — ${opponentTeamScore}`;
+  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamName || 'Home') : (userTeamName || 'Home')).toUpperCase();
+  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamName || 'Away') : (opponentTeamName || 'Away')).toUpperCase();
+  if (scoreHomeTeamEl) scoreHomeTeamEl.textContent = displayUserTeamName;
+  if (scoreAwayTeamEl) scoreAwayTeamEl.textContent = displayOpponentTeamName;
+  if (scoreHomeValueEl) scoreHomeValueEl.textContent = `${userTeamScore}`;
+  if (scoreAwayValueEl) scoreAwayValueEl.textContent = `${opponentTeamScore}`;
   quarterValueEl.textContent = isPregame ? 'Pre-Game' : `Q${currentQuarter}`;
   timeValueEl.textContent = isPregame ? '--:--' : formattedClock;
 
