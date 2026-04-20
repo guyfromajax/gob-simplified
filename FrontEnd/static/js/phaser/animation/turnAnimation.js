@@ -1577,6 +1577,16 @@ async function runDefensiveReboundSetup({
     ? "transition_policy_only"
     : "animations_end_then_fallback";
   const applyGetBackExclusion = !requiresDrebOutletPassContract;
+  const rebounderInfo = scene.playerInfo?.[String(rebounderId)] || null;
+  const rebounderPos =
+    rebounderInfo?.pos ||
+    rebounderSprite?.pos ||
+    rebounderSprite?.position ||
+    null;
+  const suppressHalfCourtOutletPass =
+    requiresDrebOutletPassContract &&
+    isHalfCourtSetup &&
+    rebounderPos === "PG";
   console.log("🏀 [DREB OUTLET DEBUG] authority mode", {
     turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
     resultType: authorityTurn?.result_type ?? null,
@@ -1586,15 +1596,27 @@ async function runDefensiveReboundSetup({
     receiverTargetAuthorityMode,
     transitionTargetAuthorityMode,
     applyGetBackExclusion,
+    rebounderPos,
+    suppressHalfCourtOutletPass,
   });
   let outletTarget = null;
   let outletTargetSource = "unset";
   let outletContext = null;
 
+  if (suppressHalfCourtOutletPass) {
+    outletReceiverId = null;
+    outletReceiverSprite = null;
+    console.log("🏀 [DREB OUTLET DEBUG] PG rebounder half-court exception applied", {
+      rebounderId,
+      rebounderPos,
+      nextPlayType,
+    });
+  }
+
   // Set up outlet receiver movement and outlet pass for HCO ONLY
   // FAST_BREAK has its own outlet pass in the fast break sequence (animateOutletPhase in fastBreak.js)
   // These two outlet steps are MUTUALLY EXCLUSIVE - never run together
-  if (outletReceiverId && String(outletReceiverId) !== String(rebounderId) && outletReceiverSprite && isHalfCourtSetup) {
+  if (!suppressHalfCourtOutletPass && outletReceiverId && String(outletReceiverId) !== String(rebounderId) && outletReceiverSprite && isHalfCourtSetup) {
     
     // SS&S: prefer backend animation end for receiver when available.
     drebTelemetry.required += 1;
@@ -1927,7 +1949,7 @@ async function runDefensiveReboundSetup({
   // For FCP/HCT: No outlet pass - players go directly to press positions
   // CRITICAL: This outlet pass step is required for smooth DREB -> HCO transitions
   // The outlet pass MUST execute if we have an outletReceiverId, even if receiver movement was skipped
-  if (isHalfCourtSetup && outletReceiverId && String(outletReceiverId) !== String(rebounderId)) {
+  if (!suppressHalfCourtOutletPass && isHalfCourtSetup && outletReceiverId && String(outletReceiverId) !== String(rebounderId)) {
     // If outletReceiverSprite is missing, re-resolve with string/number-safe lookup.
     if (!outletReceiverSprite && outletReceiverId) {
       const receiverRef = resolveSpriteById(playerSprites, outletReceiverId);

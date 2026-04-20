@@ -7,18 +7,6 @@ function playSound(filename) {
 }
 
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_v1';
-const COMMUNITY_LEADERBOARD_PLACEHOLDER = [
-  { rank: 1, username: 'Coach Atlas', geek_points: 100, is_current_user: false },
-  { rank: 2, username: 'Halfcourt Hero', geek_points: 94, is_current_user: false },
-  { rank: 3, username: 'ZoneBreaker22', geek_points: 90, is_current_user: false },
-  { rank: 4, username: 'Baseline Jamie', geek_points: 86, is_current_user: false },
-  { rank: 5, username: 'Coach Carter', geek_points: 83, is_current_user: false },
-  { rank: 6, username: 'GlassCleaner', geek_points: 81, is_current_user: false },
-  { rank: 7, username: 'ScoutTape', geek_points: 78, is_current_user: false },
-  { rank: 8, username: 'TempoSmith', geek_points: 74, is_current_user: false },
-  { rank: 9, username: 'OrangeClipboard', geek_points: 71, is_current_user: false },
-  { rank: 10, username: 'PressBreaker', geek_points: 68, is_current_user: false }
-];
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
@@ -174,23 +162,18 @@ function renderCareerSummary(commandCenterData) {
   franchiseCardCareerSummary.textContent = 'Season ' + seasonCount + ' · Career Best: #' + careerBestRank;
 }
 
-function renderCommunityLeaderboard(currentUsername) {
+function renderCommunityLeaderboard(leaderboardData, currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  const topTen = COMMUNITY_LEADERBOARD_PLACEHOLDER.slice(0, 10);
+  const topTen = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 10) : [];
   const currentTopEntry = currentUserNormalized
-    ? topTen.find(function (entry) { return entry.username.toLowerCase() === currentUserNormalized; })
+    ? topTen.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
     : null;
-  const currentPinnedEntry = (!currentTopEntry && currentUserNormalized)
-    ? {
-        rank: 37,
-        username: currentUsername,
-        geek_points: 63,
-        is_current_user: true
-      }
+  const currentPinnedEntry = (!currentTopEntry && leaderboardData && leaderboardData.current_user)
+    ? leaderboardData.current_user
     : null;
   const rows = topTen.map(function (entry) {
-    const isCurrent = entry.is_current_user || (currentUserNormalized && entry.username.toLowerCase() === currentUserNormalized);
+    const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
     return `
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
         <div class="community-rank">${entry.rank}.</div>
@@ -207,7 +190,15 @@ function renderCommunityLeaderboard(currentUsername) {
       <div class="community-score">${currentPinnedEntry.geek_points}</div>
     </div>
   ` : '';
-  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">Leaderboard coming soon</div>';
+  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
+}
+
+async function loadCommunityLeaderboard(currentUsername) {
+  if (!leaderboardHost) return;
+  const leaderboardData = await safeJsonFetch(API_CONFIG.buildUrl('/api/auth/leaderboard'), {
+    headers: getAuthHeaders()
+  });
+  renderCommunityLeaderboard(leaderboardData, currentUsername);
 }
 
 function wireAlphaBanner() {
@@ -235,9 +226,16 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
 
   const teamName = safeText(franchiseData.user_team_id, 'Program');
   if (franchiseCardTeamName) franchiseCardTeamName.textContent = teamName;
+  const bannerUrl = getSquareLogoPath(teamName);
   if (franchiseCardBanner) {
-    franchiseCardBanner.src = getSquareLogoPath(teamName);
+    franchiseCardBanner.src = bannerUrl;
     franchiseCardBanner.alt = teamName;
+    franchiseCardBanner.style.display = 'none';
+  }
+  if (franchisePlayNowBtn) {
+    franchisePlayNowBtn.style.backgroundImage = "url('" + bannerUrl + "')";
+    franchisePlayNowBtn.style.backgroundSize = 'cover';
+    franchisePlayNowBtn.style.backgroundPosition = 'center';
   }
   if (franchiseCardSeasonProgress) franchiseCardSeasonProgress.textContent = deriveSeasonProgress(commandCenterData, franchiseData);
   if (franchiseCardRecord) franchiseCardRecord.textContent = deriveRecord(commandCenterData, teamName);
@@ -429,7 +427,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
-  renderCommunityLeaderboard(currentUsername);
+  await loadCommunityLeaderboard(currentUsername);
 
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {

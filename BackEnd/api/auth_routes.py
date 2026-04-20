@@ -97,6 +97,20 @@ class AuthConfigResponse(BaseModel):
     otp_required: bool
 
 
+class LeaderboardEntry(BaseModel):
+    """Leaderboard entry."""
+    rank: int
+    username: str
+    geek_points: int
+    is_current_user: bool = False
+
+
+class LeaderboardResponse(BaseModel):
+    """Leaderboard response."""
+    top: list[LeaderboardEntry]
+    current_user: Optional[LeaderboardEntry] = None
+
+
 class ResetRequest(BaseModel):
     """Password reset request - send reset link to email."""
     email: EmailStr
@@ -525,6 +539,61 @@ async def get_me(user: dict = Depends(get_current_user)):
         created_at=created_at,
         fte=fte,
         account_settings=account_settings
+    )
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_leaderboard(user: dict = Depends(get_current_user)):
+    """
+    Return the alpha leaderboard ranked by geek_points.
+    """
+    current_user_id = str(user.get("user_id", "")).strip()
+    docs = list(users_collection.find(
+        {},
+        {
+            "_id": 1,
+            "username": 1,
+            "email": 1,
+            "geek_points": 1,
+        }
+    ))
+
+    entries = []
+    for doc in docs:
+        username = str(doc.get("username") or "").strip()
+        if not username:
+            email = str(doc.get("email") or "").strip()
+            username = email.split("@", 1)[0].strip() if email else "Coach"
+        geek_points = doc.get("geek_points", 0)
+        try:
+            geek_points = int(geek_points)
+        except Exception:
+            geek_points = 0
+
+        entries.append({
+            "_id": str(doc.get("_id", "")),
+            "username": username,
+            "geek_points": geek_points,
+        })
+
+    entries.sort(key=lambda entry: (-entry["geek_points"], entry["username"].lower()))
+
+    ranked_entries = []
+    current_user_entry = None
+    for index, entry in enumerate(entries, start=1):
+        ranked = LeaderboardEntry(
+            rank=index,
+            username=entry["username"],
+            geek_points=entry["geek_points"],
+            is_current_user=(entry["_id"] == current_user_id),
+        )
+        ranked_entries.append(ranked)
+        if ranked.is_current_user:
+            current_user_entry = ranked
+
+    return LeaderboardResponse(
+        top=ranked_entries[:10],
+        current_user=(None if current_user_entry and current_user_entry.rank <= 10 else current_user_entry),
     )
 
 
