@@ -2,6 +2,7 @@ import random
 import logging
 import copy
 import time
+import json
 from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
@@ -1850,6 +1851,87 @@ def resolve_fast_break_logic(game: "GameManager"):
     assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"
     return turn_result
 
+
+def _log_ft_rebound_calculation_snapshot(
+    *,
+    off_team,
+    def_team,
+    shooter,
+    shooter_pos,
+    basket_x,
+    basket_y,
+    bounce_spot,
+    rebounder,
+    stat,
+    x_gate_fallback,
+    anim_total,
+    player_anim_count,
+    full_sim,
+    no_lane,
+):
+    """
+    One WARNING line per FT miss that triggers rebound resolution: all lineup coords
+    (post-apply_coords_from_animations_list), shooter slot + coords, attacked basket, bounce.
+    """
+
+    def _lineup_rows(team, side_label):
+        rows = []
+        for pos in sorted((team.lineup or {}).keys()):
+            p = (team.lineup or {}).get(pos)
+            if p is None:
+                continue
+            c = getattr(p, "coords", None) or {}
+            try:
+                x = float(c.get("x", 50))
+                y = float(c.get("y", 25))
+            except (TypeError, ValueError):
+                x, y = 50.0, 25.0
+            rows.append(
+                {
+                    "side": side_label,
+                    "pos": pos,
+                    "player_id": str(getattr(p, "player_id", "") or ""),
+                    "x": round(x, 2),
+                    "y": round(y, 2),
+                }
+            )
+        return rows
+
+    sc = getattr(shooter, "coords", None) or {}
+    try:
+        sx = float(sc.get("x", 50))
+        sy = float(sc.get("y", 25))
+    except (TypeError, ValueError):
+        sx, sy = 50.0, 25.0
+
+    if isinstance(bounce_spot, dict):
+        try:
+            bx = float(bounce_spot.get("x", 0))
+            by = float(bounce_spot.get("y", 0))
+        except (TypeError, ValueError):
+            bx, by = 0.0, 0.0
+    else:
+        bx, by = 0.0, 0.0
+
+    payload = {
+        "tag": "FT_REBOUND_CALC",
+        "full_sim": full_sim,
+        "no_lane": no_lane,
+        "anim_total": anim_total,
+        "player_anim_rows": player_anim_count,
+        "shooter_pos": shooter_pos,
+        "shooter_id": str(getattr(shooter, "player_id", "") or "") if shooter else None,
+        "shooter_xy": {"x": round(sx, 2), "y": round(sy, 2)},
+        "attacked_basket_xy": {"x": float(basket_x), "y": float(basket_y)},
+        "bounce_xy": {"x": round(bx, 2), "y": round(by, 2)},
+        "players": _lineup_rows(off_team, "offense") + _lineup_rows(def_team, "defense"),
+        "x_gate_fallback": x_gate_fallback,
+        "stat": stat,
+        "rebounder_id": str(getattr(rebounder, "player_id", "") or "") if rebounder else None,
+    }
+    logging.warning("[FT_REBOUND_CALC] %s", json.dumps(payload, sort_keys=True))
+
+
 def resolve_free_throw_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     shooter = game_state.get("shooter") or game_state.get("last_ball_handler")
@@ -1965,17 +2047,21 @@ def resolve_free_throw_logic(game):
                 if isinstance(a, dict) and str(a.get("playerId")) != "ball"
             )
             x_gate_fallback = bool(game_state.pop("_ft_rebound_x_gate_fallback", False))
-            logging.info(
-                "[FT_REBOUND] miss_last_ft full_sim=%s no_lane=%s anim_total=%s player_anim=%s "
-                "bounce_x=%s x_gate_fallback=%s stat=%s rebounder_id=%s",
-                bool(game.game_state.get("_is_full_simulation")),
-                bool(game_state.get("no_lane")),
-                len(anim_list),
-                player_anim_count,
-                bounce_spot.get("x"),
-                x_gate_fallback,
-                stat,
-                getattr(rebounder, "player_id", None),
+            _log_ft_rebound_calculation_snapshot(
+                off_team=off_team,
+                def_team=def_team,
+                shooter=shooter,
+                shooter_pos=shooter_pos,
+                basket_x=basket_x,
+                basket_y=25,
+                bounce_spot=bounce_spot,
+                rebounder=rebounder,
+                stat=stat,
+                x_gate_fallback=x_gate_fallback,
+                anim_total=len(anim_list),
+                player_anim_count=player_anim_count,
+                full_sim=bool(game.game_state.get("_is_full_simulation")),
+                no_lane=bool(game_state.get("no_lane")),
             )
             
             game_state["last_rebound"] = stat

@@ -719,19 +719,19 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .lineup-bottom-bar {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
   padding: 10px 20px;
   background: rgba(18, 22, 30, 0.98);
   border-top: 1px solid rgba(255,255,255,0.1);
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
-.lineup-bottom-bar #play-now {
-  min-width: 320px;
-  height: 44px;
-  border-radius: 10px;
-  font-size: 18px;
+#play-now {
+  min-width: 160px;
+  height: 36px;
+  font-size: 16px;
 }
 
 body.set-lineup-page .set-lineup-shell:has(#context-scoreboard.is-pregame) .player-points,

@@ -219,70 +219,13 @@ function renderCommunityLeaderboard(leaderboardData, currentUsername) {
       <div class="community-score">${currentPinnedEntry.geek_points}</div>
     </div>
   ` : '';
-  const combined = rows + pinned;
-  leaderboardHost.innerHTML = combined || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
-  try {
-    console.warn('[GEEK_POINTS][leaderboard][render]', {
-      modeSelectUsernameInput: currentUsername,
-      hasPayload: !!leaderboardData,
-      topRowCount: topTen.length,
-      matchedTopByUsername: !!currentTopEntry,
-      hasPinnedCurrentUser: !!currentPinnedEntry,
-      usedEmptyFallback: !combined,
-      displayedScores: topTen.map(function (e) {
-        return { rank: e.rank, username: e.username, geek_points: e.geek_points, is_current_user: !!e.is_current_user };
-      }),
-      pinnedIfAny: currentPinnedEntry
-        ? { rank: currentPinnedEntry.rank, username: currentPinnedEntry.username, geek_points: currentPinnedEntry.geek_points }
-        : null,
-    });
-  } catch (e) {
-    console.warn('[GEEK_POINTS][leaderboard][render] log failed', e);
-  }
+  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
 }
 
 async function loadCommunityLeaderboard(currentUsername) {
   if (!leaderboardHost) return;
-  const url = API_CONFIG.buildUrl('/api/auth/leaderboard');
-  const headers = getAuthHeaders();
-  console.warn('[GEEK_POINTS][leaderboard][fetch]', {
-    url: url,
-    hasAuthorizationHeader: !!(headers && headers.Authorization),
-  });
-  var leaderboardData = null;
-  try {
-    var res = await fetch(url, { headers: headers });
-    console.warn('[GEEK_POINTS][leaderboard][fetch]', { status: res.status, ok: res.ok });
-    if (!res.ok) {
-      var errText = await res.text().catch(function () { return ''; });
-      console.warn('[GEEK_POINTS][leaderboard][fetch] non-OK body (truncated)', String(errText).slice(0, 500));
-      renderCommunityLeaderboard(null, currentUsername);
-      return;
-    }
-    leaderboardData = await res.json();
-  } catch (e) {
-    console.warn('[GEEK_POINTS][leaderboard][fetch] error', e && e.message ? e.message : e);
-    renderCommunityLeaderboard(null, currentUsername);
-    return;
-  }
-  var top = leaderboardData && leaderboardData.top;
-  var cu = leaderboardData && leaderboardData.current_user;
-  console.warn('[GEEK_POINTS][leaderboard][payload]', {
-    topCount: Array.isArray(top) ? top.length : 0,
-    top: Array.isArray(top)
-      ? top.map(function (e) {
-          return {
-            rank: e.rank,
-            username: e.username,
-            geek_points: e.geek_points,
-            is_current_user: !!e.is_current_user,
-          };
-        })
-      : null,
-    current_user: cu
-      ? { rank: cu.rank, username: cu.username, geek_points: cu.geek_points, is_current_user: !!cu.is_current_user }
-      : null,
-    modeSelectUsernameForMatch: currentUsername,
+  const leaderboardData = await safeJsonFetch(API_CONFIG.buildUrl('/api/auth/leaderboard'), {
+    headers: getAuthHeaders()
   });
   renderCommunityLeaderboard(leaderboardData, currentUsername);
 }

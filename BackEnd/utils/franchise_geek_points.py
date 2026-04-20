@@ -37,6 +37,26 @@ def _resolve_to_object_id_str(team_ref: Any) -> str | None:
     return None
 
 
+def geek_points_team_key_for_franchise_user(user_team_object_id_str: str | None) -> str | None:
+    """
+    Canonical key for users.geek_points_by_team (teams.team_id, e.g. LANCASTER).
+    Falls back to str(ObjectId) if team_id is missing on the team document.
+    """
+    if not user_team_object_id_str:
+        return None
+    try:
+        oid = ObjectId(str(user_team_object_id_str).strip())
+    except Exception:
+        return None
+    doc = db.teams.find_one({"_id": oid}, {"team_id": 1})
+    if not doc:
+        return None
+    tid = doc.get("team_id")
+    if isinstance(tid, str) and tid.strip():
+        return tid.strip()
+    return str(oid)
+
+
 def teams_match_for_franchise(team_a: Any, team_b: Any) -> bool:
     if team_a is None or team_b is None:
         return False
@@ -82,35 +102,13 @@ def maybe_award_franchise_win_geek_points(
     week: int,
     eos_game_meta: dict | None,
 ) -> None:
-    log_prefix = "[GEEK_POINTS][award]"
     if not owner_user_id or not user_team_id_str:
-        logger.info(
-            "%s skip: missing owner_user_id or user_team_id_str owner=%r user_team=%r week=%s",
-            log_prefix,
-            bool(owner_user_id),
-            bool(user_team_id_str),
-            week,
-        )
         return
     if not teams_match_for_franchise(winner_team_id, user_team_id_str):
-        logger.info(
-            "%s skip: winner not user team week=%s winner=%r user_team=%r",
-            log_prefix,
-            week,
-            winner_team_id,
-            user_team_id_str,
-        )
         return
 
     delta = franchise_win_geek_points_delta(week, eos_game_meta)
     if delta <= 0:
-        logger.info(
-            "%s skip: delta<=0 week=%s delta=%s eos_meta=%r",
-            log_prefix,
-            week,
-            delta,
-            eos_game_meta,
-        )
         return
 
     try:
@@ -119,14 +117,15 @@ def maybe_award_franchise_win_geek_points(
         logger.warning("Invalid owner_user_id for geek_points increment: %s", owner_user_id)
         return
 
-    res = users_collection.update_one({"_id": oid}, {"$inc": {"geek_points": delta}})
-    logger.info(
-        "%s $inc users.geek_points user_id=%s delta=%s week=%s eos_meta=%r matched=%s modified=%s",
-        log_prefix,
-        str(oid),
-        delta,
-        week,
-        eos_game_meta,
-        getattr(res, "matched_count", None),
-        getattr(res, "modified_count", None),
-    )
+    team_key = geek_points_team_key_for_franchise_user(user_team_id_str)
+    inc_fields: dict[str, int] = {"geek_points": delta}
+    if team_key:
+        # Dot path creates geek_points_by_team and the sub-key on first $inc (lazy).
+        inc_fields[f"geek_points_by_team.{team_key}"] = delta
+    else:
+        logger.warning(
+            "geek_points_by_team not incremented; could not resolve team key (user_team_id_str=%r)",
+            user_team_id_str,
+        )
+
+    users_collection.update_one({"_id": oid}, {"$inc": inc_fields})

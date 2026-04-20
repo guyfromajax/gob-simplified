@@ -152,11 +152,52 @@ This document defines the core visual and interaction standards for Geeked-Out B
 - Every reusable interactive component should define: default, hover, active, selected, disabled, and dead states.
 - State changes should be readable immediately but should not feel exaggerated or toy-like.
 
-## Modal Rules
-- Modals should use a clear header/body/footer structure when needed.
-- Backdrops should separate the modal from the page without fully flattening page context.
-- Modal copy should remain concise and scannable.
-- Close behavior should be obvious and consistent.
+## Modal System
+
+### Two Modal Types
+
+GOB uses two distinct modal types. Every modal must be classified as one of these before implementation.
+
+#### Functional Modals
+Used for confirmations, warnings, settings changes, and destructive actions. The goal is clarity and speed — get the user to a decision and out.
+
+**Examples:** Auto-Train confirmation, Delete Franchise confirmation, unsaved changes warning.
+
+**Design principles:**
+- Neutral dark surface: `background: rgba(28, 33, 43, 0.97)`
+- No background imagery — surface only
+- Compact, focused layout — title, supporting copy, action buttons
+- Max width: `440px`
+- Border: `1px solid rgba(255,255,255,0.12)`
+- Border radius: `14px`
+- Primary action button follows standard color rules (orange for save/confirm, green for gating actions only)
+- Secondary/cancel action is ghost treatment
+- No decorative elements — function over atmosphere
+
+#### Moment Modals
+Used for emotionally significant events — game results, training report reveals, season milestones, recruiting outcomes. The goal is payoff — the user should feel the weight of the moment.
+
+**Examples:** End of Game result, Training Camp complete, Season complete, major recruiting commit.
+
+**Design principles:**
+- Dark atmospheric surface: `background: rgba(13, 17, 36, 0.97)`
+- Team banner or contextually relevant image as full-bleed background with darkening gradient overlay (see Franchise Card treatment for gradient spec)
+- Result or outcome is the visual hero — largest, most prominent element
+- W/L or success/failure badge in top-right using semantic color (green for positive, red for negative)
+- Player or subject of the moment gets a dedicated spotlight section with portrait
+- Wider layout permitted — max width `560px`
+- Border: `1px solid rgba(255,255,255,0.12)`
+- Border radius: `16px`
+- Button row at bottom: primary action `flex: 2`, secondary action `flex: 1`
+- Motion: entrance should feel deliberate — consider a subtle scale-up from `0.96` to `1.0` over `200ms ease`
+
+### Shared Modal Rules
+- All modals use a backdrop: `background: rgba(0,0,0,0.65)`
+- Backdrop click dismisses Functional Modals; Moment Modals require explicit button action
+- ESC key dismisses Functional Modals
+- Close behavior must be obvious and consistent
+- Modal copy should remain concise and scannable
+- Only one modal visible at a time
 
 ## Toast Notifications
 

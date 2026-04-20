@@ -123,25 +123,61 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   const awayScore = Number(finalScore?.awayScore || 0);
   const homeWon = homeScore > awayScore;
   const awayWon = awayScore > homeScore;
+  const homeTeamId = String(gameData?.home_team_id || gameData?.homeTeamId || '');
+  const awayTeamId = String(gameData?.away_team_id || gameData?.awayTeamId || '');
+  const currentTeamId = String(teamId || '');
+  const userTeamSide = currentTeamId && homeTeamId && currentTeamId === homeTeamId
+    ? 'home'
+    : currentTeamId && awayTeamId && currentTeamId === awayTeamId
+    ? 'away'
+    : null;
+  const userTeamName = userTeamSide === 'away' ? awayTeamName : homeTeamName;
+  const bannerUrl = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(userTeamName, 'banner_primary')
+    : '/images/teams/general/general_banner_primary.jpg';
+  const userWon = userTeamSide === 'away' ? awayWon : homeWon;
+  const outcomeLabel = userWon ? 'WIN' : 'LOSS';
+  const winnerName = homeWon ? homeTeamName : awayTeamName;
+  const loserName = homeWon ? awayTeamName : homeTeamName;
+  const winnerScore = homeWon ? homeScore : awayScore;
+  const loserScore = homeWon ? awayScore : homeScore;
+  const potgStatsLine = potg
+    ? `${potg.stats.pts} PTS · ${potg.stats.reb} REB · ${potg.stats.ast} AST · ${potg.stats.defPct} DEF%`
+    : '';
 
   // Create popup
   const popup = document.createElement('div');
   popup.className = 'game-completion-popup';
   popup.innerHTML = `
-    <div class="game-completion-content">
-      <h2>Game Complete!</h2>
+    <div class="game-completion-content" style="background-image: linear-gradient(
+      to bottom,
+      rgba(13,17,36,0.15) 0%,
+      rgba(13,17,36,0.5) 50%,
+      rgba(13,17,36,0.92) 75%,
+      rgba(13,17,36,0.98) 100%
+    ), linear-gradient(
+      to right,
+      rgba(13,17,36,0.0) 0%,
+      rgba(13,17,36,0.0) 30%,
+      rgba(13,17,36,0.7) 60%,
+      rgba(13,17,36,0.85) 100%
+    ), url('${bannerUrl}');">
+      <div class="gc-header-row">
+        <div class="gc-eyebrow">Game Complete</div>
+        <div class="gc-outcome-badge ${userWon ? 'is-win' : 'is-loss'}">${outcomeLabel}</div>
+      </div>
       ${finalScore ? `
         <section class="gc-section gc-result-section">
           <div class="final-score-display">
             <div class="score-line">
-              <div class="team-score-left ${homeWon ? 'winner' : ''} ${awayWon ? 'loser' : ''}">
-                <span class="team-name">${homeTeamName}</span>
-                <span class="score">${homeScore}</span>
+              <div class="team-score-winner">
+                <span class="team-name">${winnerName}</span>
+                <span class="score">${winnerScore}</span>
               </div>
               <div class="score-divider">vs</div>
-              <div class="team-score-right ${awayWon ? 'winner' : ''} ${homeWon ? 'loser' : ''}">
-                <span class="team-name">${awayTeamName}</span>
-                <span class="score">${awayScore}</span>
+              <div class="team-score-loser">
+                <span class="team-name">${loserName}</span>
+                <span class="score">${loserScore}</span>
               </div>
             </div>
           </div>
@@ -150,23 +186,18 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       ${potg ? `
         <section class="gc-section gc-potg-section">
           <div class="potg-card">
-            <div class="potg-meta-row" style="color: ${potg.teamColor || '#1a1a2e'};">Player Of The Game</div>
-            <div class="potg-image-row">
+            <div class="potg-label">Player Of The Game</div>
+            <div class="potg-content-row">
               <img
                 class="potg-image"
                 src="${potgImageUrl || (staticBase + '/images/players/generic_headshot.png')}"
                 alt="${potg.name}"
                 onerror="this.onerror=null;this.src='${staticBase}/images/players/generic_headshot.png';"
               />
-            </div>
-            <div class="potg-meta-row potg-player-name" style="color: ${potg.teamColor || '#1a1a2e'};">${potg.name}</div>
-            <div class="potg-stats-grid" style="color: ${potg.teamColor || '#1a1a2e'};">
-              <div>${potg.stats.pts} PTS</div>
-              <div>${potg.stats.reb} REB</div>
-              <div>${potg.stats.ast} AST</div>
-              <div>${potg.stats.stl} STL</div>
-              <div>${potg.stats.blk} BLK</div>
-              <div>${potg.stats.defPct} DEF%</div>
+              <div class="potg-info">
+                <div class="potg-player-name">${potg.name}</div>
+                <div class="potg-stats-line">${potgStatsLine}</div>
+              </div>
             </div>
           </div>
         </section>
@@ -191,7 +222,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(9, 14, 29, 0.86);
+        background: rgba(0,0,0,0.65);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -200,265 +231,263 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       }
 
       .game-completion-content {
-        background:
-          linear-gradient(180deg, rgba(248, 249, 252, 0.98) 0%, rgba(240, 242, 247, 0.98) 100%);
-        border: 1px solid rgba(16, 30, 61, 0.18);
-        border-radius: 14px;
-        padding: 26px 30px 22px;
+        background-color: rgba(13, 17, 36, 0.97);
+        background-size: cover;
+        background-position: center;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 16px;
+        padding: 22px 24px 20px;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 18px;
         align-items: stretch;
-        width: min(760px, 100%);
-        box-shadow:
-          0 24px 60px rgba(0, 0, 0, 0.45),
-          0 2px 0 rgba(255, 255, 255, 0.25) inset;
+        width: min(560px, 100%);
+        box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+        animation: gc-modal-in 200ms ease;
       }
 
-      .game-completion-content h2 {
-        font-size: 56px;
-        font-weight: bold;
-        color: #1a1a2e;
-        margin: 0;
+      .gc-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .gc-eyebrow {
         font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 1.6px;
-        line-height: 0.95;
-        text-align: center;
+        font-size: 18px;
+        color: rgba(255,255,255,0.5);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+
+      .gc-outcome-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 12px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+      }
+
+      .gc-outcome-badge.is-win {
+        background: rgba(52,236,39,0.15);
+        border-color: rgba(52,236,39,0.4);
+        color: #34EC27;
+      }
+
+      .gc-outcome-badge.is-loss {
+        background: rgba(255,109,109,0.15);
+        border-color: rgba(255,109,109,0.4);
+        color: #ff6d6d;
       }
 
       .gc-section {
-        border-top: 1px solid rgba(26, 26, 46, 0.1);
-        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        padding-top: 16px;
       }
 
       .gc-result-section {
         border-top: none;
-        padding-top: 2px;
+        padding-top: 0;
       }
 
       .final-score-display {
-        margin: 0;
-        padding: 10px 14px;
-        background: rgba(255, 255, 255, 0.62);
-        border: 1px solid rgba(26, 26, 46, 0.1);
-        border-radius: 10px;
+        margin: 0 auto;
+        width: 100%;
       }
 
       .score-line {
-        font-size: 20px;
-        font-weight: 700;
-        color: #2e3043;
         margin: 0;
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
         width: 100%;
-        gap: 18px;
+        gap: 16px;
+        text-align: center;
       }
 
-      .score-divider {
-        font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 1.2px;
-        font-size: 20px;
-        color: rgba(26, 26, 46, 0.45);
-        text-transform: uppercase;
-      }
-
-      .team-score-left,
-      .team-score-right {
-        display: flex;
-        align-items: center;
+      .team-score-winner,
+      .team-score-loser {
+        display: inline-flex;
+        align-items: baseline;
         gap: 8px;
-        flex: 1;
       }
 
-      .team-score-left {
-        justify-content: flex-start;
+      .team-score-winner {
+        color: #ffffff;
       }
 
-      .team-score-right {
-        justify-content: flex-end;
+      .team-score-loser {
+        color: rgba(255,255,255,0.4);
       }
 
       .score-line .team-name {
-        font-weight: 700;
-        opacity: 0.8;
-        font-size: 46px;
         font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 1px;
+        font-size: 20px;
         line-height: 0.95;
       }
 
-      .team-score-left.winner .team-name,
-      .team-score-right.winner .team-name {
-        opacity: 1;
-        color: #16172a;
-      }
-
-      .team-score-left.loser .team-name,
-      .team-score-right.loser .team-name {
-        opacity: 0.56;
+      .score-divider {
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        color: rgba(255,255,255,0.35);
+        text-transform: lowercase;
       }
 
       .score-line .score {
-        font-size: 56px;
-        font-weight: 700;
-        color: #202445;
         font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 0.8px;
+        font-size: 52px;
         line-height: 0.95;
-      }
-
-      .team-score-left.winner .score,
-      .team-score-right.winner .score {
-        color: #121739;
-      }
-
-      .team-score-left.loser .score,
-      .team-score-right.loser .score {
-        color: rgba(32, 36, 69, 0.7);
+        text-shadow: 0 2px 12px rgba(0,0,0,0.6);
       }
 
       .button-container {
-        display: grid;
-        grid-template-columns: 1fr 1.45fr;
+        display: flex;
         gap: 12px;
         width: 100%;
-        align-items: stretch;
-      }
-
-      .potg-image-row {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        margin: 4px 0 2px;
+        margin-top: 20px;
       }
 
       .potg-image {
-        width: 136px;
-        height: 136px;
-        border-radius: 50%;
-        border: 4px solid rgba(26, 26, 46, 0.14);
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        border: 2px solid rgba(247,148,32,0.4);
         object-fit: cover;
-        object-position: top;
-        background: #eef0f4;
-        box-shadow:
-          0 0 0 4px rgba(255, 255, 255, 0.78),
-          0 10px 24px rgba(0, 0, 0, 0.18);
+        object-position: center top;
+        background: rgba(255,255,255,0.08);
       }
 
       .potg-card {
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid rgba(26, 26, 46, 0.1);
-        border-radius: 10px;
-        padding: 10px 14px 12px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 12px;
+        padding: 16px 20px;
       }
 
-      .potg-stats-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px 10px;
-        margin-top: 6px;
+      .potg-label {
         font-family: 'Bebas Neue', sans-serif;
-        font-size: 22px;
-        letter-spacing: 1px;
-        text-align: center;
+        font-size: 13px;
+        color: #F79420;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
         line-height: 1;
       }
 
-      .potg-meta-row {
-        font-family: 'Bebas Neue', sans-serif;
-        font-size: 30px;
-        letter-spacing: 1px;
-        text-align: center;
-        line-height: 1;
+      .potg-content-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 12px;
+      }
+
+      .potg-info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        min-width: 0;
       }
 
       .potg-player-name {
-        margin-top: 2px;
-        font-size: 34px;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 22px;
+        color: #ffffff;
+        line-height: 1;
+      }
+
+      .potg-stats-line {
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        color: rgba(255,255,255,0.6);
+        line-height: 1.45;
       }
 
       .completion-button {
-        padding: 14px 18px;
-        font-size: 19px;
-        font-weight: bold;
+        flex: 1;
+        padding: 0 18px;
+        font-size: 16px;
         border: 1px solid transparent;
-        border-radius: 8px;
+        border-radius: 10px;
         cursor: pointer;
         text-decoration: none;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 56px;
+        height: 44px;
         transition: all 0.2s ease;
         font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 0.2px;
+        letter-spacing: 0.03em;
       }
 
       .box-score-button {
-        background: rgba(255, 255, 255, 0.72);
-        color: #1d2343;
-        border-color: rgba(29, 35, 67, 0.34);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.8);
+        border-color: rgba(255,255,255,0.14);
       }
 
       .box-score-button:hover {
-        background: rgba(255, 255, 255, 0.96);
-        border-color: rgba(29, 35, 67, 0.58);
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.2);
         transform: translateY(-1px);
       }
 
       .locker-room-button {
-        background: #ff9800;
-        color: #fff;
-        border-color: #f18900;
-        box-shadow: 0 10px 22px rgba(255, 152, 0, 0.32);
+        flex: 2;
+        background: #F79420;
+        color: #15181f;
+        border-color: rgba(247,148,32,0.85);
       }
 
       .locker-room-button:hover {
-        background: #f28b00;
+        background: #ffab40;
         transform: translateY(-1px);
-        box-shadow: 0 12px 24px rgba(255, 152, 0, 0.4);
+      }
+
+      @keyframes gc-modal-in {
+        from {
+          opacity: 0;
+          transform: scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
       }
 
       @media (max-width: 760px) {
         .game-completion-content {
           padding: 18px 16px 16px;
-          gap: 10px;
+          gap: 14px;
         }
 
-        .game-completion-content h2 {
-          font-size: 44px;
+        .gc-header-row {
+          align-items: flex-start;
         }
 
         .score-line {
-          gap: 8px;
+          gap: 10px;
+          flex-wrap: wrap;
         }
 
         .score-line .team-name {
-          font-size: 34px;
+          font-size: 18px;
         }
 
         .score-line .score {
-          font-size: 46px;
+          font-size: 42px;
         }
 
-        .potg-meta-row {
-          font-size: 24px;
-        }
-
-        .potg-player-name {
-          font-size: 30px;
-        }
-
-        .potg-stats-grid {
-          font-size: 19px;
-          gap: 6px 8px;
+        .potg-content-row {
+          align-items: flex-start;
         }
 
         .button-container {
-          grid-template-columns: 1fr;
+          flex-direction: column;
         }
 
         .completion-button {
