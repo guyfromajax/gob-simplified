@@ -194,14 +194,14 @@ function renderCareerSummary(commandCenterData) {
 function renderCommunityLeaderboard(leaderboardData, currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  const topTen = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 10) : [];
+  const topFive = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 5) : [];
   const currentTopEntry = currentUserNormalized
-    ? topTen.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
+    ? topFive.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
     : null;
   const currentPinnedEntry = (!currentTopEntry && leaderboardData && leaderboardData.current_user)
     ? leaderboardData.current_user
     : null;
-  const rows = topTen.map(function (entry) {
+  const rows = topFive.map(function (entry) {
     const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
     return `
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">

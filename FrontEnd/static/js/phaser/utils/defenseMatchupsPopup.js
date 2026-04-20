@@ -16,8 +16,8 @@ const POSITION_COLORS = {
     "PG": "#4065AF",
     "SG": "#7B5EA7",
     "SF": "#3A8C4A",
-    "PF": "#C0392B",
-    "C": "#D4A017"
+    "PF": "#D4A017",
+    "C": "#C0392B"
 };
 
 function hexToRgb(hex) {

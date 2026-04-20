@@ -821,7 +821,7 @@
 
     /* Quarter start functional modal */
     .pre-game-container {
-      position: fixed;
+      position: absolute;
       inset: 0;
       z-index: 300;
       display: flex;
@@ -2313,11 +2313,8 @@
     /* ==================== LOCKER ROOM POPUP ==================== */
     .locker-room-popup {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -2325,39 +2322,83 @@
     }
 
     .locker-room-content {
-      background: #fff;
-      border: 6px solid #c0c0c0;
-      border-radius: 12px;
-      padding: 40px 60px;
+      width: min(420px, calc(100vw - 40px));
+      background: rgba(22, 26, 36, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 30px;
-      align-items: center;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-      text-align: center;
+    }
+
+    .locker-room-content::before {
+      content: '';
+      height: 3px;
+      width: 100%;
+      background: #F79420;
+      flex-shrink: 0;
+      display: block;
     }
 
     .locker-room-content h2 {
-      font-size: 32px;
-      font-weight: bold;
-      color: #333;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: #ffffff;
       margin: 0;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .locker-room-content p {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.55);
+      line-height: 1.5;
+      margin: 8px 0 0;
+    }
+
+    .locker-room-content h2,
+    .locker-room-content p,
+    .locker-room-button {
+      position: relative;
+      z-index: 1;
+    }
+
+    .locker-room-content {
+      padding-bottom: 24px;
+    }
+
+    .locker-room-content h2,
+    .locker-room-content p {
+      padding-left: 28px;
+      padding-right: 28px;
+    }
+
+    .locker-room-content h2:first-of-type {
+      padding-top: 24px;
     }
 
     .locker-room-button {
-      background: #ff9800;
-      color: #fff;
-      border: none;
-      padding: 15px 40px;
-      font-weight: bold;
-      font-size: 18px;
-      border-radius: 6px;
+      appearance: none;
+      margin: 20px 28px 0;
+      height: 42px;
+      background: #F79420;
+      border: 1px solid rgba(247, 148, 32, 0.45);
+      border-radius: 10px;
+      color: #15181f;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      letter-spacing: 0.04em;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: filter 0.14s ease, transform 0.14s ease;
     }
 
     .locker-room-button:hover {
-      background: #f57c00;
+      filter: brightness(1.06);
+      transform: translateY(-1px);
     }
   </style>
 </head>
@@ -2634,10 +2675,6 @@
         <div class="pre-game-backdrop"></div>
         <div class="pre-game-modal-box">
           <div class="pre-game-modal-accent"></div>
-          <div class="pre-game-modal-body">
-            <div class="pre-game-modal-title">Quarter Options</div>
-            <div class="pre-game-modal-subtitle">Choose how you want to proceed with the next quarter.</div>
-          </div>
           <div class="pre-game-modal-actions">
             <button class="play-button">Play Quarter</button>
             <button class="sim-full-game-button">Sim Full Game</button>

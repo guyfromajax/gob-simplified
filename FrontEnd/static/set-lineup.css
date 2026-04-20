@@ -717,15 +717,20 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   font-size: 11px;
 }
 
-.lineup-bottom-bar {
-  flex: 0 0 auto;
+.roster-panel-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 10px;
-  padding: 10px 20px;
-  background: rgba(18, 22, 30, 0.98);
-  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 12px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 6px;
+}
+
+.roster-panel-actions .lineup-btn {
+  min-width: 140px;
+  height: 34px;
+  font-size: 15px;
 }
 
 #play-now {
