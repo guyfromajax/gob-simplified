@@ -206,8 +206,31 @@ Used for emotionally significant events — game results, training report reveal
 - Button row: primary `flex: 2`, secondary `flex: 1`
 - Entrance: subtle scale from `0.96` to `1.0` over `200ms ease`
 
-### Shared Rules (Both Types)
-- Backdrop click dismisses Functional Modals only — Moment Modals require explicit button action
+#### Strategic Modals
+Used during active gameplay at decision points — quarter breaks, timeouts, foul-outs, any moment where the coach must make a tactical adjustment before play resumes. Goal is fast, confident decision-making under mild pressure. Data-dense but not celebratory.
+
+**Canonical example:**
+- Defense Matchups popup (`defenseMatchupsPopup.js`) — shown at Q1 start, quarter breaks, timeouts, and foul-outs
+
+**Design rules:**
+- Surface: `rgba(18, 22, 32, 0.98)` — slightly lighter than Functional to support data density
+- Backdrop: `rgba(0, 0, 0, 0.75)`
+- No accent bar — replaced by subtle team-color tinted panel headers using `rgba(teamColor, 0.2)` fill and `rgba(teamColor, 0.6)` border
+- Title: Bebas Neue 24px `rgba(255,255,255,0.5)` — deliberately muted, the data is the hero not the title
+- Wider layout permitted — max width `1160px` to support side-by-side team comparison panels
+- Border: `1px solid rgba(255,255,255,0.12)`
+- Border radius: `16px`
+- Position badges use the GOB system-wide position color map:
+  - PG: `#4065AF` · SG: `#7B5EA7` · SF: `#3A8C4A` · PF: `#C0392B` · C: `#D4A017`
+- Submit/confirm action is full-width green (gating — advances gameplay)
+- Dismiss/skip option is a low-prominence checkbox or ghost link, never a competing button
+- Drag-and-drop interactions for reordering use standard GOB drag visual feedback
+- No background imagery — data surfaces must remain fully readable
+- Backdrop click does NOT dismiss — user must explicitly submit or the game cannot proceed
+
+### Shared Rules (All Three Types)
+- Backdrop click dismisses Functional Modals only
+- Moment Modals and Strategic Modals require explicit button action to dismiss
 - ESC dismisses Functional Modals only
 - Only one modal visible at a time
 - All button copy uses Bebas Neue
