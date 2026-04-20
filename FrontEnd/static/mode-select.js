@@ -11,6 +11,7 @@ const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_v1';
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
 const franchiseDeleteLink = document.getElementById('franchise-delete-link');
+const franchiseDeleteRow = document.getElementById('franchise-delete-row');
 const franchiseEmptyCard = document.getElementById('franchise-empty-card');
 const franchiseCardBanner = document.getElementById('franchise-card-banner');
 const franchiseCardTeamName = document.getElementById('franchise-card-team-name');
@@ -218,7 +219,7 @@ function wireAlphaBanner() {
 function renderFranchiseEmptyState() {
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
-  if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'none';
+  if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'none';
 }
 
 function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
@@ -249,7 +250,7 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
 
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
   franchisePlayNowBtn.style.display = 'block';
-  if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'inline';
+  if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'block';
 }
 
 function goToFranchiseCommandCenter() {
