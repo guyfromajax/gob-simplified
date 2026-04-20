@@ -82,13 +82,35 @@ def maybe_award_franchise_win_geek_points(
     week: int,
     eos_game_meta: dict | None,
 ) -> None:
+    log_prefix = "[GEEK_POINTS][award]"
     if not owner_user_id or not user_team_id_str:
+        logger.info(
+            "%s skip: missing owner_user_id or user_team_id_str owner=%r user_team=%r week=%s",
+            log_prefix,
+            bool(owner_user_id),
+            bool(user_team_id_str),
+            week,
+        )
         return
     if not teams_match_for_franchise(winner_team_id, user_team_id_str):
+        logger.info(
+            "%s skip: winner not user team week=%s winner=%r user_team=%r",
+            log_prefix,
+            week,
+            winner_team_id,
+            user_team_id_str,
+        )
         return
 
     delta = franchise_win_geek_points_delta(week, eos_game_meta)
     if delta <= 0:
+        logger.info(
+            "%s skip: delta<=0 week=%s delta=%s eos_meta=%r",
+            log_prefix,
+            week,
+            delta,
+            eos_game_meta,
+        )
         return
 
     try:
@@ -97,4 +119,14 @@ def maybe_award_franchise_win_geek_points(
         logger.warning("Invalid owner_user_id for geek_points increment: %s", owner_user_id)
         return
 
-    users_collection.update_one({"_id": oid}, {"$inc": {"geek_points": delta}})
+    res = users_collection.update_one({"_id": oid}, {"$inc": {"geek_points": delta}})
+    logger.info(
+        "%s $inc users.geek_points user_id=%s delta=%s week=%s eos_meta=%r matched=%s modified=%s",
+        log_prefix,
+        str(oid),
+        delta,
+        week,
+        eos_game_meta,
+        getattr(res, "matched_count", None),
+        getattr(res, "modified_count", None),
+    )
