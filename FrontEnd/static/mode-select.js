@@ -155,12 +155,40 @@ function deriveSeasonProgress(commandCenterData, franchiseData) {
 
 function renderCareerSummary(commandCenterData) {
   if (!franchiseCardCareerSummary) return;
-  const seasonCount = safeNumber(commandCenterData && commandCenterData.seasons_coached, deriveCurrentSeason(commandCenterData));
   const careerBestRankRaw = commandCenterData && commandCenterData.career_best_rank;
   const careerBestRank = (careerBestRankRaw !== undefined && careerBestRankRaw !== null && String(careerBestRankRaw).trim() !== '')
     ? String(careerBestRankRaw)
     : '--';
-  franchiseCardCareerSummary.textContent = 'Season ' + seasonCount + ' · Career Best: #' + careerBestRank;
+  const bestRankSeasonsRaw =
+    (commandCenterData && commandCenterData.career_best_rank_seasons) ||
+    (commandCenterData && commandCenterData.best_rank_seasons) ||
+    (commandCenterData && commandCenterData.career_best_seasons) ||
+    (commandCenterData && commandCenterData.career_best_rank_season);
+
+  let seasons = [];
+  if (Array.isArray(bestRankSeasonsRaw)) {
+    seasons = bestRankSeasonsRaw
+      .map(function (value) { return safeNumber(value, null); })
+      .filter(function (value) { return Number.isFinite(value); });
+  } else {
+    const singleSeason = safeNumber(bestRankSeasonsRaw, null);
+    if (Number.isFinite(singleSeason)) seasons = [singleSeason];
+  }
+
+  let dedupedSortedSeasons = Array.from(new Set(seasons)).sort(function (a, b) { return a - b; });
+  if (!dedupedSortedSeasons.length) {
+    const currentSeason = deriveCurrentSeason(commandCenterData);
+    if (careerBestRank !== '--' && Number.isFinite(currentSeason)) dedupedSortedSeasons = [currentSeason];
+  }
+
+  if (!dedupedSortedSeasons.length) {
+    franchiseCardCareerSummary.textContent = 'Career Best Ranking: #' + careerBestRank;
+    return;
+  }
+
+  const seasonLabel = dedupedSortedSeasons.length === 1 ? 'Season ' : 'Seasons ';
+  franchiseCardCareerSummary.textContent =
+    'Career Best Ranking: #' + careerBestRank + ' (' + seasonLabel + dedupedSortedSeasons.join(', ') + ')';
 }
 
 function renderCommunityLeaderboard(leaderboardData, currentUsername) {
