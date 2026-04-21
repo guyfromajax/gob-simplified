@@ -1344,13 +1344,14 @@ function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
 function createPlaycallSubsection(title, playcallData) {
   const subsection = document.createElement('div');
   subsection.className = 'scouting-play-type';
+  const suppressOverallSummary = title === 'Focus Success Rates';
 
   const overall = playcallData.overall || {};
   const overallAttempts = overall.attempts || 0;
   const overallSuccess = overall.success || 0;
   const overallPct = overallAttempts > 0 ? ((overallSuccess / overallAttempts) * 100).toFixed(0) : '0';
 
-  // Calculate average EV and Exec for offense playcalls
+  // Calculate average EV and Execution for offense playcalls
   const overallEvScores = overall.ev_scores || [];
   const overallLeanScores = overall.lean_scores || [];
   const overallAvgEV = overallEvScores.length > 0 
@@ -1373,11 +1374,13 @@ function createPlaycallSubsection(title, playcallData) {
   
   const primary = document.createElement('div');
   primary.className = 'scouting-play-type-header';
-  primary.innerHTML = `
+  primary.innerHTML = suppressOverallSummary
+    ? `<span>${title}</span>`
+    : `
     <span>${title}:</span>
     <span>${overallSuccess} / ${overallAttempts} (${overallPct}%)</span>
     ${overallAvgEV !== null ? `<span class="${getEvClass(overallAvgEV)}">EV ${overallEvSign}${overallAvgEV}%</span>` : ''}
-    ${overallAvgExec !== null ? `<span class="${getEvClass(overallAvgExec)}">Exec ${overallExecSign}${overallAvgExec}%</span>` : ''}
+    ${overallAvgExec !== null ? `<span class="${getEvClass(overallAvgExec)}">Execution ${overallExecSign}${overallAvgExec}%</span>` : ''}
   `;
   subsection.appendChild(primary);
 
@@ -1488,15 +1491,17 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const success = stats.success || 0;
   const pct = used > 0 ? ((success / used) * 100).toFixed(0) : '0';
 
-  // Calculate average EV and Exec (lean_score)
+  // Calculate average EV and Execution (lean_score), then invert for defense display.
   const evScores = stats.ev_scores || [];
   const leanScores = stats.lean_scores || [];
-  const avgEV = evScores.length > 0 
+  const rawAvgEV = evScores.length > 0 
     ? (evScores.reduce((a, b) => a + b, 0) / evScores.length).toFixed(0)
     : '0';
-  const avgExec = leanScores.length > 0
+  const rawAvgExec = leanScores.length > 0
     ? (leanScores.reduce((a, b) => a + b, 0) / leanScores.length * 100).toFixed(0)
     : '0';
+  const avgEV = String(-Number(rawAvgEV || 0));
+  const avgExec = String(-Number(rawAvgExec || 0));
   
   const evSign = parseFloat(avgEV) >= 0 ? '+' : '';
   const execSign = parseFloat(avgExec) >= 0 ? '+' : '';
@@ -1511,7 +1516,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
     <span>${title}:</span>
     <span>${success} / ${used} (${pct}%)</span>
     ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgEV)}">EV ${evSign}${avgEV}%</span>` : ''}
-    ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgExec)}">Exec ${execSign}${avgExec}%</span>` : ''}
+    ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgExec)}">Execution ${execSign}${avgExec}%</span>` : ''}
   `;
   subsection.appendChild(primary);
 
