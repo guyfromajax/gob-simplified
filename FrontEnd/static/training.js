@@ -152,6 +152,7 @@ async function redirectIfTrainingAlreadyCommitted() {
     params.set('franchise_id', franchiseId);
     if (teamId) params.set('team_id', teamId);
     params.set('week', String(Number(data.week || 1)));
+    params.set('from', 'training');
     window.location.replace(`/training-report.html?${params.toString()}`);
     return true;
   } catch (error) {

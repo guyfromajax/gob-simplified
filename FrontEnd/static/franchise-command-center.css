@@ -2820,3 +2820,32 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
     filter: saturate(1.12);
   }
 }
+
+/* Inbox tab (training report shortcut) */
+.fcc-inbox-tab .fcc-inbox-card-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.fcc-inbox-body .fcc-inbox-message {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.fcc-inbox-body .fcc-inbox-empty {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+}
+
+.fcc-inbox-body .fcc-inbox-link {
+  color: #4a90e2;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fcc-inbox-body .fcc-inbox-link:hover {
+  color: #6ba3e8;
+}

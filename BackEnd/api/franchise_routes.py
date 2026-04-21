@@ -3224,6 +3224,16 @@ def command_center_data(
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
         )
+        last_training_report_week = None
+        if franchise_doc:
+            lt = franchise_doc.get("latest_training") or {}
+            w = lt.get("week")
+            if w is not None:
+                try:
+                    last_training_report_week = int(w)
+                except (TypeError, ValueError):
+                    last_training_report_week = None
+        response["last_training_report_week"] = last_training_report_week
         post_eos_bracket_history_visible = bool(
             not eos_tournament_active
             and week in {35, 36}
@@ -6560,7 +6570,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         return {
             "status": "already_completed",
             "week": week,
-            "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}"
+            "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training"
         }
 
     # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
@@ -6999,7 +7009,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
-        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}"
+        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}&from=training"
     }
 
 

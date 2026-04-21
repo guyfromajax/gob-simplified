@@ -401,7 +401,15 @@ The training report automatically generates notes when players have NG reduction
 
 **Location:** `FrontEnd/static/training-report.html`
 
-After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes. The report can also be accessed via links on the schedule in the Franchise Command Center.
+After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes. The report can also be opened from the **Inbox** tab on the Franchise Command Center (see below) and via other FCC links (e.g. schedule) where applicable.
+
+#### FCC Inbox (training report shortcut)
+
+- **Tab:** Franchise Command Center → **Inbox** (`tutorials-tab` in the FCC HTML).
+- **Message:** When the franchise has a stored latest training report (`latest_training.week` on the franchise document), the API exposes `last_training_report_week` on `GET /franchise/command-center/data`. The Inbox shows: `Week {N} training report` with **`here`** as a link to `training-report.html` with `from=inbox`.
+- **Single active link:** The Inbox only surfaces the **most recent** training report week. When the user runs training for a new week, `latest_training` updates and the Inbox copy and link target week update; older weeks are not listed in the Inbox.
+- **Training report behavior when `from=inbox`:** The header control is labeled **Back** and returns to `franchise-command-center.html` with `tab=tutorials-tab` (Inbox). There is no **Go To Locker Room** action on this entry path.
+- **Training report behavior when `from=training` (or omitted for legacy URLs):** After `POST /franchise/run-training`, redirects include `from=training`. The header control is **Go To Locker Room** and uses the existing locker-room / command-center navigation (same as before). This is the only path that shows that action button.
 
 #### Page Layout
 
@@ -410,7 +418,9 @@ After training is submitted, users are automatically redirected to the training 
 - Week number
 - Upcoming Opponent (from schedule)
 - Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)")
-- Orange "Go To Locker Room" button (top-right) - navigates to Franchise/Tournament Command Center
+- Top-right header control (behavior depends on `from` query parameter):
+  - **`from=inbox` (franchise):** **Back** → Franchise Command Center, Inbox tab
+  - **Otherwise (e.g. `from=training` or absent):** Orange **Go To Locker Room** → Franchise or Tournament Command Center (existing behavior)
 
 **Player Report Section:**
 - Header: "Player Report"
@@ -650,6 +660,9 @@ In Franchise mode, when the user submits training for their team, all non-user t
 - `latest_training` - Most recent training report (backward-compatible quick access)
 - `training_status.training_completed` - Boolean flag
 - `training_status.week` - Week number for last training
+
+**FCC API (`GET /franchise/command-center/data`):**
+- `last_training_report_week` - Integer week for the current **latest** user training report (`latest_training.week`), used to render the Inbox message and link; omitted or null when no report exists yet
 
 **Computer Team Updates (Franchise Mode Only):**
 - CPU distant training updates FTD team attributes and FPD player attributes / position ratings

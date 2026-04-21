@@ -2661,6 +2661,7 @@ async function init() {
   if (playbooksTab && playbooksTab.classList.contains('active')) {
     void renderFccPlaybooksSummary();
   }
+  renderFccInbox(topData);
   maybeShowChampionshipCompleteModal(topData);
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
@@ -3284,10 +3285,48 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'team-stats-tab') {
           renderTeamReport();
         }
+        if (tabName === 'tutorials-tab' && commandCenterTopDataCache) {
+          renderFccInbox(commandCenterTopDataCache);
+        }
       }
     });
   }
 });
+
+function renderFccInbox(topData) {
+  const el = document.getElementById('fcc-inbox-body');
+  if (!el) return;
+  const w = topData && topData.last_training_report_week;
+  const tid = (topData && topData.team_id) || userTeamId;
+  if (w == null || w === '' || !franchiseId || !tid) {
+    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
+    return;
+  }
+  const weekNum = Number(w);
+  if (!Number.isFinite(weekNum) || weekNum < 1) {
+    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
+    return;
+  }
+  const reportParams = new URLSearchParams({
+    mode: 'franchise',
+    franchise_id: String(franchiseId),
+    team_id: String(tid),
+    week: String(weekNum),
+    from: 'inbox',
+  });
+  const href = `/training-report.html?${reportParams.toString()}`;
+  el.innerHTML = '';
+  const p = document.createElement('p');
+  p.className = 'fcc-inbox-message';
+  p.appendChild(document.createTextNode(`Week ${weekNum} training report `));
+  const a = document.createElement('a');
+  a.href = href;
+  a.className = 'fcc-inbox-link';
+  a.textContent = 'here';
+  p.appendChild(a);
+  p.appendChild(document.createTextNode('.'));
+  el.appendChild(p);
+}
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)
 const TEAM_ATTR_NAMES = {

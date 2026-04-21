@@ -16,6 +16,8 @@ const tournamentId = urlParams.get('tournament_id');
 const teamId = urlParams.get('team_id');
 const week = parseInt(urlParams.get('week'), 10);
 const round = parseInt(urlParams.get('round'), 10); // For tournament mode (optional - backend will determine if not provided)
+/** `inbox` = opened from FCC Inbox (Back only). `training` = from training submit / default (Go To Locker Room). */
+const reportFrom = urlParams.get('from') === 'inbox' ? 'inbox' : 'training';
 
 let reportData = null;
 let currentView = 'changes'; // 'attributes' or 'changes'
@@ -393,10 +395,25 @@ function setupViewToggle() {
 function setupLockerRoomButton() {
   const btn = document.getElementById('locker-room-btn');
   if (!btn) return;
-  
+
+  if (reportFrom === 'inbox' && mode === 'franchise') {
+    btn.textContent = 'Back';
+    btn.classList.add('training-report-back-btn');
+  } else {
+    btn.textContent = 'Go To Locker Room';
+    btn.classList.remove('training-report-back-btn');
+  }
+
   btn.addEventListener('click', () => {
     playSound('click-strong.wav');
     if (mode === 'franchise') {
+      if (reportFrom === 'inbox') {
+        const lockerRoomUrl = (typeof buildFranchiseLockerRoomUrl === 'function')
+          ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'tutorials-tab' })
+          : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=tutorials-tab`;
+        window.location.href = lockerRoomUrl;
+        return;
+      }
       const lockerRoomUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
         ? resolveFranchiseLockerRoomUrl({
             franchiseId: franchiseId,
