@@ -616,11 +616,31 @@ function renderHeader() {
     : userTeamSide === 'home'
     ? homeName
     : null;
-  const bannerUrl = userTeamNameForBanner && typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(userTeamNameForBanner, 'banner_primary')
-    : (typeof getTeamAssetPath === 'function'
-      ? getTeamAssetPath(null, 'banner_primary')
-      : '/images/teams/general/general_banner_primary.jpg');
+
+  console.log('[box-score renderHeader] getTeamAssetPath scope', typeof getTeamAssetPath, typeof window !== 'undefined' ? typeof window.getTeamAssetPath : 'n/a');
+
+  const resolveTeamBannerPath =
+    typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath
+      : (typeof window !== 'undefined' && typeof window.getTeamAssetPath === 'function'
+        ? window.getTeamAssetPath
+        : null);
+
+  const bannerPathFromTeamName = (name) => {
+    const slug = String(name).toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+    return `/images/teams/${slug}/${slug}_banner_primary.jpg`;
+  };
+
+  let bannerUrl;
+  if (userTeamNameForBanner) {
+    bannerUrl = resolveTeamBannerPath
+      ? resolveTeamBannerPath(userTeamNameForBanner, 'banner_primary')
+      : bannerPathFromTeamName(userTeamNameForBanner);
+  } else {
+    bannerUrl = resolveTeamBannerPath
+      ? resolveTeamBannerPath(null, 'banner_primary')
+      : '/images/teams/general/general_banner_primary.jpg';
+  }
 
   const header = document.getElementById('box-score-header');
   if (header && bannerUrl) {
