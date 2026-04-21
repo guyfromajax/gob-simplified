@@ -565,13 +565,15 @@ function renderHeader() {
   if (myTeamParam === 'home' || myTeamParam === 'away') {
     userTeamSide = myTeamParam;
   } else if (teamIdParam) {
-    if (String(teamIdParam) === String(homeTeamId) || String(teamIdParam) === String(homeName)) {
+    const tid = String(teamIdParam).trim();
+    if (tid === String(homeTeamId ?? '') || tid === String(homeName ?? '')) {
       userTeamSide = 'home';
-    } else if (String(teamIdParam) === String(awayTeamId) || String(teamIdParam) === String(awayName)) {
+    } else if (tid === String(awayTeamId ?? '') || tid === String(awayName ?? '')) {
       userTeamSide = 'away';
     }
+    // team_id present but not this game's home/away (e.g. franchise user_team id) — do not guess from localStorage
   }
-  if (userTeamSide == null && typeof localStorage !== 'undefined') {
+  if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
     const stored = localStorage.getItem('last_game_user_team_side');
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
