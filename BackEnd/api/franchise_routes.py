@@ -2629,8 +2629,8 @@ def complete_week(req: CompleteWeekRequest):
         ) or _resolve_team_name_from_any(away_id)
         inbox_entry = _build_franchise_game_inbox_entry(
             franchise_id=str(req.franchise_id),
-            user_team_name=user_team_id_str,
-            user_team_object_id=user_team_object_id,
+            user_team_name=_u_name,
+            user_team_object_id=user_team_id_str,
             game_id=str(user_game_id_final),
             home_team_id=home_id,
             away_team_id=away_id,
@@ -2694,8 +2694,8 @@ def complete_week(req: CompleteWeekRequest):
                 season_inbox = list(franchise_doc.get("season_inbox") or [])
                 inbox_entry = _build_franchise_game_inbox_entry(
                     franchise_id=str(req.franchise_id),
-                    user_team_name=user_team_id_str,
-                    user_team_object_id=user_team_object_id,
+                    user_team_name=_u_name,
+                    user_team_object_id=user_team_id_str,
                     game_id=str(user_game_id),
                     home_team_id=home_id,
                     away_team_id=away_id,
