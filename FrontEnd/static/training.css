@@ -1134,6 +1134,41 @@ body.training-page .radio-label input[type="radio"]:checked + span {
   border-color: transparent;
 }
 
+body.training-page .radio-label.radio-label-disabled {
+  cursor: not-allowed;
+}
+
+body.training-page .radio-label.radio-label-disabled span {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+body.training-page .radio-label.radio-label-disabled::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(13, 17, 36, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+  z-index: 8;
+}
+
+body.training-page .radio-label.radio-label-disabled:hover::after {
+  opacity: 1;
+}
+
 body.training-page .archetypes-grid {
   margin-top: 12px;
   align-items: stretch;
