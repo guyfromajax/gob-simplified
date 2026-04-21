@@ -26,15 +26,16 @@ const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
 
+// Primary/secondary from scripts/align_core8_team_colors.py (Mongo teams.primary_color / secondary_color)
 const A1_CONFERENCE_TEAMS = [
-  { id: 'bentley_truman', name: 'Bentley-Truman' },
-  { id: 'lancaster', name: 'Lancaster' },
-  { id: 'four_corners', name: 'Four Corners' },
-  { id: 'ocean_city', name: 'Ocean City' },
-  { id: 'morristown', name: 'Morristown' },
-  { id: 'little_york', name: 'Little York' },
-  { id: 'xavien', name: 'Xavien' },
-  { id: 'south_lancaster', name: 'South Lancaster' },
+  { id: 'bentley_truman', name: 'Bentley-Truman', primary: '#4066b2', secondary: '#ffffff' },
+  { id: 'lancaster', name: 'Lancaster', primary: '#d24a1b', secondary: '#000000' },
+  { id: 'four_corners', name: 'Four Corners', primary: '#c0976a', secondary: '#00954b' },
+  { id: 'ocean_city', name: 'Ocean City', primary: '#2a2168', secondary: '#00a89d' },
+  { id: 'morristown', name: 'Morristown', primary: '#ec1d28', secondary: '#cccccc' },
+  { id: 'little_york', name: 'Little York', primary: '#65308e', secondary: '#f6af38' },
+  { id: 'xavien', name: 'Xavien', primary: '#016837', secondary: '#999999' },
+  { id: 'south_lancaster', name: 'South Lancaster', primary: '#7c2b24', secondary: '#e39649' },
 ];
 
 let currentFranchise = null;
@@ -278,31 +279,40 @@ async function loadLeadersByTeam() {
 
     A1_CONFERENCE_TEAMS.forEach(function (team) {
       var leaders = (data[team.id] || []).slice(0, 3);
-      var logoPath = typeof getTeamAssetPath === 'function'
-        ? getTeamAssetPath(team.id, 'logo_square')
-        : '/images/teams/' + team.id + '/' + team.id + '_logo_square.png';
+
+      var bannerPath = typeof getTeamAssetPath === 'function'
+        ? getTeamAssetPath(team.id, 'banner_primary')
+        : '/images/teams/' + team.id + '/' + team.id + '_banner_primary.jpg';
 
       var leadersHtml = leaders.length > 0
         ? leaders.map(function (entry, i) {
+            var pts = displayLbtPoints(entry.geek_points);
             return (
               '<div class="lbt-leader-row">' +
               '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
               '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
-              '<span class="lbt-leader-points">' + displayLbtPoints(entry.geek_points) + '</span>' +
+              '<span class="lbt-leader-points" style="color: ' + team.primary + ';">' + pts + '</span>' +
               '</div>'
             );
           }).join('')
-        : '<div class="lbt-no-leaders">—</div>';
+        : '<div class="lbt-no-leaders">· · ·</div>';
 
       var card = document.createElement('div');
       card.className = 'lbt-team-card';
+      card.style.cssText =
+        '--team-primary: ' + team.primary + '; ' +
+        '--team-secondary: ' + team.secondary + '; ' +
+        'border-color: ' + team.primary + '66; ' +
+        'box-shadow: 0 0 0 1px ' + team.primary + '33, inset 0 0 24px rgba(0,0,0,0.3);';
+
+      var bannerUrlCss = 'url("' + String(bannerPath).replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
       card.innerHTML =
-        '<div class="lbt-team-identity">' +
-        '<img class="lbt-team-logo" src="' + escapeHtmlLbt(logoPath) + '" alt="' + escapeHtmlLbt(team.name) + '"' +
-        ' onerror="this.style.display=\'none\'">' +
+        '<div class="lbt-card-banner" style="background-image: ' + bannerUrlCss + ';">' +
+        '<div class="lbt-card-banner-overlay"></div>' +
         '<div class="lbt-team-name">' + escapeHtmlLbt(team.name) + '</div>' +
         '</div>' +
         '<div class="lbt-leaders-list">' + leadersHtml + '</div>';
+
       grid.appendChild(card);
     });
   } catch (err) {
