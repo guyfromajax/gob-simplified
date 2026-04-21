@@ -43,6 +43,10 @@ from BackEnd.eog_attr_rules import (
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 from BackEnd.utils.franchise_geek_points import maybe_award_franchise_win_geek_points
+from BackEnd.utils.franchise_championships import (
+    maybe_award_conference_rs_championship,
+    maybe_award_franchise_eos_title_championship,
+)
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.utils.team_play_utils import iter_team_plays
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets
@@ -2285,12 +2289,20 @@ def complete_week(req: CompleteWeekRequest):
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
 
     def _award_gp_sim(winner_tid: Any, eos_g: dict | None) -> None:
+        eos_meta = eos_g if req.week in ft.EOS_WEEKS else None
         maybe_award_franchise_win_geek_points(
             owner_user_id=franchise_doc.get("user_id"),
             user_team_id_str=user_team_id_str,
             winner_team_id=winner_tid,
             week=req.week,
-            eos_game_meta=eos_g if req.week in ft.EOS_WEEKS else None,
+            eos_game_meta=eos_meta,
+        )
+        maybe_award_franchise_eos_title_championship(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            winner_team_id=winner_tid,
+            week=req.week,
+            eos_game_meta=eos_meta,
         )
     if req.week in ft.EOS_WEEKS and eos_active:
         week_games_meta = ft.get_eos_week_games(franchise_doc, req.week)
@@ -2352,6 +2364,13 @@ def complete_week(req: CompleteWeekRequest):
         if found_user_eos:
             eos_matchup_for_user = found_user_eos[1]
     maybe_award_franchise_win_geek_points(
+        owner_user_id=franchise_doc.get("user_id"),
+        user_team_id_str=user_team_id_str,
+        winner_team_id=user_winner_id,
+        week=req.week,
+        eos_game_meta=eos_matchup_for_user,
+    )
+    maybe_award_franchise_eos_title_championship(
         owner_user_id=franchise_doc.get("user_id"),
         user_team_id_str=user_team_id_str,
         winner_team_id=user_winner_id,
@@ -2840,6 +2859,11 @@ def complete_week(req: CompleteWeekRequest):
         update_fields["eos_tournament_active"] = True
         update_fields["week"] = ft.EOS_CONFERENCE_WEEKS[0]
         logger.info("✅ [EOS] Conference tournaments initialized, week set to 27")
+        maybe_award_conference_rs_championship(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            conference_tournaments=conference_tournaments,
+        )
     elif req.week in ft.EOS_WEEKS:
         # EOS week: advance brackets and set next week (or init region/national)
         next_week = req.week + 1
@@ -7493,6 +7517,13 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                 week=week,
                 eos_game_meta=g,
             )
+            maybe_award_franchise_eos_title_championship(
+                owner_user_id=franchise_doc.get("user_id"),
+                user_team_id_str=user_team_id_str,
+                winner_team_id=winner_id,
+                week=week,
+                eos_game_meta=g,
+            )
             logger.info("✅ [EOS] Distant-simmed %s: %s vs %s", g["phase"], away_id, home_id)
             continue
 
@@ -7534,6 +7565,13 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                 "home_score": home_score,
             })
             maybe_award_franchise_win_geek_points(
+                owner_user_id=franchise_doc.get("user_id"),
+                user_team_id_str=user_team_id_str,
+                winner_team_id=winner_id,
+                week=week,
+                eos_game_meta=g,
+            )
+            maybe_award_franchise_eos_title_championship(
                 owner_user_id=franchise_doc.get("user_id"),
                 user_team_id_str=user_team_id_str,
                 winner_team_id=winner_id,
@@ -7658,6 +7696,13 @@ def sim_championship(req: SimChampionshipRequest):
         if refreshed:
             _persist_week_35_awards_if_needed(refreshed)
         maybe_award_franchise_win_geek_points(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            winner_team_id=winner_id,
+            week=week,
+            eos_game_meta={"phase": "national", "round": 3},
+        )
+        maybe_award_franchise_eos_title_championship(
             owner_user_id=franchise_doc.get("user_id"),
             user_team_id_str=user_team_id_str,
             winner_team_id=winner_id,
