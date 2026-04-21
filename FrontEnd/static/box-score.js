@@ -523,13 +523,13 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tourna
 // Render header with team names and scores
 function renderHeader() {
   const { homeTeam: homeTeamObj, awayTeam: awayTeamObj } = getTeamContext();
-  
   const score = gameData.score || {};
-
   const homeName = homeTeamObj.name || 'Home Team';
   const awayName = awayTeamObj.name || 'Away Team';
   const homeScore = score[homeName] || homeTeamObj.score || 0;
   const awayScore = score[awayName] || awayTeamObj.score || 0;
+  const homeTeamId = gameData?.home_team_id;
+  const awayTeamId = gameData?.away_team_id;
 
   document.getElementById('home-team-name').textContent = homeName;
   document.getElementById('away-team-name').textContent = awayName;
@@ -553,6 +553,38 @@ function renderHeader() {
   const awayTabButton = document.querySelector('.tab-button[data-team="away"]');
   const homePrimaryColor = homeTeamObj?.colors?.primary_color || homeTeamObj?.primary_color || '#F79420';
   const awayPrimaryColor = awayTeamObj?.colors?.primary_color || awayTeamObj?.primary_color || '#4065AF';
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const myTeamParam = urlParams.get('my_team');
+  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
+
+  let userTeamSide = null;
+  if (myTeamParam === 'home' || myTeamParam === 'away') {
+    userTeamSide = myTeamParam;
+  } else if (teamIdParam) {
+    if (String(teamIdParam) === String(homeTeamId) || String(teamIdParam) === String(homeName)) {
+      userTeamSide = 'home';
+    } else if (String(teamIdParam) === String(awayTeamId) || String(teamIdParam) === String(awayName)) {
+      userTeamSide = 'away';
+    }
+  }
+
+  const userTeamName = userTeamSide === 'away' ? awayName : homeName;
+  const bannerUrl = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(userTeamName, 'banner_primary')
+    : `/images/teams/general/general_banner_primary.jpg`;
+
+  const header = document.getElementById('box-score-header');
+  if (header && bannerUrl) {
+    header.style.backgroundImage = `
+      linear-gradient(to bottom, rgba(13,17,36,0.15) 0%, rgba(13,17,36,0.5) 50%, rgba(13,17,36,0.92) 75%, rgba(13,17,36,0.98) 100%),
+      linear-gradient(to right, rgba(13,17,36,0.0) 0%, rgba(13,17,36,0.0) 30%, rgba(13,17,36,0.7) 60%, rgba(13,17,36,0.85) 100%),
+      url('${bannerUrl}')
+    `;
+    header.style.backgroundSize = 'cover';
+    header.style.backgroundPosition = 'center';
+  }
+
   if (homeTabButton) {
     homeTabButton.textContent = homeName;
     homeTabButton.style.setProperty('--tab-color', homePrimaryColor);
@@ -998,40 +1030,44 @@ function renderTeamAttributeChangesForTab(team) {
 }
 
 function renderAttributeChangePills(container, attributeDeltas) {
-  const ATTR_DISPLAY = {
-    shot_threshold: 'Shooting',
-    rebound_modifier: 'Rebounding',
-    offensive_efficiency: 'Offense',
-    defensive_efficiency: 'Defense',
-    fb_efficiency: 'Fast Break',
-    pt_efficiency: 'Press/Trap',
-    fight: 'Fight',
-    discipline: 'Discipline',
-    momentum_score: 'Momentum',
-    team_chemistry: 'Chemistry',
-    fb_defense: 'FB Defense',
-    pt_breaks: 'P/T Breaks',
-    fb_opp_modifier: 'FB Defense',
-    pt_opp_modifier: 'P/T Breaks'
+  const ATTR_CONFIG = {
+    shot_threshold: { label: 'Shooting', scale: 100, invert: true },
+    rebound_modifier: { label: 'Rebounding', scale: 0.2, invert: false },
+    offensive_efficiency: { label: 'Offense', scale: 10, invert: false },
+    defensive_efficiency: { label: 'Defense', scale: 10, invert: false },
+    fb_efficiency: { label: 'Fast Break', scale: 10, invert: false },
+    fb_defense: { label: 'FB Defense', scale: 10, invert: false },
+    pt_efficiency: { label: 'Press/Trap', scale: 10, invert: false },
+    pt_breaks: { label: 'P/T Breaks', scale: 10, invert: false },
+    fight: { label: 'Fight', scale: 10, invert: false },
+    discipline: { label: 'Discipline', scale: 10, invert: false },
+    momentum_score: { label: 'Momentum', scale: 10, invert: false },
+    team_chemistry: { label: 'Chemistry', scale: 10, invert: false },
+    fb_opp_modifier: { label: 'FB Defense', scale: 10, invert: false },
+    pt_opp_modifier: { label: 'P/T Breaks', scale: 10, invert: false }
   };
-
-  const MAX_DELTA = 10;
   container.innerHTML = '';
   container.className = 'attr-changes-pills';
 
-  Object.entries(attributeDeltas).forEach(([key, delta]) => {
-    const label = ATTR_DISPLAY[key.toLowerCase()] || key;
-    const numDelta = Number(delta) || 0;
-    const fillPct = Math.min(Math.abs(numDelta) / MAX_DELTA * 50, 50);
-    const isPositive = numDelta > 0;
-    const isNegative = numDelta < 0;
-    const deltaLabel = numDelta > 0 ? `+${numDelta}` : `${numDelta}`;
+  Object.entries(attributeDeltas).forEach(([key, rawDelta]) => {
+    const config = ATTR_CONFIG[key.toLowerCase()];
+    if (!config) return;
+
+    const numDelta = Number(rawDelta) || 0;
+    const effectiveDelta = config.invert ? -numDelta : numDelta;
+    const fillPct = Math.min(Math.abs(effectiveDelta) / config.scale * 50, 50);
+    const isPositive = effectiveDelta > 0;
+    const isNegative = effectiveDelta < 0;
+    const sign = effectiveDelta > 0 ? '+' : '';
+    const displayDelta = config.scale === 0.2
+      ? `${sign}${effectiveDelta.toFixed(2)}`
+      : `${sign}${Math.round(effectiveDelta)}`;
     const deltaColor = isPositive ? '#34EC27' : isNegative ? '#ff6d6d' : 'rgba(255,255,255,0.3)';
 
     const row = document.createElement('div');
     row.className = 'attr-change-row';
     row.innerHTML = `
-      <div class="attr-change-label">${label}</div>
+      <div class="attr-change-label">${config.label}</div>
       <div class="attr-change-pill-wrap">
         <div class="attr-change-pill">
           <div class="attr-pill-fill ${isPositive ? 'positive' : isNegative ? 'negative' : ''}"
@@ -1039,7 +1075,7 @@ function renderAttributeChangePills(container, attributeDeltas) {
           <div class="attr-pill-center"></div>
         </div>
       </div>
-      <div class="attr-change-delta" style="color: ${deltaColor}">${numDelta !== 0 ? deltaLabel : '—'}</div>
+      <div class="attr-change-delta" style="color: ${deltaColor}">${numDelta !== 0 ? displayDelta : '—'}</div>
     `;
     container.appendChild(row);
   });
@@ -1084,7 +1120,13 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const defense = teamStats.defense || {};
   const playcalls = offense.Playcalls || {};
 
-  // Offense Play Calls Section
+  const leftColumn = document.createElement('div');
+  leftColumn.className = 'scouting-column';
+  const rightColumn = document.createElement('div');
+  rightColumn.className = 'scouting-column';
+  container.appendChild(leftColumn);
+  container.appendChild(rightColumn);
+
   const playCallsSection = document.createElement('div');
   playCallsSection.className = 'scouting-section';
   playCallsSection.innerHTML = '<div class="scouting-section-header">Offense Play Calls</div>';
@@ -1105,31 +1147,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   playCallsSection.appendChild(cumulativeSection);
   }
 
-  container.appendChild(playCallsSection);
-
-  // Special Situations Section
-  const specialSection = document.createElement('div');
-  specialSection.className = 'scouting-section';
-  specialSection.innerHTML = '<div class="scouting-section-header">Special Situations</div>';
-
-  // Special situations use canonical EOG snapshot when available (matches EOG attribute calculations).
-  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
-
-  // HC Traps
-  const hct = defense.HCT || {};
-  const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
-  const hctSuccess = scoutingSnapshot.hct_success ?? hct.success ?? 0;
-  const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
-  specialSection.appendChild(createScoutingItem('HC Traps', `${hctSuccess} / ${hctUsed}`, `${hctPct}%`));
-
-  // FC Presses
-  const fcp = defense.FCP || {};
-  const fcpUsed = scoutingSnapshot.fcp_used ?? fcp.used ?? 0;
-  const fcpSuccess = scoutingSnapshot.fcp_success ?? fcp.success ?? 0;
-  const fcpPct = fcpUsed > 0 ? ((fcpSuccess / fcpUsed) * 100).toFixed(0) : '0';
-  specialSection.appendChild(createScoutingItem('FC Presses', `${fcpSuccess} / ${fcpUsed}`, `${fcpPct}%`));
-
-  container.appendChild(specialSection);
+  leftColumn.appendChild(playCallsSection);
 
   // Defense Play Calls Section
   const defensePlayCallsSection = document.createElement('div');
@@ -1215,7 +1233,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const zone131DefenseSection = createDefensePlaycallSubsection('1-3-1 Zone', zone131Defense);
   defensePlayCallsSection.appendChild(zone131DefenseSection);
 
-  container.appendChild(defensePlayCallsSection);
+  rightColumn.appendChild(defensePlayCallsSection);
 
   // Fast Breaks (offense scouting; per-play splits — after Defense Play Calls per product spec)
   const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
@@ -1224,9 +1242,13 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
 
   const fastBreakSection = document.createElement('div');
   fastBreakSection.className = 'scouting-section';
+  fastBreakSection.innerHTML = '<div class="scouting-section-header">Fast Breaks</div>';
   const fastBreakSub = document.createElement('div');
-  fastBreakSub.className = 'scouting-subsection';
-  fastBreakSub.innerHTML = `<h4>Fast Breaks: ${fbSuccess} / ${fbEntries} (${fbPct}%)</h4>`;
+  fastBreakSub.className = 'scouting-play-type';
+  const fastBreakHeader = document.createElement('div');
+  fastBreakHeader.className = 'scouting-play-type-header';
+  fastBreakHeader.innerHTML = `<span>Fast Breaks:</span><span>${fbSuccess} / ${fbEntries} (${fbPct}%)</span>`;
+  fastBreakSub.appendChild(fastBreakHeader);
 
   const mergedFbPlays = mergeFastBreakPlaysForBoxScore(
     offense.fast_break_plays,
@@ -1247,7 +1269,33 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   }
 
   fastBreakSection.appendChild(fastBreakSub);
-  container.appendChild(fastBreakSection);
+  leftColumn.appendChild(fastBreakSection);
+
+  const specialSection = document.createElement('div');
+  specialSection.className = 'scouting-section';
+  specialSection.innerHTML = '<div class="scouting-section-header">Special Situations</div>';
+
+  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
+
+  const hct = defense.HCT || {};
+  const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
+  const hctSuccess = scoutingSnapshot.hct_success ?? hct.success ?? 0;
+  const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
+  const hctBlock = document.createElement('div');
+  hctBlock.className = 'scouting-play-type';
+  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>HC Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
+  specialSection.appendChild(hctBlock);
+
+  const fcp = defense.FCP || {};
+  const fcpUsed = scoutingSnapshot.fcp_used ?? fcp.used ?? 0;
+  const fcpSuccess = scoutingSnapshot.fcp_success ?? fcp.success ?? 0;
+  const fcpPct = fcpUsed > 0 ? ((fcpSuccess / fcpUsed) * 100).toFixed(0) : '0';
+  const fcpBlock = document.createElement('div');
+  fcpBlock.className = 'scouting-play-type';
+  fcpBlock.innerHTML = `<div class="scouting-play-type-header"><span>FC Presses:</span><span>${fcpSuccess} / ${fcpUsed} (${fcpPct}%)</span></div>`;
+  specialSection.appendChild(fcpBlock);
+
+  rightColumn.appendChild(specialSection);
 }
 
 /**
@@ -1274,7 +1322,7 @@ function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
 // Create playcall subsection (Motion, Set, Cumulative)
 function createPlaycallSubsection(title, playcallData) {
   const subsection = document.createElement('div');
-  subsection.className = 'scouting-subsection';
+  subsection.className = 'scouting-play-type';
 
   const overall = playcallData.overall || {};
   const overallAttempts = overall.attempts || 0;
@@ -1303,7 +1351,7 @@ function createPlaycallSubsection(title, playcallData) {
     : null;
   
   const primary = document.createElement('div');
-  primary.className = 'scouting-primary-row';
+  primary.className = 'scouting-play-type-header';
   primary.innerHTML = `
     <span>${title}:</span>
     <span>${overallSuccess} / ${overallAttempts} (${overallPct}%)</span>
@@ -1382,9 +1430,9 @@ function getEvClass(value) {
 
 function createScoutingItem(label, value, pct) {
   const item = document.createElement('div');
-  item.className = 'scouting-sub-row';
+  item.className = 'scouting-vs-row';
   item.innerHTML = `
-    <span class="sub-label">${label}</span>
+    <span class="scouting-vs-label">${label}</span>
     <span>${value}</span>
     <span>${pct}</span>
   `;
@@ -1393,13 +1441,14 @@ function createScoutingItem(label, value, pct) {
 
 function createScoutingItemWithVs(label, value, pct, vsManValue, vsManPct, vsZoneValue, vsZonePct) {
   const wrap = document.createElement('div');
+  wrap.className = 'scouting-focus-group';
   const primary = document.createElement('div');
-  primary.className = 'scouting-primary-row';
+  primary.className = 'scouting-focus-header';
   primary.innerHTML = `<span>${label}:</span><span>${value}</span><span>${pct}</span>`;
   wrap.appendChild(primary);
 
   const subRows = document.createElement('div');
-  subRows.className = 'scouting-sub-rows';
+  subRows.className = 'scouting-vs-rows';
   subRows.appendChild(createScoutingItem('vs Man', vsManValue, `${vsManPct}%`));
   subRows.appendChild(createScoutingItem('vs Zone', vsZoneValue, `${vsZonePct}%`));
   wrap.appendChild(subRows);
@@ -1412,7 +1461,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const stats = defenseData.game_stats || defenseData.season_stats || defenseData || {};
   
   const subsection = document.createElement('div');
-  subsection.className = 'scouting-subsection';
+  subsection.className = 'scouting-play-type';
 
   const used = stats.used || 0;
   const success = stats.success || 0;
@@ -1436,7 +1485,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const execColor = parseFloat(avgExec) < 0 ? '#ff0000' : (parseFloat(avgExec) === 0 ? '#ffd700' : '#00AA00');
   
   const primary = document.createElement('div');
-  primary.className = 'scouting-primary-row';
+  primary.className = 'scouting-play-type-header';
   primary.innerHTML = `
     <span>${title}:</span>
     <span>${success} / ${used} (${pct}%)</span>

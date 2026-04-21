@@ -56,11 +56,14 @@ body.box-score-page {
 }
 
 #box-score-header {
-  background: rgba(22, 26, 36, 0.98);
+  background-color: rgba(13, 17, 36, 0.97);
+  background-size: cover;
+  background-position: center;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
-  padding: 20px 28px;
+  padding: 24px 28px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  overflow: hidden;
 }
 
 #header-content {
@@ -220,13 +223,13 @@ body.box-score-page {
   height: 48px;
   border: 0;
   border-bottom: 3px solid transparent;
-  background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.15);
-  color: rgba(255, 255, 255, 0.5);
+  background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.35);
+  color: rgba(255, 255, 255, 0.6);
   font-family: 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.06em;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
   position: relative;
 }
 
@@ -235,14 +238,14 @@ body.box-score-page {
 }
 
 .tab-button.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.85);
   color: #ffffff;
   border-bottom-color: var(--tab-color, #F79420);
 }
 
 .tab-button:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.75);
+  background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.5);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .team-content {
@@ -355,15 +358,16 @@ body.box-score-page {
 }
 
 .scouting-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 32px;
+  align-items: start;
+}
+
+.scouting-column {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.scouting-subsection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .scouting-section-header {
@@ -372,45 +376,65 @@ body.box-score-page {
   color: #F79420;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(247, 148, 32, 0.25);
 }
 
-.scouting-primary-row {
+.scouting-play-type {
+  margin-bottom: 10px;
+}
+
+.scouting-play-type-header {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 700;
   color: #ffffff;
-  margin: 0 0 6px;
+  margin-bottom: 6px;
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.scouting-sub-rows {
-  padding-left: 16px;
+.scouting-focus-group {
+  padding-left: 14px;
   border-left: 2px solid rgba(255, 255, 255, 0.07);
-  margin-bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  margin-bottom: 8px;
 }
 
-.scouting-sub-row {
+.scouting-focus-header {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 3px;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
+}
+
+.scouting-vs-rows {
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.scouting-vs-row {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.scouting-sub-row .sub-label {
-  min-width: 80px;
+.scouting-vs-label {
+  min-width: 56px;
   flex-shrink: 0;
 }
 
@@ -657,5 +681,10 @@ body.box-score-page {
   .attr-change-row {
     grid-template-columns: 110px 1fr 40px;
     gap: 10px;
+  }
+
+  .scouting-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
 }
