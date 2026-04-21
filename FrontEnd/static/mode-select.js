@@ -305,7 +305,8 @@ async function loadLeadersByTeam() {
         'border-color: ' + team.primary + '66; ' +
         'box-shadow: 0 0 0 1px ' + team.primary + '33, inset 0 0 24px rgba(0,0,0,0.3);';
 
-      var bannerUrlCss = 'url("' + String(bannerPath).replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
+      // Use unquoted url(...) so inner " does not terminate style="..." (quoted url breaks the attribute).
+      var bannerUrlCss = 'url(' + String(bannerPath).replace(/\\/g, '/') + ')';
       card.innerHTML =
         '<div class="lbt-card-banner" style="background-image: ' + bannerUrlCss + ';">' +
         '<div class="lbt-card-banner-overlay"></div>' +
