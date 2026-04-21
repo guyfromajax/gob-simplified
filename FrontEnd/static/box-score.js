@@ -543,11 +543,14 @@ function renderHeader() {
   const homeWon = homeScore > awayScore;
   const awayWon = awayScore > homeScore;
   const winningColor = '#ffffff';
-  const losingColor = 'rgba(255,255,255,0.4)';
+  const losingColor = 'rgba(255,255,255,0.45)';
   homeNameEl.style.color = homeWon ? winningColor : awayWon ? losingColor : 'rgba(255, 255, 255, 0.6)';
   homeScoreEl.style.color = homeWon ? winningColor : awayWon ? losingColor : '#ffffff';
   awayNameEl.style.color = awayWon ? winningColor : homeWon ? losingColor : 'rgba(255, 255, 255, 0.6)';
   awayScoreEl.style.color = awayWon ? winningColor : homeWon ? losingColor : '#ffffff';
+  document.querySelectorAll('#header-content .score, #header-content .team-name').forEach(el => {
+    el.style.textShadow = '0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7)';
+  });
 
   const homeTabButton = document.querySelector('.tab-button[data-team="home"]');
   const awayTabButton = document.querySelector('.tab-button[data-team="away"]');
@@ -1024,12 +1027,19 @@ function renderTeamAttributeChangesForTab(team) {
     return;
   }
 
-  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: showing section', { team, changeKeys: Object.keys(changes) });
+  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: showing section', { team, changeKeys: Object.keys(changes || {}) });
   section.style.display = 'block';
   renderAttributeChangePills(container, changes || {});
 }
 
 function renderAttributeChangePills(container, attributeDeltas) {
+  function normalizeAttrKey(key) {
+    return String(key || '')
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/[\s-]+/g, '_')
+      .toLowerCase();
+  }
+
   const ATTR_CONFIG = {
     shot_threshold: { label: 'Shooting', scale: 100, invert: true },
     rebound_modifier: { label: 'Rebounding', scale: 0.2, invert: false },
@@ -1044,13 +1054,25 @@ function renderAttributeChangePills(container, attributeDeltas) {
     momentum_score: { label: 'Momentum', scale: 10, invert: false },
     team_chemistry: { label: 'Chemistry', scale: 10, invert: false },
     fb_opp_modifier: { label: 'FB Defense', scale: 10, invert: false },
-    pt_opp_modifier: { label: 'P/T Breaks', scale: 10, invert: false }
+    pt_opp_modifier: { label: 'P/T Breaks', scale: 10, invert: false },
+    offensiveefficiency: { label: 'Offense', scale: 10, invert: false },
+    defensiveefficiency: { label: 'Defense', scale: 10, invert: false },
+    reboundmodifier: { label: 'Rebounding', scale: 0.2, invert: false },
+    shotthreshold: { label: 'Shooting', scale: 100, invert: true },
+    teamchemistry: { label: 'Chemistry', scale: 10, invert: false },
+    momentumscore: { label: 'Momentum', scale: 10, invert: false },
+    fbefficiency: { label: 'Fast Break', scale: 10, invert: false },
+    ptefficiency: { label: 'Press/Trap', scale: 10, invert: false },
+    ptbreaks: { label: 'P/T Breaks', scale: 10, invert: false }
   };
   container.innerHTML = '';
   container.className = 'attr-changes-pills';
+  console.log('🔍 [ATTR-CHANGES] renderAttributeChangePills keys=', Object.keys(attributeDeltas || {}));
 
   Object.entries(attributeDeltas).forEach(([key, rawDelta]) => {
-    const config = ATTR_CONFIG[key.toLowerCase()];
+    const normalizedKey = normalizeAttrKey(key);
+    const compactKey = normalizedKey.replace(/_/g, '');
+    const config = ATTR_CONFIG[normalizedKey] || ATTR_CONFIG[compactKey];
     if (!config) return;
 
     const numDelta = Number(rawDelta) || 0;
@@ -1119,6 +1141,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const offense = teamStats.offense || {};
   const defense = teamStats.defense || {};
   const playcalls = offense.Playcalls || {};
+  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
 
   const leftColumn = document.createElement('div');
   leftColumn.className = 'scouting-column';
@@ -1235,7 +1258,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
 
   rightColumn.appendChild(defensePlayCallsSection);
 
-  // Fast Breaks (offense scouting; per-play splits — after Defense Play Calls per product spec)
+  // Fast Breaks (left column, after Offense Play Calls)
   const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
   const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
   const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
@@ -1274,8 +1297,6 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const specialSection = document.createElement('div');
   specialSection.className = 'scouting-section';
   specialSection.innerHTML = '<div class="scouting-section-header">Special Situations</div>';
-
-  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
 
   const hct = defense.HCT || {};
   const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
@@ -1593,16 +1614,12 @@ function setupTabs() {
 
   tabButtons.forEach(button => {
     const team = button.dataset.team;
-    
     button.addEventListener('click', () => {
       playSound('click-tiny.wav');
-      // Update active tab
-      tabButtons.forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.team-content').forEach(c => c.classList.remove('active'));
       button.classList.add('active');
-
-      // Update active content
-      teamContents.forEach(content => content.classList.remove('active'));
-      document.getElementById(`${team}-content`).classList.add('active');
+      document.getElementById(`${team}-content`)?.classList.add('active');
     });
   });
 }
