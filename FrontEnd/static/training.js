@@ -993,7 +993,6 @@ submitBtn.addEventListener('click', async function() {
       const overlayTeamName = currentTeamName || 'Your team';
       window.PageLoadOverlay.show({
         variant: 'pulse',
-        title: '128 Teams Executing Training',
         subtitle: `${overlayTeamName} is executing training.`,
         teamName: currentTeamName || '',
         assetKey: 'banner_primary'

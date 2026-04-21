@@ -166,13 +166,26 @@
     var pulseImage = pulse.querySelector('.page-load-overlay-pulse-image');
     var pulseTitle = pulse.querySelector('.page-load-overlay-pulse-title');
     var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
+    var titleText = options.title || '';
+    var subtitleText = options.subtitle || '';
 
     if (pulseImage) {
       pulseImage.src = getPulseImageSrc(options);
-      pulseImage.alt = options.teamName || options.title || 'Loading';
+      pulseImage.alt = options.teamName || titleText || subtitleText || 'Loading';
     }
-    if (pulseTitle) pulseTitle.textContent = options.title || '';
-    if (pulseSubtitle) pulseSubtitle.textContent = options.subtitle || '';
+    if (pulseTitle) {
+      pulseTitle.textContent = titleText;
+      pulseTitle.style.display = titleText ? 'block' : 'none';
+    }
+    if (pulseSubtitle) {
+      pulseSubtitle.textContent = subtitleText;
+      pulseSubtitle.style.fontFamily = titleText ? "'Inter', sans-serif" : "'Bebas Neue', sans-serif";
+      pulseSubtitle.style.fontSize = titleText ? '16px' : '48px';
+      pulseSubtitle.style.lineHeight = titleText ? '1.4' : '1';
+      pulseSubtitle.style.letterSpacing = titleText ? '0' : '0.03em';
+      pulseSubtitle.style.color = titleText ? 'rgba(255,255,255,0.68)' : '#ffffff';
+      pulseSubtitle.style.margin = titleText ? '0 0 22px' : '26px 0 22px';
+    }
     pulse.style.display = 'block';
   }
 
