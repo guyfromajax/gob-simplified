@@ -12,6 +12,22 @@ function playSound(filename) {
 
 let gameData = null;
 
+function hexToRgbString(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  return result
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+    : '42, 48, 58';
+}
+
+function getTeamContext() {
+  const homeTeamId = gameData?.home_team_id;
+  const awayTeamId = gameData?.away_team_id;
+  const teamsObj = gameData?.teams || {};
+  const homeTeam = (homeTeamId && teamsObj[homeTeamId]) ? teamsObj[homeTeamId] : (gameData?.home_team || {});
+  const awayTeam = (awayTeamId && teamsObj[awayTeamId]) ? teamsObj[awayTeamId] : (gameData?.away_team || {});
+  return { homeTeam, awayTeam, teamsObj, homeTeamId, awayTeamId };
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -347,6 +363,7 @@ async function renderPlayerOfTheGameSection() {
   const section = document.getElementById('potg-section');
   const playerLine = document.getElementById('potg-player-line');
   const statsLine = document.getElementById('potg-stats-line');
+  const potgPortrait = document.getElementById('potg-portrait');
   if (!section || !playerLine || !statsLine) return;
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -360,8 +377,10 @@ async function renderPlayerOfTheGameSection() {
   if (!isGameComplete) {
     playerLine.textContent = '';
     statsLine.textContent = '';
-    playerLine.style.color = '';
-    statsLine.style.color = '';
+    if (potgPortrait) {
+      potgPortrait.removeAttribute('src');
+      potgPortrait.style.display = 'none';
+    }
     return;
   }
 
@@ -381,9 +400,13 @@ async function renderPlayerOfTheGameSection() {
     section.style.display = 'block';
     playerLine.textContent = `${potg.name} - ${potg.teamName}`;
     statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
-    const potgColor = potg.teamColor || '#1a1a2e';
-    playerLine.style.color = potgColor;
-    statsLine.style.color = potgColor;
+    if (potgPortrait && potg.playerId) {
+      potgPortrait.style.display = '';
+      potgPortrait.src = `${staticBase}/images/players/${potg.playerId}.png`;
+      potgPortrait.alt = potg.name || '';
+    } else if (potgPortrait) {
+      potgPortrait.style.display = 'none';
+    }
   } catch (err) {
     console.warn('[box-score] Failed to render POTG section:', err);
     section.style.display = 'none';
@@ -499,13 +522,7 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tourna
 
 // Render header with team names and scores
 function renderHeader() {
-  // ✅ UNIFIED STRUCTURE: Get team data from unified teams object, fallback to old structure
-  const homeTeamId = gameData.home_team_id;
-  const awayTeamId = gameData.away_team_id;
-  const teamsObj = gameData.teams || {};
-  
-  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : (gameData.home_team || {});
-  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : (gameData.away_team || {});
+  const { homeTeam: homeTeamObj, awayTeam: awayTeamObj } = getTeamContext();
   
   const score = gameData.score || {};
 
@@ -518,12 +535,34 @@ function renderHeader() {
   document.getElementById('away-team-name').textContent = awayName;
   document.getElementById('home-score').textContent = homeScore;
   document.getElementById('away-score').textContent = awayScore;
-  
-  // Update tab button labels with team names
+
+  const homeNameEl = document.getElementById('home-team-name');
+  const awayNameEl = document.getElementById('away-team-name');
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  const homeWon = homeScore > awayScore;
+  const awayWon = awayScore > homeScore;
+  const winningColor = '#ffffff';
+  const losingColor = 'rgba(255,255,255,0.4)';
+  homeNameEl.style.color = homeWon ? winningColor : awayWon ? losingColor : 'rgba(255, 255, 255, 0.6)';
+  homeScoreEl.style.color = homeWon ? winningColor : awayWon ? losingColor : '#ffffff';
+  awayNameEl.style.color = awayWon ? winningColor : homeWon ? losingColor : 'rgba(255, 255, 255, 0.6)';
+  awayScoreEl.style.color = awayWon ? winningColor : homeWon ? losingColor : '#ffffff';
+
   const homeTabButton = document.querySelector('.tab-button[data-team="home"]');
   const awayTabButton = document.querySelector('.tab-button[data-team="away"]');
-  if (homeTabButton) homeTabButton.textContent = homeName;
-  if (awayTabButton) awayTabButton.textContent = awayName;
+  const homePrimaryColor = homeTeamObj?.colors?.primary_color || homeTeamObj?.primary_color || '#F79420';
+  const awayPrimaryColor = awayTeamObj?.colors?.primary_color || awayTeamObj?.primary_color || '#4065AF';
+  if (homeTabButton) {
+    homeTabButton.textContent = homeName;
+    homeTabButton.style.setProperty('--tab-color', homePrimaryColor);
+    homeTabButton.style.setProperty('--tab-color-rgb', hexToRgbString(homePrimaryColor));
+  }
+  if (awayTabButton) {
+    awayTabButton.textContent = awayName;
+    awayTabButton.style.setProperty('--tab-color', awayPrimaryColor);
+    awayTabButton.style.setProperty('--tab-color-rgb', hexToRgbString(awayPrimaryColor));
+  }
 }
 
 // Render quarter scoring table
@@ -953,18 +992,15 @@ function renderTeamAttributeChangesForTab(team) {
     return;
   }
 
-  if (!changes || Object.keys(changes).length === 0) {
-    console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: hiding section (no changes)', { team });
-    section.style.display = 'none';
-    return;
-  }
-
   console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: showing section', { team, changeKeys: Object.keys(changes) });
   section.style.display = 'block';
+  renderAttributeChangePills(container, changes || {});
+}
 
-  const attrNames = {
-    shot_threshold: 'Shot Threshold',
-    rebound_modifier: 'Rebound',
+function renderAttributeChangePills(container, attributeDeltas) {
+  const ATTR_DISPLAY = {
+    shot_threshold: 'Shooting',
+    rebound_modifier: 'Rebounding',
     offensive_efficiency: 'Offense',
     defensive_efficiency: 'Defense',
     fb_efficiency: 'Fast Break',
@@ -973,61 +1009,40 @@ function renderTeamAttributeChangesForTab(team) {
     discipline: 'Discipline',
     momentum_score: 'Momentum',
     team_chemistry: 'Chemistry',
+    fb_defense: 'FB Defense',
+    pt_breaks: 'P/T Breaks',
     fb_opp_modifier: 'FB Defense',
     pt_opp_modifier: 'P/T Breaks'
   };
 
-  function formatChange(change, attrKey) {
-    const n = Number(change);
-    const isRebound = attrKey === 'rebound_modifier';
-    const isShotThreshold = attrKey === 'shot_threshold';
-    
-    let displayValue = n;
-    let text = '';
-    let color = 'black';
-    
-    if (isShotThreshold) {
-      // ✅ INVERT SIGN: Positive changes display as negative (red), negative changes display as positive (green)
-      displayValue = -n;
-      text = displayValue === 0 ? '0' : (displayValue > 0 ? `+${displayValue}` : `${displayValue}`);
-      color = displayValue > 0 ? 'green' : displayValue < 0 ? 'red' : 'black';
-    } else if (isRebound) {
-      // ✅ ROUND TO 2 DECIMALS: Round mathematically (e.g., -0.02634... → -0.03, -0.02499... → -0.02)
-      const rounded = Math.round(n * 100) / 100; // Round to 2 decimal places
-      text = rounded === 0 ? '0.00' : (rounded > 0 ? `+${rounded.toFixed(2)}` : `${rounded.toFixed(2)}`);
-      color = rounded > 0 ? 'green' : rounded < 0 ? 'red' : 'black';
-    } else {
-      // Other attributes: integer display
-      text = n === 0 ? '0' : (n > 0 ? `+${n}` : `${n}`);
-      color = n > 0 ? 'green' : n < 0 ? 'red' : 'black';
-    }
-    
-    return { text, color };
-  }
-
-  const rowDefs = [
-    ['shot_threshold', 'rebound_modifier', 'offensive_efficiency', 'defensive_efficiency'],
-    ['fb_efficiency', 'pt_efficiency', 'fight', 'discipline'],
-    ['momentum_score', 'team_chemistry', 'fb_opp_modifier', 'pt_opp_modifier']
-  ];
-
+  const MAX_DELTA = 10;
   container.innerHTML = '';
-  for (const attrs of rowDefs) {
+  container.className = 'attr-changes-pills';
+
+  Object.entries(attributeDeltas).forEach(([key, delta]) => {
+    const label = ATTR_DISPLAY[key.toLowerCase()] || key;
+    const numDelta = Number(delta) || 0;
+    const fillPct = Math.min(Math.abs(numDelta) / MAX_DELTA * 50, 50);
+    const isPositive = numDelta > 0;
+    const isNegative = numDelta < 0;
+    const deltaLabel = numDelta > 0 ? `+${numDelta}` : `${numDelta}`;
+    const deltaColor = isPositive ? '#34EC27' : isNegative ? '#ff6d6d' : 'rgba(255,255,255,0.3)';
+
     const row = document.createElement('div');
-    row.className = 'attribute-changes-row';
-    for (const attrKey of attrs) {
-      const change = changes[attrKey] ?? 0;
-      const { text, color } = formatChange(change, attrKey);
-      const cell = document.createElement('div');
-      cell.className = 'attribute-change-cell';
-      cell.innerHTML = `
-        <div class="attribute-change-label">${attrNames[attrKey]}</div>
-        <div class="attribute-change-value" style="color: ${color}">${text}</div>
-      `;
-      row.appendChild(cell);
-    }
+    row.className = 'attr-change-row';
+    row.innerHTML = `
+      <div class="attr-change-label">${label}</div>
+      <div class="attr-change-pill-wrap">
+        <div class="attr-change-pill">
+          <div class="attr-pill-fill ${isPositive ? 'positive' : isNegative ? 'negative' : ''}"
+               style="width: ${fillPct}%; ${isPositive ? 'left: 50%' : 'right: 50%'}"></div>
+          <div class="attr-pill-center"></div>
+        </div>
+      </div>
+      <div class="attr-change-delta" style="color: ${deltaColor}">${numDelta !== 0 ? deltaLabel : '—'}</div>
+    `;
     container.appendChild(row);
-  }
+  });
 }
 
 // Render scouting notes
@@ -1072,7 +1087,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   // Offense Play Calls Section
   const playCallsSection = document.createElement('div');
   playCallsSection.className = 'scouting-section';
-  playCallsSection.innerHTML = '<h3>Offense Play Calls</h3>';
+  playCallsSection.innerHTML = '<div class="scouting-section-header">Offense Play Calls</div>';
 
   // Motion
   const motionSection = createPlaycallSubsection('Motion', playcalls.Motion);
@@ -1095,7 +1110,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   // Special Situations Section
   const specialSection = document.createElement('div');
   specialSection.className = 'scouting-section';
-  specialSection.innerHTML = '<h3>Special Situations</h3>';
+  specialSection.innerHTML = '<div class="scouting-section-header">Special Situations</div>';
 
   // Special situations use canonical EOG snapshot when available (matches EOG attribute calculations).
   const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
@@ -1119,7 +1134,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   // Defense Play Calls Section
   const defensePlayCallsSection = document.createElement('div');
   defensePlayCallsSection.className = 'scouting-section';
-  defensePlayCallsSection.innerHTML = '<h3>Defense Play Calls</h3>';
+  defensePlayCallsSection.innerHTML = '<div class="scouting-section-header">Defense Play Calls</div>';
 
   // Man
   const manDefense = defense.Man || {};
@@ -1207,7 +1222,6 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
   const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
 
-  // Match defense subsection pattern: h4 line with title + S/A/%, then scouting-item rows (vs Motion, etc.)
   const fastBreakSection = document.createElement('div');
   fastBreakSection.className = 'scouting-section';
   const fastBreakSub = document.createElement('div');
@@ -1259,13 +1273,6 @@ function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
 
 // Create playcall subsection (Motion, Set, Cumulative)
 function createPlaycallSubsection(title, playcallData) {
-  if (!playcallData) {
-    const empty = document.createElement('div');
-    empty.className = 'scouting-subsection';
-    empty.innerHTML = `<h4>${title}: No data</h4>`;
-    return empty;
-  }
-
   const subsection = document.createElement('div');
   subsection.className = 'scouting-subsection';
 
@@ -1295,16 +1302,15 @@ function createPlaycallSubsection(title, playcallData) {
     ? (parseFloat(overallAvgExec) < 0 ? '#ff0000' : (parseFloat(overallAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
-  const overallAvgText = overallAvgEV !== null || overallAvgExec !== null
-    ? ` (Avg EV: <span style="color: ${overallEvColor || '#000'}">${overallEvSign}${overallAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${overallExecColor || '#000'}">${overallExecSign}${overallAvgExec || '0'}%</span>)`
-    : '';
-
-  // For "Focus Success Rates", don't show the numbers in the header
-  const headerText = title === 'Focus Success Rates' 
-    ? `<h4>${title}${overallAvgText}</h4>`
-    : `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)${overallAvgText}</h4>`;
-  
-  subsection.innerHTML = headerText;
+  const primary = document.createElement('div');
+  primary.className = 'scouting-primary-row';
+  primary.innerHTML = `
+    <span>${title}:</span>
+    <span>${overallSuccess} / ${overallAttempts} (${overallPct}%)</span>
+    ${overallAvgEV !== null ? `<span class="${getEvClass(overallAvgEV)}">EV ${overallEvSign}${overallAvgEV}%</span>` : ''}
+    ${overallAvgExec !== null ? `<span class="${getEvClass(overallAvgExec)}">Exec ${overallExecSign}${overallAvgExec}%</span>` : ''}
+  `;
+  subsection.appendChild(primary);
 
   // Inside (backend uses lowercase 'inside')
   const inside = playcallData.inside || playcallData.Inside || {};
@@ -1366,29 +1372,38 @@ function createPlaycallSubsection(title, playcallData) {
   return subsection;
 }
 
-// Create a scouting item element
+function getEvClass(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'ev-neutral';
+  if (n > 0) return 'ev-positive';
+  if (n < 0) return 'ev-negative';
+  return 'ev-neutral';
+}
+
 function createScoutingItem(label, value, pct) {
   const item = document.createElement('div');
-  item.className = 'scouting-item';
+  item.className = 'scouting-sub-row';
   item.innerHTML = `
-    <span class="scouting-item-label">${label}:</span>
-    <span class="scouting-item-value">${value}</span>
-    <span class="scouting-item-pct">(${pct})</span>
+    <span class="sub-label">${label}</span>
+    <span>${value}</span>
+    <span>${pct}</span>
   `;
   return item;
 }
 
-// Create a scouting item element with vs Man and vs Zone columns
 function createScoutingItemWithVs(label, value, pct, vsManValue, vsManPct, vsZoneValue, vsZonePct) {
-  const item = document.createElement('div');
-  item.className = 'scouting-item';
-  item.innerHTML = `
-    <span class="scouting-item-label">${label}:</span>
-    <span class="scouting-item-value">${value}</span>
-    <span class="scouting-item-pct">(${pct})</span>
-    <span class="scouting-item-vs" style="margin-left: 15px;">vs Man: ${vsManValue} (${vsManPct}%), vs Zone: ${vsZoneValue} (${vsZonePct}%)</span>
-  `;
-  return item;
+  const wrap = document.createElement('div');
+  const primary = document.createElement('div');
+  primary.className = 'scouting-primary-row';
+  primary.innerHTML = `<span>${label}:</span><span>${value}</span><span>${pct}</span>`;
+  wrap.appendChild(primary);
+
+  const subRows = document.createElement('div');
+  subRows.className = 'scouting-sub-rows';
+  subRows.appendChild(createScoutingItem('vs Man', vsManValue, `${vsManPct}%`));
+  subRows.appendChild(createScoutingItem('vs Zone', vsZoneValue, `${vsZonePct}%`));
+  wrap.appendChild(subRows);
+  return wrap;
 }
 
 // Create defense playcall subsection (Man, Zone, etc.)
@@ -1420,12 +1435,15 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const evColor = parseFloat(avgEV) < 0 ? '#ff0000' : (parseFloat(avgEV) === 0 ? '#ffd700' : '#00AA00');
   const execColor = parseFloat(avgExec) < 0 ? '#ff0000' : (parseFloat(avgExec) === 0 ? '#ffd700' : '#00AA00');
   
-  const headerText = `${title}: ${success} / ${used} (${pct}%)`;
-  const avgText = evScores.length > 0 || leanScores.length > 0
-    ? ` (Avg EV: <span style="color: ${evColor}">${evSign}${avgEV}%</span>) (Avg Exec: <span style="color: ${execColor}">${execSign}${avgExec}%</span>)`
-    : '';
-  
-  subsection.innerHTML = `<h4>${headerText}${avgText}</h4>`;
+  const primary = document.createElement('div');
+  primary.className = 'scouting-primary-row';
+  primary.innerHTML = `
+    <span>${title}:</span>
+    <span>${success} / ${used} (${pct}%)</span>
+    ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgEV)}">EV ${evSign}${avgEV}%</span>` : ''}
+    ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgExec)}">Exec ${execSign}${avgExec}%</span>` : ''}
+  `;
+  subsection.appendChild(primary);
 
   // vs Motion
   const vsMotion = stats.vs_motion || {};
@@ -1456,12 +1474,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
     ? (parseFloat(vsMotionAvgExec) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
-  const vsMotionAvgText = vsMotionAvgEV !== null || vsMotionAvgExec !== null
-    ? ` (Avg EV: <span style="color: ${vsMotionEvColor || '#000'}">${vsMotionEvSign}${vsMotionAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${vsMotionExecColor || '#000'}">${vsMotionExecSign}${vsMotionAvgExec || '0'}%</span>)`
-    : '';
-  
-  const vsMotionDisplayPct = vsMotionAvgText ? `${vsMotionPct}%${vsMotionAvgText}` : `${vsMotionPct}%`;
-  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, vsMotionDisplayPct));
+  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, `${vsMotionPct}%`));
 
   // vs Set Play
   const vsSet = stats.vs_set || {};
@@ -1492,12 +1505,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
     ? (parseFloat(vsSetAvgExec) < 0 ? '#ff0000' : (parseFloat(vsSetAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
-  const vsSetAvgText = vsSetAvgEV !== null || vsSetAvgExec !== null
-    ? ` (Avg EV: <span style="color: ${vsSetEvColor || '#000'}">${vsSetEvSign}${vsSetAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${vsSetExecColor || '#000'}">${vsSetExecSign}${vsSetAvgExec || '0'}%</span>)`
-    : '';
-  
-  const vsSetDisplayPct = vsSetAvgText ? `${vsSetPct}%${vsSetAvgText}` : `${vsSetPct}%`;
-  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, vsSetDisplayPct));
+  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, `${vsSetPct}%`));
 
   // vs Inside
   const vsInside = stats.vs_inside || {};
@@ -1534,46 +1542,8 @@ function setupTabs() {
   const tabButtons = document.querySelectorAll('.tab-button');
   const teamContents = document.querySelectorAll('.team-content');
 
-  const NAVY_FALLBACK = '#1a1a2e';
-  const teamsObj = gameData?.teams || {};
-  const homeTeamId = gameData?.home_team_id;
-  const awayTeamId = gameData?.away_team_id;
-  const homeTeam = (homeTeamId && teamsObj[homeTeamId]) ? teamsObj[homeTeamId] : (gameData?.home_team || {});
-  const awayTeam = (awayTeamId && teamsObj[awayTeamId]) ? teamsObj[awayTeamId] : (gameData?.away_team || {});
-
-  const resolvePrimaryColor = (teamObj) =>
-    teamObj?.colors?.primary_color ||
-    teamObj?.primary_color ||
-    NAVY_FALLBACK;
-
-  const contrastTextColor = (hexColor) => {
-    if (typeof hexColor !== 'string') return '#fff';
-    let hex = hexColor.trim().replace('#', '');
-    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return '#fff';
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-    return luminance > 165 ? '#111' : '#fff';
-  };
-
-  const homePrimaryColor = resolvePrimaryColor(homeTeam);
-  const awayPrimaryColor = resolvePrimaryColor(awayTeam);
-  const homeTextColor = contrastTextColor(homePrimaryColor);
-  const awayTextColor = contrastTextColor(awayPrimaryColor);
-
   tabButtons.forEach(button => {
     const team = button.dataset.team;
-
-    // Set background color based on team
-    if (team === 'home') {
-      button.style.backgroundColor = homePrimaryColor;
-      button.style.color = homeTextColor;
-    } else if (team === 'away') {
-      button.style.backgroundColor = awayPrimaryColor;
-      button.style.color = awayTextColor;
-    }
     
     button.addEventListener('click', () => {
       playSound('click-tiny.wav');
@@ -1768,7 +1738,7 @@ function setupLockerRoomButton() {
     lockerRoomUrl = '/mode-select.html';
   }
 
-  cleanButton.textContent = 'Back To Locker Room';
+  cleanButton.textContent = 'Back to Locker Room';
 
   cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();

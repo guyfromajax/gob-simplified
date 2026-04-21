@@ -184,6 +184,23 @@ Used for confirmations, warnings, settings changes, and destructive actions. Goa
 - No background imagery
 - No decorative elements
 
+##### Action-Only Modal (Functional Modal sub-pattern)
+A stripped-down Functional Modal with no title and no copy — the entire content is a button group. Used when the decision is self-evident from context and copy would be redundant.
+
+**Canonical example:**
+- Pre-game quarter modal (`court.html`) — Play Quarter vs Sim Full Game choice at quarter start
+
+**Design rules:**
+- Same surface, backdrop, border, border-radius as Functional Modal
+- Orange accent bar at top (`3px`, `#F79420`) — provides brand moment in absence of a title
+- No title element, no subtitle element
+- Button group: `display: flex; flex-direction: column; gap: 10px; padding: 24px 28px 28px`
+- Each button: full width (`width: 100%`), `height: 46px`, Bebas Neue 18px
+- Primary action: orange `#F79420`, `color: #15181f`
+- Secondary action(s): ghost treatment — `rgba(255,255,255,0.06)` background, `rgba(255,255,255,0.14)` border
+- No dismiss/cancel button — backdrop click or ESC does not dismiss (player must make a choice)
+- Max width: `420px`
+
 #### Moment Modals
 Used for emotionally significant events — game results, training report reveals, season milestones, recruiting outcomes. Goal is payoff — the user should feel the weight of the moment.
 

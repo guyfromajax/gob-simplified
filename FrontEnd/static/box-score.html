@@ -21,7 +21,7 @@
   <!-- End Google Tag Manager (noscript) -->
 
   <!-- Go To Locker Room Button -->
-  <button id="locker-room-button" class="locker-room-top-button">Back To Locker Room</button>
+  <button id="locker-room-button" class="locker-room-top-button">Back to Locker Room</button>
 
   <div id="box-score-container" class="resource-page-container fcc-brand-page-shell box-score-shell">
     <!-- Header -->
@@ -76,8 +76,13 @@
     <!-- Section 1.5: Player Of The Game -->
     <section id="potg-section">
       <h2>Player Of The Game</h2>
-      <div id="potg-player-line" class="potg-player-line">-</div>
-      <div id="potg-stats-line" class="potg-stats-line">0 PTS  0 REB  0 AST  0 STL  0 BLK  0 DEF%</div>
+      <div class="potg-inner">
+        <img id="potg-portrait" class="potg-portrait" src="" alt="" onerror="this.style.display='none'">
+        <div class="potg-text">
+          <div id="potg-player-line" class="potg-player-line">-</div>
+          <div id="potg-stats-line" class="potg-stats-line">0 PTS  0 REB  0 AST  0 STL  0 BLK  0 DEF%</div>
+        </div>
+      </div>
     </section>
 
     <!-- Tabs -->
@@ -182,7 +187,7 @@
         </section>
 
         <!-- Section 5: Attribute Changes (Home) -->
-        <section id="home-attribute-changes-section" class="stats-section" style="display: none;">
+        <section id="home-attribute-changes-section" class="stats-section">
           <h2>Attribute Changes</h2>
           <div id="home-attribute-changes-content" class="attribute-changes-content">
             <!-- Populated by JavaScript -->
@@ -284,7 +289,7 @@
         </section>
 
         <!-- Section 5: Attribute Changes (Away) -->
-        <section id="away-attribute-changes-section" class="stats-section" style="display: none;">
+        <section id="away-attribute-changes-section" class="stats-section">
           <h2>Attribute Changes</h2>
           <div id="away-attribute-changes-content" class="attribute-changes-content">
             <!-- Populated by JavaScript -->

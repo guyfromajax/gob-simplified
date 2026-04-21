@@ -882,9 +882,10 @@
 
     .pre-game-modal-actions {
       display: flex;
+      flex-direction: column;
       gap: 10px;
-      padding: 0 28px 24px;
-      flex-wrap: wrap;
+      padding: 24px 28px 28px;
+      flex-shrink: 0;
     }
 
     .pre-game-container.hidden {
@@ -1026,58 +1027,56 @@
     .back-button {
       appearance: none;
       min-width: 0;
-      height: 42px;
       padding: 0 18px;
-      border-radius: 10px;
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 16px;
       letter-spacing: 0.04em;
-      transition: background 0.14s ease, border-color 0.14s ease, filter 0.14s ease, transform 0.14s ease;
     }
 
     .play-button {
-      flex: 2 1 180px;
+      appearance: none;
+      width: 100%;
+      height: 46px;
+      padding: 0 18px;
+      border-radius: 10px;
+      font-size: 18px;
       background: #F79420;
       border: 1px solid rgba(247, 148, 32, 0.45);
       color: #15181f;
+      transition: filter 0.14s ease, transform 0.14s ease;
     }
 
-    .play-button:hover,
-    .back-button:hover {
+    .play-button:hover:not(:disabled) {
       filter: brightness(1.06);
       transform: translateY(-1px);
     }
 
     .sim-full-game-button,
     .sim-to-fourth-button {
-      flex: 1 1 140px;
+      appearance: none;
+      width: 100%;
+      height: 46px;
+      padding: 0 18px;
+      border-radius: 10px;
+      font-size: 18px;
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.14);
       color: rgba(255, 255, 255, 0.8);
-      box-shadow: none;
+      transition: background 0.14s ease, border-color 0.14s ease;
     }
 
-    .sim-full-game-button:hover,
-    .sim-to-fourth-button:hover {
+    .sim-full-game-button:hover:not(:disabled),
+    .sim-to-fourth-button:hover:not(:disabled) {
       background: rgba(255, 255, 255, 0.1);
       border-color: rgba(255, 255, 255, 0.24);
       color: #ffffff;
-      transform: translateY(-1px);
     }
 
     .play-button:disabled,
     .sim-full-game-button:disabled,
     .sim-to-fourth-button:disabled {
-      opacity: 0.5;
+      opacity: 0.45;
       cursor: not-allowed;
-      transform: none;
-      filter: none;
-    }
-
-    .play-button:disabled:hover,
-    .sim-full-game-button:disabled:hover,
-    .sim-to-fourth-button:disabled:hover {
       transform: none;
       filter: none;
     }

@@ -236,7 +236,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         background-position: center;
         border: 1px solid rgba(255,255,255,0.12);
         border-radius: 16px;
-        padding: 22px 24px 20px;
+        padding: 22px 24px 28px;
         display: flex;
         flex-direction: column;
         gap: 18px;
@@ -348,14 +348,15 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
       .button-container {
         display: flex;
-        gap: 12px;
+        flex-direction: column;
+        gap: 10px;
         width: 100%;
         margin-top: 20px;
       }
 
       .potg-image {
-        width: 56px;
-        height: 56px;
+        width: 72px;
+        height: 72px;
         border-radius: 8px;
         border: 2px solid rgba(247,148,32,0.4);
         object-fit: cover;
@@ -364,7 +365,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       }
 
       .potg-card {
-        background: rgba(0,0,0,0.3);
+        background: rgba(0,0,0,0.72);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-left: 3px solid #F79420;
         border-radius: 12px;
         padding: 16px 20px;
       }
@@ -382,7 +385,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         display: flex;
         align-items: center;
         gap: 16px;
-        margin-top: 12px;
+        margin-top: 10px;
       }
 
       .potg-info {
@@ -408,7 +411,8 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       }
 
       .completion-button {
-        flex: 1;
+        flex: none;
+        width: 100%;
         padding: 0 18px;
         font-size: 16px;
         border: 1px solid transparent;
@@ -437,14 +441,14 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       }
 
       .locker-room-button {
-        flex: 2;
-        background: #F79420;
+        flex: none;
+        background: #34EC27;
         color: #15181f;
-        border-color: rgba(247,148,32,0.85);
+        border-color: rgba(52,236,39,0.5);
       }
 
       .locker-room-button:hover {
-        background: #ffab40;
+        filter: brightness(1.06);
         transform: translateY(-1px);
       }
 
