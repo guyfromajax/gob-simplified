@@ -1438,7 +1438,11 @@ function buildFccPlaybooksSectionMarkup(data, section) {
     ? `<div class="fcc-playbooks-items">${items.map((item) => `
         <article class="fcc-playbooks-item-card">
           <div class="fcc-playbooks-item-top">
-            <div class="fcc-playbooks-item-name">${escapePlaybookHtml(item.name)}</div>
+            <div class="fcc-playbooks-item-name">${escapePlaybookHtml(
+              section.key === 'set_plays' && item.target_shooter
+                ? `${item.name} (${item.target_shooter})`
+                : item.name
+            )}</div>
             <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
           </div>
           <div class="fcc-playbooks-item-meta">

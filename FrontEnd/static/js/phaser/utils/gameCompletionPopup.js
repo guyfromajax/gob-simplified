@@ -6,20 +6,29 @@
  * @param {string} [options.tournamentId] - Tournament ID (for tournament mode)
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
  * @param {string} [options.teamId] - Team ID (ObjectId) for navigation anchor
+ * @param {'home'|'away'|string} [options.userTeamSide] - User's bench side (from URL/scene); used for WIN/LOSS when IDs match fails
  * @param {Object} [options.finalScore] - Final score object with homeTeam, awayTeam, homeScore, awayScore
  * @param {Object} [options.gameData] - Full game document for POTG calculation (optional)
  */
-export async function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, teamId, finalScore, homeTeam, awayTeam, gameData }) {
+export async function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, teamId, userTeamSide, finalScore, homeTeam, awayTeam, gameData }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.game-completion-popup');
   if (existingPopup) {
     existingPopup.remove();
   }
 
-  // ✅ SS&S: Fallback to reading teamId from URL params if not provided
-  if (!teamId && typeof window !== 'undefined') {
+  // ✅ SS&S: Fallback to reading teamId / user side from URL params if not provided
+  if (typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
-    teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+    if (!teamId) {
+      teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+    }
+    if (!userTeamSide) {
+      const fromUrl = urlParams.get('my_team');
+      if (fromUrl === 'home' || fromUrl === 'away') {
+        userTeamSide = fromUrl;
+      }
+    }
   }
 
   // Determine locker room URL based on mode
@@ -57,58 +66,28 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       lockerRoomUrl = '/mode-select.html';
   }
 
-  // Box Score URL - include mode, IDs, and team names for proper navigation
-  const boxScoreParams = new URLSearchParams();
-  if (gameId) boxScoreParams.set('game_id', gameId);
-  if (homeTeam) boxScoreParams.set('home', homeTeam);
-  if (awayTeam) boxScoreParams.set('away', awayTeam);
-  // ✅ SS&S: Include mode and mode-specific IDs for proper "Go To Locker Room" navigation
-  if (mode) boxScoreParams.set('mode', mode);
-  if (tournamentId) boxScoreParams.set('tournament_id', tournamentId);
-  if (franchiseId) boxScoreParams.set('franchise_id', franchiseId);
-  if (teamId) boxScoreParams.set('team_id', teamId);
-  const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
-  
-  console.log('📊 Box Score URL constructed:', {
-    gameId,
-    homeTeam,
-    awayTeam,
-    boxScoreUrl,
-    finalScore,
-    hasGameId: !!gameId,
-    gameIdType: typeof gameId,
-    gameIdLength: gameId ? gameId.length : 0
-  });
-  
-  // Also log to localStorage for persistence across page navigation
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('last_box_score_url', boxScoreUrl);
-    localStorage.setItem('last_box_score_gameId', gameId || '');
-    console.log('💾 Saved box score URL to localStorage for debugging');
-  }
-
   let potg = null;
   let potgImageUrl = '';
+  let resolvedGameDoc = gameData || null;
   const staticBase = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath)
     ? window.API_CONFIG.getStaticPath()
     : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static' : '');
   try {
     const { calculatePlayerOfTheGame } = await import((staticBase || '') + '/js/shared/potg.js');
-    let potgGameData = gameData || null;
-    if (!potgGameData && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
+    if (!resolvedGameDoc && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
       const resp = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
       });
       if (resp.ok) {
-        potgGameData = await resp.json();
+        resolvedGameDoc = await resp.json();
       }
     }
     const scoreOverride = finalScore ? {
       [finalScore.homeTeam || homeTeam || 'Home Team']: Number(finalScore.homeScore || 0),
       [finalScore.awayTeam || awayTeam || 'Away Team']: Number(finalScore.awayScore || 0),
     } : null;
-    if (potgGameData) {
-      potg = calculatePlayerOfTheGame(potgGameData, { gameId, scoreOverride });
+    if (resolvedGameDoc) {
+      potg = calculatePlayerOfTheGame(resolvedGameDoc, { gameId, scoreOverride });
       if (potg?.playerId) {
         potgImageUrl = `${staticBase}/images/players/${potg.playerId}.png`;
       }
@@ -123,20 +102,26 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   const awayScore = Number(finalScore?.awayScore || 0);
   const homeWon = homeScore > awayScore;
   const awayWon = awayScore > homeScore;
-  const homeTeamId = String(gameData?.home_team_id || gameData?.homeTeamId || '');
-  const awayTeamId = String(gameData?.away_team_id || gameData?.awayTeamId || '');
+  const homeTeamId = String(resolvedGameDoc?.home_team_id || resolvedGameDoc?.homeTeamId || '');
+  const awayTeamId = String(resolvedGameDoc?.away_team_id || resolvedGameDoc?.awayTeamId || '');
   const currentTeamId = String(teamId || '');
-  const userTeamSide = currentTeamId && homeTeamId && currentTeamId === homeTeamId
-    ? 'home'
-    : currentTeamId && awayTeamId && currentTeamId === awayTeamId
-    ? 'away'
-    : null;
-  const userTeamName = userTeamSide === 'away' ? awayTeamName : homeTeamName;
+  const passedSide = userTeamSide === 'home' || userTeamSide === 'away' ? userTeamSide : null;
+  let resolvedUserTeamSide = passedSide;
+  if (!resolvedUserTeamSide && currentTeamId && homeTeamId && currentTeamId === homeTeamId) {
+    resolvedUserTeamSide = 'home';
+  } else if (!resolvedUserTeamSide && currentTeamId && awayTeamId && currentTeamId === awayTeamId) {
+    resolvedUserTeamSide = 'away';
+  }
+  const userTeamName = resolvedUserTeamSide === 'away' ? awayTeamName : homeTeamName;
   const bannerUrl = typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
-  const userWon = userTeamSide === 'away' ? awayWon : homeWon;
-  const outcomeLabel = userWon ? 'WIN' : 'LOSS';
+  const outcomeKnown = resolvedUserTeamSide !== null;
+  const userWon = outcomeKnown
+    ? (resolvedUserTeamSide === 'away' ? awayWon : homeWon)
+    : null;
+  const outcomeLabel = !outcomeKnown ? 'FINAL' : (userWon ? 'WIN' : 'LOSS');
+  const outcomeBadgeClass = !outcomeKnown ? 'is-final' : (userWon ? 'is-win' : 'is-loss');
   const winnerName = homeWon ? homeTeamName : awayTeamName;
   const loserName = homeWon ? awayTeamName : homeTeamName;
   const winnerScore = homeWon ? homeScore : awayScore;
@@ -144,6 +129,37 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   const potgStatsLine = potg
     ? `${potg.stats.pts} PTS · ${potg.stats.reb} REB · ${potg.stats.ast} AST · ${potg.stats.defPct} DEF%`
     : '';
+
+  // Box Score URL — after user side is resolved so `my_team` matches header banner on box-score
+  const boxScoreParams = new URLSearchParams();
+  if (gameId) boxScoreParams.set('game_id', gameId);
+  if (homeTeam) boxScoreParams.set('home', homeTeam);
+  if (awayTeam) boxScoreParams.set('away', awayTeam);
+  if (mode) boxScoreParams.set('mode', mode);
+  if (tournamentId) boxScoreParams.set('tournament_id', tournamentId);
+  if (franchiseId) boxScoreParams.set('franchise_id', franchiseId);
+  if (teamId) boxScoreParams.set('team_id', teamId);
+  if (resolvedUserTeamSide === 'home' || resolvedUserTeamSide === 'away') {
+    boxScoreParams.set('my_team', resolvedUserTeamSide);
+  }
+  const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
+
+  console.log('📊 Box Score URL constructed:', {
+    gameId,
+    homeTeam,
+    awayTeam,
+    boxScoreUrl,
+    finalScore,
+    hasGameId: !!gameId,
+    gameIdType: typeof gameId,
+    gameIdLength: gameId ? gameId.length : 0
+  });
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('last_box_score_url', boxScoreUrl);
+    localStorage.setItem('last_box_score_gameId', gameId || '');
+    console.log('💾 Saved box score URL to localStorage for debugging');
+  }
 
   // Create popup
   const popup = document.createElement('div');
@@ -164,7 +180,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     ), url('${bannerUrl}');">
       <div class="gc-header-row">
         <div class="gc-eyebrow">Game Complete</div>
-        <div class="gc-outcome-badge ${userWon ? 'is-win' : 'is-loss'}">${outcomeLabel}</div>
+        <div class="gc-outcome-badge ${outcomeBadgeClass}">${outcomeLabel}</div>
       </div>
       ${finalScore ? `
         <section class="gc-section gc-result-section">
@@ -286,6 +302,12 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         color: #ff6d6d;
       }
 
+      .gc-outcome-badge.is-final {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.2);
+        color: rgba(255,255,255,0.75);
+      }
+
       .gc-section {
         border-top: 1px solid rgba(255,255,255,0.08);
         padding-top: 16px;
@@ -348,8 +370,8 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
       .button-container {
         display: flex;
-        flex-direction: column;
-        gap: 10px;
+        flex-direction: row;
+        gap: 12px;
         width: 100%;
         margin-top: 20px;
       }
@@ -411,8 +433,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       }
 
       .completion-button {
-        flex: none;
-        width: 100%;
+        flex: 1;
         padding: 0 18px;
         font-size: 16px;
         border: 1px solid transparent;
@@ -423,12 +444,13 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         align-items: center;
         justify-content: center;
         height: 44px;
-        transition: all 0.2s ease;
+        transition: all 0.14s ease;
         font-family: 'Bebas Neue', sans-serif;
         letter-spacing: 0.03em;
       }
 
       .box-score-button {
+        flex: 1;
         background: rgba(255,255,255,0.06);
         color: rgba(255,255,255,0.8);
         border-color: rgba(255,255,255,0.14);
@@ -440,11 +462,15 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         transform: translateY(-1px);
       }
 
+      .game-completion-popup .completion-button.locker-room-button {
+        margin: 0;
+      }
+
       .locker-room-button {
-        flex: none;
+        flex: 2;
         background: #34EC27;
         color: #15181f;
-        border-color: rgba(52,236,39,0.5);
+        border-color: rgba(52, 236, 39, 0.5);
       }
 
       .locker-room-button:hover {
@@ -488,14 +514,6 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
         .potg-content-row {
           align-items: flex-start;
-        }
-
-        .button-container {
-          flex-direction: column;
-        }
-
-        .completion-button {
-          width: 100%;
         }
       }
     `;

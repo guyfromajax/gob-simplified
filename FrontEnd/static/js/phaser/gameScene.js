@@ -2019,6 +2019,8 @@ export function createGameScene(Phaser) {
           mode: mode,
           tournamentId: this.tournamentId,
           franchiseId: this.franchiseId,
+          teamId: this.teamId,
+          userTeamSide: this.userTeamSide,
           finalScore: finalScore
         });
         
@@ -3371,6 +3373,7 @@ export function createGameScene(Phaser) {
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             teamId: this.teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
+            userTeamSide: this.userTeamSide,
             finalScore: finalScore
           });
           

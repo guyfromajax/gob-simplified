@@ -571,10 +571,17 @@ function renderHeader() {
       userTeamSide = 'away';
     }
   }
+  if (userTeamSide == null && typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('last_game_user_team_side');
+    if (stored === 'home' || stored === 'away') userTeamSide = stored;
+  }
 
-  const userTeamName = userTeamSide === 'away' ? awayName : homeName;
-  const bannerUrl = typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(userTeamName, 'banner_primary')
+  const userTeamNameForBanner =
+    userTeamSide === 'away' ? awayName
+    : userTeamSide === 'home' ? homeName
+    : null;
+  const bannerUrl = userTeamNameForBanner && typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(userTeamNameForBanner, 'banner_primary')
     : `/images/teams/general/general_banner_primary.jpg`;
 
   const header = document.getElementById('box-score-header');

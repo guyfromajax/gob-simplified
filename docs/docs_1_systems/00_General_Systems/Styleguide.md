@@ -181,6 +181,9 @@ Used for confirmations, warnings, settings changes, and destructive actions. Goa
 - Subtitle/copy: Inter 14px `rgba(255,255,255,0.55)`
 - Single dismiss action: full-width ghost button
 - Two actions: primary `flex: 2` + secondary/cancel `flex: 1`
+- Two-action rows use `flex-direction: row` with primary `flex: 2`, secondary `flex: 1`
+- Single dismiss action uses `width: 100%` (full width is appropriate when there is only one button)
+- Buttons are full-width stacked only in Action-Only Modals where all choices are equal weight
 - No background imagery
 - No decorative elements
 
@@ -220,7 +223,9 @@ Used for emotionally significant events — game results, training report reveal
 - Max width: `560px`
 - Border: `1px solid rgba(255,255,255,0.12)`
 - Border radius: `16px`
-- Button row: primary `flex: 2`, secondary `flex: 1`
+- Button row: `display: flex; flex-direction: row; gap: 12px` — primary action `flex: 2`, secondary action `flex: 1`
+- Buttons are never stacked full-width in Moment Modals — side-by-side with flex ratio communicates action hierarchy
+- Primary button height: `44px`. Secondary button height: `44px`.
 - Entrance: subtle scale from `0.96` to `1.0` over `200ms ease`
 
 #### Strategic Modals

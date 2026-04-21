@@ -1909,6 +1909,8 @@ async function showPopup(score) {
     mode: mode || 'single',
     tournamentId: tournamentId,
     franchiseId: franchiseId,
+    teamId: teamId,
+    userTeamSide: userTeamSide,
     finalScore: score,
     homeTeam: homeTeam,
     awayTeam: awayTeam
@@ -2051,6 +2053,7 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
     tournamentId: tournamentId,
     franchiseId: franchiseId,
     teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
+    userTeamSide: userTeamSide,
     finalScore: finalScore,
     homeTeam: homeTeam,
     awayTeam: awayTeam,
