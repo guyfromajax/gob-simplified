@@ -14,6 +14,7 @@ from copy import deepcopy
 from typing import Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
+from urllib.parse import urlencode
 from BackEnd.main import run_simulation
 
 from BackEnd.db import (
@@ -1682,6 +1683,83 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     }
 
 
+def _resolve_team_name_from_any(team_ref) -> str | None:
+    if not team_ref:
+        return None
+    doc = db.teams.find_one(
+        {"$or": [{"team_id": str(team_ref)}, {"name": str(team_ref)}, {"code": str(team_ref)}]},
+        {"name": 1},
+    )
+    if doc and doc.get("name"):
+        return str(doc["name"])
+    try:
+        oid = ObjectId(team_ref) if not isinstance(team_ref, ObjectId) else team_ref
+        doc = db.teams.find_one({"_id": oid}, {"name": 1})
+        if doc and doc.get("name"):
+            return str(doc["name"])
+    except Exception:
+        pass
+    return str(team_ref)
+
+
+def _build_franchise_game_inbox_entry(
+    *,
+    franchise_id: str,
+    user_team_name: str | None,
+    user_team_object_id: str | None,
+    game_id: str | None,
+    home_team_id: str | None,
+    away_team_id: str | None,
+    home_team_name: str | None,
+    away_team_name: str | None,
+    home_score: int,
+    away_score: int,
+    week: int,
+) -> dict | None:
+    if not franchise_id or not user_team_name or not user_team_object_id or not game_id:
+        return None
+
+    resolved_home_name = home_team_name or _resolve_team_name_from_any(home_team_id)
+    resolved_away_name = away_team_name or _resolve_team_name_from_any(away_team_id)
+    if not resolved_home_name or not resolved_away_name:
+        return None
+
+    user_is_home = str(user_team_name) == str(resolved_home_name)
+    user_is_away = str(user_team_name) == str(resolved_away_name)
+    if not user_is_home and not user_is_away:
+        return None
+
+    user_score = int(home_score if user_is_home else away_score)
+    opponent_score = int(away_score if user_is_home else home_score)
+    opponent_team_name = resolved_away_name if user_is_home else resolved_home_name
+    result = "win" if user_score > opponent_score else "loss"
+    verb = "defeated" if result == "win" else "lost to"
+    my_team = "home" if user_is_home else "away"
+    box_score_params = urlencode({
+        "game_id": str(game_id),
+        "mode": "franchise",
+        "franchise_id": str(franchise_id),
+        "team_id": str(user_team_object_id),
+        "my_team": my_team,
+        "home": resolved_home_name,
+        "away": resolved_away_name,
+    })
+
+    return {
+        "type": "game_result",
+        "week": int(week),
+        "game_id": str(game_id),
+        "result": result,
+        "user_team_name": str(user_team_name),
+        "opponent_team_name": str(opponent_team_name),
+        "user_score": user_score,
+        "opponent_score": opponent_score,
+        "copy": f"Week #{int(week)}: {user_team_name} {verb} {opponent_team_name} {user_score}-{opponent_score}",
+        "box_score_url": f"/box-score.html?{box_score_params}",
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+
 def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
     """
     Lightweight sim for distant (non-user-conference) games.
@@ -2537,6 +2615,35 @@ def complete_week(req: CompleteWeekRequest):
             winner_score=winner_score,
             loser_score=loser_score,
         )
+        season_inbox = list(franchise_doc.get("season_inbox") or [])
+        game_doc_for_inbox = summary if isinstance(summary, dict) else {}
+        home_team_name = (
+            game_doc_for_inbox.get("home_team", {}).get("name")
+            if isinstance(game_doc_for_inbox.get("home_team"), dict)
+            else game_doc_for_inbox.get("home_team")
+        ) or _resolve_team_name_from_any(home_id)
+        away_team_name = (
+            game_doc_for_inbox.get("away_team", {}).get("name")
+            if isinstance(game_doc_for_inbox.get("away_team"), dict)
+            else game_doc_for_inbox.get("away_team")
+        ) or _resolve_team_name_from_any(away_id)
+        inbox_entry = _build_franchise_game_inbox_entry(
+            franchise_id=str(req.franchise_id),
+            user_team_name=user_team_id_str,
+            user_team_object_id=user_team_object_id,
+            game_id=str(user_game_id_final),
+            home_team_id=home_id,
+            away_team_id=away_id,
+            home_team_name=home_team_name,
+            away_team_name=away_team_name,
+            home_score=home_score,
+            away_score=away_score,
+            week=req.week,
+        )
+        if inbox_entry:
+            season_inbox = [item for item in season_inbox if str(item.get("game_id") or "") != str(user_game_id_final)]
+            season_inbox.insert(0, inbox_entry)
+            franchise_doc["season_inbox"] = season_inbox
     else:
         # Fallback: Try to find game by week + team IDs (legacy behavior)
         logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
@@ -2584,6 +2691,24 @@ def complete_week(req: CompleteWeekRequest):
                     winner_score=winner_score,
                     loser_score=loser_score,
                 )
+                season_inbox = list(franchise_doc.get("season_inbox") or [])
+                inbox_entry = _build_franchise_game_inbox_entry(
+                    franchise_id=str(req.franchise_id),
+                    user_team_name=user_team_id_str,
+                    user_team_object_id=user_team_object_id,
+                    game_id=str(user_game_id),
+                    home_team_id=home_id,
+                    away_team_id=away_id,
+                    home_team_name=_resolve_team_name_from_any(home_id),
+                    away_team_name=_resolve_team_name_from_any(away_id),
+                    home_score=home_score,
+                    away_score=away_score,
+                    week=req.week,
+                )
+                if inbox_entry:
+                    season_inbox = [item for item in season_inbox if str(item.get("game_id") or "") != str(user_game_id)]
+                    season_inbox.insert(0, inbox_entry)
+                    franchise_doc["season_inbox"] = season_inbox
             else:
                 logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
         else:
@@ -2835,6 +2960,7 @@ def complete_week(req: CompleteWeekRequest):
     update_fields = {
         "results": existing_results,
         "week": next_week,
+        "season_inbox": franchise_doc.get("season_inbox", []),
         "training_status.training_completed": False,
         "training_status.session_type": "in-season"
     }
@@ -3234,6 +3360,7 @@ def command_center_data(
                 except (TypeError, ValueError):
                     last_training_report_week = None
         response["last_training_report_week"] = last_training_report_week
+        response["season_inbox"] = list(franchise_doc.get("season_inbox") or []) if franchise_doc else []
         post_eos_bracket_history_visible = bool(
             not eos_tournament_active
             and week in {35, 36}
@@ -7990,6 +8117,7 @@ def finish_season(req: FinishSeasonRequest):
             "current_season": next_season,
             "week": 1,
             "results": {},
+            "season_inbox": [],
             "schedule": schedule,
             "eos_tournament_active": False,
             "conference_tournaments": {},

@@ -651,6 +651,7 @@ function renderHeader() {
     `;
     header.style.backgroundSize = 'cover';
     header.style.backgroundPosition = 'center';
+    console.log('[box-score renderHeader] header.style.backgroundImage =', JSON.stringify(header.style.backgroundImage));
   }
 
   if (homeTabButton) {

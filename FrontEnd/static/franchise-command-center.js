@@ -3300,36 +3300,59 @@ window.addEventListener('DOMContentLoaded', () => {
 function renderFccInbox(topData) {
   const el = document.getElementById('fcc-inbox-body');
   if (!el) return;
+  el.innerHTML = '';
+  const inboxItems = Array.isArray(topData?.season_inbox) ? topData.season_inbox : [];
   const w = topData && topData.last_training_report_week;
   const tid = (topData && topData.team_id) || userTeamId;
-  if (w == null || w === '' || !franchiseId || !tid) {
-    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
-    return;
-  }
-  const weekNum = Number(w);
-  if (!Number.isFinite(weekNum) || weekNum < 1) {
-    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
-    return;
-  }
-  const reportParams = new URLSearchParams({
-    mode: 'franchise',
-    franchise_id: String(franchiseId),
-    team_id: String(tid),
-    week: String(weekNum),
-    from: 'inbox',
+
+  inboxItems.forEach((item) => {
+    if (!item || item.type !== 'game_result') return;
+    const itemWeek = Number(item.week);
+    const verb = item.result === 'win' ? 'defeated' : 'lost to';
+    const text = Number.isFinite(itemWeek) && item.user_team_name && item.opponent_team_name
+      ? `Week #${itemWeek}: ${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
+      : item.copy;
+    if (!text) return;
+    const p = document.createElement('p');
+    p.className = 'fcc-inbox-message';
+    p.appendChild(document.createTextNode(`${text} `));
+    if (item.box_score_url) {
+      const a = document.createElement('a');
+      a.href = item.box_score_url;
+      a.className = 'fcc-inbox-link';
+      a.textContent = 'box score';
+      p.appendChild(a);
+    }
+    el.appendChild(p);
   });
-  const href = `/training-report.html?${reportParams.toString()}`;
-  el.innerHTML = '';
-  const p = document.createElement('p');
-  p.className = 'fcc-inbox-message';
-  p.appendChild(document.createTextNode(`Week ${weekNum} training report `));
-  const a = document.createElement('a');
-  a.href = href;
-  a.className = 'fcc-inbox-link';
-  a.textContent = 'here';
-  p.appendChild(a);
-  p.appendChild(document.createTextNode('.'));
-  el.appendChild(p);
+
+  if (w != null && w !== '' && franchiseId && tid) {
+    const weekNum = Number(w);
+    if (Number.isFinite(weekNum) && weekNum >= 1) {
+      const reportParams = new URLSearchParams({
+        mode: 'franchise',
+        franchise_id: String(franchiseId),
+        team_id: String(tid),
+        week: String(weekNum),
+        from: 'inbox',
+      });
+      const href = `/training-report.html?${reportParams.toString()}`;
+      const p = document.createElement('p');
+      p.className = 'fcc-inbox-message';
+      p.appendChild(document.createTextNode(`Week ${weekNum} training report `));
+      const a = document.createElement('a');
+      a.href = href;
+      a.className = 'fcc-inbox-link';
+      a.textContent = 'here';
+      p.appendChild(a);
+      p.appendChild(document.createTextNode('.'));
+      el.appendChild(p);
+    }
+  }
+
+  if (!el.childElementCount) {
+    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
+  }
 }
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)
