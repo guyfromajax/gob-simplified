@@ -98,6 +98,22 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
 
   const homeTeamName = finalScore?.homeTeam || 'Home';
   const awayTeamName = finalScore?.awayTeam || 'Away';
+  // Banner + box-score `banner_team`: use game-document names when loaded so paths match box-score `getTeamContext()`.
+  const teamsFromDoc = resolvedGameDoc?.teams || {};
+  const docHomeId = resolvedGameDoc?.home_team_id;
+  const docAwayId = resolvedGameDoc?.away_team_id;
+  const teamRec = (id) => {
+    if (id == null || !teamsFromDoc || typeof teamsFromDoc !== 'object') return null;
+    return teamsFromDoc[id] || teamsFromDoc[String(id)] || null;
+  };
+  const canonicalHomeName =
+    teamRec(docHomeId)?.name ||
+    (resolvedGameDoc?.home_team && typeof resolvedGameDoc.home_team === 'object' ? resolvedGameDoc.home_team.name : null) ||
+    homeTeamName;
+  const canonicalAwayName =
+    teamRec(docAwayId)?.name ||
+    (resolvedGameDoc?.away_team && typeof resolvedGameDoc.away_team === 'object' ? resolvedGameDoc.away_team.name : null) ||
+    awayTeamName;
   const homeScore = Number(finalScore?.homeScore || 0);
   const awayScore = Number(finalScore?.awayScore || 0);
   const homeWon = homeScore > awayScore;
@@ -113,9 +129,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     resolvedUserTeamSide = 'away';
   }
   const userTeamName = resolvedUserTeamSide === 'away'
-    ? awayTeamName
+    ? canonicalAwayName
     : resolvedUserTeamSide === 'home'
-    ? homeTeamName
+    ? canonicalHomeName
     : null;
   const bannerUrl = userTeamName && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')

@@ -28,6 +28,42 @@ function getTeamContext() {
   return { homeTeam, awayTeam, teamsObj, homeTeamId, awayTeamId };
 }
 
+/** URL team_id can fail strict equality vs Mongo ids keyed under `teams` — walk keys and embedded ids. */
+function mapTeamIdToSide(teamIdRaw, gameData, homeName, awayName, homeTeamId, awayTeamId) {
+  const t = String(teamIdRaw || '').trim();
+  if (!t) return null;
+  const eq = (a, b) => a != null && b != null && String(a).trim() === String(b).trim();
+  if (eq(t, homeTeamId) || eq(t, homeName)) return 'home';
+  if (eq(t, awayTeamId) || eq(t, awayName)) return 'away';
+  const teams = gameData?.teams;
+  if (!teams || typeof teams !== 'object') return null;
+  for (const key of Object.keys(teams)) {
+    const team = teams[key];
+    if (!team || typeof team !== 'object') continue;
+    const nm = team.name || team.team_name;
+    const idHits = [key, team.team_id, team._id, team.teamId].filter((x) => x != null && String(x).trim() !== '');
+    for (const id of idHits) {
+      if (!eq(t, id)) continue;
+      if (nm && eq(nm, homeName)) return 'home';
+      if (nm && eq(nm, awayName)) return 'away';
+      if (eq(key, homeTeamId) || eq(String(key), String(homeTeamId))) return 'home';
+      if (eq(key, awayTeamId) || eq(String(key), String(awayTeamId))) return 'away';
+    }
+  }
+  return null;
+}
+
+/** Map `banner_team` query to the same display name string the game doc uses (case / spelling). */
+function resolveBannerTeamNameFromParams(bannerParam, homeName, awayName) {
+  const b = (bannerParam || '').trim();
+  if (!b) return null;
+  if (b === homeName) return homeName;
+  if (b === awayName) return awayName;
+  if (b.toLowerCase() === homeName.toLowerCase()) return homeName;
+  if (b.toLowerCase() === awayName.toLowerCase()) return awayName;
+  return b;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -566,13 +602,7 @@ function renderHeader() {
   if (myTeamParam === 'home' || myTeamParam === 'away') {
     userTeamSide = myTeamParam;
   } else if (teamIdParam) {
-    const tid = String(teamIdParam).trim();
-    if (tid === String(homeTeamId ?? '') || tid === String(homeName ?? '')) {
-      userTeamSide = 'home';
-    } else if (tid === String(awayTeamId ?? '') || tid === String(awayName ?? '')) {
-      userTeamSide = 'away';
-    }
-    // team_id present but not this game's home/away (e.g. franchise user_team id) — do not guess from localStorage
+    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
   }
   if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
     const stored = localStorage.getItem('last_game_user_team_side');
@@ -580,7 +610,7 @@ function renderHeader() {
   }
 
   const userTeamNameForBanner = bannerTeamParam
-    ? bannerTeamParam
+    ? resolveBannerTeamNameFromParams(bannerTeamParam, homeName, awayName)
     : userTeamSide === 'away'
     ? awayName
     : userTeamSide === 'home'
@@ -588,7 +618,9 @@ function renderHeader() {
     : null;
   const bannerUrl = userTeamNameForBanner && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamNameForBanner, 'banner_primary')
-    : `/images/teams/general/general_banner_primary.jpg`;
+    : (typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath(null, 'banner_primary')
+      : '/images/teams/general/general_banner_primary.jpg');
 
   const header = document.getElementById('box-score-header');
   if (header && bannerUrl) {
