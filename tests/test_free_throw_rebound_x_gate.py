@@ -8,7 +8,7 @@ class _P:
         self.player_id = pid
         self.team_id = tid
         self.coords = {"x": x, "y": 25}
-        self.attributes = {"REB": 50}
+        self.attributes = {"RB": 50, "ST": 50, "IQ": 50}
         self.stats = {"game": {}}
 
     def record_stat(self, k):

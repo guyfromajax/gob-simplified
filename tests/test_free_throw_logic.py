@@ -186,9 +186,10 @@ def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):
 
     offense_pg = game.offense_team.lineup["PG"]
     defense_c = game.defense_team.lineup["C"]
-    offense_pg_id = getattr(offense_pg, "player_id", None)
-    defense_c_id = getattr(defense_c, "player_id", None)
-    assert offense_pg_id and defense_c_id
+    offense_pg.player_id = "mock_ft_off_pg"
+    defense_c.player_id = "mock_ft_def_c"
+    offense_pg_id = offense_pg.player_id
+    defense_c_id = defense_c.player_id
 
     # Ensure starting coords are different from animation endpoints.
     offense_pg.coords = {"x": 15, "y": 10}
@@ -232,3 +233,61 @@ def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):
 
     result = resolve_free_throw_logic(game)
     assert result.get("rebound_type") == "DREB"
+
+
+def test_missed_final_ft_away_offense_rebound_uses_court_absolute_coords(monkeypatch):
+    """Away FT: apply_coords flips animation finals to runtime-home; rebound math must see absolutes."""
+    game, shooter = _setup_game(one_and_one=False)
+    game.offense_team = game.away_team
+    game.defense_team = game.home_team
+    shooter = game.offense_team.lineup["PG"]
+    game.game_state["shooter"] = shooter
+    game.game_state["last_ball_handler"] = shooter
+
+    shooter.attributes["FT"] = 1
+    shooter.attributes["CH"] = 1
+    shooter.attributes["MO"] = 0
+
+    offense_pg = game.offense_team.lineup["PG"]
+    defense_c = game.defense_team.lineup["C"]
+    offense_pg.player_id = "mock_ft_away_off_pg"
+    defense_c.player_id = "mock_ft_away_def_c"
+    offense_pg_id = offense_pg.player_id
+    defense_c_id = defense_c.player_id
+
+    offense_pg.coords = {"x": 15, "y": 10}
+    defense_c.coords = {"x": 90, "y": 40}
+    # Animator finals (court-absolute); after apply_coords away-offense → runtime-home flip.
+    anim_pg = {"x": 26, "y": 25}
+    anim_c = {"x": 11, "y": 19}
+    expected_runtime_pg = {"x": 100 - anim_pg["x"], "y": anim_pg["y"]}
+    expected_runtime_c = {"x": 100 - anim_c["x"], "y": anim_c["y"]}
+
+    ft_anims = [
+        {"playerId": offense_pg_id, "end": anim_pg, "movement": []},
+        {"playerId": defense_c_id, "end": anim_c, "movement": []},
+        {"playerId": "ball", "end": {"x": 9, "y": 25}, "movement": []},
+    ]
+
+    def fake_determine_rebounder(
+        g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **kwargs
+    ):
+        assert offense_pg.coords == anim_pg
+        assert defense_c.coords == anim_c
+        return defense_c, game.defense_team, "DREB"
+
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.random.randint",
+        lambda a, b: 100 if (a, b) == (1, 100) else 1,
+    )
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.determine_rebounder",
+        fake_determine_rebounder,
+    )
+    monkeypatch.setattr(Animator, "capture_free_throw_animation", lambda *args, **kwargs: ft_anims)
+
+    result = resolve_free_throw_logic(game)
+    assert result.get("rebound_type") == "DREB"
+    assert offense_pg.coords == expected_runtime_pg
+    assert defense_c.coords == expected_runtime_c
