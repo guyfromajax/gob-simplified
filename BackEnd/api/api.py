@@ -70,6 +70,7 @@ try:
     from .skeleton_routes import router as skeleton_router
     from .pointer_validation_routes import router as pointer_validation_router
     from .auth_routes import router as auth_router
+    from .leaderboard_routes import router as leaderboard_router
     from .admin_routes import router as admin_router
     from .feedback_routes import router as feedback_router
     from BackEnd.utils.auth import get_current_user
@@ -232,6 +233,7 @@ try:
     app.include_router(skeleton_router)
     app.include_router(pointer_validation_router)
     app.include_router(auth_router)
+    app.include_router(leaderboard_router)
     app.include_router(admin_router)
     app.include_router(feedback_router)
 

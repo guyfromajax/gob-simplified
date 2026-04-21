@@ -88,6 +88,9 @@
         <div id="community-leaderboard" class="community-leaderboard">
           <div class="community-leaderboard-empty">Leaderboard coming soon</div>
         </div>
+        <div class="leaders-by-team-trigger">
+          <button id="leaders-by-team-btn" class="leaders-by-team-link" type="button">→ View leaders by team</button>
+        </div>
       </div>
     </section>
   </div>
@@ -104,6 +107,20 @@
       <div class="confirm-modal-actions">
         <button id="new-franchise-modal-cancel" class="confirm-modal-cancel">Cancel</button>
         <button id="new-franchise-modal-confirm" class="confirm-modal-confirm">New Franchise</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="leaders-by-team-modal" class="ms-modal-overlay" aria-hidden="true">
+    <div class="ms-modal-backdrop" id="leaders-by-team-backdrop"></div>
+    <div class="ms-modal-box leaders-by-team-box">
+      <div class="leaders-by-team-header">
+        <div class="leaders-by-team-title">Leaders By Team</div>
+        <div class="leaders-by-team-conference">A1 Conference</div>
+        <button id="leaders-by-team-close" class="leaders-by-team-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="leaders-by-team-grid" id="leaders-by-team-grid">
+        <!-- Populated by JS -->
       </div>
     </div>
   </div>

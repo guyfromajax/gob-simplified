@@ -38,3 +38,8 @@ Tournament phase and round come from the franchise EOS bracket metadata (`BackEn
 - Only the **franchise owner** (`franchise_doc.user_id` → `users._id`) is credited; guest or unauthenticated flows without a stored owner do not receive points.
 - Wins are detected by matching the game winner to the user’s team (`user_team_object_id` on the franchise document), including when team identifiers are stored as ObjectId strings or canonical `team_id` strings.
 - Losses and ties do not change geek points.
+
+## API
+
+- **`GET /api/auth/leaderboard`** — Overall alpha leaderboard (`geek_points`).
+- **`GET /api/leaderboard/by-team`** (auth required) — Top 3 users per A1 team by `geek_points_by_team` canonical keys (`BENTLEY_TRUMAN`, `LANCASTER`, …). Response keys match mode select slugs (`bentley_truman`, `lancaster`, …).

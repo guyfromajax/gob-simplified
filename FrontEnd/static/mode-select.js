@@ -26,6 +26,17 @@ const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
 
+const A1_CONFERENCE_TEAMS = [
+  { id: 'bentley_truman', name: 'Bentley-Truman' },
+  { id: 'lancaster', name: 'Lancaster' },
+  { id: 'four_corners', name: 'Four Corners' },
+  { id: 'ocean_city', name: 'Ocean City' },
+  { id: 'morristown', name: 'Morristown' },
+  { id: 'little_york', name: 'Little York' },
+  { id: 'xavien', name: 'Xavien' },
+  { id: 'south_lancaster', name: 'South Lancaster' },
+];
+
 let currentFranchise = null;
 
 // Team name → square logo filename prefix (from images/square-logos/{code}_square.png)
@@ -191,6 +202,11 @@ function renderCareerSummary(commandCenterData) {
     'Career Best Ranking: #' + careerBestRank + ' (' + seasonLabel + dedupedSortedSeasons.join(', ') + ')';
 }
 
+function displayCommunityLeaderboardPoints(geekPoints) {
+  var n = parseInt(geekPoints, 10);
+  return (Number.isFinite(n) && n > 0) ? n : '--';
+}
+
 function renderCommunityLeaderboard(leaderboardData, currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
@@ -203,11 +219,12 @@ function renderCommunityLeaderboard(leaderboardData, currentUsername) {
     : null;
   const rows = topFive.map(function (entry) {
     const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
+    const displayPoints = displayCommunityLeaderboardPoints(entry.geek_points);
     return `
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
         <div class="community-rank">${entry.rank}.</div>
         <div class="community-username">${entry.username}</div>
-        <div class="community-score">${entry.geek_points}</div>
+        <div class="community-score">${displayPoints}</div>
       </div>
     `;
   }).join('');
@@ -216,7 +233,7 @@ function renderCommunityLeaderboard(leaderboardData, currentUsername) {
     <div class="community-leaderboard-row is-current-user">
       <div class="community-rank">${currentPinnedEntry.rank}.</div>
       <div class="community-username">${currentPinnedEntry.username}</div>
-      <div class="community-score">${currentPinnedEntry.geek_points}</div>
+      <div class="community-score">${displayCommunityLeaderboardPoints(currentPinnedEntry.geek_points)}</div>
     </div>
   ` : '';
   leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
@@ -228,6 +245,98 @@ async function loadCommunityLeaderboard(currentUsername) {
     headers: getAuthHeaders()
   });
   renderCommunityLeaderboard(leaderboardData, currentUsername);
+}
+
+function escapeHtmlLbt(text) {
+  if (text == null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function displayLbtPoints(geekPoints) {
+  var n = parseInt(geekPoints, 10);
+  return (Number.isFinite(n) && n > 0) ? String(n) : '--';
+}
+
+async function loadLeadersByTeam() {
+  var grid = document.getElementById('leaders-by-team-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Loading...</div>';
+
+  try {
+    var response = await fetch(API_CONFIG.buildUrl('/api/leaderboard/by-team'), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch');
+    var data = await response.json();
+
+    grid.innerHTML = '';
+
+    A1_CONFERENCE_TEAMS.forEach(function (team) {
+      var leaders = (data[team.id] || []).slice(0, 3);
+      var logoPath = typeof getTeamAssetPath === 'function'
+        ? getTeamAssetPath(team.id, 'logo_square')
+        : '/images/teams/' + team.id + '/' + team.id + '_logo_square.png';
+
+      var leadersHtml = leaders.length > 0
+        ? leaders.map(function (entry, i) {
+            return (
+              '<div class="lbt-leader-row">' +
+              '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
+              '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
+              '<span class="lbt-leader-points">' + displayLbtPoints(entry.geek_points) + '</span>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div class="lbt-no-leaders">—</div>';
+
+      var card = document.createElement('div');
+      card.className = 'lbt-team-card';
+      card.innerHTML =
+        '<div class="lbt-team-identity">' +
+        '<img class="lbt-team-logo" src="' + escapeHtmlLbt(logoPath) + '" alt="' + escapeHtmlLbt(team.name) + '"' +
+        ' onerror="this.style.display=\'none\'">' +
+        '<div class="lbt-team-name">' + escapeHtmlLbt(team.name) + '</div>' +
+        '</div>' +
+        '<div class="lbt-leaders-list">' + leadersHtml + '</div>';
+      grid.appendChild(card);
+    });
+  } catch (err) {
+    grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Could not load team leaders.</div>';
+  }
+}
+
+function wireLeadersByTeamModal() {
+  var leadersByTeamBtn = document.getElementById('leaders-by-team-btn');
+  var leadersByTeamModal = document.getElementById('leaders-by-team-modal');
+  var leadersByTeamClose = document.getElementById('leaders-by-team-close');
+  var leadersByTeamBackdrop = document.getElementById('leaders-by-team-backdrop');
+
+  if (leadersByTeamBtn && leadersByTeamModal) {
+    leadersByTeamBtn.addEventListener('click', function () {
+      leadersByTeamModal.classList.add('is-visible');
+      leadersByTeamModal.setAttribute('aria-hidden', 'false');
+      loadLeadersByTeam();
+    });
+  }
+
+  if (leadersByTeamClose && leadersByTeamModal) {
+    leadersByTeamClose.addEventListener('click', function () {
+      leadersByTeamModal.classList.remove('is-visible');
+      leadersByTeamModal.setAttribute('aria-hidden', 'true');
+    });
+  }
+
+  if (leadersByTeamBackdrop && leadersByTeamModal) {
+    leadersByTeamBackdrop.addEventListener('click', function () {
+      leadersByTeamModal.classList.remove('is-visible');
+      leadersByTeamModal.setAttribute('aria-hidden', 'true');
+    });
+  }
 }
 
 function wireAlphaBanner() {
@@ -457,6 +566,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   await loadCommunityLeaderboard(currentUsername);
+  wireLeadersByTeamModal();
 
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {

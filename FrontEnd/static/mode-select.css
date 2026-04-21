@@ -112,7 +112,7 @@ body.mode-select-page .community-panel-header {
 body.mode-select-page .community-panel-title {
   margin: 0;
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 34px;
+  font-size: 24px;
   letter-spacing: 0.03em;
   color: #ffffff;
   line-height: 1;
@@ -142,11 +142,15 @@ body.mode-select-page .community-leaderboard-row:hover {
 
 body.mode-select-page .community-leaderboard-row.is-current-user {
   background: rgba(247, 148, 32, 0.08);
+  border-left: 3px solid #F79420;
+  padding-left: calc(8px - 3px);
 }
 
 body.mode-select-page .community-rank {
-  font-size: 13px;
-  color: #9e9d9d;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 24px;
 }
 
 body.mode-select-page .community-username {
@@ -176,6 +180,27 @@ body.mode-select-page .community-leaderboard-empty {
   text-align: center;
   color: #9e9d9d;
   font-size: 14px;
+}
+
+body.mode-select-page .leaders-by-team-trigger {
+  padding: 8px 8px 6px;
+  text-align: left;
+}
+
+body.mode-select-page .leaders-by-team-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.14s ease;
+}
+
+body.mode-select-page .leaders-by-team-link:hover {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 body.mode-select-page .franchise-home-slot {
@@ -530,6 +555,178 @@ body.mode-select-page .confirm-modal-confirm:hover {
   to { opacity: 0; transform: translateY(-10px); }
 }
 
+/* ============================================
+   MODE SELECT — LOCAL MODAL SYSTEM
+   ============================================ */
+
+body.mode-select-page .ms-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+body.mode-select-page .ms-modal-overlay.is-visible {
+  display: flex;
+}
+
+body.mode-select-page .ms-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+body.mode-select-page .ms-modal-box {
+  position: relative;
+  z-index: 1;
+  background: rgba(22, 26, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Leaders By Team specific */
+body.mode-select-page .leaders-by-team-box {
+  width: min(680px, calc(100vw - 40px));
+}
+
+body.mode-select-page .leaders-by-team-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+body.mode-select-page .leaders-by-team-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  flex: 1;
+}
+
+body.mode-select-page .leaders-by-team-conference {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+body.mode-select-page .leaders-by-team-close {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.14s ease;
+}
+
+body.mode-select-page .leaders-by-team-close:hover {
+  color: #ffffff;
+}
+
+body.mode-select-page .leaders-by-team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.mode-select-page .lbt-team-card {
+  background: rgba(22, 26, 36, 0.98);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+body.mode-select-page .lbt-team-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body.mode-select-page .lbt-team-logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+body.mode-select-page .lbt-team-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+body.mode-select-page .lbt-leaders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+body.mode-select-page .lbt-leader-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+body.mode-select-page .lbt-leader-rank {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.3);
+  min-width: 14px;
+  flex-shrink: 0;
+}
+
+body.mode-select-page .lbt-leader-username {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.mode-select-page .lbt-leader-points {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #F79420;
+  flex-shrink: 0;
+}
+
+body.mode-select-page .lbt-no-leaders {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
 @media (max-width: 720px) {
   body.mode-select-page {
     padding: 82px 16px 40px;
@@ -546,5 +743,9 @@ body.mode-select-page .confirm-modal-confirm:hover {
 
   body.mode-select-page .franchise-card-team-name {
     font-size: 40px;
+  }
+
+  body.mode-select-page .leaders-by-team-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
