@@ -21,6 +21,7 @@ const customFocusTbody = document.getElementById('custom-focus-tbody');
 const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
 const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
 let currentWeek = 1;
+let currentTeamName = '';
 
 /** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
 let customFocusRoster = [];
@@ -989,7 +990,14 @@ submitBtn.addEventListener('click', async function() {
     this.disabled = true;
     this.textContent = 'Submitting...';
     if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      window.PageLoadOverlay.show('128 Teams Executing Training');
+      const overlayTeamName = currentTeamName || 'Your team';
+      window.PageLoadOverlay.show({
+        variant: 'pulse',
+        title: '128 Teams Executing Training',
+        subtitle: `${overlayTeamName} is executing training.`,
+        teamName: currentTeamName || '',
+        assetKey: 'banner_primary'
+      });
     }
     
     console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
@@ -1071,6 +1079,7 @@ async function initializeTrainingPoints() {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
         currentWeek = Number(data.week || 1);
+        currentTeamName = data.user_team_name || currentTeamName || '';
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
         }

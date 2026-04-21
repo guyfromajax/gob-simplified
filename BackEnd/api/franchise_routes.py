@@ -6597,6 +6597,7 @@ def get_training_points(franchise_id: str):
         "training_points": training_points,
         "is_first_training": is_first_training,
         "week": week,
+        "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
         "player_maximizer_ranking_attrs": ranking_attrs,
     }

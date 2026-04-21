@@ -16,6 +16,19 @@
   var OVERLAY_ID = 'page-load-overlay';
   var LOADER_IMG_PATH = '/images/loader1.gif';
   var Z_INDEX = 999999;
+  var DEFAULT_BANNER_PATH = '/images/teams/general/general_banner_primary.jpg';
+
+  function getPulseImageSrc(options) {
+    if (options && options.imageSrc) return options.imageSrc;
+    if (
+      options &&
+      options.teamName &&
+      typeof global.getTeamAssetPath === 'function'
+    ) {
+      return global.getTeamAssetPath(options.teamName, options.assetKey || 'banner_primary');
+    }
+    return DEFAULT_BANNER_PATH;
+  }
 
   function ensureOverlayStructure(overlay) {
     if (!overlay) return overlay;
@@ -41,6 +54,7 @@
     var img = content.querySelector('img');
     if (!img) {
       img = document.createElement('img');
+      img.className = 'page-load-overlay-spinner';
       img.alt = 'Loading…';
       content.appendChild(img);
     }
@@ -55,7 +69,111 @@
       content.appendChild(message);
     }
 
+    var pulse = content.querySelector('.page-load-overlay-pulse');
+    if (!pulse) {
+      pulse = document.createElement('div');
+      pulse.className = 'page-load-overlay-pulse';
+      pulse.style.cssText = 'display:none;width:min(560px,100%);text-align:center;';
+      pulse.innerHTML = [
+        '<img class="page-load-overlay-pulse-image" alt="">',
+        '<h2 class="page-load-overlay-pulse-title"></h2>',
+        '<p class="page-load-overlay-pulse-subtitle"></p>',
+        '<div class="page-load-overlay-pulse-indicator" aria-hidden="true"><span></span></div>'
+      ].join('');
+      content.appendChild(pulse);
+    }
+
+    var pulseImage = pulse.querySelector('.page-load-overlay-pulse-image');
+    if (pulseImage) {
+      pulseImage.style.cssText = 'width:100%;display:block;border-radius:18px;box-shadow:0 18px 36px rgba(0,0,0,0.28);';
+    }
+
+    var pulseTitle = pulse.querySelector('.page-load-overlay-pulse-title');
+    if (pulseTitle) {
+      pulseTitle.style.cssText =
+        "margin:26px 0 10px;font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;letter-spacing:0.03em;color:#ffffff;";
+    }
+
+    var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
+    if (pulseSubtitle) {
+      pulseSubtitle.style.cssText = 'margin:0 0 22px;font-size:16px;color:rgba(255,255,255,0.68);';
+    }
+
+    var pulseIndicator = pulse.querySelector('.page-load-overlay-pulse-indicator');
+    if (pulseIndicator) {
+      pulseIndicator.style.cssText =
+        'width:min(220px,100%);height:8px;margin:0 auto;border-radius:999px;overflow:hidden;background:rgba(255,255,255,0.08);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);';
+    }
+
+    var pulseBar = pulse.querySelector('.page-load-overlay-pulse-indicator span');
+    if (pulseBar) {
+      pulseBar.style.cssText =
+        'display:block;width:100%;height:100%;border-radius:inherit;background:linear-gradient(90deg, rgba(52,236,39,0.35), #34EC27 48%, rgba(52,236,39,0.45));transform-origin:left center;animation:pageLoadOverlayPulseBar 1.2s ease-in-out infinite;';
+    }
+
+    if (!document.getElementById('page-load-overlay-pulse-style')) {
+      var style = document.createElement('style');
+      style.id = 'page-load-overlay-pulse-style';
+      style.textContent = '@keyframes pageLoadOverlayPulseBar { 0%, 100% { opacity: 0.5; transform: scaleX(0.35); } 50% { opacity: 1; transform: scaleX(1); } }';
+      document.head.appendChild(style);
+    }
+
     return overlay;
+  }
+
+  function normalizeOptions(input) {
+    if (typeof input === 'string' || input == null) {
+      return { variant: 'spinner', message: input || '' };
+    }
+    if (typeof input === 'object') {
+      return {
+        variant: input.variant || 'spinner',
+        message: input.message || input.title || '',
+        title: input.title || input.message || '',
+        subtitle: input.subtitle || '',
+        imageSrc: input.imageSrc || '',
+        teamName: input.teamName || '',
+        assetKey: input.assetKey || 'banner_primary'
+      };
+    }
+    return { variant: 'spinner', message: '' };
+  }
+
+  function applySpinnerVariant(overlay, options) {
+    var content = overlay.querySelector('.page-load-overlay-content');
+    if (!content) return;
+    var spinner = content.querySelector('.page-load-overlay-spinner');
+    var message = content.querySelector('.page-load-overlay-message');
+    var pulse = content.querySelector('.page-load-overlay-pulse');
+    if (spinner) spinner.style.display = 'block';
+    if (message) {
+      message.style.display = 'block';
+      message.textContent = options.message || '';
+    }
+    if (pulse) pulse.style.display = 'none';
+  }
+
+  function applyPulseVariant(overlay, options) {
+    var content = overlay.querySelector('.page-load-overlay-content');
+    if (!content) return;
+    var spinner = content.querySelector('.page-load-overlay-spinner');
+    var message = content.querySelector('.page-load-overlay-message');
+    var pulse = content.querySelector('.page-load-overlay-pulse');
+    if (spinner) spinner.style.display = 'none';
+    if (message) message.style.display = 'none';
+    if (!pulse) return;
+
+    var pulseImage = pulse.querySelector('.page-load-overlay-pulse-image');
+    var pulseTitle = pulse.querySelector('.page-load-overlay-pulse-title');
+    var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
+
+    if (pulseImage) {
+      pulseImage.src = getPulseImageSrc(options);
+      pulseImage.alt = options.teamName || options.title || 'Loading';
+    }
+    if (pulseTitle) pulseTitle.textContent = options.title || '';
+    if (pulseSubtitle) pulseSubtitle.textContent = options.subtitle || '';
+    pulse.style.display = 'block';
   }
 
   function getOrCreateOverlay() {
@@ -75,21 +193,28 @@
   }
 
   function show(messageText) {
+    var options = normalizeOptions(messageText);
     if (typeof document === 'undefined' || !document.body) {
       if (typeof document !== 'undefined' && document.addEventListener) {
         document.addEventListener('DOMContentLoaded', function onReady() {
           document.removeEventListener('DOMContentLoaded', onReady);
           var readyOverlay = getOrCreateOverlay();
-          var readyMessage = readyOverlay.querySelector('.page-load-overlay-message');
-          if (readyMessage) readyMessage.textContent = messageText || '';
+          if (options.variant === 'pulse') {
+            applyPulseVariant(readyOverlay, options);
+          } else {
+            applySpinnerVariant(readyOverlay, options);
+          }
           readyOverlay.style.display = 'flex';
         });
       }
       return;
     }
     var overlay = getOrCreateOverlay();
-    var message = overlay.querySelector('.page-load-overlay-message');
-    if (message) message.textContent = messageText || '';
+    if (options.variant === 'pulse') {
+      applyPulseVariant(overlay, options);
+    } else {
+      applySpinnerVariant(overlay, options);
+    }
     overlay.style.display = 'flex';
   }
 
