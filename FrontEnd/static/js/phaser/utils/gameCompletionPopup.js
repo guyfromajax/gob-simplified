@@ -112,8 +112,12 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   } else if (!resolvedUserTeamSide && currentTeamId && awayTeamId && currentTeamId === awayTeamId) {
     resolvedUserTeamSide = 'away';
   }
-  const userTeamName = resolvedUserTeamSide === 'away' ? awayTeamName : homeTeamName;
-  const bannerUrl = typeof getTeamAssetPath === 'function'
+  const userTeamName = resolvedUserTeamSide === 'away'
+    ? awayTeamName
+    : resolvedUserTeamSide === 'home'
+    ? homeTeamName
+    : null;
+  const bannerUrl = userTeamName && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
   const outcomeKnown = resolvedUserTeamSide !== null;
@@ -141,6 +145,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   if (teamId) boxScoreParams.set('team_id', teamId);
   if (resolvedUserTeamSide === 'home' || resolvedUserTeamSide === 'away') {
     boxScoreParams.set('my_team', resolvedUserTeamSide);
+    if (userTeamName) {
+      boxScoreParams.set('banner_team', userTeamName);
+    }
   }
   const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
 

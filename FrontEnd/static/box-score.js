@@ -558,6 +558,7 @@ function renderHeader() {
   const awayPrimaryColor = awayTeamObj?.colors?.primary_color || awayTeamObj?.primary_color || '#4065AF';
 
   const urlParams = new URLSearchParams(window.location.search);
+  const bannerTeamParam = (urlParams.get('banner_team') || '').trim();
   const myTeamParam = urlParams.get('my_team');
   const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
 
@@ -578,9 +579,12 @@ function renderHeader() {
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
 
-  const userTeamNameForBanner =
-    userTeamSide === 'away' ? awayName
-    : userTeamSide === 'home' ? homeName
+  const userTeamNameForBanner = bannerTeamParam
+    ? bannerTeamParam
+    : userTeamSide === 'away'
+    ? awayName
+    : userTeamSide === 'home'
+    ? homeName
     : null;
   const bannerUrl = userTeamNameForBanner && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamNameForBanner, 'banner_primary')
