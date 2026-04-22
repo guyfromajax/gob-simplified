@@ -1414,7 +1414,6 @@ function buildFccPlaycallCenterSectionMarkup(data) {
 
   return `
     <section class="fcc-playbooks-section fcc-playcall-section">
-      <div class="fcc-psw-strip fcc-psw-playcall-strip" hidden></div>
       <div class="fcc-playbooks-section-head-wrap">
         <div class="fcc-playbooks-section-head">Playcall Center</div>
         ${editLinkMarkup}
@@ -1475,7 +1474,6 @@ function buildFccPlaybooksSectionMarkup(data, section) {
         ${editButtonMarkup}
       </div>
       <div class="fcc-playbooks-section-body">
-        ${(section.key === 'motion' || section.key === 'set_plays') ? '<div class="fcc-psw-strip fcc-psw-playbooks-strip" hidden></div>' : ''}
         ${bodyMarkup}
       </div>
     </section>
@@ -1497,15 +1495,18 @@ async function renderFccPlaybooksSummary() {
 
   // TODO: confirm position_shot_weights is present in FCC playbook API response
   const shotWeights = data?.position_shot_weights || null;
+  const playbooksCardBody = host.closest('.fcc-playbooks-card-body');
+  if (playbooksCardBody) {
+    playbooksCardBody.querySelectorAll(':scope > .fcc-psw-strip').forEach((el) => el.remove());
+  }
   if (shotWeights && typeof renderShotWeights === 'function') {
-    host.querySelectorAll('.fcc-psw-playbooks-strip').forEach((el) => {
-      el.hidden = false;
-      renderShotWeights(el, { playbooks: shotWeights.playbooks }, true);
-    });
-    host.querySelectorAll('.fcc-psw-playcall-strip').forEach((el) => {
-      el.hidden = false;
-      renderShotWeights(el, { playcall_center: shotWeights.playcall_center }, true);
-    });
+    if (playbooksCardBody) {
+      const pswStrip = document.createElement('div');
+      pswStrip.className = 'fcc-psw-strip';
+      pswStrip.style.marginTop = '18px';
+      renderShotWeights(pswStrip, shotWeights, true);
+      playbooksCardBody.appendChild(pswStrip);
+    }
   }
 
   const editBtn = document.getElementById('fcc-edit-playbooks-btn');
