@@ -123,6 +123,16 @@ body.mode-select-page .community-panel-metric {
   color: #9e9d9d;
 }
 
+.ms-leaderboard-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.42);
+  line-height: 1.45;
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
 body.mode-select-page .community-leaderboard-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
