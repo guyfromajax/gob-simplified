@@ -343,8 +343,11 @@ function getLineupPlaybookEffClass(value) {
 
 function getLineupPlaybookUrl() {
   const params = new URLSearchParams();
+  const resolvedTeamId = userTeamIdParam
+    || (myTeamSide === 'home' ? (homeId || homeTeam) : null)
+    || (myTeamSide === 'away' ? (awayId || awayTeam) : null);
   params.set('mode', modeParam || 'single');
-  if (userTeamIdParam) params.set('team_id', userTeamIdParam);
+  if (resolvedTeamId) params.set('team_id', resolvedTeamId);
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (tournamentId) params.set('tournament_id', tournamentId);
   const currentGameId = new URLSearchParams(window.location.search).get('game_id');
