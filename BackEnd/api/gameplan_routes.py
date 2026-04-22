@@ -2597,7 +2597,11 @@ def save_playbooks(request: PlaybookSettingsRequest):
             f"team_id={actual_team_id}, pc_order.offense={offense_pc_count}, pc_order.defense={defense_pc_count}, endpoint=/api/playbooks"
         )
         
-        return {"success": True, "message": "Playbook settings saved successfully"}
+        return {
+            "success": True,
+            "message": "Playbook settings saved successfully",
+            "position_shot_weights": playbook_settings.get("position_shot_weights"),
+        }
     
     except HTTPException:
         raise
