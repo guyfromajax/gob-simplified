@@ -21,6 +21,13 @@
     if (typeof rawPosition === 'string' && rawPosition.trim()) {
       return rawPosition.trim().toUpperCase();
     }
+    const positionRatings = player?.position_ratings || {};
+    const rankedPositions = Object.entries(positionRatings)
+      .filter(([, value]) => Number.isFinite(Number(value)))
+      .sort((a, b) => Number(b[1]) - Number(a[1]));
+    if (rankedPositions.length) {
+      return String(rankedPositions[0][0] || '--').toUpperCase();
+    }
     return '--';
   }
 
@@ -194,41 +201,70 @@
   }
 
   function renderCareerStats(player, team, teamColor) {
-    const body = document.getElementById('pd-career-stats-body');
+    const body = document.getElementById('pd-stats-body');
     if (!body) return;
     body.innerHTML = '';
-    const seasonStats = Array.isArray(player?.season_stats) ? player.season_stats : [];
-    const rows = seasonStats.length ? seasonStats : [{
-      season: 'Current',
-      team,
-      gp: '--',
-      pts: '--',
-      reb: '--',
-      ast: '--',
-      stl: '--',
-      blk: '--',
-      fg_pct: '--',
-      three_pct: '--'
-    }];
+    const seasonStats = player?.stats?.season || player?.stats || {};
+    const stats = typeof seasonStats === 'object' && !Array.isArray(seasonStats) ? seasonStats : {};
+    const tpm = Number(stats['3PTM'] || stats.TPM || 0);
+    const tpa = Number(stats['3PTA'] || stats.TPA || 0);
+    const fgm = Number(stats.FGM || 0);
+    const fga = Number(stats.FGA || 0);
+    const ftm = Number(stats.FTM || 0);
+    const fta = Number(stats.FTA || 0);
+    const dreb = Number(stats.DREB || 0);
+    const oreb = Number(stats.OREB || 0);
+    const treb = Number(stats.TREB || stats.REB || (dreb + oreb) || 0);
+    const scrA = Number(stats.SCR_A || 0);
+    const scrS = Number(stats.SCR_S || 0);
+    const defA = Number(stats.DEF_A || 0);
+    const defS = Number(stats.DEF_S || 0);
+    const formatPct = (made, attempts) => attempts > 0 ? `${((made / attempts) * 100).toFixed(1)}%` : '0.0%';
 
-    rows.forEach((season, index) => {
-      const tr = document.createElement('tr');
-      if (index === 0) tr.className = 'pd-current-season';
-      const teamStyle = teamColor ? ` style="color:${teamColor}"` : '';
-      tr.innerHTML = `
-        <td class="pd-season-cell">${season.season ?? (index === 0 ? 'Current' : '--')}</td>
-        <td class="pd-team-cell"${teamStyle}>${season.team ?? team ?? '--'}</td>
-        <td class="pd-career-num">${season.gp ?? '--'}</td>
-        <td class="pd-career-num">${season.pts ?? '--'}</td>
-        <td class="pd-career-num">${season.reb ?? '--'}</td>
-        <td class="pd-career-num">${season.ast ?? '--'}</td>
-        <td class="pd-career-num">${season.stl ?? '--'}</td>
-        <td class="pd-career-num">${season.blk ?? '--'}</td>
-        <td class="pd-career-num">${season.fg_pct ?? '--'}</td>
-        <td class="pd-career-num">${season.three_pct ?? '--'}</td>
-      `;
-      body.appendChild(tr);
-    });
+    const tr = document.createElement('tr');
+    tr.className = 'pd-current-season';
+    tr.innerHTML = `
+      <td class="pd-career-num">${stats.PTS ?? 0}</td>
+      <td class="pd-career-num">${fgm}</td>
+      <td class="pd-career-num">${fga}</td>
+      <td class="pd-career-num">${formatPct(fgm, fga)}</td>
+      <td class="pd-career-num">${tpm}</td>
+      <td class="pd-career-num">${tpa}</td>
+      <td class="pd-career-num">${formatPct(tpm, tpa)}</td>
+      <td class="pd-career-num">${ftm}</td>
+      <td class="pd-career-num">${fta}</td>
+      <td class="pd-career-num">${formatPct(ftm, fta)}</td>
+      <td class="pd-career-num">${dreb}</td>
+      <td class="pd-career-num">${oreb}</td>
+      <td class="pd-career-num">${treb}</td>
+      <td class="pd-career-num">${stats.AST ?? 0}</td>
+      <td class="pd-career-num">${stats.STL ?? 0}</td>
+      <td class="pd-career-num">${stats.BLK ?? 0}</td>
+      <td class="pd-career-num">${stats.F ?? 0}</td>
+      <td class="pd-career-num">${stats.MIN ?? 0}</td>
+      <td class="pd-career-num">${stats.TO ?? 0}</td>
+      <td class="pd-career-num">${scrA}</td>
+      <td class="pd-career-num">${formatPct(scrS, scrA)}</td>
+      <td class="pd-career-num">${defA}</td>
+      <td class="pd-career-num">${formatPct(defS, defA)}</td>
+    `;
+    body.appendChild(tr);
+  }
+
+  function getPlayerOverall(player) {
+    const positionRatings = player?.position_ratings || {};
+    const ratings = Object.values(positionRatings)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
+    if (!ratings.length) {
+      return player?.rt ?? player?.RT ?? '--';
+    }
+    return Math.max(...ratings);
+  }
+
+  function getPlayerMomentum(player) {
+    const momentum = player?.attributes?.MO ?? player?.MO ?? player?.mo ?? player?.momentum;
+    return momentum === undefined || momentum === null || momentum === '' ? '--' : momentum;
   }
 
   function buildPortrait(photo, fullName, genericPhoto, fallbackPhoto) {
@@ -260,8 +296,8 @@
     const year = formatYear(player.year);
     const positionAbbrev = getHighestPosition(player);
     const positionConfig = getPositionConfig(positionAbbrev);
-    const rtValue = player.rt ?? player.RT ?? '--';
-    const momentumValue = player.mo ?? player.momentum ?? '--';
+    const rtValue = getPlayerOverall(player);
+    const momentumValue = getPlayerMomentum(player);
     const emotionEmoji = getEmotionEmoji(player);
     const teamBackground = getTeamBackground(team, staticPrefix);
     const teamPrimaryColor = player.primary_color || POSITION_CONFIG[positionAbbrev]?.color || '';
@@ -314,24 +350,37 @@
           </section>
 
           <section class="pd-section">
-            <div class="pd-section-header">CAREER STATS</div>
+            <div class="pd-section-header">STATS</div>
             <div class="pd-table-wrap">
               <table class="pd-career-table">
                 <thead>
                   <tr>
-                    <th>Season</th>
-                    <th>Team</th>
-                    <th>GP</th>
                     <th>PTS</th>
-                    <th>REB</th>
+                    <th>FGM</th>
+                    <th>FGA</th>
+                    <th>FG%</th>
+                    <th>3PTM</th>
+                    <th>3PTA</th>
+                    <th>3PT%</th>
+                    <th>FTM</th>
+                    <th>FTA</th>
+                    <th>FT%</th>
+                    <th>DREB</th>
+                    <th>OREB</th>
+                    <th>TREB</th>
                     <th>AST</th>
                     <th>STL</th>
                     <th>BLK</th>
-                    <th>FG%</th>
-                    <th>3P%</th>
+                    <th>F</th>
+                    <th>MIN</th>
+                    <th>TO</th>
+                    <th>SCRA</th>
+                    <th>SCR%</th>
+                    <th>DEFA</th>
+                    <th>DEF%</th>
                   </tr>
                 </thead>
-                <tbody id="pd-career-stats-body"></tbody>
+                <tbody id="pd-stats-body"></tbody>
               </table>
             </div>
           </section>
