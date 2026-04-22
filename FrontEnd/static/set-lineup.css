@@ -569,36 +569,65 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: #ffffff;
 }
 
+.lineup-roster-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .lineup-roster-label {
   color: rgba(255,255,255,0.3);
   font-size: 10px;
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 8px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
 }
 
-/* Match Rankings page (franchise-command-center) Top 25 / All Teams toggle */
 .roster-panel-toggle-wrap {
-  margin-bottom: 10px;
+  margin: 0;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(19, 23, 31, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  flex-shrink: 0;
 }
+
 .roster-panel-toggle-wrap.rankings-toggle-wrap {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
 }
+
 .roster-panel-toggle-wrap .rankings-toggle {
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
+  padding: 0 16px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.72);
   font-family: 'Bebas Neue', sans-serif;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
 }
+
 .roster-panel-toggle-wrap .rankings-toggle.active {
-  background: #4065af;
-  color: #fff;
+  background: #F79420;
+  color: #151920;
+  border-color: transparent;
+}
+
+.roster-panel-toggle-wrap .rankings-toggle:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 .roster-roster-pane {
