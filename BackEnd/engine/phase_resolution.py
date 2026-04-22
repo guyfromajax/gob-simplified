@@ -1980,6 +1980,7 @@ def resolve_free_throw_logic(game):
         text += "but misses the free throw."
 
     # Handle 1-and-1 front-end logic
+    decrement_ft_remaining = True
     if game_state.get("one_and_one", False):
         if game_state["free_throws_remaining"] == 1:
             if makes_shot:
@@ -2011,9 +2012,13 @@ def resolve_free_throw_logic(game):
                 game_state["free_throws_remaining"] = 0
                 game_state["one_and_one"] = False
                 game_state["offensive_state"] = "HCO"
+                # Already at 0; do not run the shared decrement (would become -1 and break
+                # frontend isFinal === (free_throws_remaining === 0) for rebound/outlet).
+                decrement_ft_remaining = False
 
-    # Standard decrement for non-1-and-1 logic
-    game_state["free_throws_remaining"] -= 1
+    # Standard decrement when this attempt still consumes one FT from the remaining count
+    if decrement_ft_remaining:
+        game_state["free_throws_remaining"] -= 1
 
     # If no FTs remain, determine next state
     if game_state["free_throws_remaining"] <= 0:

@@ -1,5 +1,5 @@
 """
-Franchise mode: award geek_points on the owning user's document when their team wins.
+Franchise mode: award geek_points on the owning user's document when their team wins or loses.
 
 Point ranges are documented in docs/docs_1_systems/00_General_Systems/Geek_Points_System.md
 """
@@ -92,6 +92,52 @@ def franchise_win_geek_points_delta(week: int, eos_game: dict | None) -> int:
             return random.randint(125, 175)
 
     return 0
+
+
+def franchise_loss_geek_points_delta() -> int:
+    """Random GP for a franchise game loss (user's team played and did not win)."""
+    return random.randint(1, 2)
+
+
+def maybe_award_franchise_loss_geek_points(
+    *,
+    owner_user_id: str | None,
+    user_team_id_str: str | None,
+    winner_team_id: Any,
+    participant_team_ids: tuple[Any, ...] | list[Any] | None,
+) -> None:
+    """Increment geek_points when the user's franchise team loses a game they participated in."""
+    if not owner_user_id or not user_team_id_str:
+        return
+    if not participant_team_ids:
+        return
+    if teams_match_for_franchise(winner_team_id, user_team_id_str):
+        return
+    played = any(teams_match_for_franchise(p, user_team_id_str) for p in participant_team_ids)
+    if not played:
+        return
+
+    delta = franchise_loss_geek_points_delta()
+    if delta <= 0:
+        return
+
+    try:
+        oid = ObjectId(owner_user_id)
+    except Exception:
+        logger.warning("Invalid owner_user_id for geek_points loss increment: %s", owner_user_id)
+        return
+
+    team_key = geek_points_team_key_for_franchise_user(user_team_id_str)
+    inc_fields: dict[str, int] = {"geek_points": delta}
+    if team_key:
+        inc_fields[f"geek_points_by_team.{team_key}"] = delta
+    else:
+        logger.warning(
+            "geek_points_by_team not incremented (loss); could not resolve team key (user_team_id_str=%r)",
+            user_team_id_str,
+        )
+
+    users_collection.update_one({"_id": oid}, {"$inc": inc_fields})
 
 
 def maybe_award_franchise_win_geek_points(

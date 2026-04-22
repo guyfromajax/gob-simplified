@@ -9,17 +9,20 @@ Geek points are stored on each user document in the `users` collection and power
 
 If the team document cannot be resolved for a rare edge case, the code may increment only `geek_points` and log a warning (per-team bucket skipped).
 
-## Franchise mode wins
+## Franchise mode wins and losses
 
-When the **user’s franchise team** wins a game, the owning account receives a random geek-point award. Awards are applied server-side when results are committed (notably via `POST /franchise/complete-week`, and EOS helpers `POST /franchise/sim-rest-of-tournament` and `POST /franchise/sim-championship` when those paths produce a win for the user’s team).
+When the **user’s franchise team** **wins** a game, the owning account receives a random geek-point award in the ranges below. When the user’s team **loses** a game they **played in**, the account receives **`random.randint(1, 2)`** geek points (same `$inc` pattern on `geek_points` and `geek_points_by_team.<team_id>`). Simmed games between two other teams do not award loss points (participation is verified).
 
-Implementation: `BackEnd/utils/franchise_geek_points.py` (MongoDB `$inc` on `geek_points` and `geek_points_by_team.<team_id>`).
+Awards are applied server-side when results are committed (notably via `POST /franchise/complete-week`, and EOS helpers that record matchup results and `POST /franchise/sim-championship`).
+
+Implementation: `BackEnd/utils/franchise_geek_points.py` (`maybe_award_franchise_win_geek_points`, `maybe_award_franchise_loss_geek_points`).
 
 ### Regular season (weeks 1–26)
 
 | Event | Geek points |
 |--------|-------------|
 | Win | `random.randint(5, 15)` |
+| Loss | `random.randint(1, 2)` |
 
 ### End-of-season tournaments (weeks 27–34)
 
@@ -32,12 +35,13 @@ Tournament phase and round come from the franchise EOS bracket metadata (`BackEn
 | Region tournament (semifinal or final week) | `random.randint(40, 50)` |
 | National tournament, rounds 1–2 | `random.randint(50, 75)` |
 | National championship (round 3) | `random.randint(125, 175)` |
+| Loss (any week / phase, user played) | `random.randint(1, 2)` |
 
 ### Notes
 
 - Only the **franchise owner** (`franchise_doc.user_id` → `users._id`) is credited; guest or unauthenticated flows without a stored owner do not receive points.
 - Wins are detected by matching the game winner to the user’s team (`user_team_object_id` on the franchise document), including when team identifiers are stored as ObjectId strings or canonical `team_id` strings.
-- Losses and ties do not change geek points.
+- Losses award the flat 1–2 range above when the user’s team was a participant and did not win. Ties are handled by whichever team is recorded as the winner in the commit path.
 
 ## API
 
