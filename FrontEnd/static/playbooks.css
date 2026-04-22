@@ -984,25 +984,27 @@ input[type="reset"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 10px 8px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
+  padding: 8px 6px 10px;
+  border-radius: 8px;
   text-align: center;
+  /* border and background applied inline */
 }
 
 .psw-pill-pos {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  color: rgba(255,255,255,0.45);
   line-height: 1;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+  letter-spacing: 0.04em;
 }
 
 .psw-pill-val {
   font-family: 'Inter', sans-serif;
   font-weight: 700;
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1;
+  /* color applied inline */
 }
 
 .psw-root[data-compact="true"] .psw-strip {
@@ -1010,13 +1012,13 @@ input[type="reset"] {
 }
 
 .psw-root[data-compact="true"] .psw-pill {
-  padding: 6px 4px;
-  border-radius: 7px;
-  min-width: 0;
+  padding: 5px 4px 7px;
+  border-radius: 6px;
 }
 
 .psw-root[data-compact="true"] .psw-pill-pos {
-  font-size: 12px;
+  font-size: 11px;
+  margin-bottom: 3px;
 }
 
 .psw-root[data-compact="true"] .psw-pill-val {
@@ -1040,12 +1042,9 @@ input[type="reset"] {
 }
 
 .save-confirm-actions {
+  display: flex;
   justify-content: flex-end;
-}
-
-.save-confirm-actions .playbooks-save-btn {
-  width: auto;
-  min-width: 132px;
+  margin-top: 4px;
 }
 
 .psw-unavailable {
@@ -1054,6 +1053,25 @@ input[type="reset"] {
   color: rgba(255,255,255,0.3);
   text-align: center;
   padding: 16px 0;
+}
+
+.save-confirm-done-btn {
+  min-width: 120px;
+  height: 40px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.save-confirm-done-btn:hover {
+  border-color: rgba(255,255,255,0.45);
+  color: #ffffff;
 }
 
 @media (max-width: 1280px) {

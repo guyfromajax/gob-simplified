@@ -144,8 +144,7 @@
     const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 
     function getPswColor(pct) {
-      if (pct > 40) return '#27408E';
-      if (pct >= 31) return '#4A90D9';
+      if (pct > 35) return '#4A90D9';
       if (pct >= 21) return '#34EC27';
       if (pct >= 11) return '#FFD700';
       return '#ff6d6d';
@@ -159,14 +158,21 @@
       const pills = values.map(({ pos, pct }) => {
         const color = getPswColor(pct);
         const isDominant = pct === maxPct;
-        const border = isDominant
-          ? `border: 3px solid ${color}; box-shadow: 0 0 8px ${color}59;`
-          : `border: 2px solid ${color};`;
-        const valColor = isDominant ? color : '#ffffff';
+        const borderWidth = isDominant ? '2.5px' : '1.5px';
+        const fillOpacity = isDominant ? '1a' : '0f';
+        const bgColor = color + fillOpacity;
+        const glow = isDominant ? `box-shadow: 0 0 10px ${color}40;` : '';
+        const valColor = color;
+        const pillStyle = `
+          border: ${borderWidth} solid ${color};
+          background: ${bgColor};
+          ${glow}
+        `;
+        const valStyle = `color: ${valColor};`;
         return `
-          <div class="psw-pill" data-pos="${pos}" style="${border}">
+          <div class="psw-pill" data-pos="${pos}" style="${pillStyle}">
             <div class="psw-pill-pos">${pos}</div>
-            <div class="psw-pill-val" style="color: ${valColor};">${pct}%</div>
+            <div class="psw-pill-val" style="${valStyle}">${pct}%</div>
           </div>
         `;
       }).join('');
