@@ -1414,6 +1414,7 @@ function buildFccPlaycallCenterSectionMarkup(data) {
 
   return `
     <section class="fcc-playbooks-section fcc-playcall-section">
+      <div class="fcc-psw-strip fcc-psw-playcall-strip" hidden></div>
       <div class="fcc-playbooks-section-head-wrap">
         <div class="fcc-playbooks-section-head">Playcall Center</div>
         ${editLinkMarkup}
@@ -1473,7 +1474,10 @@ function buildFccPlaybooksSectionMarkup(data, section) {
         <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
         ${editButtonMarkup}
       </div>
-      <div class="fcc-playbooks-section-body">${bodyMarkup}</div>
+      <div class="fcc-playbooks-section-body">
+        ${(section.key === 'motion' || section.key === 'set_plays') ? '<div class="fcc-psw-strip fcc-psw-playbooks-strip" hidden></div>' : ''}
+        ${bodyMarkup}
+      </div>
     </section>
   `;
 }
@@ -1490,6 +1494,19 @@ async function renderFccPlaybooksSummary() {
   }
 
   host.innerHTML = `${FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('')}${buildFccPlaycallCenterSectionMarkup(data)}`;
+
+  // TODO: confirm position_shot_weights is present in FCC playbook API response
+  const shotWeights = data?.position_shot_weights || null;
+  if (shotWeights && typeof renderShotWeights === 'function') {
+    host.querySelectorAll('.fcc-psw-playbooks-strip').forEach((el) => {
+      el.hidden = false;
+      renderShotWeights(el, { playbooks: shotWeights.playbooks }, true);
+    });
+    host.querySelectorAll('.fcc-psw-playcall-strip').forEach((el) => {
+      el.hidden = false;
+      renderShotWeights(el, { playcall_center: shotWeights.playcall_center }, true);
+    });
+  }
 
   const editBtn = document.getElementById('fcc-edit-playbooks-btn');
   if (editBtn && !editBtn.dataset.bound) {

@@ -327,8 +327,8 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   flex-direction: row;
   align-items: center;
   gap: 10px;
-  min-height: 76px;
-  padding: 10px 12px;
+  min-height: 64px;
+  padding: 4px 12px;
   border-radius: 8px;
   border: 1px dashed rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.02);
@@ -407,6 +407,21 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   flex-shrink: 0;
 }
 
+.lineup-shot-weights {
+  margin: 10px 0 4px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.lineup-shot-weights .psw-group-label {
+  color: rgba(255,255,255,0.32);
+}
+
+.lineup-shot-weights .psw-root,
+.lineup-shot-weights.psw-root {
+  gap: 10px;
+}
+
 .lineup-left-footer #autoset-lineup {
   width: 100%;
   height: 36px;
@@ -431,9 +446,9 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .slot-row-2 {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 0;
+  gap: 8px;
   justify-content: flex-start;
   width: 100%;
 }
@@ -484,10 +499,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   flex-shrink: 0;
 }
 
-.player-points,
-.player-rebounds,
-.player-assists,
-.player-def-pct,
 .player-fouls {
   font-family: 'Inter', sans-serif;
   font-size: 12px;
@@ -855,13 +866,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   min-width: 160px;
   height: 36px;
   font-size: 16px;
-}
-
-body.set-lineup-page .set-lineup-shell:has(#context-scoreboard.is-pregame) .player-points,
-body.set-lineup-page .set-lineup-shell:has(#context-scoreboard.is-pregame) .player-rebounds,
-body.set-lineup-page .set-lineup-shell:has(#context-scoreboard.is-pregame) .player-assists,
-body.set-lineup-page .set-lineup-shell:has(#context-scoreboard.is-pregame) .player-def-pct {
-  display: none;
 }
 
 #toast {

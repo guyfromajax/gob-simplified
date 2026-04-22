@@ -154,3 +154,58 @@ function getAttrColor(scaledValue) {
   if (s >= 5) return '#FFD700';
   return '#ff6d6d';
 }
+
+// Canonical position shot weights color scale — see Styleguide.md
+function getPswColor(pct) {
+  if (pct > 35) return '#4A90D9';
+  if (pct >= 21) return '#34EC27';
+  if (pct >= 11) return '#FFD700';
+  return '#ff6d6d';
+}
+
+function renderShotWeights(container, shotWeights, compact = false) {
+  if (!container) return;
+  container.setAttribute('data-compact', compact ? 'true' : 'false');
+
+  if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
+    container.innerHTML = '<p class="psw-unavailable">Shot weight data unavailable.</p>';
+    return;
+  }
+
+  const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+  function renderGroup(label, data) {
+    if (!data) return '';
+    const values = POSITIONS.map((pos) => ({ pos, pct: data[pos] ?? 0 }));
+    const maxPct = Math.max(...values.map((value) => value.pct));
+
+    const pills = values.map(({ pos, pct }) => {
+      const color = getPswColor(pct);
+      const isDominant = pct === maxPct;
+      const pillStyle = `border: 1px solid rgba(255,255,255,0.08);`;
+      const valStyle = `color: ${color};`;
+      const accentStyle = isDominant
+        ? `background: ${color}; opacity: 1;`
+        : `opacity: 0;`;
+      return `
+        <div class="psw-pill" style="${pillStyle}">
+          <div class="psw-pill-pos">${pos}</div>
+          <div class="psw-pill-val" style="${valStyle}">${pct}%</div>
+          <div class="psw-pill-accent" style="${accentStyle}"></div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="psw-group">
+        <div class="psw-group-label">${label}</div>
+        <div class="psw-strip">${pills}</div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    ${renderGroup('PLAYBOOKS', shotWeights.playbooks)}
+    ${renderGroup('PLAYCALL CENTER', shotWeights.playcall_center)}
+  `;
+}

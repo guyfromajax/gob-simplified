@@ -134,8 +134,10 @@
     return `/playbook-report.html?${params.toString()}`;
   }
 
-  function renderShotWeights(container, shotWeights) {
+  // TODO: remove after confirming common.js version is live
+  function renderShotWeights(container, shotWeights, compact = false) {
     if (!container) return;
+    container.setAttribute('data-compact', compact ? 'true' : 'false');
     if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
       container.innerHTML = '<p class="psw-unavailable">Shot weight data unavailable.</p>';
       return;
@@ -143,6 +145,7 @@
 
     const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 
+    // TODO: remove after confirming common.js version is live
     function getPswColor(pct) {
       if (pct > 35) return '#4A90D9';
       if (pct >= 21) return '#34EC27';

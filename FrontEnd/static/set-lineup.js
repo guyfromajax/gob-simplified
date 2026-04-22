@@ -359,6 +359,16 @@ async function fetchLineupPlaybooksData() {
   return response.json();
 }
 
+function renderLineupShotWeights(playbookData) {
+  const weightsContainer = document.getElementById('lineup-shot-weights');
+  if (!weightsContainer) return;
+  weightsContainer.innerHTML = '';
+  // TODO: confirm position_shot_weights available in set-lineup playbook fetch
+  if (playbookData?.position_shot_weights && typeof renderShotWeights === 'function') {
+    renderShotWeights(weightsContainer, playbookData.position_shot_weights, true);
+  }
+}
+
 function buildLineupPlaybookItems(data, key) {
   const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
   let items = [];
@@ -1306,13 +1316,6 @@ function updateSlotDisplay(slot) {
     const stats = rawStats.game || rawStats.season || rawStats || {};
     
     // Get all stats with fallbacks (same pattern as energy)
-    const points = stats.PTS || 0;
-    // REB (TREB) is the total rebounds - use it if available, otherwise calculate from OREB + DREB
-    const rebounds = stats.REB || ((stats.OREB || 0) + (stats.DREB || 0));
-    const assists = stats.AST || 0;
-    const defA = stats.DEF_A || 0;
-    const defS = stats.DEF_S || 0;
-    const defPct = defA > 0 ? Math.round((defS / defA) * 100) : 0;
     const fouls = stats.F || 0;
     
     // Get emotion (EM) - same pattern as energy: check attributes first, then fallback
@@ -1364,10 +1367,6 @@ function updateSlotDisplay(slot) {
           <div class="player-rating">RT: ${rating}</div>
         </div>
         <div class="slot-row-2">
-          <div class="slot-stat"><span class="slot-stat-label">PTS</span><span class="player-points">${points}</span></div>
-          <div class="slot-stat"><span class="slot-stat-label">REB</span><span class="player-rebounds">${rebounds}</span></div>
-          <div class="slot-stat"><span class="slot-stat-label">AST</span><span class="player-assists">${assists}</span></div>
-          <div class="slot-stat"><span class="slot-stat-label">DEF%</span><span class="player-def-pct">${defPct}%</span></div>
           <div class="slot-stat slot-stat-momentum">
             <span class="slot-stat-label">MO</span>
             <div class="player-momentum">
@@ -1909,6 +1908,12 @@ async function init() {
   
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
+  try {
+    lineupPlaybooksModalCache = await fetchLineupPlaybooksData();
+    renderLineupShotWeights(lineupPlaybooksModalCache);
+  } catch (error) {
+    console.error('[SET-LINEUP] Failed to load shot weights:', error);
+  }
   
   // Wire up autoset button
   const autosetBtn = document.getElementById('autoset-lineup');

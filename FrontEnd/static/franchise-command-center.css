@@ -1753,6 +1753,14 @@ input[type="reset"] {
   border-bottom: 1px solid rgba(247, 148, 32, 0.7);
 }
 
+#franchise-container .fcc-psw-strip {
+  margin: 0 0 14px;
+}
+
+#franchise-container .fcc-psw-strip .psw-group-label {
+  color: rgba(255,255,255,0.35);
+}
+
 #franchise-container .fcc-playcall-slots {
   display: grid;
   gap: 8px;
