@@ -165,6 +165,7 @@ function getPswColor(pct) {
 
 function renderShotWeights(container, shotWeights, compact = false) {
   if (!container) return;
+  container.classList.add('psw-root');
   container.setAttribute('data-compact', compact ? 'true' : 'false');
 
   if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
