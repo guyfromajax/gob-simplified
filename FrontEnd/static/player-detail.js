@@ -35,6 +35,27 @@
     return POSITION_CONFIG[abbrev] || { color: 'rgba(255,255,255,0.72)', background: 'rgba(255,255,255,0.08)', fullName: 'PLAYER' };
   }
 
+  function getPositionRatings(player) {
+    // TODO: confirm position ratings field name against actual player model
+    if (player?.position_ratings && typeof player.position_ratings === 'object') {
+      return player.position_ratings;
+    }
+
+    const keys = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const fromFields = {};
+    keys.forEach((position) => {
+      const value = player?.[`rt_${position.toLowerCase()}`] ?? player?.[`RT_${position}`] ?? null;
+      if (value !== null && value !== undefined) {
+        fromFields[position] = value;
+      }
+    });
+    if (Object.keys(fromFields).length) {
+      return fromFields;
+    }
+
+    return null;
+  }
+
   function getAttrColor(scaledValue) {
     if (scaledValue <= 4) return '#ff6d6d';
     if (scaledValue <= 6) return '#FFD700';
@@ -73,6 +94,16 @@
     bars.forEach((bar, index) => {
       setTimeout(() => {
         const targetWidth = bar.getAttribute('data-width');
+        bar.style.width = `${targetWidth}%`;
+      }, index * 40);
+    });
+  }
+
+  function animatePositionRatings() {
+    const bars = document.querySelectorAll('.pd-pos-bar-fill');
+    bars.forEach((bar, index) => {
+      setTimeout(() => {
+        const targetWidth = bar.getAttribute('data-width') || '0';
         bar.style.width = `${targetWidth}%`;
       }, index * 40);
     });
@@ -267,6 +298,33 @@
     return momentum === undefined || momentum === null || momentum === '' ? '--' : momentum;
   }
 
+  function renderPositionRatingsBlock(player, primaryPosition) {
+    const ratings = getPositionRatings(player);
+    if (!ratings) return '';
+
+    const order = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const rows = order.map((position) => {
+      const rawValue = ratings[position];
+      const rating = Number(rawValue);
+      const safeRating = Number.isFinite(rating) ? rating : 0;
+      const posConfig = getPositionConfig(position);
+      const isPrimary = position === primaryPosition;
+      const opacity = isPrimary ? 1 : 0.7;
+
+      return `
+        <div class="pd-pos-rating-row" style="opacity:${opacity};">
+          <div class="pd-pos-pill" style="background:${posConfig.background};color:${posConfig.color};">${position}</div>
+          <div class="pd-pos-bar-track">
+            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${posConfig.color};width:0;"></div>
+          </div>
+          <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? rating : '--'}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `<div class="pd-position-ratings">${rows}</div>`;
+  }
+
   function buildPortrait(photo, fullName, genericPhoto, fallbackPhoto) {
     if (!photo) {
       return '<div class="pd-portrait-placeholder" aria-hidden="true"></div>';
@@ -301,6 +359,8 @@
     const emotionEmoji = getEmotionEmoji(player);
     const teamBackground = getTeamBackground(team, staticPrefix);
     const teamPrimaryColor = player.primary_color || POSITION_CONFIG[positionAbbrev]?.color || '';
+    const posConfig = getPositionConfig(positionAbbrev);
+    const positionRatingsBlock = renderPositionRatingsBlock(player, positionAbbrev);
 
     content.innerHTML = `
       <div class="resource-page-container fcc-brand-page-shell pd-shell">
@@ -315,7 +375,8 @@
             <div class="pd-overall-label">OVERALL</div>
             <div class="pd-overall-value">${rtValue}</div>
           </div>
-          <div class="pd-position-badge" style="color:${positionConfig.color};background:${positionConfig.background};">${positionAbbrev}</div>
+          <div class="pd-position-badge" style="background:${posConfig.background};color:${posConfig.color};">${positionAbbrev}</div>
+          ${positionRatingsBlock}
           <div class="pd-divider"></div>
           <div class="pd-bio-stats">
             <div class="pd-bio-row"><span class="pd-bio-label">Year</span><span class="pd-bio-value">${year}</span></div>
@@ -394,6 +455,7 @@
     renderAttributes(attributes);
     renderCareerStats(player, team, teamPrimaryColor);
     animateAttributeBars();
+    animatePositionRatings();
 
     if (typeof initAttributeTooltips !== 'undefined') {
       setTimeout(() => {

@@ -167,6 +167,57 @@ input[type="reset"] {
   font-weight: 700;
 }
 
+.pd-position-ratings {
+  width: 100%;
+  margin: 10px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pd-pos-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.pd-pos-pill {
+  min-width: 32px;
+  text-align: center;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.pd-pos-bar-track {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+}
+
+.pd-pos-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.pd-pos-rating-value {
+  min-width: 24px;
+  text-align: right;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: #ffffff;
+}
+
+.pd-pos-rating-value.is-primary {
+  color: #F79420;
+}
+
 .pd-divider {
   width: 100%;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
