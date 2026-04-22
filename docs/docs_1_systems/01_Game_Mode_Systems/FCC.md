@@ -731,6 +731,8 @@ Important system note:
 
 - the training item is still synthesized from franchise state
 - the game-result items are persisted in `season_inbox`
+- FCC renders the synthesized training-report item at the top of the Inbox
+- persisted `season_inbox` game-result items render underneath it in newest-first order
 
 If neither source produces items:
 

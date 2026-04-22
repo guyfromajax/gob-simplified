@@ -5,31 +5,60 @@ This document defines the core visual and interaction standards for Geeked-Out B
 
 ## Color System
 
-### Core Brand Color
-- Default primary color: `#27408E`
+### Brand Colors
+Core identity colors that define GOB's visual personality. Used for backgrounds, structural UI, and key interactive surfaces.
 
-### Universal Secondary Colors
-- Dark neutral: `#747474`
-- Mid neutral: `#999999`
-- White: `#FFFFFF`
-- Black at 50% opacity: `rgba(0, 0, 0, 0.50)`
-- Black at 35% opacity: `rgba(0, 0, 0, 0.35)`
-- Black at 15% opacity: `rgba(0, 0, 0, 0.15)`
+- **Dark Blue:** `#27408E` — primary brand anchor, default shell background and gradient base
+- **Light Blue:** `#4A90D9` — secondary brand accent
+- **Orange:** `#F79420` — key action color (see also Action Colors)
+- **Yellow:** `#FFD700` — brand accent
 
-### Action Color
-- Primary action green: `#34EC27`
+Note: Green (`#34EC27`) is intentionally excluded from Brand Colors. Its impact as the primary gating action color depends on its scarcity — it should never appear as a decorative or atmospheric color.
 
-### Hero Accent Colors
-- Orange: `#F79420`
-- Blue: `#4065AF`
+### Neutral Colors
+Used for surfaces, overlays, text, and structural UI elements.
+
+- **White:** `#FFFFFF`
+- **Dark neutral:** `#747474`
+- **Mid neutral:** `#999999`
+- **Black at 50% opacity:** `rgba(0, 0, 0, 0.50)`
+- **Black at 35% opacity:** `rgba(0, 0, 0, 0.35)`
+- **Black at 15% opacity:** `rgba(0, 0, 0, 0.15)`
+
+### Action Colors
+Behavioral rules — these govern interactive meaning across all buttons and CTAs. Color must be applied consistently and never used decoratively.
+
+- **Primary gating action** (advances game state — Play Next Game, Run Training Camp, Sim Next Round, Enter Franchise, Return to Game): `#34EC27` (green)
+- **Primary non-gating action** (saves settings, configures preferences, performs non-state-advancing actions): `#F79420` (orange)
+
+Note: Orange appears in both Brand Colors and Action Colors. This is intentional — it is the key action color of the product and serves both roles simultaneously.
+
+### Semantic / Data Colors
+Used exclusively for data visualization, stat bars, status indicators, pill fills, and performance feedback. Never use these for buttons or interactive elements.
+
+- **Positive / high performance:** `#34EC27` — green
+- **Good / above average:** `#4A90D9` — light blue
+- **Caution / mid range:** `#FFD700` — yellow
+- **Warning / low:** `#F79420` — orange (shared with action orange)
+- **Negative / critical:** `#ff6d6d` — red
+
+### Attribute Bar Scale
+The canonical color scale for player attribute bar fills throughout the product. Applied consistently wherever individual player attribute values are displayed as filled bars or pills.
+
+- **0–40:** `#ff6d6d` — red (below average)
+- **41–60:** `#FFD700` — yellow (developing)
+- **61–80:** `#34EC27` — green (solid)
+- **81–100:** `#4A90D9` — light blue (elite)
+- **101+:** `#27408E` — dark blue (exceptional / above ceiling)
 
 ### Color Usage Rules
 - `#27408E` is the default shell anchor color for the product.
 - Neutral graphite and steel tones should carry most UI structure, especially tabs, panels, and content surfaces.
-- Green (`#34EC27`) is reserved exclusively for gating actions that advance game state — `Play Next Game`, `Run Training Camp`, `Sim Next Round`, and equivalent actions.
-- Orange and hero blue are accent colors and should not be used as broad structural fills.
-- All other primary action buttons use orange (`#F79420`).
+- Green (`#34EC27`) is reserved exclusively for gating actions and positive semantic data states. It must never appear as a decorative, atmospheric, or brand color.
+- Orange is the key action color of the product and the standard for all non-gating primary actions.
 - Team-color theming should primarily affect atmosphere and background expression, not core readability surfaces.
+- Semantic colors must never be used for buttons, navigation, or interactive controls.
+- The Attribute Bar Scale must be applied consistently — do not invent alternative thresholds for individual pages.
 
 ## Typography
 
@@ -243,7 +272,7 @@ Used during active gameplay at decision points — quarter breaks, timeouts, fou
 - Border: `1px solid rgba(255,255,255,0.12)`
 - Border radius: `16px`
 - Position badges use the GOB system-wide position color map:
-  - PG: `#4065AF` · SG: `#7B5EA7` · SF: `#3A8C4A` · PF: `#C0392B` · C: `#D4A017`
+  - PG: `#4A90D9` · SG: `#7B5EA7` · SF: `#3A8C4A` · PF: `#C0392B` · C: `#D4A017`
 - Submit/confirm action is full-width green (gating — advances gameplay)
 - Dismiss/skip option is a low-prominence checkbox or ghost link, never a competing button
 - Drag-and-drop interactions for reordering use standard GOB drag visual feedback
