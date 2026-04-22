@@ -2545,9 +2545,10 @@ function createCardBack(player) {
     value.textContent = displayVal;
     
     // Set gold bar fill percentage (0-10 scale, max at 100%)
-    if (displayVal !== '--') {
+    if (displayVal !== '--' && typeof getAttrColor === 'function') {
       const fillPercentage = Math.min(displayVal * 10, 100);
       pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
+      pill.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil(Number(rawVal) / 10)));
     }
     
     pill.appendChild(value);

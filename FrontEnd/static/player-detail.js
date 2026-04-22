@@ -56,14 +56,6 @@
     return null;
   }
 
-  function getAttrColor(scaledValue) {
-    if (scaledValue <= 4) return '#ff6d6d';
-    if (scaledValue <= 6) return '#FFD700';
-    if (scaledValue <= 8) return '#34EC27';
-    if (scaledValue <= 10) return '#4A90D9';
-    return '#27408E';
-  }
-
   function getEmotionEmoji(player) {
     const raw = Number(player?.em ?? player?.EM ?? player?.attributes?.EM ?? player?.attributes?.anchor_EM ?? 50);
     if (raw >= 80) return '😎';
@@ -77,12 +69,13 @@
     const rawValue = attributes[`anchor_${code}`] ?? attributes[code] ?? 0;
     const scaledValue = Math.max(1, Math.floor(rawValue / 10));
     const fillPercentage = Math.min(100, scaledValue * 10);
+    const colorBucket = Math.max(0, Math.ceil(Number(rawValue) / 10));
     const row = document.createElement('div');
     row.className = 'pd-attribute-row';
     row.innerHTML = `
       <span class="pd-attribute-label attribute-label" data-attr="${code}">${code}</span>
       <div class="pd-attribute-track">
-        <div class="pd-attribute-fill" data-width="${fillPercentage}" style="background:${getAttrColor(scaledValue)};"></div>
+        <div class="pd-attribute-fill" data-width="${fillPercentage}" style="background:${getAttrColor(colorBucket)};"></div>
       </div>
       <span class="pd-attribute-value">${scaledValue}</span>
     `;
@@ -315,7 +308,7 @@
         <div class="pd-pos-rating-row" style="opacity:${opacity};">
           <div class="pd-pos-pill" style="background:${posConfig.background};color:${posConfig.color};">${position}</div>
           <div class="pd-pos-bar-track">
-            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getAttrColor(safeRating / 10)};width:0;"></div>
+            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getAttrColor(Math.ceil(safeRating / 10))};width:0;"></div>
           </div>
           <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? rating : '--'}</div>
         </div>

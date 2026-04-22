@@ -139,3 +139,18 @@ function resolveFranchiseLockerRoomUrl(options = {}) {
   const teamId = options.teamId != null ? options.teamId : params.get('team_id');
   return buildFranchiseLockerRoomUrl(franchiseId, teamId, options.extraParams || {});
 }
+
+// Canonical attribute bar color scale — see Styleguide.md ### Attribute Bar Scale
+// Do not add a fifth color tier. All values 81+ including 100+ return light blue.
+/**
+ * @param {number} scaledValue Bucket from Math.ceil(rawAttribute / 10) for anchor storage on a 0–100+ raw scale (e.g. raw 81 → 9 → light blue). Values above 10 (raw > 100) still map to light blue.
+ * @returns {string} Hex fill color for attribute / position-rating bars.
+ */
+function getAttrColor(scaledValue) {
+  const s = Number(scaledValue);
+  if (!Number.isFinite(s)) return '#ff6d6d';
+  if (s >= 9) return '#4A90D9';
+  if (s >= 7) return '#34EC27';
+  if (s >= 5) return '#FFD700';
+  return '#ff6d6d';
+}

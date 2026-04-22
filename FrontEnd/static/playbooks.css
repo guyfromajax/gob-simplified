@@ -984,19 +984,22 @@ input[type="reset"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 6px 10px;
+  padding: 10px 6px 8px;
   border-radius: 8px;
+  background: rgba(255,255,255,0.04);
   text-align: center;
-  /* border and background applied inline */
+  position: relative;
+  overflow: hidden;
+  /* border applied inline — uniform hairline on all pills */
 }
 
 .psw-pill-pos {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 13px;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.35);
   line-height: 1;
-  margin-bottom: 5px;
-  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
 }
 
 .psw-pill-val {
@@ -1007,22 +1010,39 @@ input[type="reset"] {
   /* color applied inline */
 }
 
+.psw-pill-accent {
+  position: absolute;
+  bottom: 0;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  /* background and opacity applied inline */
+  transition: opacity 0.2s ease;
+}
+
 .psw-root[data-compact="true"] .psw-strip {
   gap: 4px;
 }
 
 .psw-root[data-compact="true"] .psw-pill {
-  padding: 5px 4px 7px;
+  padding: 7px 4px 6px;
   border-radius: 6px;
 }
 
 .psw-root[data-compact="true"] .psw-pill-pos {
   font-size: 11px;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .psw-root[data-compact="true"] .psw-pill-val {
   font-size: 13px;
+}
+
+.psw-root[data-compact="true"] .psw-pill-accent {
+  height: 2px;
+  left: 8%;
+  right: 8%;
 }
 
 .psw-root[data-compact="true"] .psw-group {

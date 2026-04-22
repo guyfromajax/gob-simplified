@@ -519,6 +519,37 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   width: 100%;
 }
 
+/* Player card back: attribute bar fill (--attr-fill width, --attr-bar-color from getAttrColor in common.js) */
+.player-card-back .attr-pill,
+.player-card-back .attr-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.player-card-back .attr-pill::before,
+.player-card-back .attr-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--attr-fill, 0%);
+  max-width: 100%;
+  background: var(--attr-bar-color, #ff6d6d);
+  border-radius: inherit;
+  opacity: 0.88;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.player-card-back .attr-pill .attr-label,
+.player-card-back .attr-pill .attr-value,
+.player-card-back .attr-row .attr-label,
+.player-card-back .attr-row .attr-value {
+  position: relative;
+  z-index: 1;
+}
+
 .slot .remove {
   appearance: none;
   background: transparent;

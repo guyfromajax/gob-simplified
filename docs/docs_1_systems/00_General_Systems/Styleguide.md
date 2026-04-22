@@ -42,14 +42,15 @@ Used exclusively for data visualization, stat bars, status indicators, pill fill
 - **Warning / low:** `#F79420` — orange (shared with action orange)
 - **Negative / critical:** `#ff6d6d` — red
 
+Note: `#27408E` (Dark Blue) is a Brand Color and shell background anchor. It is not used as a data or semantic color anywhere in the product.
+
 ### Attribute Bar Scale
-The canonical color scale for player attribute bar fills throughout the product. Applied consistently wherever individual player attribute values are displayed as filled bars or pills.
+The canonical color scale for player attribute bar fills throughout the product. Applied consistently wherever individual player attribute values are displayed as filled bars or pills. All values above 80 — including values above 100 — render in light blue.
 
 - **0–40:** `#ff6d6d` — red (below average)
 - **41–60:** `#FFD700` — yellow (developing)
 - **61–80:** `#34EC27` — green (solid)
-- **81–100:** `#4A90D9` — light blue (elite)
-- **101+:** `#27408E` — dark blue (exceptional / above ceiling)
+- **81+:** `#4A90D9` — light blue (elite, including 100+)
 
 ### Color Usage Rules
 - `#27408E` is the default shell anchor color for the product.
@@ -59,6 +60,7 @@ The canonical color scale for player attribute bar fills throughout the product.
 - Team-color theming should primarily affect atmosphere and background expression, not core readability surfaces.
 - Semantic colors must never be used for buttons, navigation, or interactive controls.
 - The Attribute Bar Scale must be applied consistently — do not invent alternative thresholds for individual pages.
+- Dark Blue (`#27408E`) must never be used as a stat fill, attribute bar color, pill color, or any data visualization color. It is reserved exclusively for brand identity and shell backgrounds.
 
 ## Typography
 
