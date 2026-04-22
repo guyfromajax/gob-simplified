@@ -315,7 +315,7 @@
         <div class="pd-pos-rating-row" style="opacity:${opacity};">
           <div class="pd-pos-pill" style="background:${posConfig.background};color:${posConfig.color};">${position}</div>
           <div class="pd-pos-bar-track">
-            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${posConfig.color};width:0;"></div>
+            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getAttrColor(safeRating / 10)};width:0;"></div>
           </div>
           <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? rating : '--'}</div>
         </div>
@@ -361,6 +361,8 @@
     const teamPrimaryColor = player.primary_color || POSITION_CONFIG[positionAbbrev]?.color || '';
     const posConfig = getPositionConfig(positionAbbrev);
     const positionRatingsBlock = renderPositionRatingsBlock(player, positionAbbrev);
+    const yearJerseyLine = jersey !== '' ? `${year} · #${jersey}` : year;
+    const heightWeightLine = `${height} · ${weightValue} lbs`;
 
     content.innerHTML = `
       <div class="resource-page-container fcc-brand-page-shell pd-shell">
@@ -370,19 +372,13 @@
             ${buildPortrait(photo, fullName, genericPhoto, fallbackPhoto)}
           </div>
           <div class="pd-player-name">${fullName}</div>
-          <div class="pd-pos-line">${positionConfig.fullName} ${jersey !== '' ? `· #${jersey}` : ''}</div>
+          <div class="pd-pos-line">${yearJerseyLine}</div>
+          <div class="pd-pos-line">${heightWeightLine}</div>
           <div class="pd-overall">
             <div class="pd-overall-label">OVERALL</div>
             <div class="pd-overall-value">${rtValue}</div>
           </div>
-          <div class="pd-position-badge" style="background:${posConfig.background};color:${posConfig.color};">${positionAbbrev}</div>
           ${positionRatingsBlock}
-          <div class="pd-divider"></div>
-          <div class="pd-bio-stats">
-            <div class="pd-bio-row"><span class="pd-bio-label">Year</span><span class="pd-bio-value">${year}</span></div>
-            <div class="pd-bio-row"><span class="pd-bio-label">Height</span><span class="pd-bio-value">${height}</span></div>
-            <div class="pd-bio-row"><span class="pd-bio-label">Weight</span><span class="pd-bio-value">${weightValue} lbs</span></div>
-          </div>
           <div class="pd-divider"></div>
           <div class="pd-status-label">STATUS</div>
           <div class="pd-status-grid">

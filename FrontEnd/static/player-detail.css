@@ -160,13 +160,6 @@ input[type="reset"] {
   color: #F79420;
 }
 
-.pd-position-badge {
-  border-radius: 6px;
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .pd-position-ratings {
   width: 100%;
   margin: 10px 0 4px;
@@ -224,27 +217,8 @@ input[type="reset"] {
   margin: 16px 0;
 }
 
-.pd-bio-stats,
 .pd-status-grid {
   width: 100%;
-}
-
-.pd-bio-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 4px;
-  gap: 12px;
-  font-size: 13px;
-}
-
-.pd-bio-label {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.pd-bio-value {
-  color: #ffffff;
-  font-weight: 500;
-  text-align: right;
 }
 
 .pd-status-label {
