@@ -25,6 +25,10 @@ from BackEnd.utils.playbook_settings_utils import (
     normalize_slot_assignments_to_play_ids,
 )
 from BackEnd.utils.team_play_utils import iter_team_plays
+from BackEnd.utils.playbook_weights_utils import (
+    compute_position_shot_weights,
+    weights_cache_is_stale,
+)
 from datetime import datetime
 
 router = APIRouter()
@@ -2267,6 +2271,50 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 playbook_settings = team_obj.get("playbook_settings", {})
         
         plays_by_id, plays_by_name = build_play_lookups_from_team_plays(plays)
+        fresh_position_shot_weights = compute_position_shot_weights(
+            playbook_settings,
+            plays,
+        )
+        cached_position_shot_weights = (
+            playbook_settings.get("position_shot_weights")
+            if isinstance(playbook_settings, dict)
+            else None
+        )
+        position_shot_weights = cached_position_shot_weights
+        if not position_shot_weights or weights_cache_is_stale(
+            cached_position_shot_weights,
+            fresh_position_shot_weights,
+        ):
+            position_shot_weights = fresh_position_shot_weights
+            if isinstance(playbook_settings, dict):
+                playbook_settings["position_shot_weights"] = position_shot_weights
+            try:
+                from BackEnd.utils.team_settings_manager import save_team_settings
+                save_team_settings(
+                    settings_type="playbook_settings",
+                    settings_data=playbook_settings,
+                    team_id=team_id,
+                    mode=mode,
+                    game_id=game_id,
+                    franchise_id=franchise_id,
+                    tournament_id=tournament_id,
+                    validate_fn=None,
+                    apply_to_gamemanager=False,
+                )
+            except Exception:
+                logger.warning(
+                    "⚠️ [GET PLAYBOOKS] Failed to persist refreshed position_shot_weights cache",
+                    exc_info=True,
+                )
+            if mode == "single" and use_gamemanager_settings and gm:
+                target_team = None
+                if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                    target_team = gm.home_team
+                elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                    target_team = gm.away_team
+                if target_team and hasattr(target_team, "playbook_settings"):
+                    target_team.playbook_settings = dict(playbook_settings)
+
         simplified_playbook_settings = build_simplified_playbook_settings(
             playbook_settings,
             plays_by_id,
@@ -2338,6 +2386,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 for defense_id, defense_name in ZONE_DEFENSE_ID_TO_NAME.items()
             ],
             "pc_order": pc_order,
+            "position_shot_weights": position_shot_weights,
             "motion_dropdowns": motion_dropdowns,
             "position_filters": position_filters,
             "even_distribution_all": even_distribution_all,
@@ -2462,33 +2511,16 @@ def save_playbooks(request: PlaybookSettingsRequest):
             playbook_meta["saved_for_week"] = int(franchise_doc.get("week", 1) or 1)
         playbook_settings["_meta"] = playbook_meta
 
-        # ✅ UNIFIED: Use unified save function for consistent team_id resolution
-        success, actual_team_id, collection_name = save_team_settings(
-            settings_type="playbook_settings",
-            settings_data=playbook_settings,
-            team_id=request.team_id,
-            mode=request.mode,
-            game_id=request.game_id,
+        current_plays, plays_team_id = _load_current_team_plays_for_save(
+            request.mode,
+            request.team_id,
             franchise_id=request.franchise_id,
             tournament_id=request.tournament_id,
-            validate_fn=None,  # Playbooks don't have required keys validation
-            apply_to_gamemanager=True
+            game_id=request.game_id,
         )
-        
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to save playbook settings")
-
         play_updates = request.play_updates or {}
+        plays_changed = False
         if isinstance(play_updates, dict) and play_updates:
-            current_plays, plays_team_id = _load_current_team_plays_for_save(
-                request.mode,
-                request.team_id,
-                franchise_id=request.franchise_id,
-                tournament_id=request.tournament_id,
-                game_id=request.game_id,
-            )
-
-            plays_changed = False
             for _play_key, play_data, _display_name in iter_team_plays(current_plays):
                 play_id = str(play_data.get("play_id") or "")
                 if not play_id or play_id not in play_updates:
@@ -2507,32 +2539,53 @@ def save_playbooks(request: PlaybookSettingsRequest):
                         play_data["target_shooter"] = normalized_target
                         plays_changed = True
 
-            if plays_changed:
-                plays_success, _, _ = save_team_settings(
-                    settings_type="plays",
-                    settings_data=current_plays,
-                    team_id=request.team_id,
-                    mode=request.mode,
-                    game_id=request.game_id,
-                    franchise_id=request.franchise_id,
-                    tournament_id=request.tournament_id,
-                    validate_fn=None,
-                    apply_to_gamemanager=False,
-                )
-                if not plays_success:
-                    raise HTTPException(status_code=500, detail="Failed to save play configuration")
+        if plays_changed:
+            plays_success, _, _ = save_team_settings(
+                settings_type="plays",
+                settings_data=current_plays,
+                team_id=request.team_id,
+                mode=request.mode,
+                game_id=request.game_id,
+                franchise_id=request.franchise_id,
+                tournament_id=request.tournament_id,
+                validate_fn=None,
+                apply_to_gamemanager=False,
+            )
+            if not plays_success:
+                raise HTTPException(status_code=500, detail="Failed to save play configuration")
 
-                if request.game_id:
-                    try:
-                        from BackEnd.api.api import ongoing_games
-                        gm = ongoing_games.get(request.game_id)
-                        if gm:
-                            if gm.home_team.team_id == plays_team_id or gm.home_team.name == request.team_id:
-                                gm.home_team.plays = dict(current_plays)
-                            elif gm.away_team.team_id == plays_team_id or gm.away_team.name == request.team_id:
-                                gm.away_team.plays = dict(current_plays)
-                    except Exception:
-                        pass
+            if request.game_id:
+                try:
+                    from BackEnd.api.api import ongoing_games
+                    gm = ongoing_games.get(request.game_id)
+                    if gm:
+                        if gm.home_team.team_id == plays_team_id or gm.home_team.name == request.team_id:
+                            gm.home_team.plays = dict(current_plays)
+                        elif gm.away_team.team_id == plays_team_id or gm.away_team.name == request.team_id:
+                            gm.away_team.plays = dict(current_plays)
+                except Exception:
+                    pass
+
+        playbook_settings["position_shot_weights"] = compute_position_shot_weights(
+            playbook_settings,
+            current_plays,
+        )
+
+        # ✅ UNIFIED: Use unified save function for consistent team_id resolution
+        success, actual_team_id, collection_name = save_team_settings(
+            settings_type="playbook_settings",
+            settings_data=playbook_settings,
+            team_id=request.team_id,
+            mode=request.mode,
+            game_id=request.game_id,
+            franchise_id=request.franchise_id,
+            tournament_id=request.tournament_id,
+            validate_fn=None,  # Playbooks don't have required keys validation
+            apply_to_gamemanager=True
+        )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to save playbook settings")
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         
