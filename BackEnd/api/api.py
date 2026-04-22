@@ -5662,7 +5662,7 @@ try:
             if mode == "franchise" and franchise_id:
                 fpd_doc = franchise_players_data_collection.find_one(
                     {"franchise_id": str(franchise_id), "player_id": str(player_id)},
-                    {"attributes": 1, "position_ratings": 1, "meta": 1},
+                    {"attributes": 1, "position_ratings": 1, "meta": 1, "season": 1, "career": 1},
                 )
                 if fpd_doc:
                     if isinstance(fpd_doc.get("attributes"), dict):
@@ -5673,6 +5673,10 @@ try:
                         for key in ("year", "height", "weight", "jersey", "team"):
                             if key in fpd_doc["meta"]:
                                 player[key] = fpd_doc["meta"][key]
+                    if isinstance(fpd_doc.get("season"), dict):
+                        player["season"] = fpd_doc["season"]
+                    if isinstance(fpd_doc.get("career"), dict):
+                        player["career"] = fpd_doc["career"]
 
             # Debug logging removed - was cluttering logs
             # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")

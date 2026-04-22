@@ -2154,7 +2154,7 @@ function renderPlayerStatsTable(players) {
 
       const tr = document.createElement('tr');
       tr.innerHTML =
-        '<td>' + getDisplayPlayerNameForStats(entry.raw) + '</td>' +
+        '<td><a href="' + buildPlayerDetailUrl(entry.raw._id) + '" style="color:inherit;text-decoration:none;">' + getDisplayPlayerNameForStats(entry.raw) + '</a></td>' +
         '<td>' + (stats.PTS || 0) + '</td>' +
         '<td>' + (stats.FGM || 0) + '</td>' +
         '<td>' + (stats.FGA || 0) + '</td>' +

@@ -204,7 +204,7 @@
     const body = document.getElementById('pd-stats-body');
     if (!body) return;
     body.innerHTML = '';
-    const seasonStats = player?.stats?.season || player?.stats || {};
+    const seasonStats = player?.season || player?.stats?.season || {};
     const stats = typeof seasonStats === 'object' && !Array.isArray(seasonStats) ? seasonStats : {};
     const tpm = Number(stats['3PTM'] || stats.TPM || 0);
     const tpa = Number(stats['3PTA'] || stats.TPA || 0);
