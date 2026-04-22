@@ -3322,27 +3322,6 @@ function renderFccInbox(topData) {
   const w = topData && topData.last_training_report_week;
   const tid = (topData && topData.team_id) || userTeamId;
 
-  inboxItems.forEach((item) => {
-    if (!item || item.type !== 'game_result') return;
-    const itemWeek = Number(item.week);
-    const verb = item.result === 'win' ? 'defeated' : 'lost to';
-    const text = Number.isFinite(itemWeek) && item.user_team_name && item.opponent_team_name
-      ? `Week #${itemWeek}: ${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
-      : item.copy;
-    if (!text) return;
-    const p = document.createElement('p');
-    p.className = 'fcc-inbox-message';
-    p.appendChild(document.createTextNode(`${text} `));
-    if (item.box_score_url) {
-      const a = document.createElement('a');
-      a.href = item.box_score_url;
-      a.className = 'fcc-inbox-link';
-      a.textContent = 'box score';
-      p.appendChild(a);
-    }
-    el.appendChild(p);
-  });
-
   if (w != null && w !== '' && franchiseId && tid) {
     const weekNum = Number(w);
     if (Number.isFinite(weekNum) && weekNum >= 1) {
@@ -3366,6 +3345,27 @@ function renderFccInbox(topData) {
       el.appendChild(p);
     }
   }
+
+  inboxItems.forEach((item) => {
+    if (!item || item.type !== 'game_result') return;
+    const itemWeek = Number(item.week);
+    const verb = item.result === 'win' ? 'defeated' : 'lost to';
+    const text = Number.isFinite(itemWeek) && item.user_team_name && item.opponent_team_name
+      ? `Week #${itemWeek}: ${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
+      : item.copy;
+    if (!text) return;
+    const p = document.createElement('p');
+    p.className = 'fcc-inbox-message';
+    p.appendChild(document.createTextNode(`${text} `));
+    if (item.box_score_url) {
+      const a = document.createElement('a');
+      a.href = item.box_score_url;
+      a.className = 'fcc-inbox-link';
+      a.textContent = 'box score';
+      p.appendChild(a);
+    }
+    el.appendChild(p);
+  });
 
   if (!el.childElementCount) {
     el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
