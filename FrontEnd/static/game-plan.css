@@ -6,7 +6,7 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: linear-gradient(180deg, #3551A5 0%, #27408E 40%, #1C2D60 100%);
+  background: linear-gradient(180deg, var(--fcc-primary-top, #3551A5) 0%, var(--fcc-primary-mid, #1E3068) 40%, var(--fcc-primary-deep, #1C2D60) 100%);
   color: #ffffff;
   min-height: 100vh;
 }

@@ -69,6 +69,7 @@ function clearFranchiseLocalStorage() {
     'franchise_week',
     'franchise_user_team',
     'franchise_user_team_id',
+    'franchise_user_team_primary_color',
   ];
   toRemove.forEach((k) => localStorage.removeItem(k));
   Object.keys(localStorage).forEach((k) => {

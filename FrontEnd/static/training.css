@@ -1,5 +1,5 @@
 :root {
-  --color-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --color-bg: linear-gradient(180deg, var(--fcc-primary-top, #3551A5) 0%, var(--fcc-primary-mid, #1E3068) 42%, var(--fcc-primary-deep, #1C2D60) 100%);
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-border: rgba(255, 215, 0, 0.2);
   --color-accent: #FFD700;

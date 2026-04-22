@@ -2039,46 +2039,11 @@ def resolve_free_throw_logic(game):
             basket_x = 9 if is_away_offense else 91
             bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
 
-            # FT lane finals from capture_free_throw_animation are court-absolute; apply_coords
-            # maps away-offense finals into runtime-home via get_away_player_coords. Bounce math
-            # uses the same absolute grid as the animator, so temporarily undo that flip for all
-            # ten players during rebound selection only, then restore runtime coords.
-            ft_reb_coord_snapshot = None
-            if is_away_offense:
-                ft_reb_coord_snapshot = {}
-                for team in (game.home_team, game.away_team):
-                    for pl in (team.lineup or {}).values():
-                        if not pl or getattr(pl, "player_id", None) is None:
-                            continue
-                        pid = str(pl.player_id)
-                        c = getattr(pl, "coords", None) or {}
-                        ft_reb_coord_snapshot[pid] = dict(c) if isinstance(c, dict) else {}
-                        try:
-                            pl.coords = get_away_player_coords(
-                                {
-                                    "x": float(c.get("x", 50)),
-                                    "y": float(c.get("y", 25)),
-                                }
-                            )
-                        except (TypeError, ValueError):
-                            pl.coords = {"x": 50.0, "y": 25.0}
-
-            try:
-                # Closest-to-bounce among players within |x - bounce_x| <= threshold.
-                rebounder, rebound_team, stat = determine_rebounder(
-                    game,
-                    bounce_spot,
-                    max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
-                )
-            finally:
-                if ft_reb_coord_snapshot:
-                    for team in (game.home_team, game.away_team):
-                        for pl in (team.lineup or {}).values():
-                            if not pl or getattr(pl, "player_id", None) is None:
-                                continue
-                            pid = str(pl.player_id)
-                            if pid in ft_reb_coord_snapshot:
-                                pl.coords = ft_reb_coord_snapshot[pid]
+            rebounder, rebound_team, stat = determine_rebounder(
+                game,
+                bounce_spot,
+                max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
+            )
 
             anim_list = animations if isinstance(animations, list) else []
             player_anim_count = sum(

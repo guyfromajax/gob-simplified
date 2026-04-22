@@ -1,7 +1,7 @@
 body.playbook-report-page {
   min-height: 100vh;
   margin: 0;
-  background: linear-gradient(180deg, #263d7a 0%, #1e3068 54%, #141f4a 100%);
+  background: linear-gradient(180deg, var(--fcc-primary-top, #263d7a) 0%, var(--fcc-primary-mid, #1E3068) 54%, var(--fcc-primary-deep, #141f4a) 100%);
   color: #f7f9ff;
   font-family: 'Inter', sans-serif;
 }

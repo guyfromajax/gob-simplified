@@ -710,30 +710,190 @@ async function loadRoster() {
   renderRoster();
 }
 
-// Store roster data for sorting
-let rosterDataForSorting = [];
-let currentSortColumn = 'RT';
-let currentSortDirection = 'desc'; // 'desc' or 'asc'
+function getGameStatsForRoster(p) {
+  const raw = p.stats || {};
+  return raw.game || raw;
+}
 
-function renderRoster() {
+/** Match box-score.js player stats MIN formatting */
+function formatMinutesRosterStats(seconds) {
+  if (!seconds) return '0';
+  return Math.floor(seconds / 60).toString();
+}
+
+const ROSTER_STATS_COLUMN_NAMES = ['Name', 'PTS', 'FGM/FGA', '3PTM/3PTA', 'FTM/FTA', 'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'TO', 'DEFA', 'DEF%', 'SCRA', 'SCR%', 'MIN'];
+
+let rosterDataForSorting = [];
+/** Display header label or 'RT' for default highest-rating sort (no dedicated column). */
+let attrSortColumn = 'RT';
+let attrSortDirection = 'desc';
+
+let rosterStatsRows = [];
+let statsSortColumn = 'PTS';
+let statsSortDirection = 'desc';
+
+function buildRosterStatsRowSnapshot(p) {
+  const st = getGameStatsForRoster(p);
+  const fgm = Number(st.FGM) || 0;
+  const fga = Number(st.FGA) || 0;
+  const tpm = Number(st['3PTM']) || 0;
+  const tpa = Number(st['3PTA']) || 0;
+  const ftm = Number(st.FTM) || 0;
+  const fta = Number(st.FTA) || 0;
+  const dreb = Number(st.DREB) || 0;
+  const oreb = Number(st.OREB) || 0;
+  const treb = dreb + oreb;
+  const defa = Number(st.DEF_A) || 0;
+  const defs = Number(st.DEF_S) || 0;
+  const defPct = defa > 0 ? (defs / defa) * 100 : 0;
+  const scra = Number(st.SCR_A) || 0;
+  const scrs = Number(st.SCR_S) || 0;
+  const scrPct = scra > 0 ? (scrs / scra) * 100 : 0;
+  return {
+    player: p,
+    sort: {
+      Name: (p.name || '').trim(),
+      PTS: Number(st.PTS) || 0,
+      'FGM/FGA': { m: fgm, a: fga },
+      '3PTM/3PTA': { m: tpm, a: tpa },
+      'FTM/FTA': { m: ftm, a: fta },
+      DREB: dreb,
+      OREB: oreb,
+      TREB: treb,
+      AST: Number(st.AST) || 0,
+      STL: Number(st.STL) || 0,
+      BLK: Number(st.BLK) || 0,
+      F: Number(st.F) || 0,
+      TO: Number(st.TO) || 0,
+      DEFA: defa,
+      'DEF%': defPct,
+      SCRA: scra,
+      'SCR%': scrPct,
+      MIN: Number(st.MIN) || 0
+    }
+  };
+}
+
+function compareRosterStatsSnapshots(a, b) {
+  const col = statsSortColumn;
+  const desc = statsSortDirection === 'desc';
+  const av = a.sort[col];
+  const bv = b.sort[col];
+
+  if (col === 'Name') {
+    return desc ? bv.localeCompare(av) : av.localeCompare(bv);
+  }
+
+  if (av && typeof av === 'object' && av !== null && 'm' in av) {
+    if (desc) {
+      if (bv.m !== av.m) return bv.m - av.m;
+      return bv.a - av.a;
+    }
+    if (av.m !== bv.m) return av.m - bv.m;
+    return av.a - bv.a;
+  }
+
+  const an = Number(av) || 0;
+  const bn = Number(bv) || 0;
+  return desc ? bn - an : an - bn;
+}
+
+function applyRosterStatsSort() {
+  rosterStatsRows.sort(compareRosterStatsSnapshots);
+}
+
+function sortRosterDataInPlace(data, columnName, direction) {
+  const columnMap = {
+    'Player Name': 'name',
+    'Pos': 'pos',
+    'HT': 'height',
+    'WT': 'weight',
+    'SC': 'SC',
+    'SH': 'SH',
+    'ID': 'ID',
+    'OD': 'OD',
+    'PS': 'PS',
+    'BH': 'BH',
+    'RB': 'RB',
+    'ST': 'ST',
+    'AG': 'AG',
+    'ND': 'ND',
+    'IQ': 'IQ',
+    'FT': 'FT',
+    'NG': 'NG',
+    'RT': 'RT'
+  };
+
+  const dataKey = columnMap[columnName] || columnName;
+
+  data.sort((a, b) => {
+    let val1;
+    let val2;
+
+    if (dataKey === 'name') {
+      val1 = a.name || '';
+      val2 = b.name || '';
+      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    }
+    if (dataKey === 'RT') {
+      val1 = a.highestRT ?? -Infinity;
+      val2 = b.highestRT ?? -Infinity;
+    } else if (dataKey === 'pos') {
+      const posOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
+      const posRatingsA = a.position_ratings || {};
+      const posRatingsB = b.position_ratings || {};
+      const entriesA = Object.entries(posRatingsA);
+      const entriesB = Object.entries(posRatingsB);
+      const bestA = entriesA.length ? entriesA.reduce((x, y) => y[1] > x[1] ? y : x)[0] : '';
+      const bestB = entriesB.length ? entriesB.reduce((x, y) => y[1] > x[1] ? y : x)[0] : '';
+      val1 = posOrder.indexOf(bestA);
+      val2 = posOrder.indexOf(bestB);
+    } else if (dataKey === 'height') {
+      const parseHeight = (h) => {
+        if (!h || h === '--') return 0;
+        const match = h.match(/(\d+)'(\d+)"/);
+        return match ? parseInt(match[1], 10) * 12 + parseInt(match[2], 10) : 0;
+      };
+      val1 = parseHeight(a.height);
+      val2 = parseHeight(b.height);
+    } else if (dataKey === 'weight') {
+      val1 = parseInt(a.weight, 10) || 0;
+      val2 = parseInt(b.weight, 10) || 0;
+    } else if (dataKey === 'NG') {
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      val1 = attrsA.NG ?? 1.0;
+      val2 = attrsB.NG ?? 1.0;
+    } else {
+      const attrsA = a.attributes || {};
+      const attrsB = b.attributes || {};
+      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
+      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
+      val1 = Math.floor(rawValA / 10);
+      val2 = Math.floor(rawValB / 10);
+    }
+
+    if (direction === 'desc') {
+      return val2 - val1;
+    }
+    return val1 - val2;
+  });
+}
+
+function renderRosterAttributes() {
   const tbody = document.getElementById('roster-body');
   if (!tbody) return;
   tbody.innerHTML = '';
-  
-  // Calculate RT for each player and store for sorting
+
   rosterDataForSorting = roster.map(p => {
     const posRatings = p.position_ratings || {};
     const rtValues = Object.values(posRatings);
     const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
     return { ...p, highestRT };
   });
-  
-  // Default sort by RT (descending)
-  if (currentSortColumn === 'RT' && currentSortDirection === 'desc') {
-    rosterDataForSorting.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
-  }
-  
-  // ✅ PERFORMANCE FIX: Use DocumentFragment to batch DOM updates (single reflow)
+
+  sortRosterDataInPlace(rosterDataForSorting, attrSortColumn, attrSortDirection);
+
   const fragment = document.createDocumentFragment();
 
   function getEnergyClass(ngValue) {
@@ -743,17 +903,17 @@ function renderRoster() {
     if (percent >= 70) return 'low';
     return 'critical';
   }
-  
+
   rosterDataForSorting.forEach(p => {
     const tr = document.createElement('tr');
-    tr.draggable = !p.ineligible;  // Disable drag for ineligible players
+    tr.draggable = !p.ineligible;
     tr.dataset.playerId = p._id;
     if (p.ineligible || p.fouled_out) {
-      tr.classList.add('ineligible');  // Add class for styling
-      tr.style.backgroundColor = '#d3d3d3';  // Light grey background tint
-      tr.style.opacity = '0.7';  // Slight opacity reduction
-      tr.style.pointerEvents = 'none';  // Disable interactions
-      tr.style.cursor = 'not-allowed';  // Show not-allowed cursor
+      tr.classList.add('ineligible');
+      tr.style.backgroundColor = '#d3d3d3';
+      tr.style.opacity = '0.7';
+      tr.style.pointerEvents = 'none';
+      tr.style.cursor = 'not-allowed';
     }
     tr.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', p._id);
@@ -764,11 +924,10 @@ function renderRoster() {
     let rt = '--';
     const entries = Object.entries(posRatings);
     if (entries.length) {
-      const [pos, rating] = entries.reduce((a, b) => b[1] > a[1] ? b : a);
+      const [pos, rating] = entries.reduce((a, b) => (b[1] > a[1] ? b : a));
       bestPos = pos;
       rt = rating;
     }
-    // Use anchor attributes (don't show energy-scaled values)
     const anchorAttrs = p.attributes || {};
 
     const displayPlayerName =
@@ -818,120 +977,196 @@ function renderRoster() {
       tr.appendChild(td);
     });
 
-    // ✅ PERFORMANCE FIX: Append to fragment instead of tbody (batched update)
     fragment.appendChild(tr);
   });
-  
-  // ✅ PERFORMANCE FIX: Single DOM update (triggers one reflow instead of N)
+
   tbody.appendChild(fragment);
-  
-  // Add click handlers to sortable headers
-  const sortableHeaders = document.querySelectorAll('.roster-table thead th');
+
+  const sortableHeaders = document.querySelectorAll('#roster-attributes-pane .roster-table thead th');
   sortableHeaders.forEach((header, index) => {
-    // Remove existing listeners
     const newHeader = header.cloneNode(true);
     header.parentNode.replaceChild(newHeader, header);
-    
+
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
       const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG'];
-      const columnName = columnNames[index];
-      sortRoster(columnName);
+      sortRoster(columnNames[index]);
     });
   });
-  
-  // Note: Tooltips for th headers are initialized in DOMContentLoaded
-  // We don't need to initialize tooltips for td elements (they contain values, not abbreviations)
+}
+
+function renderRosterStats() {
+  const tbody = document.getElementById('roster-body-stats');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  rosterStatsRows = roster.map(buildRosterStatsRowSnapshot);
+  applyRosterStatsSort();
+
+  const fragment = document.createDocumentFragment();
+
+  rosterStatsRows.forEach(snap => {
+    const p = snap.player;
+    const stats = getGameStatsForRoster(p);
+    const tr = document.createElement('tr');
+    tr.draggable = !p.ineligible;
+    tr.dataset.playerId = p._id;
+    if (p.ineligible || p.fouled_out) {
+      tr.classList.add('ineligible');
+      tr.style.backgroundColor = '#d3d3d3';
+      tr.style.opacity = '0.7';
+      tr.style.pointerEvents = 'none';
+      tr.style.cursor = 'not-allowed';
+    }
+    tr.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', p._id);
+    });
+
+    const treb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
+    const defa = Number(stats.DEF_A) || 0;
+    const defs = Number(stats.DEF_S) || 0;
+    const defPct = defa > 0 ? ((defs / defa) * 100).toFixed(0) : '0';
+    const scra = Number(stats.SCR_A) || 0;
+    const scrs = Number(stats.SCR_S) || 0;
+    const scrPct = scra > 0 ? ((scrs / scra) * 100).toFixed(0) : '0';
+    const minDisplay = formatMinutesRosterStats(Number(stats.MIN) || 0);
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'player-name-cell';
+    const wrap = document.createElement('div');
+    wrap.className = 'player-name-wrap';
+    const nameText = document.createElement('span');
+    nameText.className = 'player-name-link';
+    nameText.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : (p.name || '—');
+    wrap.appendChild(nameText);
+    nameTd.appendChild(wrap);
+    tr.appendChild(nameTd);
+
+    const cellVals = [
+      String(stats.PTS || 0),
+      `${stats.FGM || 0}/${stats.FGA || 0}`,
+      `${stats['3PTM'] || 0}/${stats['3PTA'] || 0}`,
+      `${stats.FTM || 0}/${stats.FTA || 0}`,
+      String(stats.DREB || 0),
+      String(stats.OREB || 0),
+      String(treb),
+      String(stats.AST || 0),
+      String(stats.STL || 0),
+      String(stats.BLK || 0),
+      String(stats.F || 0),
+      String(stats.TO || 0),
+      String(defa),
+      `${defPct}%`,
+      String(scra),
+      `${scrPct}%`,
+      minDisplay
+    ];
+
+    cellVals.forEach(text => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+
+    fragment.appendChild(tr);
+  });
+
+  tbody.appendChild(fragment);
+
+  const sortableHeaders = document.querySelectorAll('#roster-stats-pane .roster-stats-table thead th');
+  sortableHeaders.forEach((header, index) => {
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      sortRosterStats(ROSTER_STATS_COLUMN_NAMES[index]);
+    });
+  });
+}
+
+function applySelectionToRosterRows() {
+  const selectedIds = Object.values(lineup);
+  roster.forEach(p => {
+    document.querySelectorAll(`tr[data-player-id="${p._id}"]`).forEach(row => {
+      if (selectedIds.includes(p._id)) {
+        row.classList.add('selected');
+      } else {
+        row.classList.remove('selected');
+      }
+
+      if (!p.ineligible && !p.fouled_out) {
+        row.addEventListener('click', () => {
+          if (!selectedIds.includes(p._id)) {
+            const assigned = fillNextSlot(p._id);
+            if (assigned) {
+              playSound('click-soft.mp3');
+            }
+          }
+        });
+      } else if (p.ineligible || p.fouled_out) {
+        row.classList.add('ineligible');
+        row.style.backgroundColor = '#d3d3d3';
+        row.style.opacity = '0.7';
+        row.style.pointerEvents = 'none';
+        row.style.cursor = 'not-allowed';
+      }
+    });
+  });
+}
+
+function renderRoster() {
+  renderRosterAttributes();
+  renderRosterStats();
+  applySelectionToRosterRows();
 }
 
 function sortRoster(columnName) {
-  // Toggle sort direction if clicking the same column
-  if (currentSortColumn === columnName) {
-    currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+  if (attrSortColumn === columnName) {
+    attrSortDirection = attrSortDirection === 'desc' ? 'asc' : 'desc';
   } else {
-    currentSortColumn = columnName;
-    currentSortDirection = 'desc'; // Default to descending
+    attrSortColumn = columnName;
+    attrSortDirection = 'desc';
   }
-  
-  const columnMap = {
-    'Player Name': 'name',
-    'Pos': 'pos',
-    'HT': 'height',
-    'WT': 'weight',
-    'SC': 'SC',
-    'SH': 'SH',
-    'ID': 'ID',
-    'OD': 'OD',
-    'PS': 'PS',
-    'BH': 'BH',
-    'RB': 'RB',
-    'ST': 'ST',
-    'AG': 'AG',
-    'ND': 'ND',
-    'IQ': 'IQ',
-    'FT': 'FT',
-    'NG': 'NG',
-    'RT': 'RT'
-  };
-  
-  const dataKey = columnMap[columnName] || columnName;
-  
-  rosterDataForSorting.sort((a, b) => {
-    let val1, val2;
-    
-    if (dataKey === 'name') {
-      val1 = a.name || '';
-      val2 = b.name || '';
-      return currentSortDirection === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    } else if (dataKey === 'RT') {
-      val1 = a.highestRT ?? -Infinity;
-      val2 = b.highestRT ?? -Infinity;
-    } else if (dataKey === 'pos') {
-      const posOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
-      const posRatingsA = a.position_ratings || {};
-      const posRatingsB = b.position_ratings || {};
-      const entriesA = Object.entries(posRatingsA);
-      const entriesB = Object.entries(posRatingsB);
-      const bestA = entriesA.length ? entriesA.reduce((a, b) => b[1] > a[1] ? b : a)[0] : '';
-      const bestB = entriesB.length ? entriesB.reduce((a, b) => b[1] > a[1] ? b : a)[0] : '';
-      val1 = posOrder.indexOf(bestA);
-      val2 = posOrder.indexOf(bestB);
-    } else if (dataKey === 'height') {
-      // Parse height (e.g., "6'8\"")
-      const parseHeight = (h) => {
-        if (!h || h === '--') return 0;
-        const match = h.match(/(\d+)'(\d+)"/);
-        return match ? parseInt(match[1]) * 12 + parseInt(match[2]) : 0;
-      };
-      val1 = parseHeight(a.height);
-      val2 = parseHeight(b.height);
-    } else if (dataKey === 'weight') {
-      val1 = parseInt(a.weight) || 0;
-      val2 = parseInt(b.weight) || 0;
-    } else if (dataKey === 'NG') {
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      val1 = attrsA.NG ?? 1.0;
-      val2 = attrsB.NG ?? 1.0;
-    } else {
-      // Attribute columns (SC, SH, ID, etc.)
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
-      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
-      val1 = Math.floor(rawValA / 10);
-      val2 = Math.floor(rawValB / 10);
-    }
-    
-    if (currentSortDirection === 'desc') {
-      return val2 - val1;
-    } else {
-      return val1 - val2;
-    }
-  });
-  
   renderRoster();
+}
+
+function sortRosterStats(columnName) {
+  if (statsSortColumn === columnName) {
+    statsSortDirection = statsSortDirection === 'desc' ? 'asc' : 'desc';
+  } else {
+    statsSortColumn = columnName;
+    statsSortDirection = 'desc';
+  }
+  renderRoster();
+}
+
+function initRosterPanelToggle() {
+  const btnAttr = document.getElementById('roster-view-attributes');
+  const btnStats = document.getElementById('roster-view-stats');
+  const paneAttr = document.getElementById('roster-attributes-pane');
+  const paneStats = document.getElementById('roster-stats-pane');
+  if (!btnAttr || !btnStats || !paneAttr || !paneStats) return;
+
+  function apply(view) {
+    const isAttr = view === 'attributes';
+    btnAttr.classList.toggle('active', isAttr);
+    btnStats.classList.toggle('active', !isAttr);
+    paneAttr.hidden = !isAttr;
+    paneStats.hidden = isAttr;
+  }
+
+  btnAttr.addEventListener('click', () => {
+    playSound('click-tiny.wav');
+    apply('attributes');
+  });
+  btnStats.addEventListener('click', () => {
+    playSound('click-tiny.wav');
+    apply('stats');
+  });
+  apply('attributes');
 }
 
 function updatePlayButton() {
@@ -1630,6 +1865,7 @@ async function init() {
   }
 
   await loadRoster();
+  initRosterPanelToggle();
   await setHeader();
   setupSlots(); // Setup slot event handlers (this clears slots/lineup)
   
@@ -2435,44 +2671,6 @@ function fillNextSlot(playerId) {
   return false;
 }
 
-// Update renderRoster to mark selected rows
-const originalRenderRoster = renderRoster;
-renderRoster = function() {
-  originalRenderRoster();
-  
-  // Mark selected rows
-  const selectedIds = Object.values(lineup);
-  roster.forEach(p => {
-    const row = document.querySelector(`tr[data-player-id="${p._id}"]`);
-    if (row) {
-      if (selectedIds.includes(p._id)) {
-        row.classList.add('selected');
-      } else {
-        row.classList.remove('selected');
-      }
-      
-      // Add click handler to fill next slot (only if not ineligible)
-      if (!p.ineligible && !p.fouled_out) {
-        row.addEventListener('click', (e) => {
-          if (!selectedIds.includes(p._id)) {
-            const assigned = fillNextSlot(p._id);
-            if (assigned) {
-              playSound('click-soft.mp3');
-            }
-          }
-        });
-      } else if (p.ineligible || p.fouled_out) {
-        // Mark ineligible rows with grey tint
-        row.classList.add('ineligible');
-        row.style.backgroundColor = '#d3d3d3';  // Light grey background tint
-        row.style.opacity = '0.7';
-        row.style.pointerEvents = 'none';
-        row.style.cursor = 'not-allowed';
-      }
-    }
-  });
-};
-
 // Make slots draggable for swapping
 function setupSlotDragAndDrop() {
   const slots = document.querySelectorAll('.slot');
@@ -2616,7 +2814,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Use a small delay to ensure thead is fully rendered
   setTimeout(() => {
     if (typeof initAttributeTooltips !== 'undefined') {
-      const thead = document.querySelector('.roster-table thead');
+      const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
       if (thead) {
         initAttributeTooltips(thead, ['th']);
         

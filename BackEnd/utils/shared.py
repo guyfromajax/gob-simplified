@@ -1,6 +1,7 @@
 import math
 import random
 import logging
+from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -804,8 +805,10 @@ def resolve_offensive_rebound(game, rebounder):
             rebounder_id = getattr(rebounder, "player_id", None)
             exclude_player_ids = set()  # Don't exclude putback player anymore
             penalize_player_ids = {rebounder_id} if rebounder_id else set()  # Penalize putback player by 20% distance
-            
-            new_rebounder, new_team, new_stat = determine_rebounder(game, bounce_spot, exclude_player_ids, penalize_player_ids)
+
+            new_rebounder, new_team, new_stat = determine_rebounder(
+                game, bounce_spot, exclude_player_ids, penalize_player_ids
+            )
             
             # Get rebounder ID (support both Player and dict for robustness)
             new_rebounder_id = getattr(new_rebounder, "player_id", None)
@@ -1147,89 +1150,95 @@ def determine_rebounder(
     if penalize_player_ids is None:
         penalize_player_ids = set()
 
-    if max_x_delta_from_bounce is not None:
-        gs_diag = getattr(game, "game_state", None)
-        if isinstance(gs_diag, dict):
-            gs_diag.pop("_ft_rebound_x_gate_fallback", None)
-        bx = bounce_spot.get("x", 50)
-        off_use = _filter_lineup_by_max_x_delta_from_bounce(
-            off_lineup, bx, max_x_delta_from_bounce
-        )
-        def_use = _filter_lineup_by_max_x_delta_from_bounce(
-            def_lineup, bx, max_x_delta_from_bounce
-        )
-        if not off_use and not def_use:
-            logging.warning(
-                "determine_rebounder: max_x_delta_from_bounce=%s excluded all players "
-                "(bounce_x=%s); falling back to full lineups",
-                max_x_delta_from_bounce,
-                bx,
-            )
+    is_away_offense = (
+        off_team is not None
+        and getattr(game, "away_team", None) is not None
+        and off_team.team_id == game.away_team.team_id
+    )
+
+    def _core():
+        if max_x_delta_from_bounce is not None:
+            gs_diag = getattr(game, "game_state", None)
             if isinstance(gs_diag, dict):
-                gs_diag["_ft_rebound_x_gate_fallback"] = True
-            off_use, def_use = off_lineup, def_lineup
-    else:
-        off_use, def_use = off_lineup, def_lineup
-    
-    # Choose closest player from each team (with penalty for shooter/putback player)
-    o_rebounder = choose_rebounder(off_use, bounce_spot, exclude_player_ids, penalize_player_ids)
-    d_rebounder = choose_rebounder(def_use, bounce_spot, exclude_player_ids, penalize_player_ids)
-    
-    # Handle edge cases
-    if o_rebounder is None and d_rebounder is None:
-        # No rebounders from either team - find closest player to bounce spot from all players
-        logging.warning("determine_rebounder: No valid rebounders found, using closest player from all players")
-        all_players_lineup = {}
-        # Combine both lineups (full — excludes/empty pool edge case)
-        for pos, player in off_lineup.items():
-            if player is not None:
-                all_players_lineup[f"O_{pos}"] = player
-        for pos, player in def_lineup.items():
-            if player is not None:
-                all_players_lineup[f"D_{pos}"] = player
-
-        closest_player = choose_rebounder(all_players_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
-        
-        if closest_player is None:
-            raise ValueError("No players available for rebound")
-        
-        # Determine which team the closest player belongs to
-        closest_team_id = getattr(closest_player, "team_id", None)
-        if closest_team_id == off_team.team_id:
-            return closest_player, off_team, "OREB"
+                gs_diag.pop("_ft_rebound_x_gate_fallback", None)
+            bx = bounce_spot.get("x", 50)
+            off_use = _filter_lineup_by_max_x_delta_from_bounce(
+                off_lineup, bx, max_x_delta_from_bounce
+            )
+            def_use = _filter_lineup_by_max_x_delta_from_bounce(
+                def_lineup, bx, max_x_delta_from_bounce
+            )
+            if not off_use and not def_use:
+                logging.warning(
+                    "determine_rebounder: max_x_delta_from_bounce=%s excluded all players "
+                    "(bounce_x=%s); falling back to full lineups",
+                    max_x_delta_from_bounce,
+                    bx,
+                )
+                if isinstance(gs_diag, dict):
+                    gs_diag["_ft_rebound_x_gate_fallback"] = True
+                off_use, def_use = off_lineup, def_lineup
         else:
+            off_use, def_use = off_lineup, def_lineup
+
+        o_rebounder = choose_rebounder(
+            off_use, bounce_spot, exclude_player_ids, penalize_player_ids
+        )
+        d_rebounder = choose_rebounder(
+            def_use, bounce_spot, exclude_player_ids, penalize_player_ids
+        )
+
+        if o_rebounder is None and d_rebounder is None:
+            logging.warning(
+                "determine_rebounder: No valid rebounders found, using closest player from all players"
+            )
+            all_players_lineup = {}
+            for pos, player in off_lineup.items():
+                if player is not None:
+                    all_players_lineup[f"O_{pos}"] = player
+            for pos, player in def_lineup.items():
+                if player is not None:
+                    all_players_lineup[f"D_{pos}"] = player
+
+            closest_player = choose_rebounder(
+                all_players_lineup, bounce_spot, exclude_player_ids, penalize_player_ids
+            )
+
+            if closest_player is None:
+                raise ValueError("No players available for rebound")
+
+            closest_team_id = getattr(closest_player, "team_id", None)
+            if closest_team_id == off_team.team_id:
+                return closest_player, off_team, "OREB"
             return closest_player, def_team, "DREB"
-    
-    if o_rebounder is None:
-        # Only defensive rebounders available
-        return d_rebounder, def_team, "DREB"
-    
-    if d_rebounder is None:
-        # Only offensive rebounders available
-        return o_rebounder, off_team, "OREB"
-    
-    # Calculate rebound scores for the closest players
-    o_score = calculate_rebound_score(o_rebounder)
-    d_score = calculate_rebound_score(d_rebounder)
 
-    # Apply team bias
-    off_mod = off_team.team_attributes["rebound_modifier"]
-    def_mod = def_team.team_attributes["rebound_modifier"]
-    bias = def_mod - off_mod
-    def_prob = min(0.95, max(0.55, 0.75 + bias))
+        if o_rebounder is None:
+            return d_rebounder, def_team, "DREB"
 
-    # Calculate final weights
-    total_score = d_score + o_score
-    d_weight = (d_score / total_score) if total_score else 0.5
-    d_weight += (def_prob - 0.5)
-    d_weight = min(0.95, max(0.05, d_weight))
+        if d_rebounder is None:
+            return o_rebounder, off_team, "OREB"
 
-    # Weighted random selection
-    new_team = def_team if random.random() < d_weight else off_team
-    new_rebounder = d_rebounder if new_team == def_team else o_rebounder
-    new_stat = "DREB" if new_team == def_team else "OREB"
+        o_score = calculate_rebound_score(o_rebounder)
+        d_score = calculate_rebound_score(d_rebounder)
 
-    return new_rebounder, new_team, new_stat
+        off_mod = off_team.team_attributes["rebound_modifier"]
+        def_mod = def_team.team_attributes["rebound_modifier"]
+        bias = def_mod - off_mod
+        def_prob = min(0.95, max(0.55, 0.75 + bias))
+
+        total_score = d_score + o_score
+        d_weight = (d_score / total_score) if total_score else 0.5
+        d_weight += (def_prob - 0.5)
+        d_weight = min(0.95, max(0.05, d_weight))
+
+        new_team = def_team if random.random() < d_weight else off_team
+        new_rebounder = d_rebounder if new_team == def_team else o_rebounder
+        new_stat = "DREB" if new_team == def_team else "OREB"
+
+        return new_rebounder, new_team, new_stat
+
+    with temp_lineup_court_absolute_for_away_rebound_math(game, is_away_offense):
+        return _core()
 
 def get_team_thresholds(game):
     
@@ -2142,6 +2151,54 @@ def getAwayTeamCoords(coordsDict):
            xSpot = 100 - coordsX
            coordsDict[position] = {"x": xSpot, "y": ySpot}
        return coordsDict
+
+
+@contextmanager
+def temp_lineup_court_absolute_for_away_rebound_math(
+    game: Any,
+    is_away_offense: bool,
+):
+    """Align lineup coords with court-absolute bounce geometry for rebound selection (away offense only).
+
+    ``apply_coords_from_animations_list`` / turn sync writes away-offense animation finals into
+    runtime-home orientation (x flipped via ``get_away_player_coords``). ``calculate_bounce_spot``
+    uses the fixed rim grid in court-absolute space. For ``determine_rebounder`` and similar,
+    temporarily undo that flip for all active lineup players, then restore prior ``coords``.
+
+    No-op when ``not is_away_offense`` or ``game`` is None.
+    """
+    if not is_away_offense or game is None:
+        yield
+        return
+
+    snapshot: Dict[str, Dict[str, Any]] = {}
+    for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
+        if team is None:
+            continue
+        for pl in (team.lineup or {}).values():
+            if not pl or getattr(pl, "player_id", None) is None:
+                continue
+            pid = str(pl.player_id)
+            c = getattr(pl, "coords", None) or {}
+            snapshot[pid] = dict(c) if isinstance(c, dict) else {}
+            try:
+                pl.coords = get_away_player_coords(
+                    {"x": float(c.get("x", 50)), "y": float(c.get("y", 25))}
+                )
+            except (TypeError, ValueError):
+                pl.coords = {"x": 50.0, "y": 25.0}
+    try:
+        yield
+    finally:
+        for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
+            if team is None:
+                continue
+            for pl in (team.lineup or {}).values():
+                if not pl or getattr(pl, "player_id", None) is None:
+                    continue
+                pid = str(pl.player_id)
+                if pid in snapshot:
+                    pl.coords = snapshot[pid]
 
 
 ANIMATION_CLAMP_BOUNDS: Dict[str, float] = {

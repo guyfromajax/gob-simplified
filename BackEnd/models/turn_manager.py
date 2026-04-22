@@ -3443,7 +3443,23 @@ class TurnManager:
             }
             
             if oreb_event["result"] == "MAKE":
-                is_and_one = oreb_event.get("next_play_type") == "FREE_THROW"
+                # OREB putback and-one: resolver sets FREE_THROW + foul fields together; if next_play_type
+                # is missing or still BIP, Pattern A would synthesize an extra BASELINE_INBOUND before FTs.
+                raw_next = oreb_event.get("next_play_type")
+                ft_rem = int(oreb_event.get("free_throws_remaining", 0) or 0)
+                putback_shooting_foul_fts = bool(oreb_event.get("foul_player_id")) and (
+                    ft_rem > 0
+                    or bool(oreb_event.get("has_and_one"))
+                    or game_state.get("offensive_state") == "FREE_THROW"
+                )
+                if raw_next == "FREE_THROW" or putback_shooting_foul_fts:
+                    putback_next_play = "FREE_THROW"
+                elif raw_next not in (None, ""):
+                    putback_next_play = raw_next
+                else:
+                    putback_next_play = "BASELINE_INBOUND"
+
+                is_and_one = putback_next_play == "FREE_THROW"
                 text = (
                     f"{get_name_safe(rebounder)} goes back up, scores, and gets fouled!"
                     if is_and_one
@@ -3506,8 +3522,8 @@ class TurnManager:
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
-                    "next_play_type": oreb_event.get("next_play_type", "BASELINE_INBOUND"),  # ✅ FIX 2: Create BASELINE_INBOUND turn (Pattern A)
-                    "next_turn": oreb_event.get("next_play_type", "BASELINE_INBOUND"),  # ✅ SS&S: Explicit next turn
+                    "next_play_type": putback_next_play,
+                    "next_turn": putback_next_play,
                     "next_defensive_setup": pressure_type,
                     "animations": [],  # Putbacks use simple animation, not skeleton
                     "rebounderId": getattr(rebounder, "player_id", None),

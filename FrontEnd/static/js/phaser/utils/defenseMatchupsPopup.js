@@ -747,7 +747,7 @@ function addPopupStyles() {
         .submit-matchups-button {
           appearance: none;
           width: 100%;
-          height: 46px;
+          height: 42px;
           background: #34EC27;
           border: 1px solid rgba(52, 236, 39, 0.5);
           border-radius: 10px;

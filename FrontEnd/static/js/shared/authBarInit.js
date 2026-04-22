@@ -454,11 +454,82 @@
     return { display_color: displayColor };
   }
 
+  var BRAND_DEFAULT_PRIMARY = '#27408E';
+  var BRAND_DEFAULT_TOP = '#3551A5';
+  var BRAND_DEFAULT_MID = '#1E3068';
+  var BRAND_DEFAULT_DEEP = '#1C2D60';
+  var CORE_TEAM_PRIMARY_COLORS = {
+    'Bentley-Truman': '#4066B2',
+    'Lancaster': '#D24A1B',
+    'Four Corners': '#C0976A',
+    'Ocean City': '#2A2168',
+    'Morristown': '#EC1D28',
+    'Little York': '#65308E',
+    'Xavien': '#016837',
+    'South Lancaster': '#7C2B24'
+  };
+
+  function normalizeHexColor(value) {
+    var raw = String(value || '').trim();
+    if (!/^#?[0-9a-fA-F]{6}$/.test(raw)) return null;
+    return raw.charAt(0) === '#' ? raw.toUpperCase() : ('#' + raw.toUpperCase());
+  }
+
+  function blendHexColors(baseHex, targetHex, ratio) {
+    var base = normalizeHexColor(baseHex);
+    var target = normalizeHexColor(targetHex);
+    if (!base || !target) return null;
+    var clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
+    var baseInt = parseInt(base.slice(1), 16);
+    var targetInt = parseInt(target.slice(1), 16);
+    var r = Math.round(((baseInt >> 16) & 255) * (1 - clamped) + ((targetInt >> 16) & 255) * clamped);
+    var g = Math.round(((baseInt >> 8) & 255) * (1 - clamped) + ((targetInt >> 8) & 255) * clamped);
+    var b = Math.round((baseInt & 255) * (1 - clamped) + (targetInt & 255) * clamped);
+    return '#' + [r, g, b].map(function (part) {
+      return part.toString(16).padStart(2, '0');
+    }).join('').toUpperCase();
+  }
+
+  function resolveStoredFranchiseTeamPrimaryColor() {
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      var storedPrimary = normalizeHexColor(localStorage.getItem('franchise_user_team_primary_color'));
+      if (storedPrimary) return storedPrimary;
+      var storedTeam = localStorage.getItem('franchise_user_team');
+      return normalizeHexColor(CORE_TEAM_PRIMARY_COLORS[storedTeam || '']);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function applyGlobalDisplayColor(displayColor) {
+    var root = document.documentElement;
+    if (!root) return;
+    var context = getDisplayContext();
+    var teamPrimaryColor = normalizeHexColor(context && context.teamPrimaryColor) || resolveStoredFranchiseTeamPrimaryColor();
+    var useTeamColor = displayColor === 'team_colors' && teamPrimaryColor;
+    if (!useTeamColor) {
+      root.style.setProperty('--fcc-primary', BRAND_DEFAULT_PRIMARY);
+      root.style.setProperty('--fcc-primary-top', BRAND_DEFAULT_TOP);
+      root.style.setProperty('--fcc-primary-mid', BRAND_DEFAULT_MID);
+      root.style.setProperty('--fcc-primary-deep', BRAND_DEFAULT_DEEP);
+      return;
+    }
+    var top = blendHexColors(teamPrimaryColor, '#FFFFFF', 0.18) || BRAND_DEFAULT_TOP;
+    var mid = blendHexColors(teamPrimaryColor, '#000000', 0.14) || teamPrimaryColor;
+    var deep = blendHexColors(teamPrimaryColor, '#000000', 0.34) || BRAND_DEFAULT_DEEP;
+    root.style.setProperty('--fcc-primary', teamPrimaryColor);
+    root.style.setProperty('--fcc-primary-top', top);
+    root.style.setProperty('--fcc-primary-mid', mid);
+    root.style.setProperty('--fcc-primary-deep', deep);
+  }
+
   function setAuthMeData(meData) {
     if (!meData) return;
     meData.account_settings = normalizeAccountSettings(meData.account_settings);
     authMeDataCache = meData;
     window.__gobAuthMeData = meData;
+    applyGlobalDisplayColor(meData.account_settings.display_color);
     try {
       window.dispatchEvent(new CustomEvent('gob:auth-me-loaded', { detail: meData }));
     } catch (e) {}
@@ -486,7 +557,11 @@
         return window.__gobDisplayColorContext;
       }
     } catch (e) {}
-    return {};
+    return {
+      mode: 'franchise',
+      hasActiveFranchiseTeam: !!(typeof localStorage !== 'undefined' && (localStorage.getItem('franchise_user_team') || localStorage.getItem('franchise_user_team_id'))),
+      teamPrimaryColor: resolveStoredFranchiseTeamPrimaryColor()
+    };
   }
 
   function refreshAccountSettingsModal() {
@@ -855,6 +930,7 @@
   }
 
   function initAuthBar() {
+    applyGlobalDisplayColor(normalizeAccountSettings((getStoredAuthUser() || {}).account_settings).display_color);
     if (!shouldShowAuthBar()) return;
     ensureAuthBarStyles();
     injectAuthBar();

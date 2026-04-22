@@ -272,8 +272,9 @@ def test_missed_final_ft_away_offense_rebound_uses_court_absolute_coords(monkeyp
     def fake_determine_rebounder(
         g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **kwargs
     ):
-        assert offense_pg.coords == anim_pg
-        assert defense_c.coords == anim_c
+        # Mock bypasses shared.determine_rebounder; coords stay runtime-home after apply_coords.
+        assert offense_pg.coords == expected_runtime_pg
+        assert defense_c.coords == expected_runtime_c
         return defense_c, game.defense_team, "DREB"
 
     monkeypatch.setattr(

@@ -1,4 +1,11 @@
 /* Shared styles for standalone resource pages (standings, stats, schedule, team-traits, rankings) */
+:root {
+  --fcc-primary: #27408E;
+  --fcc-primary-top: #3551A5;
+  --fcc-primary-mid: #1E3068;
+  --fcc-primary-deep: #1C2D60;
+}
+
 .resource-page-container {
   max-width: 1200px;
   margin: 0 auto;

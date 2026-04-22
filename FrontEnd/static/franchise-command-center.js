@@ -318,6 +318,20 @@ function emitDisplayContextUpdate() {
   } catch (error) {}
 }
 
+function persistFranchiseDisplayColorContext(topData) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const teamName = String(topData?.team || '').trim();
+    const teamPrimaryColor = normalizeHexColor(topData?.primary_color);
+    if (teamName) localStorage.setItem('franchise_user_team', teamName);
+    if (teamPrimaryColor) {
+      localStorage.setItem('franchise_user_team_primary_color', teamPrimaryColor);
+    } else {
+      localStorage.removeItem('franchise_user_team_primary_color');
+    }
+  } catch (error) {}
+}
+
 function syncFccDisplayColorFromAccountSettings(meData) {
   const displayColor = meData?.account_settings?.display_color === 'team_colors' ? 'team_colors' : 'default';
   applyFccDisplayColor(displayColor, commandCenterTopDataCache?.primary_color);
@@ -2561,6 +2575,7 @@ async function init() {
   const restoredFromSession = restoreFccSessionCache();
   try {
   if (restoredFromSession && commandCenterTopDataCache) {
+    persistFranchiseDisplayColorContext(commandCenterTopDataCache);
     emitDisplayContextUpdate();
     if (commandCenterTopDataCache && commandCenterTopDataCache.team_id && !userTeamId) {
       userTeamId = commandCenterTopDataCache.team_id;
@@ -2607,6 +2622,7 @@ async function init() {
     invalidateHomeWeekSensitiveCaches();
   }
   commandCenterTopDataCache = topData;
+  persistFranchiseDisplayColorContext(topData);
   persistFccSessionCache();
   emitDisplayContextUpdate();
 
@@ -2757,6 +2773,7 @@ function clearFranchiseLocalStorage() {
     'franchise_week',
     'franchise_user_team',
     'franchise_user_team_id',
+    'franchise_user_team_primary_color',
   ];
   toRemove.forEach((k) => localStorage.removeItem(k));
   Object.keys(localStorage).forEach((k) => {

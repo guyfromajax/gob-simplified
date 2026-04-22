@@ -56,34 +56,67 @@
       <div class="lineup-left-panel">
         <section class="lineup-roster-section">
           <div class="lineup-roster-label">Roster — click or drag to assign</div>
+          <div class="rankings-toggle-wrap roster-panel-toggle-wrap">
+            <button type="button" id="roster-view-attributes" class="rankings-toggle active">Attributes</button>
+            <button type="button" id="roster-view-stats" class="rankings-toggle">Stats</button>
+          </div>
           <div id="roster-table-container" class="roster-table-region active">
             <div class="roster-table-scroll">
-              <table class="roster-table gob-data-grid">
-                <thead>
-                  <tr>
-                    <th class="player-header-cell"><span>Player Name</span><span>RT</span></th>
-                    <th>Pos</th>
-                    <th>HT</th>
-                    <th>WT</th>
-                    <th>SC</th>
-                    <th>SH</th>
-                    <th>ID</th>
-                    <th>OD</th>
-                    <th>PS</th>
-                    <th>BH</th>
-                    <th>RB</th>
-                    <th>ST</th>
-                    <th>AG</th>
-                    <th>ND</th>
-                    <th>IQ</th>
-                    <th>FT</th>
-                    <th>NG</th>
-                  </tr>
-                </thead>
-                <tbody id="roster-body"></tbody>
-              </table>
+              <div id="roster-attributes-pane" class="roster-roster-pane">
+                <table class="roster-table gob-data-grid">
+                  <thead>
+                    <tr>
+                      <th class="player-header-cell"><span>Player Name</span><span>RT</span></th>
+                      <th>Pos</th>
+                      <th>HT</th>
+                      <th>WT</th>
+                      <th>SC</th>
+                      <th>SH</th>
+                      <th>ID</th>
+                      <th>OD</th>
+                      <th>PS</th>
+                      <th>BH</th>
+                      <th>RB</th>
+                      <th>ST</th>
+                      <th>AG</th>
+                      <th>ND</th>
+                      <th>IQ</th>
+                      <th>FT</th>
+                      <th>NG</th>
+                    </tr>
+                  </thead>
+                  <tbody id="roster-body"></tbody>
+                </table>
+              </div>
+              <div id="roster-stats-pane" class="roster-roster-pane" hidden>
+                <table class="roster-stats-table gob-data-grid">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>PTS</th>
+                      <th>FGM/FGA</th>
+                      <th>3PTM/3PTA</th>
+                      <th>FTM/FTA</th>
+                      <th>DREB</th>
+                      <th>OREB</th>
+                      <th>TREB</th>
+                      <th>AST</th>
+                      <th>STL</th>
+                      <th>BLK</th>
+                      <th>F</th>
+                      <th>TO</th>
+                      <th>DEFA</th>
+                      <th>DEF%</th>
+                      <th>SCRA</th>
+                      <th>SCR%</th>
+                      <th>MIN</th>
+                    </tr>
+                  </thead>
+                  <tbody id="roster-body-stats"></tbody>
+                </table>
+              </div>
+              <p id="roster-pos-note" class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
             </div>
-            <p class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
             <div class="roster-panel-actions">
               <button id="gameplan-optional" class="lineup-btn lineup-btn-orange" type="button">Game Plan</button>
               <button id="playbooks-button" class="lineup-btn lineup-btn-ghost" type="button">Playbooks</button>

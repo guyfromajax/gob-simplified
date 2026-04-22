@@ -1,7 +1,7 @@
 body.set-lineup-page {
   min-height: 100vh;
   margin: 0;
-  background: linear-gradient(180deg, #263d7a 0%, #1e3068 54%, #141f4a 100%);
+  background: linear-gradient(180deg, var(--fcc-primary-top, #263d7a) 0%, var(--fcc-primary-mid, #1E3068) 54%, var(--fcc-primary-deep, #141f4a) 100%);
   color: #f7f9ff;
   font-family: 'Inter', sans-serif;
 }
@@ -547,6 +547,33 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   margin-bottom: 8px;
 }
 
+/* Match Rankings page (franchise-command-center) Top 25 / All Teams toggle */
+.roster-panel-toggle-wrap {
+  margin-bottom: 10px;
+}
+.roster-panel-toggle-wrap.rankings-toggle-wrap {
+  display: flex;
+  gap: 8px;
+}
+.roster-panel-toggle-wrap .rankings-toggle {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Bebas Neue', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.roster-panel-toggle-wrap .rankings-toggle.active {
+  background: #4065af;
+  color: #fff;
+}
+
+.roster-roster-pane {
+  min-width: 0;
+}
+
 .roster-table-region {
   display: flex;
   flex: 1 1 auto;
@@ -564,7 +591,8 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   background: rgba(255,255,255,0.02);
 }
 
-.roster-table {
+.roster-table,
+.roster-stats-table {
   width: 100%;
   min-width: 0;
   border-collapse: separate;
@@ -572,7 +600,12 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   table-layout: auto;
 }
 
-.roster-table thead th {
+.roster-stats-table {
+  min-width: 920px;
+}
+
+.roster-table thead th,
+.roster-stats-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -588,7 +621,8 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   white-space: nowrap;
 }
 
-.roster-table tbody td {
+.roster-table tbody td,
+.roster-stats-table tbody td {
   padding: 10px 10px;
   color: rgba(255,255,255,0.6);
   font-size: 12px;
@@ -600,16 +634,20 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   position: relative;
 }
 
-.roster-table tbody tr:nth-child(odd) td {
+.roster-table tbody tr:nth-child(odd) td,
+.roster-stats-table tbody tr:nth-child(odd) td {
   background: rgba(255,255,255,0.02);
 }
 
-.roster-table tbody tr:hover td {
+.roster-table tbody tr:hover td,
+.roster-stats-table tbody tr:hover td {
   background: rgba(255,255,255,0.045);
 }
 
 .roster-table th:first-child,
-.roster-table td:first-child {
+.roster-table td:first-child,
+.roster-stats-table th:first-child,
+.roster-stats-table td:first-child {
   text-align: left;
   padding-left: 16px;
 }
@@ -652,12 +690,14 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   font-weight: 700;
 }
 
-.roster-table tr.selected td {
+.roster-table tr.selected td,
+.roster-stats-table tr.selected td {
   background: rgba(255,255,255,0.03) !important;
   color: rgba(255,255,255,0.32);
 }
 
-.roster-table tr.selected td::after {
+.roster-table tr.selected td::after,
+.roster-stats-table tr.selected td::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -665,22 +705,29 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   pointer-events: none;
 }
 
-.roster-table tr.selected td:first-child {
+.roster-table tr.selected td:first-child,
+.roster-stats-table tr.selected td:first-child {
   box-shadow: inset 3px 0 0 rgba(247,148,32,0.8);
 }
 
-.roster-table tr.selected {
+.roster-table tr.selected,
+.roster-stats-table tr.selected {
   cursor: not-allowed;
 }
 
 .roster-table tr.selected td:first-child,
 .roster-table tr.selected td:first-child a,
 .roster-table tr.selected td.rt,
-.roster-table tr.selected .inline-rt {
+.roster-table tr.selected .inline-rt,
+.roster-stats-table tr.selected td:first-child,
+.roster-stats-table tr.selected td:first-child a,
+.roster-stats-table tr.selected td.rt,
+.roster-stats-table tr.selected .inline-rt {
   color: rgba(255,255,255,0.52);
 }
 
-.roster-table tr.ineligible td {
+.roster-table tr.ineligible td,
+.roster-stats-table tr.ineligible td {
   background: rgba(255,255,255,0.08) !important;
   color: rgba(255,255,255,0.36);
   cursor: not-allowed;
@@ -688,16 +735,21 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .roster-table td:first-child,
 .roster-table td:first-child a,
-.roster-table td.rt {
+.roster-table td.rt,
+.roster-stats-table td:first-child,
+.roster-stats-table td:first-child a,
+.roster-stats-table td.rt {
   color: #ffffff;
   font-weight: 600;
 }
 
-.roster-table td:first-child a {
+.roster-table td:first-child a,
+.roster-stats-table td:first-child a {
   text-decoration: none;
 }
 
-.roster-table td:first-child a:hover {
+.roster-table td:first-child a:hover,
+.roster-stats-table td:first-child a:hover {
   text-decoration: underline;
 }
 
@@ -715,6 +767,12 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   margin: 2px 0 0;
   color: rgba(255,255,255,0.42);
   font-size: 11px;
+}
+
+/* Sits directly under the roster table inside the scroll area (both Attributes and Stats) */
+.roster-table-scroll > .pos-note {
+  margin: 0;
+  padding: 6px 16px 10px;
 }
 
 .roster-panel-actions {
