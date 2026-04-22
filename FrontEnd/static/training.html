@@ -11,20 +11,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Team Training - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/training.css">
 </head>
-<body>
+<body class="training-page">
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
-  <div class="training-container">
+  <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
     <header class="training-header">
       <button id="back-btn" class="back-button">Back</button>
       <div class="header-center">
-        <h1 class="page-title">TEAM TRAINING</h1>
+        <h1 class="page-title">Team Training</h1>
         <div class="points-display">POINTS REMAINING: <span id="points-remaining">24</span></div>
       </div>
       <div class="header-actions">
@@ -42,7 +44,7 @@
       <div class="content-section player-drills-section">
         <h2 class="section-header">Player Drills</h2>
         <div class="section-container">
-          <div class="content-columns">
+          <div class="content-columns team-drills-columns">
           <!-- Column 1 -->
           <div class="content-column">
             <!-- Offense Drills Section -->
@@ -52,14 +54,12 @@
                 <span class="label-text">Inside Offense</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offense-inside" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
               </label>
               <label class="slider-label">
                 <span class="label-text">Outside Offense</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offense-outside" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
               </label>
             </div>
@@ -71,21 +71,18 @@
                 <span class="label-text">Passing</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-passing" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
               </label>
               <label class="slider-label">
                 <span class="label-text">Ball Handling</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-ball-handling" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
               <label class="slider-label">
                 <span class="label-text">Rebounding</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-rebounding" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
     </div>
@@ -100,14 +97,12 @@
                 <span class="label-text">Inside Defense</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defense-inside" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
               <label class="slider-label">
                 <span class="label-text">Outside Defense</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defense-outside" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
     </div>
@@ -119,14 +114,12 @@
                 <span class="label-text">Strength</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
               <label class="slider-label">
                 <span class="label-text">Agility</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
             </div>
@@ -139,17 +132,15 @@
       <div class="content-section team-drills-section">
         <h2 class="section-header">Team Drills</h2>
         <div class="section-container">
-          <div class="content-columns">
+          <div class="content-columns team-drills-columns">
           <!-- Column 1 -->
           <div class="content-column">
             <!-- Team Offense Section -->
             <div class="drill-group">
-              <h3 class="drill-title">Offense</h3>
+              <h3 class="drill-title">Offense Install</h3>
               <label class="slider-label">
-                <span class="label-text">Offense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-offense-install" data-category="team-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
     </div>
@@ -161,23 +152,14 @@
                 <span class="label-text">FB Offense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
-                  <span class="slider-value">0</span>
                 </div>
               </label>
               <label class="slider-label">
                 <span class="label-text">FB Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
-                  <span class="slider-value">0</span>
                 </div>
               </label>
-              <label class="slider-label">
-                <span class="label-text">Scrimmages</span>
-                <div class="slider-container">
-                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-scrimmages" data-category="team-drills">
-                  <span class="slider-value">0</span>
-                </div>
-      </label>
             </div>
           </div>
 
@@ -185,12 +167,10 @@
           <div class="content-column">
             <!-- Team Defense Section -->
             <div class="drill-group">
-              <h3 class="drill-title">Defense</h3>
+              <h3 class="drill-title">Defense Install</h3>
               <label class="slider-label">
-                <span class="label-text">Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-defense-install" data-category="team-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
     </div>
@@ -202,34 +182,38 @@
                 <span class="label-text">P/T Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
-                  <span class="slider-value">0</span>
                 </div>
               </label>
               <label class="slider-label">
                 <span class="label-text">P/T Offense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
-                  <span class="slider-value">0</span>
                 </div>
       </label>
             </div>
+
           </div>
+          </div>
+
+          <div class="drill-group scrimmages-group">
+            <label class="slider-label">
+              <span class="label-text">Scrimmages</span>
+              <div class="slider-container">
+                <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-scrimmages" data-category="team-drills">
+              </div>
+            </label>
           </div>
           
           <!-- Playbook Training Mode Selection -->
           <div class="playbook-mode-selection">
             <div class="radio-group">
               <label class="radio-label">
-                <input type="radio" name="playbook-training-mode" value="all-plays-even" checked>
-                <span>Standard</span>
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="playbook-training-mode" value="current-playbooks">
+                <input type="radio" name="playbook-training-mode" value="current-playbooks" checked>
                 <span>Current Playbooks</span>
               </label>
-              <label class="radio-label">
-                <input type="radio" name="playbook-training-mode" value="custom">
-                <span>Custom</span>
+              <label class="radio-label radio-label-disabled" data-tooltip="coming soon">
+                <input type="radio" name="playbook-training-mode" value="custom" disabled>
+                <span>Custom Playbook</span>
               </label>
             </div>
           </div>
@@ -246,28 +230,24 @@
           <span class="label-text">Conditioning</span>
           <div class="slider-container">
             <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-conditioning" data-category="general">
-            <span class="slider-value">0</span>
           </div>
         </label>
         <label class="slider-label">
           <span class="label-text">Free Throws</span>
           <div class="slider-container">
             <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-free-throws" data-category="general">
-            <span class="slider-value">0</span>
           </div>
         </label>
         <label class="slider-label">
           <span class="label-text">Film Study</span>
           <div class="slider-container">
             <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-film-study" data-category="general">
-            <span class="slider-value">0</span>
           </div>
         </label>
         <label class="slider-label">
           <span class="label-text">Breaks</span>
           <div class="slider-container">
             <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-breaks" data-category="general">
-            <span class="slider-value">0</span>
           </div>
       </label>
         </div>
@@ -276,7 +256,7 @@
 
     <!-- Coaching Style / Focus Section -->
     <div class="coaching-section">
-      <h2 class="coaching-title">Coaching Style / Focus (choose one)</h2>
+      <h2 class="coaching-title">Coaching Style / Focus</h2>
       <div class="archetypes-grid">
         <!-- Authoritarian -->
         <div class="archetype-block" data-archetype="authoritarian">
@@ -410,10 +390,17 @@
   </div>
 
   <!-- Auto-Train confirmation modal -->
-  <div id="auto-train-modal" class="auto-train-modal">
-    <div class="auto-train-modal-content">
-      <p id="auto-train-modal-message">Training Points Assigned</p>
-      <button id="auto-train-modal-close" class="auto-train-modal-close">Close</button>
+  <div id="auto-train-modal" class="gob-modal-overlay">
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box">
+      <div class="gob-modal-accent"></div>
+      <div class="gob-modal-body">
+        <div class="gob-modal-title" id="auto-train-modal-title">Training Lock In</div>
+        <div class="gob-modal-subtitle" id="auto-train-modal-focus">Focus: Attributes 4–6 (Player Maximizer)</div>
+      </div>
+      <div class="gob-modal-actions">
+        <button id="auto-train-modal-close" class="gob-modal-btn-dismiss">Close</button>
+      </div>
     </div>
   </div>
 

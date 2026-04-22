@@ -19,7 +19,7 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS, getMadeShotSweetSpotGrid } from './courtConstants.js';
 import { getPlayerDuration } from './turnAnimation.js';
 import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
@@ -783,10 +783,22 @@ export class ShotAnimationSystem {
     const shooterSprite = this.playerSprites[shotInfo.playerId];
     // BLOCK: animate ball to block spot instead of rim
     const isBlock = turnData.result_type === 'BLOCK';
-    const rimCoords = (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null)
-      ? gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, this.scene.game.config.width, this.scene.game.config.height)
-      : this.getRimCoordinates(turnData);
     const isMake = turnData.result_type === 'MAKE';
+    let flightTargetPixels;
+    if (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null) {
+      flightTargetPixels = gridToPixels(
+        turnData.ball_bounce_x,
+        turnData.ball_bounce_y,
+        this.scene.game.config.width,
+        this.scene.game.config.height
+      );
+    } else if (isMake) {
+      const isHomeTeam = shooterSprite?.team === 'home';
+      const g = getMadeShotSweetSpotGrid(isHomeTeam);
+      flightTargetPixels = gridToPixels(g.x, g.y, this.scene.game.config.width, this.scene.game.config.height);
+    } else {
+      flightTargetPixels = this.getRimCoordinates(turnData);
+    }
     
     // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
     // console.log('🎯 ShotAnimationSystem: Handling shot at step', {
@@ -810,7 +822,7 @@ export class ShotAnimationSystem {
     // console.log('🎯 ShotAnimationSystem: Shot started, new state:', this.ballController.getState());
     
     // Animate ball flight
-    await this.animateBallFlight(shooterSprite, rimCoords, turnData);
+    await this.animateBallFlight(shooterSprite, flightTargetPixels, turnData);
   }
 
   /**
@@ -1220,44 +1232,28 @@ export class ShotAnimationSystem {
     const isShootingFoul = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
     
     if (isShootingFoul) {
-      // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow from ballManager.js)
-      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+      // Route shooting-foul miss announcements through the central dispatcher so whistle SFX is universal.
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
 
       // Get foul player data from turnData (same pattern as AND-1)
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && this.scene) {
         const foulPlayerSprite = this.playerSprites?.[foulPlayerId];
         if (foulPlayerSprite) {
-          // Get team names
-          const homeTeamField = this.scene.simData?.home_team;
-          const awayTeamField = this.scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          const foulPlayerTeamId = foulPlayerSprite?.team_id;
-          const foulPlayerTeamName = foulPlayerTeamId === this.scene.homeTeamId ? homeTeamName : awayTeamName;
-
-          const foulPlayerData = {
-            playerId: foulPlayerId,
-            photo: foulPlayerSprite?.photo || null,
-            teamName: foulPlayerTeamName,
-            secondaryColor: getSecondaryColorForTeam(this.scene, foulPlayerTeamId)
-          };
-          
           // Trigger foul effect
           const { triggerFoulEffect } = await import('./negativeActionEffects.js');
           triggerFoulEffect(this.scene, foulPlayerId);
           
-          // Show announcement with player data (matches AND-1 pattern)
-          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+          announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
         } else {
           // Fallback if sprite not found (matches AND-1 pattern)
           const { triggerFoulEffect } = await import('./negativeActionEffects.js');
           triggerFoulEffect(this.scene, foulPlayerId);
-          showAnnouncement("Shooting Foul!", 'neutral', null);
+          announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
         }
       } else {
         // Fallback if foulPlayerId not found (matches AND-1 pattern)
-        showAnnouncement("Shooting Foul!", 'neutral', null);
+        announceGameEvent('FOUL_SHOOTING', turnData, this.scene, {});
       }
     }
     
@@ -1693,7 +1689,9 @@ export class ShotAnimationSystem {
     // ✅ DEBUG: Check what turns are coming next
     const currentTurnIndex = this.scene.currentTurn || 0;
     const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
-    const nextNextTurn = this.scene.simData?.turns?.[currentTurnIndex + 2];
+    const otbNegatesOrebFollowup =
+      Boolean(turnData?.suppress_oreb_putback_animation) ||
+      (nextTurn?.result_type === 'FOUL' && Boolean(nextTurn?.otb_foul));
     
     // ✅ REMOVED: Offensive rebound logging (cluttering console)
     
@@ -1738,10 +1736,28 @@ export class ShotAnimationSystem {
         decisionType,
         hasKickoutEvent,
         isPutbackAttempt,
+        otbNegatesOrebFollowup,
       },
     });
 
     const actionStartMs = Date.now();
+    if (otbNegatesOrebFollowup) {
+      this.enforceOrebUnitContract({
+        turnData,
+        unitId: 'oreb.phase.otb_negates_putback_kickout',
+        advanceTrigger: 'OTB foul follows; no putback or kickout',
+        visualSettleTrigger: 'rebound secure only',
+        authorizingEventReceived: true,
+        visualSettled: true,
+        unitStartMs: actionStartMs,
+        maxWaitGameSeconds: this.getOrebBudgetGameSeconds('action'),
+        context: {
+          fromBackendFlag: Boolean(turnData?.suppress_oreb_putback_animation),
+          nextTurnOtb: nextTurn?.result_type === 'FOUL' && Boolean(nextTurn?.otb_foul),
+        },
+      });
+      return;
+    }
     if (decisionType === 'kickout') {
       await this.executeKickoutPass(rebounderSprite, turnData);
       this.enforceOrebUnitContract({
@@ -2126,18 +2142,6 @@ export class ShotAnimationSystem {
     // Away team shoots at AWAY_RIM_COORDS (x: 9, y: 25)
     const isHomeTeam = shooterSprite?.team === 'home';
     let gridRimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
-    
-    // ✅ FIX: Adjust rim position for made shots (1 grid unit closer to shooter)
-    // This matches the adjustment in ballManager.js and fastBreak.js
-    // Home team (shoots at x=91): reduce by 1 → 90
-    // Away team (shoots at x=9): increase by 1 → 10
-    const isMake = turnData.result_type === 'MAKE' || turnData.result_type === 'PUTBACK_MAKE';
-    if (isMake) {
-      gridRimCoords = {
-        ...gridRimCoords,
-        x: isHomeTeam ? gridRimCoords.x - 1 : gridRimCoords.x + 1
-      };
-    }
     
     // Convert grid coordinates to pixel coordinates (like the old system does)
     const pixelRimCoords = gridToPixels(

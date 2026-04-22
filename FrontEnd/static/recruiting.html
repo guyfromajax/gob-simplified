@@ -9,46 +9,256 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
-  <link rel="stylesheet" href="/recruiting.css">
+  <style>
+    .recruiting-page-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .recruiting-page-header .brand-back-link {
+      justify-self: start;
+    }
+
+    .brand-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .brand-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .brand-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .recruiting-page-title {
+      margin: 0 !important;
+      text-align: center;
+    }
+
+    .recruiting-regions-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .recruiting-region-card {
+      min-width: 0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+        linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 14px 28px rgba(7, 10, 16, 0.28);
+      overflow: hidden;
+    }
+
+    .recruiting-region-title {
+      padding: 10px 12px 8px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.03em;
+      color: #f7f9ff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    }
+
+    .recruiting-region-body {
+      padding: 8px 10px 10px;
+    }
+
+    .recruiting-region-body .scroll-x {
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.34) rgba(255, 255, 255, 0.08);
+    }
+
+    .recruiting-region-body .scroll-x::-webkit-scrollbar {
+      height: 9px;
+    }
+
+    .recruiting-region-body .scroll-x::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+    }
+
+    .recruiting-region-body .scroll-x::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.34);
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .recruiting-region-table {
+      width: 100%;
+      margin: 0;
+      min-width: 0;
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .recruiting-region-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding: 12px 10px 10px;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    }
+
+    .recruiting-region-table tbody td {
+      padding: 9px 10px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: transparent;
+    }
+
+    .recruiting-region-table tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .recruiting-region-table tbody tr:hover td {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .recruiting-region-table th:nth-child(1),
+    .recruiting-region-table td:nth-child(1) {
+      width: 11%;
+    }
+
+    .recruiting-region-table th:nth-child(2),
+    .recruiting-region-table td:nth-child(2) {
+      width: 11%;
+      white-space: nowrap;
+    }
+
+    .recruiting-region-table th:nth-child(3),
+    .recruiting-region-table td:nth-child(3),
+    .recruiting-region-table th:nth-child(4),
+    .recruiting-region-table td:nth-child(4) {
+      width: 4.5%;
+    }
+
+    .recruiting-region-table th:nth-child(5),
+    .recruiting-region-table td:nth-child(5) {
+      width: 4%;
+    }
+
+    .recruiting-region-table th:nth-child(n+6):nth-child(-n+17),
+    .recruiting-region-table td:nth-child(n+6):nth-child(-n+17) {
+      width: 3.5%;
+    }
+
+    .recruiting-region-table th:nth-child(18),
+    .recruiting-region-table td:nth-child(18) {
+      width: 4%;
+    }
+
+    .recruiting-region-table th:nth-child(19),
+    .recruiting-region-table td:nth-child(19) {
+      width: 16%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recruiting-region-table thead th:first-child,
+    .recruiting-region-table tbody td:first-child,
+    .recruiting-region-table thead th:nth-child(2),
+    .recruiting-region-table tbody td:nth-child(2),
+    .recruiting-region-table thead th:last-child,
+    .recruiting-region-table tbody td:last-child {
+      text-align: left;
+    }
+
+    .recruiting-region-table thead th:first-child,
+    .recruiting-region-table tbody td:first-child {
+      padding-left: 16px;
+    }
+
+    .recruiting-region-table tbody td:first-child {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .recruiting-region-table thead th[data-sort-key] {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .recruiting-region-table thead th.sorted-asc::after {
+      content: ' ▲';
+    }
+
+    .recruiting-region-table thead th.sorted-desc::after {
+      content: ' ▼';
+    }
+
+    .recruiting-region-empty {
+      padding: 18px 10px;
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.68);
+    }
+
+    .recruiting-status-note {
+      margin: 0 0 12px;
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+  </style>
 </head>
 <body>
-  <div class="resource-page-container recruiting-page">
-    <div class="recruiting-header">
-      <a id="back-btn" class="recruiting-back-btn" href="#">Back To Locker Room</a>
+  <div class="resource-page-container fcc-brand-page-shell">
+    <div class="recruiting-page-header">
+      <a id="back-btn" class="brand-back-link" href="#">Back to Locker Room</a>
+      <h1 id="recruiting-page-title" class="recruiting-page-title">Recruiting</h1>
+      <div></div>
     </div>
-    <div class="recruiting-section">
-      <h1>Recruiting</h1>
-      <p class="recruiting-help">Recruits are sorted by top RT by default. Click any sortable header to reorder the table.</p>
-      <div class="scroll-x">
-        <table id="recruiting-table" class="roster-table recruiting-table">
-          <thead>
-            <tr>
-              <th data-sort-key="name">Name</th>
-              <th data-sort-key="homeRegion">Home Region</th>
-              <th data-sort-key="archetype">Archetype</th>
-              <th data-sort-key="height">HT</th>
-              <th data-sort-key="weight">WT</th>
-              <th data-sort-key="pos">POS</th>
-              <th data-sort-key="SC">SC</th>
-              <th data-sort-key="SH">SH</th>
-              <th data-sort-key="ID">ID</th>
-              <th data-sort-key="OD">OD</th>
-              <th data-sort-key="PS">PS</th>
-              <th data-sort-key="BH">BH</th>
-              <th data-sort-key="RB">RB</th>
-              <th data-sort-key="AG">AG</th>
-              <th data-sort-key="ST">ST</th>
-              <th data-sort-key="ND">ND</th>
-              <th data-sort-key="IQ">IQ</th>
-              <th data-sort-key="FT">FT</th>
-              <th data-sort-key="rt">RT</th>
-              <th id="recruiting-last-col" data-sort-key="lean">Current Lean</th>
-            </tr>
-          </thead>
-          <tbody id="recruiting-body"></tbody>
-        </table>
-      </div>
-    </div>
+    <p id="recruiting-status-note" class="recruiting-status-note"></p>
+    <div id="recruiting-regions" class="recruiting-regions-grid"></div>
   </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>

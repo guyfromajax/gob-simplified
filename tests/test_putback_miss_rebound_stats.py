@@ -50,11 +50,17 @@ class TestPutbackMissReboundStats:
         def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
             return rebounder_player, game.offense_team, "OREB"
 
-        # Force putback miss: low shot (1), high defense (6), time_elapsed (3); then calculate_bounce_spot (2,2,0)
-        randint_returns = [1, 6, 3, 2, 2, 0]
-        with patch("BackEnd.utils.shared.determine_rebounder", side_effect=fake_determine_rebounder):
-            with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
-                result = game.turn_manager.resolve_offensive_rebound_turn()
+        # Skip OTB randints; uncontested putback miss via randint(1,100) → 100; bounce uses 3 randints.
+        randint_returns = [1, 100, 2, 2, 0] + [5] * 40
+        with patch("BackEnd.utils.shared.resolve_over_the_back_foul", return_value=None):
+            with patch(
+                "BackEnd.utils.shared._resolve_oreb_putback_defender",
+                return_value=(None, False),
+            ):
+                with patch("BackEnd.utils.shared.determine_rebounder", side_effect=fake_determine_rebounder):
+                    with patch("BackEnd.utils.shared.random.random", return_value=0.05):
+                        with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
+                            result = game.turn_manager.resolve_offensive_rebound_turn()
 
         assert result is not None, "OREB turn should return a result"
         assert result.get("result_type") == "PUTBACK_MISS", f"Expected PUTBACK_MISS, got {result.get('result_type')}"
@@ -82,10 +88,16 @@ class TestPutbackMissReboundStats:
         def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
             return rebounder_player, game.defense_team, "DREB"
 
-        randint_returns = [1, 6, 3, 2, 2, 0]
-        with patch("BackEnd.utils.shared.determine_rebounder", side_effect=fake_determine_rebounder):
-            with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
-                result = game.turn_manager.resolve_offensive_rebound_turn()
+        randint_returns = [1, 100, 2, 2, 0] + [5] * 40
+        with patch("BackEnd.utils.shared.resolve_over_the_back_foul", return_value=None):
+            with patch(
+                "BackEnd.utils.shared._resolve_oreb_putback_defender",
+                return_value=(None, False),
+            ):
+                with patch("BackEnd.utils.shared.determine_rebounder", side_effect=fake_determine_rebounder):
+                    with patch("BackEnd.utils.shared.random.random", return_value=0.05):
+                        with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
+                            result = game.turn_manager.resolve_offensive_rebound_turn()
 
         assert result is not None
         assert result.get("result_type") == "PUTBACK_MISS"
@@ -109,11 +121,16 @@ class TestPutbackMissReboundStats:
             return rebounder_player, game.offense_team, "OREB"
 
         oreb_before = rebounder_player.stats["game"].get("OREB", 0)
-        randint_returns = [1, 6, 3, 2, 2, 0]
-        with patch("BackEnd.utils.shared.determine_rebounder", side_effect=fake_determine_rebounder):
-            with patch("BackEnd.utils.shared.random.random", return_value=0.1):  # 0.1 < 0.90 => putback branch
-                with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
-                    result = game.turn_manager.resolve_offensive_rebound_turn()
+        randint_returns = [1, 100, 2, 2, 0] + [5] * 40
+        with patch("BackEnd.utils.shared.resolve_over_the_back_foul", return_value=None):
+            with patch(
+                "BackEnd.utils.shared._resolve_oreb_putback_defender",
+                return_value=(None, False),
+            ):
+                with patch("BackEnd.utils.shared.determine_rebounder", side_effect=fake_determine_rebounder):
+                    with patch("BackEnd.utils.shared.random.random", return_value=0.1):  # 0.1 < 0.90 => putback branch
+                        with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
+                            result = game.turn_manager.resolve_offensive_rebound_turn()
         oreb_after = rebounder_player.stats["game"].get("OREB", 0)
         assert result is not None, "resolve_offensive_rebound_turn should return a result"
         assert result.get("result_type") == "PUTBACK_MISS", f"Expected PUTBACK_MISS, got {result.get('result_type')}"

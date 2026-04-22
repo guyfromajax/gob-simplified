@@ -317,6 +317,7 @@ class FranchiseManager:
         extra_state = {
             "players": {},  # FPD holds player data; empty here for legacy safety
             "recruits": [],  # FRD holds recruit data; empty here for legacy safety
+            "season_inbox": [],
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
             "applied_games": [],

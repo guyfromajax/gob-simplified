@@ -7,7 +7,19 @@ from BackEnd.utils.shared_defense import (
     get_defender_coords
 )
 from collections import defaultdict
-from BackEnd.constants import HCO_STRING_SPOTS, OFFSET_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY
+from BackEnd.constants import (
+    HCO_STRING_SPOTS,
+    OFFSET_SPOTS,
+    ACTIONS,
+    RIM_COORDS,
+    TOP_KEY_COORDS,
+    HOME_RIM_COORDS,
+    AWAY_RIM_COORDS,
+    HOME_TOP_KEY,
+    AWAY_TOP_KEY,
+    MADE_SHOT_SWEET_SPOT_HOME_RIM,
+    MADE_SHOT_SWEET_SPOT_AWAY_RIM,
+)
 import random
 import logging
 from BackEnd.constants.fast_break_constants import (
@@ -646,15 +658,13 @@ class Animator:
         for idx, outcome in enumerate(attempts or []):
             time += shot_ms
             
-            # Calculate ball landing position based on make/miss
-            from BackEnd.constants import MADE_SHOT_BALL_OFFSET
-            
+            # Made shots: unified sweet spot (same as field goals); misses hit rim first
             if outcome == "MAKE":
-                # Made shot: ball lands closer to shooter
-                ball_coords = {
-                    "x": rim["x"] - MADE_SHOT_BALL_OFFSET if offense_is_home else rim["x"] + MADE_SHOT_BALL_OFFSET,
-                    "y": rim["y"]
-                }
+                ball_coords = (
+                    dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+                    if rim["x"] == HOME_RIM_COORDS["x"]
+                    else dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
+                )
             else:
                 # Missed shot: ball goes to rim first
                 ball_coords = rim

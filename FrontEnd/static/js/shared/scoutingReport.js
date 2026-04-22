@@ -240,8 +240,8 @@ function ensureScoutingProjectedToggleWired() {
  * @param {Object} teamAttrs - Team attributes object
  * @param {Function} createTeamAttrItem - Function to create team attribute items (must be provided by caller)
  */
-function renderScoutingTeamReport(teamAttrs, createTeamAttrItem) {
-  const grid = document.getElementById('scouting-team-attributes-grid');
+function renderScoutingTeamReport(teamAttrs, createTeamAttrItem, gridId) {
+  const grid = document.getElementById(gridId || 'scouting-team-attributes-grid');
   if (!grid) return;
   
   if (typeof createTeamAttrItem !== 'function') {
@@ -277,8 +277,8 @@ function renderScoutingTeamReport(teamAttrs, createTeamAttrItem) {
  * @param {Array} plays - Array of play objects with name, times_run, successes, total_playcalls
  * @param {string} emptyMessage - Message to display when no plays are available (optional)
  */
-function renderPlayUsage(plays, emptyMessage = 'No previous game data available. Opponent has not played a game yet.') {
-  const tbody = document.getElementById('play-usage-body');
+function renderPlayUsage(plays, emptyMessage = 'No previous game data available. Opponent has not played a game yet.', tbodyId = 'play-usage-body') {
+  const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
   
   tbody.innerHTML = '';
@@ -346,4 +346,3 @@ function setupScoutingReport(loadScoutingReportCallback) {
 
   ensureScoutingProjectedToggleWired();
 }
-

@@ -819,23 +819,73 @@
       background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1)) !important;  /* Match Playcall gradient for seamless blend */
     }
 
-    /* Pre-game button container */
+    /* Quarter start functional modal */
     .pre-game-container {
       position: absolute;
-      top: 35%; /* Positioned higher on court for better centering */
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #fff;
-      border: 6px solid #c0c0c0;
-      border-radius: 12px;
-      padding: 40px 60px;
+      inset: 0;
+      z-index: 300;
       display: flex;
-      flex-direction: column;
-      gap: 20px;
       align-items: center;
       justify-content: center;
-      z-index: 100;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      padding: 20px;
+    }
+
+    .pre-game-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+    }
+
+    .pre-game-modal-box {
+      position: relative;
+      z-index: 1;
+      width: min(420px, calc(100vw - 40px));
+      background: rgba(22, 26, 36, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pre-game-modal-accent {
+      height: 3px;
+      width: 100%;
+      background: #F79420;
+      flex-shrink: 0;
+    }
+
+    .pre-game-modal-body {
+      padding: 24px 28px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pre-game-modal-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: #ffffff;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .pre-game-modal-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.55);
+      line-height: 1.5;
+    }
+
+    .pre-game-modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 24px 28px 28px;
+      flex-shrink: 0;
     }
 
     .pre-game-container.hidden {
@@ -975,48 +1025,60 @@
     .sim-full-game-button,
     .sim-to-fourth-button,
     .back-button {
-      background-color: #ff6200;
-      color: #fff;
-      border: none;
-      padding: 14px 40px;
-      border-radius: 8px;
+      appearance: none;
+      min-width: 0;
+      padding: 0 18px;
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 22px;
-      transition: background-color 0.2s, transform 0.1s;
-      min-width: 240px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      letter-spacing: 0.04em;
     }
 
-    .play-button:hover,
-    .back-button:hover {
-      background-color: #ff7a1a;
-      transform: translateY(-2px);
+    .play-button {
+      appearance: none;
+      width: 100%;
+      height: 46px;
+      padding: 0 18px;
+      border-radius: 10px;
+      font-size: 18px;
+      background: #F79420;
+      border: 1px solid rgba(247, 148, 32, 0.45);
+      color: #15181f;
+      transition: filter 0.14s ease, transform 0.14s ease;
+    }
+
+    .play-button:hover:not(:disabled) {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
     }
 
     .sim-full-game-button,
     .sim-to-fourth-button {
-      background-color: #007bff;
+      appearance: none;
+      width: 100%;
+      height: 46px;
+      padding: 0 18px;
+      border-radius: 10px;
+      font-size: 18px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.8);
+      transition: background 0.14s ease, border-color 0.14s ease;
     }
 
-    .sim-full-game-button:hover,
-    .sim-to-fourth-button:hover {
-      background-color: #0056b3;
-      transform: translateY(-2px);
+    .sim-full-game-button:hover:not(:disabled),
+    .sim-to-fourth-button:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.24);
+      color: #ffffff;
     }
 
     .play-button:disabled,
     .sim-full-game-button:disabled,
     .sim-to-fourth-button:disabled {
-      opacity: 0.5;
+      opacity: 0.45;
       cursor: not-allowed;
       transform: none;
-    }
-
-    .play-button:disabled:hover,
-    .sim-full-game-button:disabled:hover,
-    .sim-to-fourth-button:disabled:hover {
-      transform: none;
+      filter: none;
     }
 
     /* ==================== PLAY-BY-PLAY TEXT SCROLL (REACTIVATED FOR DEBUGGING) ==================== */
@@ -2250,11 +2312,8 @@
     /* ==================== LOCKER ROOM POPUP ==================== */
     .locker-room-popup {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -2262,39 +2321,83 @@
     }
 
     .locker-room-content {
-      background: #fff;
-      border: 6px solid #c0c0c0;
-      border-radius: 12px;
-      padding: 40px 60px;
+      width: min(420px, calc(100vw - 40px));
+      background: rgba(22, 26, 36, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 30px;
-      align-items: center;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-      text-align: center;
+    }
+
+    .locker-room-content::before {
+      content: '';
+      height: 3px;
+      width: 100%;
+      background: #F79420;
+      flex-shrink: 0;
+      display: block;
     }
 
     .locker-room-content h2 {
-      font-size: 32px;
-      font-weight: bold;
-      color: #333;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: #ffffff;
       margin: 0;
+      letter-spacing: 0.04em;
+      line-height: 1;
     }
 
-    .locker-room-button {
-      background: #ff9800;
-      color: #fff;
-      border: none;
-      padding: 15px 40px;
-      font-weight: bold;
-      font-size: 18px;
-      border-radius: 6px;
+    .locker-room-content p {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.55);
+      line-height: 1.5;
+      margin: 8px 0 0;
+    }
+
+    .locker-room-content h2,
+    .locker-room-content p,
+    .locker-room-content .locker-room-button {
+      position: relative;
+      z-index: 1;
+    }
+
+    .locker-room-content {
+      padding-bottom: 24px;
+    }
+
+    .locker-room-content h2,
+    .locker-room-content p {
+      padding-left: 28px;
+      padding-right: 28px;
+    }
+
+    .locker-room-content h2:first-of-type {
+      padding-top: 24px;
+    }
+
+    .locker-room-content .locker-room-button {
+      appearance: none;
+      margin: 20px 28px 0;
+      height: 42px;
+      background: #F79420;
+      border: 1px solid rgba(247, 148, 32, 0.45);
+      border-radius: 10px;
+      color: #15181f;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      letter-spacing: 0.04em;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: filter 0.14s ease, transform 0.14s ease;
     }
 
-    .locker-room-button:hover {
-      background: #f57c00;
+    .locker-room-content .locker-room-button:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
     }
   </style>
 </head>
@@ -2568,9 +2671,15 @@
   <!-- COURT CONTAINER (CENTER) - grid-area: court -->
   <div id="phaser-container" style="grid-area: court;">
       <div class="pre-game-container">
-        <button class="play-button">Play Quarter</button>
-        <button class="sim-full-game-button">Sim Full Game</button>
-        <button class="sim-to-fourth-button" style="display: none;" aria-hidden="true" tabindex="-1">Sim Quarter</button>
+        <div class="pre-game-backdrop"></div>
+        <div class="pre-game-modal-box">
+          <div class="pre-game-modal-accent"></div>
+          <div class="pre-game-modal-actions">
+            <button class="play-button">Play Quarter</button>
+            <button class="sim-full-game-button">Sim Full Game</button>
+            <button class="sim-to-fourth-button" style="display: none;" aria-hidden="true" tabindex="-1">Sim Quarter</button>
+          </div>
+        </div>
       </div>
       
       <!-- Sim Quarter Scrolling Text Popup -->

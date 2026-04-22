@@ -7,6 +7,43 @@ A unified system that handles rebound logic for all missed shot instances.
 
 **Note - we need to animate rebounders into position during shot attempt**
 
+## Free Throw Miss Rebounds
+
+When the **last** free throw is missed, rebound selection runs in `resolve_free_throw_logic` (`BackEnd/engine/phase_resolution.py`) after **`apply_coords_from_animations_list`** updates player `coords` from the FT lane / setup animation. Rebounding uses **`determine_rebounder`** in `BackEnd/utils/shared.py` with the same bounce spot as today (`calculate_bounce_spot` from the attacked basket).
+
+### X-distance eligibility (FT only)
+
+- **Constant:** `FREE_THROW_REBOUND_MAX_X_DELTA = 20` (x grid units) in `BackEnd/utils/shared.py`.
+- **Rule:** Before choosing the closest player to the bounce on each team, the pool is filtered to players with **|coords.x − bounce_x| ≤ 20**. Players farther than **20** x-spots from the bounce (using coords at FT attempt time) are **not** eligible to be that team’s rebound candidate.
+- **Y:** The gate uses **x only**; y is unchanged from existing closest-to-bounce logic.
+- **Fallback:** If no one on **either** team passes the filter, the engine logs a warning and runs **`determine_rebounder`** again on **full lineups** (no x gate) so a rebound is always assigned.
+- **Scope:** Only **missed last FT** passes `max_x_delta_from_bounce` into `determine_rebounder`. HCO, fast break, and OREB putback-miss rebounds do **not** use this gate unless called with the same keyword explicitly in the future.
+
+## OREB Putback Shot Defender
+
+OREB putbacks now use a proximity-qualified shot defender system instead of the old weighted-by-position shortcut.
+
+### Defender Qualification
+1. Only defenders within `10` Euclidean distance of the OREB shooter are initially eligible.
+2. Among those eligible defenders, first look for players whose `x` position is at least as close to the basket as the shooter:
+   - home offense attacking right basket: `defender_x >= shooter_x`
+   - away offense attacking left basket: `defender_x <= shooter_x`
+3. If exactly one qualifies, he is the shot defender.
+4. If more than one qualifies, choose the one closest to the shooter. Ties are broken randomly.
+5. If none qualify on the x-axis, take the closest initially eligible defender and run an IQ read:
+   - `x = random.randint(1, 100)`
+   - if `x <= defender.IQ`, move the defender to one x-grid closer to the basket than the shooter and within `-1` to `+1` y of the shooter, and he becomes the shot defender
+   - if `x > defender.IQ`, the putback is uncontested
+
+### Putback Resolution
+- Contested putback:
+  - use the same `inside` shot logic as a standard inside shot with no passer
+  - this includes standard make/miss thresholding, defensive foul checks, and and-1 / 2 FT outcomes
+- Uncontested putback:
+  - `y = random.randint(1, 100)`
+  - if `y < 100`, shot is good
+  - else the putback is missed and rebound resolution proceeds normally
+
 ## Rebound Stat Recording
 
 ### Standard Flow (HCO, Fast Break, Free Throw)
@@ -63,3 +100,22 @@ A unified system that handles rebound logic for all missed shot instances.
         rebound_team = OFFENSE
         rebounder = o_rebounder
 
+
+**Over The Back Fouls**
+On each rebound attempt we will calculate the possibility of over teh back fouls via the following logic
+
+-Identify one potential fouling player from each team. 
+    -use the rebounder from teh reboudnging team, and the player on the non-rebounding team who is cloest to the rebounder using Euclidian distance
+-If the closest player from the non-rebounding team is farther than 4 Euclidian distance from the rebounder, there is no Over The Back foul in play for either team
+-Offense Threahsold = 90 + offense team discipline value
+-Defense Threshold = 10 - defense team discipline value
+otb_foul = random.randint(1,100)
+-if otb_foul > Offense Threshold, o foul is in play, elif otb_foul < Defense Threshold, d foul in play, else no foul
+
+-if o foul or d foul in play
+    - second_roll = random.randint(1,100)
+    - if second_roll > potential fouling player's IQ from the in play foul team (offenssive potential fouler for o foul in play or defensive potential fouler for d foul in play), then foul_still_in_play = True, else foul_in_play = False
+    -if foul_still_in_play = True, final_roll = random.randint(1,2), 1 = foul, 2 = no foul
+
+-if there is an over the back foul called on the offense or the defense, it will end the turn there and negate any Putback attempt or kickout pass that would have been executed. We will process each like a standard non shooting d foul or non shooting o foul.
+-Announcement copy: "Over The Back!" with the fouling player's image through the announcement system

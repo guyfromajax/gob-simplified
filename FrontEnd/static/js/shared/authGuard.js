@@ -8,6 +8,31 @@
  * Public pages: homepage, login, signup (and root /)
  */
 (function () {
+  (function loadGlobalButtonFont() {
+    try {
+      var head = document.head || document.getElementsByTagName("head")[0];
+      if (!head) return;
+
+      if (!document.getElementById("gob-bebas-neue-font")) {
+        var fontLink = document.createElement("link");
+        fontLink.id = "gob-bebas-neue-font";
+        fontLink.rel = "stylesheet";
+        fontLink.href = "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap";
+        head.appendChild(fontLink);
+      }
+
+      if (!document.getElementById("gob-button-font-css")) {
+        var styleLink = document.createElement("link");
+        styleLink.id = "gob-button-font-css";
+        styleLink.rel = "stylesheet";
+        styleLink.href = "/css/button-font.css";
+        head.appendChild(styleLink);
+      }
+    } catch (e) {
+      // ignore
+    }
+  })();
+
   // Always load the maintenance banner script (even on public pages).
   // authGuard early-returns on public paths, but we still want the banner everywhere.
   (function loadMaintenanceBanner() {

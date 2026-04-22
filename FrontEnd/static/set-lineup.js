@@ -301,6 +301,16 @@ const lineup = {};
 /** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
 let rimRunnerPlayerId = null;
 const playerMap = {};
+let lineupPlaybooksModalInitialized = false;
+let lineupPlaybooksModalCache = null;
+
+const LINEUP_PLAYBOOK_SECTION_ORDER = [
+  { key: 'motion', label: 'Motion Plays' },
+  { key: 'set_plays', label: 'Set Plays' },
+  { key: 'man_defense', label: 'Man Defense' },
+  { key: 'zone_defense', label: 'Zone Defense' },
+  { key: 'fast_breaks', label: 'Fast Breaks' },
+];
 
 function getRT(player) {
   const ratings = Object.values(player.position_ratings || {});
@@ -313,6 +323,173 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.hidden = false;
   setTimeout(() => { toast.hidden = true; }, 2000);
+}
+
+function escapeLineupPlaybookHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getLineupPlaybookEffClass(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 67) return 'is-high';
+  if (numeric >= 34) return 'is-mid';
+  return 'is-low';
+}
+
+function getLineupPlaybookUrl() {
+  const params = new URLSearchParams();
+  const resolvedTeamId = userTeamIdParam
+    || (myTeamSide === 'home' ? (homeId || homeTeam) : null)
+    || (myTeamSide === 'away' ? (awayId || awayTeam) : null);
+  params.set('mode', modeParam || 'single');
+  if (resolvedTeamId) params.set('team_id', resolvedTeamId);
+  if (franchiseId) params.set('franchise_id', franchiseId);
+  if (tournamentId) params.set('tournament_id', tournamentId);
+  const currentGameId = new URLSearchParams(window.location.search).get('game_id');
+  if (currentGameId) params.set('game_id', currentGameId);
+  return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
+}
+
+async function fetchLineupPlaybooksData() {
+  const response = await fetch(getLineupPlaybookUrl(), { headers: API_CONFIG.getAuthHeaders() });
+  if (abortIfAccessDenied(response)) return null;
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json();
+}
+
+function renderLineupShotWeights(playbookData) {
+  const weightsContainer = document.getElementById('lineup-shot-weights');
+  if (!weightsContainer) return;
+  weightsContainer.innerHTML = '';
+  // TODO: confirm position_shot_weights available in set-lineup playbook fetch
+  if (playbookData?.position_shot_weights && typeof renderShotWeights === 'function') {
+    renderShotWeights(weightsContainer, playbookData.position_shot_weights, true);
+  }
+}
+
+function buildLineupPlaybookItems(data, key) {
+  const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
+  let items = [];
+  if (key === 'motion') {
+    items = (data?.motion || []).map((play) => ({
+      id: String(play?.play_id || ''),
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.motion?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || '',
+    }));
+  } else if (key === 'set_plays') {
+    items = (data?.set_plays || []).map((play) => ({
+      id: String(play?.play_id || ''),
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || '',
+    }));
+  } else if (key === 'man_defense') {
+    items = (data?.man_defense_rows || [])
+      .filter((row) => row?.is_active !== false)
+      .map((row) => ({
+        id: String(row?.id || ''),
+        name: row?.name || 'Unknown',
+        percentage: Number(percentages.man_defense?.[row?.id] || 0),
+        effectiveness: Number(row?.effectiveness || 0),
+        top_scorer: row?.top_scorer || '',
+      }));
+  } else if (key === 'zone_defense') {
+    items = (data?.zone_defense_rows || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.zone_defense?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || '',
+    }));
+  } else if (key === 'fast_breaks') {
+    items = (data?.fast_breaks || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || '',
+    }));
+  }
+
+  return items
+    .filter((item) => Number(item.percentage || 0) > 0)
+    .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
+}
+
+function renderLineupPlaybooksModal(data) {
+  const host = document.getElementById('playbooks-modal-sections');
+  if (!host) return;
+  host.innerHTML = '';
+  LINEUP_PLAYBOOK_SECTION_ORDER.forEach((section) => {
+    const items = buildLineupPlaybookItems(data, section.key);
+    const sectionEl = document.createElement('section');
+    sectionEl.className = 'lineup-playbooks-section';
+    sectionEl.innerHTML = `
+      <div class="lineup-playbooks-head">${escapeLineupPlaybookHtml(section.label)}</div>
+      <div class="lineup-playbooks-items">
+        ${items.length ? items.map((item) => `
+          <article class="lineup-playbook-card">
+            <div class="lineup-playbook-card-top">
+              <div class="lineup-playbook-card-name">${escapeLineupPlaybookHtml(item.name)}</div>
+              <div class="lineup-playbook-card-pct">${escapeLineupPlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
+            </div>
+            <div class="lineup-playbook-card-meta">
+              <div class="lineup-playbook-card-eff ${getLineupPlaybookEffClass(item.effectiveness)}">${escapeLineupPlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+              ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="lineup-playbook-card-top-scorer">${escapeLineupPlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
+            </div>
+          </article>
+        `).join('') : '<div class="lineup-playbooks-empty">No plays assigned.</div>'}
+      </div>
+    `;
+    host.appendChild(sectionEl);
+  });
+}
+
+function closeLineupPlaybooksModal() {
+  const modal = document.getElementById('playbooks-modal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.style.overflow = '';
+}
+
+async function openLineupPlaybooksModal() {
+  const modal = document.getElementById('playbooks-modal');
+  const host = document.getElementById('playbooks-modal-sections');
+  if (!modal || !host) return;
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+  host.innerHTML = '<div class="lineup-playbooks-empty">Loading playbook settings...</div>';
+  try {
+    lineupPlaybooksModalCache = await fetchLineupPlaybooksData();
+    if (!lineupPlaybooksModalCache) {
+      host.innerHTML = '<div class="lineup-playbooks-empty">Failed to load playbook settings.</div>';
+      return;
+    }
+    renderLineupPlaybooksModal(lineupPlaybooksModalCache);
+  } catch (error) {
+    console.error('[SET-LINEUP] Failed to load playbooks modal:', error);
+    host.innerHTML = '<div class="lineup-playbooks-empty">Failed to load playbook settings.</div>';
+  }
+}
+
+function initLineupPlaybooksModal() {
+  if (lineupPlaybooksModalInitialized) return;
+  lineupPlaybooksModalInitialized = true;
+  const closeBtn = document.getElementById('playbooks-modal-close');
+  const backdrop = document.getElementById('playbooks-modal-backdrop');
+  closeBtn?.addEventListener('click', closeLineupPlaybooksModal);
+  backdrop?.addEventListener('click', closeLineupPlaybooksModal);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeLineupPlaybooksModal();
+  });
 }
 
 async function loadRoster() {
@@ -546,165 +723,99 @@ async function loadRoster() {
   renderRoster();
 }
 
-// Store roster data for sorting
-let rosterDataForSorting = [];
-let currentSortColumn = 'RT';
-let currentSortDirection = 'desc'; // 'desc' or 'asc'
-
-function renderRoster() {
-  const tbody = document.getElementById('roster-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  
-  // Calculate RT for each player and store for sorting
-  rosterDataForSorting = roster.map(p => {
-    const posRatings = p.position_ratings || {};
-    const rtValues = Object.values(posRatings);
-    const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
-    return { ...p, highestRT };
-  });
-  
-  // Default sort by RT (descending)
-  if (currentSortColumn === 'RT' && currentSortDirection === 'desc') {
-    rosterDataForSorting.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
-  }
-  
-  // ✅ PERFORMANCE FIX: Use DocumentFragment to batch DOM updates (single reflow)
-  const fragment = document.createDocumentFragment();
-  
-  rosterDataForSorting.forEach(p => {
-    const tr = document.createElement('tr');
-    tr.draggable = !p.ineligible;  // Disable drag for ineligible players
-    tr.dataset.playerId = p._id;
-    if (p.ineligible || p.fouled_out) {
-      tr.classList.add('ineligible');  // Add class for styling
-      tr.style.backgroundColor = '#d3d3d3';  // Light grey background tint
-      tr.style.opacity = '0.7';  // Slight opacity reduction
-      tr.style.pointerEvents = 'none';  // Disable interactions
-      tr.style.cursor = 'not-allowed';  // Show not-allowed cursor
-    }
-    tr.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', p._id);
-    });
-
-    const posRatings = p.position_ratings || {};
-    let bestPos = '--';
-    let rt = '--';
-    const entries = Object.entries(posRatings);
-    if (entries.length) {
-      const [pos, rating] = entries.reduce((a, b) => b[1] > a[1] ? b : a);
-      bestPos = pos;
-      rt = rating;
-    }
-    // Use anchor attributes (don't show energy-scaled values)
-    const anchorAttrs = p.attributes || {};
-    
-    const displayPlayerName =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-    const cells = [
-      displayPlayerName,
-      bestPos,
-      formatHeight(p.height),
-      p.weight ?? '--',
-      Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_OD ?? anchorAttrs.OD ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_PS ?? anchorAttrs.PS ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_BH ?? anchorAttrs.BH ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_RB ?? anchorAttrs.RB ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_ST ?? anchorAttrs.ST ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_AG ?? anchorAttrs.AG ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10), 
-      Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      Math.round((anchorAttrs.NG ?? 1.0) * 100),  // NG as percentage
-      rt
-    ];
-    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
-    
-    const ng = anchorAttrs.NG ?? 1.0;
-    let energyBgColor;
-    if (ng > 0.89) energyBgColor = '#00aa00';      // Green
-    else if (ng >= 0.8) energyBgColor = '#cccc00'; // Yellow
-    else if (ng >= 0.7) energyBgColor = '#ff8800'; // Orange
-    else energyBgColor = '#cc0000';                // Red
-    
-    cells.forEach((val, idx) => {
-      const td = document.createElement('td');
-      
-      // Make player name a clickable link
-      if (idx === 0) {  // First cell is player name
-        const link = document.createElement('a');
-        applyPlayerDetailLinkBehavior(link, p._id);
-        link.textContent = val ?? '--';
-        link.style.color = ng <= 0.89 ? '#fff' : 'inherit';
-        link.style.textDecoration = 'none';
-        link.style.fontWeight = ng <= 0.89 ? 'bold' : 'normal';
-        link.addEventListener('mouseenter', () => {
-          link.style.textDecoration = 'underline';
-        });
-        link.addEventListener('mouseleave', () => {
-          link.style.textDecoration = 'none';
-        });
-        td.appendChild(link);
-        
-        // Apply energy-based background color to player name cell (except green)
-        if (ng <= 0.89) {
-          td.style.backgroundColor = energyBgColor;
-        }
-      } else {
-      td.textContent = val ?? '--';
-      }
-      
-      if (classes[idx]) td.classList.add(classes[idx]);
-      
-      // Apply energy-based background color to NG cell
-      if (classes[idx] === 'ng') {
-        td.style.backgroundColor = energyBgColor;
-        td.style.color = '#fff';  // White text on colored background
-        td.style.fontWeight = 'bold';
-        td.textContent = `${val}%`;  // Add % symbol
-      }
-      
-      tr.appendChild(td);
-    });
-    // ✅ PERFORMANCE FIX: Append to fragment instead of tbody (batched update)
-    fragment.appendChild(tr);
-  });
-  
-  // ✅ PERFORMANCE FIX: Single DOM update (triggers one reflow instead of N)
-  tbody.appendChild(fragment);
-  
-  // Add click handlers to sortable headers
-  const sortableHeaders = document.querySelectorAll('.roster-table thead th');
-  sortableHeaders.forEach((header, index) => {
-    // Remove existing listeners
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-    
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
-      const columnName = columnNames[index];
-      sortRoster(columnName);
-    });
-  });
-  
-  // Note: Tooltips for th headers are initialized in DOMContentLoaded
-  // We don't need to initialize tooltips for td elements (they contain values, not abbreviations)
+function getGameStatsForRoster(p) {
+  const raw = p.stats || {};
+  return raw.game || raw;
 }
 
-function sortRoster(columnName) {
-  // Toggle sort direction if clicking the same column
-  if (currentSortColumn === columnName) {
-    currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
-  } else {
-    currentSortColumn = columnName;
-    currentSortDirection = 'desc'; // Default to descending
+/** Match box-score.js player stats MIN formatting */
+function formatMinutesRosterStats(seconds) {
+  if (!seconds) return '0';
+  return Math.floor(seconds / 60).toString();
+}
+
+const ROSTER_STATS_COLUMN_NAMES = ['Name', 'PTS', 'FGM/FGA', '3PTM/3PTA', 'FTM/FTA', 'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'TO', 'DEFA', 'DEF%', 'SCRA', 'SCR%', 'MIN'];
+
+let rosterDataForSorting = [];
+/** Display header label or 'RT' for default highest-rating sort (no dedicated column). */
+let attrSortColumn = 'RT';
+let attrSortDirection = 'desc';
+
+let rosterStatsRows = [];
+let statsSortColumn = 'PTS';
+let statsSortDirection = 'desc';
+
+function buildRosterStatsRowSnapshot(p) {
+  const st = getGameStatsForRoster(p);
+  const fgm = Number(st.FGM) || 0;
+  const fga = Number(st.FGA) || 0;
+  const tpm = Number(st['3PTM']) || 0;
+  const tpa = Number(st['3PTA']) || 0;
+  const ftm = Number(st.FTM) || 0;
+  const fta = Number(st.FTA) || 0;
+  const dreb = Number(st.DREB) || 0;
+  const oreb = Number(st.OREB) || 0;
+  const treb = dreb + oreb;
+  const defa = Number(st.DEF_A) || 0;
+  const defs = Number(st.DEF_S) || 0;
+  const defPct = defa > 0 ? (defs / defa) * 100 : 0;
+  const scra = Number(st.SCR_A) || 0;
+  const scrs = Number(st.SCR_S) || 0;
+  const scrPct = scra > 0 ? (scrs / scra) * 100 : 0;
+  return {
+    player: p,
+    sort: {
+      Name: (p.name || '').trim(),
+      PTS: Number(st.PTS) || 0,
+      'FGM/FGA': { m: fgm, a: fga },
+      '3PTM/3PTA': { m: tpm, a: tpa },
+      'FTM/FTA': { m: ftm, a: fta },
+      DREB: dreb,
+      OREB: oreb,
+      TREB: treb,
+      AST: Number(st.AST) || 0,
+      STL: Number(st.STL) || 0,
+      BLK: Number(st.BLK) || 0,
+      F: Number(st.F) || 0,
+      TO: Number(st.TO) || 0,
+      DEFA: defa,
+      'DEF%': defPct,
+      SCRA: scra,
+      'SCR%': scrPct,
+      MIN: Number(st.MIN) || 0
+    }
+  };
+}
+
+function compareRosterStatsSnapshots(a, b) {
+  const col = statsSortColumn;
+  const desc = statsSortDirection === 'desc';
+  const av = a.sort[col];
+  const bv = b.sort[col];
+
+  if (col === 'Name') {
+    return desc ? bv.localeCompare(av) : av.localeCompare(bv);
   }
-  
+
+  if (av && typeof av === 'object' && av !== null && 'm' in av) {
+    if (desc) {
+      if (bv.m !== av.m) return bv.m - av.m;
+      return bv.a - av.a;
+    }
+    if (av.m !== bv.m) return av.m - bv.m;
+    return av.a - bv.a;
+  }
+
+  const an = Number(av) || 0;
+  const bn = Number(bv) || 0;
+  return desc ? bn - an : an - bn;
+}
+
+function applyRosterStatsSort() {
+  rosterStatsRows.sort(compareRosterStatsSnapshots);
+}
+
+function sortRosterDataInPlace(data, columnName, direction) {
   const columnMap = {
     'Player Name': 'name',
     'Pos': 'pos',
@@ -725,17 +836,19 @@ function sortRoster(columnName) {
     'NG': 'NG',
     'RT': 'RT'
   };
-  
+
   const dataKey = columnMap[columnName] || columnName;
-  
-  rosterDataForSorting.sort((a, b) => {
-    let val1, val2;
-    
+
+  data.sort((a, b) => {
+    let val1;
+    let val2;
+
     if (dataKey === 'name') {
       val1 = a.name || '';
       val2 = b.name || '';
-      return currentSortDirection === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    } else if (dataKey === 'RT') {
+      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
+    }
+    if (dataKey === 'RT') {
       val1 = a.highestRT ?? -Infinity;
       val2 = b.highestRT ?? -Infinity;
     } else if (dataKey === 'pos') {
@@ -744,29 +857,27 @@ function sortRoster(columnName) {
       const posRatingsB = b.position_ratings || {};
       const entriesA = Object.entries(posRatingsA);
       const entriesB = Object.entries(posRatingsB);
-      const bestA = entriesA.length ? entriesA.reduce((a, b) => b[1] > a[1] ? b : a)[0] : '';
-      const bestB = entriesB.length ? entriesB.reduce((a, b) => b[1] > a[1] ? b : a)[0] : '';
+      const bestA = entriesA.length ? entriesA.reduce((x, y) => y[1] > x[1] ? y : x)[0] : '';
+      const bestB = entriesB.length ? entriesB.reduce((x, y) => y[1] > x[1] ? y : x)[0] : '';
       val1 = posOrder.indexOf(bestA);
       val2 = posOrder.indexOf(bestB);
     } else if (dataKey === 'height') {
-      // Parse height (e.g., "6'8\"")
       const parseHeight = (h) => {
         if (!h || h === '--') return 0;
         const match = h.match(/(\d+)'(\d+)"/);
-        return match ? parseInt(match[1]) * 12 + parseInt(match[2]) : 0;
+        return match ? parseInt(match[1], 10) * 12 + parseInt(match[2], 10) : 0;
       };
       val1 = parseHeight(a.height);
       val2 = parseHeight(b.height);
     } else if (dataKey === 'weight') {
-      val1 = parseInt(a.weight) || 0;
-      val2 = parseInt(b.weight) || 0;
+      val1 = parseInt(a.weight, 10) || 0;
+      val2 = parseInt(b.weight, 10) || 0;
     } else if (dataKey === 'NG') {
       const attrsA = a.attributes || {};
       const attrsB = b.attributes || {};
       val1 = attrsA.NG ?? 1.0;
       val2 = attrsB.NG ?? 1.0;
     } else {
-      // Attribute columns (SC, SH, ID, etc.)
       const attrsA = a.attributes || {};
       const attrsB = b.attributes || {};
       const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
@@ -774,15 +885,301 @@ function sortRoster(columnName) {
       val1 = Math.floor(rawValA / 10);
       val2 = Math.floor(rawValB / 10);
     }
-    
-    if (currentSortDirection === 'desc') {
+
+    if (direction === 'desc') {
       return val2 - val1;
-    } else {
-      return val1 - val2;
     }
+    return val1 - val2;
   });
-  
+}
+
+function renderRosterAttributes() {
+  const tbody = document.getElementById('roster-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  rosterDataForSorting = roster.map(p => {
+    const posRatings = p.position_ratings || {};
+    const rtValues = Object.values(posRatings);
+    const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
+    return { ...p, highestRT };
+  });
+
+  sortRosterDataInPlace(rosterDataForSorting, attrSortColumn, attrSortDirection);
+
+  const fragment = document.createDocumentFragment();
+
+  function getEnergyClass(ngValue) {
+    const percent = Math.round((ngValue ?? 1.0) * 100);
+    if (percent >= 90) return 'high';
+    if (percent >= 80) return 'medium';
+    if (percent >= 70) return 'low';
+    return 'critical';
+  }
+
+  rosterDataForSorting.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.draggable = !p.ineligible;
+    tr.dataset.playerId = p._id;
+    if (p.ineligible || p.fouled_out) {
+      tr.classList.add('ineligible');
+      tr.style.backgroundColor = '#d3d3d3';
+      tr.style.opacity = '0.7';
+      tr.style.pointerEvents = 'none';
+      tr.style.cursor = 'not-allowed';
+    }
+    tr.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', p._id);
+    });
+
+    const posRatings = p.position_ratings || {};
+    let bestPos = '--';
+    let rt = '--';
+    const entries = Object.entries(posRatings);
+    if (entries.length) {
+      const [pos, rating] = entries.reduce((a, b) => (b[1] > a[1] ? b : a));
+      bestPos = pos;
+      rt = rating;
+    }
+    const anchorAttrs = p.attributes || {};
+
+    const displayPlayerName =
+      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
+    const ngValue = anchorAttrs.NG ?? 1.0;
+    const weightValue = p.weight != null && p.weight !== '' ? p.weight : '--';
+    const cells = [
+      displayPlayerName,
+      bestPos,
+      formatHeight(p.height),
+      weightValue,
+      Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_OD ?? anchorAttrs.OD ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_PS ?? anchorAttrs.PS ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_BH ?? anchorAttrs.BH ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_RB ?? anchorAttrs.RB ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_ST ?? anchorAttrs.ST ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_AG ?? anchorAttrs.AG ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
+      `${Math.round(ngValue * 100)}%`
+    ];
+    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', `ng ${getEnergyClass(ngValue)}`];
+
+    cells.forEach((val, idx) => {
+      const td = document.createElement('td');
+      if (idx === 0) {
+        td.className = 'player-name-cell';
+        const wrap = document.createElement('div');
+        wrap.className = 'player-name-wrap';
+        const nameText = document.createElement('span');
+        nameText.textContent = val ?? '--';
+        nameText.className = 'player-name-link';
+        const rtSpan = document.createElement('span');
+        rtSpan.className = 'inline-rt';
+        rtSpan.textContent = rt ?? '--';
+        wrap.appendChild(nameText);
+        wrap.appendChild(rtSpan);
+        td.appendChild(wrap);
+      } else {
+        td.textContent = val ?? '--';
+      }
+      if (classes[idx]) td.className = classes[idx];
+      tr.appendChild(td);
+    });
+
+    fragment.appendChild(tr);
+  });
+
+  tbody.appendChild(fragment);
+
+  const sortableHeaders = document.querySelectorAll('#roster-attributes-pane .roster-table thead th');
+  sortableHeaders.forEach((header, index) => {
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG'];
+      sortRoster(columnNames[index]);
+    });
+  });
+}
+
+function renderRosterStats() {
+  const tbody = document.getElementById('roster-body-stats');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  rosterStatsRows = roster.map(buildRosterStatsRowSnapshot);
+  applyRosterStatsSort();
+
+  const fragment = document.createDocumentFragment();
+
+  rosterStatsRows.forEach(snap => {
+    const p = snap.player;
+    const stats = getGameStatsForRoster(p);
+    const tr = document.createElement('tr');
+    tr.draggable = !p.ineligible;
+    tr.dataset.playerId = p._id;
+    if (p.ineligible || p.fouled_out) {
+      tr.classList.add('ineligible');
+      tr.style.backgroundColor = '#d3d3d3';
+      tr.style.opacity = '0.7';
+      tr.style.pointerEvents = 'none';
+      tr.style.cursor = 'not-allowed';
+    }
+    tr.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', p._id);
+    });
+
+    const treb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
+    const defa = Number(stats.DEF_A) || 0;
+    const defs = Number(stats.DEF_S) || 0;
+    const defPct = defa > 0 ? ((defs / defa) * 100).toFixed(0) : '0';
+    const scra = Number(stats.SCR_A) || 0;
+    const scrs = Number(stats.SCR_S) || 0;
+    const scrPct = scra > 0 ? ((scrs / scra) * 100).toFixed(0) : '0';
+    const minDisplay = formatMinutesRosterStats(Number(stats.MIN) || 0);
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'player-name-cell';
+    const wrap = document.createElement('div');
+    wrap.className = 'player-name-wrap';
+    const nameText = document.createElement('span');
+    nameText.className = 'player-name-link';
+    nameText.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : (p.name || '—');
+    wrap.appendChild(nameText);
+    nameTd.appendChild(wrap);
+    tr.appendChild(nameTd);
+
+    const cellVals = [
+      String(stats.PTS || 0),
+      `${stats.FGM || 0}/${stats.FGA || 0}`,
+      `${stats['3PTM'] || 0}/${stats['3PTA'] || 0}`,
+      `${stats.FTM || 0}/${stats.FTA || 0}`,
+      String(stats.DREB || 0),
+      String(stats.OREB || 0),
+      String(treb),
+      String(stats.AST || 0),
+      String(stats.STL || 0),
+      String(stats.BLK || 0),
+      String(stats.F || 0),
+      String(stats.TO || 0),
+      String(defa),
+      `${defPct}%`,
+      String(scra),
+      `${scrPct}%`,
+      minDisplay
+    ];
+
+    cellVals.forEach(text => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+
+    fragment.appendChild(tr);
+  });
+
+  tbody.appendChild(fragment);
+
+  const sortableHeaders = document.querySelectorAll('#roster-stats-pane .roster-stats-table thead th');
+  sortableHeaders.forEach((header, index) => {
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      sortRosterStats(ROSTER_STATS_COLUMN_NAMES[index]);
+    });
+  });
+}
+
+function applySelectionToRosterRows() {
+  const selectedIds = Object.values(lineup);
+  roster.forEach(p => {
+    document.querySelectorAll(`tr[data-player-id="${p._id}"]`).forEach(row => {
+      if (selectedIds.includes(p._id)) {
+        row.classList.add('selected');
+      } else {
+        row.classList.remove('selected');
+      }
+
+      if (!p.ineligible && !p.fouled_out) {
+        row.addEventListener('click', () => {
+          if (!selectedIds.includes(p._id)) {
+            const assigned = fillNextSlot(p._id);
+            if (assigned) {
+              playSound('click-soft.mp3');
+            }
+          }
+        });
+      } else if (p.ineligible || p.fouled_out) {
+        row.classList.add('ineligible');
+        row.style.backgroundColor = '#d3d3d3';
+        row.style.opacity = '0.7';
+        row.style.pointerEvents = 'none';
+        row.style.cursor = 'not-allowed';
+      }
+    });
+  });
+}
+
+function renderRoster() {
+  renderRosterAttributes();
+  renderRosterStats();
+  applySelectionToRosterRows();
+}
+
+function sortRoster(columnName) {
+  if (attrSortColumn === columnName) {
+    attrSortDirection = attrSortDirection === 'desc' ? 'asc' : 'desc';
+  } else {
+    attrSortColumn = columnName;
+    attrSortDirection = 'desc';
+  }
   renderRoster();
+}
+
+function sortRosterStats(columnName) {
+  if (statsSortColumn === columnName) {
+    statsSortDirection = statsSortDirection === 'desc' ? 'asc' : 'desc';
+  } else {
+    statsSortColumn = columnName;
+    statsSortDirection = 'desc';
+  }
+  renderRoster();
+}
+
+function initRosterPanelToggle() {
+  const btnAttr = document.getElementById('roster-view-attributes');
+  const btnStats = document.getElementById('roster-view-stats');
+  const paneAttr = document.getElementById('roster-attributes-pane');
+  const paneStats = document.getElementById('roster-stats-pane');
+  if (!btnAttr || !btnStats || !paneAttr || !paneStats) return;
+
+  function apply(view) {
+    const isAttr = view === 'attributes';
+    btnAttr.classList.toggle('active', isAttr);
+    btnStats.classList.toggle('active', !isAttr);
+    paneAttr.hidden = !isAttr;
+    paneStats.hidden = isAttr;
+  }
+
+  btnAttr.addEventListener('click', () => {
+    playSound('click-tiny.wav');
+    apply('attributes');
+  });
+  btnStats.addEventListener('click', () => {
+    playSound('click-tiny.wav');
+    apply('stats');
+  });
+  apply('attributes');
 }
 
 function updatePlayButton() {
@@ -922,13 +1319,6 @@ function updateSlotDisplay(slot) {
     const stats = rawStats.game || rawStats.season || rawStats || {};
     
     // Get all stats with fallbacks (same pattern as energy)
-    const points = stats.PTS || 0;
-    // REB (TREB) is the total rebounds - use it if available, otherwise calculate from OREB + DREB
-    const rebounds = stats.REB || ((stats.OREB || 0) + (stats.DREB || 0));
-    const assists = stats.AST || 0;
-    const defA = stats.DEF_A || 0;
-    const defS = stats.DEF_S || 0;
-    const defPct = defA > 0 ? Math.round((defS / defA) * 100) : 0;
     const fouls = stats.F || 0;
     
     // Get emotion (EM) - same pattern as energy: check attributes first, then fallback
@@ -938,7 +1328,7 @@ function updateSlotDisplay(slot) {
     else if (em >= 60) emoji = '😊';   // Big smile
     else if (em >= 40) emoji = '😐';   // Straight face
     else if (em >= 20) emoji = '😕';   // Slight frown
-    else emoji = '😞';                 // Sad face
+    else emoji = '😡';                 // Angry face
     
     // Get momentum (MO) - same pattern as energy: check attributes first, then fallback
     const momentum = player.attributes?.MO ?? player.MO ?? 0;
@@ -968,32 +1358,31 @@ function updateSlotDisplay(slot) {
     const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     const slotDisplayName =
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
-    const pidStr = String(playerId);
-    const rrChecked = rimRunnerPlayerId != null && String(rimRunnerPlayerId) === pidStr;
-    // Build slot content HTML (RR column after ENERGY, before remove button)
+    // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
         <img class="player-image" src="${imgBase}${playerId}.png" 
              onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
-      <div class="player-name">${slotDisplayName}</div>
-      <div class="player-rating">${rating}</div>
-      <div class="player-points">${points}</div>
-      <div class="player-rebounds">${rebounds}</div>
-      <div class="player-assists">${assists}</div>
-      <div class="player-def-pct">${defPct}%</div>
-      <div class="player-emotion">${emoji}</div>
-      <div class="player-momentum">
-        <div class="momentum-bar-container">
-          <div class="momentum-bar-left" style="width: ${leftWidth}"></div>
-          <div class="momentum-bar-center"></div>
-          <div class="momentum-bar-right" style="width: ${rightWidth}"></div>
+      <div class="slot-info">
+        <div class="slot-row-1">
+          <div class="player-name">${slotDisplayName}</div>
+          <div class="player-rating">RT: ${rating}</div>
         </div>
-      </div>
-      <div class="player-fouls">${fouls}</div>
-      <div class="player-energy ${energyClass}">${energyPercent}%</div>
-      <div class="player-rim-runner">
-        <input type="checkbox" class="rim-runner-checkbox" data-player-id="${pidStr}" aria-label="Rim Runner for ${player.name.replace(/"/g, '&quot;')}" ${rrChecked ? 'checked' : ''} />
+        <div class="slot-row-2">
+          <div class="slot-stat slot-stat-momentum">
+            <span class="slot-stat-label">MO</span>
+            <div class="player-momentum">
+              <div class="momentum-bar-container">
+                <div class="momentum-bar-left" style="width: ${leftWidth}"></div>
+                <div class="momentum-bar-center"></div>
+                <div class="momentum-bar-right" style="width: ${rightWidth}"></div>
+              </div>
+            </div>
+          </div>
+          <div class="slot-stat"><span class="slot-stat-label">F</span><span class="player-fouls${fouls >= 3 ? ' danger' : ''}">${fouls}</span></div>
+          <div class="slot-stat"><span class="slot-stat-label">ENG</span><span class="player-energy ${energyClass}">${energyPercent}%</span></div>
+        </div>
       </div>
     `;
     
@@ -1009,7 +1398,7 @@ function updateSlotDisplay(slot) {
     slot.setAttribute('draggable', 'true');
   } else {
     // Empty slot
-    slotContent.innerHTML = '';
+    slotContent.innerHTML = '<span class="slot-empty-copy">Drag a player here</span>';
     slotContent.classList.add('empty');
     
     if (remove) {
@@ -1063,22 +1452,6 @@ function setupSlots() {
   
   const slotsContainer = document.getElementById('slots');
   if (!slotsContainer) return;
-
-  // Rim Runner: single-select checkboxes (column after Energy, before remove)
-  slotsContainer.addEventListener('change', (e) => {
-    const t = e.target;
-    if (!t || !t.classList || !t.classList.contains('rim-runner-checkbox')) return;
-    const pid = t.getAttribute('data-player-id');
-    if (!pid) return;
-    if (t.checked) {
-      rimRunnerPlayerId = pid;
-      slotsContainer.querySelectorAll('.rim-runner-checkbox').forEach((cb) => {
-        if (cb !== t) cb.checked = false;
-      });
-    } else if (String(rimRunnerPlayerId) === String(pid)) {
-      rimRunnerPlayerId = null;
-    }
-  });
 
   // Delegated dragstart on container
   slotsContainer.addEventListener('dragstart', (e) => {
@@ -1179,19 +1552,21 @@ function resolveTeam() {
 }
 
 async function setHeader() {
-  const title = document.getElementById('team-title');
-  if (!title) {
-    console.warn('[setHeader] team-title element not found');
-    return;
-  }
-  
-  // Determine user team and opponent team
+  const banner = document.getElementById('team-banner');
+  const bannerFallback = document.getElementById('team-banner-fallback');
+  const scoreHomeTeamEl = document.getElementById('score-home-team');
+  const scoreAwayTeamEl = document.getElementById('score-away-team');
+  const scoreHomeValueEl = document.getElementById('score-home-value');
+  const scoreAwayValueEl = document.getElementById('score-away-value');
+  const quarterValueEl = document.getElementById('quarter-value');
+  const timeValueEl = document.getElementById('time-value');
+  const scoreboardEl = document.getElementById('context-scoreboard');
+  const playBtn = document.getElementById('play-now');
+  if (!quarterValueEl || !timeValueEl) return;
+
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
-  
-  console.log('[setHeader] Setting header:', { userTeamName, opponentTeamName, gameId });
-  
-  // Get scores: when resuming from timeout, prefer URL params (what user saw) then API
+
   let userTeamScore = 0;
   let opponentTeamScore = 0;
   let scoresFromUrl = false;
@@ -1229,76 +1604,61 @@ async function setHeader() {
     console.log('[setHeader] No gameId, using default scores (0)');
   }
   
-  // Update header format: "Set Your Lineup -- User Team Name: User Team Score -- Opponent Team Name: Opponent Team Score"
-  let headerText = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
-  
-  // ✅ COMPUTER TIMEOUT: Add bold red text if computer called timeout
-  const computerTimeout = urlParams.get('computer_timeout') === 'true';
-  const computerTeamName = urlParams.get('computer_team_name');
-  if (computerTimeout && computerTeamName) {
-    headerText += ` <span style="color: red; font-weight: bold; margin-left: 20px;">${computerTeamName} Called Timeout</span>`;
-  }
-  
-  // ✅ TIME REMAINING: Get clock from URL params and display to the right
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
   let clockTime = urlParams.get('clock');
-  
-  // ✅ QUARTER BREAK FIX: Detect quarter breaks reliably and always set correct clock
-  // Quarter break = NOT a timeout resume AND quarter > 1 (starting a new quarter)
   const currentQuarter = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
   const isQuarterBreak = !resumeFromTimeout && currentQuarter > 1;
-  
   if (isQuarterBreak) {
-    // During quarter breaks, always set clock to start of new quarter
-    // OT = 4:00, regular quarters = 8:00
     clockTime = currentQuarter > 4 ? '4:00' : '8:00';
-    console.log(`✅ QUARTER BREAK: Setting clock to ${clockTime} for Q${currentQuarter}`);
   } else if (!resumeFromTimeout && (!clockTime || clockTime === '0:00')) {
-    // Fallback: If not a timeout and clock is 0:00 or missing, show correct time for upcoming quarter
-    clockTime = currentQuarter > 4 ? '4:00' : '8:00'; // OT = 4:00, regular = 8:00
+    clockTime = currentQuarter > 4 ? '4:00' : '8:00';
   } else if (resumeFromTimeout && (!clockTime || clockTime === '')) {
-    // Step 3 fallback: when resuming from timeout and URL has no clock, use DB if we have gameData.
-    // Note: This may not fix wrong clock – DB was written at the same timeout save as the response,
-    // so it can be just as stale. If the header still shows wrong time, we may need to revisit.
     if (gameData && gameData.clock) {
       clockTime = gameData.clock;
-      console.log('[setHeader] Using clock from API (timeout resume, URL clock missing):', clockTime);
     }
   }
-  
-  // Format clock time (ensure MM:SS format)
+ 
+  let formattedClock = '--:--';
   if (clockTime) {
-    // Handle different clock formats (e.g., "8:00", "480" seconds, etc.)
-    let formattedClock = clockTime;
     if (!clockTime.includes(':')) {
-      // If it's just a number (seconds), convert to MM:SS
       const totalSeconds = parseInt(clockTime, 10);
       if (!isNaN(totalSeconds)) {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         formattedClock = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       }
+    } else {
+      formattedClock = clockTime;
     }
-    
-    // Add time remaining to the right of header content
-    headerText += ` <span style="margin-left: 20px; font-weight: bold;">Time: ${formattedClock}</span>`;
-    
-    // Add quarter display to the right of time remaining
-    // During quarter breaks, show the upcoming quarter (which is currentQuarter)
-    // During regular play, show the current quarter
-    const displayQuarter = currentQuarter;
-    headerText += ` <span style="margin-left: 10px; font-weight: bold;">Q${displayQuarter}</span>`;
   }
-  
-  title.innerHTML = headerText; // Use innerHTML to support the span element
-  console.log('[setHeader] Header updated to:', headerText);
-  
-  const logo = document.getElementById('team-logo');
-  if (logo) {
-    logo.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'logo_square') : '/images/teams/general/general_logo_square.png';
-    logo.alt = `${teamName} logo`;
-    logo.hidden = false;
-    logo.onerror = () => { logo.hidden = true; };
+
+  const bannerSrc = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(teamName, 'banner_primary')
+    : '/images/teams/general/general_banner_primary.jpg';
+  if (banner && bannerFallback) {
+    banner.src = bannerSrc;
+    banner.alt = `${teamName} banner`;
+    banner.hidden = false;
+    bannerFallback.hidden = true;
+    banner.onerror = () => {
+      banner.hidden = true;
+      bannerFallback.hidden = false;
+    };
+  }
+
+  const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
+  scoreboardEl?.classList.toggle('is-pregame', isPregame);
+  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamName || 'Home') : (userTeamName || 'Home')).toUpperCase();
+  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamName || 'Away') : (opponentTeamName || 'Away')).toUpperCase();
+  if (scoreHomeTeamEl) scoreHomeTeamEl.textContent = displayUserTeamName;
+  if (scoreAwayTeamEl) scoreAwayTeamEl.textContent = displayOpponentTeamName;
+  if (scoreHomeValueEl) scoreHomeValueEl.textContent = `${userTeamScore}`;
+  if (scoreAwayValueEl) scoreAwayValueEl.textContent = `${opponentTeamScore}`;
+  quarterValueEl.textContent = isPregame ? 'Pre-Game' : `Q${currentQuarter}`;
+  timeValueEl.textContent = isPregame ? '--:--' : formattedClock;
+
+  if (playBtn) {
+    playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
   }
 }
 
@@ -1360,7 +1720,7 @@ function removeIneligiblePlayersFromLineup() {
           slotContent.classList.add('empty');
           slot.classList.remove('filled');
           slot.draggable = false;
-          const removeBtn = slot.querySelector('.remove-btn');
+          const removeBtn = slot.querySelector('.remove');
           if (removeBtn) removeBtn.hidden = true;
         }
         console.log(`✅ [FOUL-OUT] Cleared ${pos} slot display`);
@@ -1450,77 +1810,10 @@ function wireLineupNavButtons() {
   }
   const playbooksBtn = document.getElementById('playbooks-button');
   if (playbooksBtn) {
+    initLineupPlaybooksModal();
     playbooksBtn.addEventListener('click', async () => {
       playSound('positive-beep.wav');
-      console.log('📚 PLAYBOOKS BUTTON CLICKED! Redirecting to playbook-report.html');
-      const currentUrlParams = new URLSearchParams(window.location.search);
-      let currentGameId = currentUrlParams.get('game_id');
-      const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
-        initGameInProgress = true;
-        try {
-          const mode = modeParam || 'single';
-          const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
-          if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
-          else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
-          const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
-            method: 'POST',
-            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(initPayload)
-          });
-          if (abortIfAccessDenied(initRes)) {
-            initGameInProgress = false;
-            return;
-          }
-          if (initRes.ok) {
-            const initData = await initRes.json();
-            currentGameId = initData.game_id;
-            currentUrlParams.set('game_id', currentGameId);
-            if (typeof history !== 'undefined' && history.replaceState) {
-              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
-            }
-          } else {
-            alert('Failed to initialize game. Please try again.');
-            initGameInProgress = false;
-            return;
-          }
-        } catch (err) {
-          console.error('❌ [SET-LINEUP] Error initializing game for Playbooks navigation:', err);
-          alert('Failed to initialize game. Please try again.');
-          initGameInProgress = false;
-          return;
-        }
-        initGameInProgress = false;
-      } else if (initGameInProgress) {
-        let waitCount = 0;
-        while (initGameInProgress && waitCount < 50) {
-          await new Promise(r => setTimeout(r, 100));
-          waitCount++;
-          currentGameId = new URLSearchParams(window.location.search).get('game_id');
-          if (currentGameId) break;
-        }
-        if (!currentGameId) {
-          alert('Game initialization is taking longer than expected. Please try again.');
-          return;
-        }
-      }
-      const helper = window.TimeoutNavigationHelper;
-      if (!helper) {
-        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
-        return;
-      }
-      const params = helper.buildGameNavigationParams({
-        sourceParams: currentUrlParams,
-        targetQuarter: quarter,
-        gameId: currentGameId,
-        resumeFromTimeout: resumeFromTimeout,
-        lineup: lineup,
-        myTeamSide: myTeamSide
-      });
-      params.set('from', 'lineup');
-      params.set('return_url', getCurrentRelativeUrl());
-      if (DEBUG) params.set('debug', '1');
-      window.location.href = `/playbook-report.html?${params.toString()}`;
+      await openLineupPlaybooksModal();
     });
   }
   const boxBtn = document.getElementById('box-score-button');
@@ -1573,8 +1866,9 @@ async function init() {
     return;
   }
 
-  await setHeader();
   await loadRoster();
+  initRosterPanelToggle();
+  await setHeader();
   setupSlots(); // Setup slot event handlers (this clears slots/lineup)
   
   // Restore lineup from URL AFTER setupSlots (which clears the lineup)
@@ -1617,6 +1911,12 @@ async function init() {
   
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
+  try {
+    lineupPlaybooksModalCache = await fetchLineupPlaybooksData();
+    renderLineupShotWeights(lineupPlaybooksModalCache);
+  } catch (error) {
+    console.error('[SET-LINEUP] Failed to load shot weights:', error);
+  }
   
   // Wire up autoset button
   const autosetBtn = document.getElementById('autoset-lineup');
@@ -2253,9 +2553,10 @@ function createCardBack(player) {
     value.textContent = displayVal;
     
     // Set gold bar fill percentage (0-10 scale, max at 100%)
-    if (displayVal !== '--') {
+    if (displayVal !== '--' && typeof getAttrColor === 'function') {
       const fillPercentage = Math.min(displayVal * 10, 100);
       pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
+      pill.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil(Number(rawVal) / 10)));
     }
     
     pill.appendChild(value);
@@ -2348,62 +2649,36 @@ function assignToSlot(pos, playerId) {
   return true;
 }
 
+function getHighestOpenSlotPosition() {
+  const renderedSlots = Array.from(document.querySelectorAll('#slots .slot[data-pos]'));
+  for (const slot of renderedSlots) {
+    const pos = slot.dataset.pos;
+    if (pos && !lineup[pos]) {
+      return pos;
+    }
+  }
+
+  const fallbackPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  return fallbackPositions.find(pos => !lineup[pos]) || null;
+}
+
 function fillNextSlot(playerId) {
   const player = playerMap[playerId];
   
   // Check if player is ineligible (fouled out)
   if (player && (player.ineligible || player.fouled_out)) {
     showToast(`${player.name} has fouled out and cannot play`);
-    return;
+    return false;
   }
-  
-  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-  
-  for (const pos of positions) {
-    if (!lineup[pos]) {
-      const success = assignToSlot(pos, playerId);
-      if (success) return;
-    }
-  }
-  
-  showToast('All positions filled');
-}
 
-// Update renderRoster to mark selected rows
-const originalRenderRoster = renderRoster;
-renderRoster = function() {
-  originalRenderRoster();
-  
-  // Mark selected rows
-  const selectedIds = Object.values(lineup);
-  roster.forEach(p => {
-    const row = document.querySelector(`tr[data-player-id="${p._id}"]`);
-    if (row) {
-      if (selectedIds.includes(p._id)) {
-        row.classList.add('selected');
-      } else {
-        row.classList.remove('selected');
-      }
-      
-      // Add click handler to fill next slot (only if not ineligible)
-      if (!p.ineligible && !p.fouled_out) {
-        row.addEventListener('click', (e) => {
-          if (!selectedIds.includes(p._id)) {
-            playSound('click-soft.mp3');
-            fillNextSlot(p._id);
-          }
-        });
-      } else if (p.ineligible || p.fouled_out) {
-        // Mark ineligible rows with grey tint
-        row.classList.add('ineligible');
-        row.style.backgroundColor = '#d3d3d3';  // Light grey background tint
-        row.style.opacity = '0.7';
-        row.style.pointerEvents = 'none';
-        row.style.cursor = 'not-allowed';
-      }
-    }
-  });
-};
+  const openPos = getHighestOpenSlotPosition();
+  if (openPos) {
+    return assignToSlot(openPos, playerId);
+  }
+
+  showToast('All positions filled');
+  return false;
+}
 
 // Make slots draggable for swapping
 function setupSlotDragAndDrop() {
@@ -2543,13 +2818,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const redirected = await redirectIfFranchiseGameplayAlreadyCommitted();
   if (redirected) return;
   init();
-  initViewToggle();
   
   // Initialize tooltips for table headers (th elements only)
   // Use a small delay to ensure thead is fully rendered
   setTimeout(() => {
     if (typeof initAttributeTooltips !== 'undefined') {
-      const thead = document.querySelector('.roster-table thead');
+      const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
       if (thead) {
         initAttributeTooltips(thead, ['th']);
         

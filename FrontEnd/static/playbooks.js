@@ -23,65 +23,6 @@
     } catch (error) {}
   }
 
-  function showSuccessPopup(message) {
-    const overlay = document.createElement("div");
-    overlay.className = "gameplan-success-overlay";
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-    `;
-
-    const modal = document.createElement("div");
-    modal.className = "gameplan-success-modal";
-    modal.style.cssText = `
-      background: #1a1a1a;
-      border: 2px solid #00ff00;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 400px;
-      width: 90%;
-      color: #fff;
-      text-align: center;
-    `;
-
-    const messageEl = document.createElement("p");
-    messageEl.textContent = message;
-    messageEl.style.cssText = `
-      font-size: 1.125rem;
-      margin-bottom: 20px;
-      font-weight: 600;
-      color: #00ff00;
-    `;
-
-    const okBtn = document.createElement("button");
-    okBtn.textContent = "OK";
-    okBtn.style.cssText = `
-      padding: 10px 30px;
-      background: #00ff00;
-      color: #000;
-      border: none;
-      border-radius: 4px;
-      font-weight: 600;
-      cursor: pointer;
-    `;
-    okBtn.addEventListener("click", () => {
-      overlay.remove();
-    });
-
-    modal.appendChild(messageEl);
-    modal.appendChild(okBtn);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-  }
-
   function focusCode(value) {
     if (value === "attack") return "A";
     if (value === "inside") return "I";
@@ -141,6 +82,14 @@
     return value || "balanced";
   }
 
+  function displayMotionFocusLabel(value) {
+    const normalized = displayMotionFocus(value);
+    if (normalized === "inside") return "Inside";
+    if (normalized === "attack") return "Attack";
+    if (normalized === "outside") return "Outside";
+    return "Balanced";
+  }
+
   function buildPlayDetailsUrl(context, play) {
     const params = new URLSearchParams();
     params.set("mode", context.mode);
@@ -183,6 +132,61 @@
     });
 
     return `/playbook-report.html?${params.toString()}`;
+  }
+
+  // TODO: remove after confirming common.js version is live
+  function renderShotWeights(container, shotWeights, compact = false) {
+    if (!container) return;
+    container.setAttribute('data-compact', compact ? 'true' : 'false');
+    if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
+      container.innerHTML = '<p class="psw-unavailable">Shot weight data unavailable.</p>';
+      return;
+    }
+
+    const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+    // TODO: remove after confirming common.js version is live
+    function getPswColor(pct) {
+      if (pct > 35) return '#4A90D9';
+      if (pct >= 21) return '#34EC27';
+      if (pct >= 11) return '#FFD700';
+      return '#ff6d6d';
+    }
+
+    function renderGroup(label, data) {
+      if (!data) return '';
+      const values = POSITIONS.map((pos) => ({ pos, pct: data[pos] ?? 0 }));
+      const maxPct = Math.max(...values.map((value) => value.pct));
+
+      const pills = values.map(({ pos, pct }) => {
+        const color = getPswColor(pct);
+        const isDominant = pct === maxPct;
+        const pillStyle = `border: 1px solid rgba(255,255,255,0.08);`;
+        const valStyle = `color: ${color};`;
+        const accentStyle = isDominant
+          ? `background: ${color}; opacity: 1;`
+          : `opacity: 0;`;
+        return `
+          <div class="psw-pill" style="${pillStyle}">
+            <div class="psw-pill-pos">${pos}</div>
+            <div class="psw-pill-val" style="${valStyle}">${pct}%</div>
+            <div class="psw-pill-accent" style="${accentStyle}"></div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="psw-group">
+          <div class="psw-group-label">${label}</div>
+          <div class="psw-strip">${pills}</div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      ${renderGroup('PLAYBOOKS', shotWeights.playbooks)}
+      ${renderGroup('PLAYCALL CENTER', shotWeights.playcall_center)}
+    `;
   }
 
   class ConfirmModal {
@@ -231,6 +235,37 @@
     }
   }
 
+  class SaveConfirmModal {
+    constructor() {
+      this.root = document.getElementById('save-confirm-modal');
+      this.doneBtn = document.getElementById('save-confirm-done-btn');
+      this.weightsRoot = document.getElementById('save-confirm-weights');
+    }
+
+    open(shotWeights) {
+      if (this.weightsRoot) {
+        renderShotWeights(this.weightsRoot, shotWeights);
+      }
+      this.root.classList.remove('hidden');
+      this.root.setAttribute('aria-hidden', 'false');
+
+      return new Promise((resolve) => {
+        const onDone = () => {
+          this.close();
+          this.doneBtn.removeEventListener('click', onDone);
+          resolve();
+        };
+
+        this.doneBtn.addEventListener('click', onDone, { once: true });
+      });
+    }
+
+    close() {
+      this.root.classList.add('hidden');
+      this.root.setAttribute('aria-hidden', 'true');
+    }
+  }
+
   class PlaybooksPage {
     constructor() {
       this.params = new URLSearchParams(window.location.search);
@@ -252,6 +287,7 @@
         manDefense: [],
         zoneDefense: [],
         pcOrder: { offense: [], defense: [] },
+        pcErrors: { offense: "", defense: "" },
         playbookMeta: { user_saved: false, schema_version: 2 },
         positionFilters: {},
         evenDistributionAll: false,
@@ -259,8 +295,10 @@
       };
 
       this.toastTimer = null;
+      this.toastHideTimer = null;
       this.dragContext = null;
       this.modal = new ConfirmModal();
+      this.saveConfirmModal = new SaveConfirmModal();
       this.draftStorageKey = this.buildDraftStorageKey();
       this.draftRestoreFlagKey = this.buildDraftRestoreFlagKey();
 
@@ -268,6 +306,12 @@
         saveBtn: document.getElementById("save-btn"),
         backBtn: document.getElementById("back-btn"),
         evenAllBtn: document.getElementById("even-all-btn"),
+        sectionsReadyIndicator: document.getElementById("sections-ready-indicator"),
+        motionEvenBtn: document.getElementById("motion-even-btn"),
+        setPlaysEvenBtn: document.getElementById("set-plays-even-btn"),
+        manDefenseEvenBtn: document.getElementById("man-defense-even-btn"),
+        zoneDefenseEvenBtn: document.getElementById("zone-defense-even-btn"),
+        fastBreaksEvenBtn: document.getElementById("fast-breaks-even-btn"),
         toast: document.getElementById("toast"),
         motionRows: document.getElementById("motion-rows"),
         setPlaysRows: document.getElementById("set-plays-rows"),
@@ -281,6 +325,8 @@
         zoneDefenseTotal: document.getElementById("zone-defense-total"),
         pcOffense: document.getElementById("pc-order-offense"),
         pcDefense: document.getElementById("pc-order-defense"),
+        pcErrorOffense: document.getElementById("pc-error-offense"),
+        pcErrorDefense: document.getElementById("pc-error-defense"),
         gameplayLockout: document.getElementById("gameplay-lockout"),
       };
     }
@@ -402,12 +448,21 @@
       });
       if (this.elements.saveBtn) this.elements.saveBtn.hidden = true;
       if (this.elements.evenAllBtn) this.elements.evenAllBtn.hidden = true;
+      if (this.elements.sectionsReadyIndicator) this.elements.sectionsReadyIndicator.hidden = true;
     }
 
     bindGlobalEvents() {
-      this.elements.backBtn.addEventListener("click", () => this.handleBack());
+      this.elements.backBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        this.handleBack();
+      });
       this.elements.saveBtn.addEventListener("click", () => this.handleSave());
-      this.elements.evenAllBtn.addEventListener("click", () => this.handleEvenDistributionAll());
+      this.elements.evenAllBtn?.addEventListener("click", () => this.handleEvenDistributionAll());
+      this.elements.motionEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("motion"));
+      this.elements.setPlaysEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("setPlays"));
+      this.elements.manDefenseEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("manDefense"));
+      this.elements.zoneDefenseEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("zoneDefense"));
+      this.elements.fastBreaksEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("fastBreaks"));
       document.querySelectorAll(".sort-btn").forEach((button) => {
         button.addEventListener("click", () => {
           playSound("click-tiny.wav");
@@ -484,6 +539,7 @@
         percentage: parseInteger(percentages.man_defense?.[row.id], 0),
         playcallCenter: defenseSelected.has(String(row.id)),
         effectiveness: parseInteger(row.effectiveness, 0),
+        top_scorer: row.top_scorer || "N/A",
         isActive: row.is_active !== false,
       }));
 
@@ -493,6 +549,7 @@
         percentage: parseInteger(percentages.zone_defense?.[row.id], 0),
         playcallCenter: defenseSelected.has(String(row.id)),
         effectiveness: parseInteger(row.effectiveness, 0),
+        top_scorer: row.top_scorer || "N/A",
         isActive: true,
       }));
 
@@ -530,14 +587,14 @@
       this.state.motion.forEach((play) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>
+          <td class="play-name-cell">
             <button class="play-name-btn" type="button">${play.name}</button>
           </td>
-          <td>${this.renderPercentControl(play.id, play.percentage, "motion")}</td>
-          <td>${this.renderSelectControl(play.id, displayMotionFocus(play.motion_focus), MOTION_FOCUS_OPTIONS, "motion-focus-select")}</td>
+          <td class="percent-cell">${this.renderPercentControl(play.id, play.percentage, "motion")}</td>
+          <td class="control-cell">${this.renderSelectControl(play.id, displayMotionFocus(play.motion_focus), MOTION_FOCUS_OPTIONS, "motion-focus-select")}</td>
           <td class="checkbox-cell">${this.renderCheckbox(play.id, play.playcallCenter, "offense")}</td>
-          <td><span class="stat-pill">${play.effectiveness}/100</span></td>
-          <td><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
+          <td class="eff-cell">${this.renderEffScore(play.effectiveness)}</td>
+          <td class="top-scorer-cell"><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
         `;
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
@@ -557,7 +614,7 @@
       this.state.setPlays.forEach((play) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>
+          <td class="play-name-cell">
             <button class="play-name-btn" type="button">
               <span class="play-name-inline">
                 <span>${play.name}</span>
@@ -565,11 +622,11 @@
               </span>
             </button>
           </td>
-          <td>${this.renderPercentControl(play.id, play.percentage, "setPlays")}</td>
-          <td>${this.renderSelectControl(play.id, play.target_shooter, TARGET_SHOOTER_OPTIONS.map((value) => ({ value, label: value })), "target-shooter-select")}</td>
+          <td class="percent-cell">${this.renderPercentControl(play.id, play.percentage, "setPlays")}</td>
+          <td class="control-cell">${this.renderSelectControl(play.id, play.target_shooter, TARGET_SHOOTER_OPTIONS.map((value) => ({ value, label: value })), "target-shooter-select")}</td>
           <td class="checkbox-cell">${this.renderCheckbox(play.id, play.playcallCenter, "offense")}</td>
-          <td><span class="stat-pill">${play.effectiveness}/100</span></td>
-          <td><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
+          <td class="eff-cell">${this.renderEffScore(play.effectiveness)}</td>
+          <td class="top-scorer-cell"><span class="${play.top_scorer === "N/A" ? "stat-muted" : ""}">${play.top_scorer}</span></td>
         `;
 
         tr.querySelector(".play-name-btn").addEventListener("click", () => {
@@ -589,8 +646,8 @@
       this.state.fastBreaks.forEach((row) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${row.name}</td>
-          <td>${this.renderPercentControl(row.id, row.percentage, "fastBreaks")}</td>
+          <td class="play-name-cell"><span class="play-name-text">${row.name}</span></td>
+          <td class="percent-cell">${this.renderPercentControl(row.id, row.percentage, "fastBreaks")}</td>
         `;
         this.bindPercentEvents(tr, row.id, "fastBreaks");
         this.elements.fastBreakRows.appendChild(tr);
@@ -609,13 +666,14 @@
           tr.classList.add("row-dead");
         }
         tr.innerHTML = `
-          <td>
+          <td class="play-name-cell">
             <span>${row.name}</span>
             ${row.isActive ? "" : '<span class="dead-pill">Coming Later</span>'}
           </td>
-          <td>${this.renderPercentControl(row.id, row.percentage, sectionKey, row.isActive === false)}</td>
+          <td class="percent-cell">${this.renderPercentControl(row.id, row.percentage, sectionKey, row.isActive === false)}</td>
           <td class="checkbox-cell">${this.renderCheckbox(row.id, row.playcallCenter, "defense", row.isActive === false)}</td>
-          <td><span class="stat-pill">${row.effectiveness}/100</span></td>
+          <td class="eff-cell">${this.renderEffScore(row.effectiveness)}</td>
+          <td class="top-scorer-cell"><span class="${row.top_scorer === "N/A" ? "stat-muted" : ""}">${row.top_scorer}</span></td>
         `;
         if (row.isActive) {
           this.bindPercentEvents(tr, row.id, sectionKey);
@@ -628,40 +686,59 @@
     renderPcLists() {
       this.renderPcList("offense", this.elements.pcOffense, this.state.pcOrder.offense);
       this.renderPcList("defense", this.elements.pcDefense, this.state.pcOrder.defense);
+      if (this.elements.pcErrorOffense) {
+        this.elements.pcErrorOffense.textContent = this.state.pcErrors.offense || "";
+      }
+      if (this.elements.pcErrorDefense) {
+        this.elements.pcErrorDefense.textContent = this.state.pcErrors.defense || "";
+      }
     }
 
     renderPcList(listType, container, order) {
       container.innerHTML = "";
-      if (!order.length) {
-        const empty = document.createElement("div");
-        empty.className = "pc-empty";
-        empty.textContent = "No plays selected.";
-        container.appendChild(empty);
-        return;
+      for (let index = 0; index < MAX_PC_ITEMS_PER_SIDE; index += 1) {
+        const id = order[index];
+        const item = id ? this.findItemById(listType, id) : null;
+        const slot = document.createElement("div");
+        slot.className = "pc-slot";
+        slot.dataset.listType = listType;
+        slot.dataset.slotIndex = String(index);
+        slot.addEventListener("dragover", (event) => this.handleDragOver(event, slot));
+        slot.addEventListener("dragleave", () => this.clearDropHints());
+        slot.addEventListener("drop", (event) => this.handleDrop(event, listType, index));
+
+        if (item) {
+          const detail = this.getPcItemDetail(item, listType);
+          const row = document.createElement("div");
+          row.className = "pc-slot-filled";
+          row.draggable = true;
+          row.dataset.id = id;
+          row.dataset.listType = listType;
+          row.innerHTML = `
+            <span class="pc-drag-handle" aria-hidden="true">⋮⋮</span>
+            <span class="pc-slot-name"><span class="pc-slot-number">${index + 1}.</span> <span class="pc-slot-primary">${item.name}</span>${detail ? ` <span class="pc-slot-detail">— ${detail}</span>` : ""}</span>
+            <button class="pc-remove-btn" type="button" aria-label="Remove ${item.name}">×</button>
+          `;
+          row.addEventListener("dragstart", (event) => this.handleDragStart(event, listType, id));
+          row.addEventListener("dragend", () => this.handleDragEnd());
+          row.querySelector(".pc-remove-btn").addEventListener("click", () => {
+            playSound("click-tiny.wav");
+            this.state.pcOrder[listType] = this.state.pcOrder[listType].filter((entry) => entry !== id);
+            this.state.pcErrors[listType] = "";
+            this.syncSelectionFromPcOrder();
+            this.render();
+          });
+          slot.appendChild(row);
+        } else {
+          slot.classList.add("is-empty");
+          const empty = document.createElement("div");
+          empty.className = "pc-slot-empty";
+          empty.innerHTML = `<span class="pc-slot-number">${index + 1}.</span> <span class="pc-slot-detail">Empty</span>`;
+          slot.appendChild(empty);
+        }
+
+        container.appendChild(slot);
       }
-
-      order.forEach((id, index) => {
-        const item = this.findItemById(listType, id);
-        if (!item) return;
-        const row = document.createElement("div");
-        row.className = "pc-item";
-        row.draggable = true;
-        row.dataset.id = id;
-        row.dataset.listType = listType;
-        row.innerHTML = `
-          <span class="pc-index">${index + 1}.</span>
-          <span>${item.name}</span>
-        `;
-        row.addEventListener("dragstart", (event) => this.handleDragStart(event, listType, id));
-        row.addEventListener("dragend", () => this.handleDragEnd());
-        row.addEventListener("dragover", (event) => this.handleDragOver(event, row));
-        row.addEventListener("dragleave", () => this.clearDropHints());
-        row.addEventListener("drop", (event) => this.handleDrop(event, listType, id));
-        container.appendChild(row);
-      });
-
-      container.ondragover = (event) => this.handleDragOver(event);
-      container.ondrop = (event) => this.handleDrop(event, listType, null);
     }
 
     handleDragStart(event, listType, id) {
@@ -671,7 +748,7 @@
     }
 
     handleDragEnd() {
-      document.querySelectorAll(".pc-item.dragging").forEach((node) => node.classList.remove("dragging"));
+      document.querySelectorAll(".pc-slot-filled.dragging").forEach((node) => node.classList.remove("dragging"));
       this.clearDropHints();
       this.dragContext = null;
     }
@@ -683,12 +760,10 @@
         return;
       }
       this.clearDropHints();
-      const rect = row.getBoundingClientRect();
-      const placeAfter = event.clientY >= rect.top + (rect.height / 2);
-      row.classList.add(placeAfter ? "drop-after" : "drop-before");
+      row.classList.add("drop-target");
     }
 
-    handleDrop(event, listType, targetId) {
+    handleDrop(event, listType, targetIndex) {
       event.preventDefault();
       event.stopPropagation();
       if (!this.dragContext || this.dragContext.listType !== listType) {
@@ -702,26 +777,18 @@
 
       const nextOrder = order.slice();
       nextOrder.splice(sourceIndex, 1);
-
-      if (!targetId) {
-        nextOrder.push(this.dragContext.id);
-      } else {
-        const targetIndex = nextOrder.indexOf(targetId);
-        const targetRow = event.currentTarget?.closest?.(".pc-item") || event.currentTarget;
-        const rect = targetRow?.getBoundingClientRect?.();
-        const placeAfter = rect ? event.clientY >= rect.top + (rect.height / 2) : false;
-        const insertionIndex = targetIndex === -1 ? nextOrder.length : targetIndex + (placeAfter ? 1 : 0);
-        nextOrder.splice(insertionIndex, 0, this.dragContext.id);
-      }
+      const insertionIndex = Math.max(0, Math.min(Number(targetIndex ?? nextOrder.length), nextOrder.length));
+      nextOrder.splice(insertionIndex, 0, this.dragContext.id);
 
       this.state.pcOrder[listType] = nextOrder;
+      this.state.pcErrors[listType] = "";
       this.syncSelectionFromPcOrder();
       this.render();
     }
 
     clearDropHints() {
-      document.querySelectorAll(".pc-item.drop-before, .pc-item.drop-after").forEach((node) => {
-        node.classList.remove("drop-before", "drop-after");
+      document.querySelectorAll(".pc-slot.drop-target").forEach((node) => {
+        node.classList.remove("drop-target");
       });
     }
 
@@ -730,11 +797,17 @@
         <div class="number-input-wrap">
           <input type="number" min="0" max="100" step="1" value="${value}" data-id="${id}" data-section="${sectionKey}" ${disabled ? "disabled" : ""}>
           <div class="spin-btns">
-            <button type="button" data-delta="1" data-id="${id}" data-section="${sectionKey}" ${disabled ? "disabled" : ""}>▲</button>
-            <button type="button" data-delta="-1" data-id="${id}" data-section="${sectionKey}" ${disabled ? "disabled" : ""}>▼</button>
+            <button type="button" data-delta="-1" data-id="${id}" data-section="${sectionKey}" ${disabled ? "disabled" : ""}>−</button>
+            <button type="button" data-delta="1" data-id="${id}" data-section="${sectionKey}" ${disabled ? "disabled" : ""}>+</button>
           </div>
         </div>
       `;
+    }
+
+    renderEffScore(value) {
+      const numeric = parseInteger(value, 0);
+      const className = numeric >= 67 ? "is-high" : (numeric >= 34 ? "is-mid" : "is-low");
+      return `<span class="eff-score ${className}">${numeric}</span>`;
     }
 
     renderSelectControl(id, currentValue, options, cssClass) {
@@ -746,7 +819,9 @@
     }
 
     renderCheckbox(id, checked, listType, disabled = false) {
-      return `<div class="checkbox-wrap"><input class="control-check" type="checkbox" data-id="${id}" data-list-type="${listType}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}></div>`;
+      const listFull = (this.state.pcOrder[listType] || []).length >= MAX_PC_ITEMS_PER_SIDE;
+      const disabledForCapacity = listFull && !checked;
+      return `<label class="checkbox-wrap"><input class="control-check" type="checkbox" data-id="${id}" data-list-type="${listType}" ${checked ? "checked" : ""} ${(disabled || disabledForCapacity) ? "disabled" : ""}><span class="control-check-ui" aria-hidden="true"></span></label>`;
     }
 
     toggleSort(sectionKey, sortKey) {
@@ -829,6 +904,7 @@
         if (!play) return;
         play.motion_focus = normalizeMotionFocus(select.value);
         this.state.evenDistributionAll = false;
+        this.renderPcLists();
       });
     }
 
@@ -841,7 +917,19 @@
         if (!play) return;
         play.target_shooter = select.value;
         this.state.evenDistributionAll = false;
+        this.renderPcLists();
       });
+    }
+
+    getPcItemDetail(item, listType) {
+      if (!item || listType !== "offense") return "";
+      if (Object.prototype.hasOwnProperty.call(item, "motion_focus")) {
+        return displayMotionFocusLabel(item.motion_focus);
+      }
+      if (Object.prototype.hasOwnProperty.call(item, "target_shooter")) {
+        return item.target_shooter || "";
+      }
+      return "";
     }
 
     bindPcCheckboxEvent(row, id, listType) {
@@ -855,16 +943,19 @@
         if (checkbox.checked && !isSelected) {
           if (list.length >= MAX_PC_ITEMS_PER_SIDE) {
             checkbox.checked = false;
-            window.alert("8 plays max can be added to the playcall center, please remove one to add another");
+            this.state.pcErrors[listType] = "Playcall Center is full. Remove a play to add another.";
+            this.renderPcLists();
             return;
           }
           list.push(id);
+          this.state.pcErrors[listType] = "";
         } else if (!checkbox.checked && isSelected) {
           this.state.pcOrder[listType] = list.filter((entry) => entry !== id);
+          this.state.pcErrors[listType] = "";
         }
 
         this.syncSelectionFromPcOrder();
-        this.renderPcLists();
+        this.render();
       });
     }
 
@@ -909,7 +1000,7 @@
     updateTotals() {
       const totals = this.getSectionTotals();
       const applyTotalState = (element, total) => {
-        element.textContent = `Total: ${total}%`;
+        element.textContent = `${total} / 100`;
         element.classList.toggle("valid", total === 100);
         element.classList.toggle("invalid", total !== 100);
       };
@@ -920,8 +1011,31 @@
       applyTotalState(this.elements.manDefenseTotal, totals.manDefense);
       applyTotalState(this.elements.zoneDefenseTotal, totals.zoneDefense);
 
-      const allValid = Object.values(totals).every((total) => total === 100);
+      const validSections = Object.values(totals).filter((total) => total === 100).length;
+      const allValid = validSections === Object.keys(totals).length;
+      if (this.elements.sectionsReadyIndicator) {
+        this.elements.sectionsReadyIndicator.textContent = `${validSections} / 5 sections ready`;
+        this.elements.sectionsReadyIndicator.classList.toggle("valid", allValid);
+        this.elements.sectionsReadyIndicator.classList.toggle("invalid", !allValid);
+      }
       this.elements.saveBtn.disabled = !allValid;
+    }
+
+    handleEvenDistributionSection(sectionKey) {
+      playSound("click-tiny.wav");
+      if (sectionKey === "motion") {
+        distributeEvenly(this.state.motion);
+      } else if (sectionKey === "setPlays") {
+        distributeEvenly(this.state.setPlays);
+      } else if (sectionKey === "fastBreaks") {
+        distributeEvenly(this.state.fastBreaks);
+      } else if (sectionKey === "manDefense") {
+        distributeEvenly(this.state.manDefense, { activeOnly: true });
+      } else if (sectionKey === "zoneDefense") {
+        distributeEvenly(this.state.zoneDefense);
+      }
+      this.state.evenDistributionAll = false;
+      this.render();
     }
 
     async handleEvenDistributionAll() {
@@ -994,7 +1108,13 @@
           throw new Error(`Save failed (${response.status})`);
         }
 
-        showSuccessPopup("Playbooks Successfully Saved");
+        const responseData = await response.json();
+        const shotWeights = responseData.position_shot_weights || null;
+
+        const weightsContainer = document.getElementById('save-confirm-weights');
+        if (weightsContainer) renderShotWeights(weightsContainer, shotWeights);
+
+        await this.saveConfirmModal.open(shotWeights);
         this.state.playbookMeta.user_saved = true;
         this.clearDraftState();
         if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {
@@ -1009,7 +1129,7 @@
         }
       } catch (error) {
         console.error("Failed to save playbooks:", error);
-        this.showToast("Failed to save playbooks");
+        this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });
       } finally {
         this.updateTotals();
       }
@@ -1031,19 +1151,69 @@
     }
 
     handleBack() {
+      if (typeof resolveFranchiseLockerRoomUrl === "function") {
+        const resolvedUrl = resolveFranchiseLockerRoomUrl({
+          params: this.params,
+          franchiseId: this.context.franchiseId,
+          teamId: this.context.teamId,
+        });
+        if (resolvedUrl) {
+          window.location.href = resolvedUrl;
+          return;
+        }
+      }
+
       window.location.href = buildPlaybookReportUrl(this.context);
     }
 
-    showToast(message) {
+    dismissToast() {
       const toast = this.elements.toast;
-      toast.textContent = message;
-      toast.classList.add("visible");
+      if (this.toastTimer) {
+        window.clearTimeout(this.toastTimer);
+        this.toastTimer = null;
+      }
+      if (this.toastHideTimer) {
+        window.clearTimeout(this.toastHideTimer);
+        this.toastHideTimer = null;
+      }
+      toast.classList.remove("visible");
+      this.toastHideTimer = window.setTimeout(() => {
+        toast.hidden = true;
+      }, 220);
+    }
+
+    showToast(title, subtitle = "", options = {}) {
+      const toast = this.elements.toast;
+      const accent = options.accentColor || "#34EC27";
+      const subline = subtitle ? `<div class="toast-subline">${subtitle}</div>` : "";
+      toast.innerHTML = `
+        <div class="toast-icon" style="--toast-accent: ${accent};">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M5.1 10.4 8.3 13.6 14.9 7" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+        <div class="toast-copy">
+          <div class="toast-title">${title}</div>
+          ${subline}
+        </div>
+        <button class="toast-dismiss" type="button" aria-label="Dismiss notification">×</button>
+      `;
+      toast.style.setProperty("--toast-accent", accent);
+      toast.hidden = false;
+      toast.querySelector(".toast-dismiss")?.addEventListener("click", () => this.dismissToast(), { once: true });
       if (this.toastTimer) {
         window.clearTimeout(this.toastTimer);
       }
+      if (this.toastHideTimer) {
+        window.clearTimeout(this.toastHideTimer);
+        this.toastHideTimer = null;
+      }
+      requestAnimationFrame(() => {
+        toast.classList.add("visible");
+      });
       this.toastTimer = window.setTimeout(() => {
-        toast.classList.remove("visible");
-      }, 2200);
+        this.dismissToast();
+      }, 3000);
     }
   }
 
@@ -1056,8 +1226,30 @@
       console.error("Failed to initialize playbooks page:", error);
       const toast = document.getElementById("toast");
       if (toast) {
-        toast.textContent = "Failed to load playbooks";
-        toast.classList.add("visible");
+        toast.innerHTML = `
+          <div class="toast-icon" style="--toast-accent: #F79420;">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M5.1 10.4 8.3 13.6 14.9 7" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </div>
+          <div class="toast-copy">
+            <div class="toast-title">Failed to load playbooks</div>
+          </div>
+          <button class="toast-dismiss" type="button" aria-label="Dismiss notification">×</button>
+        `;
+        toast.style.setProperty("--toast-accent", "#F79420");
+        toast.hidden = false;
+        toast.querySelector(".toast-dismiss")?.addEventListener("click", () => {
+          toast.classList.remove("visible");
+          window.setTimeout(() => { toast.hidden = true; }, 220);
+        }, { once: true });
+        requestAnimationFrame(() => {
+          toast.classList.add("visible");
+        });
+        window.setTimeout(() => {
+          toast.classList.remove("visible");
+          window.setTimeout(() => { toast.hidden = true; }, 220);
+        }, 3000);
       }
     }
   });

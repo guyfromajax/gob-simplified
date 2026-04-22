@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Team Stats</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <style>
+    .team-stats-page-header {
+      margin-bottom: 10px;
+    }
+
+    .team-stats-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      margin-bottom: 12px;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .team-stats-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .team-stats-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .team-stats-page-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px 0;
+    }
+
+    .team-stats-page-title {
+      margin: 0 !important;
+    }
+
+    .team-stats-page-card .scroll-x {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+    }
+
+    .team-stats-page-card .scroll-x::-webkit-scrollbar {
+      height: 10px;
+    }
+
+    .team-stats-page-card .scroll-x::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .team-stats-page-card .scroll-x::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.24);
+      border-radius: 999px;
+    }
+
+    .team-stats-page-card .stats-table {
+      margin: 0;
+      width: max(100%, 1180px);
+      min-width: 1180px;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .team-stats-page-card .stats-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding: 12px 10px 10px;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    }
+
+    .team-stats-page-card .stats-table tbody td {
+      padding: 9px 10px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: transparent;
+    }
+
+    .team-stats-page-card .stats-table tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .team-stats-page-card .stats-table tbody tr:hover td {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .team-stats-page-card .stats-table th:first-child,
+    .team-stats-page-card .stats-table td:first-child {
+      text-align: left;
+      padding-left: 16px;
+    }
+
+    .team-stats-page-card .stats-table tbody td:first-child {
+      font-weight: 700;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <div class="resource-page-container fcc-brand-page-shell fcc-brand-page-shell-no-lines">
+    <div class="team-stats-page-header">
+      <a id="back-btn" class="team-stats-back-link" href="#">Back to Locker Room</a>
+    </div>
+    <section class="fcc-data-card team-stats-page-card">
+      <div class="team-stats-page-card-head">
+        <h1 class="team-stats-page-title">Team Stats</h1>
+        <div class="stats-scope-toggle-wrap">
+          <button type="button" class="stats-scope-btn active" data-scope="conference">Conference</button>
+          <button type="button" class="stats-scope-btn" data-scope="region">Region</button>
+          <button type="button" class="stats-scope-btn" data-scope="national">National</button>
+        </div>
+      </div>
+      <div class="fcc-data-card-body scroll-x">
+        <table class="stats-table fcc-team-stats-grid">
+          <thead>
+            <tr class="group-row">
+              <th colspan="6"></th>
+              <th colspan="3">Shooting</th>
+              <th colspan="3">3-Point</th>
+              <th colspan="3">Free Throws</th>
+              <th colspan="3">Rebounding</th>
+              <th colspan="5">Other</th>
+              <th colspan="4">Defense</th>
+            </tr>
+            <tr class="col-row">
+              <th class="sortable col-group-start" data-stat="team">Team <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="rank">Rank <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="W">W <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="L">L <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="PF">PF <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="PA">PA <span class="sort-arrow"></span></th>
+              <th class="sortable col-group-start" data-stat="FGM">FGM <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="FGA">FGA <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="FG%">FG% <span class="sort-arrow"></span></th>
+              <th class="sortable col-group-start" data-stat="3PTM">3PTM <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="3PTA">3PTA <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="3PT%">3PT% <span class="sort-arrow"></span></th>
+              <th class="sortable col-group-start" data-stat="FTM">FTM <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="FTA">FTA <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="FT%">FT% <span class="sort-arrow"></span></th>
+              <th class="sortable col-group-start" data-stat="DREB">DREB <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="OREB">OREB <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="TREB">TREB <span class="sort-arrow"></span></th>
+              <th class="sortable col-group-start" data-stat="AST">AST <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="F">F <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="TO">TO <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="SCR_A">SCRA <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="SCR%">SCR% <span class="sort-arrow"></span></th>
+              <th class="sortable col-group-start" data-stat="STL">STL <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="BLK">BLK <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="DEF_A">DEFA <span class="sort-arrow"></span></th>
+              <th class="sortable" data-stat="DEF%">DEF% <span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="teamstats-body">
+            <tr><td colspan="27">Loading team stats...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/resourceCache.js"></script>
+  <script src="/team-stats.js"></script>
+</body>
+</html>

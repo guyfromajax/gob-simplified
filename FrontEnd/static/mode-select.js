@@ -6,15 +6,37 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_v1';
+
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
 const franchiseDeleteLink = document.getElementById('franchise-delete-link');
+const franchiseDeleteRow = document.getElementById('franchise-delete-row');
 const franchiseEmptyCard = document.getElementById('franchise-empty-card');
 const franchiseCardBanner = document.getElementById('franchise-card-banner');
-const franchiseCardWeek = document.getElementById('franchise-card-week');
+const franchiseCardTeamName = document.getElementById('franchise-card-team-name');
+const franchiseCardSeasonProgress = document.getElementById('franchise-card-season-progress');
 const franchiseCardRecord = document.getElementById('franchise-card-record');
 const franchiseCardRank = document.getElementById('franchise-card-rank');
+const franchiseCardPrestige = document.getElementById('franchise-card-prestige');
 const franchiseCardNext = document.getElementById('franchise-card-next');
+const franchiseCardCareerSummary = document.getElementById('franchise-card-career-summary');
+const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
+const alphaDisclaimer = document.getElementById('alpha-disclaimer');
+const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
+const leaderboardHost = document.getElementById('community-leaderboard');
+
+// Primary/secondary from scripts/align_core8_team_colors.py (Mongo teams.primary_color / secondary_color)
+const A1_CONFERENCE_TEAMS = [
+  { id: 'bentley_truman', name: 'Bentley-Truman', primary: '#4066b2', secondary: '#ffffff' },
+  { id: 'lancaster', name: 'Lancaster', primary: '#d24a1b', secondary: '#000000' },
+  { id: 'four_corners', name: 'Four Corners', primary: '#c0976a', secondary: '#00954b' },
+  { id: 'ocean_city', name: 'Ocean City', primary: '#2a2168', secondary: '#00a89d' },
+  { id: 'morristown', name: 'Morristown', primary: '#ec1d28', secondary: '#cccccc' },
+  { id: 'little_york', name: 'Little York', primary: '#65308e', secondary: '#f6af38' },
+  { id: 'xavien', name: 'Xavien', primary: '#016837', secondary: '#999999' },
+  { id: 'south_lancaster', name: 'South Lancaster', primary: '#7c2b24', secondary: '#e39649' },
+];
 
 let currentFranchise = null;
 
@@ -47,6 +69,7 @@ function clearFranchiseLocalStorage() {
     'franchise_week',
     'franchise_user_team',
     'franchise_user_team_id',
+    'franchise_user_team_primary_color',
   ];
   toRemove.forEach((k) => localStorage.removeItem(k));
   Object.keys(localStorage).forEach((k) => {
@@ -58,20 +81,6 @@ function clearFranchiseLocalStorage() {
   localStorage.removeItem('last_game_user_team_side');
   localStorage.removeItem('game_home');
   localStorage.removeItem('game_away');
-}
-
-function franchiseStatusLabel(data) {
-  if (!data) return '--';
-  if (data.eos_tournament_active) {
-    if (data.eos_completed) return 'Offseason';
-    const r = data.eos_current_round || 1;
-    if (r === 1) return 'First Round';
-    if (r === 2) return 'Semis';
-    if (r === 3) return 'Championship';
-    return 'First Round';
-  }
-  const week = data.week != null ? data.week : 1;
-  return `Week ${week}`;
 }
 
 function getAuthHeaders() {
@@ -99,6 +108,15 @@ function safeText(value, fallback) {
   return text ? text : fallback;
 }
 
+function safeNumber(value, fallback) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function deriveCurrentSeason(commandCenterData) {
+  return safeNumber(commandCenterData && commandCenterData.current_season, 1);
+}
+
 function deriveRank(teamDoc, commandCenterData) {
   if (teamDoc) {
     const teamRank = teamDoc.natl_rank || teamDoc.rank || teamDoc.national_rank;
@@ -108,6 +126,16 @@ function deriveRank(teamDoc, commandCenterData) {
   }
   if (commandCenterData && commandCenterData.rank !== undefined && commandCenterData.rank !== null && commandCenterData.rank !== '-') {
     return String(commandCenterData.rank);
+  }
+  return '-';
+}
+
+function derivePrestige(teamDoc, commandCenterData) {
+  if (commandCenterData && commandCenterData.prestige !== undefined && commandCenterData.prestige !== null && String(commandCenterData.prestige).trim() !== '') {
+    return String(commandCenterData.prestige);
+  }
+  if (teamDoc && teamDoc.prestige !== undefined && teamDoc.prestige !== null && String(teamDoc.prestige).trim() !== '') {
+    return String(teamDoc.prestige);
   }
   return '-';
 }
@@ -132,28 +160,246 @@ function deriveNextOpponent(commandCenterData, teamName) {
   return safeText(teamEntry.next, 'TBD');
 }
 
+function deriveSeasonProgress(commandCenterData, franchiseData) {
+  const currentSeason = deriveCurrentSeason(commandCenterData);
+  const week = safeNumber(franchiseData && franchiseData.week, 1);
+  return 'Season ' + currentSeason + ' · Week ' + week + ' of 26';
+}
+
+function renderCareerSummary(commandCenterData) {
+  if (!franchiseCardCareerSummary) return;
+  const careerBestRankRaw = commandCenterData && commandCenterData.career_best_rank;
+  const careerBestRank = (careerBestRankRaw !== undefined && careerBestRankRaw !== null && String(careerBestRankRaw).trim() !== '')
+    ? String(careerBestRankRaw)
+    : '--';
+  const bestRankSeasonsRaw =
+    (commandCenterData && commandCenterData.career_best_rank_seasons) ||
+    (commandCenterData && commandCenterData.best_rank_seasons) ||
+    (commandCenterData && commandCenterData.career_best_seasons) ||
+    (commandCenterData && commandCenterData.career_best_rank_season);
+
+  let seasons = [];
+  if (Array.isArray(bestRankSeasonsRaw)) {
+    seasons = bestRankSeasonsRaw
+      .map(function (value) { return safeNumber(value, null); })
+      .filter(function (value) { return Number.isFinite(value); });
+  } else {
+    const singleSeason = safeNumber(bestRankSeasonsRaw, null);
+    if (Number.isFinite(singleSeason)) seasons = [singleSeason];
+  }
+
+  let dedupedSortedSeasons = Array.from(new Set(seasons)).sort(function (a, b) { return a - b; });
+  if (!dedupedSortedSeasons.length) {
+    const currentSeason = deriveCurrentSeason(commandCenterData);
+    if (careerBestRank !== '--' && Number.isFinite(currentSeason)) dedupedSortedSeasons = [currentSeason];
+  }
+
+  if (!dedupedSortedSeasons.length) {
+    franchiseCardCareerSummary.textContent = 'Career Best Ranking: #' + careerBestRank;
+    return;
+  }
+
+  const seasonLabel = dedupedSortedSeasons.length === 1 ? 'Season ' : 'Seasons ';
+  franchiseCardCareerSummary.textContent =
+    'Career Best Ranking: #' + careerBestRank + ' (' + seasonLabel + dedupedSortedSeasons.join(', ') + ')';
+}
+
+function displayCommunityLeaderboardPoints(geekPoints) {
+  var n = parseInt(geekPoints, 10);
+  return (Number.isFinite(n) && n > 0) ? n : '--';
+}
+
+function renderCommunityLeaderboard(leaderboardData, currentUsername) {
+  if (!leaderboardHost) return;
+  const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
+  const topFive = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 5) : [];
+  const currentTopEntry = currentUserNormalized
+    ? topFive.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
+    : null;
+  const currentPinnedEntry = (!currentTopEntry && leaderboardData && leaderboardData.current_user)
+    ? leaderboardData.current_user
+    : null;
+  const rows = topFive.map(function (entry) {
+    const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
+    const displayPoints = displayCommunityLeaderboardPoints(entry.geek_points);
+    return `
+      <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
+        <div class="community-rank">${entry.rank}.</div>
+        <div class="community-username">${entry.username}</div>
+        <div class="community-score">${displayPoints}</div>
+      </div>
+    `;
+  }).join('');
+  const pinned = currentPinnedEntry ? `
+    <div class="community-leaderboard-separator"></div>
+    <div class="community-leaderboard-row is-current-user">
+      <div class="community-rank">${currentPinnedEntry.rank}.</div>
+      <div class="community-username">${currentPinnedEntry.username}</div>
+      <div class="community-score">${displayCommunityLeaderboardPoints(currentPinnedEntry.geek_points)}</div>
+    </div>
+  ` : '';
+  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
+}
+
+async function loadCommunityLeaderboard(currentUsername) {
+  if (!leaderboardHost) return;
+  const leaderboardData = await safeJsonFetch(API_CONFIG.buildUrl('/api/auth/leaderboard'), {
+    headers: getAuthHeaders()
+  });
+  renderCommunityLeaderboard(leaderboardData, currentUsername);
+}
+
+function escapeHtmlLbt(text) {
+  if (text == null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function displayLbtPoints(geekPoints) {
+  var n = parseInt(geekPoints, 10);
+  return (Number.isFinite(n) && n > 0) ? String(n) : '--';
+}
+
+async function loadLeadersByTeam() {
+  var grid = document.getElementById('leaders-by-team-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Loading...</div>';
+
+  try {
+    var response = await fetch(API_CONFIG.buildUrl('/api/leaderboard/by-team'), {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch');
+    var data = await response.json();
+
+    grid.innerHTML = '';
+
+    A1_CONFERENCE_TEAMS.forEach(function (team) {
+      var leaders = (data[team.id] || []).slice(0, 3);
+
+      var bannerPath = typeof getTeamAssetPath === 'function'
+        ? getTeamAssetPath(team.id, 'banner_primary')
+        : '/images/teams/' + team.id + '/' + team.id + '_banner_primary.jpg';
+
+      var leadersHtml = leaders.length > 0
+        ? leaders.map(function (entry, i) {
+            var pts = displayLbtPoints(entry.geek_points);
+            return (
+              '<div class="lbt-leader-row">' +
+              '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
+              '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
+              '<span class="lbt-leader-points" style="color: ' + team.primary + ';">' + pts + '</span>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div class="lbt-no-leaders">· · ·</div>';
+
+      var card = document.createElement('div');
+      card.className = 'lbt-team-card';
+      card.style.cssText =
+        '--team-primary: ' + team.primary + '; ' +
+        '--team-secondary: ' + team.secondary + '; ' +
+        'border-color: ' + team.primary + '66; ' +
+        'box-shadow: 0 0 0 1px ' + team.primary + '33, inset 0 0 24px rgba(0,0,0,0.3);';
+
+      // Use unquoted url(...) so inner " does not terminate style="..." (quoted url breaks the attribute).
+      var bannerUrlCss = 'url(' + String(bannerPath).replace(/\\/g, '/') + ')';
+      card.innerHTML =
+        '<div class="lbt-card-banner" style="background-image: ' + bannerUrlCss + ';">' +
+        '<div class="lbt-card-banner-overlay"></div>' +
+        '<div class="lbt-team-name">' + escapeHtmlLbt(team.name) + '</div>' +
+        '</div>' +
+        '<div class="lbt-leaders-list">' + leadersHtml + '</div>';
+
+      grid.appendChild(card);
+    });
+  } catch (err) {
+    grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Could not load team leaders.</div>';
+  }
+}
+
+function wireLeadersByTeamModal() {
+  var leadersByTeamBtn = document.getElementById('leaders-by-team-btn');
+  var leadersByTeamModal = document.getElementById('leaders-by-team-modal');
+  var leadersByTeamClose = document.getElementById('leaders-by-team-close');
+  var leadersByTeamBackdrop = document.getElementById('leaders-by-team-backdrop');
+
+  if (leadersByTeamBtn && leadersByTeamModal) {
+    leadersByTeamBtn.addEventListener('click', function () {
+      leadersByTeamModal.classList.add('is-visible');
+      leadersByTeamModal.setAttribute('aria-hidden', 'false');
+      loadLeadersByTeam();
+    });
+  }
+
+  if (leadersByTeamClose && leadersByTeamModal) {
+    leadersByTeamClose.addEventListener('click', function () {
+      leadersByTeamModal.classList.remove('is-visible');
+      leadersByTeamModal.setAttribute('aria-hidden', 'true');
+    });
+  }
+
+  if (leadersByTeamBackdrop && leadersByTeamModal) {
+    leadersByTeamBackdrop.addEventListener('click', function () {
+      leadersByTeamModal.classList.remove('is-visible');
+      leadersByTeamModal.setAttribute('aria-hidden', 'true');
+    });
+  }
+}
+
+function wireAlphaBanner() {
+  if (!alphaDisclaimer || !alphaDisclaimerDismiss) return;
+  alphaDisclaimerDismiss.addEventListener('click', function () {
+    try {
+      localStorage.setItem(ALPHA_DISMISS_STORAGE_KEY, '1');
+    } catch (e) {}
+    alphaDisclaimer.classList.add('is-dismissing');
+    window.setTimeout(function () {
+      alphaDisclaimer.classList.remove('visible', 'is-dismissing');
+      alphaDisclaimer.hidden = true;
+    }, 180);
+  });
+}
+
 function renderFranchiseEmptyState() {
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
-  if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'none';
+  if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'none';
 }
 
 function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (!franchisePlayNowBtn) return;
 
   const teamName = safeText(franchiseData.user_team_id, 'Program');
+  if (franchiseCardTeamName) franchiseCardTeamName.textContent = teamName;
+  const bannerUrl = getSquareLogoPath(teamName);
   if (franchiseCardBanner) {
-    franchiseCardBanner.src = getSquareLogoPath(teamName);
+    franchiseCardBanner.src = bannerUrl;
     franchiseCardBanner.alt = teamName;
+    franchiseCardBanner.style.display = 'none';
   }
-  if (franchiseCardWeek) franchiseCardWeek.textContent = String(franchiseData.week || 1);
+  if (franchisePlayNowBtn) {
+    franchisePlayNowBtn.style.backgroundImage = "url('" + bannerUrl + "')";
+    franchisePlayNowBtn.style.backgroundSize = 'cover';
+    franchisePlayNowBtn.style.backgroundPosition = 'center';
+  }
+  if (franchiseCardSeasonProgress) franchiseCardSeasonProgress.textContent = deriveSeasonProgress(commandCenterData, franchiseData);
   if (franchiseCardRecord) franchiseCardRecord.textContent = deriveRecord(commandCenterData, teamName);
-  if (franchiseCardRank) franchiseCardRank.textContent = deriveRank(teamDoc, commandCenterData);
+  if (franchiseCardRank) {
+    const rank = deriveRank(teamDoc, commandCenterData);
+    franchiseCardRank.textContent = rank === '-' ? '-' : '#' + rank;
+  }
+  if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
+  renderCareerSummary(commandCenterData);
 
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
-  franchisePlayNowBtn.style.display = 'flex';
-  if (franchiseDeleteLink) franchiseDeleteLink.style.display = 'inline';
+  franchisePlayNowBtn.style.display = 'block';
+  if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'block';
 }
 
 function goToFranchiseCommandCenter() {
@@ -218,12 +464,23 @@ if (franchisePlayNowBtn) {
   });
 }
 
+if (franchiseEnterBtn) {
+  franchiseEnterBtn.addEventListener('click', function (event) {
+    event.stopPropagation();
+    playSound('click-strong.wav');
+    goToFranchiseCommandCenter();
+  });
+}
+
 if (franchiseNewBtn) {
   franchiseNewBtn.addEventListener('click', startNewFranchiseFlow);
 }
 
 if (franchiseDeleteLink) {
-  franchiseDeleteLink.addEventListener('click', startNewFranchiseFlow);
+  franchiseDeleteLink.addEventListener('click', function (event) {
+    event.stopPropagation();
+    startNewFranchiseFlow();
+  });
 }
 
 if (newFranchiseModalCancel) {
@@ -265,9 +522,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     const appConfig = await API_CONFIG.loadAppConfig();
     if (appConfig.isAlpha) {
       const alphaBadge = document.getElementById('alpha-badge');
-      const alphaDisclaimer = document.getElementById('alpha-disclaimer');
+      const isDismissed = typeof localStorage !== 'undefined' && localStorage.getItem(ALPHA_DISMISS_STORAGE_KEY) === '1';
       if (alphaBadge) alphaBadge.classList.add('visible');
-      if (alphaDisclaimer) alphaDisclaimer.classList.add('visible');
+      if (alphaDisclaimer && !isDismissed) {
+        alphaDisclaimer.hidden = false;
+        alphaDisclaimer.classList.add('visible');
+      }
       console.log('[ALPHA] Alpha mode enabled');
     }
   } catch (error) {
@@ -280,10 +540,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   const logoutBtn = document.getElementById('logout-btn');
   const authToken = localStorage.getItem('auth_token');
   const authUser = localStorage.getItem('auth_user');
+  let currentUsername = '';
+
+  wireAlphaBanner();
 
   if (authToken && authUser) {
     try {
       const user = JSON.parse(authUser);
+      currentUsername = user.username || user.email || '';
       if (authLoggedOut) authLoggedOut.style.display = 'none';
       if (authLoggedIn) authLoggedIn.style.display = 'flex';
       if (authUserEmail) authUserEmail.textContent = user.username || user.email;
@@ -292,6 +556,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (meRes.ok) {
         const meData = await meRes.json();
         if (meData.username && meData.username.trim()) {
+          currentUsername = meData.username;
           if (authUserEmail) authUserEmail.textContent = meData.username;
           const stored = JSON.parse(authUser);
           stored.username = meData.username;
@@ -312,6 +577,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  await loadCommunityLeaderboard(currentUsername);
+  wireLeadersByTeamModal();
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {
       try {
@@ -323,39 +591,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (authLoggedIn) authLoggedIn.style.display = 'none';
     });
   }
-
-  const teamButtons = document.querySelectorAll('.team-button');
-  const franchiseHomeSlot = document.querySelector('.franchise-home-slot');
-  const teamGrid = document.getElementById('team-grid');
-  const syncTeamGridWidth = function () {
-    if (franchiseHomeSlot && teamGrid) {
-      teamGrid.style.width = franchiseHomeSlot.offsetWidth + 'px';
-    }
-  };
-  window.addEventListener('resize', syncTeamGridWidth);
-  syncTeamGridWidth();
-
-  const taglines = {
-    'Bentley-Truman': 'Top-Shelf Talent',
-    'Lancaster': 'Muscle & Defense',
-    'Four Corners': 'Hustle & Attitude',
-    'Ocean City': 'Sharpshooters Galore',
-    'Morristown': 'Perfectly Balanced',
-    'Little York': 'Wicked Smart',
-    'Xavien': 'Youthful Exuberance',
-    'South Lancaster': 'Us vs The World'
-  };
-
-  teamButtons.forEach(function (btn) {
-    const team = btn.dataset.team;
-    const taglineEl = btn.querySelector('.team-tagline');
-    if (taglineEl && taglines[team]) {
-      taglineEl.textContent = taglines[team];
-    }
-    btn.addEventListener('click', function () {
-      window.location.href = '/team-roster-view.html?team_name=' + encodeURIComponent(team) + '&return_url=' + encodeURIComponent(window.location.pathname);
-    });
-  });
 
   const headers = getAuthHeaders();
   const currentFranchiseData = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/current'), { headers: headers });
@@ -369,7 +604,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   if (!currentFranchise) {
     renderFranchiseEmptyState();
-    syncTeamGridWidth();
     return;
   }
 
@@ -381,5 +615,4 @@ document.addEventListener('DOMContentLoaded', async function () {
   const teamName = safeText(currentFranchise.user_team_id, '');
   const teamDoc = teamsByName[teamName] || null;
   renderFranchiseActiveState(currentFranchise, teamDoc, commandCenterData);
-  syncTeamGridWidth();
 });

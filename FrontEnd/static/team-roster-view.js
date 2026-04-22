@@ -83,12 +83,12 @@ const ATTR_GROUPS = {
 document.addEventListener('DOMContentLoaded', async () => {
   setupBackButton();
   
-  // Set team name in header
-  const teamNameEl = document.getElementById('team-name');
+  const teamBannerEl = document.getElementById('team-banner');
   if (teamName) {
-    teamNameEl.textContent = `${teamName} Roster`;
-  } else {
-    teamNameEl.textContent = 'Team Roster';
+    if (teamBannerEl && typeof getTeamAssetPath === 'function') {
+      teamBannerEl.src = getTeamAssetPath(teamName, 'banner_primary');
+      teamBannerEl.alt = `${teamName} banner`;
+    }
   }
   
   // Initialize view toggle
@@ -1093,9 +1093,10 @@ function createCardBack(player) {
     value.textContent = displayVal;
     
     // Set gold bar fill percentage (0-10 scale, max at 100%)
-    if (displayVal !== '--') {
+    if (displayVal !== '--' && typeof getAttrColor === 'function') {
       const fillPercentage = Math.min(displayVal * 10, 100);
       pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
+      pill.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil(Number(rawVal) / 10)));
     }
     
     pill.appendChild(value);

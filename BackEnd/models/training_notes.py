@@ -23,6 +23,10 @@ def _player_name(p: Dict) -> str:
     return n or str(p.get("_id", ""))
 
 
+def _player_id(p: Dict) -> str:
+    return str(p.get("_id", "") or "")
+
+
 def _anchor_val(attrs: Dict, code: str) -> int:
     v = attrs.get(f"anchor_{code}", attrs.get(code, 0))
     try:
@@ -161,6 +165,37 @@ def _locker_room_body(players: List[dict]) -> str:
     return _player_name(picked)
 
 
+def _locker_room_note(players: List[dict]) -> Dict[str, Any]:
+    eligible = [p for p in players if _ch_post(p) > 59]
+    if not eligible:
+        return {"title": "Most Positive Locker Room Influence", "body": "None"}
+    weights = [2 if _ch_post(p) > 79 else 1 for p in eligible]
+    picked = random.choices(eligible, weights=weights, k=1)[0]
+    player_id = _player_id(picked)
+    note: Dict[str, Any] = {
+        "title": "Most Positive Locker Room Influence",
+        "body": _player_name(picked),
+    }
+    if player_id:
+        note["player_id"] = player_id
+        note["player_ids"] = [player_id]
+    return note
+
+
+def _note_with_player_ids(title: str, names: List[str], players_by_name: Dict[str, Dict[str, Any]], empty_body: str) -> Dict[str, Any]:
+    note: Dict[str, Any] = {"title": title}
+    if not names:
+        note["body"] = empty_body
+        return note
+    note["body"] = ", ".join(names)
+    player_ids = [_player_id(players_by_name[name]) for name in names if name in players_by_name and _player_id(players_by_name[name])]
+    if player_ids:
+        note["player_ids"] = player_ids
+        if len(player_ids) == 1:
+            note["player_id"] = player_ids[0]
+    return note
+
+
 def build_structured_training_report_notes(
     *,
     is_training_camp: bool,
@@ -170,8 +205,9 @@ def build_structured_training_report_notes(
     plays_data: dict,
     scouting_data: dict,
     legacy_energy_notes: List[str],
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     sections: List[Dict[str, str]] = []
+    players_by_name = {_player_name(p): p for p in players}
     by_name = { _player_name(p): _cumulative_delta(p, original_player_baselines) for p in players }
     discounted_by_name = { _player_name(p): _mvp_discounted_total(p, original_player_baselines) for p in players }
     sums = _team_attr_delta_sums(players, original_player_baselines)
@@ -195,7 +231,7 @@ def build_structured_training_report_notes(
             title = "Biggest Concerns" if len(names) > 1 else "Biggest Concern"
             sections.append({"title": title, "body": ", ".join(names)})
 
-        sections.append({"title": "Most Positive Locker Room Influence", "body": _locker_room_body(players)})
+        sections.append(_locker_room_note(players))
 
         hi = sorted(a for a, s in sums.items() if s > 49)
         sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})
@@ -208,7 +244,7 @@ def build_structured_training_report_notes(
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)
             title = "Practice Players Of The Week" if len(names) > 1 else "Practice Player Of The Week"
-            sections.append({"title": title, "body": ", ".join(names)})
+            sections.append(_note_with_player_ids(title, names, players_by_name, NSS))
         else:
             sections.append({"title": "Practice Player Of The Week", "body": NSS})
 
@@ -218,9 +254,9 @@ def build_structured_training_report_notes(
         else:
             worst = min(t for _, t in neg)
             names = sorted(n for n, t in neg if t == worst)
-            sections.append({"title": "Biggest Regression", "body": ", ".join(names)})
+            sections.append(_note_with_player_ids("Biggest Regression", names, players_by_name, "None"))
 
-        sections.append({"title": "Most Positive Locker Room Influence", "body": _locker_room_body(players)})
+        sections.append(_locker_room_note(players))
 
         hi = sorted(a for a, s in sums.items() if s >= 10)
         sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})

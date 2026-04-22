@@ -250,7 +250,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
         text-decoration: none;
         display: inline-block;
         transition: all 0.3s;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Bebas Neue', sans-serif;
       }
 
       .sub-players-button {
@@ -275,4 +275,3 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   }
   document.body.appendChild(popup);
 }
-

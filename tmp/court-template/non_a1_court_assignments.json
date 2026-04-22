@@ -1,0 +1,16 @@
+{
+  "generated_count": 1,
+  "assignments": [
+    {
+      "slug": "grupenberg",
+      "hardwood_variant": "medium_light",
+      "inside_tone": "medium",
+      "outside_tone": "light",
+      "lane_fill": "primary",
+      "half_circle_fill": "primary",
+      "oob_fill": "black",
+      "line_fill": "black",
+      "output": "/Users/jamesdavies/gob-simplified/FrontEnd/static/images/teams/grupenberg/grupenberg_court.jpg"
+    }
+  ]
+}

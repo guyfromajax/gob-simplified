@@ -9,6 +9,7 @@ let userTeamId = ""; // ObjectId for API calls
 let userTeamName = ""; // Team name for bracket comparisons
 let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting (matches Franchise pattern)
 let teamColorCache = null; // Cache for team primary colors
+let teamMetaByNameCache = null;
 let tournamentRosterData = null; // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
 
 function playSound(filename) {
@@ -101,6 +102,13 @@ console.log("✅ tournament.js loaded");
 
 function getLogo(teamName) {
   return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+}
+
+function getTeamTooltipText(teamName) {
+  if (!teamName) return '';
+  const meta = teamMetaByNameCache?.[teamName] || null;
+  const mascot = String(meta?.mascot || '').trim();
+  return mascot ? `${teamName} ${mascot}` : String(teamName);
 }
 
 
@@ -221,6 +229,10 @@ function renderBracket() {
       results,
       getLogo,
       isUserTeam,
+      getTooltip: function (teamId, teamName) {
+        const resolvedName = teamIdNameMap[String(teamId)] || teamName || '';
+        return getTeamTooltipText(resolvedName);
+      },
     });
   } else {
     console.warn('[TCC] renderBracketShared not found; bracket.js may not be loaded');
@@ -560,12 +572,18 @@ async function initializeTeamColorCache() {
     const res = await fetch(API_CONFIG.buildUrl('/teams'));
     const teamData = await res.json();
     teamColorCache = {};
+    teamMetaByNameCache = {};
     teamData.forEach(t => {
       teamColorCache[t.name] = t.primary_color;
+      teamMetaByNameCache[t.name] = {
+        mascot: t.mascot || '',
+        primary_color: t.primary_color || null,
+      };
     });
   } catch (err) {
     console.warn('Failed to load team colors:', err);
     teamColorCache = {};
+    teamMetaByNameCache = {};
   }
 }
 

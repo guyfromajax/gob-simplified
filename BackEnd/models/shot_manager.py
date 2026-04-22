@@ -37,9 +37,12 @@ from BackEnd.utils.shared import (
     calculate_defender_pressure_score,
     calculate_bounce_spot,
     determine_rebounder,
+    temp_lineup_court_absolute_for_away_rebound_math,
     calculate_charge,
     height_to_block_score,
     calculate_block_spot,
+    resolve_over_the_back_foul,
+    increment_no_defender_shot_breakdown,
 )
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
@@ -50,9 +53,26 @@ from BackEnd.constants.fast_break_play_types import (
 )
 
 # Location-based contest / rim shortcuts (see Shot_System.md)
-CONTEST_DEFENDER_DX_MAX = 6
-CONTEST_DEFENDER_DY_MAX = 4
+CONTEST_DEFENDER_DX_MAX = 8
+CONTEST_DEFENDER_DY_MAX = 8
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
+
+# DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
+DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
+
+
+def _hco_zone_shot_threshold_delta(defense_playcall, shot_type):
+    """
+    Zone-specific shot threshold adjustment for half-court / Final Turn only (Shot_System.md).
+    Higher threshold => harder to convert (shot_score must clear a higher bar).
+    """
+    if shot_type not in ("inside", "attack", "outside"):
+        return 0
+    if defense_playcall == "2-3 Zone":
+        return {"inside": 25, "attack": 10, "outside": -25}[shot_type]
+    if defense_playcall == "3-2 Zone":
+        return {"inside": -30, "attack": -30, "outside": 50}[shot_type]
+    return 0
 
 
 def _shooter_xy_from_roles(roles, shooter):
@@ -86,21 +106,45 @@ def _animation_transition_basket_xy(team, game):
     return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
 
 
-def _defender_in_contest_range(sx, sy, def_lineup):
-    """True if any defensive lineup player lies within the contest bounding box around the shooter."""
-    for p in (def_lineup or {}).values():
-        if p is None:
-            continue
-        c = getattr(p, "coords", None) or {}
-        dx = abs(float(c.get("x", 50)) - sx)
-        dy = abs(float(c.get("y", 25)) - sy)
-        if dx <= CONTEST_DEFENDER_DX_MAX and dy <= CONTEST_DEFENDER_DY_MAX:
-            return True
-    return False
+def _player_xy(player):
+    c = getattr(player, "coords", None) or {}
+    return float(c.get("x", 50)), float(c.get("y", 25))
 
 
 def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
+
+
+def _resolve_hco_shot_defenders(game, def_lineup, shooter, shooter_pos, shot_step_index):
+    if game.game_state.get("offensive_state") != "HCO":
+        return None, None
+
+    defense_call = game.game_state.get("defense_playcall", "Man")
+
+    from BackEnd.utils.defense_utils import is_zone_defense
+
+    if is_zone_defense(defense_call):
+        assignments_by_step = getattr(game, "zone_defender_assignments_by_step", {}) or {}
+        shot_step_assignments = assignments_by_step.get(shot_step_index, {}) if shot_step_index is not None else {}
+        shooter_id = getattr(shooter, "player_id", None)
+        defenders_on_shooter = [
+            def_pos for def_pos, guarded_player_id in shot_step_assignments.items()
+            if guarded_player_id == shooter_id
+        ]
+        primary = def_lineup.get(defenders_on_shooter[0]) if len(defenders_on_shooter) >= 1 else None
+        secondary = def_lineup.get(defenders_on_shooter[1]) if len(defenders_on_shooter) >= 2 else None
+        return primary, secondary
+
+    from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
+
+    defending_team_is_user = getattr(game.defense_team, "is_user_team", False)
+    defender_pos = get_defender_position_for_man_defense(
+        shooter_pos,
+        game.game_state,
+        defending_team_is_user=defending_team_is_user,
+    ) if shooter_pos else "PG"
+    primary = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+    return primary, None
 
 
 class ShotManager:
@@ -212,32 +256,72 @@ class ShotManager:
                 return player
         return None
 
-    def _build_dreb_outlet_receiver_target(self, rebound_team, rebounder_id):
+    def _build_dreb_outlet_receiver_target(self, rebound_team, rebounder_id, ball_bounce=None):
         """
         Build unit-specific receive target for DREB->halfcourt outlet.
 
         This target is not the generic shot-turn animation end. It is a dedicated
         receive spot near the rebounder, biased toward the new attacking basket.
+
+        When ``ball_bounce`` is provided and ``rebounder.coords`` disagree with it by
+        more than ``DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD`` on x, passer position
+        is re-anchored near the bounce so the outlet matches where the board was secured
+        (avoids stale defensive-shell coords).
         """
         rebounder = self._resolve_lineup_player_by_id(rebound_team, rebounder_id)
         if rebounder is None:
             return None
         rebounder_coords = getattr(rebounder, "coords", None) or {}
-        reb_x = float(rebounder_coords.get("x", 50))
-        reb_y = float(rebounder_coords.get("y", 25))
+        raw_reb_x = float(rebounder_coords.get("x", 50))
+        raw_reb_y = float(rebounder_coords.get("y", 25))
+        reb_x = raw_reb_x
+        reb_y = raw_reb_y
+        anchor_source = "rebounder_coords"
+
+        if ball_bounce is not None:
+            bx = ball_bounce.get("x") if isinstance(ball_bounce, dict) else None
+            by = ball_bounce.get("y") if isinstance(ball_bounce, dict) else None
+            if bx is not None and by is not None:
+                bx = float(bx)
+                by = float(by)
+                if abs(raw_reb_x - bx) > DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD:
+                    reb_x = float(max(4.0, min(97.0, bx + random.randint(-3, 3))))
+                    reb_y = float(max(1.0, min(50.0, by + random.randint(-5, 5))))
+                    anchor_source = "ball_bounce_corrected"
+
         # Use transition animation basket orientation (matches frontend).
         basket_x, _basket_y = _animation_transition_basket_xy(rebound_team, self.game)
         sign = 1 if basket_x > reb_x else -1
 
         target_x = max(4.0, min(97.0, reb_x + sign * random.randint(3, 6)))
         target_y = max(1.0, min(50.0, reb_y + random.randint(-6, 6)))
+        rebound_team_name = getattr(rebound_team, "name", None) or getattr(
+            rebound_team, "team_id", "?"
+        )
+        logging.info(
+            "[DREB_OUTLET_TARGET] rebound_team=%s rebounder_id=%s raw_reb_xy=(%.2f,%.2f) "
+            "passer_xy_used=(%.2f,%.2f) anchor=%s bounce_xy=%s transition_basket_x=%.2f "
+            "sign=%s target_xy=(%.2f,%.2f)",
+            rebound_team_name,
+            rebounder_id,
+            raw_reb_x,
+            raw_reb_y,
+            reb_x,
+            reb_y,
+            anchor_source,
+            ball_bounce,
+            basket_x,
+            sign,
+            target_x,
+            target_y,
+        )
         return {
             "x": round(target_x, 2),
             "y": round(target_y, 2),
             "source": "shot_manager_dreb_outlet_receiver_target",
         }
 
-    def _build_dreb_outlet_pass_contract(self, rebound_team, rebounder_id):
+    def _build_dreb_outlet_pass_contract(self, rebound_team, rebounder_id, ball_bounce=None):
         """Build explicit outlet-pass contract consumed by frontend DREB setup."""
         passer_id = rebounder_id
         if passer_id is None:
@@ -246,7 +330,9 @@ class ShotManager:
         receiver_id = self._resolve_dreb_outlet_receiver(rebound_team, passer_id)
         if passer_id is None or receiver_id is None:
             return None
-        receiver_target = self._build_dreb_outlet_receiver_target(rebound_team, passer_id)
+        receiver_target = self._build_dreb_outlet_receiver_target(
+            rebound_team, passer_id, ball_bounce=ball_bounce
+        )
         return {
             "passer_id": passer_id,
             "receiver_id": receiver_id,
@@ -368,6 +454,20 @@ class ShotManager:
         if has_double_team_at_shot and second_defender_id_at_shot:
             result["second_defender_id"] = second_defender_id_at_shot
             result["has_double_team"] = True
+
+        if game_state.get("offensive_state") == "HCO":
+            resolved_defender, resolved_second_defender = _resolve_hco_shot_defenders(
+                self.game,
+                def_lineup,
+                shooter,
+                shooter_pos,
+                shot_step_index,
+            )
+            if resolved_defender or resolved_second_defender:
+                defender = resolved_defender or defender
+                second_defender = resolved_second_defender
+                roles["defender"] = defender
+                roles["second_defender"] = second_defender
 
         # Debug: Print shooter information with object ID
         # from BackEnd.constants import DEBUG
@@ -493,9 +593,23 @@ class ShotManager:
         if game_state.pop("shot_at_one_second", False):
             shot_threshold += 100
 
+        # Zone defense: shot-type threshold deltas (HCO + Final Turn only; Shot_System.md)
+        if not is_fast_break and game_state.get("offensive_state") == "HCO":
+            _zdelta = _hco_zone_shot_threshold_delta(defense_call, shot_type)
+            if _zdelta:
+                shot_threshold += _zdelta
+
         sx, sy = _shooter_xy_from_roles(roles, shooter)
         bx, by = _attacking_basket_xy(off_team, self.game)
-        has_contest = _defender_in_contest_range(sx, sy, def_lineup)
+        geometry_has_contest = False
+        for candidate in (def_lineup or {}).values():
+            if candidate is None:
+                continue
+            candidate_x, candidate_y = _player_xy(candidate)
+            if abs(candidate_x - sx) <= CONTEST_DEFENDER_DX_MAX and abs(candidate_y - sy) <= CONTEST_DEFENDER_DY_MAX:
+                geometry_has_contest = True
+                break
+        has_contest = bool(defender or second_defender) if game_state.get("offensive_state") == "HCO" else geometry_has_contest
         rim_unguarded_99 = (
             _shot_in_rim_box(sx, sy, bx, by)
             and not has_contest
@@ -506,8 +620,8 @@ class ShotManager:
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
-        
         charge_result = None
+        defense_applied_defenders = []
 
         if rim_unguarded_99:
             # Unguarded attempt in rim box: 99% make; skip defense, fouls, block recon, charge.
@@ -517,6 +631,10 @@ class ShotManager:
             shot_score = 0
             shot_score_pre_defense = 0
         else:
+            if has_contest and defender:
+                defense_applied_defenders.append(defender)
+                if second_defender:
+                    defense_applied_defenders.append(second_defender)
             # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
             # Use shot_type instead of playcall for shot score calculation
             # No contest → omit defensive scoring and shooting-foul rolls (still full offense / gravity).
@@ -878,6 +996,13 @@ class ShotManager:
                 logging.warning(f"   📊 Shot result unchanged: {'MADE' if made else 'MISS'} (calibration did not force change)")
 
         # Stat tracking (attempts)
+        if not defense_applied_defenders:
+            self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
+            increment_no_defender_shot_breakdown(
+                self.game_state,
+                self.game_state.get("offensive_state"),
+                shot_type,
+            )
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
@@ -1184,8 +1309,9 @@ class ShotManager:
         # ------------------------
         else:
             text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}."
-            if defender:
-                defender.record_stat("DEF_S")
+            for defense_player in defense_applied_defenders:
+                if defense_player:
+                    defense_player.record_stat("DEF_S")
 
             if d_foul:
                 # Shooting foul → free throws
@@ -1308,102 +1434,132 @@ class ShotManager:
                     # ==================== FAST BREAK REBOUND (x-eligibility) ====================
                     # Eligibility: home offense → x >= 50; away offense → x <= 50. Then standard rebound logic.
                     is_away_offense = off_team.team_id == self.game.away_team.team_id
-                    basket_x = 9 if is_away_offense else 91
-                    bounce_spot = block_spot_used or calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
+                    with temp_lineup_court_absolute_for_away_rebound_math(self.game, is_away_offense):
+                        basket_x = 9 if is_away_offense else 91
+                        bounce_spot = block_spot_used or calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
 
-                    def _eligible_fb_lineup(lineup_dict):
-                        eligible = {}
-                        for pos, player in lineup_dict.items():
-                            if player is None:
-                                continue
-                            px = getattr(player, "coords", {}).get("x", 50)
-                            if is_away_offense and px <= 50:
-                                eligible[pos] = player
-                            elif not is_away_offense and px >= 50:
-                                eligible[pos] = player
-                        return eligible
+                        def _eligible_fb_lineup(lineup_dict):
+                            eligible = {}
+                            for pos, player in lineup_dict.items():
+                                if player is None:
+                                    continue
+                                px = getattr(player, "coords", {}).get("x", 50)
+                                if is_away_offense and px <= 50:
+                                    eligible[pos] = player
+                                elif not is_away_offense and px >= 50:
+                                    eligible[pos] = player
+                            return eligible
 
-                    o_rebounder_lineup = _eligible_fb_lineup(off_lineup)
-                    d_rebounder_lineup = _eligible_fb_lineup(def_lineup)
-                    shooter_id = getattr(shooter, "player_id", None)
-                    exclude_player_ids = set()
-                    penalize_player_ids = {shooter_id} if shooter_id else set()
+                        o_rebounder_lineup = _eligible_fb_lineup(off_lineup)
+                        d_rebounder_lineup = _eligible_fb_lineup(def_lineup)
+                        shooter_id = getattr(shooter, "player_id", None)
+                        exclude_player_ids = set()
+                        penalize_player_ids = {shooter_id} if shooter_id else set()
 
-                    o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
-                    d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
+                        o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
+                        d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
 
-                    if o_rebounder is None and d_rebounder is None:
-                        d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
-                        if d_rebounder:
+                        if o_rebounder is None and d_rebounder is None:
+                            d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
+                            if d_rebounder:
+                                rebounder = d_rebounder
+                                rebound_team = def_team
+                                stat = "DREB"
+                            else:
+                                raise ValueError("No players available for rebound")
+                        elif o_rebounder is None:
                             rebounder = d_rebounder
                             rebound_team = def_team
                             stat = "DREB"
+                        elif d_rebounder is None:
+                            rebounder = o_rebounder
+                            rebound_team = off_team
+                            stat = "OREB"
                         else:
-                            raise ValueError("No players available for rebound")
-                    elif o_rebounder is None:
-                        rebounder = d_rebounder
-                        rebound_team = def_team
-                        stat = "DREB"
-                    elif d_rebounder is None:
-                        rebounder = o_rebounder
-                        rebound_team = off_team
-                        stat = "OREB"
-                    else:
-                        o_score = calculate_rebound_score(o_rebounder)
-                        d_score = calculate_rebound_score(d_rebounder)
-                        def_prob = 0.7
-                        player_advantage = len(d_rebounder_lineup) - len(o_rebounder_lineup)
-                        def_prob += (player_advantage * 0.05)
-                        off_mod = off_team.team_attributes["rebound_modifier"]
-                        def_mod = def_team.team_attributes["rebound_modifier"]
-                        bias = def_mod - off_mod
-                        new_prob = min(0.95, max(0.35, def_prob + bias))
-                        total_score = d_score + o_score
-                        d_weight = (d_score / total_score) if total_score > 0 else 0.5
-                        d_weight += (new_prob - 0.5)
-                        d_weight = min(0.95, max(0.05, d_weight))
-                        if game_state.get("defense_playcall") == "Zone":
-                            d_weight *= 0.9
-                        rebound_team = def_team if random.random() < d_weight else off_team
-                        rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                        stat = "DREB" if rebound_team == def_team else "OREB"
+                            o_score = calculate_rebound_score(o_rebounder)
+                            d_score = calculate_rebound_score(d_rebounder)
+                            def_prob = 0.7
+                            player_advantage = len(d_rebounder_lineup) - len(o_rebounder_lineup)
+                            def_prob += (player_advantage * 0.05)
+                            off_mod = off_team.team_attributes["rebound_modifier"]
+                            def_mod = def_team.team_attributes["rebound_modifier"]
+                            bias = def_mod - off_mod
+                            new_prob = min(0.95, max(0.35, def_prob + bias))
+                            total_score = d_score + o_score
+                            d_weight = (d_score / total_score) if total_score > 0 else 0.5
+                            d_weight += (new_prob - 0.5)
+                            d_weight = min(0.95, max(0.05, d_weight))
+                            if game_state.get("defense_playcall") == "Zone":
+                                d_weight *= 0.9
+                            rebound_team = def_team if random.random() < d_weight else off_team
+                            rebounder = d_rebounder if rebound_team == def_team else o_rebounder
+                            stat = "DREB" if rebound_team == def_team else "OREB"
 
-                    result["ball_bounce_x"] = bounce_spot["x"]
-                    result["ball_bounce_y"] = bounce_spot["y"]
-                    self.game_state["last_rebound"] = stat
-                    rebounder.record_stat(stat)
-                    text += f"...{get_name_safe(rebounder)} grabs the rebound."
-                    result["rebounderId"] = getattr(rebounder, "player_id", None)
-                    result["rebound_type"] = stat
-                    result["offense_getback"] = []
-                    result["defense_release"] = []
-                    result["offense_rebounders"] = [getattr(p, "player_id", None) for p in o_rebounder_lineup.values()]
-                    result["defense_rebounders"] = [getattr(p, "player_id", None) for p in d_rebounder_lineup.values()]
-                    result["offense_getback_coords"] = {}
-                    result["defense_release_coords"] = {}
+                        result["ball_bounce_x"] = bounce_spot["x"]
+                        result["ball_bounce_y"] = bounce_spot["y"]
 
-                    if stat == "OREB":
-                        possession_flips = False
-                        self.game_state.pop("_shot_dreb_fb_play_key", None)
-                        if self.game_state.get("final_turn"):
-                            result["quarter_ends_after"] = True
-                            result["next_play_type"] = None
+                        otb = resolve_over_the_back_foul(
+                            self.game,
+                            rebounder,
+                            rebound_team,
+                            d_rebounder_lineup if rebound_team == off_team else o_rebounder_lineup,
+                        )
+                        if otb:
+                            from BackEnd.engine.phase_resolution import resolve_non_shooting_foul
+
+                            self.game_state["foul_team"] = otb["foul_team"]
+                            foul_result = resolve_non_shooting_foul(
+                                {
+                                    "ball_handler": otb["victim"],
+                                    "defender": d_rebounder if rebound_team == off_team else rebounder,
+                                    "foul_player": otb["foul_player"],
+                                    "shooter": otb["victim"],
+                                    "screener": None,
+                                    "passer": None,
+                                },
+                                self.game,
+                            )
+                            foul_result["otb_foul"] = True
+                            foul_result["text"] = "Over the back!"
+                            foul_result["current_turn"] = "FAST_BREAK"
+                            foul_result["ball_bounce_x"] = bounce_spot["x"]
+                            foul_result["ball_bounce_y"] = bounce_spot["y"]
+                            return foul_result
+
+                        self.game_state["last_rebound"] = stat
+                        rebounder.record_stat(stat)
+                        text += f"...{get_name_safe(rebounder)} grabs the rebound."
+                        result["rebounderId"] = getattr(rebounder, "player_id", None)
+                        result["rebound_type"] = stat
+                        result["offense_getback"] = []
+                        result["defense_release"] = []
+                        result["offense_rebounders"] = [getattr(p, "player_id", None) for p in o_rebounder_lineup.values()]
+                        result["defense_rebounders"] = [getattr(p, "player_id", None) for p in d_rebounder_lineup.values()]
+                        result["offense_getback_coords"] = {}
+                        result["defense_release_coords"] = {}
+
+                        if stat == "OREB":
+                            possession_flips = False
+                            self.game_state.pop("_shot_dreb_fb_play_key", None)
+                            if self.game_state.get("final_turn"):
+                                result["quarter_ends_after"] = True
+                                result["next_play_type"] = None
+                            else:
+                                self.game_state["pending_oreb"] = {
+                                    "rebounder": rebounder,
+                                    "rebounder_id": getattr(rebounder, "player_id", None),
+                                    "from_block": getattr(self, "_block_spot", None) is not None,
+                                }
+                                result["next_play_type"] = "OREB"
                         else:
-                            self.game_state["pending_oreb"] = {
-                                "rebounder": rebounder,
-                                "rebounder_id": getattr(rebounder, "player_id", None),
-                                "from_block": getattr(self, "_block_spot", None) is not None,
-                            }
-                            result["next_play_type"] = "OREB"
-                    else:
-                        possession_flips = True
-                        if self.game_state.get("final_turn"):
-                            result["quarter_ends_after"] = True
-                            result["next_play_type"] = None
-                        else:
-                            self.game_state["offensive_state"] = "HCO"
-                            self.game_state["last_rebounder"] = rebounder
-                            result["next_play_type"] = "HCO"
+                            possession_flips = True
+                            if self.game_state.get("final_turn"):
+                                result["quarter_ends_after"] = True
+                                result["next_play_type"] = None
+                            else:
+                                self.game_state["offensive_state"] = "HCO"
+                                self.game_state["last_rebounder"] = rebounder
+                                result["next_play_type"] = "HCO"
 
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
                     for pos, rebounder_player in o_rebounder_lineup.items():
@@ -1433,91 +1589,120 @@ class ShotManager:
                 # FAST_BREAK-specific block. Do not run the shared HCO rebound pipeline,
                 # or we can resolve rebound twice and emit contradictory state.
                 if not is_fast_break:
-                    # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
-                    # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
-                    o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
-                    d_rebounder_lineup = {pos: def_team.lineup[pos] for pos in defense_rebounders if def_team.lineup.get(pos) is not None}
+                    is_away_offense = off_team.team_id == self.game.away_team.team_id
+                    with temp_lineup_court_absolute_for_away_rebound_math(self.game, is_away_offense):
+                        # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
+                        # Build filtered lineups containing only players in offense_rebounders/defense_rebounders
+                        o_rebounder_lineup = {pos: off_team.lineup[pos] for pos in offense_rebounders if off_team.lineup.get(pos) is not None}
+                        d_rebounder_lineup = {pos: def_team.lineup[pos] for pos in defense_rebounders if def_team.lineup.get(pos) is not None}
                     
-                    # Step 3: Penalize shooter (20% distance penalty) but don't exclude
-                    shooter_id = getattr(shooter, "player_id", None)
-                    exclude_player_ids = set()  # Don't exclude shooter anymore
-                    penalize_player_ids = {shooter_id} if shooter_id else set()  # Penalize shooter by 20% distance
+                        # Step 3: Penalize shooter (20% distance penalty) but don't exclude
+                        shooter_id = getattr(shooter, "player_id", None)
+                        exclude_player_ids = set()  # Don't exclude shooter anymore
+                        penalize_player_ids = {shooter_id} if shooter_id else set()  # Penalize shooter by 20% distance
                     
-                    # Step 4: Choose closest player to bounce spot from each team
-                    o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
-                    d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
+                        # Step 4: Choose closest player to bounce spot from each team
+                        o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
+                        d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
                     
-                    # Step 5: Handle edge cases (all players released/got back)
-                    if o_rebounder is None and d_rebounder is None:
-                        # Fallback: use any defensive player
-                        logging.warning("No eligible rebounders found, using fallback")
-                        d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
-                        if d_rebounder:
+                        # Step 5: Handle edge cases (all players released/got back)
+                        if o_rebounder is None and d_rebounder is None:
+                            # Fallback: use any defensive player
+                            logging.warning("No eligible rebounders found, using fallback")
+                            d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
+                            if d_rebounder:
+                                rebounder = d_rebounder
+                                rebound_team = def_team
+                                stat = "DREB"
+                            else:
+                                raise ValueError("No players available for rebound")
+                        elif o_rebounder is None:
+                            # All offensive players got back - automatic DREB
                             rebounder = d_rebounder
                             rebound_team = def_team
                             stat = "DREB"
+                        elif d_rebounder is None:
+                            # All defensive players released - automatic OREB
+                            rebounder = o_rebounder
+                            rebound_team = off_team
+                            stat = "OREB"
                         else:
-                            raise ValueError("No players available for rebound")
-                    elif o_rebounder is None:
-                        # All offensive players got back - automatic DREB
-                        rebounder = d_rebounder
-                        rebound_team = def_team
-                        stat = "DREB"
-                    elif d_rebounder is None:
-                        # All defensive players released - automatic OREB
-                        rebounder = o_rebounder
-                        rebound_team = off_team
-                        stat = "OREB"
-                    else:
-                        # Step 6: Calculate rebound scores for closest players
-                        o_score = calculate_rebound_score(o_rebounder)
-                        d_score = calculate_rebound_score(d_rebounder)
+                            # Step 6: Calculate rebound scores for closest players
+                            o_score = calculate_rebound_score(o_rebounder)
+                            d_score = calculate_rebound_score(d_rebounder)
                         
-                        # Step 7: Apply team bias with player advantage modifier
-                        def_prob = 0.7
-                        player_advantage = len(defense_rebounders) - len(offense_rebounders)
-                        def_prob += (player_advantage * 0.05)
+                            # Step 7: Apply team bias with player advantage modifier
+                            def_prob = 0.7
+                            player_advantage = len(defense_rebounders) - len(offense_rebounders)
+                            def_prob += (player_advantage * 0.05)
                         
-                        off_mod = off_team.team_attributes["rebound_modifier"]
-                        def_mod = def_team.team_attributes["rebound_modifier"]
-                        bias = def_mod - off_mod
-                        new_prob = min(0.95, max(0.35, def_prob + bias))
+                            off_mod = off_team.team_attributes["rebound_modifier"]
+                            def_mod = def_team.team_attributes["rebound_modifier"]
+                            bias = def_mod - off_mod
+                            new_prob = min(0.95, max(0.35, def_prob + bias))
                         
-                        # Step 8: Calculate final weights
-                        total_score = d_score + o_score
-                        d_weight = (d_score / total_score) if total_score > 0 else 0.5
-                        d_weight += (new_prob - 0.5)
-                        d_weight = min(0.95, max(0.05, d_weight))
+                            # Step 8: Calculate final weights
+                            total_score = d_score + o_score
+                            d_weight = (d_score / total_score) if total_score > 0 else 0.5
+                            d_weight += (new_prob - 0.5)
+                            d_weight = min(0.95, max(0.05, d_weight))
                         
-                        # Zone defense penalty
-                        defense_call = game_state.get("defense_call", "Man")
-                        if defense_call == "Zone":
-                            d_weight *= 0.9
+                            # Zone defense penalty
+                            defense_call = game_state.get("defense_call", "Man")
+                            if defense_call == "Zone":
+                                d_weight *= 0.9
                         
-                        # Step 9: Weighted random selection
-                        rebound_team = def_team if random.random() < d_weight else off_team
-                        rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                        stat = "DREB" if rebound_team == def_team else "OREB"
+                            # Step 9: Weighted random selection
+                            rebound_team = def_team if random.random() < d_weight else off_team
+                            rebounder = d_rebounder if rebound_team == def_team else o_rebounder
+                            stat = "DREB" if rebound_team == def_team else "OREB"
                     
-                    # Store bounce spot for frontend animation
-                    result["ball_bounce_x"] = bounce_spot["x"]
-                    result["ball_bounce_y"] = bounce_spot["y"]
+                        # Store bounce spot for frontend animation
+                        result["ball_bounce_x"] = bounce_spot["x"]
+                        result["ball_bounce_y"] = bounce_spot["y"]
+
+                        otb = resolve_over_the_back_foul(
+                            self.game,
+                            rebounder,
+                            rebound_team,
+                            d_rebounder_lineup if rebound_team == off_team else o_rebounder_lineup,
+                        )
+                        if otb:
+                            from BackEnd.engine.phase_resolution import resolve_non_shooting_foul
+
+                            self.game_state["foul_team"] = otb["foul_team"]
+                            foul_result = resolve_non_shooting_foul(
+                                {
+                                    "ball_handler": otb["victim"],
+                                    "defender": d_rebounder if rebound_team == off_team else rebounder,
+                                    "foul_player": otb["foul_player"],
+                                    "shooter": otb["victim"],
+                                    "screener": None,
+                                    "passer": None,
+                                },
+                                self.game,
+                            )
+                            foul_result["otb_foul"] = True
+                            foul_result["text"] = "Over the back!"
+                            foul_result["ball_bounce_x"] = bounce_spot["x"]
+                            foul_result["ball_bounce_y"] = bounce_spot["y"]
+                            return foul_result
                     
-                    # Record rebound stat and update game state
-                    self.game_state["last_rebound"] = stat
-                    rebounder.record_stat(stat)
-                    # Debug: Log when initial rebound stat is recorded
-                    # ✅ COMMENTED OUT: Initial rebound log (cluttering transition debugging)
-                    # logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
-                    text += f"...{get_name_safe(rebounder)} grabs the rebound."
-                    result["rebounderId"] = getattr(rebounder, "player_id", None)
-                    result["rebound_type"] = stat
+                        # Record rebound stat and update game state
+                        self.game_state["last_rebound"] = stat
+                        rebounder.record_stat(stat)
+                        # Debug: Log when initial rebound stat is recorded
+                        # ✅ COMMENTED OUT: Initial rebound log (cluttering transition debugging)
+                        # logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
+                        text += f"...{get_name_safe(rebounder)} grabs the rebound."
+                        result["rebounderId"] = getattr(rebounder, "player_id", None)
+                        result["rebound_type"] = stat
                     
-                    # Add player positioning data for frontend animation (already added at top for MAKE shots)
-                    result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
-                    result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
-                    result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
-                    result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
+                        # Add player positioning data for frontend animation (already added at top for MAKE shots)
+                        result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
+                        result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
+                        result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
+                        result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
                     
                     # ✅ SS&S: Calculate and store get-back player coordinates (backend as source of truth)
                     offense_getback_coords = {}
@@ -1775,9 +1960,17 @@ class ShotManager:
         next_play_type = str(result.get("next_play_type") or "").upper()
         rebound_type = str(result.get("rebound_type") or "").upper()
         if rebound_type == "DREB" and next_play_type in {"HCO", "HCT", "FCP"}:
+            ball_bounce = None
+            bx, by = result.get("ball_bounce_x"), result.get("ball_bounce_y")
+            if bx is not None and by is not None:
+                try:
+                    ball_bounce = {"x": float(bx), "y": float(by)}
+                except (TypeError, ValueError):
+                    ball_bounce = None
             contract = self._build_dreb_outlet_pass_contract(
                 rebound_team=def_team,
                 rebounder_id=result.get("rebounderId"),
+                ball_bounce=ball_bounce,
             )
             if contract:
                 result["dreb_outlet_pass"] = contract
@@ -2184,6 +2377,13 @@ class ShotManager:
 
         made = shot_score >= shot_threshold
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
+        if not defender:
+            self.game_state["no_defender_shots"] = int(self.game_state.get("no_defender_shots", 0) or 0) + 1
+            increment_no_defender_shot_breakdown(
+                self.game_state,
+                self.game_state.get("offensive_state"),
+                "fast_break",
+            )
         shooter.record_stat("FGA")
 
         if made:

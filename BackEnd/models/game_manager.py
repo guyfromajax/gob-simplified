@@ -218,6 +218,8 @@ class GameManager:
             "shooter": None,
             "free_throws": 0,
             "free_throws_remaining": 0,
+            "no_defender_shots": 0,
+            "no_defender_shots_breakdown": {},
             "one_and_one": False,
             "last_ball_handler": None,
             "foul_team": None,
@@ -695,6 +697,20 @@ class GameManager:
                 break
         _perf["oreb_loop"] = (_time.time() - _t0) * 1000
 
+        # OTB foul from resolve_offensive_rebound() means no putback/kickout was resolved on the
+        # OREB turn. The MISS (or BLOCK) turn still carries embedded OREB; the client otherwise
+        # defaults to a forced putback animation. Flag the prior shot turn so the frontend skips it.
+        if len(self.turns) >= 2:
+            _last = self.turns[-1]
+            _prev = self.turns[-2]
+            if (
+                _last.get("result_type") == "FOUL"
+                and _last.get("otb_foul")
+                and _prev.get("rebound_type") == "OREB"
+                and _prev.get("result_type") in ("MISS", "BLOCK")
+            ):
+                _prev["suppress_oreb_putback_animation"] = True
+
         # Log breakdown on sample turns during full_sim to see what drives user-game slowness
         if self.game_state.get("_is_full_simulation") and (
             self.macro_turn_count <= 3 or self.macro_turn_count % 10 == 0
@@ -802,28 +818,41 @@ class GameManager:
 
         # (Foul-out check and timeout creation now run inside _append_turn for the main result)
 
+        # SIP/dead-ball setup must key off the turn that actually ended the live sequence.
+        # Example: MISS (run_micro_turn) + batched OREB turn that resolves to OTB FOUL — the foul
+        # payload is the last appended turn; gating on `result` alone would still see MISS and skip SIP.
+        sip_gate_result = result
+        last_batched = self.turns[-1] if self.turns else None
+        if last_batched is not result and last_batched is not None:
+            if (
+                (last_batched.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
+                or last_batched.get("result_type") == "DEAD BALL"
+                or last_batched.get("result_type") == "CHARGE"
+            ):
+                sip_gate_result = last_batched
+
         # If the turn ended with a dead-ball turnover, a non-shooting foul
         # that does not result in free throws, or a charge (offensive foul),
         # prepare a sideline inbound and append its payload so the front end can animate it.
         if (
-            (result.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
-            or result.get("result_type") == "DEAD BALL"
-            or result.get("result_type") == "CHARGE"
+            (sip_gate_result.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
+            or sip_gate_result.get("result_type") == "DEAD BALL"
+            or sip_gate_result.get("result_type") == "CHARGE"
         ):
             # ✅ FIX: Flip possession BEFORE setup_side_inbound so correct team inbounds
             # Dead ball turnovers and offensive fouls always flip possession
-            # logging.warning(f"🔍 [SIP SETUP] Checking possession flip: result_type={result.get('result_type')}, possession_flips={result.get('possession_flips')}, current_turn={result.get('current_turn')}, current_offense={self.offense_team.name}")
-            if result.get("possession_flips"):
+            # logging.warning(f"🔍 [SIP SETUP] Checking possession flip: result_type={sip_gate_result.get('result_type')}, possession_flips={sip_gate_result.get('possession_flips')}, current_turn={sip_gate_result.get('current_turn')}, current_offense={self.offense_team.name}")
+            if sip_gate_result.get("possession_flips"):
                 old_offense = self.offense_team.name
                 self.switch_possession()
                 # ✅ FIX: Clear possession_flips flag after flipping to prevent frontend double flip
-                result["possession_flips"] = False
+                sip_gate_result["possession_flips"] = False
                 # logging.warning(f"🔄 [SIP] Flipped possession before SIP: {old_offense} → {self.offense_team.name}, set possession_flips=False")
             # else:
-            #     logging.warning(f"⏭️ [SIP] No possession flip needed (possession_flips={result.get('possession_flips')})")
+            #     logging.warning(f"⏭️ [SIP] No possession flip needed (possession_flips={sip_gate_result.get('possession_flips')})")
             
             inbound_payload = self.turn_manager.setup_side_inbound()
-            # logging.warning(f"✅ [SIP CREATE] Created SIDE_INBOUND, offense_team={inbound_payload.get('offense_team_id')}, result_was={result.get('current_turn')} {result.get('result_type')}")
+            # logging.warning(f"✅ [SIP CREATE] Created SIDE_INBOUND, offense_team={inbound_payload.get('offense_team_id')}, result_was={sip_gate_result.get('current_turn')} {sip_gate_result.get('result_type')}")
             
             # ✅ COMPUTER TIMEOUT: Check if any computer team should call timeout
             # should_computer_call_timeout() already filters out user teams (checks is_user_team flag)

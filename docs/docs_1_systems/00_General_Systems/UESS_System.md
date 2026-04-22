@@ -249,6 +249,92 @@ This contract applies to all dynamic-event non-skeleton units, including:
 
 Skeleton step families remain governed by skeleton completion rules unless explicitly migrated.
 
+## Per-Shot State Snapshot Contract
+
+This contract is the UESS control point for shot resolution correctness.
+
+### Purpose
+
+Ensure every shot attempt resolves contest, foul, block, rebound, and make/miss logic from one authoritative runtime snapshot instead of branch-specific coordinate fallbacks.
+
+### Core Rule
+
+Every shot attempt must build a single `shot_state_snapshot` immediately before shot resolution.
+
+The snapshot is the authority for:
+
+- shooter coordinates
+- shooter coordinate source
+- shot location / `shot_spot`
+- shooter role / position
+- assigned primary defender
+- assigned secondary defender
+- nearest defender
+- defender coordinates used for debug and contest evaluation
+- turn-family metadata (`HCO`, `HCT`, `FCP`, `FAST_BREAK`, `OREB_PUTBACK`)
+
+### Required Snapshot Fields
+
+- `turn_type`
+- `shot_type`
+- `shooter`
+  - `player_id`
+  - `name`
+  - `pos`
+  - `x`
+  - `y`
+  - `coord_source`
+- `shot_spot`
+  - `present`
+  - `x`
+  - `y`
+- `primary_defender`
+- `secondary_defender`
+- `nearest_defender`
+- `assigned_defender_count`
+- `contest_box_defender_count`
+- `contest_box_defenders`
+- `has_assigned_defender`
+- `has_contest_box_defender`
+
+### Authority Rule
+
+- `shot_state_snapshot.shooter.x/y` is the authoritative shooter location for shot resolution.
+- If `shot_spot` exists, shooter coordinates must derive from `shot_spot`.
+- If `shot_spot` does not exist, the fallback source must be explicit and logged as `shooter.coords`.
+- Contest evaluation must read from the same snapshot that is logged.
+
+### Logging Rule
+
+- Every shot emits `SHOT_COORD_DEBUG` from the resolved snapshot.
+- Every shot with zero assigned defenders emits a loud `NO_DEFENDER_SHOT` log.
+- No branch may silently resolve shot contest from ad hoc local coordinate state without snapshot source labeling.
+
+### HCO Shot-Defender Assignment Fallback
+
+For `HCO` shot attempts only:
+
+- if the shot reaches resolution with no assigned primary defender and no assigned secondary defender,
+- the engine may recover assignment from the legacy coverage system before shot resolution.
+
+Fallback order:
+
+- `Man`: recover the defender from the man-defense matchup assignment for the shooter's offensive position
+- `Zone`: recover the defender(s) from the zone-assignment data at the shot step
+
+Guardrails:
+
+- fallback assignment is for defender responsibility only
+- fallback assignment does not automatically set `has_contest=True`
+- contest remains a shot-time frame / proximity decision
+- every fallback assignment must emit a labeled runtime log
+
+### Current Implementation Note
+
+- `ShotManager.resolve_shot()` now builds and stores `roles["shot_state_snapshot"]` as the authoritative pre-resolution shot snapshot for standard shot paths.
+- `HCO` now includes a narrow shot-defender fallback that reuses legacy man/zone assignment logic when a shot arrives at resolution with no assigned defender.
+- `OREB` putback flow emits equivalent no-defender diagnostics and should be migrated into the same payload shape if/when putback resolution is folded into the main shot resolver.
+
 ## Local Dev Strictness Policy
 
 - Unit-completion contracts default to `throw` for UESS-target units.

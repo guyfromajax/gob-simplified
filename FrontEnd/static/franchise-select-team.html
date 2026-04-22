@@ -18,10 +18,24 @@
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
+  <div class="team-select-page">
+    <a id="team-select-back-link" class="team-select-back-link" href="/mode-select.html">Back</a>
+    <h1 id="page-title">Who Are You Coaching?</h1>
+    <p id="page-subtitle">You're building this program from the ground up. Choose wisely.</p>
+    <div id="team-select-error" class="team-select-error" hidden></div>
+    <div id="team-container"></div>
+  </div>
 
-  <h1 id="page-title">Who Are You Coaching?</h1>
-  <p id="page-subtitle">You're building this program from the ground up. Choose wisely.</p>
-  <div id="team-container"></div>
+  <div id="team-select-loading" class="team-select-loading" hidden>
+    <div class="team-select-loading-card">
+      <img id="team-select-loading-banner" class="team-select-loading-banner" alt="">
+      <h2 class="team-select-loading-title">Building Your Franchise, Coach</h2>
+      <p id="team-select-loading-subline" class="team-select-loading-subline">Getting your team ready for the season...</p>
+      <div class="team-select-loading-indicator" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
   <script src="/franchise-select-team.js"></script>

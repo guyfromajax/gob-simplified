@@ -10,24 +10,108 @@
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <style>
+    .rankings-page-header {
+      margin-bottom: 10px;
+    }
+
+    .rankings-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      margin-bottom: 12px;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .rankings-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .rankings-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .rankings-page-title {
+      margin-bottom: 8px !important;
+    }
+
+    .rankings-page-card {
+      margin-top: 0;
+    }
+
+    .rankings-page-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px 0;
+    }
+
+    .rankings-page-card .scroll-x {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+    }
+
+    .rankings-page-card .scroll-x::-webkit-scrollbar {
+      height: 10px;
+    }
+
+    .rankings-page-card .scroll-x::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .rankings-page-card .scroll-x::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.24);
+      border-radius: 999px;
+    }
+
     .rankings-results-table {
-      width: 100%;
-      min-width: 920px;
+      margin: 0;
+      width: max(100%, 1180px);
+      min-width: 1180px;
       table-layout: fixed;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
     }
     .rankings-results-table th,
     .rankings-results-table td {
-      padding: 0.9rem 1rem;
+      padding: 12px 10px 10px;
       vertical-align: middle;
       line-height: 1.35;
     }
     .rankings-results-table th {
-      letter-spacing: 0.03em;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
     }
     .rankings-results-table th:nth-child(1),
     .rankings-results-table .team-cell {
-      width: 32%;
+      width: 34%;
       white-space: nowrap;
     }
     .rankings-results-table th:nth-child(2),
@@ -43,17 +127,39 @@
     }
     .rankings-results-table th:nth-child(4),
     .rankings-results-table td:nth-child(4) {
-      width: 24%;
+      width: 22%;
+    }
+    .rankings-results-table tbody td {
+      padding: 9px 10px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: transparent;
+    }
+    .rankings-results-table tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .rankings-results-table tbody tr:hover td {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .rankings-results-table th:first-child,
+    .rankings-results-table td:first-child {
+      text-align: left;
+      padding-left: 16px;
     }
     .rankings-results-table td:nth-child(3),
     .rankings-results-table td:nth-child(4) {
       white-space: nowrap;
     }
-    .rankings-results-table tbody tr:hover {
-      background: rgba(255, 255, 255, 0.035);
-    }
     .rankings-results-table .team-cell a {
+      color: #ffffff;
+      text-decoration: none;
       font-weight: 700;
+    }
+    .rankings-results-table .team-cell a:hover {
+      text-decoration: underline;
     }
     .rankings-results-table .team-cell span:first-child {
       display: inline-block;
@@ -72,11 +178,11 @@
     }
     @media (max-width: 900px) {
       .rankings-results-table {
-        min-width: 760px;
+        min-width: 980px;
       }
       .rankings-results-table th,
       .rankings-results-table td {
-        padding: 0.78rem 0.8rem;
+        padding: 10px 9px;
       }
       .rankings-results-table th:nth-child(1),
       .rankings-results-table .team-cell {
@@ -94,26 +200,32 @@
   </style>
 </head>
 <body>
-  <div class="resource-page-container">
-    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
-    <h1>National Rankings</h1>
-    <div class="rankings-toggle-wrap">
-      <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
-      <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
+  <div class="resource-page-container fcc-brand-page-shell fcc-brand-page-shell-no-lines">
+    <div class="rankings-page-header">
+      <a id="back-btn" class="back-to-locker-room rankings-back-link" href="#">Back to Locker Room</a>
     </div>
-    <div class="scroll-x">
-      <table id="rankings-table" class="leaders-table standings-conference-table rankings-results-table">
-        <thead>
-          <tr>
-            <th>Team</th>
-            <th>W-L</th>
-            <th>Last Week</th>
-            <th>Next</th>
-          </tr>
-        </thead>
-        <tbody id="rankings-table-body"></tbody>
-      </table>
-    </div>
+    <section class="fcc-data-card rankings-page-card">
+      <div class="rankings-page-card-head">
+        <h1 class="rankings-page-title">National Rankings</h1>
+        <div class="rankings-toggle-wrap">
+          <button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>
+          <button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>
+        </div>
+      </div>
+      <div class="fcc-data-card-body scroll-x">
+        <table id="rankings-table" class="leaders-table standings-conference-table rankings-results-table">
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>W-L</th>
+              <th>Last Week</th>
+              <th>Next</th>
+            </tr>
+          </thead>
+          <tbody id="rankings-table-body"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/resourceCache.js"></script>

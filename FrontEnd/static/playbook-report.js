@@ -145,25 +145,24 @@ function getPlaybookUrl() {
 
 function buildOffenseRows(data) {
   const percentages = data.simple_playbook_percentages || {};
-  const offensePcIds = new Set(ensureArray((data.pc_order || {}).offense).map(String));
 
   const motionRows = ensureArray(data.motion)
     .map((play) => ({
       label: play.name,
       value: Number((percentages.motion || {})[String(play.play_id)] || 0),
-      highlight: offensePcIds.has(String(play.play_id)),
     }))
+    .filter((play) => play.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-    .map((play) => buildRow(play.label, formatPct(play.value), { highlight: play.highlight }));
+    .map((play) => buildRow(play.label, formatPct(play.value)));
 
   const setRows = ensureArray(data.set_plays)
     .map((play) => ({
       label: play.name,
       value: Number((percentages.set_plays || {})[String(play.play_id)] || 0),
-      highlight: offensePcIds.has(String(play.play_id)),
     }))
+    .filter((play) => play.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-    .map((play) => buildRow(play.label, formatPct(play.value), { highlight: play.highlight }));
+    .map((play) => buildRow(play.label, formatPct(play.value)));
 
   renderList('offense-motion-list', motionRows);
   renderList('offense-set-list', setRows);
@@ -171,7 +170,6 @@ function buildOffenseRows(data) {
 
 function buildDefenseRows(data) {
   const percentages = data.simple_playbook_percentages || {};
-  const defensePcIds = new Set(ensureArray((data.pc_order || {}).defense).map(String));
 
   const manRows = ensureArray(data.man_defense_rows)
     .map((defense) => {
@@ -179,11 +177,11 @@ function buildDefenseRows(data) {
       return {
         label: defense.name,
         value,
-        highlight: defensePcIds.has(String(defense.id)),
       };
     })
+    .filter((defense) => defense.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-    .map((defense) => buildRow(defense.label, formatPct(defense.value), { highlight: defense.highlight }));
+    .map((defense) => buildRow(defense.label, formatPct(defense.value)));
 
   const zoneRows = ensureArray(data.zone_defense_rows)
     .map((defense) => {
@@ -191,11 +189,11 @@ function buildDefenseRows(data) {
       return {
         label: defense.name,
         value,
-        highlight: defensePcIds.has(String(defense.id)),
       };
     })
+    .filter((defense) => defense.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-    .map((defense) => buildRow(defense.label, formatPct(defense.value), { highlight: defense.highlight }));
+    .map((defense) => buildRow(defense.label, formatPct(defense.value)));
 
   renderList('defense-man-list', manRows);
   renderList('defense-zone-list', zoneRows);
@@ -208,6 +206,7 @@ function buildFastBreakRows(data) {
       label: item.name,
       value: Number(percentages[item.id] || 0),
     }))
+    .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .map((item) => buildRow(item.label, formatPct(item.value)));
 
@@ -242,14 +241,14 @@ function buildPcRows(data) {
     .map((playId, index) => {
       const play = playMap.get(String(playId));
       if (!play) return null;
-      return buildOrderedRow(index, play.name, buildPcMeta(play), { highlight: true });
+      return buildOrderedRow(index, play.name, buildPcMeta(play));
     })
     .filter(Boolean);
 
   const defenseRows = ensureArray((data.pc_order || {}).defense)
     .map((defenseId, index) => {
       const defenseName = defenseNameMap.get(String(defenseId)) || String(defenseId);
-      return buildOrderedRow(index, defenseName, null, { highlight: true });
+      return buildOrderedRow(index, defenseName, null);
     });
 
   renderList('pc-offense-list', offenseRows);

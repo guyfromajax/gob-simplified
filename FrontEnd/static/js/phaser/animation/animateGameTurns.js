@@ -209,7 +209,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
   const { shootBall } = await import('./ballManager.js');
   const { animateKickoutReset } = await import('./ballManager.js');
   const { runInboundSetup } = await import('./turnAnimation.js');
-  const { HOME_RIM_COORDS, AWAY_RIM_COORDS } = await import('./courtConstants.js');
   
   appendToTextScroll(turnData.text);
   
@@ -257,8 +256,6 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
   
   if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
     // Animate putback attempt using shootBall
-    const isHomeTeam = rebounderSprite.team === "home";
-    const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     const result = turnData.result_type === "PUTBACK_MAKE" ? "MAKE" : "MISS";
     
     // CRITICAL: Clear scene.rebounderId BEFORE attaching ball for putback

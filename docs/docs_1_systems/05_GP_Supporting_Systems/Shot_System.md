@@ -11,6 +11,9 @@
 3. SOFT_PROB = 0.16 (probability for soft foul bands)
 4. THREE_POINTER_FOUL_MISS_CHANCE = 0.4 (40% chance foul forces miss on 3-pointers)
 5. TWO_POINTER_FOUL_MISS_CHANCE = 0.2 (20% chance foul forces miss on 2-pointers)
+6. **Zone shot-type threshold deltas (HCO / Final Turn only, `resolve_shot`):** Added to `shot_threshold` when `offensive_state == "HCO"` and not fast break; **`defense_playcall`** exact strings **`2-3 Zone`** / **`3-2 Zone`**:
+   - **2-3 Zone:** inside **+25**, attack **+10**, outside **−25**
+   - **3-2 Zone:** outside **+50**, inside **−30**, attack **−30**
 
 **Location: contest range, rim box, `has_contest` (implemented in `shot_manager.py`)**
 1. **Shooter coordinates:** `roles["shot_spot"]` `{x,y}` when present; otherwise `shooter.coords` (defaults x=50, y=25 if missing).
@@ -21,7 +24,7 @@
 6. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`.
 7. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
 
-**Shot Resolution Flow (12 Steps)**
+**Shot Resolution Flow (13 Steps)**
 1. Extract Roles
    - shooter, passer, screener, defender, second_defender from roles dict
    - Get playcall from `roles.get("motion_playcall")` or `game_state["current_playcall"]`
@@ -61,7 +64,15 @@
    - contested: +25 to threshold
    - broken: +100 to threshold
 
-6. Location layer → then Calculate Shot Score (`calculate_shot_score()`)
+6. Zone defense shot-type threshold (HCO / Final Turn only)
+   - Applies when **not** fast break and `game_state["offensive_state"] == "HCO"` (normal HCO and Final Turn shot resolution both use HCO state; **excludes** FCP, HCT, fast break).
+   - **Does not apply** to OREB putbacks (they use `shared.resolve_offensive_rebound` / `calculate_shot_score`, not `resolve_shot`).
+   - If `defense_playcall` is **`2-3 Zone`**, add to `shot_threshold` by `shot_type`: **inside +25**, **attack +10**, **outside −25** (higher threshold = harder make).
+   - If `defense_playcall` is **`3-2 Zone`**: **outside +50**, **inside −30**, **attack −30**.
+   - **`1-3-1 Zone`** and **Man**: no adjustment from this rule.
+   - Implemented in `shot_manager.py` as `_hco_zone_shot_threshold_delta()` after crowd / three-point / variant / shot-at-1 threshold lines.
+
+7. Location layer → then Calculate Shot Score (`calculate_shot_score()`)
    - After shot threshold modifiers: compute shooter `(x,y)`, attacking basket, `has_contest`, and whether the **unguarded rim shortcut** applies (see **Location** above). Shortcut: 99% make, skip defense/foul/block/charge pipeline for that outcome.
    - Otherwise `calculate_shot_score(..., apply_defense=has_contest)`.
    a. Base Score: `sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.items()) * random.randint(1, 6)`
@@ -109,31 +120,31 @@
       - gravity_boost = total_gravity * 0.02
       - shot_score += gravity_boost
 
-7. Apply Motion Attack Penalty
+8. Apply Motion Attack Penalty
    - if `roles.get("motion_attack_penalty")` or `game_state.get("motion_attack_penalty")` > 0:
      - Applied when Motion offense chooses "attack" shot type and player is stopped short of basket
      - Penalty = distance from final shot location to basket (calculated in `_apply_attack_penalty()`)
      - shot_score -= penalty
      - Clear penalty after use
 
-8. Determine Make/Miss
+9. Determine Make/Miss
    - made = shot_score >= shot_threshold
 
-9. Shooting Foul Calibration (if d_foul)
+10. Shooting Foul Calibration (if d_foul)
    - if is_three: 40% chance foul forces miss (THREE_POINTER_FOUL_MISS_CHANCE = 0.4)
    - else: 20% chance foul forces miss (TWO_POINTER_FOUL_MISS_CHANCE = 0.2)
    - if calibration roll triggers: made = False
 
-10. Record Shot Attempt Stats
+11. Record Shot Attempt Stats
     - shooter.record_stat("FGA")
     - if is_three: shooter.record_stat("3PTA")
 
-11. Final Result
+12. Final Result
     - result["result_type"] = "MAKE" if made else "MISS"
     - If made: Calculate points (3 if is_three, else 2), record FGM, 3PTM, PIP if applicable
     - If miss: Determine rebound (geography-based system)
 
-12. Player Positioning (for all shots)
+13. Player Positioning (for all shots)
     - Determine offense get-back players (based on rebounding strategy setting)
     - Determine defense release players (based on fast_breaks strategy setting)
     - Calculate coordinates for animation
@@ -192,9 +203,17 @@ Shot resolution uses the following base constants:
 #### Step 5: Apply Variant Modifier
 - From `skeleton.get("_variant")`: successful=-50, mid_play_change=0, contested=+25, broken=+100
 
-#### Step 6: Calculate Shot Score
+#### Step 6: Zone defense shot-type threshold (HCO / Final Turn only)
+- **Scope:** `resolve_shot()` only; `offensive_state == "HCO"`, not fast break. Covers standard half-court possessions and **Final Turn** shots (still resolved under HCO). **Excludes** FCP/HCT, fast break, and **OREB putbacks** (different code path).
+- **`defense_playcall`** from `game_state["defense_playcall"]` (exact strings):
+  - **`2-3 Zone`:** `shot_threshold` += **inside +25**, **attack +10**, **outside −25**
+  - **`3-2 Zone`:** **outside +50**, **inside −30**, **attack −30**
+- **Man** / **`1-3-1 Zone`:** no delta from this step.
+- Applied after crowd delta, three-point threshold modifier, skeleton variant modifier, and shot-at-1 penalty (see `shot_manager.py`).
 
-**6a. Base Score:**
+#### Step 7: Calculate Shot Score
+
+**7a. Base Score:**
 ```python
 sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.items()) * random.randint(1, 6)
 ```
@@ -202,53 +221,53 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 - Attack: SC=5, AG=2, ST=1, IQ=1, CH=1
 - Outside: SH=8, IQ=1, CH=1
 
-**6b. Passing/Dribbling Bonus:**
+**7b. Passing/Dribbling Bonus:**
 - Passer: `(PS * 0.8 + IQ * 0.2) * random(1-6) * 0.2`
 - Dribble: `(AG * 0.8 + IQ * 0.2) * random(1-6) * 0.2`
 
-**6c. Defense Score:**
+**7c. Defense Score:**
 - Paint: `(ID * 0.6 + ST * 0.2 + IQ * 0.1 + CH * 0.1) * random(1-6)`
 - Three-point: `(OD * 0.8 + IQ * 0.1 + CH * 0.1) * random(1-6)`
 - Mid-range: `(OD * 0.3 + ID * 0.3 + AG * 0.1 + ST * 0.1 + IQ * 0.1 + CH * 0.1) * random(1-6)`
 
-**6d. Defensive Foul Check:**
+**7d. Defensive Foul Check:**
 - Thresholds: Inside(50/110), Attack(70/130), Outside(30/90) + fight
 - If `defense_score < hard_threshold`: d_foul = True
 - Elif `defense_score < soft_threshold`: d_foul = random() < 0.16
 - Else: d_foul = False
 
-**6e. Defense Penalty:**
+**7e. Defense Penalty:**
 - Single: `shot_score -= defense_score * 0.2`
 - Double team: `shot_score -= (defense_score * 0.14) + (second_defense_score * 0.14)`
 
-**6f. Defense Scheme Multiplier:**
+**7f. Defense Scheme Multiplier:**
 - Zone vs 3pt: `shot_score *= 1.1`
 
-**6g. Screener Bonus:**
+**7g. Screener Bonus:**
 - If screener: `shot_score += (ST * 0.5 + AG * 0.2 + IQ * 0.2 + CH * 0.1) * random(1-6) * 0.15`
 
-**6h. Gravity Boost:**
+**7h. Gravity Boost:**
 - Per player: `(SH * 0.3 + SC * 0.3 + IQ * 0.4)`
 - Total: `shot_score += total_gravity * 0.02`
 
-#### Step 7: Apply Motion Attack Penalty
+#### Step 8: Apply Motion Attack Penalty
 - If `motion_attack_penalty > 0`: `shot_score -= penalty`
 - Penalty = distance from shot location to basket (when stopped short)
 
-#### Step 8: Determine Make/Miss
+#### Step 9: Determine Make/Miss
 - `made = shot_score >= shot_threshold`
 
-#### Step 9: Shooting Foul Calibration
+#### Step 10: Shooting Foul Calibration
 - If d_foul: 3pt=40% miss chance, 2pt=20% miss chance
 
-#### Step 10: Record Stats
+#### Step 11: Record Stats
 - `shooter.record_stat("FGA")`, `shooter.record_stat("3PTA")` if is_three
 
-#### Step 11: Final Result
+#### Step 12: Final Result
 - If made: Record FGM, 3PTM, PIP, AST, SCR_S, set up AND-1 if d_foul
 - If miss: Record DEF_S, determine rebound (geography-based), check block
 
-#### Step 12: Player Positioning
+#### Step 13: Player Positioning
 - Get-back players (offense): Based on rebounding strategy (0-4 scale)
 - Release players (defense): Based on fast_breaks strategy (0-4 scale)
 - Coordinates calculated in backend for animation
@@ -268,6 +287,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 8. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
 9. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)
 10. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes
+11. **Zone shot-type threshold**: 2-3 and 3-2 zone defenses adjust `shot_threshold` by `shot_type` on HCO and Final Turn shots only (`_hco_zone_shot_threshold_delta` in `shot_manager.py`).
 
 ### Status
 
@@ -282,7 +302,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 
 ### Key Files
 
-- `BackEnd/models/shot_manager.py`: `resolve_shot()`, `calculate_shot_score()`, `check_defensive_foul_on_shot()`, `resolve_fast_break_shot()`
+- `BackEnd/models/shot_manager.py`: `resolve_shot()`, `_hco_zone_shot_threshold_delta()`, `calculate_shot_score()`, `check_defensive_foul_on_shot()`, `resolve_fast_break_shot()`
 - `BackEnd/constants/__init__.py`: PLAYCALL_ATTRIBUTE_WEIGHTS, THREE_POINT_SPOTS, PAINT_SPOTS
 - `BackEnd/utils/shared.py`: `calculate_gravity_score()`, `calculate_screen_score()`, `calculate_bounce_spot()`, `determine_rebounder()`
 - `BackEnd/engine/phase_resolution.py`: `_apply_attack_penalty()`, `resolve_motion_offense_shot()`, `apply_balancing_system()`

@@ -16,6 +16,8 @@ const tournamentId = urlParams.get('tournament_id');
 const teamId = urlParams.get('team_id');
 const week = parseInt(urlParams.get('week'), 10);
 const round = parseInt(urlParams.get('round'), 10); // For tournament mode (optional - backend will determine if not provided)
+/** `inbox` = opened from FCC Inbox (Back only). `training` = from training submit / default (Go To Locker Room). */
+const reportFrom = urlParams.get('from') === 'inbox' ? 'inbox' : 'training';
 
 let reportData = null;
 let currentView = 'changes'; // 'attributes' or 'changes'
@@ -86,6 +88,109 @@ const TEAM_ATTR_NAMES = {
   'fb_opp_modifier': 'Fast Break Defense',
   'pt_opp_modifier': 'Press/Trap Breaks'
 };
+
+const NOTE_ATTRIBUTE_LABELS = {
+  SC: 'Scoring (SC)',
+  SH: 'Shooting (SH)',
+  ID: 'Inside Defense (ID)',
+  OD: 'Outside Defense (OD)',
+  PS: 'Passing (PS)',
+  BH: 'Ball Handling (BH)',
+  RB: 'Rebounding (RB)',
+  ST: 'Steals (ST)',
+  AG: 'Aggression (AG)',
+  FT: 'Free Throws (FT)',
+  ND: 'Interior Presence (ND)',
+  IQ: 'Basketball IQ (IQ)',
+  NG: 'Energy (NG)',
+  EM: 'Emotion (EM)',
+};
+
+const NOTES_HERO_CONFIG = [
+  {
+    key: 'practice',
+    titles: ['Practice Player Of The Week', 'Practice Players Of The Week'],
+    label: 'Practice Player Of The Week',
+    accent: '#34EC27',
+    accentBorder: 'rgba(52,236,39,0.3)',
+    accentTint: 'rgba(52,236,39,0.1)',
+  },
+  {
+    key: 'regression',
+    titles: ['Biggest Regression'],
+    label: 'Biggest Regression',
+    accent: '#ff6d6d',
+    accentBorder: 'rgba(255,109,109,0.35)',
+    accentTint: 'rgba(255,109,109,0.12)',
+  },
+  {
+    key: 'locker',
+    titles: ['Most Positive Locker Room Influence'],
+    label: 'Most Positive Locker Room Influence',
+    accent: '#F79420',
+    accentBorder: 'rgba(247,148,32,0.4)',
+    accentTint: 'rgba(247,148,32,0.12)',
+  }
+];
+
+/** In-season tactical row title; camp week uses Concerning Progression (see training_notes.py). */
+const NOTES_TACTICAL_ORDER_BASE = [
+  'Strong Cumulative Increase',
+  'Strongest Defensive Set',
+  'Strongest Offensive Plays',
+  'Fast Break Readiness',
+  'Press/Trap Readiness',
+];
+
+function getConcerningTeamAttrNoteTitle(sectionMap) {
+  if (sectionMap.has('Concerning Progression')) return 'Concerning Progression';
+  return 'Concerning Regression';
+}
+
+function isTrainingCampReportNotes(sectionMap) {
+  return (
+    sectionMap.has('Concerning Progression') ||
+    sectionMap.has('Training Camp MVP') ||
+    sectionMap.has('Training Camp Co-MVPs')
+  );
+}
+
+function resolveHeroNoteSection(config, sectionMap) {
+  const isCamp = isTrainingCampReportNotes(sectionMap);
+  let order;
+  if (config.key === 'practice') {
+    order = isCamp
+      ? [
+          'Training Camp MVP',
+          'Training Camp Co-MVPs',
+          'Practice Player Of The Week',
+          'Practice Players Of The Week',
+        ]
+      : [
+          'Practice Player Of The Week',
+          'Practice Players Of The Week',
+          'Training Camp MVP',
+          'Training Camp Co-MVPs',
+        ];
+  } else if (config.key === 'regression') {
+    order = isCamp
+      ? ['Biggest Concern', 'Biggest Concerns', 'Biggest Regression']
+      : ['Biggest Regression', 'Biggest Concern', 'Biggest Concerns'];
+  } else {
+    order = config.titles;
+  }
+  const section =
+    order.map((t) => sectionMap.get(t)).find(Boolean) || {
+      title: order[0],
+      body: 'No Significant Updates',
+    };
+  return { section, order };
+}
+
+function buildNotesTacticalOrder(sectionMap) {
+  const concerning = getConcerningTeamAttrNoteTitle(sectionMap);
+  return [NOTES_TACTICAL_ORDER_BASE[0], concerning, ...NOTES_TACTICAL_ORDER_BASE.slice(1)];
+}
 
 // Coaching focus display names
 const FOCUS_DISPLAY = {
@@ -249,6 +354,7 @@ function renderProjectedStartingFiveStats(rows) {
   });
   table.appendChild(tbody);
   el.appendChild(table);
+  enhanceProjectedStartingFiveTable();
 }
 
 function renderProjectedStartingFiveSection() {
@@ -264,6 +370,7 @@ function renderProjectedStartingFiveSection() {
       tableClass: 'training-projected-table',
       emptyClass: 'training-projected-empty',
     });
+    enhanceProjectedStartingFiveTable();
   }
 }
 
@@ -288,10 +395,25 @@ function setupViewToggle() {
 function setupLockerRoomButton() {
   const btn = document.getElementById('locker-room-btn');
   if (!btn) return;
-  
+
+  if (reportFrom === 'inbox' && mode === 'franchise') {
+    btn.textContent = 'Back';
+    btn.classList.add('training-report-back-btn');
+  } else {
+    btn.textContent = 'Go To Locker Room';
+    btn.classList.remove('training-report-back-btn');
+  }
+
   btn.addEventListener('click', () => {
     playSound('click-strong.wav');
     if (mode === 'franchise') {
+      if (reportFrom === 'inbox') {
+        const lockerRoomUrl = (typeof buildFranchiseLockerRoomUrl === 'function')
+          ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'tutorials-tab' })
+          : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=tutorials-tab`;
+        window.location.href = lockerRoomUrl;
+        return;
+      }
       const lockerRoomUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
         ? resolveFranchiseLockerRoomUrl({
             franchiseId: franchiseId,
@@ -439,6 +561,321 @@ function renderHeader() {
   document.getElementById('training-focus').textContent = focusText;
 }
 
+function getReportWeekNumber() {
+  return Number(reportData?.week || week || 0);
+}
+
+function getExceptionalGainThreshold() {
+  return getReportWeekNumber() === 1 ? 10 : 5;
+}
+
+function getPlayerDisplayPosition(player) {
+  const validPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const direct = String(player?.position || '').toUpperCase().trim();
+  if (validPositions.includes(direct)) return direct;
+
+  const ratings = player?.position_ratings || {};
+  let bestPos = 'PG';
+  let bestVal = -Infinity;
+  validPositions.forEach((pos) => {
+    const value = Number(ratings[pos]) || 0;
+    if (value > bestVal) {
+      bestVal = value;
+      bestPos = pos;
+    }
+  });
+  return bestPos;
+}
+
+function getPracticePlayerOfWeekNames() {
+  const names = new Set();
+  const players = (reportData?.players || []).map((p) => String(p?.name || '').trim()).filter(Boolean);
+  const notes = reportData?.training_notes || [];
+  notes.forEach((section) => {
+    const title = typeof section === 'object' ? String(section.title || '') : '';
+    if (
+      !/Practice Player(?:s)? Of The Week/i.test(title) &&
+      !/Training Camp (?:Co-)?MVPs?/i.test(title)
+    ) {
+      return;
+    }
+    const body = typeof section === 'object' ? String(section.body || '') : String(section || '');
+    const bodyLower = body.toLowerCase();
+    players.forEach((name) => {
+      if (bodyLower.includes(name.toLowerCase())) names.add(name);
+    });
+  });
+  return names;
+}
+
+function isMutedTrainingNote(text) {
+  const normalized = String(text || '').trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized === 'neutral' ||
+    /no significant updates/.test(normalized) ||
+    /no significant update/.test(normalized) ||
+    /no significant changes/.test(normalized) ||
+    /no significant change/.test(normalized) ||
+    /no notable updates/.test(normalized) ||
+    /no notable changes/.test(normalized)
+  );
+}
+
+function getTrainingReportPlayerName(player) {
+  return String(
+    player?.name ||
+    player?.player_name ||
+    player?.full_name ||
+    `${player?.first_name || ''} ${player?.last_name || ''}`
+  ).trim();
+}
+
+function getTrainingReportPlayerInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '—';
+  return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+}
+
+function getTrainingReportPlayerPortraitUrl(player) {
+  const playerId = player?.player_id || player?._id || player?.id || '';
+  if (player?.photo) return player.photo;
+  if (window.API_CONFIG && typeof window.API_CONFIG.buildStaticPath === 'function') {
+    return playerId
+      ? window.API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`)
+      : window.API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
+  }
+  return playerId ? `/images/players/${playerId}.png` : '/images/players/generic_headshot.png';
+}
+
+function getTrainingReportPlayerYear(player) {
+  return String(player?.year || player?.class_year || '').trim();
+}
+
+function normalizeTrainingReportText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getTrainingReportPlayerNameCandidates(player) {
+  const candidates = new Set();
+  const fullName = getTrainingReportPlayerName(player);
+  const firstName = String(player?.first_name || '').trim();
+  const lastName = String(player?.last_name || '').trim();
+  if (fullName) candidates.add(fullName);
+  if (firstName && lastName) {
+    candidates.add(`${firstName} ${lastName}`);
+    candidates.add(`${lastName}, ${firstName}`);
+  }
+  if (lastName) candidates.add(lastName);
+  return Array.from(candidates)
+    .map(normalizeTrainingReportText)
+    .filter(Boolean);
+}
+
+function getTrainingNotePortraitPlayer(sectionOrTitle, text) {
+  const section = (sectionOrTitle && typeof sectionOrTitle === 'object') ? sectionOrTitle : null;
+  const title = section ? String(section.title || '') : String(sectionOrTitle || '');
+  const eligibleTitles = new Set([
+    'Practice Player Of The Week',
+    'Practice Players Of The Week',
+    'Training Camp MVP',
+    'Training Camp Co-MVPs',
+    'Biggest Regression',
+    'Biggest Concern',
+    'Biggest Concerns',
+    'Most Positive Locker Room Influence',
+  ]);
+  if (!eligibleTitles.has(title)) return null;
+  const players = Array.isArray(reportData?.players) ? reportData.players : [];
+  const playerIds = section
+    ? [
+        ...(section.player_id ? [String(section.player_id)] : []),
+        ...((Array.isArray(section.player_ids) ? section.player_ids : []).map((id) => String(id)))
+      ]
+    : [];
+  console.log('[TRAINING REPORT][NOTES] portrait lookup start', {
+    title,
+    body: String(text || ''),
+    player_id: section?.player_id || null,
+    player_ids: section?.player_ids || [],
+    report_player_count: players.length,
+  });
+  if (playerIds.length) {
+    const byId = new Map(players.map((player) => [
+      String(player?.player_id || player?._id || player?.id || ''),
+      player
+    ]));
+    const directMatch = playerIds.map((id) => byId.get(id)).find(Boolean);
+    if (directMatch) {
+      console.log('[TRAINING REPORT][NOTES] portrait direct id match', {
+        title,
+        matched_player: getTrainingReportPlayerName(directMatch),
+        matched_player_id: String(directMatch?.player_id || directMatch?._id || directMatch?.id || ''),
+      });
+      return directMatch;
+    }
+    console.warn('[TRAINING REPORT][NOTES] portrait id match failed', {
+      title,
+      requested_ids: playerIds,
+      available_ids_sample: players.slice(0, 12).map((player) => String(player?.player_id || player?._id || player?.id || '')),
+    });
+  }
+  const haystack = ` ${normalizeTrainingReportText(text)} `;
+  let bestMatch = null;
+  players.forEach((player) => {
+    const candidates = getTrainingReportPlayerNameCandidates(player);
+    if (!candidates.length) return;
+    const matchedCandidate = candidates.find((candidate) => haystack.includes(` ${candidate} `) || haystack.includes(candidate));
+    if (!matchedCandidate) return;
+    if (!bestMatch || matchedCandidate.length > normalizeTrainingReportText(getTrainingReportPlayerName(bestMatch)).length) {
+      bestMatch = player;
+    }
+  });
+  console.log('[TRAINING REPORT][NOTES] portrait text fallback result', {
+    title,
+    matched_player: bestMatch ? getTrainingReportPlayerName(bestMatch) : null,
+    matched_player_id: bestMatch ? String(bestMatch?.player_id || bestMatch?._id || bestMatch?.id || '') : null,
+  });
+  return bestMatch;
+}
+
+function createTrainingNotePortrait(player, text) {
+  const normalizedText = normalizeTrainingReportText(text);
+  if (!player && (
+    !normalizedText ||
+    normalizedText === 'no significant updates' ||
+    normalizedText === 'none'
+  )) {
+    return null;
+  }
+
+  const playerName = getTrainingReportPlayerName(player) || String(text || '').trim();
+  const initials = getTrainingReportPlayerInitials(playerName);
+  const wrap = document.createElement('div');
+  wrap.className = 'training-note-portrait-wrap';
+
+  const fallback = document.createElement('div');
+  fallback.className = 'training-note-portrait-fallback';
+  fallback.textContent = initials;
+  fallback.setAttribute('aria-label', `${playerName || 'Player'} portrait placeholder`);
+
+  if (!player) {
+    wrap.appendChild(fallback);
+    return wrap;
+  }
+
+  const img = document.createElement('img');
+  img.className = 'training-note-portrait';
+  img.alt = playerName ? `${playerName} headshot` : 'Player headshot';
+  const portraitUrl = getTrainingReportPlayerPortraitUrl(player);
+  console.log('[TRAINING REPORT][NOTES] portrait render attempt', {
+    player_name: playerName,
+    player_id: String(player?.player_id || player?._id || player?.id || ''),
+    player_photo: player?.photo || null,
+    portrait_url: portraitUrl,
+  });
+  img.src = portraitUrl;
+  img.onerror = function () {
+    console.warn('[TRAINING REPORT][NOTES] portrait image failed', {
+      player_name: playerName,
+      player_id: String(player?.player_id || player?._id || player?.id || ''),
+      attempted_url: portraitUrl,
+    });
+    wrap.innerHTML = '';
+    wrap.appendChild(fallback);
+  };
+  wrap.appendChild(img);
+  return wrap;
+}
+
+function formatNoteAttributeToken(token) {
+  const trimmed = String(token || '').trim();
+  if (!trimmed) return '';
+  return NOTE_ATTRIBUTE_LABELS[trimmed] || trimmed;
+}
+
+function formatNoteAttributeList(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized || isMutedTrainingNote(normalized)) return normalized || 'No Significant Updates';
+  return normalized
+    .split(',')
+    .map((token) => formatNoteAttributeToken(token))
+    .filter(Boolean)
+    .join(', ');
+}
+
+function getTrainingNoteValueTone(title, body) {
+  const text = String(body || '').trim();
+  if (isMutedTrainingNote(text) || /^none$/i.test(text)) return 'muted';
+  if (title === 'Strong Cumulative Increase') return 'positive';
+  if (title === 'Concerning Regression' || title === 'Concerning Progression') return 'negative';
+  return 'default';
+}
+
+function formatTrainingNoteValue(title, body) {
+  if (
+    title === 'Strong Cumulative Increase' ||
+    title === 'Concerning Regression' ||
+    title === 'Concerning Progression'
+  ) {
+    return formatNoteAttributeList(body);
+  }
+  return String(body || '').trim() || 'No Significant Updates';
+}
+
+function createNotesHeroPortrait(player, displayName, accentConfig, isMuted) {
+  const wrap = document.createElement('div');
+  wrap.className = 'training-notes-hero-portrait';
+
+  if (player) {
+    const img = document.createElement('img');
+    img.className = 'training-notes-hero-portrait-img';
+    img.src = getTrainingReportPlayerPortraitUrl(player);
+    img.alt = displayName;
+    img.addEventListener('error', () => {
+      wrap.innerHTML = '';
+      wrap.appendChild(createNotesHeroInitials(displayName, accentConfig, isMuted));
+    }, { once: true });
+    wrap.appendChild(img);
+    return wrap;
+  }
+
+  wrap.appendChild(createNotesHeroInitials(displayName, accentConfig, isMuted));
+  return wrap;
+}
+
+function createNotesHeroInitials(displayName, accentConfig, isMuted) {
+  const fallback = document.createElement('div');
+  fallback.className = 'training-notes-hero-portrait-fallback';
+  fallback.textContent = isMuted ? 'NS' : getTrainingReportPlayerInitials(displayName);
+  if (isMuted) fallback.classList.add('is-muted');
+  fallback.style.setProperty('--notes-accent', accentConfig.accent);
+  fallback.style.setProperty('--notes-accent-border', accentConfig.accentBorder);
+  fallback.style.setProperty('--notes-accent-tint', accentConfig.accentTint);
+  return fallback;
+}
+
+function createPlayerNameCell(player) {
+  const td = document.createElement('td');
+  td.className = 'player-name-cell';
+
+  const badge = document.createElement('span');
+  badge.className = 'position-badge';
+  badge.textContent = getPlayerDisplayPosition(player);
+
+  const name = document.createElement('span');
+  name.className = 'player-name-text';
+  name.textContent = player.name || '—';
+
+  td.appendChild(badge);
+  td.appendChild(name);
+  return td;
+}
+
 function renderPlayersTable() {
   if (!reportData || !reportData.players) return;
   
@@ -481,9 +918,13 @@ function renderPlayersTable() {
   thead.appendChild(headerRow);
   
   // Build rows
+  const practicePlayers = getPracticePlayerOfWeekNames();
   getSortedPlayersForReport().forEach(player => {
     const row = document.createElement('tr');
-    row.appendChild(createCell(player.name));
+    if (practicePlayers.has(player.name)) {
+      row.classList.add('practice-player-highlight');
+    }
+    row.appendChild(createPlayerNameCell(player));
     
     if (currentView === 'attributes') {
       // Show current attribute values with tooltips
@@ -522,6 +963,8 @@ function renderPlayersTable() {
       });
       totalRow.appendChild(createChangeCell(total));
     });
+
+    totalRow.appendChild(createCell('—'));
     
     tbody.appendChild(totalRow);
   }
@@ -620,7 +1063,7 @@ function getEmotionEmoji(em) {
   else if (emValue >= 60) return '😊';   // Big smile
   else if (emValue >= 40) return '😐';   // Straight face
   else if (emValue >= 20) return '😕';   // Slight frown
-  else return '😞';                      // Sad face
+  else return '😡';                      // Angry face
 }
 
 function createMomentumPill(mo) {
@@ -745,10 +1188,14 @@ function positionAttributeTooltip(event) {
 
 function createChangeCell(change) {
   const td = document.createElement('td');
+  const exceptionalThreshold = getExceptionalGainThreshold();
   
-  if (change > 0) {
+  if (change >= exceptionalThreshold) {
     td.textContent = `+${change}`;
-    td.className = change > 5 ? 'change-gold' : 'change-positive';
+    td.className = 'change-gold';
+  } else if (change > 0) {
+    td.textContent = `+${change}`;
+    td.className = 'change-positive';
   } else if (change < 0) {
     td.textContent = change.toString();
     td.className = 'change-negative';
@@ -805,36 +1252,25 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   
   const item = document.createElement('div');
   item.className = 'team-attr-item';
+  if (change === 0) item.classList.add('is-muted');
   
   const label = document.createElement('div');
   label.className = 'attr-label';
   
   const nameSpan = document.createElement('span');
+  nameSpan.className = 'attr-name';
   nameSpan.textContent = displayName;
   
   const changeSpan = document.createElement('span');
   changeSpan.className = 'attr-change';
   
   if (change !== 0) {
-    // Special handling for shot_threshold: negative change (decrease) is good, positive change (increase) is bad
-    if (attrKey === 'shot_threshold') {
-      // Invert: negative change (good) shows as green with +, positive change (bad) shows as red with -
-      const absChange = Math.abs(change);
-      if (change < 0) {
-        // Decrease is good - show as green with +
-        changeSpan.textContent = `+${absChange}`;
-        changeSpan.className += absChange > 5 ? ' change-gold' : ' change-positive';
-      } else {
-        // Increase is bad - show as red with -
-        changeSpan.textContent = `-${absChange}`;
-        changeSpan.className += ' change-negative';
-      }
-    } else if (attrKey === 'rebound_modifier') {
+    if (attrKey === 'rebound_modifier') {
       // Format rebound_modifier changes to 2 decimal places
       const formattedChange = change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2);
       changeSpan.textContent = formattedChange;
       if (change > 0) {
-        changeSpan.className += change > 5 ? ' change-gold' : ' change-positive';
+        changeSpan.className += change >= getExceptionalGainThreshold() ? ' change-gold' : ' change-positive';
       } else {
         changeSpan.className += ' change-negative';
       }
@@ -843,7 +1279,7 @@ function createTeamAttrItem(attrKey, currentValue, change) {
       const formattedChange = change > 0 ? `+${change}` : change.toString();
       changeSpan.textContent = formattedChange;
       if (change > 0) {
-        changeSpan.className += change > 5 ? ' change-gold' : ' change-positive';
+        changeSpan.className += change >= getExceptionalGainThreshold() ? ' change-gold' : ' change-positive';
       } else {
         changeSpan.className += ' change-negative';
       }
@@ -875,42 +1311,6 @@ function createTeamAttrItem(attrKey, currentValue, change) {
     barContainer.appendChild(barFill);
     barContainer.appendChild(barText);
     item.appendChild(barContainer);
-  } else if (attrKey === 'fb_opp_modifier' || attrKey === 'pt_opp_modifier') {
-    // +/- Design - centered, bold, no value shown
-    const indicatorContainer = document.createElement('div');
-    indicatorContainer.className = 'plus-minus-container';
-    indicatorContainer.style.textAlign = 'center';
-    indicatorContainer.style.marginTop = 'var(--spacing-sm)';
-    
-    const indicator = document.createElement('span');
-    indicator.className = 'plus-minus-indicator';
-    indicator.style.fontWeight = '700';
-    
-    if (currentValue >= 10) {
-      indicator.textContent = '+++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 5) {
-      indicator.textContent = '++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 1) {
-      indicator.textContent = '+';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue === 0) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-zero';
-    } else if (currentValue >= -4) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-negative';
-    } else if (currentValue >= -9) {
-      indicator.textContent = '--';
-      indicator.className += ' plus-minus-negative';
-    } else {
-      indicator.textContent = '---';
-      indicator.className += ' plus-minus-negative';
-    }
-    
-    indicatorContainer.appendChild(indicator);
-    item.appendChild(indicatorContainer);
   } else {
     // Red/Green Pill Design
     const pill = createPill(currentValue, attrKey);
@@ -952,12 +1352,14 @@ function createPill(originalValue, attrKey) {
   if (value > 0) {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-positive';
+    if ((value / maxValue) >= 0.7) fill.classList.add('is-extreme');
     const percentage = Math.min((value / maxValue) * 50, 50); // Max 50% to the right
     fill.style.width = `${percentage}%`;
     pill.insertBefore(fill, centerLine);
   } else if (value < 0) {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-negative';
+    if ((Math.abs(value) / maxValue) >= 0.7) fill.classList.add('is-extreme');
     const absValue = Math.abs(value);
     const percentage = Math.min((absValue / maxValue) * 50, 50); // Max 50% to the left
     fill.style.width = `${percentage}%`;
@@ -1020,76 +1422,8 @@ function renderPlaybookSummary() {
   man_defenses.sort((a, b) => a.name.localeCompare(b.name));
   zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
   
-  // Render Offense section
-  const offenseSection = document.createElement('div');
-  offenseSection.className = 'playbook-category';
-  
-  const offenseTitle = document.createElement('h3');
-  offenseTitle.textContent = 'Offense';
-  offenseSection.appendChild(offenseTitle);
-  
-  // Motion Plays
-  if (motion_plays.length > 0) {
-    motion_plays.forEach(play => {
-      const resolvedChange = getTrainingReportPlayChange(plays_changes, play);
-      // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(
-        play.display_name || play.name,
-        play,
-        resolvedChange
-      );
-      offenseSection.appendChild(playRow);
-    });
-  }
-  
-  // Set Plays
-  if (set_plays.length > 0) {
-    set_plays.forEach(play => {
-      const resolvedChange = getTrainingReportPlayChange(plays_changes, play);
-      // Pass full play object to access effectiveness, momentum, cloaking
-      const playRow = createPlayRow(
-        play.display_name || play.name,
-        play,
-        resolvedChange
-      );
-      offenseSection.appendChild(playRow);
-    });
-  }
-  
-  // Empty row
-  const emptyRow = document.createElement('div');
-  emptyRow.className = 'playbook-empty-row';
-  offenseSection.appendChild(emptyRow);
-  
-  container.appendChild(offenseSection);
-  
-  // Render Defense section
-  const defenseSection = document.createElement('div');
-  defenseSection.className = 'playbook-category';
-  
-  const defenseTitle = document.createElement('h3');
-  defenseTitle.textContent = 'Defense';
-  defenseSection.appendChild(defenseTitle);
-  
-  // Man Defenses
-  if (man_defenses.length > 0) {
-    man_defenses.forEach(defense => {
-      // Pass full defense object to access effectiveness, momentum, cloaking
-      const defenseRow = createPlayRow(defense.name, defense, defenses_changes[defense.name] || 0);
-      defenseSection.appendChild(defenseRow);
-    });
-  }
-  
-  // Zone Defenses
-  if (zone_defenses.length > 0) {
-    zone_defenses.forEach(defense => {
-      // Pass full defense object to access effectiveness, momentum, cloaking
-      const defenseRow = createPlayRow(defense.name, defense, defenses_changes[defense.name] || 0);
-      defenseSection.appendChild(defenseRow);
-    });
-  }
-  
-  container.appendChild(defenseSection);
+  container.appendChild(createPlaybookCategorySection('Offense', motion_plays.concat(set_plays), plays_changes));
+  container.appendChild(createPlaybookCategorySection('Defense', man_defenses.concat(zone_defenses), defenses_changes));
 }
 
 function looksLikeTrainingReportObjectId(value) {
@@ -1243,95 +1577,106 @@ function getTrainingReportPlayChange(playsChanges, play) {
   return 0;
 }
 
-function createPlayRow(playName, playData, change) {
-  // playData can be an object with effectiveness, momentum, cloaking, or just a number (effectiveness)
-  // Handle both formats for backward compatibility
+function createPlaybookCategorySection(title, items, changesLookup) {
+  const section = document.createElement('div');
+  section.className = 'playbook-category';
+
+  const header = document.createElement('div');
+  header.className = 'playbook-category-header';
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  header.appendChild(heading);
+  section.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'playbook-card-grid';
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'playbook-empty-state';
+    empty.textContent = 'No data available.';
+    grid.appendChild(empty);
+  } else {
+    items.forEach((item) => {
+      const change = title === 'Offense'
+        ? getTrainingReportPlayChange(changesLookup, item)
+        : normalizeTrainingReportChangeValue(changesLookup[item.name] || 0);
+      grid.appendChild(createPlayCard(item.display_name || item.name, item, change));
+    });
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+function createPlayCard(playName, playData, change) {
   const effectiveness = typeof playData === 'object' ? (playData.effectiveness || 0) : (playData || 0);
   const momentum = typeof playData === 'object' ? (playData.momentum || 0) : 0;
   const cloaking = typeof playData === 'object' ? (playData.cloaking || 0) : 0;
-  
+
   const row = document.createElement('div');
-  row.className = 'playbook-row';
+  row.className = 'playbook-card';
   if (playData && typeof playData === 'object') {
     const normalizedPlayId = normalizeTrainingReportPlayId(playData.play_id || playData.playId || playData._id || playData.id);
     if (normalizedPlayId) {
       row.dataset.playId = normalizedPlayId;
     }
   }
-  
-  // Play name
+
+  const top = document.createElement('div');
+  top.className = 'playbook-card-top';
+
   const nameDiv = document.createElement('div');
-  nameDiv.className = 'playbook-name';
+  nameDiv.className = 'playbook-card-name';
   nameDiv.textContent = playName;
-  row.appendChild(nameDiv);
-  
-  // Metrics container - holds all three bars
-  const metricsContainer = document.createElement('div');
-  metricsContainer.className = 'playbook-metrics-container';
-  
-  // Command (Effectiveness) - Blue, 0-100 scale
-  const commandMetric = createMetricBar('Command', effectiveness, 100, '#4a90e2', change);
-  metricsContainer.appendChild(commandMetric);
-  
-  // Momentum - Orange, 0-10 scale
-  const momentumMetric = createMetricBar('Momentum', momentum, 10, '#ff9800', null);
-  metricsContainer.appendChild(momentumMetric);
-  
-  // Cloaking - Purple, 0-10 scale
-  const cloakingMetric = createMetricBar('Cloaking', cloaking, 10, '#9c27b0', null);
-  metricsContainer.appendChild(cloakingMetric);
-  
-  row.appendChild(metricsContainer);
-  
+
+  const delta = document.createElement('div');
+  delta.className = 'playbook-card-delta';
+  if (change > 0) {
+    delta.textContent = `+${change}`;
+    delta.classList.add('is-positive');
+  } else if (change < 0) {
+    delta.textContent = String(change);
+    delta.classList.add('is-negative');
+  } else {
+    delta.textContent = '0';
+    delta.classList.add('is-zero');
+  }
+
+  top.appendChild(nameDiv);
+  top.appendChild(delta);
+  row.appendChild(top);
+
+  const bars = document.createElement('div');
+  bars.className = 'playbook-card-bars';
+  bars.appendChild(createPlaybookMetricCard('Command', effectiveness, 100, '#4065AF'));
+  bars.appendChild(createPlaybookMetricCard('Momentum', momentum, 10, '#F79420'));
+  bars.appendChild(createPlaybookMetricCard('Cloaking', cloaking, 10, '#7B5EA7'));
+  row.appendChild(bars);
+
   return row;
 }
 
-function createMetricBar(title, value, maxValue, color, change) {
+function createPlaybookMetricCard(title, value, maxValue, color) {
   const metricDiv = document.createElement('div');
-  metricDiv.className = 'playbook-metric';
-  
-  // Title
+  metricDiv.className = 'playbook-metric-card';
+
   const titleDiv = document.createElement('div');
   titleDiv.className = 'playbook-metric-title';
   titleDiv.textContent = title;
   metricDiv.appendChild(titleDiv);
-  
-  // Progress bar container
-  const progressContainer = document.createElement('div');
-  progressContainer.className = 'playbook-progress-container';
-  
+
   const progressBar = document.createElement('div');
   progressBar.className = 'playbook-progress-bar';
-  
+
   const progressFill = document.createElement('div');
   progressFill.className = 'playbook-progress-fill';
   progressFill.style.backgroundColor = color;
   const percentage = Math.min(100, (value / maxValue) * 100);
   progressFill.style.width = `${percentage}%`;
-  
+
   progressBar.appendChild(progressFill);
-  progressContainer.appendChild(progressBar);
-  metricDiv.appendChild(progressContainer);
-  
-  // Change indicator (only for Command/Effectiveness)
-  if (change !== null && change !== undefined) {
-    const changeDiv = document.createElement('div');
-    changeDiv.className = 'playbook-change';
-    
-    if (change > 0) {
-      changeDiv.textContent = `+${change}`;
-      changeDiv.style.color = '#4CAF50'; // Green
-    } else if (change < 0) {
-      changeDiv.textContent = `-${Math.abs(change)}`;
-      changeDiv.style.color = '#f44336'; // Red
-    } else {
-      changeDiv.textContent = '0';
-      changeDiv.style.color = '#ffffff'; // White
-    }
-    
-    metricDiv.appendChild(changeDiv);
-  }
-  
+  metricDiv.appendChild(progressBar);
   return metricDiv;
 }
 
@@ -1341,6 +1686,10 @@ function renderTrainingNotes() {
   const container = document.getElementById('training-notes-container');
   if (!container) return;
   container.innerHTML = '';
+  const brief = document.getElementById('training-notes-brief');
+  if (brief) {
+    brief.textContent = `Week ${getReportWeekNumber() || '--'} Training Brief · For Coaching Staff Only`;
+  }
   
   const training_notes = reportData.training_notes || [];
   
@@ -1362,55 +1711,102 @@ function renderTrainingNotes() {
       sectionMap.set(section.title || '', section);
     });
 
-    const orderedTitles = [
-      'Training Camp MVP',
-      'Training Camp Co-MVPs',
-      'Practice Player Of The Week',
-      'Practice Players Of The Week',
-      'Biggest Concern',
-      'Biggest Concerns',
-      'Biggest Regression',
-      'Most Positive Locker Room Influence',
-      'Strong Cumulative Increase',
-      'Concerning Progression',
-      'Concerning Regression',
-      'Strongest Offensive Plays',
-      'Strongest Defensive Set',
-      'Fast Break Readiness',
-      'Press/Trap Readiness',
-      'Player Energy Levels'
-    ];
+    const heroGrid = document.createElement('div');
+    heroGrid.className = 'training-notes-hero-grid';
 
-    orderedTitles.forEach(function (title) {
-      const section = sectionMap.get(title);
-      if (!section) return;
-      const wrap = document.createElement('div');
-      wrap.className = 'training-note-section';
-      if (section.title === 'Player Energy Levels') {
-        wrap.classList.add('training-note-section-wide');
-      }
-      const h3 = document.createElement('h3');
-      h3.className = 'training-note-section-title';
-      h3.textContent = section.title === 'Player Energy Levels' ? 'Miscellaneous Notes' : (section.title || '');
+    NOTES_HERO_CONFIG.forEach((config) => {
+      const { section } = resolveHeroNoteSection(config, sectionMap);
+      const text = section.body != null ? String(section.body).trim() : '';
+      const muted = isMutedTrainingNote(text) || /^none$/i.test(text);
+      const player = muted ? null : getTrainingNotePortraitPlayer(section, text);
+      const displayName = muted ? 'No Significant Updates' : (getTrainingReportPlayerName(player) || text || 'No Significant Updates');
+      const hero = document.createElement('article');
+      hero.className = 'training-notes-hero-card';
+      if (muted) hero.classList.add('is-muted');
+      hero.style.setProperty('--notes-accent', config.accent);
+      hero.style.setProperty('--notes-accent-border', config.accentBorder);
+      hero.style.setProperty('--notes-accent-tint', config.accentTint);
+
+      const label = document.createElement('div');
+      label.className = 'training-notes-hero-label';
+      label.textContent =
+        config.key === 'locker' ? config.label : section.title || config.label;
+
       const body = document.createElement('div');
-      body.className = 'training-note-section-body';
-      const text = section.body != null ? String(section.body) : '';
-      text.split('\n\n').forEach(function (para, i) {
-        const p = document.createElement('p');
-        p.className = 'training-note-section-p';
-        p.textContent = para.trim();
-        if (p.textContent) body.appendChild(p);
-      });
-      if (!body.children.length) {
-        const p = document.createElement('p');
-        p.className = 'training-note-section-p';
-        p.textContent = text || 'No Significant Updates';
-        body.appendChild(p);
+      body.className = 'training-notes-hero-body';
+
+      const portrait = createNotesHeroPortrait(player, displayName, config, muted);
+      body.appendChild(portrait);
+
+      const copy = document.createElement('div');
+      copy.className = 'training-notes-hero-copy';
+      const name = document.createElement('div');
+      name.className = 'training-notes-hero-name';
+      name.textContent = displayName;
+      copy.appendChild(name);
+      const meta = document.createElement('div');
+      meta.className = 'training-notes-hero-meta';
+      if (!muted && player) {
+        const position = getPlayerDisplayPosition(player);
+        const year = getTrainingReportPlayerYear(player);
+        meta.textContent = year ? `${position} · ${year}` : position;
+      } else {
+        meta.textContent = '';
       }
-      wrap.appendChild(h3);
-      wrap.appendChild(body);
-      container.appendChild(wrap);
+      copy.appendChild(meta);
+      body.appendChild(copy);
+
+      hero.appendChild(label);
+      hero.appendChild(body);
+      heroGrid.appendChild(hero);
     });
+
+    container.appendChild(heroGrid);
+
+    const dividerOne = document.createElement('div');
+    dividerOne.className = 'training-notes-subrule';
+    container.appendChild(dividerOne);
+
+    const tacticalGrid = document.createElement('div');
+    tacticalGrid.className = 'training-notes-tactical-grid';
+    buildNotesTacticalOrder(sectionMap).forEach((title) => {
+      const section = sectionMap.get(title) || { title, body: 'No Significant Updates' };
+      const valueText = formatTrainingNoteValue(title, section.body);
+      const tone = getTrainingNoteValueTone(title, section.body);
+      const pill = document.createElement('div');
+      pill.className = `training-notes-tactical-pill is-${tone}`;
+
+      const label = document.createElement('div');
+      label.className = 'training-notes-tactical-label';
+      label.textContent = title;
+      pill.appendChild(label);
+
+      const value = document.createElement('div');
+      value.className = 'training-notes-tactical-value';
+      value.textContent = valueText;
+      pill.appendChild(value);
+
+      tacticalGrid.appendChild(pill);
+    });
+    container.appendChild(tacticalGrid);
+
+    const dividerTwo = document.createElement('div');
+    dividerTwo.className = 'training-notes-subrule';
+    container.appendChild(dividerTwo);
+
+    const miscSection = sectionMap.get('Player Energy Levels') || { body: 'No Significant Updates' };
+    const miscText = String(miscSection.body || '').trim() || 'No Significant Updates';
+    const miscRow = document.createElement('div');
+    miscRow.className = 'training-notes-misc-row';
+    const miscLabel = document.createElement('div');
+    miscLabel.className = 'training-notes-misc-label';
+    miscLabel.textContent = 'Misc';
+    const miscValue = document.createElement('div');
+    miscValue.className = 'training-notes-misc-value';
+    miscValue.textContent = miscText;
+    miscRow.appendChild(miscLabel);
+    miscRow.appendChild(miscValue);
+    container.appendChild(miscRow);
     return;
   }
   
@@ -1420,5 +1816,26 @@ function renderTrainingNotes() {
     noteElement.className = 'training-note';
     noteElement.textContent = typeof note === 'string' ? note : JSON.stringify(note);
     container.appendChild(noteElement);
+  });
+}
+
+function enhanceProjectedStartingFiveTable() {
+  const table = document.querySelector('#training-projected-lineup table.training-projected-table');
+  if (!table) return;
+  const bodyRows = table.querySelectorAll('tbody tr');
+  bodyRows.forEach((row) => {
+    const posCell = row.children[0];
+    const playerCell = row.children[1];
+    if (posCell && !posCell.querySelector('.position-badge')) {
+      const text = posCell.textContent.trim();
+      posCell.textContent = '';
+      const badge = document.createElement('span');
+      badge.className = 'position-badge';
+      badge.textContent = text || '—';
+      posCell.appendChild(badge);
+    }
+    if (playerCell) {
+      playerCell.classList.add('projected-player-name-cell');
+    }
   });
 }

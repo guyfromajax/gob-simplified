@@ -78,33 +78,36 @@ function ensureTimeoutPopupButtonStyles() {
     style.textContent = `
         .button-container {
             display: flex;
-            gap: 20px;
+            gap: 10px;
             width: 100%;
-            justify-content: center;
+            justify-content: stretch;
         }
 
         .timeout-button {
-            padding: 15px 40px;
-            font-size: 18px;
-            font-weight: bold;
-            border: none;
-            border-radius: 6px;
+            appearance: none;
+            flex: 1;
+            height: 42px;
+            border-radius: 10px;
             cursor: pointer;
             text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s;
-            font-family: 'Inter', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: filter 0.14s ease, transform 0.14s ease;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 16px;
+            letter-spacing: 0.04em;
         }
 
         .go-to-timeout-button {
-            background: #ff9800;
-            color: #fff;
+            background: #F79420;
+            border: 1px solid rgba(247, 148, 32, 0.45);
+            color: #15181f;
         }
 
         .go-to-timeout-button:hover {
-            background: #f57c00;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+            filter: brightness(1.06);
+            transform: translateY(-1px);
         }
     `;
     document.head.appendChild(style);
@@ -581,8 +584,11 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     popup.className = 'user-timeout-popup';
     popup.innerHTML = `
         <div class="user-timeout-content">
-            <h2>${userTeamName} Called Timeout</h2>
-            <div class="button-container">
+            <div class="timeout-modal-accent"></div>
+            <div class="timeout-modal-body">
+                <h2>${userTeamName} Called Timeout</h2>
+            </div>
+            <div class="button-container timeout-modal-actions">
                 <button class="timeout-button go-to-timeout-button">Go To Timeout</button>
             </div>
         </div>
@@ -595,11 +601,8 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
         style.textContent = `
             .user-timeout-popup {
                 position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.85);
+                inset: 0;
+                background: rgba(0, 0, 0, 0.72);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -607,25 +610,42 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
             }
 
             .user-timeout-content {
-                background: #fff;
-                border: 6px solid #c0c0c0;
-                border-radius: 12px;
-                padding: 40px 60px;
+                width: min(420px, calc(100vw - 40px));
+                background: rgba(22, 26, 36, 0.98);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 14px;
+                box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+                overflow: hidden;
                 display: flex;
                 flex-direction: column;
-                gap: 30px;
-                align-items: center;
-                min-width: 400px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            }
+
+            .timeout-modal-accent {
+                height: 3px;
+                width: 100%;
+                background: #F79420;
+                flex-shrink: 0;
+            }
+
+            .timeout-modal-body {
+                padding: 24px 28px 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
             }
 
             .user-timeout-content h2 {
-                font-size: 36px;
-                font-weight: bold;
-                color: #333;
+                font-size: 28px;
+                color: #ffffff;
                 margin: 0;
                 font-family: 'Bebas Neue', sans-serif;
-                letter-spacing: 2px;
+                letter-spacing: 0.04em;
+                line-height: 1;
+            }
+
+            .timeout-modal-actions {
+                padding: 0 28px 24px;
             }
 
         `;
@@ -700,8 +720,11 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
     popup.className = 'computer-timeout-popup';
     popup.innerHTML = `
         <div class="computer-timeout-content">
-            <h2>${callingTeamName} Called Timeout</h2>
-            <div class="button-container">
+            <div class="timeout-modal-accent"></div>
+            <div class="timeout-modal-body">
+                <h2>${callingTeamName} Called Timeout</h2>
+            </div>
+            <div class="button-container timeout-modal-actions">
                 <button class="timeout-button go-to-timeout-button">Go To Timeout</button>
             </div>
         </div>
@@ -714,11 +737,8 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
         style.textContent = `
             .computer-timeout-popup {
                 position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.85);
+                inset: 0;
+                background: rgba(0, 0, 0, 0.72);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -726,25 +746,42 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
             }
 
             .computer-timeout-content {
-                background: #fff;
-                border: 6px solid #c0c0c0;
-                border-radius: 12px;
-                padding: 40px 60px;
+                width: min(420px, calc(100vw - 40px));
+                background: rgba(22, 26, 36, 0.98);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 14px;
+                box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+                overflow: hidden;
                 display: flex;
                 flex-direction: column;
-                gap: 30px;
-                align-items: center;
-                min-width: 400px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            }
+
+            .timeout-modal-accent {
+                height: 3px;
+                width: 100%;
+                background: #F79420;
+                flex-shrink: 0;
+            }
+
+            .timeout-modal-body {
+                padding: 24px 28px 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
             }
 
             .computer-timeout-content h2 {
-                font-size: 36px;
-                font-weight: bold;
-                color: #333;
+                font-size: 28px;
+                color: #ffffff;
                 margin: 0;
                 font-family: 'Bebas Neue', sans-serif;
-                letter-spacing: 2px;
+                letter-spacing: 0.04em;
+                line-height: 1;
+            }
+
+            .timeout-modal-actions {
+                padding: 0 28px 24px;
             }
         `;
         document.head.appendChild(style);

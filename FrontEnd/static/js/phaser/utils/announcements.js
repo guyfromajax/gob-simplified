@@ -15,6 +15,15 @@ import {
 
 let currentAnnouncement = null;
 
+export function playAnnouncementSfx(kind) {
+  const filename = kind === 'shot_clock_violation' ? 'whistle-3.mp3' : 'whistle-1.mp3';
+  try {
+    const sfx = new Audio('/sounds/' + encodeURIComponent(filename));
+    sfx.volume = 0.7;
+    sfx.play().catch(() => {});
+  } catch (e) {}
+}
+
 function getPlayerJerseyValue(player) {
   if (!player) return '';
   if (typeof player.jersey === 'number') return String(player.jersey);
@@ -173,11 +182,7 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
     foulerJersey: getPlayerJerseyValue(fouler) ? `#${getPlayerJerseyValue(fouler)}` : '',
     foulerLastName: getPlayerLastName(fouler) || '',
   };
-  try {
-    const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-1.mp3'));
-    sfx.volume = 0.7;
-    sfx.play().catch(() => {});
-  } catch (e) {}
+  playAnnouncementSfx('foul');
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
   }
@@ -217,21 +222,8 @@ export function showAnnouncement(text, team = 'home', playerData = null, meta = 
     decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
   };
-  const isFoulAnnouncement = text && (text.includes('FOUL') || text.includes('Foul'));
-  const isDeadBallTurnoverAnnouncement = text && text.includes('Turnover') && text !== 'STEAL!';
-  const isShotClockViolation = text === 'Shot Clock Violation!';
-  if (isShotClockViolation) {
-    try {
-      const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-3.mp3'));
-      sfx.volume = 0.7;
-      sfx.play().catch(() => {});
-    } catch (e) {}
-  } else if (isFoulAnnouncement || isDeadBallTurnoverAnnouncement) {
-    try {
-      const sfx = new Audio('/sounds/' + encodeURIComponent('whistle-1.mp3'));
-      sfx.volume = 0.7;
-      sfx.play().catch(() => {});
-    } catch (e) {}
+  if (meta?.sfx) {
+    playAnnouncementSfx(meta.sfx);
   }
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
@@ -351,10 +343,15 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
-      if (isBlockingFoul) {
+      if (turnData.otb_foul) {
+        playAnnouncementSfx('foul');
+        showAnnouncement("Over The Back!", foulTeam === 'OFFENSE' ? defenseTeam : offenseTeam, playerData);
+      } else if (isBlockingFoul) {
+        playAnnouncementSfx('foul');
         showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
       } else if (foulTeam === 'OFFENSE') {
         // Offensive foul - show in defense team color (they benefited)
+        playAnnouncementSfx('foul');
         showAnnouncement(pickOffensiveFoulAnnouncementText(turnData), defenseTeam, playerData);
       } else {
         // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
@@ -362,6 +359,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         let defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
         if (isQuickFoul) defensiveFoulText = "Quick Foul!";
         if (isBonusFoul && !isQuickFoul) defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
+        playAnnouncementSfx('foul');
         showAnnouncement(defensiveFoulText, offenseTeam, playerData);
       }
       
@@ -476,6 +474,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       }
       
       console.log(`📢 Announcing turnover: ${turnoverText} (result_type: ${turnData.result_type}, source: ${turnData.offensive_state || 'HCO'})`);
+      const turnoverSfxKind = turnoverText === 'Shot Clock Violation!' ? 'shot_clock_violation' : 'foul';
+      playAnnouncementSfx(turnoverSfxKind);
       showAnnouncement(turnoverText, offenseTeam, playerData);
       
       // Trigger visual effect on turnover victim

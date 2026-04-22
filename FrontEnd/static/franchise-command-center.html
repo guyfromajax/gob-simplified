@@ -10,8 +10,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Franchise Command Center</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/tournament.css">
+  <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/command-center-team-styles.css">
   <link rel="stylesheet" href="/scouting-report.css">
@@ -31,217 +32,224 @@
   <div id="franchise-container">
     <div id="tournament-top">
       <div id="top-left">
-        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
-        <div class="left-info">
-          <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
-          <div id="fcc-season-label" class="fcc-season-label">Season --</div>
-        </div>
+        <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
       </div>
       <div id="top-center">
-        <div class="chemistry-label">Team Chemistry</div>
-        <div class="chemistry-bar">
-          <div class="chemistry-bar-fill"></div>
-          <div class="chemistry-bar-text">0 / 25</div>
-        </div>
-        <div class="team-stats">
-          <div id="stat-rank">Nat'l Rank: --</div>
-          <div id="stat-prestige">Prestige: --</div>
+        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
+        <div class="fcc-meta-row">
+          <div id="fcc-season-label" class="fcc-season-label">Season --</div>
+          <div id="fcc-record-label" class="fcc-season-label fcc-record-label">Record: --</div>
+          <div id="fcc-rank-label" class="fcc-season-label fcc-rank-label">National Rank: --</div>
         </div>
       </div>
       <div id="top-right" class="right-controls">
-        <div class="secondary-buttons-group">
-          <button id="set-gameplan-franchise" class="secondary-btn">Set Game Plan</button>
-          <button id="playbooks-franchise" class="secondary-btn">Playbooks</button>
-          <button id="scouting-report-btn" class="secondary-btn" style="display: none;">Scouting Report</button>
-        </div>
         <div class="hero-buttons-group">
           <button id="play-now" class="hero-btn">Run Training</button>
-          <button id="fcc-recruiting-btn" class="recruiting-access-btn is-dead" type="button" disabled>Recruiting Begins Week 20</button>
-          <div id="fcc-recruiting-live-copy" class="fcc-recruiting-live-copy" style="display:none;">Recruiting Is Live</div>
         </div>
       </div>
     </div>
 
     <div id="tournament-tabs">
       <div class="tab-buttons">
-        <button data-tab="standings-tab" class="active">Standings</button>
+        <button data-tab="home-tab" class="active">Coach's Office</button>
         <button data-tab="roster-tab">Roster</button>
-        <button data-tab="team-tab">Team</button>
+        <button data-tab="player-stats-tab">Player Stats</button>
+        <button data-tab="team-stats-tab">Team Measures</button>
+        <button data-tab="game-plan-tab">Game Plan</button>
+        <button data-tab="playbooks-tab">Playbooks</button>
+        <button data-tab="coaches-tab">Scouting Report</button>
+        <button data-tab="standings-tab">Standings</button>
+        <button data-tab="schedule-tab">Schedule</button>
+        <button id="stats-nav-btn" data-tab="fcc-team-stats-summary-tab">Team Stats</button>
+        <button data-tab="awards-tab">Leaders</button>
+        <button data-tab="press-tab">Press</button>
         <button data-tab="recruits-tab">Recruits</button>
-        <button data-tab="tournament-tab">Tournament</button>
-        <button data-tab="resources-tab">Coaching Resources</button>
+        <button data-tab="tutorials-tab">Inbox</button>
       </div>
-      <div id="standings-tab" class="tab-content active">
-        <h3>Team Standings</h3>
-        <p class="standings-fcc-note">Your conference and sister conference (same region). For all 16 conferences, use <a href="#" id="standings-resources-link">Resources → Standings</a>.</p>
+      <div id="home-tab" class="tab-content active">
+        <div class="fcc-home-grid">
+          <section class="fcc-home-card">
+            <h3>Standings</h3>
+            <div id="home-standings-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <h3>Next Game</h3>
+            <div id="home-next-game-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <h3>Locker Room</h3>
+            <div id="home-locker-room-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <h3>Recruiting</h3>
+            <div id="home-recruiting-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <div class="fcc-home-card-head">
+              <h3>National Rankings</h3>
+              <a id="home-rankings-full-link" class="fcc-home-card-link" href="#">See All Rankings</a>
+            </div>
+            <div id="home-rankings-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <h3>Last Game</h3>
+            <div id="home-last-game-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <h3>Player Scoring</h3>
+            <div id="home-team-stats-body" class="fcc-home-card-body">In Development</div>
+          </section>
+          <section class="fcc-home-card">
+            <h3>News</h3>
+            <div id="home-news-body" class="fcc-home-card-body">In Development</div>
+          </section>
+        </div>
+      </div>
+      <div id="standings-tab" class="tab-content">
         <div id="standings-by-region" class="standings-by-region"></div>
+        <div class="fcc-standings-footer-link-wrap">
+          <a id="standings-full-link" class="fcc-standings-full-link" href="#">Full national standings here</a>
+        </div>
       </div>
       <div id="roster-tab" class="tab-content">
-        <div class="scroll-x">
-          <table class="roster-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>POS</th>
-                <th>Year</th>
-                <th>Height</th>
-                <th>Weight</th>
-                <th>SC</th>
-                <th>SH</th>
-                <th>ID</th>
-                <th>OD</th>
-                <th>PS</th>
-                <th>BH</th>
-                <th>RB</th>
-                <th>AG</th>
-                <th>ST</th>
-                <th>ND</th>
-                <th>IQ</th>
-                <th>FT</th>
-                <th>RT</th>
-              </tr>
-            </thead>
-            <tbody id="team-body"></tbody>
-          </table>
-        </div>
-        <div class="scroll-x" style="margin-top: 20px;">
-          <table class="stats-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-stat="name">Player</th>
-                <th class="sortable" data-stat="PTS">PTS</th>
-                <th class="sortable" data-stat="FGM">FGM</th>
-                <th class="sortable" data-stat="FGA">FGA</th>
-                <th class="sortable" data-stat="FG%">FG%</th>
-                <th class="sortable" data-stat="3PTM">3PTM</th>
-                <th class="sortable" data-stat="TPA">3PTA</th>
-                <th class="sortable" data-stat="3PT%">3PT%</th>
-                <th class="sortable" data-stat="FTM">FTM</th>
-                <th class="sortable" data-stat="FTA">FTA</th>
-                <th class="sortable" data-stat="FT%">FT%</th>
-                <th class="sortable" data-stat="DREB">DREB</th>
-                <th class="sortable" data-stat="OREB">OREB</th>
-                <th class="sortable" data-stat="TREB">TREB</th>
-                <th class="sortable" data-stat="AST">AST</th>
-                <th class="sortable" data-stat="STL">STL</th>
-                <th class="sortable" data-stat="BLK">BLK</th>
-                <th class="sortable" data-stat="F">F</th>
-                <th class="sortable" data-stat="MIN">MIN</th>
-                <th class="sortable" data-stat="TO">TO</th>
-              </tr>
-            </thead>
-            <tbody id="roster-stats-body"></tbody>
-          </table>
-        </div>
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="roster-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>POS</th>
+                  <th>Year</th>
+                  <th>Height</th>
+                  <th>Weight</th>
+                  <th>SC</th>
+                  <th>SH</th>
+                  <th>ID</th>
+                  <th>OD</th>
+                  <th>PS</th>
+                  <th>BH</th>
+                  <th>RB</th>
+                  <th>AG</th>
+                  <th>ST</th>
+                  <th>ND</th>
+                  <th>IQ</th>
+                  <th>FT</th>
+                  <th>RT</th>
+                </tr>
+              </thead>
+              <tbody id="team-body"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
-      <div id="team-tab" class="tab-content">
-        <div class="training-report-styled">
-          <!-- Team Report Section -->
-          <section class="team-section">
-            <h2>Team Report</h2>
-            <div class="team-attributes-grid" id="team-attributes-grid"></div>
-          </section>
-
-          <!-- Playbook Summary Section -->
-          <section class="playbook-summary-section">
-            <h2>Playbook Summary</h2>
-            <div class="playbook-summary-container" id="playbook-summary-container">
-              <!-- Plays will be populated here -->
+      <div id="player-stats-tab" class="tab-content">
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="stats-table">
+              <thead>
+                <tr>
+                  <th class="sortable" data-stat="name">Player</th>
+                  <th class="sortable" data-stat="PTS">PTS</th>
+                  <th class="sortable" data-stat="FGM">FGM</th>
+                  <th class="sortable" data-stat="FGA">FGA</th>
+                  <th class="sortable" data-stat="FG%">FG%</th>
+                  <th class="sortable" data-stat="3PTM">3PTM</th>
+                  <th class="sortable" data-stat="TPA">3PTA</th>
+                  <th class="sortable" data-stat="3PT%">3PT%</th>
+                  <th class="sortable" data-stat="FTM">FTM</th>
+                  <th class="sortable" data-stat="FTA">FTA</th>
+                  <th class="sortable" data-stat="FT%">FT%</th>
+                  <th class="sortable" data-stat="DREB">DREB</th>
+                  <th class="sortable" data-stat="OREB">OREB</th>
+                  <th class="sortable" data-stat="TREB">TREB</th>
+                  <th class="sortable" data-stat="AST">AST</th>
+                  <th class="sortable" data-stat="STL">STL</th>
+                  <th class="sortable" data-stat="BLK">BLK</th>
+                  <th class="sortable" data-stat="F">F</th>
+                  <th class="sortable" data-stat="MIN">MIN</th>
+                  <th class="sortable" data-stat="TO">TO</th>
+                  <th class="sortable" data-stat="SCR_A">SCRA</th>
+                  <th class="sortable" data-stat="SCR%">SCR%</th>
+                  <th class="sortable" data-stat="DEF_A">DEFA</th>
+                  <th class="sortable" data-stat="DEF%">DEF%</th>
+                </tr>
+              </thead>
+              <tbody id="player-stats-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <div id="game-plan-tab" class="tab-content">
+        <section class="fcc-data-card fcc-game-plan-card">
+          <div class="fcc-data-card-body fcc-game-plan-card-body">
+            <div id="fcc-game-plan-grid" class="fcc-game-plan-grid"></div>
+            <div class="fcc-game-plan-cta-wrap">
+              <button id="fcc-edit-game-plan-btn" class="fcc-game-plan-edit-btn" type="button">Edit Game Plan</button>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
-      <div id="recruits-tab" class="tab-content">
-        <h3>Recruits Leaning Your Way</h3>
-        <p id="fcc-recruits-link-copy" class="standings-fcc-note" style="margin-top: 0;">
-          Click <a id="fcc-recruits-full-link" href="#">here</a> to see the full list of recruits.
-        </p>
-        <div class="scroll-x">
-          <table id="fcc-recruits-table" class="roster-table recruiting-table">
-            <thead>
-              <tr>
-                <th data-sort-key="name">Name</th>
-                <th data-sort-key="homeRegion">Home Region</th>
-                <th data-sort-key="archetype">Archetype</th>
-                <th data-sort-key="height">HT</th>
-                <th data-sort-key="weight">WT</th>
-                <th data-sort-key="pos">POS</th>
-                <th data-sort-key="SC">SC</th>
-                <th data-sort-key="SH">SH</th>
-                <th data-sort-key="ID">ID</th>
-                <th data-sort-key="OD">OD</th>
-                <th data-sort-key="PS">PS</th>
-                <th data-sort-key="BH">BH</th>
-                <th data-sort-key="RB">RB</th>
-                <th data-sort-key="AG">AG</th>
-                <th data-sort-key="ST">ST</th>
-                <th data-sort-key="ND">ND</th>
-                <th data-sort-key="IQ">IQ</th>
-                <th data-sort-key="FT">FT</th>
-                <th data-sort-key="rt">RT</th>
-                <th id="fcc-recruits-last-col" data-sort-key="lean">Current Lean</th>
-              </tr>
-            </thead>
-            <tbody id="fcc-recruits-body"></tbody>
-          </table>
-        </div>
+      <div id="playbooks-tab" class="tab-content">
+        <section class="fcc-data-card fcc-playbooks-card">
+          <div class="fcc-data-card-body fcc-playbooks-card-body">
+            <div id="fcc-playbooks-sections" class="fcc-playbooks-sections">
+              <div class="fcc-playbooks-empty">Loading playbook settings...</div>
+            </div>
+          </div>
+        </section>
       </div>
-      <div id="tournament-tab" class="tab-content">
-        <h3 id="fcc-tournament-title">End-of-Season Tournament</h3>
-        <div style="width: 100%; overflow-x: auto;">
-          <div id="tournament-bracket-container" class="bracket"></div>
-        </div>
-      </div>
-      <div id="resources-tab" class="tab-content">
-        <h3>Coaching Resources</h3>
-        <div class="resources-grid">
-          <a id="resources-standings" class="resources-btn" href="#">Standings</a>
-          <a id="resources-stats" class="resources-btn" href="#">Stats</a>
-          <a id="resources-schedule" class="resources-btn" href="#">Schedule</a>
-          <a id="resources-team-traits" class="resources-btn" href="#">Team Traits</a>
-          <a id="resources-rankings" class="resources-btn" href="#">Rankings</a>
-          <a id="resources-recruits" class="resources-btn" href="#">Recruits</a>
-          <a id="resources-awards" class="resources-btn is-dead" href="#" aria-disabled="true">Awards</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scouting Report Modal -->
-  <div id="scouting-report-modal" class="scouting-modal" style="display: none;">
-    <div class="scouting-modal-content">
-      <div class="scouting-modal-header">
-        <h2 id="scouting-report-title">Scouting Report</h2>
-        <button class="scouting-modal-close">&times;</button>
-      </div>
-      <div class="scouting-modal-body">
-        <div id="scouting-loading" class="scouting-loading">Loading scouting report...</div>
-        <div id="scouting-content" style="display: none;">
-          <div class="training-report-styled">
-            <section class="projected-starting-five-section">
-              <div class="scouting-projected-header">
-                <h2>Projected Starting 5</h2>
-                <div class="scouting-projected-toggle view-toggle" role="group" aria-label="Projected lineup columns">
-                  <button type="button" class="toggle-btn active" data-scouting-projected="attributes">Attributes</button>
-                  <button type="button" class="toggle-btn" data-scouting-projected="stats">Stats</button>
+      <div id="coaches-tab" class="tab-content">
+        <div id="fcc-scouting-status" class="fcc-scouting-status">Loading scouting report...</div>
+        <div id="fcc-scouting-content" class="fcc-scouting-layout" style="display:none;">
+          <section class="fcc-data-card fcc-scouting-summary-card">
+            <div class="fcc-data-card-body fcc-scouting-summary-body">
+              <div class="fcc-scouting-summary-row">
+                <div class="fcc-scouting-summary-left">
+                  <div class="fcc-scouting-opponent-label">Upcoming Opponent</div>
+                  <div id="fcc-scouting-opponent-name" class="fcc-scouting-opponent-name">--</div>
+                </div>
+                <div class="fcc-scouting-summary-right">
+                  <span class="fcc-scouting-rank-label">National Rank:</span>
+                  <span id="fcc-scouting-opponent-rank" class="fcc-scouting-rank-value">--</span>
                 </div>
               </div>
-              <div id="scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
-            </section>
-          </div>
-          <!-- Team Report Section -->
-          <div class="training-report-styled">
-            <section class="team-section">
-              <h2>Team Report</h2>
-              <div class="team-attributes-grid" id="scouting-team-attributes-grid"></div>
-            </section>
-          </div>
-          
-          <!-- Play Usage Section -->
-          <section class="play-usage-section">
-            <h2>Play Usage (Last Game)</h2>
-            <div class="scroll-x">
-              <table class="play-usage-table" id="play-usage-table">
+            </div>
+          </section>
+          <section class="fcc-data-card">
+            <div class="fcc-scouting-card-head">
+              <h3>Projected Starting Five</h3>
+            </div>
+            <div class="fcc-data-card-body scroll-x">
+              <div id="fcc-scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
+            </div>
+          </section>
+          <section class="fcc-data-card">
+            <div class="fcc-scouting-card-head">
+              <h3>Team Measures</h3>
+            </div>
+            <div class="fcc-data-card-body fcc-scouting-measures-body">
+              <div class="fcc-scouting-measures-grid">
+                <div id="fcc-scouting-radar-host" class="fcc-scouting-radar-host"></div>
+                <div class="fcc-scouting-side-cards">
+                  <section class="fcc-data-card fcc-scouting-side-card">
+                    <div id="fcc-scouting-shooting-card" class="tm-side-card-content"></div>
+                  </section>
+                  <section class="fcc-data-card fcc-scouting-side-card">
+                    <div id="fcc-scouting-rebounding-card" class="tm-side-card-content"></div>
+                  </section>
+                  <section class="fcc-data-card fcc-scouting-side-card fcc-scouting-side-card-chemistry">
+                    <div id="fcc-scouting-chemistry-card" class="tm-side-card-content tm-side-card-content-chemistry"></div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="fcc-data-card">
+            <div class="fcc-scouting-card-head">
+              <h3>Play Usage (Last Game)</h3>
+            </div>
+            <div class="fcc-data-card-body scroll-x">
+              <table class="play-usage-table fcc-scouting-play-usage-table">
                 <thead>
                   <tr>
                     <th>Play Name</th>
@@ -250,12 +258,156 @@
                     <th>Usage %</th>
                   </tr>
                 </thead>
-                <tbody id="play-usage-body">
-                </tbody>
+                <tbody id="fcc-play-usage-body"></tbody>
               </table>
             </div>
           </section>
         </div>
+      </div>
+      <div id="recruits-tab" class="tab-content">
+        <h3>Recruits Leaning Your Way</h3>
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table id="fcc-recruits-table" class="roster-table recruiting-table">
+              <thead>
+                <tr>
+                  <th data-sort-key="name">Name</th>
+                  <th data-sort-key="homeRegion">Home Region</th>
+                  <th data-sort-key="archetype">Archetype</th>
+                  <th data-sort-key="height">HT</th>
+                  <th data-sort-key="weight">WT</th>
+                  <th data-sort-key="pos">POS</th>
+                  <th data-sort-key="SC">SC</th>
+                  <th data-sort-key="SH">SH</th>
+                  <th data-sort-key="ID">ID</th>
+                  <th data-sort-key="OD">OD</th>
+                  <th data-sort-key="PS">PS</th>
+                  <th data-sort-key="BH">BH</th>
+                  <th data-sort-key="RB">RB</th>
+                  <th data-sort-key="AG">AG</th>
+                  <th data-sort-key="ST">ST</th>
+                  <th data-sort-key="ND">ND</th>
+                  <th data-sort-key="IQ">IQ</th>
+                  <th data-sort-key="FT">FT</th>
+                  <th data-sort-key="rt">RT</th>
+                  <th id="fcc-recruits-last-col" data-sort-key="lean">Current Lean</th>
+                </tr>
+              </thead>
+              <tbody id="fcc-recruits-body"></tbody>
+            </table>
+          </div>
+        </section>
+        <div class="fcc-standings-footer-link-wrap">
+          <a id="fcc-recruits-full-link" class="fcc-standings-full-link" href="#">See all recruits here</a>
+        </div>
+      </div>
+      <div id="team-stats-tab" class="tab-content">
+        <div class="training-report-styled fcc-team-measures-layout">
+          <section class="fcc-data-card fcc-team-measures-radar-panel">
+            <div class="fcc-data-card-body fcc-team-measures-panel-body">
+              <div id="team-measures-radar"></div>
+            </div>
+          </section>
+          <div class="fcc-team-measures-side">
+            <section class="fcc-data-card fcc-team-measures-side-card">
+              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-shooting"></div>
+            </section>
+            <section class="fcc-data-card fcc-team-measures-side-card">
+              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-rebounding"></div>
+            </section>
+            <section class="fcc-data-card fcc-team-measures-side-card fcc-team-measures-side-card-chemistry">
+              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-chemistry"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div id="schedule-tab" class="tab-content">
+        <section class="fcc-data-card fcc-schedule-card">
+          <div class="fcc-data-card-body fcc-schedule-card-body">
+            <div id="fcc-schedule-grid" class="fcc-schedule-grid"></div>
+          </div>
+        </section>
+        <div class="fcc-standings-footer-link-wrap">
+          <a id="schedule-full-link" class="fcc-standings-full-link" href="#">Full national schedule here</a>
+        </div>
+      </div>
+      <div id="fcc-team-stats-summary-tab" class="tab-content">
+        <section class="fcc-data-card">
+          <div class="fcc-data-card-body scroll-x">
+            <table class="stats-table fcc-team-stats-grid">
+              <thead>
+                <tr class="group-row">
+                  <th colspan="6"></th>
+                  <th colspan="3">Shooting</th>
+                  <th colspan="3">3-Point</th>
+                  <th colspan="3">Free Throws</th>
+                  <th colspan="3">Rebounding</th>
+                  <th colspan="5">Other</th>
+                  <th colspan="4">Defense</th>
+                </tr>
+                <tr class="col-row">
+                  <th class="col-group-start">Team</th>
+                  <th>Rank</th>
+                  <th>W</th>
+                  <th>L</th>
+                  <th>PF</th>
+                  <th>PA</th>
+                  <th class="col-group-start">FGM</th>
+                  <th>FGA</th>
+                  <th>FG%</th>
+                  <th class="col-group-start">3PTM</th>
+                  <th>3PTA</th>
+                  <th>3PT%</th>
+                  <th class="col-group-start">FTM</th>
+                  <th>FTA</th>
+                  <th>FT%</th>
+                  <th class="col-group-start">DREB</th>
+                  <th>OREB</th>
+                  <th>TREB</th>
+                  <th class="col-group-start">AST</th>
+                  <th>F</th>
+                  <th>TO</th>
+                  <th>SCRA</th>
+                  <th>SCR%</th>
+                  <th class="col-group-start">STL</th>
+                  <th>BLK</th>
+                  <th>DEFA</th>
+                  <th>DEF%</th>
+                </tr>
+              </thead>
+              <tbody id="fcc-team-stats-summary-body">
+                <tr><td colspan="27">Loading team stats...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <div class="fcc-team-stats-footer-link-wrap">
+          <a id="team-stats-full-link" class="fcc-standings-full-link" href="#">See all teams' stats here</a>
+        </div>
+      </div>
+      <div id="awards-tab" class="tab-content">
+        <section class="fcc-data-card fcc-leaders-card">
+          <div class="fcc-data-card-body fcc-leaders-card-body">
+            <div id="fcc-leaders-grid" class="fcc-leaders-grid">
+              <div class="fcc-leader-card"><div class="fcc-leader-card-empty">Loading leaders...</div></div>
+            </div>
+          </div>
+        </section>
+        <div class="fcc-team-stats-footer-link-wrap">
+          <a id="leaders-full-link" class="fcc-standings-full-link" href="#">See all leaders here</a>
+        </div>
+      </div>
+      <div id="press-tab" class="tab-content fcc-placeholder-tab">
+        <div class="fcc-placeholder-body">In Development</div>
+      </div>
+      <div id="tutorials-tab" class="tab-content fcc-inbox-tab">
+        <section class="fcc-data-card fcc-inbox-card">
+          <div class="fcc-data-card-body fcc-inbox-card-body">
+            <div id="fcc-inbox-body" class="fcc-inbox-body" aria-live="polite">
+              <p class="fcc-inbox-empty">Loading…</p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </div>

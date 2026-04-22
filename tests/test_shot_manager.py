@@ -243,3 +243,23 @@ def test_dreb_outlet_receiver_target_direction_matches_transition_orientation(mo
     assert away_target["x"] < away_rebounder.coords["x"]
 
 
+def test_dreb_outlet_receiver_target_anchors_to_bounce_when_coords_stale(monkeypatch):
+    """Stale high-x defender coords + low-x bounce should yield outlet near bounce, not coords."""
+    game = build_mock_game()
+    _assign_mock_player_ids(game)
+    shot_manager = ShotManager(game)
+
+    monkeypatch.setattr("BackEnd.models.shot_manager.random.randint", lambda a, b: 4 if a == 3 and b == 6 else 0)
+
+    rebounder = game.home_team.lineup["C"]
+    rebounder.coords = {"x": 68, "y": 25}
+    bounce = {"x": 6.0, "y": 28.0}
+    target = shot_manager._build_dreb_outlet_receiver_target(
+        game.home_team, rebounder.player_id, ball_bounce=bounce
+    )
+    assert target is not None
+    # Toward HOME_RIM (91) from bounce-anchored x (~6..9): expect low 10s–20s, not ~72.
+    assert target["x"] < 30
+    assert target["x"] > bounce["x"]
+
+

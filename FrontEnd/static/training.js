@@ -12,7 +12,8 @@ const coachingRadios = document.querySelectorAll('input[name="coaching-focus"]')
 const offensePlaysRadios = document.querySelectorAll('input[name="offense-plays"]');
 const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"]');
 const autoTrainModal = document.getElementById('auto-train-modal');
-const autoTrainModalMessage = document.getElementById('auto-train-modal-message');
+const autoTrainModalTitle = document.getElementById('auto-train-modal-title');
+const autoTrainModalFocus = document.getElementById('auto-train-modal-focus');
 const autoTrainModalClose = document.getElementById('auto-train-modal-close');
 const customFocusModal = document.getElementById('custom-focus-modal');
 const customFocusThead = document.getElementById('custom-focus-thead');
@@ -20,6 +21,7 @@ const customFocusTbody = document.getElementById('custom-focus-tbody');
 const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
 const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
 let currentWeek = 1;
+let currentTeamName = '';
 
 /** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
 let customFocusRoster = [];
@@ -151,6 +153,7 @@ async function redirectIfTrainingAlreadyCommitted() {
     params.set('franchise_id', franchiseId);
     if (teamId) params.set('team_id', teamId);
     params.set('week', String(Number(data.week || 1)));
+    params.set('from', 'training');
     window.location.replace(`/training-report.html?${params.toString()}`);
     return true;
   } catch (error) {
@@ -164,6 +167,62 @@ allSliders.forEach(slider => {
   slider.dataset.prev = '0';
 });
 
+function ensureTrainingSliderVisual(slider) {
+  const wrapper = slider?.closest('.slider-container');
+  if (!wrapper) return null;
+  let shell = wrapper.querySelector('.training-slider-shell');
+  if (shell) return shell;
+
+  shell = document.createElement('div');
+  shell.className = 'training-slider-shell';
+  shell.setAttribute('aria-hidden', 'true');
+  shell.innerHTML = `
+    <div class="training-slider-track"></div>
+    <div class="training-slider-nodes">
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+      <span class="training-slider-node"></span>
+    </div>
+    <div class="training-slider-scale">
+      <span class="training-slider-scale-value">0</span>
+      <span class="training-slider-scale-value">1</span>
+      <span class="training-slider-scale-value">2</span>
+      <span class="training-slider-scale-value">3</span>
+      <span class="training-slider-scale-value">4</span>
+      <span class="training-slider-scale-value">5</span>
+    </div>
+  `;
+  wrapper.appendChild(shell);
+  return shell;
+}
+
+function updateTrainingSliderVisual(slider, rawValue) {
+  const shell = ensureTrainingSliderVisual(slider);
+  if (!shell) return;
+  const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
+  shell.querySelectorAll('.training-slider-node').forEach((node, index) => {
+    node.classList.toggle('is-selected', index === value);
+  });
+}
+
+function updateTrainingSliderValuePosition(slider) {
+  const wrapper = slider?.closest('.slider-container');
+  if (!wrapper) return;
+  const valueSpan = wrapper.querySelector('.slider-value');
+  if (!valueSpan) return;
+  const min = Number(slider.min || 0);
+  const max = Number(slider.max || 0);
+  const current = Number(slider.value || 0);
+  const range = max - min;
+  const percent = range > 0 ? (current - min) / range : 0;
+  const thumbOffset = percent * slider.offsetWidth;
+  valueSpan.style.left = `${thumbOffset}px`;
+  valueSpan.style.transform = 'translateX(-50%)';
+}
+
 /**
  * Utility: set slider value and update display/cache
  */
@@ -174,6 +233,8 @@ function setSliderValue(slider, value) {
   if (valueDisplay) {
     valueDisplay.textContent = value;
   }
+  updateTrainingSliderVisual(slider, value);
+  updateTrainingSliderValuePosition(slider);
 }
 
 /**
@@ -330,6 +391,7 @@ function renderCustomFocusTable() {
 
 function onCustomFocusCellClick(playerId, attrCode) {
   if (getPmModalMode() !== 'custom') return;
+  playSound('click-tiny.wav');
   if (!customFocusDraft[playerId]) customFocusDraft[playerId] = [];
   const sel = customFocusDraft[playerId];
   const idx = sel.indexOf(attrCode);
@@ -391,6 +453,15 @@ function updatePointsRemaining() {
   const remaining = TOTAL_POINTS - total;
   
   pointsRemainingEl.textContent = remaining;
+  const pointsDisplay = pointsRemainingEl.closest('.points-display');
+  if (pointsDisplay) {
+    pointsDisplay.classList.remove('is-low', 'is-empty');
+    if (remaining === 0) {
+      pointsDisplay.classList.add('is-empty');
+    } else if (remaining <= 5) {
+      pointsDisplay.classList.add('is-low');
+    }
+  }
   
   // Enable/disable submit button based on points allocation AND coaching focus selection
   const allPointsAllocated = remaining === 0;
@@ -412,6 +483,8 @@ function updatePointsRemaining() {
  * Handle slider input - prevent over-allocation
  */
 allSliders.forEach(slider => {
+  ensureTrainingSliderVisual(slider);
+  updateTrainingSliderVisual(slider, slider.value);
   slider.addEventListener('change', function() {
     playSound('click-tiny.wav');
   });
@@ -432,6 +505,8 @@ allSliders.forEach(slider => {
     if (valueDisplay) {
       valueDisplay.textContent = this.value;
     }
+    updateTrainingSliderVisual(this, this.value);
+    updateTrainingSliderValuePosition(this);
     
     // Store current value as previous
     this.dataset.prev = this.value;
@@ -445,6 +520,13 @@ allSliders.forEach(slider => {
   if (valueDisplay) {
     valueDisplay.textContent = slider.value;
   }
+  updateTrainingSliderValuePosition(slider);
+});
+
+window.addEventListener('resize', function () {
+  allSliders.forEach(function (slider) {
+    updateTrainingSliderValuePosition(slider);
+  });
 });
 
 /**
@@ -508,7 +590,7 @@ function autoAssignTraining() {
   updatePointsRemaining();
 
   // 5) Show confirmation popup
-  if (autoTrainModal && autoTrainModalMessage) {
+  if (autoTrainModal && autoTrainModalTitle && autoTrainModalFocus) {
     // Normalize archetype names to exact format required
     const archetypeMap = {
       'authoritarian': 'Authoritarian',
@@ -554,8 +636,10 @@ function autoAssignTraining() {
     // Format: focus (archetype) - focus outside, archetype inside parentheses
     // Archetype must be exactly: "Authoritarian", "Systems Coach", "Player Maximizer", or "Culture Builder"
     const focusText = normalizedArchetype ? `${cleanFocus} (${normalizedArchetype})` : cleanFocus;
-    autoTrainModalMessage.innerHTML = `Training Points Assigned<br>Assigned ${focusText} Focus`;
-    autoTrainModal.style.display = 'flex';
+    autoTrainModalTitle.textContent = 'Training Lock In';
+    autoTrainModalFocus.textContent = `Focus: ${focusText}`;
+    autoTrainModalFocus.hidden = false;
+    autoTrainModal.classList.add('is-visible');
   }
 }
 
@@ -565,7 +649,7 @@ if (autoTrainBtn) {
 if (autoTrainModalClose && autoTrainModal) {
   autoTrainModalClose.addEventListener('click', () => {
     playSound('click-tiny.wav');
-    autoTrainModal.style.display = 'none';
+    autoTrainModal.classList.remove('is-visible');
   });
 }
 
@@ -646,6 +730,7 @@ coachingRadios.forEach(radio => {
 document.querySelectorAll('input[name="pm-modal-mode"]').forEach(function (radio) {
   radio.addEventListener('change', function () {
     if (!this.checked) return;
+    playSound('click-tiny.wav');
     syncPmModalCustomHint();
     const mode = getPmModalMode();
     if (mode !== 'custom') {
@@ -787,7 +872,7 @@ function collectTrainingData() {
     })(),
     
     // Playbook Training Mode
-    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'all-plays-even'
+    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks'
   };
 
   if (data.coaching_focus === 'player-maximizer-custom') {
@@ -823,13 +908,15 @@ function playSound(filename) {
 }
 
 function showMessageModal(message, buttonLabel = 'Close') {
-  if (!autoTrainModal || !autoTrainModalMessage || !autoTrainModalClose) {
+  if (!autoTrainModal || !autoTrainModalTitle || !autoTrainModalFocus || !autoTrainModalClose) {
     alert(message);
     return;
   }
-  autoTrainModalMessage.textContent = message;
+  autoTrainModalTitle.textContent = message;
+  autoTrainModalFocus.textContent = '';
+  autoTrainModalFocus.hidden = true;
   autoTrainModalClose.textContent = buttonLabel;
-  autoTrainModal.style.display = 'flex';
+  autoTrainModal.classList.add('is-visible');
 }
 
 /**
@@ -903,7 +990,13 @@ submitBtn.addEventListener('click', async function() {
     this.disabled = true;
     this.textContent = 'Submitting...';
     if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      window.PageLoadOverlay.show('128 Teams Executing Training');
+      const overlayTeamName = currentTeamName || 'Your team';
+      window.PageLoadOverlay.show({
+        variant: 'pulse',
+        subtitle: `${overlayTeamName} is executing training.`,
+        teamName: currentTeamName || '',
+        assetKey: 'banner_primary'
+      });
     }
     
     console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
@@ -985,6 +1078,7 @@ async function initializeTrainingPoints() {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
         currentWeek = Number(data.week || 1);
+        currentTeamName = data.user_team_name || currentTeamName || '';
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
         }

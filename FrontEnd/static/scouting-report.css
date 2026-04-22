@@ -1,4 +1,11 @@
 /* Scouting Report Modal Styles */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .scouting-modal {
   position: fixed;
   top: 0;
@@ -62,6 +69,7 @@
 
 .scouting-modal-body {
   padding: 30px;
+  color: #333;
 }
 
 .scouting-loading {
@@ -171,6 +179,10 @@
   border: 1px solid #ddd;
 }
 
+.scouting-projected-table td {
+  color: #333;
+}
+
 .scouting-projected-table th:first-child,
 .scouting-projected-table td:first-child,
 .scouting-projected-table th:nth-child(2),
@@ -224,9 +236,9 @@
 .play-usage-table td {
   padding: 10px 16px;
   border-bottom: 1px solid #eee;
+  color: #333;
 }
 
 .play-usage-table tr:hover {
   background: #f9f9f9;
 }
-

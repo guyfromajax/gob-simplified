@@ -15,7 +15,6 @@ from BackEnd.db import (
 )
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.team_play_utils import iter_team_plays
-
 logger = logging.getLogger(__name__)
 
 
@@ -1776,6 +1775,8 @@ def finalize_game(
         
         quarter = game.get('quarter', 1)
         is_final = game.get('is_final', False)
+        game_state = game.get("game_state", {}) if isinstance(game.get("game_state", {}), dict) else {}
+        no_defender_shots = int(game_state.get("no_defender_shots", game.get("no_defender_shots", 0)) or 0)
         print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
         logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
 

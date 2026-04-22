@@ -20,6 +20,12 @@
       color: #1a1a1a;
       line-height: 1.6;
     }
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"] {
+      font-family: 'Bebas Neue', sans-serif;
+    }
     .tutorial-page {
       max-width: 900px;
       margin: 0 auto;
@@ -52,7 +58,6 @@
     }
     .tutorial-tab {
       padding: 12px 20px;
-      font-family: 'Inter', sans-serif;
       font-size: 0.95rem;
       font-weight: 500;
       color: #555;
@@ -139,7 +144,6 @@
       background: #fafafa;
       border: none;
       cursor: pointer;
-      font-family: inherit;
     }
     .tutorial-attr-toggle:hover {
       background: #f0f0f0;
@@ -249,7 +253,7 @@
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-em" id="attr-toggle-em"><span>Emotion (EM)</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-em" role="region" aria-labelledby="attr-toggle-em"><p class="tutorial-attr-body">😎 happiest<br>😊 happy<br>😐 neutral<br>🙁 unhappy<br>🤢 disruptive</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-em" role="region" aria-labelledby="attr-toggle-em"><p class="tutorial-attr-body">😎 happiest<br>😊 happy<br>😐 neutral<br>😕 unhappy<br>😡 disruptive</p></div>
             </div>
           </div>
           <div class="tutorial-col">
@@ -293,19 +297,19 @@
           <div class="tutorial-col">
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-shooting" id="attr-toggle-ta-shooting"><span>Shooting</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-shooting" role="region" aria-labelledby="attr-toggle-ta-shooting"><p class="tutorial-attr-body">Represents your team’s collective confidence and rhythm as shooters. High Shooting teams trust their spacing, step into open looks decisively, and maintain composure when shots aren’t falling early. Success fuels it. Poor selection and cold stretches can slowly chip away at it.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-shooting" role="region" aria-labelledby="attr-toggle-ta-shooting"><p class="tutorial-attr-body">This is your team’s intangible mindset when it comes to converting baskets. It reflects your team’s overall belief in its identity as a group that scores points. This is a compounding attribute that can rise or fall based on in-game performance and training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-offense" id="attr-toggle-ta-offense"><span>Offense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-offense" role="region" aria-labelledby="attr-toggle-ta-offense"><p class="tutorial-attr-body">Reflects how effectively your team executes its offensive structure before the shot is taken. Ball movement, spacing, timing, and decision-making all flow through this attribute. Running varied schemes sharpens it. Becoming predictable puts it on tape — and makes execution harder.</p><p class="tutorial-attr-body">Offense and Shooting work together. One creates the opportunity. The other converts it.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-offense" role="region" aria-labelledby="attr-toggle-ta-offense"><p class="tutorial-attr-body">This is how well your team executes the Xs and Os of its offense: running plays, setting screens, making reads, and getting open. It affects how cleanly your offense operates as a unit, independent of raw talent. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through diverse play-calling and offense-focused training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fastbreaks" id="attr-toggle-ta-fastbreaks"><span>Fast Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fastbreaks" role="region" aria-labelledby="attr-toggle-ta-fastbreaks"><p class="tutorial-attr-body">Determines how efficiently your team turns defense into immediate offense. Outlet decisions, lane discipline, and transition awareness all contribute. Teams that push with intention sharpen this trait. Reckless transition play can blunt it over time.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fastbreaks" role="region" aria-labelledby="attr-toggle-ta-fastbreaks"><p class="tutorial-attr-body">This is how well your team executes in transition: pushing the pace, picking the right moments to run, and converting opportunities before the defense can get set. It affects both how often your team generates fast-break chances and how effectively it finishes them. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed fast-break install, a balanced fast-break playbook, and dedicated fast-break training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fight" id="attr-toggle-ta-fight"><span>Fight</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fight" role="region" aria-labelledby="attr-toggle-ta-fight"><p class="tutorial-attr-body">Represents your team’s competitive edge. High Fight teams embrace physical play, respond to runs with resilience, and perform with urgency when trailing. Winning builds it. Adversity tests it. This trait defines how your team responds when the game turns hostile.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fight" role="region" aria-labelledby="attr-toggle-ta-fight"><p class="tutorial-attr-body">Represents your team’s competitive edge. High Fight teams have great resilience, handle adverse situations well, and perform with urgency when trailing. This is a compounding attribute that can rise or fall based on in-game performance and training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-momentum" id="attr-toggle-ta-momentum"><span>Momentum</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
@@ -313,33 +317,33 @@
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-fb-defense" id="attr-toggle-ta-fb-defense"><span>Fast Break Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fb-defense" role="region" aria-labelledby="attr-toggle-ta-fb-defense"><p class="tutorial-attr-body">Determines how quickly and effectively your team regains structure in transition. Stopping the ball, identifying matchups, and protecting the rim all matter. Teams that prioritize transition awareness see this grow over time.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-fb-defense" role="region" aria-labelledby="attr-toggle-ta-fb-defense"><p class="tutorial-attr-body">This is how well your team defends fast breaks and transition offense. It is about containing pace, cutting off passing lanes, and not allowing easy transition baskets. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed fast-break defense install and film study of your opponent.</p></div>
             </div>
           </div>
           <div class="tutorial-col">
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-rebounding" id="attr-toggle-ta-rebounding"><span>Rebounding</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-rebounding" role="region" aria-labelledby="attr-toggle-ta-rebounding"><p class="tutorial-attr-body">Measures how consistently your team finishes possessions. Strong Rebounding teams anticipate misses, secure position early, and treat loose balls as momentum plays. Over time, disciplined fundamentals and physical commitment strengthen this trait — while lapses in effort weaken it.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-rebounding" role="region" aria-labelledby="attr-toggle-ta-rebounding"><p class="tutorial-attr-body">This is your team’s intangible mindset when it comes to rebounding. It reflects your team’s overall belief in its identity as a group that gets more rebounds than its opponent. This is a compounding attribute that can rise or fall based on in-game performance and training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-defense" id="attr-toggle-ta-defense"><span>Defense</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-defense" role="region" aria-labelledby="attr-toggle-ta-defense"><p class="tutorial-attr-body">Captures your team’s cohesion and discipline on the defensive end. Rotations, help positioning, communication, and overall structure are all influenced here. Teams that consistently defend with purpose see this grow. Breakdowns and careless play gradually erode it.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-defense" role="region" aria-labelledby="attr-toggle-ta-defense"><p class="tutorial-attr-body">This is how well your team executes the Xs and Os of its defense: rotating on time, closing out, communicating switches, and making life difficult for the offense. Raw athleticism only takes you so far; this is what separates a disciplined unit from a collection of individuals. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through diverse play-calling and defense-focused training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-press-trap" id="attr-toggle-ta-press-trap"><span>Press/Trap</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap" role="region" aria-labelledby="attr-toggle-ta-press-trap"><p class="tutorial-attr-body">Measures your team’s ability to apply structured pressure. Timing, coordination, and controlled aggression all matter. Repeated, predictable pressure schemes may lose effectiveness as opponents adjust. Strategic variety keeps this sharp.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap" role="region" aria-labelledby="attr-toggle-ta-press-trap"><p class="tutorial-attr-body">This is how well your team executes full-court presses and half-court traps: timing the traps, cutting off passing lanes, and turning defensive pressure into live-ball turnovers. It affects both how often your team disrupts the opponent’s offense and how effectively it converts that pressure into scoring opportunities. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed press/trap install, a disciplined approach to how often you deploy it, and dedicated press/trap training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-discipline" id="attr-toggle-ta-discipline"><span>Discipline</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-discipline" role="region" aria-labelledby="attr-toggle-ta-discipline"><p class="tutorial-attr-body">Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight — aggression without structure becomes chaos.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-discipline" role="region" aria-labelledby="attr-toggle-ta-discipline"><p class="tutorial-attr-body">Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight very well. Aggression without structure becomes chaos. This is a compounding attribute that can rise or fall based on in-game performance and training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-chemistry" id="attr-toggle-ta-chemistry"><span>Team Chemistry</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-chemistry" role="region" aria-labelledby="attr-toggle-ta-chemistry"><p class="tutorial-attr-body">The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see it directly — but you will feel it in tight games.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-chemistry" role="region" aria-labelledby="attr-toggle-ta-chemistry"><p class="tutorial-attr-body">The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see the impact of this attribute directly, but you will definitely feel it. This is a compounding attribute that can rise or fall based on in-game performance and training activities.</p></div>
             </div>
             <div class="tutorial-attr" role="group">
               <button type="button" class="tutorial-attr-toggle" aria-expanded="false" aria-controls="attr-body-ta-press-trap-breaks" id="attr-toggle-ta-press-trap-breaks"><span>Press/Trap Breaks</span><span class="tutorial-attr-caret" aria-hidden="true">▼</span></button>
-              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap-breaks" role="region" aria-labelledby="attr-toggle-ta-press-trap-breaks"><p class="tutorial-attr-body">Measures your team’s composure under pressure. Spacing discipline, passing clarity, and decision-making against traps all feed this attribute. Teams that regularly face and solve pressure become sharper. Panic erodes it.</p></div>
+              <div class="tutorial-attr-body-wrap" id="attr-body-ta-press-trap-breaks" role="region" aria-labelledby="attr-toggle-ta-press-trap-breaks"><p class="tutorial-attr-body">This is how well your team works through your opponent’s presses and traps. Handling the pressure of these disruptive defenses is key to avoiding the many mistakes they can cause. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay, and push it higher, through a committed press/trap offense install and film study of your opponent.</p></div>
             </div>
           </div>
         </div>

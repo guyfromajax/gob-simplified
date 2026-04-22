@@ -104,6 +104,7 @@
     <div class="players-grid"></div>
   </div>
 
+  <script src="/common.js"></script>
   <script>
     let currentView = sessionStorage.getItem('rosterView') || 'grid';
     let playersData = {{ players | tojson }};
@@ -343,7 +344,10 @@
           const percentage = Math.min(100, Math.max(0, (attrs[attr] ?? 0) * 8.33));
           
           attrRow.style.setProperty('--attr-fill', `${percentage}%`);
-          
+          if (typeof getAttrColor === 'function') {
+            attrRow.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil((attrs[attr] ?? 0) / 10)));
+          }
+
           const label = document.createElement('span');
           label.className = 'attr-label';
           label.textContent = attr;

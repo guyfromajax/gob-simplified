@@ -2,6 +2,7 @@ import random
 import logging
 import copy
 import time
+import json
 from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
@@ -34,7 +35,9 @@ from BackEnd.utils.shared import (
     unpack_game_context,
     calculate_bounce_spot,
     determine_rebounder,
+    FREE_THROW_REBOUND_MAX_X_DELTA,
     apply_coords_from_animations_list,
+    get_away_player_coords,
 )
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
@@ -1694,11 +1697,11 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Capture Fast Break animation first so fb_roles gets _bh_final_x/y (shot spot); set shooter coords for block reconciliation
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, hold_up, stopper_id)
+        apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             shooter.coords = shot_spot
             roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
-
         snap_roles = {**roles, "ball_handler": fb_roles.get("ball_handler")}
         fb_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, snap_roles, "fb_logic_pre_shot"
@@ -1849,6 +1852,87 @@ def resolve_fast_break_logic(game: "GameManager"):
     assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"
     return turn_result
 
+
+def _log_ft_rebound_calculation_snapshot(
+    *,
+    off_team,
+    def_team,
+    shooter,
+    shooter_pos,
+    basket_x,
+    basket_y,
+    bounce_spot,
+    rebounder,
+    stat,
+    x_gate_fallback,
+    anim_total,
+    player_anim_count,
+    full_sim,
+    no_lane,
+):
+    """
+    One WARNING line per FT miss that triggers rebound resolution: all lineup coords
+    (post-apply_coords_from_animations_list), shooter slot + coords, attacked basket, bounce.
+    """
+
+    def _lineup_rows(team, side_label):
+        rows = []
+        for pos in sorted((team.lineup or {}).keys()):
+            p = (team.lineup or {}).get(pos)
+            if p is None:
+                continue
+            c = getattr(p, "coords", None) or {}
+            try:
+                x = float(c.get("x", 50))
+                y = float(c.get("y", 25))
+            except (TypeError, ValueError):
+                x, y = 50.0, 25.0
+            rows.append(
+                {
+                    "side": side_label,
+                    "pos": pos,
+                    "player_id": str(getattr(p, "player_id", "") or ""),
+                    "x": round(x, 2),
+                    "y": round(y, 2),
+                }
+            )
+        return rows
+
+    sc = getattr(shooter, "coords", None) or {}
+    try:
+        sx = float(sc.get("x", 50))
+        sy = float(sc.get("y", 25))
+    except (TypeError, ValueError):
+        sx, sy = 50.0, 25.0
+
+    if isinstance(bounce_spot, dict):
+        try:
+            bx = float(bounce_spot.get("x", 0))
+            by = float(bounce_spot.get("y", 0))
+        except (TypeError, ValueError):
+            bx, by = 0.0, 0.0
+    else:
+        bx, by = 0.0, 0.0
+
+    payload = {
+        "tag": "FT_REBOUND_CALC",
+        "full_sim": full_sim,
+        "no_lane": no_lane,
+        "anim_total": anim_total,
+        "player_anim_rows": player_anim_count,
+        "shooter_pos": shooter_pos,
+        "shooter_id": str(getattr(shooter, "player_id", "") or "") if shooter else None,
+        "shooter_xy": {"x": round(sx, 2), "y": round(sy, 2)},
+        "attacked_basket_xy": {"x": float(basket_x), "y": float(basket_y)},
+        "bounce_xy": {"x": round(bx, 2), "y": round(by, 2)},
+        "players": _lineup_rows(off_team, "offense") + _lineup_rows(def_team, "defense"),
+        "x_gate_fallback": x_gate_fallback,
+        "stat": stat,
+        "rebounder_id": str(getattr(rebounder, "player_id", "") or "") if rebounder else None,
+    }
+    logging.warning("[FT_REBOUND_CALC] %s", json.dumps(payload, sort_keys=True))
+
+
 def resolve_free_throw_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     shooter = game_state.get("shooter") or game_state.get("last_ball_handler")
@@ -1896,6 +1980,7 @@ def resolve_free_throw_logic(game):
         text += "but misses the free throw."
 
     # Handle 1-and-1 front-end logic
+    decrement_ft_remaining = True
     if game_state.get("one_and_one", False):
         if game_state["free_throws_remaining"] == 1:
             if makes_shot:
@@ -1927,9 +2012,13 @@ def resolve_free_throw_logic(game):
                 game_state["free_throws_remaining"] = 0
                 game_state["one_and_one"] = False
                 game_state["offensive_state"] = "HCO"
+                # Already at 0; do not run the shared decrement (would become -1 and break
+                # frontend isFinal === (free_throws_remaining === 0) for rebound/outlet).
+                decrement_ft_remaining = False
 
-    # Standard decrement for non-1-and-1 logic
-    game_state["free_throws_remaining"] -= 1
+    # Standard decrement when this attempt still consumes one FT from the remaining count
+    if decrement_ft_remaining:
+        game_state["free_throws_remaining"] -= 1
 
     # If no FTs remain, determine next state
     if game_state["free_throws_remaining"] <= 0:
@@ -1949,9 +2038,36 @@ def resolve_free_throw_logic(game):
             # Home team attacks away basket (x=91), away team attacks home basket (x=9)
             basket_x = 9 if is_away_offense else 91
             bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
-            
-            # Use unified system to determine rebounder
-            rebounder, rebound_team, stat = determine_rebounder(game, bounce_spot)
+
+            rebounder, rebound_team, stat = determine_rebounder(
+                game,
+                bounce_spot,
+                max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
+            )
+
+            anim_list = animations if isinstance(animations, list) else []
+            player_anim_count = sum(
+                1
+                for a in anim_list
+                if isinstance(a, dict) and str(a.get("playerId")) != "ball"
+            )
+            x_gate_fallback = bool(game_state.pop("_ft_rebound_x_gate_fallback", False))
+            _log_ft_rebound_calculation_snapshot(
+                off_team=off_team,
+                def_team=def_team,
+                shooter=shooter,
+                shooter_pos=shooter_pos,
+                basket_x=basket_x,
+                basket_y=25,
+                bounce_spot=bounce_spot,
+                rebounder=rebounder,
+                stat=stat,
+                x_gate_fallback=x_gate_fallback,
+                anim_total=len(anim_list),
+                player_anim_count=player_anim_count,
+                full_sim=bool(game.game_state.get("_is_full_simulation")),
+                no_lane=bool(game_state.get("no_lane")),
+            )
             
             game_state["last_rebound"] = stat
             game_state["last_rebounder"] = rebounder
@@ -3632,6 +3748,7 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     has a shoot action for the shooter. Used for HCO, FCP, and HCT so block
     reconciliation uses the correct shot location. Fast Break does not use this.
     """
+    _ensure_skeleton_shot_role_positions(game, roles)
     if not skeleton or not roles:
         return
     steps = skeleton.get("steps") or []
@@ -3642,13 +3759,46 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     if shooter is None or shooter_pos is None:
         return
     last_step = steps[-1]
-    pos_actions = last_step.get("pos_actions") or {}
-    pa = pos_actions.get(shooter_pos)
-    if not pa or pa.get("action") != "shoot":
+    last_step_pos_actions = last_step.get("pos_actions") or {}
+    last_step_keys = list(last_step_pos_actions.keys())
+    final_step_shooter_pos = None
+    final_step_shooter_action = None
+    final_step_shot_event_by = None
+    final_step_has_location = False
+    final_step_has_spot = False
+    for pos, action_info in last_step_pos_actions.items():
+        action = (action_info.get("action") or "").lower().strip()
+        if action == "shoot":
+            final_step_shooter_pos = pos
+            final_step_shooter_action = action_info.get("action")
+            final_step_has_location = action_info.get("location") is not None
+            final_step_has_spot = action_info.get("spot") is not None
+            break
+    for event in last_step.get("events", []):
+        if event.get("type") == "shot":
+            final_step_shot_event_by = event.get("by")
+            break
+
+    shoot_step = None
+    shoot_pos_actions = None
+    pa = None
+    matched_shoot_step_index = None
+    for step_index in range(len(steps) - 1, -1, -1):
+        candidate_step = steps[step_index]
+        candidate_pos_actions = candidate_step.get("pos_actions") or {}
+        candidate_action = candidate_pos_actions.get(shooter_pos)
+        if candidate_action and (candidate_action.get("action") or "").lower().strip() == "shoot":
+            shoot_step = candidate_step
+            shoot_pos_actions = candidate_pos_actions
+            pa = candidate_action
+            matched_shoot_step_index = step_index
+            break
+
+    if not pa:
         return
     from BackEnd.constants import HCO_STRING_SPOTS
     from BackEnd.utils.shared import get_away_player_coords
-    location = (pa.get("location") or "key").strip()
+    location = (pa.get("location") or pa.get("spot") or "key").strip()
     # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
     coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
     if coords == {"x": 50, "y": 25} and location.lower() != "key":
@@ -3661,6 +3811,43 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         coords = get_away_player_coords(coords)
     shooter.coords = coords
     roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
+
+
+def _ensure_skeleton_shot_role_positions(game, roles):
+    """
+    Normalize positional role fields for skeleton-driven shot turns.
+
+    HCO, FCP, and HCT all use player-object roles plus skeleton steps. This helper
+    backfills the matching *_pos fields so shared shot-spot logic, snapshots, and
+    downstream debugging operate on one consistent contract.
+    """
+    if not isinstance(roles, dict):
+        return roles
+
+    off_lineup = game.offense_team.lineup
+    def_lineup = game.defense_team.lineup
+
+    if roles.get("shooter_pos") is None and roles.get("shooter") is not None:
+        roles["shooter_pos"] = get_player_position(off_lineup, roles.get("shooter"))
+    if roles.get("passer_pos") is None and roles.get("passer") is not None:
+        roles["passer_pos"] = get_player_position(off_lineup, roles.get("passer"))
+    if roles.get("screener_pos") is None and roles.get("screener") is not None:
+        roles["screener_pos"] = get_player_position(off_lineup, roles.get("screener"))
+    if roles.get("defender_pos") is None and roles.get("defender") is not None:
+        roles["defender_pos"] = get_player_position(def_lineup, roles.get("defender"))
+    if roles.get("second_defender_pos") is None and roles.get("second_defender") is not None:
+        roles["second_defender_pos"] = get_player_position(def_lineup, roles.get("second_defender"))
+
+    ball_handler = roles.get("ball_handler")
+    if roles.get("ball_handler_pos") is None:
+        if ball_handler is not None:
+            roles["ball_handler_pos"] = get_player_position(off_lineup, ball_handler)
+        elif roles.get("passer_pos") is not None:
+            roles["ball_handler_pos"] = roles.get("passer_pos")
+        else:
+            roles["ball_handler_pos"] = roles.get("shooter_pos")
+
+    return roles
 
 
 def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_shot_step_index=None):
@@ -4160,7 +4347,7 @@ def resolve_half_court_offense_logic(game):
         successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
     
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
-    
+
     # ✅ FIX: For non-shot outcomes (steals, turnovers, fouls), override defender
     # to be based on ball handler's position, not shooter's position
     # assign_roles() assigns defender based on shooter, but for steals we need
@@ -4323,6 +4510,46 @@ def resolve_half_court_offense_logic(game):
     
     # Store intended shooter in roles for later comparison
     roles["intended_shooter_pos"] = intended_shooter_pos
+
+    if result == "SHOT" and not is_motion_play and skeleton and "steps" in skeleton:
+        steps = skeleton.get("steps") or []
+        final_step = steps[-1] if steps else {}
+        final_pos_actions = final_step.get("pos_actions") or {}
+        final_events = final_step.get("events") or []
+        final_step_keys = list(final_pos_actions.keys())
+        final_step_actions = {
+            pos: {
+                "action": action_info.get("action"),
+                "location": action_info.get("location"),
+                "spot": action_info.get("spot"),
+            }
+            for pos, action_info in final_pos_actions.items()
+        }
+        any_shoot_steps = []
+        for step_index, step in enumerate(steps):
+            for pos, action_info in (step.get("pos_actions") or {}).items():
+                if (action_info.get("action") or "").lower().strip() == "shoot":
+                    any_shoot_steps.append(
+                        {
+                            "step_index": step_index,
+                            "pos": pos,
+                            "location": action_info.get("location"),
+                            "spot": action_info.get("spot"),
+                        }
+                    )
+        logging.warning(
+            "🧭 [HCO_SET_PLAY_VARIANT_TRACE] playcall=%s variant=%s intended_shooter_pos=%s derived_shooter=%s derived_shooter_pos=%s final_step_keys=%s final_step_actions=%s final_step_events=%s any_shoot_steps=%s step_count=%s",
+            off_call,
+            skeleton.get("_variant"),
+            intended_shooter_pos,
+            get_name_safe(roles.get("shooter")) if roles.get("shooter") else "NONE",
+            roles.get("shooter_pos"),
+            final_step_keys,
+            final_step_actions,
+            final_events,
+            any_shoot_steps,
+            len(steps),
+        )
     
     # ============================================================================
     # STEAL HCO SETUP: Check if this HCO turn comes from a steal
@@ -5437,11 +5664,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         shot_roles = {
             "ball_handler": passer,
+            "ball_handler_pos": passer_pos,
             "shooter": shooter,
+            "shooter_pos": shooter_pos,
             "passer": passer,
+            "passer_pos": passer_pos,
             "screener": None,
+            "screener_pos": None,
             "defender": defender,
         }
+        _ensure_skeleton_shot_role_positions(game, shot_roles)
         
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
@@ -6660,11 +6892,16 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         shot_roles = {
             "ball_handler": passer,
+            "ball_handler_pos": passer_pos,
             "shooter": shooter,
+            "shooter_pos": shooter_pos,
             "passer": passer,
+            "passer_pos": passer_pos,
             "screener": None,
+            "screener_pos": None,
             "defender": defender,
         }
+        _ensure_skeleton_shot_role_positions(game, shot_roles)
         
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)

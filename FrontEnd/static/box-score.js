@@ -12,6 +12,58 @@ function playSound(filename) {
 
 let gameData = null;
 
+function hexToRgbString(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  return result
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+    : '42, 48, 58';
+}
+
+function getTeamContext() {
+  const homeTeamId = gameData?.home_team_id;
+  const awayTeamId = gameData?.away_team_id;
+  const teamsObj = gameData?.teams || {};
+  const homeTeam = (homeTeamId && teamsObj[homeTeamId]) ? teamsObj[homeTeamId] : (gameData?.home_team || {});
+  const awayTeam = (awayTeamId && teamsObj[awayTeamId]) ? teamsObj[awayTeamId] : (gameData?.away_team || {});
+  return { homeTeam, awayTeam, teamsObj, homeTeamId, awayTeamId };
+}
+
+/** URL team_id can fail strict equality vs Mongo ids keyed under `teams` — walk keys and embedded ids. */
+function mapTeamIdToSide(teamIdRaw, gameData, homeName, awayName, homeTeamId, awayTeamId) {
+  const t = String(teamIdRaw || '').trim();
+  if (!t) return null;
+  const eq = (a, b) => a != null && b != null && String(a).trim() === String(b).trim();
+  if (eq(t, homeTeamId) || eq(t, homeName)) return 'home';
+  if (eq(t, awayTeamId) || eq(t, awayName)) return 'away';
+  const teams = gameData?.teams;
+  if (!teams || typeof teams !== 'object') return null;
+  for (const key of Object.keys(teams)) {
+    const team = teams[key];
+    if (!team || typeof team !== 'object') continue;
+    const nm = team.name || team.team_name;
+    const idHits = [key, team.team_id, team._id, team.teamId].filter((x) => x != null && String(x).trim() !== '');
+    for (const id of idHits) {
+      if (!eq(t, id)) continue;
+      if (nm && eq(nm, homeName)) return 'home';
+      if (nm && eq(nm, awayName)) return 'away';
+      if (eq(key, homeTeamId) || eq(String(key), String(homeTeamId))) return 'home';
+      if (eq(key, awayTeamId) || eq(String(key), String(awayTeamId))) return 'away';
+    }
+  }
+  return null;
+}
+
+/** Map `banner_team` query to the same display name string the game doc uses (case / spelling). */
+function resolveBannerTeamNameFromParams(bannerParam, homeName, awayName) {
+  const b = (bannerParam || '').trim();
+  if (!b) return null;
+  if (b === homeName) return homeName;
+  if (b === awayName) return awayName;
+  if (b.toLowerCase() === homeName.toLowerCase()) return homeName;
+  if (b.toLowerCase() === awayName.toLowerCase()) return awayName;
+  return b;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -347,6 +399,7 @@ async function renderPlayerOfTheGameSection() {
   const section = document.getElementById('potg-section');
   const playerLine = document.getElementById('potg-player-line');
   const statsLine = document.getElementById('potg-stats-line');
+  const potgPortrait = document.getElementById('potg-portrait');
   if (!section || !playerLine || !statsLine) return;
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -360,8 +413,10 @@ async function renderPlayerOfTheGameSection() {
   if (!isGameComplete) {
     playerLine.textContent = '';
     statsLine.textContent = '';
-    playerLine.style.color = '';
-    statsLine.style.color = '';
+    if (potgPortrait) {
+      potgPortrait.removeAttribute('src');
+      potgPortrait.style.display = 'none';
+    }
     return;
   }
 
@@ -381,9 +436,13 @@ async function renderPlayerOfTheGameSection() {
     section.style.display = 'block';
     playerLine.textContent = `${potg.name} - ${potg.teamName}`;
     statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
-    const potgColor = potg.teamColor || '#1a1a2e';
-    playerLine.style.color = potgColor;
-    statsLine.style.color = potgColor;
+    if (potgPortrait && potg.playerId) {
+      potgPortrait.style.display = '';
+      potgPortrait.src = `${staticBase}/images/players/${potg.playerId}.png`;
+      potgPortrait.alt = potg.name || '';
+    } else if (potgPortrait) {
+      potgPortrait.style.display = 'none';
+    }
   } catch (err) {
     console.warn('[box-score] Failed to render POTG section:', err);
     section.style.display = 'none';
@@ -499,31 +558,112 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tourna
 
 // Render header with team names and scores
 function renderHeader() {
-  // ✅ UNIFIED STRUCTURE: Get team data from unified teams object, fallback to old structure
-  const homeTeamId = gameData.home_team_id;
-  const awayTeamId = gameData.away_team_id;
-  const teamsObj = gameData.teams || {};
-  
-  const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : (gameData.home_team || {});
-  const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : (gameData.away_team || {});
-  
+  const { homeTeam: homeTeamObj, awayTeam: awayTeamObj } = getTeamContext();
   const score = gameData.score || {};
-
   const homeName = homeTeamObj.name || 'Home Team';
   const awayName = awayTeamObj.name || 'Away Team';
   const homeScore = score[homeName] || homeTeamObj.score || 0;
   const awayScore = score[awayName] || awayTeamObj.score || 0;
+  const homeTeamId = gameData?.home_team_id;
+  const awayTeamId = gameData?.away_team_id;
 
   document.getElementById('home-team-name').textContent = homeName;
   document.getElementById('away-team-name').textContent = awayName;
   document.getElementById('home-score').textContent = homeScore;
   document.getElementById('away-score').textContent = awayScore;
-  
-  // Update tab button labels with team names
+
+  const homeNameEl = document.getElementById('home-team-name');
+  const awayNameEl = document.getElementById('away-team-name');
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  const homeWon = homeScore > awayScore;
+  const awayWon = awayScore > homeScore;
+  const winningColor = '#ffffff';
+  const losingColor = 'rgba(255,255,255,0.45)';
+  homeNameEl.style.color = homeWon ? winningColor : awayWon ? losingColor : 'rgba(255, 255, 255, 0.6)';
+  homeScoreEl.style.color = homeWon ? winningColor : awayWon ? losingColor : '#ffffff';
+  awayNameEl.style.color = awayWon ? winningColor : homeWon ? losingColor : 'rgba(255, 255, 255, 0.6)';
+  awayScoreEl.style.color = awayWon ? winningColor : homeWon ? losingColor : '#ffffff';
+  document.querySelectorAll('#header-content .score, #header-content .team-name').forEach(el => {
+    el.style.textShadow = '0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7)';
+  });
+
   const homeTabButton = document.querySelector('.tab-button[data-team="home"]');
   const awayTabButton = document.querySelector('.tab-button[data-team="away"]');
-  if (homeTabButton) homeTabButton.textContent = homeName;
-  if (awayTabButton) awayTabButton.textContent = awayName;
+  const homePrimaryColor = homeTeamObj?.colors?.primary_color || homeTeamObj?.primary_color || '#F79420';
+  const awayPrimaryColor = awayTeamObj?.colors?.primary_color || awayTeamObj?.primary_color || '#4065AF';
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const bannerTeamParam = (urlParams.get('banner_team') || '').trim();
+  const myTeamParam = urlParams.get('my_team');
+  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
+
+  let userTeamSide = null;
+  if (myTeamParam === 'home' || myTeamParam === 'away') {
+    userTeamSide = myTeamParam;
+  } else if (teamIdParam) {
+    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
+  }
+  if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('last_game_user_team_side');
+    if (stored === 'home' || stored === 'away') userTeamSide = stored;
+  }
+
+  const userTeamNameForBanner = bannerTeamParam
+    ? resolveBannerTeamNameFromParams(bannerTeamParam, homeName, awayName)
+    : userTeamSide === 'away'
+    ? awayName
+    : userTeamSide === 'home'
+    ? homeName
+    : null;
+
+  console.log('[box-score renderHeader] getTeamAssetPath scope', typeof getTeamAssetPath, typeof window !== 'undefined' ? typeof window.getTeamAssetPath : 'n/a');
+
+  const resolveTeamBannerPath =
+    typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath
+      : (typeof window !== 'undefined' && typeof window.getTeamAssetPath === 'function'
+        ? window.getTeamAssetPath
+        : null);
+
+  const bannerPathFromTeamName = (name) => {
+    const slug = String(name).toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+    return `/images/teams/${slug}/${slug}_banner_primary.jpg`;
+  };
+
+  let bannerUrl;
+  if (userTeamNameForBanner) {
+    bannerUrl = resolveTeamBannerPath
+      ? resolveTeamBannerPath(userTeamNameForBanner, 'banner_primary')
+      : bannerPathFromTeamName(userTeamNameForBanner);
+  } else {
+    bannerUrl = resolveTeamBannerPath
+      ? resolveTeamBannerPath(null, 'banner_primary')
+      : '/images/teams/general/general_banner_primary.jpg';
+  }
+
+  const header = document.getElementById('box-score-header');
+  if (header && bannerUrl) {
+    header.style.backgroundImage = `
+      linear-gradient(to bottom, rgba(13,17,36,0.15) 0%, rgba(13,17,36,0.5) 50%, rgba(13,17,36,0.92) 75%, rgba(13,17,36,0.98) 100%),
+      linear-gradient(to right, rgba(13,17,36,0.0) 0%, rgba(13,17,36,0.0) 30%, rgba(13,17,36,0.7) 60%, rgba(13,17,36,0.85) 100%),
+      url('${bannerUrl}')
+    `;
+    header.style.backgroundSize = 'cover';
+    header.style.backgroundPosition = 'center';
+    console.log('[box-score renderHeader] header.style.backgroundImage =', JSON.stringify(header.style.backgroundImage));
+  }
+
+  if (homeTabButton) {
+    homeTabButton.textContent = homeName;
+    homeTabButton.style.setProperty('--tab-color', homePrimaryColor);
+    homeTabButton.style.setProperty('--tab-color-rgb', hexToRgbString(homePrimaryColor));
+  }
+  if (awayTabButton) {
+    awayTabButton.textContent = awayName;
+    awayTabButton.style.setProperty('--tab-color', awayPrimaryColor);
+    awayTabButton.style.setProperty('--tab-color-rgb', hexToRgbString(awayPrimaryColor));
+  }
 }
 
 // Render quarter scoring table
@@ -767,8 +907,6 @@ function renderPlayerStatsTable(team, players) {
       nameLink.className = 'player-name-link';
       nameLink.textContent = `${name}${jerseyDisplay}`;
       nameLink.style.cursor = 'pointer';
-      nameLink.style.color = '#0066cc';
-      nameLink.style.textDecoration = 'underline';
       nameLink.addEventListener('click', () => showSpecialStatsPopup(player));
       nameCell.appendChild(nameLink);
       
@@ -955,81 +1093,80 @@ function renderTeamAttributeChangesForTab(team) {
     return;
   }
 
-  if (!changes || Object.keys(changes).length === 0) {
-    console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: hiding section (no changes)', { team });
-    section.style.display = 'none';
-    return;
-  }
-
-  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: showing section', { team, changeKeys: Object.keys(changes) });
+  console.log('🔍 [ATTR-CHANGES] renderTeamAttributeChangesForTab: showing section', { team, changeKeys: Object.keys(changes || {}) });
   section.style.display = 'block';
+  renderAttributeChangePills(container, changes || {});
+}
 
-  const attrNames = {
-    shot_threshold: 'Shot Threshold',
-    rebound_modifier: 'Rebound',
-    offensive_efficiency: 'Offense',
-    defensive_efficiency: 'Defense',
-    fb_efficiency: 'Fast Break',
-    pt_efficiency: 'Press/Trap',
-    fight: 'Fight',
-    discipline: 'Discipline',
-    momentum_score: 'Momentum',
-    team_chemistry: 'Chemistry',
-    fb_opp_modifier: 'FB Defense',
-    pt_opp_modifier: 'P/T Breaks'
+function renderAttributeChangePills(container, attributeDeltas) {
+  function normalizeAttrKey(key) {
+    return String(key || '')
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/[\s-]+/g, '_')
+      .toLowerCase();
+  }
+
+  const ATTR_CONFIG = {
+    shot_threshold: { label: 'Shooting', scale: 100, invert: true },
+    rebound_modifier: { label: 'Rebounding', scale: 0.2, invert: false },
+    offensive_efficiency: { label: 'Offense', scale: 10, invert: false },
+    defensive_efficiency: { label: 'Defense', scale: 10, invert: false },
+    fb_efficiency: { label: 'Fast Break', scale: 10, invert: false },
+    fb_defense: { label: 'FB Defense', scale: 10, invert: false },
+    pt_efficiency: { label: 'Press/Trap', scale: 10, invert: false },
+    pt_breaks: { label: 'P/T Breaks', scale: 10, invert: false },
+    fight: { label: 'Fight', scale: 10, invert: false },
+    discipline: { label: 'Discipline', scale: 10, invert: false },
+    momentum_score: { label: 'Momentum', scale: 10, invert: false },
+    team_chemistry: { label: 'Chemistry', scale: 10, invert: false },
+    fb_opp_modifier: { label: 'FB Defense', scale: 10, invert: false },
+    pt_opp_modifier: { label: 'P/T Breaks', scale: 10, invert: false },
+    offensiveefficiency: { label: 'Offense', scale: 10, invert: false },
+    defensiveefficiency: { label: 'Defense', scale: 10, invert: false },
+    reboundmodifier: { label: 'Rebounding', scale: 0.2, invert: false },
+    shotthreshold: { label: 'Shooting', scale: 100, invert: true },
+    teamchemistry: { label: 'Chemistry', scale: 10, invert: false },
+    momentumscore: { label: 'Momentum', scale: 10, invert: false },
+    fbefficiency: { label: 'Fast Break', scale: 10, invert: false },
+    ptefficiency: { label: 'Press/Trap', scale: 10, invert: false },
+    ptbreaks: { label: 'P/T Breaks', scale: 10, invert: false }
   };
-
-  function formatChange(change, attrKey) {
-    const n = Number(change);
-    const isRebound = attrKey === 'rebound_modifier';
-    const isShotThreshold = attrKey === 'shot_threshold';
-    
-    let displayValue = n;
-    let text = '';
-    let color = 'black';
-    
-    if (isShotThreshold) {
-      // ✅ INVERT SIGN: Positive changes display as negative (red), negative changes display as positive (green)
-      displayValue = -n;
-      text = displayValue === 0 ? '0' : (displayValue > 0 ? `+${displayValue}` : `${displayValue}`);
-      color = displayValue > 0 ? 'green' : displayValue < 0 ? 'red' : 'black';
-    } else if (isRebound) {
-      // ✅ ROUND TO 2 DECIMALS: Round mathematically (e.g., -0.02634... → -0.03, -0.02499... → -0.02)
-      const rounded = Math.round(n * 100) / 100; // Round to 2 decimal places
-      text = rounded === 0 ? '0.00' : (rounded > 0 ? `+${rounded.toFixed(2)}` : `${rounded.toFixed(2)}`);
-      color = rounded > 0 ? 'green' : rounded < 0 ? 'red' : 'black';
-    } else {
-      // Other attributes: integer display
-      text = n === 0 ? '0' : (n > 0 ? `+${n}` : `${n}`);
-      color = n > 0 ? 'green' : n < 0 ? 'red' : 'black';
-    }
-    
-    return { text, color };
-  }
-
-  const rowDefs = [
-    ['shot_threshold', 'rebound_modifier', 'offensive_efficiency', 'defensive_efficiency'],
-    ['fb_efficiency', 'pt_efficiency', 'fight', 'discipline'],
-    ['momentum_score', 'team_chemistry', 'fb_opp_modifier', 'pt_opp_modifier']
-  ];
-
   container.innerHTML = '';
-  for (const attrs of rowDefs) {
+  container.className = 'attr-changes-pills';
+  console.log('🔍 [ATTR-CHANGES] renderAttributeChangePills keys=', Object.keys(attributeDeltas || {}));
+
+  Object.entries(attributeDeltas).forEach(([key, rawDelta]) => {
+    const normalizedKey = normalizeAttrKey(key);
+    const compactKey = normalizedKey.replace(/_/g, '');
+    const config = ATTR_CONFIG[normalizedKey] || ATTR_CONFIG[compactKey];
+    if (!config) return;
+
+    const numDelta = Number(rawDelta) || 0;
+    const effectiveDelta = config.invert ? -numDelta : numDelta;
+    const fillPct = Math.min(Math.abs(effectiveDelta) / config.scale * 50, 50);
+    const isPositive = effectiveDelta > 0;
+    const isNegative = effectiveDelta < 0;
+    const sign = effectiveDelta > 0 ? '+' : '';
+    const displayDelta = config.scale === 0.2
+      ? `${sign}${effectiveDelta.toFixed(2)}`
+      : `${sign}${Math.round(effectiveDelta)}`;
+    const deltaColor = isPositive ? '#34EC27' : isNegative ? '#ff6d6d' : 'rgba(255,255,255,0.3)';
+
     const row = document.createElement('div');
-    row.className = 'attribute-changes-row';
-    for (const attrKey of attrs) {
-      const change = changes[attrKey] ?? 0;
-      const { text, color } = formatChange(change, attrKey);
-      const cell = document.createElement('div');
-      cell.className = 'attribute-change-cell';
-      cell.innerHTML = `
-        <div class="attribute-change-label">${attrNames[attrKey]}</div>
-        <div class="attribute-change-value" style="color: ${color}">${text}</div>
-      `;
-      row.appendChild(cell);
-    }
+    row.className = 'attr-change-row';
+    row.innerHTML = `
+      <div class="attr-change-label">${config.label}</div>
+      <div class="attr-change-pill-wrap">
+        <div class="attr-change-pill">
+          <div class="attr-pill-fill ${isPositive ? 'positive' : isNegative ? 'negative' : ''}"
+               style="width: ${fillPct}%; ${isPositive ? 'left: 50%' : 'right: 50%'}"></div>
+          <div class="attr-pill-center"></div>
+        </div>
+      </div>
+      <div class="attr-change-delta" style="color: ${deltaColor}">${numDelta !== 0 ? displayDelta : '—'}</div>
+    `;
     container.appendChild(row);
-  }
+  });
 }
 
 // Render scouting notes
@@ -1070,11 +1207,18 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const offense = teamStats.offense || {};
   const defense = teamStats.defense || {};
   const playcalls = offense.Playcalls || {};
+  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
 
-  // Offense Play Calls Section
+  const leftColumn = document.createElement('div');
+  leftColumn.className = 'scouting-column';
+  const rightColumn = document.createElement('div');
+  rightColumn.className = 'scouting-column';
+  container.appendChild(leftColumn);
+  container.appendChild(rightColumn);
+
   const playCallsSection = document.createElement('div');
   playCallsSection.className = 'scouting-section';
-  playCallsSection.innerHTML = '<h3>Offense Play Calls</h3>';
+  playCallsSection.innerHTML = '<div class="scouting-section-header">Offense Play Calls</div>';
 
   // Motion
   const motionSection = createPlaycallSubsection('Motion', playcalls.Motion);
@@ -1092,36 +1236,12 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   playCallsSection.appendChild(cumulativeSection);
   }
 
-  container.appendChild(playCallsSection);
-
-  // Special Situations Section
-  const specialSection = document.createElement('div');
-  specialSection.className = 'scouting-section';
-  specialSection.innerHTML = '<h3>Special Situations</h3>';
-
-  // Special situations use canonical EOG snapshot when available (matches EOG attribute calculations).
-  const scoutingSnapshot = (eogSnapshot && eogSnapshot.scouting) || {};
-
-  // HC Traps
-  const hct = defense.HCT || {};
-  const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
-  const hctSuccess = scoutingSnapshot.hct_success ?? hct.success ?? 0;
-  const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
-  specialSection.appendChild(createScoutingItem('HC Traps', `${hctSuccess} / ${hctUsed}`, `${hctPct}%`));
-
-  // FC Presses
-  const fcp = defense.FCP || {};
-  const fcpUsed = scoutingSnapshot.fcp_used ?? fcp.used ?? 0;
-  const fcpSuccess = scoutingSnapshot.fcp_success ?? fcp.success ?? 0;
-  const fcpPct = fcpUsed > 0 ? ((fcpSuccess / fcpUsed) * 100).toFixed(0) : '0';
-  specialSection.appendChild(createScoutingItem('FC Presses', `${fcpSuccess} / ${fcpUsed}`, `${fcpPct}%`));
-
-  container.appendChild(specialSection);
+  leftColumn.appendChild(playCallsSection);
 
   // Defense Play Calls Section
   const defensePlayCallsSection = document.createElement('div');
   defensePlayCallsSection.className = 'scouting-section';
-  defensePlayCallsSection.innerHTML = '<h3>Defense Play Calls</h3>';
+  defensePlayCallsSection.innerHTML = '<div class="scouting-section-header">Defense Play Calls</div>';
 
   // Man
   const manDefense = defense.Man || {};
@@ -1202,19 +1322,22 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const zone131DefenseSection = createDefensePlaycallSubsection('1-3-1 Zone', zone131Defense);
   defensePlayCallsSection.appendChild(zone131DefenseSection);
 
-  container.appendChild(defensePlayCallsSection);
+  rightColumn.appendChild(defensePlayCallsSection);
 
-  // Fast Breaks (offense scouting; per-play splits — after Defense Play Calls per product spec)
+  // Fast Breaks (left column, after Offense Play Calls)
   const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
   const fbSuccess = scoutingSnapshot.fb_success ?? offense.Fast_Break_Success ?? 0;
   const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
 
-  // Match defense subsection pattern: h4 line with title + S/A/%, then scouting-item rows (vs Motion, etc.)
   const fastBreakSection = document.createElement('div');
   fastBreakSection.className = 'scouting-section';
+  fastBreakSection.innerHTML = '<div class="scouting-section-header">Fast Breaks</div>';
   const fastBreakSub = document.createElement('div');
-  fastBreakSub.className = 'scouting-subsection';
-  fastBreakSub.innerHTML = `<h4>Fast Breaks: ${fbSuccess} / ${fbEntries} (${fbPct}%)</h4>`;
+  fastBreakSub.className = 'scouting-play-type';
+  const fastBreakHeader = document.createElement('div');
+  fastBreakHeader.className = 'scouting-play-type-header';
+  fastBreakHeader.innerHTML = `<span>Fast Breaks:</span><span>${fbSuccess} / ${fbEntries} (${fbPct}%)</span>`;
+  fastBreakSub.appendChild(fastBreakHeader);
 
   const mergedFbPlays = mergeFastBreakPlaysForBoxScore(
     offense.fast_break_plays,
@@ -1235,7 +1358,31 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   }
 
   fastBreakSection.appendChild(fastBreakSub);
-  container.appendChild(fastBreakSection);
+  leftColumn.appendChild(fastBreakSection);
+
+  const specialSection = document.createElement('div');
+  specialSection.className = 'scouting-section';
+  specialSection.innerHTML = '<div class="scouting-section-header">Special Situations</div>';
+
+  const hct = defense.HCT || {};
+  const hctUsed = scoutingSnapshot.hct_used ?? hct.used ?? 0;
+  const hctSuccess = scoutingSnapshot.hct_success ?? hct.success ?? 0;
+  const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
+  const hctBlock = document.createElement('div');
+  hctBlock.className = 'scouting-play-type';
+  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>HC Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
+  specialSection.appendChild(hctBlock);
+
+  const fcp = defense.FCP || {};
+  const fcpUsed = scoutingSnapshot.fcp_used ?? fcp.used ?? 0;
+  const fcpSuccess = scoutingSnapshot.fcp_success ?? fcp.success ?? 0;
+  const fcpPct = fcpUsed > 0 ? ((fcpSuccess / fcpUsed) * 100).toFixed(0) : '0';
+  const fcpBlock = document.createElement('div');
+  fcpBlock.className = 'scouting-play-type';
+  fcpBlock.innerHTML = `<div class="scouting-play-type-header"><span>FC Presses:</span><span>${fcpSuccess} / ${fcpUsed} (${fcpPct}%)</span></div>`;
+  specialSection.appendChild(fcpBlock);
+
+  rightColumn.appendChild(specialSection);
 }
 
 /**
@@ -1261,22 +1408,16 @@ function mergeFastBreakPlaysForBoxScore(offensePlays, snapshotPlays) {
 
 // Create playcall subsection (Motion, Set, Cumulative)
 function createPlaycallSubsection(title, playcallData) {
-  if (!playcallData) {
-    const empty = document.createElement('div');
-    empty.className = 'scouting-subsection';
-    empty.innerHTML = `<h4>${title}: No data</h4>`;
-    return empty;
-  }
-
   const subsection = document.createElement('div');
-  subsection.className = 'scouting-subsection';
+  subsection.className = 'scouting-play-type';
+  const suppressOverallSummary = title === 'Focus Success Rates';
 
   const overall = playcallData.overall || {};
   const overallAttempts = overall.attempts || 0;
   const overallSuccess = overall.success || 0;
   const overallPct = overallAttempts > 0 ? ((overallSuccess / overallAttempts) * 100).toFixed(0) : '0';
 
-  // Calculate average EV and Exec for offense playcalls
+  // Calculate average EV and Execution for offense playcalls
   const overallEvScores = overall.ev_scores || [];
   const overallLeanScores = overall.lean_scores || [];
   const overallAvgEV = overallEvScores.length > 0 
@@ -1297,16 +1438,17 @@ function createPlaycallSubsection(title, playcallData) {
     ? (parseFloat(overallAvgExec) < 0 ? '#ff0000' : (parseFloat(overallAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
-  const overallAvgText = overallAvgEV !== null || overallAvgExec !== null
-    ? ` (Avg EV: <span style="color: ${overallEvColor || '#000'}">${overallEvSign}${overallAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${overallExecColor || '#000'}">${overallExecSign}${overallAvgExec || '0'}%</span>)`
-    : '';
-
-  // For "Focus Success Rates", don't show the numbers in the header
-  const headerText = title === 'Focus Success Rates' 
-    ? `<h4>${title}${overallAvgText}</h4>`
-    : `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)${overallAvgText}</h4>`;
-  
-  subsection.innerHTML = headerText;
+  const primary = document.createElement('div');
+  primary.className = 'scouting-play-type-header';
+  primary.innerHTML = suppressOverallSummary
+    ? `<span>${title}</span>`
+    : `
+    <span>${title}:</span>
+    <span>${overallSuccess} / ${overallAttempts} (${overallPct}%)</span>
+    ${overallAvgEV !== null ? `<span class="${getEvClass(overallAvgEV)}">EV ${overallEvSign}${overallAvgEV}%</span>` : ''}
+    ${overallAvgExec !== null ? `<span class="${getEvClass(overallAvgExec)}">Execution ${overallExecSign}${overallAvgExec}%</span>` : ''}
+  `;
+  subsection.appendChild(primary);
 
   // Inside (backend uses lowercase 'inside')
   const inside = playcallData.inside || playcallData.Inside || {};
@@ -1368,29 +1510,39 @@ function createPlaycallSubsection(title, playcallData) {
   return subsection;
 }
 
-// Create a scouting item element
+function getEvClass(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'ev-neutral';
+  if (n > 0) return 'ev-positive';
+  if (n < 0) return 'ev-negative';
+  return 'ev-neutral';
+}
+
 function createScoutingItem(label, value, pct) {
   const item = document.createElement('div');
-  item.className = 'scouting-item';
+  item.className = 'scouting-vs-row';
   item.innerHTML = `
-    <span class="scouting-item-label">${label}:</span>
-    <span class="scouting-item-value">${value}</span>
-    <span class="scouting-item-pct">(${pct})</span>
+    <span class="scouting-vs-label">${label}</span>
+    <span>${value}</span>
+    <span>${pct}</span>
   `;
   return item;
 }
 
-// Create a scouting item element with vs Man and vs Zone columns
 function createScoutingItemWithVs(label, value, pct, vsManValue, vsManPct, vsZoneValue, vsZonePct) {
-  const item = document.createElement('div');
-  item.className = 'scouting-item';
-  item.innerHTML = `
-    <span class="scouting-item-label">${label}:</span>
-    <span class="scouting-item-value">${value}</span>
-    <span class="scouting-item-pct">(${pct})</span>
-    <span class="scouting-item-vs" style="margin-left: 15px;">vs Man: ${vsManValue} (${vsManPct}%), vs Zone: ${vsZoneValue} (${vsZonePct}%)</span>
-  `;
-  return item;
+  const wrap = document.createElement('div');
+  wrap.className = 'scouting-focus-group';
+  const primary = document.createElement('div');
+  primary.className = 'scouting-focus-header';
+  primary.innerHTML = `<span>${label}:</span><span>${value}</span><span>${pct}</span>`;
+  wrap.appendChild(primary);
+
+  const subRows = document.createElement('div');
+  subRows.className = 'scouting-vs-rows';
+  subRows.appendChild(createScoutingItem('vs Man', vsManValue, `${vsManPct}%`));
+  subRows.appendChild(createScoutingItem('vs Zone', vsZoneValue, `${vsZonePct}%`));
+  wrap.appendChild(subRows);
+  return wrap;
 }
 
 // Create defense playcall subsection (Man, Zone, etc.)
@@ -1399,21 +1551,23 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const stats = defenseData.game_stats || defenseData.season_stats || defenseData || {};
   
   const subsection = document.createElement('div');
-  subsection.className = 'scouting-subsection';
+  subsection.className = 'scouting-play-type';
 
   const used = stats.used || 0;
   const success = stats.success || 0;
   const pct = used > 0 ? ((success / used) * 100).toFixed(0) : '0';
 
-  // Calculate average EV and Exec (lean_score)
+  // Calculate average EV and Execution (lean_score), then invert for defense display.
   const evScores = stats.ev_scores || [];
   const leanScores = stats.lean_scores || [];
-  const avgEV = evScores.length > 0 
+  const rawAvgEV = evScores.length > 0 
     ? (evScores.reduce((a, b) => a + b, 0) / evScores.length).toFixed(0)
     : '0';
-  const avgExec = leanScores.length > 0
+  const rawAvgExec = leanScores.length > 0
     ? (leanScores.reduce((a, b) => a + b, 0) / leanScores.length * 100).toFixed(0)
     : '0';
+  const avgEV = String(-Number(rawAvgEV || 0));
+  const avgExec = String(-Number(rawAvgExec || 0));
   
   const evSign = parseFloat(avgEV) >= 0 ? '+' : '';
   const execSign = parseFloat(avgExec) >= 0 ? '+' : '';
@@ -1422,12 +1576,15 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const evColor = parseFloat(avgEV) < 0 ? '#ff0000' : (parseFloat(avgEV) === 0 ? '#ffd700' : '#00AA00');
   const execColor = parseFloat(avgExec) < 0 ? '#ff0000' : (parseFloat(avgExec) === 0 ? '#ffd700' : '#00AA00');
   
-  const headerText = `${title}: ${success} / ${used} (${pct}%)`;
-  const avgText = evScores.length > 0 || leanScores.length > 0
-    ? ` (Avg EV: <span style="color: ${evColor}">${evSign}${avgEV}%</span>) (Avg Exec: <span style="color: ${execColor}">${execSign}${avgExec}%</span>)`
-    : '';
-  
-  subsection.innerHTML = `<h4>${headerText}${avgText}</h4>`;
+  const primary = document.createElement('div');
+  primary.className = 'scouting-play-type-header';
+  primary.innerHTML = `
+    <span>${title}:</span>
+    <span>${success} / ${used} (${pct}%)</span>
+    ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgEV)}">EV ${evSign}${avgEV}%</span>` : ''}
+    ${(evScores.length > 0 || leanScores.length > 0) ? `<span class="${getEvClass(avgExec)}">Execution ${execSign}${avgExec}%</span>` : ''}
+  `;
+  subsection.appendChild(primary);
 
   // vs Motion
   const vsMotion = stats.vs_motion || {};
@@ -1458,12 +1615,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
     ? (parseFloat(vsMotionAvgExec) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
-  const vsMotionAvgText = vsMotionAvgEV !== null || vsMotionAvgExec !== null
-    ? ` (Avg EV: <span style="color: ${vsMotionEvColor || '#000'}">${vsMotionEvSign}${vsMotionAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${vsMotionExecColor || '#000'}">${vsMotionExecSign}${vsMotionAvgExec || '0'}%</span>)`
-    : '';
-  
-  const vsMotionDisplayPct = vsMotionAvgText ? `${vsMotionPct}%${vsMotionAvgText}` : `${vsMotionPct}%`;
-  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, vsMotionDisplayPct));
+  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, `${vsMotionPct}%`));
 
   // vs Set Play
   const vsSet = stats.vs_set || {};
@@ -1494,12 +1646,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
     ? (parseFloat(vsSetAvgExec) < 0 ? '#ff0000' : (parseFloat(vsSetAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
-  const vsSetAvgText = vsSetAvgEV !== null || vsSetAvgExec !== null
-    ? ` (Avg EV: <span style="color: ${vsSetEvColor || '#000'}">${vsSetEvSign}${vsSetAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${vsSetExecColor || '#000'}">${vsSetExecSign}${vsSetAvgExec || '0'}%</span>)`
-    : '';
-  
-  const vsSetDisplayPct = vsSetAvgText ? `${vsSetPct}%${vsSetAvgText}` : `${vsSetPct}%`;
-  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, vsSetDisplayPct));
+  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, `${vsSetPct}%`));
 
   // vs Inside
   const vsInside = stats.vs_inside || {};
@@ -1536,56 +1683,14 @@ function setupTabs() {
   const tabButtons = document.querySelectorAll('.tab-button');
   const teamContents = document.querySelectorAll('.team-content');
 
-  const NAVY_FALLBACK = '#1a1a2e';
-  const teamsObj = gameData?.teams || {};
-  const homeTeamId = gameData?.home_team_id;
-  const awayTeamId = gameData?.away_team_id;
-  const homeTeam = (homeTeamId && teamsObj[homeTeamId]) ? teamsObj[homeTeamId] : (gameData?.home_team || {});
-  const awayTeam = (awayTeamId && teamsObj[awayTeamId]) ? teamsObj[awayTeamId] : (gameData?.away_team || {});
-
-  const resolvePrimaryColor = (teamObj) =>
-    teamObj?.colors?.primary_color ||
-    teamObj?.primary_color ||
-    NAVY_FALLBACK;
-
-  const contrastTextColor = (hexColor) => {
-    if (typeof hexColor !== 'string') return '#fff';
-    let hex = hexColor.trim().replace('#', '');
-    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return '#fff';
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-    return luminance > 165 ? '#111' : '#fff';
-  };
-
-  const homePrimaryColor = resolvePrimaryColor(homeTeam);
-  const awayPrimaryColor = resolvePrimaryColor(awayTeam);
-  const homeTextColor = contrastTextColor(homePrimaryColor);
-  const awayTextColor = contrastTextColor(awayPrimaryColor);
-
   tabButtons.forEach(button => {
     const team = button.dataset.team;
-
-    // Set background color based on team
-    if (team === 'home') {
-      button.style.backgroundColor = homePrimaryColor;
-      button.style.color = homeTextColor;
-    } else if (team === 'away') {
-      button.style.backgroundColor = awayPrimaryColor;
-      button.style.color = awayTextColor;
-    }
-    
     button.addEventListener('click', () => {
       playSound('click-tiny.wav');
-      // Update active tab
-      tabButtons.forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.team-content').forEach(c => c.classList.remove('active'));
       button.classList.add('active');
-
-      // Update active content
-      teamContents.forEach(content => content.classList.remove('active'));
-      document.getElementById(`${team}-content`).classList.add('active');
+      document.getElementById(`${team}-content`)?.classList.add('active');
     });
   });
 }
@@ -1770,7 +1875,7 @@ function setupLockerRoomButton() {
     lockerRoomUrl = '/mode-select.html';
   }
 
-  cleanButton.textContent = 'Back To Locker Room';
+  cleanButton.textContent = 'Back to Locker Room';
 
   cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();

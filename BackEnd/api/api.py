@@ -70,6 +70,7 @@ try:
     from .skeleton_routes import router as skeleton_router
     from .pointer_validation_routes import router as pointer_validation_router
     from .auth_routes import router as auth_router
+    from .leaderboard_routes import router as leaderboard_router
     from .admin_routes import router as admin_router
     from .feedback_routes import router as feedback_router
     from BackEnd.utils.auth import get_current_user
@@ -232,6 +233,7 @@ try:
     app.include_router(skeleton_router)
     app.include_router(pointer_validation_router)
     app.include_router(auth_router)
+    app.include_router(leaderboard_router)
     app.include_router(admin_router)
     app.include_router(feedback_router)
 
@@ -5660,7 +5662,7 @@ try:
             if mode == "franchise" and franchise_id:
                 fpd_doc = franchise_players_data_collection.find_one(
                     {"franchise_id": str(franchise_id), "player_id": str(player_id)},
-                    {"attributes": 1, "position_ratings": 1, "meta": 1},
+                    {"attributes": 1, "position_ratings": 1, "meta": 1, "season": 1, "career": 1},
                 )
                 if fpd_doc:
                     if isinstance(fpd_doc.get("attributes"), dict):
@@ -5671,6 +5673,10 @@ try:
                         for key in ("year", "height", "weight", "jersey", "team"):
                             if key in fpd_doc["meta"]:
                                 player[key] = fpd_doc["meta"][key]
+                    if isinstance(fpd_doc.get("season"), dict):
+                        player["season"] = fpd_doc["season"]
+                    if isinstance(fpd_doc.get("career"), dict):
+                        player["career"] = fpd_doc["career"]
 
             # Debug logging removed - was cluttering logs
             # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")

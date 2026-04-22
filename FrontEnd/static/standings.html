@@ -9,20 +9,106 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
+  <style>
+    .standings-page-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .standings-page-header .brand-back-link {
+      justify-self: start;
+    }
+
+    .brand-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .brand-back-link:hover {
+      background: none;
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .brand-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .standings-page-title {
+      margin: 0 !important;
+      text-align: center;
+    }
+
+    .standings-all-regions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .standings-all-regions .fcc-standings-card {
+      flex: none;
+      max-width: none;
+      min-width: 0;
+    }
+
+    .standings-all-regions .fcc-standings-card-title {
+      padding: 10px 12px 8px;
+      font-size: 18px;
+    }
+
+    .standings-all-regions .fcc-standings-card-body {
+      padding: 4px 8px 8px;
+    }
+
+    .standings-all-regions .fcc-standings-row {
+      grid-template-columns: minmax(132px, 1.9fr) 38px 38px 48px 48px;
+      gap: 4px;
+      min-height: 30px;
+      padding: 0 1px;
+    }
+
+    .standings-all-regions .fcc-standings-row-header {
+      min-height: 28px;
+      padding: 0 10px;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .standings-all-regions .fcc-standings-col-team {
+      font-size: 11px;
+    }
+
+    .standings-all-regions .fcc-standings-col-stat {
+      font-size: 11px;
+    }
+
+  </style>
 </head>
 <body>
-  <div class="resource-page-container">
-    <a id="back-btn" class="back-to-locker-room" href="#">Back To Locker Room</a>
-    <h1>Conference Standings</h1>
-    <div class="standings-region-toggle-wrap">
-      <button type="button" class="standings-region-btn active" data-region="A">Region A</button>
-      <button type="button" class="standings-region-btn" data-region="B">Region B</button>
-      <button type="button" class="standings-region-btn" data-region="C">Region C</button>
-      <button type="button" class="standings-region-btn" data-region="D">Region D</button>
-      <button type="button" class="standings-region-btn" data-region="E">Region E</button>
-      <button type="button" class="standings-region-btn" data-region="F">Region F</button>
-      <button type="button" class="standings-region-btn" data-region="G">Region G</button>
-      <button type="button" class="standings-region-btn" data-region="H">Region H</button>
+  <div class="resource-page-container fcc-brand-page-shell">
+    <div class="standings-page-header">
+      <a id="back-btn" class="back-to-locker-room brand-back-link" href="#">Back to Locker Room</a>
+      <h1 class="standings-page-title">National Standings</h1>
+      <div></div>
     </div>
     <div id="standings-by-region" class="standings-by-region"></div>
   </div>
@@ -58,51 +144,92 @@
     return a;
   }
 
-  function render(list, selectedRegion) {
+  function buildStandingsCard(titleText, teams) {
+    const card = document.createElement('section');
+    card.className = 'fcc-standings-card';
+
+    const title = document.createElement('div');
+    title.className = 'fcc-standings-card-title';
+    title.textContent = titleText;
+    card.appendChild(title);
+
+    const headerRow = document.createElement('div');
+    headerRow.className = 'fcc-standings-row fcc-standings-row-header';
+    headerRow.innerHTML = [
+      '<span class="fcc-standings-col-team">Team</span>',
+      '<span class="fcc-standings-col-stat">W</span>',
+      '<span class="fcc-standings-col-stat">L</span>',
+      '<span class="fcc-standings-col-stat">PF</span>',
+      '<span class="fcc-standings-col-stat">PA</span>'
+    ].join('');
+    card.appendChild(headerRow);
+
+    const body = document.createElement('div');
+    body.className = 'fcc-standings-card-body';
+
+    teams.forEach(function (t) {
+      const row = document.createElement('div');
+      row.className = 'fcc-standings-row';
+
+      const teamCell = document.createElement('span');
+      teamCell.className = 'fcc-standings-col-team';
+      teamCell.appendChild(buildTeamLink(t));
+      row.appendChild(teamCell);
+
+      const wCell = document.createElement('span');
+      wCell.className = 'fcc-standings-col-stat';
+      wCell.textContent = t.W;
+      row.appendChild(wCell);
+
+      const lCell = document.createElement('span');
+      lCell.className = 'fcc-standings-col-stat';
+      lCell.textContent = t.L;
+      row.appendChild(lCell);
+
+      const pfCell = document.createElement('span');
+      pfCell.className = 'fcc-standings-col-stat';
+      pfCell.textContent = t.PF;
+      row.appendChild(pfCell);
+
+      const paCell = document.createElement('span');
+      paCell.className = 'fcc-standings-col-stat';
+      paCell.textContent = t.PA;
+      row.appendChild(paCell);
+
+      body.appendChild(row);
+    });
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function render(allStandingsByRegion) {
     const container = document.getElementById('standings-by-region');
     if (!container) return;
     container.innerHTML = '';
-    selectedRegion = selectedRegion || 'A';
-    const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
-    const byConference = {};
-    byRegion.forEach(t => {
-      const c = t.conference != null ? t.conference : 0;
-      if (!byConference[c]) byConference[c] = [];
-      byConference[c].push(t);
-    });
-    const confNumbers = Object.keys(byConference).map(Number).sort((a, b) => a - b);
-    confNumbers.forEach(confNum => {
-      const teams = byConference[confNum];
-      teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
-      const heading = document.createElement('h4');
-      heading.className = 'standings-conference-heading';
-      heading.textContent = 'Conference ' + selectedRegion + confNum;
-      container.appendChild(heading);
-      const scrollWrap = document.createElement('div');
-      scrollWrap.className = 'scroll-x';
-      const table = document.createElement('table');
-      table.className = 'leaders-table standings-conference-table';
-      table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
-      const tbody = table.querySelector('tbody');
-      teams.forEach(t => {
-        const tr = document.createElement('tr');
-        const teamTd = document.createElement('td');
-        teamTd.appendChild(buildTeamLink(t));
-        tr.appendChild(teamTd);
-        tr.appendChild(document.createElement('td')).textContent = t.W;
-        tr.appendChild(document.createElement('td')).textContent = t.L;
-        tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
-        tr.appendChild(document.createElement('td')).textContent = t.PF;
-        tr.appendChild(document.createElement('td')).textContent = t.PA;
-        tr.appendChild(document.createElement('td')).textContent = t.next || '';
-        tbody.appendChild(tr);
+
+    const layout = document.createElement('div');
+    layout.className = 'standings-all-regions';
+    const regionOrder = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+    regionOrder.forEach(function (region) {
+      const list = allStandingsByRegion[region] || [];
+      const byConference = {};
+      list.forEach(function (t) {
+        const c = t.conference != null ? t.conference : 0;
+        if (!byConference[c]) byConference[c] = [];
+        byConference[c].push(t);
       });
-      scrollWrap.appendChild(table);
-      container.appendChild(scrollWrap);
+      const confNumbers = Object.keys(byConference).map(Number).sort(function (a, b) { return a - b; });
+
+      confNumbers.forEach(function (confNum) {
+        const teams = byConference[confNum];
+        teams.sort(function (a, b) { return (b.W - a.W) || (b.differential - a.differential); });
+        layout.appendChild(buildStandingsCard('Conference ' + region + confNum, teams));
+      });
     });
-    document.querySelectorAll('.standings-region-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
-    });
+
+    container.appendChild(layout);
   }
 
   async function loadRegion(region) {
@@ -120,24 +247,18 @@
     document.getElementById('standings-by-region').innerHTML = '<p>Missing franchise_id in URL.</p>';
     return;
   }
-  const regionFromConference = (c) => (c >= 1 && c <= 16) ? String.fromCharCode(65 + Math.floor((c - 1) / 2)) : 'A';
   Promise.all([
     fetchJSON(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId)),
   ]).then(async ([cc]) => {
     resourceCache = window.ResourceCache.createResourceCache('standings', franchiseId, cc.current_season, cc.week);
-    const defaultRegion = regionFromConference(cc.user_conference);
-    const data = await loadRegion(defaultRegion);
-    render(data.standings || [], defaultRegion);
-    document.querySelectorAll('.standings-region-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-region') === defaultRegion);
-      btn.addEventListener('click', async () => {
-        const region = btn.getAttribute('data-region');
-        document.getElementById('standings-by-region').innerHTML = '<p>Loading standings...</p>';
-        const regionData = await loadRegion(region);
-        render(regionData.standings || [], region);
-        document.querySelectorAll('.standings-region-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-region') === region));
-      });
-    });
+    const regionOrder = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    document.getElementById('standings-by-region').innerHTML = '<p>Loading standings...</p>';
+    const regionPayloads = await Promise.all(regionOrder.map(async function (region) {
+      const data = await loadRegion(region);
+      return [region, data.standings || []];
+    }));
+    const allStandingsByRegion = Object.fromEntries(regionPayloads);
+    render(allStandingsByRegion);
   })
     .catch(err => {
       document.getElementById('standings-by-region').innerHTML = '<p>Failed to load standings.</p>';

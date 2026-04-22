@@ -139,3 +139,74 @@ function resolveFranchiseLockerRoomUrl(options = {}) {
   const teamId = options.teamId != null ? options.teamId : params.get('team_id');
   return buildFranchiseLockerRoomUrl(franchiseId, teamId, options.extraParams || {});
 }
+
+// Canonical attribute bar color scale — see Styleguide.md ### Attribute Bar Scale
+// Do not add a fifth color tier. All values 81+ including 100+ return light blue.
+/**
+ * @param {number} scaledValue Bucket from Math.ceil(rawAttribute / 10) for anchor storage on a 0–100+ raw scale (e.g. raw 81 → 9 → light blue). Values above 10 (raw > 100) still map to light blue.
+ * @returns {string} Hex fill color for attribute / position-rating bars.
+ */
+function getAttrColor(scaledValue) {
+  const s = Number(scaledValue);
+  if (!Number.isFinite(s)) return '#ff6d6d';
+  if (s >= 9) return '#4A90D9';
+  if (s >= 7) return '#34EC27';
+  if (s >= 5) return '#FFD700';
+  return '#ff6d6d';
+}
+
+// Canonical position shot weights color scale — see Styleguide.md
+function getPswColor(pct) {
+  if (pct > 35) return '#4A90D9';
+  if (pct >= 21) return '#34EC27';
+  if (pct >= 11) return '#FFD700';
+  return '#ff6d6d';
+}
+
+function renderShotWeights(container, shotWeights, compact = false) {
+  if (!container) return;
+  container.classList.add('psw-root');
+  container.setAttribute('data-compact', compact ? 'true' : 'false');
+
+  if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
+    container.innerHTML = '<p class="psw-unavailable">Shot weight data unavailable.</p>';
+    return;
+  }
+
+  const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+  function renderGroup(label, data) {
+    if (!data) return '';
+    const values = POSITIONS.map((pos) => ({ pos, pct: data[pos] ?? 0 }));
+    const maxPct = Math.max(...values.map((value) => value.pct));
+
+    const pills = values.map(({ pos, pct }) => {
+      const color = getPswColor(pct);
+      const isDominant = pct === maxPct;
+      const pillStyle = `border: 1px solid rgba(255,255,255,0.08);`;
+      const valStyle = `color: ${color};`;
+      const accentStyle = isDominant
+        ? `background: ${color}; opacity: 1;`
+        : `opacity: 0;`;
+      return `
+        <div class="psw-pill" style="${pillStyle}">
+          <div class="psw-pill-pos">${pos}</div>
+          <div class="psw-pill-val" style="${valStyle}">${pct}%</div>
+          <div class="psw-pill-accent" style="${accentStyle}"></div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="psw-group">
+        <div class="psw-group-label">${label}</div>
+        <div class="psw-strip">${pills}</div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    ${renderGroup('PLAYBOOKS', shotWeights.playbooks)}
+    ${renderGroup('PLAYCALL CENTER', shotWeights.playcall_center)}
+  `;
+}

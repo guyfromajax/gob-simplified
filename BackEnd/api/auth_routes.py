@@ -88,12 +88,27 @@ class UserResponse(BaseModel):
     username: Optional[str] = None
     created_at: Optional[str] = None
     fte: Optional[bool] = None  # First-time experience; True = show FTE, False = completed
+    account_settings: Optional[dict] = None
 
 
 class AuthConfigResponse(BaseModel):
     """Auth configuration response."""
     is_alpha: bool
     otp_required: bool
+
+
+class LeaderboardEntry(BaseModel):
+    """Leaderboard entry."""
+    rank: int
+    username: str
+    geek_points: int
+    is_current_user: bool = False
+
+
+class LeaderboardResponse(BaseModel):
+    """Leaderboard response."""
+    top: list[LeaderboardEntry]
+    current_user: Optional[LeaderboardEntry] = None
 
 
 class ResetRequest(BaseModel):
@@ -104,6 +119,19 @@ class ResetRequest(BaseModel):
 class RequestAccessCodeRequest(BaseModel):
     """Request an alpha access code (signup page). Stores request for admin to process manually."""
     email: EmailStr
+
+
+class UpdateAccountSettingsRequest(BaseModel):
+    """Update supported account settings for the authenticated user."""
+    display_color: str
+
+    @field_validator('display_color')
+    @classmethod
+    def validate_display_color(cls, v):
+        normalized = str(v or "").strip().lower()
+        if normalized not in {"default", "team_colors"}:
+            raise ValueError("display_color must be 'default' or 'team_colors'")
+        return normalized
 
 
 def _validate_password(v: str) -> str:
@@ -240,6 +268,9 @@ async def signup(request: Request, body: SignupRequest):
         "password_hash": hash_password(body.password),
         "role": "user",
         "subscription": "alpha",
+        "account_settings": {
+            "display_color": "default"
+        },
         "geek_points": 0,
         "fte": True,
         "created_at": now,
@@ -272,7 +303,10 @@ async def signup(request: Request, body: SignupRequest):
             "user_id": user_id,
             "email": email,
             "role": "user",
-            "username": None
+            "username": None,
+            "account_settings": {
+                "display_color": "default"
+            }
         },
         message="Account created successfully"
     ).model_dump()
@@ -326,7 +360,8 @@ async def login(request: Request, body: LoginRequest):
             "user_id": user_id,
             "email": email,
             "role": user.get("role", "user"),
-            "username": user.get("username")
+            "username": user.get("username"),
+            "account_settings": user.get("account_settings") or {"display_color": "default"}
         },
         message="Login successful"
     ).model_dump()
@@ -361,6 +396,33 @@ async def set_username(
     )
 
     return {"username": username, "message": "Username set successfully"}
+
+
+@router.patch("/account-settings")
+async def update_account_settings(
+    request: UpdateAccountSettingsRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Update account settings for the authenticated user.
+    Account settings are nested to allow future expansion without flattening the user document.
+    """
+    display_color = request.display_color
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {
+            "$set": {
+                "account_settings.display_color": display_color,
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    return {
+        "account_settings": {
+            "display_color": display_color
+        },
+        "message": "Account settings updated successfully"
+    }
 
 
 def _redact_email(email: str) -> str:
@@ -467,6 +529,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     role = db_user.get("role", user.get("role", "user")) if db_user else user.get("role", "user")
     # FTE: True = show first-time experience; False = already completed (default True if missing)
     fte = db_user.get("fte", True) if db_user else True
+    account_settings = (db_user.get("account_settings") if db_user else None) or {"display_color": "default"}
 
     return UserResponse(
         user_id=user["user_id"],
@@ -474,7 +537,63 @@ async def get_me(user: dict = Depends(get_current_user)):
         role=role,
         username=username,
         created_at=created_at,
-        fte=fte
+        fte=fte,
+        account_settings=account_settings
+    )
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_leaderboard(user: dict = Depends(get_current_user)):
+    """
+    Return the alpha leaderboard ranked by geek_points.
+    """
+    current_user_id = str(user.get("user_id", "")).strip()
+    docs = list(users_collection.find(
+        {},
+        {
+            "_id": 1,
+            "username": 1,
+            "email": 1,
+            "geek_points": 1,
+        }
+    ))
+
+    entries = []
+    for doc in docs:
+        username = str(doc.get("username") or "").strip()
+        if not username:
+            email = str(doc.get("email") or "").strip()
+            username = email.split("@", 1)[0].strip() if email else "Coach"
+        geek_points = doc.get("geek_points", 0)
+        try:
+            geek_points = int(geek_points)
+        except Exception:
+            geek_points = 0
+
+        entries.append({
+            "_id": str(doc.get("_id", "")),
+            "username": username,
+            "geek_points": geek_points,
+        })
+
+    entries.sort(key=lambda entry: (-entry["geek_points"], entry["username"].lower()))
+
+    ranked_entries = []
+    current_user_entry = None
+    for index, entry in enumerate(entries, start=1):
+        ranked = LeaderboardEntry(
+            rank=index,
+            username=entry["username"],
+            geek_points=entry["geek_points"],
+            is_current_user=(entry["_id"] == current_user_id),
+        )
+        ranked_entries.append(ranked)
+        if ranked.is_current_user:
+            current_user_entry = ranked
+
+    return LeaderboardResponse(
+        top=ranked_entries[:10],
+        current_user=(None if current_user_entry and current_user_entry.rank <= 10 else current_user_entry),
     )
 
 

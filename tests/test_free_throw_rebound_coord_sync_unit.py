@@ -118,7 +118,13 @@ def test_free_throw_miss_rebound_uses_coords_synced_from_ft_animation(monkeypatc
     )
     monkeypatch.setattr(phase_resolution_module.random, "random", lambda: 1.0)
 
-    def _fake_determine_rebounder(game, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+    def _fake_determine_rebounder(
+        game,
+        bounce_spot=None,
+        exclude_player_ids=None,
+        penalize_player_ids=None,
+        **kwargs,
+    ):
         # Core assertion: rebound selection sees FT-updated coords, not stale pre-FT coords.
         assert offense_pg.coords == expected_offense_end
         assert defense_c.coords == expected_defense_end

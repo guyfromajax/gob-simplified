@@ -2,6 +2,13 @@ body {
   background: #f4f6fb;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .recruiting-page {
   max-width: 1440px;
 }
@@ -28,7 +35,7 @@ body {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 700;
 }
 
@@ -291,7 +298,7 @@ body {
   border-radius: 6px;
   background: #2f8f46;
   color: #fff;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-weight: 700;
   cursor: pointer;
 }

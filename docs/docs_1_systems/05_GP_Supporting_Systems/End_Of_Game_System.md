@@ -45,54 +45,63 @@
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System. For a side-by-side comparison with Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
 - Values will be capped to normal ranges:
-  - `shot_threshold`: 0 to 200
+  - `shot_threshold`: 10 to 210
   - `rebound_modifier`: 0 to 0.4
   - `team_chemistry`: 7 to 25
   - all others: -10 to 10
 - End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
   - `shot_threshold`
-    - **Winning team:** If game FG% > 50%: −(10 to 20); if FG% > 45%: −(0 to 10); else +(0 to 10).
-    - **Losing team:** If game FG% > 50%: −(5 to 15); if FG% > 45%: −(0 to 5); else +(0 to 15).
+    - Golf-score style attr: lower is better, higher is worse.
+    - **Winning team:** If game FG% > 50%: `+= random.randint(-10, -5)`; if FG% > 45%: `+= random.randint(-5, 5)`; else `+= random.randint(5, 15)`.
+    - **Losing team:** If game FG% > 50%: `+= random.randint(0, 5)`; if FG% > 45%: `+= random.randint(5, 10)`; else `+= random.randint(10, 25)`.
   - `discipline` (both teams, same criteria)
-    - If team (F + TO) < opponent's (F + TO): += random.randint(0, 1). Otherwise: += random.randint(-3, -1).
+    - Compare team `(F + TO)` to opponent `(F + TO) + 8`.
+    - If lower: `+= random.randint(0, 1)`.
+    - If higher: `+= random.randint(-3, -2)`.
+    - If equal: `+= random.randint(-1, 0)`.
     - F = team fouls for the game (from box score / team totals).
   - `fight`
     - **Winning team:** += random.randint(0, 1).
     - **Losing team:** += random.randint(-3, -1).
   - `rebound_modifier` (winning and losing team have same criteria)
-    - if team TREB for the game > opponents TREB for the game + 5: += random.uniform(0, 0.1)
-    - elif TREB for the game < opponents TREB for the game - 5: += random.uniform(-0.1, 0)
-    - else: += random.uniform(-0.05, 0.05)
+    - if team TREB for the game > opponents TREB for the game + 8: += `0.00 to 0.05`
+    - elif TREB for the game < opponents TREB for the game - 8: += `-0.20 to -0.10`
+    - else: += `-0.10 to -0.05`
   - `offensive_efficiency` (winning and losing team have same criteria)
-    - += random.randint(-2, -1)
+    - Uses offensive play diversity from the completed game's play-usage snapshot.
+    - If total offensive plays used > 12: `+= random.randint(-2, -1)`
+    - elif total offensive plays used > 7: `+= random.randint(-3, -2)`
+    - else: `+= random.randint(-4, -3)`
   - `defensive_efficiency` (winning and losing team have same criteria)
-    - += random.randint(-2, -1)
+    - Uses defensive play distribution from the completed game's scouting snapshot.
+    - If any one defensive play was > 49% of defensive calls: `+= random.randint(-4, -3)`
+    - elif any one defensive play was > 39%: `+= random.randint(-3, -2)`
+    - else: `+= random.randint(-2, -1)`
   - `fb_efficiency`
-    - if fast break success rate > 60%: += random.randint(0,1)
-    - else: += random.randint(-2,-1)
+    - Uses per-play fast break usage from the completed game's scouting snapshot.
+    - If any one fast break play was > 60% of fast break calls: `+= random.randint(-4, -3)`
+    - elif any one fast break play was > 50%: `+= random.randint(-3, -2)`
+    - else: `+= random.randint(-2, -1)`
   - `fb_opp_modifier` - Fast break opponent modifier
-    - if opponents fast break success rate < 20%: += random.randint(0,2)
-    - elif oppoent's fast break success rate > 55% OR total fast breaks run by opponent in the game > 12: += random.randint(-3,-2)
-    - else: += random.randint(-1,0)
+    - If opponent ran > 20 fast breaks: `+= random.randint(-4, -3)`
+    - elif opponent ran > 10: `+= random.randint(-3, -2)`
+    - else: `+= random.randint(-2, -1)`
   - `pt_efficiency` - Press/Trap efficiency rating
-    - if (fc press success rate + hc trap success rate) combined > 60%: += random.randint(1,2)
-    - elif (fc press success rate + hc trap success rate) combined < 30%: += random.randint(-3,-1)
-    - else: += random.randint(-1,0)
-    - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
+    - If total HCT + FCP uses > 20: `+= random.randint(-4, -3)`
+    - elif total HCT + FCP uses > 15: `+= random.randint(-3, -2)`
+    - else: `+= random.randint(-2, -1)`
   - `pt_opp_modifier` - Press/Trap opponent modifier
-    - if opponents (press success rate + trap success rate) combined < 20%: += random.randint(1,2)
-    - elif opponents (press success rate + trap success rate) combined > 50% OR total FCP and HCT run by opponent in the game > 12: += random.randint(-3,-2)
-    - else: += (-2,-1)
-    - Note: Combined rate = (FC Press successes + HC Trap successes) / (FC Press attempts + HC Trap attempts)
+    - If opponent ran > 20 presses + traps: `+= random.randint(-4, -3)`
+    - elif opponent ran > 10: `+= random.randint(-3, -2)`
+    - else: `+= random.randint(-2, -1)`
   - **Distant-sim override (Franchise distant games only):**
-    - Distant-simmed games do not generate TBT special-situations scouting data.
-    - For those games only, bypass the normal scouting-driven logic for:
+    - For distant-simmed games only, bypass the normal usage-based logic for:
       - `fb_efficiency`
       - `fb_opp_modifier`
       - `pt_efficiency`
       - `pt_opp_modifier`
     - Instead apply: `random.randint(-2, 1)` to each of the four attrs.
-    - All other EOG team-attribute logic continues to use the normal totals-based rules.
+    - All other EOG team-attribute logic continues to use the normal finished-game snapshot rules.
   - `team_chemistry` - Team chemistry rating
     - score delta = winning team final score - losing team final score
     - if score_delta < 4:
@@ -100,18 +109,16 @@ Team attributes will adjust at the end of game based on the notes below. Note th
       - losing team += random.randint(-2,-1)
     - elif score_delta < 10:
       - winning team += random.randint(1,3)
-      - losing team += random.randint(-3,-1)
+      - losing team += random.randint(-4,-2)
     - else:
-      - winning team += random.randint(1,4)
-      - losing team += random.randint(-6,-2)
+      - winning team += random.randint(2,4)
+      - losing team += random.randint(-6,-4)
 - **Data Sources:**
-  - Team statistics (F, TO, STL, TREB, FG%) come from the current game's box score / team totals (F = team fouls; used with TO for discipline rule)
-  - Fast Break, HC Trap, and FC Press success rates come from the box score's "Special Situations" section
-  - Success rates are calculated as: (successes / attempts) * 100%
-  - [FOR REFERENCE ONLY]: Previous deprecation rates when run in training:
-    - Rebound modifier: `+= random.uniform(-0.1, 0)` (pre-training, range from -0.1 to 0)
-    - Shot threshold: `+= random.randint(5, 20)`
-    - Other team attributes: `+= random.choice([-2, -1, 0])`
+  - Team totals (F, TO, FG%, TREB) come from the canonical finished-game snapshot built for EOG and box score display.
+  - Offensive play usage reads the completed game's `teams[team_id].plays[*].game_stats.times_run`.
+  - Defensive play usage reads the completed game's `teams[team_id].scouting.defense` usage counts.
+  - Fast break play usage reads the completed game's `teams[team_id].scouting.offense.fast_break_plays[*].A`.
+  - Press/trap totals read the same HCT/FCP usage fields shown in the box score's Special Situations section.
 
 
 **Long Form Documentation**
@@ -190,6 +197,13 @@ The End of Game System handles game completion, displays final scores, and provi
 ### Franchise complete-week team id resolution (February 2026)
 
 - **Endpoint:** `POST /franchise/complete-week` (request body: `franchise_id`, `week`, `result: { team1_id, team2_id, team1_score, team2_score }`, optional `game_id`, optional `game_document`).
+- **Frontend week resolution:** `finalizeGame()` in `FrontEnd/static/js/phaser/finalizeGame.js` resolves `week` in this order before posting `complete-week`:
+  1. `window.location.search`
+  2. `localStorage.franchise_week`
+  3. `simData.week`
+  4. `simData.final_game_document.week`
+  5. backend franchise state fallback via `/franchise/command-center/data`, then `/franchise/state`
+- **Reason for backend fallback:** Prevent intermittent franchise EOG failures where command-center navigation context is incomplete at game end; if local/frontend week sources are missing, the finalizer recovers the authoritative current franchise week instead of silently skipping `/franchise/complete-week`.
 - **Team ids:** Backend normalizes `result.team1_id` and `result.team2_id` via `_normalize_team_id()` in `BackEnd/api/franchise_routes.py`:
   1. If the value is a valid ObjectId string, it is returned.
   2. Else lookup in universal `teams` by `_id`, `name`, or `code`; if found, return that document’s `_id`.

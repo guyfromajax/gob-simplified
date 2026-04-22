@@ -219,11 +219,16 @@ function createPlayerCard(player) {
       attrRow.className = 'attr-row';
       
       const value = formatAttr(attr);
-      const percentage = attr === 'NG' ? 
-        Math.min(100, Math.max(0, (attrs[attr] ?? 0) * 10)) : 
-        Math.min(100, Math.max(0, (attrs[attr] ?? 0) * 8.33));
-      
+      const rawAttr = Number(attrs[attr] ?? 0);
+      const percentage = attr === 'NG' ?
+        Math.min(100, Math.max(0, rawAttr * 10)) :
+        Math.min(100, Math.max(0, rawAttr * 8.33));
+
       attrRow.style.setProperty('--attr-fill', `${percentage}%`);
+      if (typeof getAttrColor === 'function') {
+        const bucket = attr === 'NG' ? Math.ceil(rawAttr * 10) : Math.ceil(rawAttr / 10);
+        attrRow.style.setProperty('--attr-bar-color', getAttrColor(bucket));
+      }
       
       const label = document.createElement('span');
       label.className = 'attr-label';

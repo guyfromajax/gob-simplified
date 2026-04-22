@@ -1,5 +1,5 @@
 :root {
-  --color-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --color-bg: linear-gradient(180deg, var(--fcc-primary-top, #3551A5) 0%, var(--fcc-primary-mid, #1E3068) 42%, var(--fcc-primary-deep, #1C2D60) 100%);
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-border: rgba(255, 215, 0, 0.2);
   --color-accent: #FFD700;
@@ -35,6 +35,13 @@ body {
   line-height: 1.6;
 }
 
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
 .training-report-container {
   max-width: 1600px;
   margin: 0 auto;
@@ -55,6 +62,9 @@ body {
 
 .header-left {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .page-title {
@@ -65,26 +75,20 @@ body {
   margin-bottom: var(--spacing-sm);
 }
 
-.header-info {
+.header-meta-line {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.54);
+  text-align: left;
+  flex-wrap: wrap;
 }
 
-.info-item {
-  display: flex;
-  gap: var(--spacing-xs);
-  font-size: 1.1rem;
-}
-
-.info-label {
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.info-value {
-  color: var(--color-text);
-  font-weight: 500;
+.meta-sep {
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .locker-room-button {
@@ -693,7 +697,882 @@ table.training-projected-table {
     grid-template-columns: 1fr;
   }
 
-  .training-note-section {
+.training-note-section {
     min-height: auto;
+  }
+}
+
+body.training-report-page {
+  margin: 0;
+  min-height: 100vh;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(180deg, #263d7a 0%, #1e3068 42%, #141f4a 100%);
+  color: #f4f6ff;
+}
+
+body.training-report-page .training-report-resource-shell {
+  width: min(1480px, calc(100vw - 24px));
+  padding: 28px 28px 32px;
+  gap: 18px;
+}
+
+body.training-report-page .report-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  gap: 16px;
+  margin-bottom: 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.94), rgba(30, 35, 44, 0.97));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 20px rgba(0, 0, 0, 0.16);
+}
+
+body.training-report-page .page-title {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.2rem;
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  text-shadow: none;
+}
+
+body.training-report-page .header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  justify-self: start;
+  align-self: center;
+  text-align: left;
+  min-width: 0;
+  width: 100%;
+}
+
+body.training-report-page .header-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.54);
+  text-align: left;
+  width: 100%;
+  align-self: flex-start;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+body.training-report-page .header-meta-line #week-number,
+body.training-report-page .header-meta-line #upcoming-opponent,
+body.training-report-page .header-meta-line #training-focus {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+body.training-report-page .meta-sep {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+body.training-report-page .locker-room-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, #42f438 0%, #34EC27 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: #101510;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+
+body.training-report-page .locker-room-button:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+body.training-report-page .training-notes-section,
+body.training-report-page .players-section,
+body.training-report-page .team-section,
+body.training-report-page .projected-lineup-section,
+body.training-report-page .playbook-summary-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 28px rgba(0, 0, 0, 0.12);
+  padding: 18px 20px 20px;
+}
+
+body.training-report-page .training-notes-section h2,
+body.training-report-page .section-header h2,
+body.training-report-page .team-section h2,
+body.training-report-page .projected-lineup-section h2,
+body.training-report-page .playbook-summary-section h2 {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.7rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+body.training-report-page .training-notes-section h2::after,
+body.training-report-page .section-header h2::after,
+body.training-report-page .team-section h2::after,
+body.training-report-page .projected-lineup-section h2::after,
+body.training-report-page .playbook-summary-section h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  height: 1px;
+  background: rgba(247, 148, 32, 0.95);
+}
+
+body.training-report-page .section-header,
+body.training-report-page .projected-lineup-header {
+  margin-bottom: 14px;
+}
+
+body.training-report-page .view-toggle {
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(19, 23, 31, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+}
+
+body.training-report-page .toggle-btn {
+  padding: 0 16px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+body.training-report-page .toggle-btn.active {
+  background: #F79420;
+  color: #151920;
+  border-color: transparent;
+}
+
+body.training-report-page .toggle-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+body.training-report-page .scroll-x,
+body.training-report-page .training-projected-lineup-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+}
+
+body.training-report-page .scroll-x::-webkit-scrollbar,
+body.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+body.training-report-page .scroll-x::-webkit-scrollbar-track,
+body.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.training-report-page .scroll-x::-webkit-scrollbar-thumb,
+body.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+
+body.training-report-page .players-table,
+body.training-report-page .training-projected-table {
+  width: max(100%, 1180px);
+  min-width: 1180px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+}
+
+body.training-report-page .players-table thead,
+body.training-report-page .training-projected-table thead {
+  background: transparent;
+}
+
+body.training-report-page .players-table th,
+body.training-report-page .training-projected-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 10px 10px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+  white-space: nowrap;
+}
+
+body.training-report-page .players-table td,
+body.training-report-page .training-projected-table td {
+  padding: 9px 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
+}
+
+body.training-report-page .players-table tbody tr:nth-child(odd) td,
+body.training-report-page .training-projected-table tbody tr:nth-child(odd) td {
+  background: rgba(255,255,255,0.03);
+}
+
+body.training-report-page .players-table tbody tr:hover td,
+body.training-report-page .training-projected-table tbody tr:hover td {
+  background: rgba(255,255,255,0.04);
+}
+
+body.training-report-page .players-table th:first-child,
+body.training-report-page .training-projected-table th:first-child,
+body.training-report-page .players-table th:nth-child(2),
+body.training-report-page .training-projected-table th:nth-child(2),
+body.training-report-page .training-projected-table td:nth-child(2) {
+  text-align: left;
+}
+
+body.training-report-page .players-table td:first-child,
+body.training-report-page .training-projected-table td:first-child {
+  text-align: center;
+}
+
+body.training-report-page .player-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+body.training-report-page .player-name-text,
+body.training-report-page .projected-player-name-cell {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+body.training-report-page .position-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.76);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+body.training-report-page .practice-player-highlight td {
+  background: rgba(245, 197, 24, 0.08) !important;
+}
+
+body.training-report-page .training-notes-container {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  gap: 14px;
+}
+
+body.training-report-page .training-notes-section {
+  display: grid;
+  gap: 16px;
+}
+
+body.training-report-page .training-notes-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+
+body.training-report-page .training-notes-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+body.training-report-page .training-notes-header-accent {
+  flex: 0 0 3px;
+  width: 3px;
+  height: 32px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: #F79420;
+}
+
+body.training-report-page .training-notes-header-copy {
+  min-width: 0;
+}
+
+body.training-report-page .training-notes-section h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+body.training-report-page .training-notes-section h2::after {
+  content: none;
+}
+
+body.training-report-page .training-notes-brief {
+  margin-top: 6px;
+  color: rgba(255,255,255,0.4);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+}
+
+body.training-report-page .training-notes-classification {
+  color: rgba(255,255,255,0.25);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  align-self: start;
+  padding-top: 6px;
+}
+
+body.training-report-page .training-notes-rule,
+body.training-report-page .training-notes-subrule {
+  width: 100%;
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+}
+
+body.training-report-page .training-notes-subrule {
+  background: rgba(255,255,255,0.06);
+}
+
+body.training-report-page .training-notes-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+body.training-report-page .training-notes-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body.training-report-page .training-notes-hero-card {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--notes-accent-border);
+  border-left: 3px solid var(--notes-accent);
+  background: rgba(255,255,255,0.04);
+}
+
+body.training-report-page .training-notes-hero-card.is-muted {
+  --notes-accent: rgba(255,255,255,0.4);
+  --notes-accent-border: rgba(255,255,255,0.2);
+  --notes-accent-tint: rgba(255,255,255,0.08);
+}
+
+body.training-report-page .training-notes-hero-label {
+  color: var(--notes-accent);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+body.training-report-page .training-notes-hero-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+body.training-report-page .training-notes-hero-portrait {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+
+body.training-report-page .training-notes-hero-portrait-img,
+body.training-report-page .training-notes-hero-portrait-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+}
+
+body.training-report-page .training-notes-hero-portrait-img {
+  display: block;
+  object-fit: cover;
+  border: 1px solid var(--notes-accent-border);
+  background: rgba(255,255,255,0.08);
+}
+
+body.training-report-page .training-notes-hero-portrait-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--notes-accent-border);
+  background: var(--notes-accent-tint);
+  color: var(--notes-accent);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body.training-report-page .training-notes-hero-portrait-fallback.is-muted {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.4);
+}
+
+body.training-report-page .training-notes-hero-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+body.training-report-page .training-notes-hero-name {
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+body.training-report-page .training-notes-hero-card.is-muted .training-notes-hero-name {
+  color: rgba(255,255,255,0.45);
+}
+
+body.training-report-page .training-notes-hero-meta {
+  color: rgba(255,255,255,0.45);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+body.training-report-page .training-notes-tactical-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.training-report-page .training-notes-tactical-pill {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+}
+
+body.training-report-page .training-notes-tactical-label {
+  flex: 0 1 42%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.38);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+body.training-report-page .training-notes-tactical-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body.training-report-page .training-notes-tactical-pill.is-muted .training-notes-tactical-value {
+  color: rgba(255,255,255,0.45);
+  font-weight: 400;
+}
+
+body.training-report-page .training-notes-tactical-pill.is-positive .training-notes-tactical-value {
+  color: #34EC27;
+}
+
+body.training-report-page .training-notes-tactical-pill.is-negative .training-notes-tactical-value {
+  color: #ff6d6d;
+}
+
+body.training-report-page .training-notes-misc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.training-report-page .training-notes-misc-label {
+  flex: 0 0 auto;
+  color: rgba(255,255,255,0.3);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+body.training-report-page .training-notes-misc-value {
+  min-width: 0;
+  color: rgba(255,255,255,0.35);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: italic;
+}
+
+@media (max-width: 980px) {
+  body.training-report-page .training-notes-hero-grid,
+  body.training-report-page .training-notes-tactical-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.training-report-page .training-notes-header {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.training-report-page .team-attributes-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body.training-report-page .team-attr-item {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  transition: opacity 0.18s ease;
+}
+
+body.training-report-page .team-attr-item.is-muted {
+  opacity: 0.6;
+}
+
+body.training-report-page .attr-label {
+  margin-bottom: 12px;
+}
+
+body.training-report-page .attr-name {
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+body.training-report-page .attr-change {
+  margin-left: 12px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+
+body.training-report-page .change-zero {
+  color: #9e9d9d;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+body.training-report-page .change-positive {
+  color: #34EC27;
+  font-weight: 700;
+}
+
+body.training-report-page .change-negative {
+  color: #ff6d6d;
+  font-weight: 700;
+}
+
+body.training-report-page .change-gold {
+  color: #F5C518;
+  font-weight: 700;
+}
+
+body.training-report-page .players-table td.change-zero {
+  color: #9e9d9d;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+body.training-report-page .players-table td.change-positive {
+  color: #34EC27;
+  font-weight: 700;
+}
+
+body.training-report-page .players-table td.change-negative {
+  color: #ff6d6d;
+  font-weight: 700;
+}
+
+body.training-report-page .players-table td.change-gold {
+  color: #F5C518;
+  font-weight: 700;
+}
+
+body.training-report-page .attr-pill {
+  height: 36px;
+  background: rgba(0,0,0,0.34);
+  border-radius: 999px;
+}
+
+body.training-report-page .pill-center-line {
+  background: rgba(255,255,255,0.14);
+}
+
+body.training-report-page .pill-fill-positive {
+  background: linear-gradient(90deg, rgba(52, 236, 39, 0.7), rgba(52, 236, 39, 0.96));
+  box-shadow: 0 0 18px rgba(52, 236, 39, 0.28);
+}
+
+body.training-report-page .pill-fill-negative {
+  background: linear-gradient(90deg, rgba(255, 109, 109, 0.96), rgba(255, 109, 109, 0.7));
+  box-shadow: 0 0 18px rgba(255, 109, 109, 0.24);
+}
+
+body.training-report-page .pill-fill-positive.is-extreme,
+body.training-report-page .pill-fill-negative.is-extreme {
+  animation: training-report-pill-pulse 1.7s ease-in-out infinite;
+}
+
+body.training-report-page .chemistry-bar-container {
+  height: 36px;
+  background: rgba(0,0,0,0.34);
+  border-radius: 999px;
+}
+
+body.training-report-page .chemistry-bar-fill {
+  background: linear-gradient(90deg, rgba(247, 148, 32, 0.7), rgba(247, 148, 32, 0.96));
+  box-shadow: 0 0 18px rgba(247, 148, 32, 0.28);
+}
+
+body.training-report-page .players-table .total-row td {
+  background: rgba(255,255,255,0.08) !important;
+  font-weight: 700;
+}
+
+body.training-report-page .playbook-summary-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+body.training-report-page .playbook-category {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+body.training-report-page .playbook-category-header h3 {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 8px;
+  color: #F79420;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+body.training-report-page .playbook-category-header h3::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 42px;
+  height: 1px;
+  background: rgba(247, 148, 32, 0.9);
+}
+
+body.training-report-page .playbook-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body.training-report-page .playbook-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+body.training-report-page .playbook-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+body.training-report-page .playbook-card-name {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+body.training-report-page .playbook-card-delta {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+
+body.training-report-page .playbook-card-delta.is-positive {
+  color: #34EC27;
+}
+
+body.training-report-page .playbook-card-delta.is-negative {
+  color: #ff6d6d;
+}
+
+body.training-report-page .playbook-card-delta.is-zero {
+  color: #9e9d9d;
+}
+
+body.training-report-page .playbook-card-bars {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body.training-report-page .playbook-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body.training-report-page .playbook-metric-title {
+  min-width: 0;
+  color: rgba(255,255,255,0.56);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+body.training-report-page .playbook-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+body.training-report-page .playbook-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+body.training-report-page .playbook-empty-state {
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+}
+
+@keyframes training-report-pill-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+}
+
+@media (max-width: 1100px) {
+  body.training-report-page .training-report-resource-shell {
+    width: calc(100vw - 12px);
+    padding: 20px 12px 24px;
+  }
+
+  body.training-report-page .report-header {
+    grid-template-columns: 1fr;
+  }
+
+  body.training-report-page .section-header,
+  body.training-report-page .projected-lineup-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body.training-report-page .team-attributes-grid,
+  body.training-report-page .playbook-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  body.training-report-page .header-meta-line {
+    white-space: normal;
+  }
+
+  body.training-report-page .team-attributes-grid,
+  body.training-report-page .playbook-card-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -13,12 +13,19 @@
 
 // Position colors for user team
 const POSITION_COLORS = {
-    "PG": "#ff69b4",  // Pink
-    "SG": "#ff8c00",  // Orange
-    "SF": "#ffd700",  // Yellow
-    "PF": "#87ceeb",  // Light blue
-    "C": "#9370db"   // Purple
+    "PG": "#4065AF",
+    "SG": "#7B5EA7",
+    "SF": "#3A8C4A",
+    "PF": "#D4A017",
+    "C": "#C0392B"
 };
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+        ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+        : '255, 255, 255';
+}
 
 // Position order
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
@@ -129,13 +136,13 @@ function createPopupElement(userTeam, computerTeam, currentMatchups, gameId) {
             <h2>DEFENSE MATCHUPS</h2>
             <div class="matchups-container">
                 <div class="team-column user-team-column">
-                    <div class="team-header" style="background-color: ${userPrimaryColor}; color: ${userSecondaryColor}; border: 2px solid ${userSecondaryColor};">${userTeam.team_name}</div>
+                    <div class="team-header" style="background: rgba(${hexToRgb(userPrimaryColor)}, 0.2); border: 1px solid rgba(${hexToRgb(userPrimaryColor)}, 0.6); color: #ffffff;">${userTeam.team_name}</div>
                     <div class="player-rows">
                         ${userRows}
                     </div>
                 </div>
                 <div class="team-column computer-team-column">
-                    <div class="team-header" style="background-color: ${computerPrimaryColor}; color: ${computerSecondaryColor}; border: 2px solid ${computerSecondaryColor};">${computerTeam.team_name}</div>
+                    <div class="team-header" style="background: rgba(${hexToRgb(computerPrimaryColor)}, 0.2); border: 1px solid rgba(${hexToRgb(computerPrimaryColor)}, 0.6); color: #ffffff;">${computerTeam.team_name}</div>
                     <div class="player-rows">
                         ${computerRows}
                     </div>
@@ -145,7 +152,7 @@ function createPopupElement(userTeam, computerTeam, currentMatchups, gameId) {
                 <button class="submit-matchups-button">Submit Defense Matchups</button>
                 <label class="dont-show-again-checkbox">
                     <input type="checkbox" id="dont-show-again-checkbox">
-                    <span>Don't show this pop up again this game</span>
+                    <span>Skip matchups for the rest of this game</span>
                 </label>
             </div>
         </div>
@@ -552,220 +559,232 @@ function addPopupStyles() {
     style.id = 'defense-matchups-popup-styles';
     style.textContent = `
         .defense-matchups-popup {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10002;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.75);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10002;
         }
 
         .defense-matchups-content {
-            background: #fff;
-            border: 4px solid #c0c0c0;
-            border-radius: 8px;
-            padding: 20px 48px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            align-items: center;
-            min-width: 1000px;
-            max-width: 1200px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+          background: rgba(18, 22, 32, 0.98);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 16px;
+          box-shadow: 0 24px 56px rgba(0, 0, 0, 0.6),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+          padding: 24px 28px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          align-items: stretch;
+          min-width: 960px;
+          max-width: 1160px;
+          max-height: 90vh;
+          overflow-y: auto;
         }
 
         .defense-matchups-content h2 {
-            font-size: 28px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin: 0;
-            font-family: 'Bebas Neue', sans-serif;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 24px;
+          color: rgba(255, 255, 255, 0.5);
+          margin: 0;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          text-align: left;
         }
 
         .matchups-container {
-            display: flex;
-            gap: 32px;
-            width: 100%;
+          display: flex;
+          gap: 20px;
+          width: 100%;
         }
 
         .team-column {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
 
         .team-header {
-            font-size: 18px;
-            font-weight: 600;
-            text-align: center;
-            padding: 4px 12px;
-            border-radius: 4px;
-            font-family: 'Inter', sans-serif;
-            letter-spacing: 0.5px;
-            border: 2px solid;
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 18px;
+          letter-spacing: 0.06em;
+          text-align: center;
+          padding: 8px 12px;
+          border-radius: 8px;
         }
 
         .player-rows {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
         }
 
         .player-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 8px;
-            border-radius: 4px;
-            background: #fafafa;
-            cursor: move;
-            transition: background-color 0.15s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid;
+          transition: background 0.14s ease;
         }
 
         .player-row:hover {
-            background: #f0f0f0;
+          background: rgba(255, 255, 255, 0.06);
         }
 
         .user-team-row {
-            cursor: grab;
+          cursor: grab;
         }
 
         .user-team-row:active {
-            cursor: grabbing;
+          cursor: grabbing;
         }
 
         .computer-team-row {
-            cursor: default;
+          cursor: default;
         }
 
         .position-square {
-            width: 42px;
-            height: 42px;
-            border: 2px solid #c0c0c0;
-            border-radius: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 20px;
-            color: #fff;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-            flex-shrink: 0;
+          width: 36px;
+          height: 36px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 16px;
+          color: #ffffff;
+          flex-shrink: 0;
+          border: none;
         }
 
         .player-headshot {
-            width: 50px;
-            height: 50px;
-            border-radius: 3px;
-            object-fit: cover;
-            border: 2px solid #ddd;
-            flex-shrink: 0;
+          width: 44px;
+          height: 44px;
+          border-radius: 6px;
+          object-fit: cover;
+          object-position: center top;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
         }
 
         .player-info {
-            min-width: 90px;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+          min-width: 88px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
         }
 
         .player-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1a1a1a;
-            font-family: 'Inter', sans-serif;
-            line-height: 1.2;
+          font-family: 'Inter', sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          color: #ffffff;
+          line-height: 1.2;
         }
 
         .player-height-weight {
-            font-size: 11px;
-            color: #888;
-            font-weight: 400;
-            font-family: 'Inter', sans-serif;
-            line-height: 1.2;
+          font-family: 'Inter', sans-serif;
+          font-size: 11px;
+          color: rgba(255, 255, 255, 0.35);
+          font-weight: 400;
+          line-height: 1.2;
         }
 
         .stat-strip {
-            display: flex;
-            gap: 6px;
-            flex-wrap: nowrap;
-            flex: 1;
-            align-items: center;
+          display: flex;
+          gap: 0;
+          flex: 1;
+          align-items: center;
+          justify-content: flex-end;
         }
 
         .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1px;
-            min-width: 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1px;
+          flex: 1;
+          min-width: 0;
         }
 
         .stat-label {
-            font-size: 11px;
-            color: #555;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-family: 'Inter', sans-serif;
+          font-family: 'Inter', sans-serif;
+          font-size: 9px;
+          color: rgba(255, 255, 255, 0.35);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          line-height: 1;
         }
 
         .stat-value {
-            font-size: 15px;
-            color: #1a1a1a;
-            font-weight: 700;
-            font-family: 'Inter', sans-serif;
+          font-family: 'Inter', sans-serif;
+          font-size: 13px;
+          color: rgba(255, 255, 255, 0.85);
+          font-weight: 700;
+          line-height: 1;
         }
 
         .matchups-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-            width: 100%;
-            margin-top: 2px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          align-items: stretch;
+          margin-top: 4px;
         }
 
         .submit-matchups-button {
-            padding: 12px 32px;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            background: #ff9800;
-            color: #fff;
-            transition: background-color 0.2s ease;
-            font-family: 'Inter', sans-serif;
-            letter-spacing: 0.3px;
+          appearance: none;
+          width: 100%;
+          height: 42px;
+          background: #34EC27;
+          border: 1px solid rgba(52, 236, 39, 0.5);
+          border-radius: 10px;
+          color: #15181f;
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 18px;
+          letter-spacing: 0.04em;
+          cursor: pointer;
+          transition: filter 0.14s ease, transform 0.14s ease;
         }
 
         .submit-matchups-button:hover {
-            background: #f57c00;
+          filter: brightness(1.06);
+          transform: translateY(-1px);
         }
 
         .dont-show-again-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            color: #555;
-            cursor: pointer;
-            font-family: 'Inter', sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          font-family: 'Inter', sans-serif;
+          font-size: 12px;
+          color: rgba(255, 255, 255, 0.3);
+          cursor: pointer;
+          transition: color 0.14s ease;
+        }
+
+        .dont-show-again-checkbox:hover {
+          color: rgba(255, 255, 255, 0.55);
         }
 
         .dont-show-again-checkbox input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
+          width: 14px;
+          height: 14px;
+          cursor: pointer;
+          accent-color: #F79420;
         }
     `;
     document.head.appendChild(style);
@@ -784,4 +803,3 @@ export function resetDontShowAgainFlag(gameId) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY_PREFIX + gameId);
     }
 }
-

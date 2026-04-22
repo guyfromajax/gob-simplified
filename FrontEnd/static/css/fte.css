@@ -2,7 +2,7 @@
  * First Time Experience (FTE) modal — desktop-optimized.
  * Entire pop-up silver fill; buttons sit inside at bottom. Inter, sentence case.
  */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap');
 
 .fte-backdrop {
   position: fixed;
@@ -117,6 +117,14 @@
   text-transform: none;
   letter-spacing: 0.02em;
   line-height: 1.4;
+}
+
+.fte-btn,
+.fte-btn-back,
+.fte-btn-next,
+.fte-btn-primary,
+.fte-btn-secondary {
+  font-family: 'Bebas Neue', sans-serif;
 }
 .fte-content-main p + p {
   margin-top: 0.5em;
@@ -268,4 +276,3 @@
   color: #c00;
   text-transform: none;
 }
-

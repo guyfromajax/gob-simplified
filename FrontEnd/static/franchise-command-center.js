@@ -23,22 +23,74 @@ let userTeamNameForLeaders = null; // Store user team name for leaderboard highl
 let userConference = null; // User team's conference (for Stats/Traits scope)
 let userRegion = null;    // User team's region (for Stats/Traits scope)
 let teamColorCache = null; // Cache for team primary colors
+let teamMetaByNameCache = null;
 let leadersDataCache = null;
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
+let fccTeamStatsSummaryCache = null;
 let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
+let fccPlaybooksSummaryCache = null;
+let userRosterPlayersCache = [];
+let userScheduleDataCache = null;
+let homeLastGameDataCache = null;
+const homeOpponentRosterCache = new Map();
+const FCC_SESSION_CACHE_PREFIX = 'fcc-shell';
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
 let traitsScope = 'conference';
+const FCC_DEFAULT_PRIMARY = '#27408E';
+const FCC_DEFAULT_TOP = '#3551A5';
+const FCC_DEFAULT_DEEP = '#1C2D60';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
+const HOME_EMOJI_BUCKETS = [
+  { emoji: '😡', min: 0, maxExclusive: 20 },
+  { emoji: '😕', min: 20, maxExclusive: 40 },
+  { emoji: '😐', min: 40, maxExclusive: 60 },
+  { emoji: '😊', min: 60, maxExclusive: 80 },
+  { emoji: '😎', min: 80, maxExclusive: Infinity }
+];
+const GENERIC_GAMEPLAN_SCALE = {
+  0: 'Never',
+  1: 'Less',
+  2: 'Normal',
+  3: 'More',
+  4: 'Most'
+};
+const GAMEPLAN_LABELS = {
+  offense: 'Offense',
+  inside: 'Inside',
+  attack: 'Attack',
+  outside: 'Outside',
+  fast_breaks: 'Fast Breaks',
+  defense: 'Defense',
+  aggression: 'Aggression',
+  hc_trap: 'Half-Court Trap',
+  fc_press: 'Full-Court Press',
+  rebounding: 'Rebounding'
+};
+const GAMEPLAN_DISPLAY_ORDER = [
+  'offense',
+  'defense',
+  'inside',
+  'aggression',
+  'attack',
+  'hc_trap',
+  'outside',
+  'fc_press',
+  'fast_breaks',
+  'rebounding'
+];
 
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
-    window.location.reload();
-  }
+function hideFccLoadingOverlay() {
+  if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+}
+
+window.addEventListener('pageshow', () => {
+  maybeRefreshPlaybooksButtonState();
 });
 
 window.addEventListener('focus', () => {
@@ -50,6 +102,61 @@ document.addEventListener('visibilitychange', () => {
     maybeRefreshPlaybooksButtonState();
   }
 });
+
+function getFccSessionCacheKey() {
+  return `${FCC_SESSION_CACHE_PREFIX}:${franchiseId || ''}`;
+}
+
+function readFccSessionCache() {
+  if (!franchiseId || typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(getFccSessionCacheKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn('Failed to read FCC session cache:', error);
+    return null;
+  }
+}
+
+function persistFccSessionCache() {
+  if (!franchiseId || typeof sessionStorage === 'undefined') return;
+  try {
+    const payload = {
+      topData: commandCenterTopDataCache || null,
+      standingsData: standingsDataCache || null,
+      rosterPlayers: Array.isArray(userRosterPlayersCache) ? userRosterPlayersCache : [],
+      teamData: teamData || null,
+      scheduleData: userScheduleDataCache || null,
+      lastGameDataCache: homeLastGameDataCache || null,
+      opponentRosters: Array.from(homeOpponentRosterCache.entries())
+    };
+    sessionStorage.setItem(getFccSessionCacheKey(), JSON.stringify(payload));
+  } catch (error) {
+    console.warn('Failed to persist FCC session cache:', error);
+  }
+}
+
+function restoreFccSessionCache() {
+  const cached = readFccSessionCache();
+  if (!cached) return false;
+  commandCenterTopDataCache = cached.topData || null;
+  standingsDataCache = cached.standingsData || null;
+  userRosterPlayersCache = Array.isArray(cached.rosterPlayers) ? cached.rosterPlayers : [];
+  teamData = cached.teamData || null;
+  userScheduleDataCache = cached.scheduleData || null;
+  homeLastGameDataCache = cached.lastGameDataCache || null;
+  homeOpponentRosterCache.clear();
+  (cached.opponentRosters || []).forEach(([teamId, players]) => {
+    if (teamId) homeOpponentRosterCache.set(String(teamId), players || []);
+  });
+  return !!(commandCenterTopDataCache || standingsDataCache || userRosterPlayersCache.length || teamData || userScheduleDataCache);
+}
+
+function invalidateHomeWeekSensitiveCaches() {
+  userScheduleDataCache = null;
+  homeLastGameDataCache = null;
+  homeOpponentRosterCache.clear();
+}
 
 function buildPlayerDetailUrl(playerId) {
   const qs = new URLSearchParams();
@@ -90,11 +197,16 @@ function populateTop(data) {
   const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
   const seasonLabelEl = document.getElementById('fcc-season-label');
+  const rankLabelEl = document.getElementById('fcc-rank-label');
   if (seasonLabelEl) {
     const seasonNumber = Number(data.current_season || 1);
     const weekNumber = Number(data.week || 1);
     seasonLabelEl.textContent = `Season ${seasonNumber} / Week ${weekNumber}`;
   }
+  if (rankLabelEl) {
+    rankLabelEl.textContent = `National Rank: ${data.rank || '--'}`;
+  }
+  updateTopRecordLabel();
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -123,7 +235,7 @@ function populateTop(data) {
     
     if (fillElement) {
       const percentage = (chemistryValue / 25) * 100;
-      fillElement.style.width = `${percentage}%`;
+      fillElement.style.transform = `scaleX(${Math.max(0, Math.min(percentage / 100, 1))})`;
     }
     
     if (textElement) {
@@ -135,6 +247,125 @@ function populateTop(data) {
   if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
   if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
 }
+
+function updateTopRecordLabel() {
+  const recordLabelEl = document.getElementById('fcc-record-label');
+  if (!recordLabelEl) return;
+  let wins = 0;
+  let losses = 0;
+  if (standingsDataCache?.standings?.length && userTeamId) {
+    const teamEntry = standingsDataCache.standings.find((team) => String(team.team_id || '') === String(userTeamId));
+    wins = Number(teamEntry?.W || 0);
+    losses = Number(teamEntry?.L || 0);
+  }
+  recordLabelEl.textContent = `Record: ${wins}-${losses}`;
+}
+
+function normalizeHexColor(value) {
+  const raw = String(value || '').trim();
+  if (!/^#?[0-9a-fA-F]{6}$/.test(raw)) return null;
+  return raw.startsWith('#') ? raw.toUpperCase() : ('#' + raw.toUpperCase());
+}
+
+function blendHexColors(baseHex, targetHex, ratio) {
+  const base = normalizeHexColor(baseHex);
+  const target = normalizeHexColor(targetHex);
+  if (!base || !target) return null;
+  const clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
+  const baseInt = parseInt(base.slice(1), 16);
+  const targetInt = parseInt(target.slice(1), 16);
+  const r = Math.round(((baseInt >> 16) & 255) * (1 - clamped) + ((targetInt >> 16) & 255) * clamped);
+  const g = Math.round(((baseInt >> 8) & 255) * (1 - clamped) + ((targetInt >> 8) & 255) * clamped);
+  const b = Math.round((baseInt & 255) * (1 - clamped) + (targetInt & 255) * clamped);
+  return '#' + [r, g, b].map((part) => part.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+function applyFccDisplayColor(displayColor, teamPrimaryColor) {
+  const root = document.documentElement;
+  const useTeamColor = displayColor === 'team_colors' && normalizeHexColor(teamPrimaryColor);
+  if (!root) return;
+  if (!useTeamColor) {
+    root.style.setProperty('--fcc-primary', FCC_DEFAULT_PRIMARY);
+    root.style.setProperty('--fcc-primary-top', FCC_DEFAULT_TOP);
+    root.style.setProperty('--fcc-primary-deep', FCC_DEFAULT_DEEP);
+    return;
+  }
+  const primary = normalizeHexColor(teamPrimaryColor);
+  const top = blendHexColors(primary, '#FFFFFF', 0.18) || FCC_DEFAULT_TOP;
+  const deep = blendHexColors(primary, '#000000', 0.34) || FCC_DEFAULT_DEEP;
+  root.style.setProperty('--fcc-primary', primary);
+  root.style.setProperty('--fcc-primary-top', top);
+  root.style.setProperty('--fcc-primary-deep', deep);
+}
+
+function getGobDisplayColorContext() {
+  const teamPrimaryColor = normalizeHexColor(commandCenterTopDataCache?.primary_color);
+  return {
+    mode: 'franchise',
+    hasActiveFranchiseTeam: !!(franchiseId && (userTeamId || commandCenterTopDataCache?.team_id) && teamPrimaryColor),
+    teamPrimaryColor: teamPrimaryColor
+  };
+}
+
+window.getGobDisplayColorContext = getGobDisplayColorContext;
+
+function emitDisplayContextUpdate() {
+  try {
+    window.__gobDisplayColorContext = getGobDisplayColorContext();
+    window.dispatchEvent(new CustomEvent('gob:display-context-updated', {
+      detail: window.__gobDisplayColorContext
+    }));
+  } catch (error) {}
+}
+
+function persistFranchiseDisplayColorContext(topData) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const teamName = String(topData?.team || '').trim();
+    const teamPrimaryColor = normalizeHexColor(topData?.primary_color);
+    if (teamName) localStorage.setItem('franchise_user_team', teamName);
+    if (teamPrimaryColor) {
+      localStorage.setItem('franchise_user_team_primary_color', teamPrimaryColor);
+    } else {
+      localStorage.removeItem('franchise_user_team_primary_color');
+    }
+  } catch (error) {}
+}
+
+function syncFccDisplayColorFromAccountSettings(meData) {
+  const displayColor = meData?.account_settings?.display_color === 'team_colors' ? 'team_colors' : 'default';
+  applyFccDisplayColor(displayColor, commandCenterTopDataCache?.primary_color);
+}
+
+async function hydrateFccDisplayColorPreference() {
+  if (window.__gobAuthMeData) {
+    syncFccDisplayColorFromAccountSettings(window.__gobAuthMeData);
+    return;
+  }
+  if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
+    applyFccDisplayColor('default');
+    return;
+  }
+  try {
+    const response = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
+    if (!response.ok) {
+      applyFccDisplayColor('default');
+      return;
+    }
+    const meData = await response.json();
+    syncFccDisplayColorFromAccountSettings(meData);
+  } catch (error) {
+    applyFccDisplayColor('default');
+  }
+}
+
+window.addEventListener('gob:auth-me-loaded', (event) => {
+  syncFccDisplayColorFromAccountSettings(event.detail || {});
+});
+
+window.addEventListener('gob:account-settings-updated', (event) => {
+  syncFccDisplayColorFromAccountSettings(event.detail || {});
+});
 
 let standingsDataCache = null;
 
@@ -153,9 +384,75 @@ function buildTeamLink(t) {
   return teamLink;
 }
 
+function buildStandingsCard(titleText, teams) {
+  const card = document.createElement('section');
+  card.className = 'fcc-standings-card';
+
+  const title = document.createElement('div');
+  title.className = 'fcc-standings-card-title';
+  title.textContent = titleText;
+  card.appendChild(title);
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'fcc-standings-row fcc-standings-row-header';
+  headerRow.innerHTML = [
+    '<span class="fcc-standings-col-team">Team</span>',
+    '<span class="fcc-standings-col-stat">W</span>',
+    '<span class="fcc-standings-col-stat">L</span>',
+    '<span class="fcc-standings-col-stat">PF</span>',
+    '<span class="fcc-standings-col-stat">PA</span>',
+    '<span class="fcc-standings-col-next">Next</span>'
+  ].join('');
+  card.appendChild(headerRow);
+
+  const body = document.createElement('div');
+  body.className = 'fcc-standings-card-body';
+
+  teams.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'fcc-standings-row';
+
+    const teamCell = document.createElement('span');
+    teamCell.className = 'fcc-standings-col-team';
+    teamCell.appendChild(buildTeamLink(t));
+    row.appendChild(teamCell);
+
+    const wCell = document.createElement('span');
+    wCell.className = 'fcc-standings-col-stat';
+    wCell.textContent = t.W;
+    row.appendChild(wCell);
+
+    const lCell = document.createElement('span');
+    lCell.className = 'fcc-standings-col-stat';
+    lCell.textContent = t.L;
+    row.appendChild(lCell);
+
+    const pfCell = document.createElement('span');
+    pfCell.className = 'fcc-standings-col-stat';
+    pfCell.textContent = t.PF;
+    row.appendChild(pfCell);
+
+    const paCell = document.createElement('span');
+    paCell.className = 'fcc-standings-col-stat';
+    paCell.textContent = t.PA;
+    row.appendChild(paCell);
+
+    const nextCell = document.createElement('span');
+    nextCell.className = 'fcc-standings-col-next';
+    nextCell.textContent = t.next || '';
+    row.appendChild(nextCell);
+
+    body.appendChild(row);
+  });
+
+  card.appendChild(body);
+  return card;
+}
+
 function renderStandings(data, selectedRegion) {
   if (!data) return;
   const list = data.standings || [];
+  updateTopRecordLabel();
   list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
 
   const container = document.getElementById('standings-by-region');
@@ -167,36 +464,11 @@ function renderStandings(data, selectedRegion) {
   const sisterConf = data.sister_conference;
   if (userConf != null && sisterConf != null && list.length > 0) {
     const regionLabels = { 1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2', 7: 'D1', 8: 'D2', 9: 'E1', 10: 'E2', 11: 'F1', 12: 'F2', 13: 'G1', 14: 'G2', 15: 'H1', 16: 'H2' };
-    [userConf, sisterConf].forEach((confNum, idx) => {
+    [userConf, sisterConf].forEach((confNum) => {
       const teams = list.filter(t => t.conference === confNum);
       if (teams.length === 0) return;
-      const label = idx === 0 ? 'Your conference' : 'Sister conference';
-      const subLabel = regionLabels[confNum] ? ` (Conf ${regionLabels[confNum]})` : '';
-      const heading = document.createElement('h4');
-      heading.className = 'standings-conference-heading';
-      heading.textContent = label + subLabel;
-      container.appendChild(heading);
-      const scrollWrap = document.createElement('div');
-      scrollWrap.className = 'scroll-x';
-      const table = document.createElement('table');
-      table.className = 'leaders-table standings-conference-table';
-      table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
-      const tbody = table.querySelector('tbody');
-      teams.forEach(t => {
-        const tr = document.createElement('tr');
-        const teamTd = document.createElement('td');
-        teamTd.appendChild(buildTeamLink(t));
-        tr.appendChild(teamTd);
-        tr.appendChild(document.createElement('td')).textContent = t.W;
-        tr.appendChild(document.createElement('td')).textContent = t.L;
-        tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
-        tr.appendChild(document.createElement('td')).textContent = t.PF;
-        tr.appendChild(document.createElement('td')).textContent = t.PA;
-        tr.appendChild(document.createElement('td')).textContent = t.next || '';
-        tbody.appendChild(tr);
-      });
-      scrollWrap.appendChild(table);
-      container.appendChild(scrollWrap);
+      const label = regionLabels[confNum] ? `Conference ${regionLabels[confNum]}` : `Conference ${confNum}`;
+      container.appendChild(buildStandingsCard(label, teams));
     });
     return;
   }
@@ -215,38 +487,528 @@ function renderStandings(data, selectedRegion) {
   confNumbers.forEach(confNum => {
     const teams = byConference[confNum];
     teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
-
-    const heading = document.createElement('h4');
-    heading.className = 'standings-conference-heading';
-    heading.textContent = `Conference ${selectedRegion}${confNum}`;
-    container.appendChild(heading);
-
-    const scrollWrap = document.createElement('div');
-    scrollWrap.className = 'scroll-x';
-    const table = document.createElement('table');
-    table.className = 'leaders-table standings-conference-table';
-    table.innerHTML = '<thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr></thead><tbody></tbody>';
-    const tbody = table.querySelector('tbody');
-    teams.forEach(t => {
-      const tr = document.createElement('tr');
-      const teamTd = document.createElement('td');
-      teamTd.appendChild(buildTeamLink(t));
-      tr.appendChild(teamTd);
-      tr.appendChild(document.createElement('td')).textContent = t.W;
-      tr.appendChild(document.createElement('td')).textContent = t.L;
-      tr.appendChild(document.createElement('td')).textContent = (t.pct != null ? t.pct : 0).toFixed(3);
-      tr.appendChild(document.createElement('td')).textContent = t.PF;
-      tr.appendChild(document.createElement('td')).textContent = t.PA;
-      tr.appendChild(document.createElement('td')).textContent = t.next || '';
-      tbody.appendChild(tr);
-    });
-    scrollWrap.appendChild(table);
-    container.appendChild(scrollWrap);
+    container.appendChild(buildStandingsCard(`Conference ${selectedRegion}${confNum}`, teams));
   });
 
   document.querySelectorAll('.standings-region-btn').forEach(btn => {
     if (btn) btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
   });
+}
+
+function escapeHomeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function getPlayerSeasonStats(player) {
+  return player?.stats?.season || {};
+}
+
+function getGamesPlayed(player) {
+  const stats = getPlayerSeasonStats(player);
+  return Number(stats.GP || 0) || 0;
+}
+
+function formatPerGame(total, gamesPlayed) {
+  if (!gamesPlayed) return '0.0';
+  return (Number(total || 0) / gamesPlayed).toFixed(1);
+}
+
+function getPlayerDisplayName(player) {
+  return `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || player?.name || 'Unknown';
+}
+
+function getPlayerTotalRebounds(player) {
+  const stats = getPlayerSeasonStats(player);
+  return Number(stats.TREB || ((stats.OREB || 0) + (stats.DREB || 0)) || 0);
+}
+
+function getDisplayPlayerNameForStats(player) {
+  const base = `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || player?.name || '';
+  return typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player?.jersey, base) : base;
+}
+
+function getTopPlayerByAverage(players, totalResolver) {
+  let best = null;
+  let bestAvg = -1;
+  (players || []).forEach((player) => {
+    const gp = getGamesPlayed(player);
+    if (!gp) return;
+    const average = Number(totalResolver(player) || 0) / gp;
+    if (average > bestAvg) {
+      best = player;
+      bestAvg = average;
+    }
+  });
+  return { player: best, average: bestAvg > -1 ? bestAvg : 0 };
+}
+
+function getPlayerPpg(player) {
+  return Number(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)));
+}
+
+function getPlayerRt(player) {
+  if (player?.rt != null) return Number(player.rt) || 0;
+  if (player?.position_ratings && typeof getBestPosition === 'function') {
+    try {
+      return Number(getBestPosition(player.position_ratings || {}).rating || 0);
+    } catch (error) {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+function getScheduleDisplayName(teamId) {
+  if (!userScheduleDataCache) return '';
+  const display = userScheduleDataCache.team_display_name_map?.[teamId];
+  const fallback = userScheduleDataCache.team_name_map?.[teamId];
+  return display || fallback || '';
+}
+
+function formatConferenceShortLabel(conference) {
+  const numericConference = Number(conference);
+  if (!Number.isInteger(numericConference) || numericConference < 1 || numericConference > 16) return '';
+  const regionLetter = String.fromCharCode(65 + Math.floor((numericConference - 1) / 2));
+  const conferenceNumber = ((numericConference - 1) % 2) + 1;
+  return `${regionLetter}${conferenceNumber}`;
+}
+
+function getTeamTooltipText(teamName) {
+  if (!teamName) return '';
+  const meta = teamMetaByNameCache?.[teamName] || null;
+  const mascot = String(meta?.mascot || '').trim();
+  return mascot ? `${teamName} ${mascot}` : String(teamName);
+}
+
+function getTeamRankingEntry(teamId) {
+  return (commandCenterTopDataCache?.rankings || []).find((entry) => String(entry.team_id) === String(teamId)) || null;
+}
+
+function getStandingsTeamEntry(teamId) {
+  return (standingsDataCache?.standings || []).find((entry) => String(entry.team_id || '') === String(teamId)) || null;
+}
+
+function getUserScheduleGames() {
+  const weeks = userScheduleDataCache?.schedule || [];
+  return weeks.flat().filter((game) => game && game.is_user_team);
+}
+
+function getOpponentIdFromGame(game) {
+  if (!game || !userTeamId) return null;
+  return String(game.home_team_id) === String(userTeamId) ? String(game.away_team_id) : String(game.home_team_id);
+}
+
+function getMatchupLabelForGame(game) {
+  if (!game || !userTeamId) return '';
+  return String(game.home_team_id) === String(userTeamId) ? 'vs' : '@';
+}
+
+function getNextUserGame() {
+  const currentWeek = Number(commandCenterTopDataCache?.week || 1);
+  return getUserScheduleGames().find((game) => Number(game.week || 0) >= currentWeek && game.status !== 'complete') || null;
+}
+
+function getLastCompletedUserGame() {
+  const currentWeek = Number(commandCenterTopDataCache?.week || 1);
+  const games = getUserScheduleGames()
+    .filter((game) => {
+      const week = Number(game.week || 0);
+      const awayScore = game.away_score;
+      const homeScore = game.home_score;
+      const hasRecordedScore =
+        awayScore !== null &&
+        awayScore !== undefined &&
+        homeScore !== null &&
+        homeScore !== undefined;
+      const hasRealFinalScore =
+        hasRecordedScore &&
+        (Number(awayScore) > 0 || Number(homeScore) > 0);
+      const looksComplete = game.status === 'complete' || hasRealFinalScore;
+      return looksComplete && week <= currentWeek;
+    })
+    .sort((a, b) => Number(b.week || 0) - Number(a.week || 0));
+  return games[0] || null;
+}
+
+async function fetchRosterWithStatsForTeam(teamId) {
+  if (!franchiseId || !teamId) return [];
+  if (homeOpponentRosterCache.has(teamId)) return homeOpponentRosterCache.get(teamId);
+  const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}`;
+  const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${encodeURIComponent(franchiseId)}`;
+  try {
+    const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
+    const players = result?.players || [];
+    homeOpponentRosterCache.set(teamId, players);
+    persistFccSessionCache();
+    return players;
+  } catch (error) {
+    console.warn('Failed to load opponent roster for Home tab:', teamId, error);
+    return [];
+  }
+}
+
+async function ensureHomeScheduleData() {
+  if (userScheduleDataCache || !franchiseId) return userScheduleDataCache;
+  const params = new URLSearchParams();
+  params.set('franchise_id', franchiseId);
+  params.set('user_team_only', '1');
+  userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
+  persistFccSessionCache();
+  return userScheduleDataCache;
+}
+
+async function ensureHomeLastGameData(game) {
+  if (!game?.game_id) return null;
+  if (homeLastGameDataCache && homeLastGameDataCache.game_id === game.game_id) return homeLastGameDataCache.data;
+  const data = await fetchJSON(`${API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(game.game_id)}`)}`);
+  if (data) {
+    homeLastGameDataCache = { game_id: game.game_id, data };
+    persistFccSessionCache();
+  }
+  return data;
+}
+
+function createEmptyHomeState(message = 'N/A') {
+  return `<div class="fcc-home-empty">${escapeHomeHtml(message)}</div>`;
+}
+
+function renderHomeStandingsCard() {
+  const body = document.getElementById('home-standings-body');
+  if (!body) return;
+  if (!standingsDataCache?.standings || userConference == null) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+  const teams = standingsDataCache.standings
+    .filter((team) => Number(team.conference) === Number(userConference))
+    .sort((a, b) => (Number(b.W || 0) - Number(a.W || 0)) || (Number(b.differential || 0) - Number(a.differential || 0)));
+  if (!teams.length) {
+    body.innerHTML = createEmptyHomeState();
+    return;
+  }
+
+  const rows = teams.map((team) => `
+    <div class="fcc-home-standings-row">
+      <span class="fcc-home-standings-team">${escapeHomeHtml(team.name || '')}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.W ?? 0)}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.L ?? 0)}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PF ?? 0)}</span>
+      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PA ?? 0)}</span>
+    </div>
+  `).join('');
+
+  body.innerHTML = `
+    <div class="fcc-home-standings">
+      <div class="fcc-home-standings-row fcc-home-standings-row-header">
+        <span class="fcc-home-standings-team">Team</span>
+        <span class="fcc-home-standings-stat">W</span>
+        <span class="fcc-home-standings-stat">L</span>
+        <span class="fcc-home-standings-stat">PF</span>
+        <span class="fcc-home-standings-stat">PA</span>
+      </div>
+      <div class="fcc-home-list-scroll">${rows}</div>
+    </div>
+  `;
+}
+
+function renderHomeRankingsCard() {
+  const body = document.getElementById('home-rankings-body');
+  if (!body) return;
+  const rankings = (commandCenterTopDataCache?.rankings || []).slice(0, 10);
+  if (!rankings.length) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+  body.innerHTML = `
+    <div class="fcc-home-list-scroll">
+      ${rankings.map((team) => `
+        <div class="fcc-home-list-row">
+          <span class="fcc-home-list-rank">${escapeHomeHtml(team.natl_rank)}</span>
+          <span class="fcc-home-list-main">${escapeHomeHtml(`${team.team_name || ''}${formatConferenceShortLabel(team.conference) ? ` (${formatConferenceShortLabel(team.conference)})` : ''}`)}</span>
+          <span class="fcc-home-list-meta">${escapeHomeHtml(`${team.W || 0}-${team.L || 0}`)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function getScheduleGameForWeek(weekNumber) {
+  return getUserScheduleGames().find((game) => Number(game.week || 0) === Number(weekNumber)) || null;
+}
+
+function getScheduleRowMarkup(label, detail, detailClass = '') {
+  return `
+    <div class="fcc-schedule-row">
+      <span class="fcc-schedule-week">${escapeHomeHtml(label)}</span>
+      <span class="fcc-schedule-detail ${detailClass}">${escapeHomeHtml(detail)}</span>
+    </div>
+  `;
+}
+
+function formatScheduleGameDetail(game) {
+  if (!game) {
+    return { text: 'Open', className: '' };
+  }
+  const opponentId = getOpponentIdFromGame(game);
+  const opponentName = getScheduleDisplayName(opponentId) || 'TBD';
+  const matchupLabel = getMatchupLabelForGame(game);
+  const baseText = `${matchupLabel} ${opponentName}`;
+  const awayScore = Number(game.away_score ?? 0);
+  const homeScore = Number(game.home_score ?? 0);
+  const isComplete = game.status === 'complete' || (Number.isFinite(awayScore) && Number.isFinite(homeScore) && (awayScore > 0 || homeScore > 0));
+  if (!isComplete) {
+    return { text: baseText, className: 'is-pending' };
+  }
+  const userIsHome = String(game.home_team_id) === String(userTeamId);
+  const userScore = userIsHome ? homeScore : awayScore;
+  const oppScore = userIsHome ? awayScore : homeScore;
+  let className = 'is-complete-tie';
+  if (userScore > oppScore) className = 'is-complete-win';
+  else if (userScore < oppScore) className = 'is-complete-loss';
+  return {
+    text: `${baseText} ${userScore}-${oppScore}`,
+    className
+  };
+}
+
+function buildScheduleColumnMarkup(title, weeks, extraRows = []) {
+  const rows = weeks.map((weekNumber) => {
+    const game = getScheduleGameForWeek(weekNumber);
+    const detail = formatScheduleGameDetail(game);
+    return getScheduleRowMarkup(`Wk ${weekNumber}`, detail.text, detail.className);
+  });
+  extraRows.forEach((rowText) => {
+    rows.push(getScheduleRowMarkup('', rowText, 'is-tournament'));
+  });
+  return `
+    <section class="fcc-schedule-column">
+      <div class="fcc-schedule-column-head">${escapeHomeHtml(title)}</div>
+      <div class="fcc-schedule-column-body">${rows.join('')}</div>
+    </section>
+  `;
+}
+
+async function renderScheduleTab() {
+  const host = document.getElementById('fcc-schedule-grid');
+  if (!host) return;
+  if (!franchiseId) {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Schedule unavailable.</div>';
+    return;
+  }
+  if (!userScheduleDataCache) {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Loading schedule...</div>';
+  }
+  await ensureHomeScheduleData();
+  if (!userScheduleDataCache) {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Schedule unavailable.</div>';
+    return;
+  }
+  host.innerHTML = [
+    buildScheduleColumnMarkup('Weeks 1-7', [1, 2, 3, 4, 5, 6, 7]),
+    buildScheduleColumnMarkup('Weeks 8-14', [8, 9, 10, 11, 12, 13, 14]),
+    buildScheduleColumnMarkup('Weeks 15-21', [15, 16, 17, 18, 19, 20, 21]),
+    buildScheduleColumnMarkup('Weeks 22-26', [22, 23, 24, 25, 26], [
+      'Conference Tournaments',
+      'Region Tournaments',
+      'National Tournament'
+    ])
+  ].join('');
+}
+
+function renderHomeMatchupCard(bodyId, summary) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  if (!summary) {
+    body.innerHTML = createEmptyHomeState('N/A');
+    return;
+  }
+  const opponentName = summary.opponent_team_name || 'Opponent';
+  const matchupLabel = summary.matchup_label || '';
+  const logoSrc = typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(opponentName, 'banner_primary')
+    : '/images/teams/general/general_banner_primary.jpg';
+  const tooltipText = getTeamTooltipText(opponentName);
+
+  if (bodyId === 'home-next-game-body') {
+    body.innerHTML = `
+      <div class="fcc-home-matchup-card">
+        <div class="fcc-home-matchup-top">
+          <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
+          <span class="team-tooltip-host" data-team-tooltip="${escapeHomeHtml(tooltipText)}" aria-label="${escapeHomeHtml(tooltipText)}">
+            <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+          </span>
+        </div>
+        <div class="fcc-home-matchup-bottom">
+          <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${summary.record?.wins || 0}-${summary.record?.losses || 0}`)}</div>
+          <div class="fcc-home-detail-line">Rank: ${escapeHomeHtml(summary.rank || 'N/A')}</div>
+          <div class="fcc-home-detail-line">Top Scorer: ${escapeHomeHtml(summary.top_scorer ? `${summary.top_scorer.name}, ${Number(summary.top_scorer.average || 0).toFixed(1)}` : 'N/A')}</div>
+          <div class="fcc-home-detail-line">Top Rebounder: ${escapeHomeHtml(summary.top_rebounder ? `${summary.top_rebounder.name}, ${Number(summary.top_rebounder.average || 0).toFixed(1)}` : 'N/A')}</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const awayName = summary.away_team_name || 'Away';
+  const homeName = summary.home_team_name || 'Home';
+  const awayScore = Number(summary.away_score || 0);
+  const homeScore = Number(summary.home_score || 0);
+  const awayBold = awayScore > homeScore ? 'fcc-home-score-strong' : '';
+  const homeBold = homeScore > awayScore ? 'fcc-home-score-strong' : '';
+
+  body.innerHTML = `
+    <div class="fcc-home-matchup-card">
+      <div class="fcc-home-matchup-top">
+        <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
+        <span class="team-tooltip-host" data-team-tooltip="${escapeHomeHtml(tooltipText)}" aria-label="${escapeHomeHtml(tooltipText)}">
+          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
+        </span>
+      </div>
+      <div class="fcc-home-matchup-bottom">
+        <div class="fcc-home-final-score">
+          <span class="${awayBold}">${escapeHomeHtml(`${awayName} (${awayScore})`)}</span>
+          <span class="fcc-home-final-score-at">at</span>
+          <span class="${homeBold}">${escapeHomeHtml(`${homeName} (${homeScore})`)}</span>
+        </div>
+        <div class="fcc-home-detail-line">Player of The Game: ${escapeHomeHtml(summary.potg?.name || 'N/A')}</div>
+        <div class="fcc-home-detail-line fcc-home-potg-line">
+          ${escapeHomeHtml(summary.potg ? `${summary.potg.stats.pts} PTS  ${summary.potg.stats.reb} REB  ${summary.potg.stats.ast} AST  ${summary.potg.stats.stl} STL  ${summary.potg.stats.blk} BLK  ${summary.potg.stats.defPct} DEF%` : 'N/A')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeLockerRoomCard() {
+  const body = document.getElementById('home-locker-room-body');
+  if (!body) return;
+  if (!teamData?.team_attributes || !userRosterPlayersCache.length) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+
+  const chemistry = Number(teamData.team_attributes.team_chemistry || 0);
+  const chemistryPercent = Math.max(0, Math.min(100, (chemistry / 25) * 100));
+  const attitudeCounts = HOME_EMOJI_BUCKETS.map((bucket) => {
+    const count = userRosterPlayersCache.filter((player) => {
+      const em = Number(player?.attributes?.EM || 0);
+      return em >= bucket.min && em < bucket.maxExclusive;
+    }).length;
+    return { ...bucket, count };
+  });
+
+  body.innerHTML = `
+    <div class="fcc-home-locker-room">
+      <div class="fcc-home-locker-label">Team Chemistry</div>
+      <div class="fcc-home-chemistry-bar">
+        <div class="fcc-home-chemistry-fill" style="width:${chemistryPercent}%"></div>
+        <div class="fcc-home-chemistry-text">${escapeHomeHtml(`${chemistry} / 25`)}</div>
+      </div>
+      <div class="fcc-home-locker-label">Player Attitudes</div>
+      <div class="fcc-home-attitude-scale">
+        <div class="fcc-home-attitude-emojis">
+          ${attitudeCounts.map((bucket) => `<span>${bucket.emoji}</span>`).join('')}
+        </div>
+        <div class="fcc-home-attitude-rail">
+          ${attitudeCounts.map(() => '<span class="fcc-home-attitude-tick"></span>').join('')}
+        </div>
+        <div class="fcc-home-attitude-counts">
+          ${attitudeCounts.map((bucket) => `<span>${bucket.count}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeTeamStatsCard() {
+  const body = document.getElementById('home-team-stats-body');
+  if (!body) return;
+  if (!userRosterPlayersCache.length) {
+    body.innerHTML = createEmptyHomeState('Loading...');
+    return;
+  }
+  const players = [...userRosterPlayersCache]
+    .sort((a, b) => {
+      const bGp = getGamesPlayed(b);
+      const aGp = getGamesPlayed(a);
+      const bPpg = getPlayerPpg(b);
+      const aPpg = getPlayerPpg(a);
+      if (bGp === 0 && aGp === 0) {
+        return getPlayerRt(b) - getPlayerRt(a);
+      }
+      if (bPpg !== aPpg) return bPpg - aPpg;
+      return getPlayerRt(b) - getPlayerRt(a);
+    })
+    .slice(0, 12);
+  body.innerHTML = `
+    <div class="fcc-home-team-stats">
+      <div class="fcc-home-team-stats-header">
+        <span>Player</span>
+        <span>PPG</span>
+      </div>
+      <div class="fcc-home-list-scroll">
+        ${players.map((player, index) => `
+          <div class="fcc-home-team-stats-row">
+            <span class="fcc-home-team-stats-name">${escapeHomeHtml(`${index + 1}. ${getPlayerDisplayName(player)}`)}</span>
+            <span class="fcc-home-team-stats-value">${escapeHomeHtml(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)))}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeRecruitingCard() {
+  const body = document.getElementById('home-recruiting-body');
+  if (!body) return;
+  const recruits = [...leanRecruitsDataCache].sort((a, b) => Number(b.rt || 0) - Number(a.rt || 0));
+  body.innerHTML = `
+    <div class="fcc-home-recruiting">
+      <div class="fcc-home-list-scroll">
+        <div class="fcc-home-recruit-header">
+          <span>Recruit</span>
+          <span>Arch.</span>
+          <span>HT</span>
+          <span>WT</span>
+          <span>RT</span>
+        </div>
+        ${recruits.map((recruit) => `
+          <div class="fcc-home-recruit-row">
+            <span class="fcc-home-recruit-name">${escapeHomeHtml(recruit.name || '--')}</span>
+            <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
+            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
+            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
+            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.rt ?? '--')}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderHomeNewsCard() {
+  const body = document.getElementById('home-news-body');
+  if (!body) return;
+  body.innerHTML = createEmptyHomeState('In Development');
+}
+
+async function renderHomeTab() {
+  renderHomeStandingsCard();
+  renderHomeRankingsCard();
+  renderHomeLockerRoomCard();
+  renderHomeTeamStatsCard();
+  renderHomeRecruitingCard();
+  renderHomeNewsCard();
+  renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null);
+  renderHomeMatchupCard('home-last-game-body', commandCenterTopDataCache?.last_game_summary || null);
+}
+
+async function loadHomeTabData() {
+  await renderHomeTab();
 }
 
 function bindStandingsRegionButtons() {
@@ -319,6 +1081,16 @@ function bindResourcesLinks() {
   };
   const standingsLink = document.getElementById('standings-resources-link');
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
+  const standingsFullLink = document.getElementById('standings-full-link');
+  if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
+  const scheduleFullLink = document.getElementById('schedule-full-link');
+  if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
+  const statsNavBtn = document.getElementById('stats-nav-btn');
+  if (statsNavBtn) statsNavBtn.dataset.route = '';
+  const teamStatsFullLink = document.getElementById('team-stats-full-link');
+  if (teamStatsFullLink) teamStatsFullLink.href = `/team-stats.html${q()}`;
+  const leadersFullLink = document.getElementById('leaders-full-link');
+  if (leadersFullLink) leadersFullLink.href = `/leaders.html${q()}`;
   const rStandings = document.getElementById('resources-standings');
   if (rStandings) rStandings.href = `/standings.html${q()}`;
   const rStats = document.getElementById('resources-stats');
@@ -329,10 +1101,441 @@ function bindResourcesLinks() {
   if (rTraits) rTraits.href = `/team-traits.html${q()}`;
   const rRankings = document.getElementById('resources-rankings');
   if (rRankings) rRankings.href = `/rankings.html${q()}`;
+  const homeRankingsFullLink = document.getElementById('home-rankings-full-link');
+  if (homeRankingsFullLink) homeRankingsFullLink.href = `/rankings.html${q()}`;
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');
-  if (rAwards) rAwards.href = `/awards.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
+  if (rAwards) rAwards.href = `/leaders.html${q()}`;
+}
+
+function formatTeamStatsPercent(numerator, denominator) {
+  return denominator > 0 ? (((numerator || 0) / denominator) * 100).toFixed(1) + '%' : '0.0%';
+}
+
+const FCC_LEADER_CATEGORY_ORDER = ['PTS', '3PTM', 'AST', 'BLK', 'FG%', 'REB', 'STL', 'DEF%'];
+const FCC_LEADER_CATEGORY_LABELS = {
+  PTS: 'Points',
+  '3PTM': '3 PT Made',
+  AST: 'Assists',
+  BLK: 'Blocks',
+  'FG%': 'FG%',
+  REB: 'Rebounds',
+  STL: 'Steals',
+  'DEF%': 'DEF%',
+};
+
+function formatLeaderValue(category, value) {
+  if (value == null || value === '') return '--';
+  if (category === 'FG%' || category === 'DEF%') {
+    const numeric = Number(value);
+    return `${Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0'}%`;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, '') : String(value);
+}
+
+function escapeFccLeaderHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function ensureConferenceLeaders() {
+  if (leadersDataCache || !franchiseId) return leadersDataCache;
+  leadersDataCache = await fetchJSON(
+    `${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${encodeURIComponent(franchiseId)}&scope=season&view_scope=conference&limit=5`
+  );
+  return leadersDataCache;
+}
+
+async function renderFccLeadersSummary() {
+  const grid = document.getElementById('fcc-leaders-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="fcc-leader-card"><div class="fcc-leader-card-empty">Loading leaders...</div></div>';
+  const data = await ensureConferenceLeaders();
+  if (!data) {
+    grid.innerHTML = '<div class="fcc-leader-card"><div class="fcc-leader-card-empty">Failed to load leaders.</div></div>';
+    return;
+  }
+  grid.innerHTML = '';
+  FCC_LEADER_CATEGORY_ORDER.forEach((category) => {
+    const card = document.createElement('section');
+    card.className = 'fcc-leader-card';
+    const header = document.createElement('div');
+    header.className = 'fcc-leader-card-header';
+    header.textContent = FCC_LEADER_CATEGORY_LABELS[category] || category;
+    card.appendChild(header);
+    const list = document.createElement('div');
+    list.className = 'fcc-leader-card-list';
+    const leaders = Array.isArray(data[category]) ? data[category].slice(0, 5) : [];
+    if (!leaders.length) {
+      list.innerHTML = '<div class="fcc-leader-card-empty">No leaders available.</div>';
+    } else {
+      leaders.forEach((leader, index) => {
+        const row = document.createElement('div');
+        row.className = 'fcc-leader-row';
+        row.innerHTML = `
+          <div class="fcc-leader-rank">${index + 1}.</div>
+          <div class="fcc-leader-meta">
+            <div class="fcc-leader-name">${escapeFccLeaderHtml(leader.name || '--')}</div>
+            <div class="fcc-leader-team">${escapeFccLeaderHtml(leader.team || '--')}</div>
+          </div>
+          <div class="fcc-leader-value">${escapeFccLeaderHtml(formatLeaderValue(category, leader.value))}</div>
+        `;
+        list.appendChild(row);
+      });
+    }
+    card.appendChild(list);
+    grid.appendChild(card);
+  });
+}
+
+async function ensureFccTeamStatsSummary() {
+  if (fccTeamStatsSummaryCache || !franchiseId) return fccTeamStatsSummaryCache;
+  fccTeamStatsSummaryCache = await fetchJSON(
+    `${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${encodeURIComponent(franchiseId)}&scope=conference`
+  );
+  return fccTeamStatsSummaryCache;
+}
+
+async function ensureFccPlaybooksSummary() {
+  if (fccPlaybooksSummaryCache || !franchiseId || !userTeamId) return fccPlaybooksSummaryCache;
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  params.set('team_id', userTeamId);
+  params.set('franchise_id', franchiseId);
+  fccPlaybooksSummaryCache = await fetchJSON(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
+  return fccPlaybooksSummaryCache;
+}
+
+async function renderFccTeamStatsSummary() {
+  const tbody = document.getElementById('fcc-team-stats-summary-body');
+  if (!tbody) return;
+  if (!fccTeamStatsSummaryCache) {
+    tbody.innerHTML = '<tr><td colspan="27">Loading team stats...</td></tr>';
+  }
+  const payload = await ensureFccTeamStatsSummary();
+  const teams = payload?.teams || [];
+  if (!teams.length) {
+    tbody.innerHTML = '<tr><td colspan="27">Failed to load team stats.</td></tr>';
+    return;
+  }
+  const rows = teams.map((team) => {
+    const stats = team.stats || {};
+    const rank = Number(team?.natl_rank);
+    return `
+      <tr>
+        <td class="col-group-start">${escapeHomeHtml(team.team || '')}</td>
+        <td>${Number.isFinite(rank) && rank > 0 ? rank : '--'}</td>
+        <td class="col-w">${escapeHomeHtml(stats.W ?? 0)}</td>
+        <td class="col-l">${escapeHomeHtml(stats.L ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.PF ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.PA ?? 0)}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.FGM ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.FGA ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.FGM, stats.FGA))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats['3PTM'] ?? 0)}</td>
+        <td>${escapeHomeHtml(stats['3PTA'] ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats['3PTM'], stats['3PTA']))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.FTM ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.FTA ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.FTM, stats.FTA))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.DREB ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.OREB ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.TREB ?? 0)}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.AST ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.F ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.TO ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.SCR_A ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.SCR_S, stats.SCR_A))}</td>
+        <td class="col-group-start">${escapeHomeHtml(stats.STL ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.BLK ?? 0)}</td>
+        <td>${escapeHomeHtml(stats.DEF_A ?? 0)}</td>
+        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.DEF_S, stats.DEF_A))}</td>
+      </tr>
+    `;
+  }).join('');
+  tbody.innerHTML = rows;
+}
+
+const FCC_PLAYBOOK_SECTION_ORDER = [
+  { key: 'motion', label: 'Motion Plays' },
+  { key: 'set_plays', label: 'Set Plays' },
+  { key: 'man_defense', label: 'Man Defense' },
+  { key: 'zone_defense', label: 'Zone Defense' },
+  { key: 'fast_breaks', label: 'Fast Breaks' },
+  { key: 'press_trap', label: 'Press/Trap' }
+];
+
+function escapePlaybookHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildFccPlaybooksItems(data, key) {
+  const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
+  let items = [];
+
+  if (key === 'motion') {
+    items = (data?.motion || []).map((play) => ({
+      id: String(play?.play_id || ''),
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.motion?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || '',
+      motion_focus: play?.motion_focus || ''
+    }));
+  } else if (key === 'set_plays') {
+    items = (data?.set_plays || []).map((play) => ({
+      id: String(play?.play_id || ''),
+      name: play?.name || 'Unknown',
+      percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
+      effectiveness: Number(play?.effectiveness || 0),
+      top_scorer: play?.top_scorer || '',
+      target_shooter: play?.target_shooter || ''
+    }));
+  } else if (key === 'man_defense') {
+    items = (data?.man_defense_rows || [])
+      .filter((row) => row?.is_active !== false)
+      .map((row) => ({
+        id: String(row?.id || ''),
+        name: row?.name || 'Unknown',
+        percentage: Number(percentages.man_defense?.[row?.id] || 0),
+        effectiveness: Number(row?.effectiveness || 0),
+        top_scorer: row?.top_scorer || ''
+      }));
+  } else if (key === 'zone_defense') {
+    items = (data?.zone_defense_rows || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.zone_defense?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || ''
+    }));
+  } else if (key === 'fast_breaks') {
+    items = (data?.fast_breaks || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || ''
+    }));
+  }
+
+  return items
+    .filter((item) => Number(item.percentage || 0) > 0)
+    .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
+}
+
+function getFccPlaybookEffClass(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 70) return 'is-good';
+  if (numeric >= 40) return 'is-mid';
+  return 'is-low';
+}
+
+function getFccMotionFocusLabel(value) {
+  if (value === 'inside') return 'Inside';
+  if (value === 'attack') return 'Attack';
+  if (value === 'outside') return 'Outside';
+  return 'Balanced';
+}
+
+function buildFccPlaycallCenterMaps(data) {
+  const offense = new Map();
+  const defense = new Map();
+
+  (data?.motion || []).forEach((play) => {
+    offense.set(String(play?.play_id || ''), {
+      name: play?.name || 'Unknown',
+      detail: getFccMotionFocusLabel(play?.motion_focus || '')
+    });
+  });
+  (data?.set_plays || []).forEach((play) => {
+    offense.set(String(play?.play_id || ''), {
+      name: play?.name || 'Unknown',
+      detail: play?.target_shooter || ''
+    });
+  });
+  (data?.man_defense_rows || []).filter((row) => row?.is_active !== false).forEach((row) => {
+    defense.set(String(row?.id || ''), {
+      name: row?.name || 'Unknown',
+      detail: ''
+    });
+  });
+  (data?.zone_defense_rows || []).forEach((row) => {
+    defense.set(String(row?.id || ''), {
+      name: row?.name || 'Unknown',
+      detail: ''
+    });
+  });
+
+  return { offense, defense };
+}
+
+function buildFccPlaycallCenterListMarkup(label, entries, lookup) {
+  const rows = Array.from({ length: 8 }, (_, index) => {
+    const id = String(entries?.[index] || '');
+    const item = id ? lookup.get(id) : null;
+    return `
+      <article class="fcc-playcall-slot-card">
+        <div class="fcc-playcall-slot-line">
+          <span class="fcc-playcall-slot-number">${index + 1}.</span>
+          ${item
+            ? `<span class="fcc-playcall-slot-name">${escapePlaybookHtml(item.name)}</span>${item.detail ? ` <span class="fcc-playcall-slot-detail">&mdash; ${escapePlaybookHtml(item.detail)}</span>` : ''}`
+            : '<span class="fcc-playcall-slot-empty">Empty</span>'}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  return `
+    <div class="fcc-playcall-column">
+      <div class="fcc-playcall-column-head">${escapePlaybookHtml(label)}</div>
+      <div class="fcc-playcall-slots">${rows}</div>
+    </div>
+  `;
+}
+
+function buildFccPlaycallCenterSectionMarkup(data) {
+  const editLinkMarkup = `
+    <button id="fcc-edit-playcall-center-link" class="fcc-playbooks-inline-link" type="button">Edit in Playbooks</button>
+  `;
+  const pcOrder = data?.pc_order || { offense: [], defense: [] };
+  const lookup = buildFccPlaycallCenterMaps(data);
+
+  return `
+    <section class="fcc-playbooks-section fcc-playcall-section">
+      <div class="fcc-playbooks-section-head-wrap">
+        <div class="fcc-playbooks-section-head">Playcall Center</div>
+        ${editLinkMarkup}
+      </div>
+      <div class="fcc-playbooks-section-body">
+        <div class="fcc-playcall-grid">
+          ${buildFccPlaycallCenterListMarkup('Offense', pcOrder.offense || [], lookup.offense)}
+          ${buildFccPlaycallCenterListMarkup('Defense', pcOrder.defense || [], lookup.defense)}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function buildFccPlaybooksSectionMarkup(data, section) {
+  const editButtonMarkup = section.key === 'motion'
+    ? '<button id="fcc-edit-playbooks-btn" class="fcc-game-plan-edit-btn" type="button">Edit Playbooks</button>'
+    : '';
+
+  if (section.key === 'press_trap') {
+    return `
+      <section class="fcc-playbooks-section">
+        <div class="fcc-playbooks-section-head-wrap">
+          <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+          ${editButtonMarkup}
+        </div>
+        <div class="fcc-playbooks-section-body fcc-playbooks-placeholder-body">
+          <div class="fcc-playbooks-placeholder-copy">In Development</div>
+        </div>
+      </section>
+    `;
+  }
+
+  const items = buildFccPlaybooksItems(data, section.key);
+  const bodyMarkup = items.length
+    ? `<div class="fcc-playbooks-items">${items.map((item) => `
+        <article class="fcc-playbooks-item-card">
+          <div class="fcc-playbooks-item-top">
+            <div class="fcc-playbooks-item-name">${escapePlaybookHtml(
+              section.key === 'set_plays' && item.target_shooter
+                ? `${item.name} (${item.target_shooter})`
+                : item.name
+            )}</div>
+            <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
+          </div>
+          <div class="fcc-playbooks-item-meta">
+            <div class="fcc-playbooks-item-eff ${getFccPlaybookEffClass(item.effectiveness)}">${escapePlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+            ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="fcc-playbooks-item-top-scorer">${escapePlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
+          </div>
+        </article>
+      `).join('')}</div>`
+    : '<div class="fcc-playbooks-empty">No plays assigned.</div>';
+
+  return `
+    <section class="fcc-playbooks-section">
+      <div class="fcc-playbooks-section-head-wrap">
+        <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
+        ${editButtonMarkup}
+      </div>
+      <div class="fcc-playbooks-section-body">
+        ${bodyMarkup}
+      </div>
+    </section>
+  `;
+}
+
+async function renderFccPlaybooksSummary() {
+  const host = document.getElementById('fcc-playbooks-sections');
+  if (!host) return;
+
+  host.innerHTML = '<div class="fcc-playbooks-empty">Loading playbook settings...</div>';
+  const data = await ensureFccPlaybooksSummary();
+  if (!data) {
+    host.innerHTML = '<div class="fcc-playbooks-empty">Failed to load playbook settings.</div>';
+    return;
+  }
+
+  host.innerHTML = `${FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('')}${buildFccPlaycallCenterSectionMarkup(data)}`;
+
+  // TODO: confirm position_shot_weights is present in FCC playbook API response
+  const shotWeights = data?.position_shot_weights || null;
+  const playbooksCardBody = host.closest('.fcc-playbooks-card-body');
+  if (playbooksCardBody) {
+    playbooksCardBody.querySelectorAll(':scope > .fcc-psw-strip').forEach((el) => el.remove());
+  }
+  if (shotWeights && typeof renderShotWeights === 'function') {
+    if (playbooksCardBody) {
+      const pswStrip = document.createElement('div');
+      pswStrip.className = 'fcc-psw-strip';
+      pswStrip.style.marginTop = '18px';
+      renderShotWeights(pswStrip, shotWeights, true);
+      playbooksCardBody.appendChild(pswStrip);
+    }
+  }
+
+  const editBtn = document.getElementById('fcc-edit-playbooks-btn');
+  if (editBtn && !editBtn.dataset.bound) {
+    editBtn.dataset.bound = '1';
+    editBtn.addEventListener('click', () => {
+      if (!franchiseId || !userTeamId) return;
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('team_id', userTeamId);
+      params.set('franchise_id', franchiseId);
+      params.set('return_url', getCurrentRelativeUrl());
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
+
+  const playcallEditLink = document.getElementById('fcc-edit-playcall-center-link');
+  if (playcallEditLink && !playcallEditLink.dataset.bound) {
+    playcallEditLink.dataset.bound = '1';
+    playcallEditLink.addEventListener('click', () => {
+      if (!franchiseId || !userTeamId) return;
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('team_id', userTeamId);
+      params.set('franchise_id', franchiseId);
+      params.set('return_url', getCurrentRelativeUrl());
+      window.location.href = `/playbooks.html?${params.toString()}`;
+    });
+  }
 }
 
 function bindStatsAndTraitsScopeButtons() {
@@ -362,13 +1565,11 @@ function renderFccRecruits() {
   const table = document.getElementById('fcc-recruits-table');
   const heading = document.querySelector('#recruits-tab h3');
   const lastCol = document.getElementById('fcc-recruits-last-col');
-  const fullListCopy = document.getElementById('fcc-recruits-link-copy');
   const fullListLink = document.getElementById('fcc-recruits-full-link');
   if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
 
   const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
   if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
-  if (fullListCopy) fullListCopy.style.display = useSignedRecruits ? 'none' : 'block';
   if (fullListLink) {
     const params = new URLSearchParams();
     params.set('franchise_id', franchiseId);
@@ -477,6 +1678,7 @@ function initFccRecruits(topData) {
     const recruitsTable = document.getElementById('fcc-recruits-table');
     if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
   }
+  void renderHomeTab();
 }
 
 let rankingsFullList = [];
@@ -510,12 +1712,18 @@ async function initializeTeamColorCache() {
     const res = await fetch(API_CONFIG.buildUrl('/teams'));
     const teamData = await res.json();
     teamColorCache = {};
+    teamMetaByNameCache = {};
     teamData.forEach(t => {
       teamColorCache[t.name] = t.primary_color;
+      teamMetaByNameCache[t.name] = {
+        mascot: t.mascot || '',
+        primary_color: t.primary_color || null,
+      };
     });
   } catch (err) {
     console.warn('Failed to load team colors:', err);
     teamColorCache = {};
+    teamMetaByNameCache = {};
   }
 }
 
@@ -790,6 +1998,8 @@ function renderTeam(data) {
   if (!data) {
     return;
   }
+  userRosterPlayersCache = data.players || [];
+  persistFccSessionCache();
   const tbody = document.getElementById('team-body');
   if (!tbody) {
     return;
@@ -916,11 +2126,114 @@ function renderTeam(data) {
       sortRosterTable(columnName, rosterSortDirection);
     });
   });
-  
-  // Also render player stats (shared module Phase 4.2)
-  if (typeof RosterStatsRenderer !== 'undefined') {
-    RosterStatsRenderer.renderRosterStats(data.players || []);
+  renderPlayerStatsTable(data.players || []);
+  void renderHomeTab();
+}
+
+function renderPlayerStatsTable(players) {
+  const tbody = document.getElementById('player-stats-body');
+  const statsTable = document.querySelector('#player-stats-tab .stats-table');
+  if (!tbody || !statsTable) return;
+
+  const statsRows = (players || []).map((player) => ({
+    raw: player,
+    stats: getPlayerSeasonStats(player),
+    rt: getPlayerRt(player)
+  }));
+
+  function statValueForSort(entry, statKey) {
+    const stats = entry.stats || {};
+    if (statKey === 'name') return `${entry.raw?.last_name || ''} ${entry.raw?.first_name || ''}`.trim() || entry.raw?.name || '';
+      if (statKey === 'FG%') return stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA) : 0;
+      if (statKey === '3PT%') {
+        const attempts = stats['3PTA'] || stats.TPA || 0;
+        return attempts > 0 ? (((stats['3PTM'] || stats.TPM || 0) / attempts)) : 0;
+      }
+      if (statKey === 'FT%') return stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA) : 0;
+      if (statKey === 'SCR%') return stats.SCR_A > 0 ? ((stats.SCR_S || 0) / stats.SCR_A) : 0;
+      if (statKey === 'DEF%') return stats.DEF_A > 0 ? ((stats.DEF_S || 0) / stats.DEF_A) : 0;
+      if (statKey === 'TREB') return stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0));
+      return Number(stats[statKey] || 0);
+    }
+
+  function renderRows(rows) {
+    tbody.innerHTML = '';
+    rows.forEach((entry) => {
+      const stats = entry.stats || {};
+      const tpm = stats['3PTM'] || 0;
+      const tpa = stats['3PTA'] || stats.TPA || 0;
+      const fgPct = stats.FGA > 0 ? (((stats.FGM || 0) / stats.FGA) * 100).toFixed(1) : '0.0';
+      const threePct = tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
+      const ftPct = stats.FTA > 0 ? (((stats.FTM || 0) / stats.FTA) * 100).toFixed(1) : '0.0';
+      const scrA = stats.SCR_A || 0;
+      const scrPct = scrA > 0 ? (((stats.SCR_S || 0) / scrA) * 100).toFixed(1) : '0.0';
+      const defA = stats.DEF_A || 0;
+      const defPct = defA > 0 ? (((stats.DEF_S || 0) / defA) * 100).toFixed(1) : '0.0';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><a href="' + buildPlayerDetailUrl(entry.raw._id) + '" style="color:inherit;text-decoration:none;">' + getDisplayPlayerNameForStats(entry.raw) + '</a></td>' +
+        '<td>' + (stats.PTS || 0) + '</td>' +
+        '<td>' + (stats.FGM || 0) + '</td>' +
+        '<td>' + (stats.FGA || 0) + '</td>' +
+        '<td>' + fgPct + '%</td>' +
+        '<td>' + tpm + '</td>' +
+        '<td>' + tpa + '</td>' +
+        '<td>' + threePct + '%</td>' +
+        '<td>' + (stats.FTM || 0) + '</td>' +
+        '<td>' + (stats.FTA || 0) + '</td>' +
+        '<td>' + ftPct + '%</td>' +
+        '<td>' + (stats.DREB || 0) + '</td>' +
+        '<td>' + (stats.OREB || 0) + '</td>' +
+        '<td>' + (stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0))) + '</td>' +
+        '<td>' + (stats.AST || 0) + '</td>' +
+        '<td>' + (stats.STL || 0) + '</td>' +
+        '<td>' + (stats.BLK || 0) + '</td>' +
+        '<td>' + (stats.F || 0) + '</td>' +
+        '<td>' + (stats.MIN || 0) + '</td>' +
+        '<td>' + (stats.TO || 0) + '</td>' +
+        '<td>' + scrA + '</td>' +
+        '<td>' + scrPct + '%</td>' +
+        '<td>' + defA + '</td>' +
+        '<td>' + defPct + '%</td>';
+      tbody.appendChild(tr);
+    });
   }
+
+  function sortAndRender(statKey, direction) {
+    const sorted = [...statsRows].sort((a, b) => {
+      if (statKey === 'name') {
+        const cmp = statValueForSort(a, statKey).localeCompare(statValueForSort(b, statKey));
+        return direction === 'asc' ? cmp : -cmp;
+      }
+      const aVal = statValueForSort(a, statKey);
+      const bVal = statValueForSort(b, statKey);
+      if (aVal !== bVal) return direction === 'asc' ? aVal - bVal : bVal - aVal;
+      return direction === 'asc' ? a.rt - b.rt : b.rt - a.rt;
+    });
+    renderRows(sorted);
+  }
+
+  let activeSort = 'PTS';
+  let activeDirection = 'desc';
+  sortAndRender(activeSort, activeDirection);
+
+  statsTable.querySelectorAll('thead .sortable').forEach((header) => {
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => {
+      const stat = newHeader.dataset.stat;
+      if (activeSort === stat) {
+        activeDirection = activeDirection === 'desc' ? 'asc' : 'desc';
+      } else {
+        activeSort = stat;
+        activeDirection = 'desc';
+      }
+      sortAndRender(activeSort, activeDirection);
+    });
+  });
 }
 
 // Store roster data for sorting
@@ -1277,18 +2590,65 @@ async function init() {
   
   const initStartTime = performance.now();
   console.log('⏱️ [PERF] FCC init() START');
+  const restoredFromSession = restoreFccSessionCache();
   try {
+  if (restoredFromSession && commandCenterTopDataCache) {
+    persistFranchiseDisplayColorContext(commandCenterTopDataCache);
+    emitDisplayContextUpdate();
+    if (commandCenterTopDataCache && commandCenterTopDataCache.team_id && !userTeamId) {
+      userTeamId = commandCenterTopDataCache.team_id;
+      localStorage.setItem('franchise_user_team_id', userTeamId);
+      emitDisplayContextUpdate();
+    }
+    populateTop(commandCenterTopDataCache);
+    void hydrateFccDisplayColorPreference();
+    initFccRecruits(commandCenterTopDataCache);
+    if (commandCenterTopDataCache.team) {
+      userTeamNameForLeaders = commandCenterTopDataCache.team;
+    }
+    userConference = commandCenterTopDataCache.user_conference != null ? commandCenterTopDataCache.user_conference : null;
+    userRegion = commandCenterTopDataCache.user_region != null && commandCenterTopDataCache.user_region !== '' ? commandCenterTopDataCache.user_region : null;
+    void initializeTeamColorCache();
+    updatePlayButton(commandCenterTopDataCache);
+    updateScoutingButton(commandCenterTopDataCache);
+    updateRecruitingButton(commandCenterTopDataCache);
+    updateAwardsButton(commandCenterTopDataCache);
+    void updatePlaybooksButtonState(commandCenterTopDataCache);
+    bindResourcesLinks();
+    if (standingsDataCache) renderStandings(standingsDataCache, 'A');
+    if (userRosterPlayersCache.length) renderTeam({ players: userRosterPlayersCache });
+    renderHomeStandingsCard();
+    renderHomeRankingsCard();
+    renderHomeLockerRoomCard();
+    renderHomeTeamStatsCard();
+    renderHomeRecruitingCard();
+    renderHomeNewsCard();
+    if (userScheduleDataCache) {
+      void renderHomeTab();
+    }
+    hideFccLoadingOverlay();
+  }
   const topDataStartTime = performance.now();
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  const previousWeek = Number(commandCenterTopDataCache?.week || 0);
+  const nextWeek = Number(topData?.week || 0);
+  if (previousWeek && nextWeek && previousWeek !== nextWeek) {
+    console.warn('[FCC CACHE] Invalidating week-sensitive Home caches after week change', { previousWeek, nextWeek });
+    invalidateHomeWeekSensitiveCaches();
+  }
   commandCenterTopDataCache = topData;
+  persistFranchiseDisplayColorContext(topData);
+  persistFccSessionCache();
+  emitDisplayContextUpdate();
 
   // ✅ SS&S: Resolve team_id from command center data if not already set
   if (topData && topData.team_id && !userTeamId) {
     userTeamId = topData.team_id;
     localStorage.setItem('franchise_user_team_id', userTeamId);
+    emitDisplayContextUpdate();
   }
   
   // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /franchise/team-data
@@ -1305,6 +2665,7 @@ async function init() {
         if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
           topData.team_chemistry = teamData.team_attributes.team_chemistry;
           console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', topData.team_chemistry);
+          persistFccSessionCache();
         }
       }
     } catch (error) {
@@ -1313,6 +2674,7 @@ async function init() {
   }
   
   populateTop(topData);
+  await hydrateFccDisplayColorPreference();
   initFccRecruits(topData);
   
   // Store user team name and scope keys (used by roster/team if needed)
@@ -1333,6 +2695,11 @@ async function init() {
   updateRecruitingButton(topData);
   updateAwardsButton(topData);
   await updatePlaybooksButtonState(topData);
+  const playbooksTab = document.getElementById('playbooks-tab');
+  if (playbooksTab && playbooksTab.classList.contains('active')) {
+    void renderFccPlaybooksSummary();
+  }
+  renderFccInbox(topData);
   maybeShowChampionshipCompleteModal(topData);
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
@@ -1364,8 +2731,10 @@ async function init() {
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   standingsDataCache = standingsData;
+  persistFccSessionCache();
   renderStandings(standingsData, 'A');
   bindResourcesLinks();
+  const homeTabDataPromise = loadHomeTabData();
     
     // ============================================================================
     // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
@@ -1394,15 +2763,23 @@ async function init() {
     // Load team data for Team tab
     const loadTeamDataStartTime = performance.now();
     console.log('⏱️ [PERF] loadTeamData() START');
-    await loadTeamData();
+    if (restoredFromSession && teamData) {
+      void loadTeamData();
+    } else {
+      await loadTeamData();
+    }
     const loadTeamDataEndTime = performance.now();
     console.log(`⏱️ [PERF] loadTeamData() COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
+    if (restoredFromSession && userScheduleDataCache) {
+      void homeTabDataPromise;
+    } else {
+      await homeTabDataPromise;
+    }
     
     const initEndTime = performance.now();
     console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
   } finally {
-    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
-    if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
+    hideFccLoadingOverlay();
   }
 }
 
@@ -1414,6 +2791,7 @@ function clearFranchiseLocalStorage() {
     'franchise_week',
     'franchise_user_team',
     'franchise_user_team_id',
+    'franchise_user_team_primary_color',
   ];
   toRemove.forEach((k) => localStorage.removeItem(k));
   Object.keys(localStorage).forEach((k) => {
@@ -1845,29 +3223,35 @@ playNowBtn.addEventListener('click', async () => {
   }
 });
 
-// Set Game Plan, Playbooks (and Scouting Report via loadScoutingReport) — wire on DOMContentLoaded so buttons exist
+function navigateToGamePlan() {
+  playSound('click-tiny.wav');
+  if (!franchiseId || !userTeamId) {
+    alert('Franchise or user team not loaded');
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  params.set('from', 'command_center');
+  params.set('return_url', getCurrentRelativeUrl());
+  window.location.href = `/game-plan.html?${params.toString()}`;
+}
+
+// Legacy route buttons were removed from the FCC tab bar in favor of local placeholder tabs.
 function wireFccNavButtons() {
   const setGameplanBtn = document.getElementById('set-gameplan-franchise');
   if (setGameplanBtn) {
-    setGameplanBtn.addEventListener('click', () => {
-      playSound('positive-beep.wav');
-      if (!franchiseId || !userTeamId) {
-        alert('Franchise or user team not loaded');
-        return;
-      }
-      const params = new URLSearchParams();
-      params.set('mode', 'franchise');
-      params.set('franchise_id', franchiseId);
-      params.set('team_id', userTeamId);
-      params.set('from', 'command_center');
-      params.set('return_url', getCurrentRelativeUrl());
-      window.location.href = `/game-plan.html?${params.toString()}`;
-    });
+    setGameplanBtn.addEventListener('click', navigateToGamePlan);
+  }
+  const fccEditGamePlanBtn = document.getElementById('fcc-edit-game-plan-btn');
+  if (fccEditGamePlanBtn) {
+    fccEditGamePlanBtn.addEventListener('click', navigateToGamePlan);
   }
   const playbooksBtn = document.getElementById('playbooks-franchise');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', () => {
-      playSound('positive-beep.wav');
+      playSound('click-tiny.wav');
       if (!franchiseId || !userTeamId) {
         alert('Franchise or user team not loaded');
         return;
@@ -1910,7 +3294,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)
   if (typeof CommandCenterTabs !== 'undefined') {
     CommandCenterTabs.initCommandCenterTabs({
-      defaultTab: 'standings-tab',
+      defaultTab: 'home-tab',
       onTabShow: (tabName) => {
         bindResourcesLinks();
         if (commandCenterTopDataCache) {
@@ -1919,21 +3303,92 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
         }
-        if (tabName === 'tournament-tab') {
-          renderTournamentBracket();
+        if (tabName === 'game-plan-tab') {
+          renderGamePlanSummary();
         }
-        if (tabName === 'team-tab') {
-          if (!teamData) {
-            loadTeamData();
-          } else {
-            renderTeamReport();
-            renderPlaybookSummary();
-          }
+        if (tabName === 'playbooks-tab') {
+          void renderFccPlaybooksSummary();
+        }
+        if (tabName === 'coaches-tab') {
+          void renderScoutingTab();
+        }
+        if (tabName === 'schedule-tab') {
+          void renderScheduleTab();
+        }
+        if (tabName === 'fcc-team-stats-summary-tab') {
+          void renderFccTeamStatsSummary();
+        }
+        if (tabName === 'awards-tab') {
+          void renderFccLeadersSummary();
+        }
+        if (tabName === 'team-stats-tab') {
+          renderTeamReport();
+        }
+        if (tabName === 'tutorials-tab' && commandCenterTopDataCache) {
+          renderFccInbox(commandCenterTopDataCache);
         }
       }
     });
   }
 });
+
+function renderFccInbox(topData) {
+  const el = document.getElementById('fcc-inbox-body');
+  if (!el) return;
+  el.innerHTML = '';
+  const inboxItems = Array.isArray(topData?.season_inbox) ? topData.season_inbox : [];
+  const w = topData && topData.last_training_report_week;
+  const tid = (topData && topData.team_id) || userTeamId;
+
+  if (w != null && w !== '' && franchiseId && tid) {
+    const weekNum = Number(w);
+    if (Number.isFinite(weekNum) && weekNum >= 1) {
+      const reportParams = new URLSearchParams({
+        mode: 'franchise',
+        franchise_id: String(franchiseId),
+        team_id: String(tid),
+        week: String(weekNum),
+        from: 'inbox',
+      });
+      const href = `/training-report.html?${reportParams.toString()}`;
+      const p = document.createElement('p');
+      p.className = 'fcc-inbox-message';
+      p.appendChild(document.createTextNode(`Week ${weekNum} training report `));
+      const a = document.createElement('a');
+      a.href = href;
+      a.className = 'fcc-inbox-link';
+      a.textContent = 'here';
+      p.appendChild(a);
+      p.appendChild(document.createTextNode('.'));
+      el.appendChild(p);
+    }
+  }
+
+  inboxItems.forEach((item) => {
+    if (!item || item.type !== 'game_result') return;
+    const itemWeek = Number(item.week);
+    const verb = item.result === 'win' ? 'defeated' : 'lost to';
+    const text = Number.isFinite(itemWeek) && item.user_team_name && item.opponent_team_name
+      ? `Week #${itemWeek}: ${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
+      : item.copy;
+    if (!text) return;
+    const p = document.createElement('p');
+    p.className = 'fcc-inbox-message';
+    p.appendChild(document.createTextNode(`${text} `));
+    if (item.box_score_url) {
+      const a = document.createElement('a');
+      a.href = item.box_score_url;
+      a.className = 'fcc-inbox-link';
+      a.textContent = 'box score';
+      p.appendChild(a);
+    }
+    el.appendChild(p);
+  });
+
+  if (!el.childElementCount) {
+    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
+  }
+}
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)
 const TEAM_ATTR_NAMES = {
@@ -1942,13 +3397,13 @@ const TEAM_ATTR_NAMES = {
   'offensive_efficiency': 'Offense',
   'defensive_efficiency': 'Defense',
   'fb_efficiency': 'Fast Breaks',
-  'pt_efficiency': 'Press/Trap',
+  'pt_efficiency': 'Press/Traps',
   'fight': 'Fight',
   'discipline': 'Discipline',
   'momentum_score': 'Momentum',
   'team_chemistry': 'Team Chemistry',
   'fb_opp_modifier': 'Fast Break Defense',
-  'pt_opp_modifier': 'Press/Trap Breaks'
+  'pt_opp_modifier': 'P/T Offense'
 };
 
 let teamData = null;
@@ -1961,13 +3416,17 @@ async function loadTeamData() {
   
   try {
     // First, ensure team objects exist (this will create them if missing)
+    let gamePlanData = null;
     try {
       // ✅ SS&S: Use ObjectId directly - backend accepts it
       const gameplanStartTime = performance.now();
       console.log('⏱️ [PERF] loadTeamData() calling /api/gameplan START');
-      await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
+      const gameplanResponse = await fetch(`${API_CONFIG.buildUrl('/api/gameplan')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
       const gameplanEndTime = performance.now();
       console.log(`⏱️ [PERF] loadTeamData() /api/gameplan: ${(gameplanEndTime - gameplanStartTime).toFixed(2)}ms`);
+      if (gameplanResponse.ok) {
+        gamePlanData = await gameplanResponse.json();
+      }
     } catch (error) {
       console.warn('Could not ensure team objects exist:', error);
     }
@@ -2005,18 +3464,24 @@ async function loadTeamData() {
       team_attributes: data.team_attributes || {},
       plays_data: data.plays_data || {},
       scouting_data: data.scouting_data || {},
-      players: players
+      players: players,
+      game_plan: gamePlanData || { strategy_settings: {} }
     };
+    persistFccSessionCache();
     
     // Log all team attribute values on page load
     console.log('📊 [TEAM ATTRIBUTES] All team attribute values:', teamData.team_attributes);
     
-    // Render if Team tab is active
-    const teamTab = document.getElementById('team-tab');
-    if (teamTab && teamTab.classList.contains('active')) {
+    // Render if Team Measures tab is active
+    const teamMeasuresTab = document.getElementById('team-stats-tab');
+    if (teamMeasuresTab && teamMeasuresTab.classList.contains('active')) {
       renderTeamReport();
-      renderPlaybookSummary();
     }
+    const gamePlanTab = document.getElementById('game-plan-tab');
+    if (gamePlanTab && gamePlanTab.classList.contains('active')) {
+      renderGamePlanSummary();
+    }
+    void renderHomeTab();
     
     const loadTeamDataEndTime = performance.now();
     console.log(`⏱️ [PERF] loadTeamData() function COMPLETE: ${(loadTeamDataEndTime - loadTeamDataStartTime).toFixed(2)}ms`);
@@ -2027,33 +3492,226 @@ async function loadTeamData() {
 
 function renderTeamReport() {
   if (!teamData) return;
-  
-  const grid = document.getElementById('team-attributes-grid');
-  if (!grid) return;
-  
-  grid.innerHTML = '';
-  
   const teamAttrs = teamData.team_attributes || {};
-  
-  const attrOrder = [
-    'shot_threshold',
-    'rebound_modifier',
-    'offensive_efficiency',
-    'defensive_efficiency',
-    'fb_efficiency',
-    'pt_efficiency',
-    'fight',
-    'discipline',
-    'momentum_score',
-    'team_chemistry',
-    'fb_opp_modifier',
-    'pt_opp_modifier'
-  ];
-  
-  attrOrder.forEach(attrKey => {
-    const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], 0);
-    if (item) grid.appendChild(item);
+  const radarHost = document.getElementById('team-measures-radar');
+  const shootingHost = document.getElementById('team-measure-shooting');
+  const reboundingHost = document.getElementById('team-measure-rebounding');
+  const chemistryHost = document.getElementById('team-measure-chemistry');
+  if (!radarHost || !shootingHost || !reboundingHost || !chemistryHost) return;
+
+  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(teamAttrs);
+  shootingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(teamAttrs.shot_threshold || 0));
+  reboundingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(teamAttrs.rebound_modifier || 0));
+  chemistryHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(teamAttrs.team_chemistry || 0));
+}
+
+function mapGamePlanValue(key, rawValue) {
+  const value = Math.max(0, Math.min(4, Number(rawValue ?? 2)));
+  switch (key) {
+    case 'offense':
+      return {
+        0: '100% Motion',
+        1: '75% Motion / 25% Set Plays',
+        2: '50% Motion / 50% Set Plays',
+        3: '75% Set Plays / 25% Motion',
+        4: '100% Set Plays'
+      }[value];
+    case 'defense':
+      return {
+        0: '100% Man',
+        1: '75% Man / 25% Zone',
+        2: '50% Man / 50% Zone',
+        3: '75% Zone / 25% Man',
+        4: '100% Zone'
+      }[value];
+    case 'fast_breaks':
+      return {
+        0: '100% Half Court Sets',
+        1: '75% Half Court Sets / 25% Fast Breaks',
+        2: '50% Half Court Sets / 50% Fast Breaks',
+        3: '75% Fast Breaks / 25% Half Court Sets',
+        4: '100% Fast Breaks'
+      }[value];
+    case 'aggression':
+      return {
+        0: 'Passive',
+        1: 'Normal / Passive',
+        2: 'Normal',
+        3: 'Normal / Aggressive',
+        4: 'Aggressive'
+      }[value];
+    case 'rebounding':
+      return {
+        0: '100% Crash The Boards',
+        1: '75% Crash The Boards / 25% Get Back on D',
+        2: '50% Crash The Boards / 50% Get Back on D',
+        3: '75% Get Back on D / 25% Crash The Boards',
+        4: '100% Get Back on D'
+      }[value];
+    default:
+      return GENERIC_GAMEPLAN_SCALE[value] || 'Normal';
+  }
+}
+
+function buildGamePlanSummaryMarkup(strategySettings = {}) {
+  const items = GAMEPLAN_DISPLAY_ORDER.map((key) => {
+    const label = GAMEPLAN_LABELS[key];
+    const valueText = mapGamePlanValue(key, strategySettings?.[key]);
+    return `
+      <div class="fcc-game-plan-item">
+        <div class="fcc-game-plan-label">${label}</div>
+        <div class="fcc-game-plan-value">${valueText}</div>
+      </div>
+    `;
   });
+  return items.join('');
+}
+
+function renderGamePlanSummary() {
+  const host = document.getElementById('fcc-game-plan-grid');
+  if (!host) return;
+  const strategySettings = teamData?.game_plan?.strategy_settings;
+  if (!strategySettings || typeof strategySettings !== 'object') {
+    host.innerHTML = '<div class="fcc-game-plan-empty">Game plan settings are not available yet.</div>';
+    return;
+  }
+  host.innerHTML = buildGamePlanSummaryMarkup(strategySettings);
+}
+
+const TEAM_MEASURES_RADAR_AXES = [
+  { key: 'offensive_efficiency', label: 'Offense', angle: -90 },
+  { key: 'fb_efficiency', label: 'Fast Breaks', angle: -45 },
+  { key: 'discipline', label: 'Discipline', angle: 0 },
+  { key: 'pt_efficiency', label: 'Press/Traps', angle: 45 },
+  { key: 'defensive_efficiency', label: 'Defense', angle: 90 },
+  { key: 'fb_opp_modifier', label: 'Fast Break Defense', angle: 135 },
+  { key: 'fight', label: 'Fight', angle: 180 },
+  { key: 'pt_opp_modifier', label: 'P/T Offense', angle: 225 }
+];
+
+function buildTeamMeasuresRadarMarkup(teamAttrs) {
+  const center = 250;
+  const radius = 164;
+  const labelRadius = 204;
+  const pointLabelRadius = 18;
+  const ringValues = [10, 6.7, 3.3, 0, -3.3, -6.7, -10];
+
+  const values = TEAM_MEASURES_RADAR_AXES.map((axis) => Number(teamAttrs?.[axis.key] || 0));
+  const clampedValues = values.map((value) => Math.max(-10, Math.min(10, value)));
+  const dominantCount = values.filter((value) => Number(value) >= 7).length;
+
+  function radiusForValue(value) {
+    const clamped = Math.max(-10, Math.min(10, Number(value) || 0));
+    return ((clamped + 10) / 20) * radius;
+  }
+
+  function pointFor(angleDeg, value, extra = 0) {
+    const radians = (angleDeg * Math.PI) / 180;
+    const scaledRadius = radiusForValue(value) + extra;
+    return {
+      x: center + Math.cos(radians) * scaledRadius,
+      y: center + Math.sin(radians) * scaledRadius
+    };
+  }
+
+  const ringPolygons = ringValues.map((ringValue) => {
+    const points = TEAM_MEASURES_RADAR_AXES.map((axis) => {
+      const point = pointFor(axis.angle, ringValue);
+      return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+    }).join(' ');
+    const ringClass = ringValue === 10
+      ? ' tm-radar-ring-outer'
+      : ringValue === 0
+        ? ' tm-radar-ring-zero'
+        : ringValue === -10
+          ? ' tm-radar-ring-inner'
+          : '';
+    return `<polygon class="tm-radar-ring${ringClass}" points="${points}" />`;
+  }).join('');
+
+  const axisLines = TEAM_MEASURES_RADAR_AXES.map((axis) => {
+    const point = pointFor(axis.angle, 10);
+    return `<line class="tm-radar-axis" x1="${center}" y1="${center}" x2="${point.x.toFixed(2)}" y2="${point.y.toFixed(2)}" />`;
+  }).join('');
+
+  const shapePoints = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
+    const point = pointFor(axis.angle, clampedValues[index]);
+    return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+  }).join(' ');
+
+  const labels = TEAM_MEASURES_RADAR_AXES.map((axis) => {
+    const point = pointFor(axis.angle, 10, labelRadius - radius);
+    return `<text class="tm-radar-axis-label" x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}" text-anchor="middle" dominant-baseline="middle">${axis.label}</text>`;
+  }).join('');
+
+  const valueLabels = TEAM_MEASURES_RADAR_AXES.map((axis, index) => {
+    return '';
+  }).join('');
+
+  return `
+    <div class="tm-radar-wrap">
+      <svg class="tm-radar-svg" viewBox="0 0 500 500" role="img" aria-label="Team Measures radar chart">
+        <defs>
+          <filter id="tm-radar-outline-glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="tm-radar-point-glow" x="-200%" y="-200%" width="400%" height="400%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <g class="tm-radar-grid">
+          ${ringPolygons}
+          ${axisLines}
+        </g>
+        <polygon class="tm-radar-shape-fill" points="${shapePoints}" />
+        <polygon class="tm-radar-shape-outline${dominantCount >= 3 ? ' is-pulsing' : ''}" points="${shapePoints}" />
+        ${labels}
+        ${valueLabels}
+      </svg>
+    </div>
+  `;
+}
+
+function buildTeamMeasuresLinearCardMarkup(title, attrKey, value) {
+  const visual = getTeamAttrVisualConfig(attrKey, value);
+  if (attrKey === 'team_chemistry') {
+    const percentage = Math.max(0, Math.min((Number(value) / 25) * 100, 100));
+    const pulseClass = visual.pulse ? ' is-pulsing' : '';
+    return `
+      <div class="tm-side-card-content tm-side-card-content-chemistry">
+        <div class="tm-side-card-label">${title}</div>
+        <div class="tm-chemistry-bar${pulseClass}">
+          <div class="tm-chemistry-fill" style="width:${percentage}%; opacity:${0.2 + (percentage / 100) * 0.8};"></div>
+          <div class="tm-chemistry-text">${visual.displayValue}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const pulseClass = visual.pulse ? ' is-pulsing' : '';
+  const fillMarkup = visual.direction === 'positive'
+    ? `<div class="tm-linear-fill tm-linear-fill-positive" style="width:${visual.fillPercent}%"></div>`
+    : (visual.direction === 'negative'
+      ? `<div class="tm-linear-fill tm-linear-fill-negative" style="width:${visual.fillPercent}%"></div>`
+      : '');
+
+  return `
+    <div class="tm-side-card-content">
+      <div class="tm-side-card-label">${title}</div>
+      <div class="tm-linear-bar${pulseClass}">
+        ${fillMarkup}
+        <div class="tm-linear-center"></div>
+      </div>
+    </div>
+  `;
 }
 
 function createTeamAttrItem(attrKey, currentValue, change) {
@@ -2069,6 +3727,8 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   
   const item = document.createElement('div');
   item.className = 'team-attr-item';
+  const visual = getTeamAttrVisualConfig(attrKey, Number(currentValue) || 0);
+  if (visual.cardTone) item.dataset.tone = visual.cardTone;
   
   const label = document.createElement('div');
   label.className = 'attr-label';
@@ -2081,55 +3741,22 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   
   if (attrKey === 'team_chemistry') {
     const barContainer = document.createElement('div');
-    barContainer.className = 'chemistry-bar-container';
+    barContainer.className = 'fcc-chemistry-bar-container';
+    if (visual.pulse) barContainer.classList.add('is-pulsing');
     
     const barFill = document.createElement('div');
-    barFill.className = 'chemistry-bar-fill';
-    const percentage = (currentValue / 25) * 100;
+    barFill.className = 'fcc-chemistry-bar-fill';
+    const percentage = Math.max(0, Math.min((Number(currentValue) / 25) * 100, 100));
     barFill.style.width = `${percentage}%`;
+    barFill.style.opacity = String(0.2 + (percentage / 100) * 0.8);
     
     const barText = document.createElement('div');
-    barText.className = 'chemistry-bar-text';
+    barText.className = 'fcc-chemistry-bar-text';
     barText.textContent = `${currentValue} / 25`;
     
     barContainer.appendChild(barFill);
     barContainer.appendChild(barText);
     item.appendChild(barContainer);
-  } else if (attrKey === 'fb_opp_modifier' || attrKey === 'pt_opp_modifier') {
-    const indicatorContainer = document.createElement('div');
-    indicatorContainer.className = 'plus-minus-container';
-    indicatorContainer.style.textAlign = 'center';
-    indicatorContainer.style.marginTop = 'var(--spacing-sm)';
-    
-    const indicator = document.createElement('span');
-    indicator.className = 'plus-minus-indicator';
-    indicator.style.fontWeight = '700';
-    
-    if (currentValue >= 10) {
-      indicator.textContent = '+++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 5) {
-      indicator.textContent = '++';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue >= 1) {
-      indicator.textContent = '+';
-      indicator.className += ' plus-minus-positive';
-    } else if (currentValue === 0) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-zero';
-    } else if (currentValue >= -4) {
-      indicator.textContent = '-';
-      indicator.className += ' plus-minus-negative';
-    } else if (currentValue >= -9) {
-      indicator.textContent = '--';
-      indicator.className += ' plus-minus-negative';
-    } else {
-      indicator.textContent = '---';
-      indicator.className += ' plus-minus-negative';
-    }
-    
-    indicatorContainer.appendChild(indicator);
-    item.appendChild(indicatorContainer);
   } else {
     const pill = createPill(currentValue, attrKey);
     item.appendChild(pill);
@@ -2141,38 +3768,85 @@ function createTeamAttrItem(attrKey, currentValue, change) {
 function createPill(originalValue, attrKey) {
   const pill = document.createElement('div');
   pill.className = 'attr-pill';
+  const visual = getTeamAttrVisualConfig(attrKey, Number(originalValue) || 0);
+  if (visual.direction !== 'zero') {
+    pill.classList.add(`pill-${visual.direction}`);
+  }
+  if (visual.pulse) {
+    pill.classList.add('is-pulsing');
+  }
   
   const centerLine = document.createElement('div');
   centerLine.className = 'pill-center-line';
   pill.appendChild(centerLine);
-  
-  let maxValue = 10;
-  let value = originalValue;
-  
-  if (attrKey === 'shot_threshold') {
-    maxValue = 100; // Range is 10 to 210, center at 110, so max deviation is 100
-    value = 110 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
-  } else if (attrKey === 'rebound_modifier') {
-    maxValue = 0.2;
-    value = originalValue - 0.2; // Center at 0.2 (new range: 0.0-0.4)
-  }
-  
-  if (value > 0) {
+
+  if (visual.direction === 'positive') {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-positive';
-    const percentage = Math.min((value / maxValue) * 50, 50);
-    fill.style.width = `${percentage}%`;
+    fill.style.width = `${visual.fillPercent}%`;
     pill.insertBefore(fill, centerLine);
-  } else if (value < 0) {
+  } else if (visual.direction === 'negative') {
     const fill = document.createElement('div');
     fill.className = 'pill-fill-negative';
-    const absValue = Math.abs(value);
-    const percentage = Math.min((absValue / maxValue) * 50, 50);
-    fill.style.width = `${percentage}%`;
+    fill.style.width = `${visual.fillPercent}%`;
     pill.insertBefore(fill, centerLine);
   }
+
+  const valueLabel = document.createElement('div');
+  valueLabel.className = 'pill-value show';
+  valueLabel.textContent = visual.displayValue;
+  pill.appendChild(valueLabel);
   
   return pill;
+}
+
+function formatTeamAttrDisplayValue(attrKey, value) {
+  const numericValue = Number(value) || 0;
+  if (attrKey === 'rebound_modifier') return numericValue.toFixed(2);
+  return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(1);
+}
+
+function getTeamAttrVisualConfig(attrKey, value) {
+  if (attrKey === 'team_chemistry') {
+    return {
+      direction: value > 0 ? 'positive' : 'zero',
+      fillPercent: Math.max(0, Math.min((value / 25) * 100, 100)),
+      displayValue: `${value} / 25`,
+      pulse: value <= 5 || value >= 22,
+      cardTone: value < 8 ? 'warning-negative' : (value > 20 ? 'warning-elite' : '')
+    };
+  }
+
+  let normalized = value;
+  let fillPercent = 0;
+  let pulse = false;
+
+  if (attrKey === 'shot_threshold') {
+    const deviation = 110 - value;
+    normalized = (deviation / 100) * 10;
+    fillPercent = Math.min((Math.abs(deviation) / 100) * 50, 50);
+    pulse = Math.abs(110 - value) >= 30;
+  } else if (attrKey === 'rebound_modifier') {
+    const deviation = value - 0.2;
+    normalized = (deviation / 0.2) * 10;
+    fillPercent = Math.min((Math.abs(deviation) / 0.2) * 50, 50);
+    pulse = Math.abs(deviation) >= 0.06;
+  } else {
+    fillPercent = Math.min((Math.abs(normalized) / 10) * 50, 50);
+    pulse = Math.abs(normalized) >= 7;
+  }
+
+  let cardTone = '';
+  if (normalized <= -6) cardTone = 'negative';
+  else if (normalized >= 6) cardTone = 'positive';
+
+  return {
+    direction: normalized > 0 ? 'positive' : (normalized < 0 ? 'negative' : 'zero'),
+    fillPercent,
+    displayValue: formatTeamAttrDisplayValue(attrKey, value),
+    pulse,
+    cardTone
+  };
 }
 
 function renderPlaybookSummary() {
@@ -2518,9 +4192,8 @@ async function renderTournamentBracket() {
           const meta = teamIdMetaMap[String(id)] || {};
           const teamName = meta.team || name || '';
           const mascot = meta.mascot || '';
-          const conferenceLabel = formatConferenceTooltipLabel(meta.conference);
-          if (!teamName || !mascot || !conferenceLabel) return '';
-          return `${teamName} ${mascot}, conference ${conferenceLabel}`;
+          if (!teamName) return '';
+          return mascot ? `${teamName} ${mascot}` : teamName;
         },
       });
     } else {
@@ -2566,154 +4239,167 @@ async function renderTournamentBracket() {
 // Scouting Report functionality
 let upcomingOpponent = null;
 let upcomingOpponentId = null;
+let scoutingTabDataCache = null;
+let fccScoutingProjectedViewMode = 'attributes';
+
+function disableLegacyFccScoutingModal() {
+  const legacyModal = document.getElementById('scouting-report-modal');
+  if (legacyModal) legacyModal.remove();
+
+  const legacyScoutingButton = document.getElementById('scouting-report-btn');
+  if (legacyScoutingButton) {
+    legacyScoutingButton.style.display = 'none';
+    legacyScoutingButton.setAttribute('aria-hidden', 'true');
+  }
+}
+
+disableLegacyFccScoutingModal();
+
+async function resolveUpcomingOpponentFromMatchup(data) {
+  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
+  const week = data?.week || data?.training_status?.current_week || 0;
+  const eosTournamentActive = data?.eos_tournament_active || false;
+  const eosTournament = data?.eos_tournament;
+
+  let userTeamEliminated = false;
+  if (eosTournamentActive && eosTournament && userTeamId && week >= 27) {
+    const bracket = eosTournament.bracket || {};
+    const allMatchups = [...(bracket.round1 || []), ...(bracket.round2 || []), ...(bracket.final || [])];
+    userTeamEliminated = !allMatchups.some((m) =>
+      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
+    );
+  }
+
+  const scoutingAvailable = data && ((week >= 0 && week <= 26) || (week >= 27 && week <= 34 && !userTeamEliminated));
+  if (!scoutingAvailable || !franchiseId) {
+    upcomingOpponent = null;
+    upcomingOpponentId = null;
+    return null;
+  }
+
+  try {
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: franchiseId })
+    });
+    if (!res.ok) throw new Error('Failed to resolve next game');
+    const matchup = await res.json();
+    upcomingOpponent = null;
+    upcomingOpponentId = null;
+    if (matchup && matchup.home && matchup.away) {
+      if (resolvedUserTeamName === matchup.home) {
+        upcomingOpponent = matchup.away;
+        upcomingOpponentId = matchup.away_id;
+      } else if (resolvedUserTeamName === matchup.away) {
+        upcomingOpponent = matchup.home;
+        upcomingOpponentId = matchup.home_id;
+      } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
+        if (String(userTeamId) === String(matchup.home_id)) {
+          upcomingOpponent = matchup.away;
+          upcomingOpponentId = matchup.away_id;
+        } else if (String(userTeamId) === String(matchup.away_id)) {
+          upcomingOpponent = matchup.home;
+          upcomingOpponentId = matchup.home_id;
+        }
+      }
+    }
+    return upcomingOpponent ? { name: upcomingOpponent, id: upcomingOpponentId } : null;
+  } catch (err) {
+    console.warn('Could not determine upcoming opponent:', err);
+    upcomingOpponent = null;
+    upcomingOpponentId = null;
+    return null;
+  }
+}
 
 function updateScoutingButton(data) {
   const scoutingBtn = document.getElementById('scouting-report-btn');
   if (!scoutingBtn) return;
-  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
-  
-  // ✅ EOS TOURNAMENT: Show button for regular season (weeks 1-26) and EOS Tournament (weeks 27-34)
-  // Also show during preseason (week 0 or undefined) if there's a schedule
-  const week = data?.week || data?.training_status?.current_week || 0;
-  const eosTournamentActive = data?.eos_tournament_active || false;
-  const eosTournament = data?.eos_tournament;
-  
-  // Check if user team is eliminated from tournament
-  let userTeamEliminated = false;
-  if (eosTournamentActive && eosTournament && userTeamId && week >= 27) {
-    const bracket = eosTournament.bracket || {};
-    const round1 = bracket.round1 || [];
-    const round2 = bracket.round2 || [];
-    const final = bracket.final || [];
-    const allMatchups = [...round1, ...round2, ...final];
-    const userInMatchup = allMatchups.some(m => 
-      m.home_team === userTeamId || m.away_team === userTeamId
-    );
-    userTeamEliminated = !userInMatchup;
-  }
-  
-  // Show button if: (regular season weeks 0-26) OR (EOS Tournament weeks 27-34 and user not eliminated)
-  if (data && ((week >= 0 && week <= 26) || (week >= 27 && week <= 34 && !userTeamEliminated))) {
-    // Get upcoming opponent from play-next-game endpoint (now handles both regular season and EOS Tournament)
-    fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ franchise_id: franchiseId })
-    })
-    .then(res => res.json())
-    .then(matchup => {
-      upcomingOpponent = null;
-      upcomingOpponentId = null;
-      if (matchup && matchup.home && matchup.away) {
-        // Prefer API-sourced team identity, then fall back to ObjectId match.
-        if (resolvedUserTeamName === matchup.home) {
-          upcomingOpponent = matchup.away;
-          upcomingOpponentId = matchup.away_id;
-        } else if (resolvedUserTeamName === matchup.away) {
-          upcomingOpponent = matchup.home;
-          upcomingOpponentId = matchup.home_id;
-        } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
-          if (String(userTeamId) === String(matchup.home_id)) {
-            upcomingOpponent = matchup.away;
-            upcomingOpponentId = matchup.away_id;
-          } else if (String(userTeamId) === String(matchup.away_id)) {
-            upcomingOpponent = matchup.home;
-            upcomingOpponentId = matchup.home_id;
-          }
-        }
-        
-        if (upcomingOpponent) {
-          scoutingBtn.style.display = 'block';
-        } else {
-          scoutingBtn.style.display = 'none';
-        }
-      } else {
-        scoutingBtn.style.display = 'none';
-      }
-    })
-    .catch(err => {
-      console.warn('Could not determine upcoming opponent:', err);
-      scoutingBtn.style.display = 'none';
+  resolveUpcomingOpponentFromMatchup(data).then((result) => {
+    scoutingBtn.style.display = result ? 'block' : 'none';
+  });
+}
+
+function renderFccScoutingProjectedLineup() {
+  if (!scoutingTabDataCache) return;
+  if (typeof renderProjectedStartingFive === 'function') {
+    renderProjectedStartingFive(scoutingTabDataCache.projected_starting_five || [], {
+      containerId: 'fcc-scouting-projected-lineup',
+      tableClass: 'scouting-projected-table',
+      emptyClass: 'scouting-projected-empty',
     });
-  } else {
-    scoutingBtn.style.display = 'none';
   }
 }
 
-async function loadScoutingReport() {
-  playSound('positive-slide.wav');
-  if (!upcomingOpponent || !franchiseId) {
-    alert('No upcoming opponent found');
+function renderFccScoutingMeasures(teamAttrs) {
+  const radarHost = document.getElementById('fcc-scouting-radar-host');
+  const shootingCard = document.getElementById('fcc-scouting-shooting-card');
+  const reboundingCard = document.getElementById('fcc-scouting-rebounding-card');
+  const chemistryCard = document.getElementById('fcc-scouting-chemistry-card');
+  if (!radarHost || !shootingCard || !reboundingCard || !chemistryCard) return;
+
+  const attrs = teamAttrs || {};
+  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(attrs);
+  shootingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(attrs.shot_threshold || 0));
+  reboundingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(attrs.rebound_modifier || 0));
+  chemistryCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(attrs.team_chemistry || 0));
+}
+
+async function renderScoutingTab() {
+  const status = document.getElementById('fcc-scouting-status');
+  const content = document.getElementById('fcc-scouting-content');
+  const opponentName = document.getElementById('fcc-scouting-opponent-name');
+  const opponentRank = document.getElementById('fcc-scouting-opponent-rank');
+  if (!status || !content || !opponentName || !opponentRank) return;
+
+  status.style.display = 'block';
+  content.style.display = 'none';
+  status.textContent = 'Loading scouting report...';
+
+  const opponent = await resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache);
+  if (!opponent) {
+    status.textContent = 'No upcoming opponent available for scouting.';
     return;
   }
-  
-  const modal = document.getElementById('scouting-report-modal');
-  const loading = document.getElementById('scouting-loading');
-  const content = document.getElementById('scouting-content');
-  const title = document.getElementById('scouting-report-title');
-  
-  modal.style.display = 'flex';
-  loading.style.display = 'block';
-  content.style.display = 'none';
-  title.textContent = `Scouting Report: ${upcomingOpponent}`;
-  
+
+  const opponentTeamName = opponent.name || '--';
+  const standingsEntry = getStandingsTeamEntry(opponent.id);
+  const rankingEntry = getTeamRankingEntry(opponent.id);
+  const wins = Number(standingsEntry?.W || 0);
+  const losses = Number(standingsEntry?.L || 0);
+  const rank = Number(rankingEntry?.natl_rank || 0);
+
+  opponentName.textContent = `${opponentTeamName} (${wins}-${losses})`;
+  opponentRank.textContent = Number.isFinite(rank) && rank > 0 ? String(rank) : '--';
+
   try {
-    // Load opponent team data and last game play usage
     const authHeaders = API_CONFIG.getAuthHeaders();
     const [teamDataRes, playUsageRes] = await Promise.all([
-      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`, { headers: authHeaders }),
-      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(upcomingOpponent)}`, { headers: authHeaders })
+      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders }),
+      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders })
     ]);
-    
-    if (!teamDataRes.ok) throw new Error('Failed to load team data');
+
+    if (!teamDataRes.ok) throw new Error('Failed to load team report');
     if (!playUsageRes.ok) throw new Error('Failed to load play usage');
-    
+
     const teamData = await teamDataRes.json();
     const playUsage = await playUsageRes.json();
-    
-    // ✅ SS&S: Use shared rendering functions
-    if (typeof renderScoutingTeamReport === 'function' && typeof createTeamAttrItem === 'function') {
-      renderScoutingTeamReport(teamData.team_attributes || {}, createTeamAttrItem);
-    } else {
-      console.error('Scouting report rendering functions not available');
-    }
-    
+    scoutingTabDataCache = playUsage || {};
+    renderFccScoutingProjectedLineup();
+    renderFccScoutingMeasures(teamData.team_attributes || {});
     if (typeof renderPlayUsage === 'function') {
-      renderPlayUsage(playUsage.plays || [], 'No previous game data available. Opponent has not played a game yet this season.');
-    } else {
-      console.error('Play usage rendering function not available');
-    }
-
-    if (typeof setScoutingProjectedLineupData === 'function') {
-      setScoutingProjectedLineupData(
-        playUsage.projected_starting_five || [],
-        playUsage.player_season_stats || {}
+      renderPlayUsage(
+        playUsage.plays || [],
+        'No previous game data available. Opponent has not played a game yet this season.',
+        'fcc-play-usage-body'
       );
-    } else if (typeof renderProjectedStartingFive === 'function') {
-      renderProjectedStartingFive(playUsage.projected_starting_five || []);
     }
-    
-    loading.style.display = 'none';
-    content.style.display = 'block';
+    status.style.display = 'none';
+    content.style.display = 'flex';
   } catch (error) {
-    console.error('Error loading scouting report:', error);
-    loading.textContent = `Error loading scouting report: ${error.message}`;
-  }
-}
-
-// ✅ SS&S: Removed duplicate functions - now using shared functions from scoutingReport.js
-// renderScoutingTeamReport, renderPlayUsage, and setupScoutingReport are now in /js/shared/scoutingReport.js
-
-// ✅ SS&S: Initialize scouting report using shared function
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (typeof setupScoutingReport === 'function') {
-      setupScoutingReport(loadScoutingReport);
-    }
-  });
-} else {
-  if (typeof setupScoutingReport === 'function') {
-    setupScoutingReport(loadScoutingReport);
+    console.error('Error loading scouting report tab:', error);
+    status.textContent = `Error loading scouting report: ${error.message}`;
   }
 }
 

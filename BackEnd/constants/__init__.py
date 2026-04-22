@@ -133,8 +133,10 @@ TURNOVER_CALC_DICT = {
 
 POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
 
-# Ball landing adjustment for made shots (grid units closer to shooter)
-MADE_SHOT_BALL_OFFSET = 1
+# Ball rest position after a make (grid coords, one step toward center from each hoop).
+# Must stay in sync with FrontEnd/static/js/phaser/animation/courtConstants.js
+MADE_SHOT_SWEET_SPOT_HOME_RIM = {"x": 90, "y": 25}  # hoop at HOME_RIM_COORDS (91)
+MADE_SHOT_SWEET_SPOT_AWAY_RIM = {"x": 10, "y": 25}  # hoop at AWAY_RIM_COORDS (9)
 
 # constants/strategy_factors.py
 AGGRESSION_FOUL_MULTIPLIER = {
@@ -164,8 +166,8 @@ THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
 # Target averages per game:
 # - 60 field goal attempts per team per game
 # - Average target FG% of 45%
-STANDARD_D_FOUL = 94
-STANDARD_O_FOUL = 6
+STANDARD_D_FOUL = 95 #changed from 94 to accommodate over the back fouls
+STANDARD_O_FOUL = 5 #changed from 6 to accommodate over the back fouls
 HARD_STEAL = -135
 SOFT_STEAL = -35
 HARD_FOUL = 250

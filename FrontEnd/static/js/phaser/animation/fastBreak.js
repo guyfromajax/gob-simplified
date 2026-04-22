@@ -4,7 +4,13 @@ import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenPlayerTo, runPass, detachBall, getBallDuration } from "./ballTween.js";
 import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
+import {
+  HOME_RIM_COORDS,
+  AWAY_RIM_COORDS,
+  HOME_TOP_KEY,
+  AWAY_TOP_KEY,
+  getMadeShotSweetSpotGrid,
+} from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
 import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
@@ -654,6 +660,14 @@ function rimRunnerSpriteGrid(sprite, width, height) {
   };
 }
 
+function rimRunnerLiveSpriteGrid(sprite, width, height) {
+  if (!sprite) return { x: 50, y: 25 };
+  return {
+    x: Phaser.Math.Clamp((sprite.x / width) * 100, GRID_MIN_X, GRID_MAX_X),
+    y: Phaser.Math.Clamp(50 - (sprite.y / height) * 50, GRID_MIN_Y, GRID_MAX_Y),
+  };
+}
+
 function setRimRunnerSpriteGrid(sprite, gx, gy) {
   if (!sprite) return;
   sprite.gridX = gx;
@@ -1212,7 +1226,14 @@ async function animateRimRunnerOutletDeniedBeat(
 
   attachBallToPlayer(scene, ballSprite, passerSprite);
 
-  const pg = rimRunnerSpriteGrid(passerSprite, width, height);
+  // Derive the denied-outlet beat from the visible on-court locations, not the
+  // cached logical burst endpoints. This branch forks immediately after the burst
+  // receiver reaches the trigger spot, so cached gridX/gridY can get ahead of
+  // what is actually on screen and make the defender step / receiver cutback
+  // appear skipped.
+  const pg = rimRunnerLiveSpriteGrid(passerSprite, width, height);
+  const receiverLiveGrid = rimRunnerLiveSpriteGrid(recvSprite, width, height);
+  const defenderLiveGrid = defSprite ? rimRunnerLiveSpriteGrid(defSprite, width, height) : null;
   const defenderTarget = {
     x: Phaser.Math.Clamp(pg.x + 2 * towardBasket, GRID_MIN_X, GRID_MAX_X),
     y: Phaser.Math.Clamp(pg.y, GRID_MIN_Y, GRID_MAX_Y),
@@ -1222,8 +1243,8 @@ async function animateRimRunnerOutletDeniedBeat(
     receiverId: recvId,
     defenderId: defId,
     passerGrid: pg,
-    receiverGrid: rimRunnerSpriteGrid(recvSprite, width, height),
-    defenderGrid: defSprite ? rimRunnerSpriteGrid(defSprite, width, height) : null,
+    receiverGrid: receiverLiveGrid,
+    defenderGrid: defenderLiveGrid,
     defenderTarget,
   });
 
@@ -1315,7 +1336,7 @@ async function animateRimRunnerOutletDeniedBeat(
   logRrDenied(scene, "TRIGGER", {
     trigger: "receiver_cutback_reached",
     receiverTarget: recvTarget,
-    receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+    receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
     snapshotAtTrigger: captureRrLiveSnapshot(playerSprites, width, height),
   });
 
@@ -1346,7 +1367,7 @@ async function animateRimRunnerOutletDeniedBeat(
     synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
     attachBallToPlayer(scene, ballSprite, recvSprite, { reason: "rim_runner_outlet_denied_pass" });
     logRrDenied(scene, "PASS END", {
-      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
       snapshotAfterPass: captureRrLiveSnapshot(playerSprites, width, height),
     });
   } else {
@@ -1354,7 +1375,7 @@ async function animateRimRunnerOutletDeniedBeat(
       reason: "rim_runner_outlet_denied_pass_recovery_failed",
     });
     logRrDenied(scene, "PASS END", {
-      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
+      receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
       mode: "pass_recovery_failed",
       passerId,
       receiverId: recvId,
@@ -2124,8 +2145,8 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     // RR burst only owns the fork into outlet-denied. Once receiver reaches the
     // fork point, the dedicated denied branch becomes the sole owner.
     logRrDenied(scene, "BURST FORK", {
-      receiverLive: rimRunnerSpriteGrid(recvSprite, width, height),
-      rrLive: rimRunnerSpriteGrid(rrSprite, width, height),
+      receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
+      rrLive: rimRunnerLiveSpriteGrid(rrSprite, width, height),
       outletDefenderId: sid(phase.outlet_defender_id),
       snapshot: captureRrLiveSnapshot(playerSprites, width, height),
     });
@@ -2708,11 +2729,11 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
   if (hasBlockSpotWithStopper) {
     shotTargetPxWithStopper = gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, width, height);
   } else {
-    const adjustedBasket = { ...basket };
-    if (turnData.result_type === "MAKE") {
-      adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
-    }
-    shotTargetPxWithStopper = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
+    const endGrid =
+      turnData.result_type === "MAKE"
+        ? getMadeShotSweetSpotGrid(isHomeOffense)
+        : basket;
+    shotTargetPxWithStopper = gridToPixels(endGrid.x, endGrid.y, width, height);
   }
   await animateShotToRim(scene, shotTargetPxWithStopper, {
     duration: animationConfig.fastBreak?.shotMs ?? 350,
@@ -2791,22 +2812,17 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         if (foulPlayerId && scene) {
           const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
           if (foulPlayerSprite) {
-            const teamsObj = scene.simData?.teams || {};
-            const homeId = scene.simData?.home_team_id;
-            const awayId = scene.simData?.away_team_id;
-            const homeTeamNameMiss = (homeId && teamsObj[homeId]?.name) || scene.simData?.home_team?.name || "Home";
-            const awayTeamNameMiss = (awayId && teamsObj[awayId]?.name) || scene.simData?.away_team?.name || "Away";
-            const foulPlayerTeamId = foulPlayerSprite?.team_id;
-            const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamNameMiss : awayTeamNameMiss;
-            const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
             triggerFoulEffect(scene, foulPlayerId);
-            showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
           } else {
             triggerFoulEffect(scene, foulPlayerId);
-            showAnnouncement("Shooting Foul!", 'neutral', null);
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
           }
         } else {
-          showAnnouncement("Shooting Foul!", 'neutral', null);
+          const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
         }
       }
       appendToTextScroll("Missed!");
@@ -3026,12 +3042,11 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const blockSpotGrid = { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y };
     shotTargetPx = gridToPixels(blockSpotGrid.x, blockSpotGrid.y, width, height);
   } else {
-    // ✅ FIX: Adjust rim position for made shots (1 grid unit closer to shooter)
-    const adjustedBasket = { ...basket };
-    if (turnData.result_type === "MAKE") {
-      adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
-    }
-    shotTargetPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
+    const endGrid =
+      turnData.result_type === "MAKE"
+        ? getMadeShotSweetSpotGrid(isHomeOffense)
+        : basket;
+    shotTargetPx = gridToPixels(endGrid.x, endGrid.y, width, height);
   }
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
   await animateShotToRim(scene, shotTargetPx, {
@@ -3190,27 +3205,20 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
     const isShootingFoulOnMiss = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
     if (isShootingFoulOnMiss) {
-      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && scene) {
         const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
         if (foulPlayerSprite) {
-          const homeTeamField = scene.simData?.home_team;
-          const awayTeamField = scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          const foulPlayerTeamId = foulPlayerSprite?.team_id;
-          const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-          const foulPlayerData = { playerId: foulPlayerId, photo: foulPlayerSprite?.photo || null, teamName: foulPlayerTeamName, secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId) };
           triggerFoulEffect(scene, foulPlayerId);
-          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
         } else {
           triggerFoulEffect(scene, foulPlayerId);
-          showAnnouncement("Shooting Foul!", 'neutral', null);
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
         }
       } else {
-        showAnnouncement("Shooting Foul!", 'neutral', null);
+        announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
       }
     }
     appendToTextScroll("Missed!");

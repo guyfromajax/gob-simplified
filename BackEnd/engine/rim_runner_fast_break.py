@@ -1136,11 +1136,11 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
 
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
+        apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             rr.coords = shot_spot
             roles["shot_spot"] = shot_spot
-
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1190,6 +1190,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         game_state["fast_break_shot_threshold_override"] = 1
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
+        apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None:
             rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             roles["shot_spot"] = rr.coords
@@ -1320,6 +1321,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     game_state["fast_break_shot_threshold_override"] = base_threshold + def_chemistry - off_fight
     animator = Animator(game)
     fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
+    apply_coords_from_animations_list(game, fb_animations)
     if fb_roles.get("_bh_final_x") is not None:
         rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         roles["shot_spot"] = rr.coords

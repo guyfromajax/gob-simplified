@@ -3,7 +3,7 @@ import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { runInboundSetup as baseRunInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS, getMadeShotSweetSpotGrid } from "./courtConstants.js";
 import {
   detachBall,
   runPass as baseRunPass,
@@ -301,7 +301,9 @@ export async function shootBall({
   // });
   
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  
+  const shotEndGrid =
+    result === "MAKE" ? getMadeShotSweetSpotGrid(isHomeTeam) : rimCoords;
+
   // Check for double team and show announcement (before shot animation)
   if (turnData?.has_double_team || turnData?.second_defender_id) {
     // Import and show announcement immediately
@@ -310,17 +312,9 @@ export async function shootBall({
     showAnnouncement("DOUBLE TEAM!", 'neutral', null);
   }
   
-  // Adjust landing position for made shots
-  // Home team (attacks away basket x=91): reduce by 1 → 90
-  // Away team (attacks home basket x=9): increase by 1 → 10
-  const adjustedRimCoords = { ...rimCoords };
-  if (result === "MAKE") {
-    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - 1 : rimCoords.x + 1;
-  }
-  
   const rim = gridToPixels(
-    adjustedRimCoords.x,
-    adjustedRimCoords.y,
+    shotEndGrid.x,
+    shotEndGrid.y,
     scene.game.config.width,
     scene.game.config.height
   );
@@ -567,31 +561,23 @@ export async function shootBall({
           if (foulPlayerId && scene) {
             const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
             if (foulPlayerSprite) {
-              const foulPlayerTeamId = foulPlayerSprite?.team_id;
-              const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-              
-              const foulPlayerData = {
-                playerId: foulPlayerId,
-                photo: foulPlayerSprite?.photo || null,
-                teamName: foulPlayerTeamName,
-                secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
-              };
-
               // Trigger foul effect
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
 
-              // Show announcement with player data (matches AND-1 pattern)
-              showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
+              const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
             } else {
               // Fallback if sprite not found (matches AND-1 pattern)
               const { triggerFoulEffect } = await import('./negativeActionEffects.js');
               triggerFoulEffect(scene, foulPlayerId);
-              showAnnouncement("Shooting Foul!", 'neutral', null);
+              const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
             }
           } else {
             // Fallback if foulPlayerId not found (matches AND-1 pattern)
-            showAnnouncement("Shooting Foul!", 'neutral', null);
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
           }
         }
         

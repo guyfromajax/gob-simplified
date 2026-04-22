@@ -888,8 +888,8 @@ export function createGameScene(Phaser) {
         if (em >= 80) emoji = '😎';        // Sunglasses
         else if (em >= 60) emoji = '😊';   // Big smile
         else if (em >= 40) emoji = '😐';   // Straight face
-        else if (em >= 20) emoji = '🙁';   // Frown
-        else emoji = '🤢';                  // Sick green face
+        else if (em >= 20) emoji = '😕';   // Slight frown
+        else emoji = '😡';                  // Angry face
         
         // Update tooltip content
         energyEl.textContent = `${ngPercent}%`;
@@ -2019,6 +2019,8 @@ export function createGameScene(Phaser) {
           mode: mode,
           tournamentId: this.tournamentId,
           franchiseId: this.franchiseId,
+          teamId: this.teamId,
+          userTeamSide: this.userTeamSide,
           finalScore: finalScore
         });
         
@@ -3371,6 +3373,7 @@ export function createGameScene(Phaser) {
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             teamId: this.teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
+            userTeamSide: this.userTeamSide,
             finalScore: finalScore
           });
           
