@@ -222,6 +222,31 @@
     </div>
   </div>
 
+  <div id="save-confirm-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-panel save-confirm-panel">
+      <div class="save-confirm-header">
+        <div class="save-confirm-accent"></div>
+        <div class="save-confirm-title-block">
+          <div class="save-confirm-title">Playbooks Saved</div>
+          <div class="save-confirm-subtitle">Here's how your offense distributes shots by position</div>
+        </div>
+      </div>
+
+      <div id="save-confirm-weights" class="psw-root">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="save-confirm-note">
+        These values reflect your Playbook percentages and Playcall Center assignments.
+        They update each time you save.
+      </div>
+
+      <div class="modal-actions save-confirm-actions">
+        <button id="save-confirm-done-btn" class="playbooks-save-btn" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/common.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
   <script src="/js/config/api-config.js"></script>

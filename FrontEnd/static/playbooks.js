@@ -134,6 +134,57 @@
     return `/playbook-report.html?${params.toString()}`;
   }
 
+  function renderShotWeights(container, shotWeights) {
+    if (!container) return;
+    if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
+      container.innerHTML = '<p class="psw-unavailable">Shot weight data unavailable.</p>';
+      return;
+    }
+
+    const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+    function getPswColor(pct) {
+      if (pct > 40) return '#27408E';
+      if (pct >= 31) return '#4A90D9';
+      if (pct >= 21) return '#34EC27';
+      if (pct >= 11) return '#FFD700';
+      return '#ff6d6d';
+    }
+
+    function renderGroup(label, data) {
+      if (!data) return '';
+      const values = POSITIONS.map((pos) => ({ pos, pct: data[pos] ?? 0 }));
+      const maxPct = Math.max(...values.map((value) => value.pct));
+
+      const pills = values.map(({ pos, pct }) => {
+        const color = getPswColor(pct);
+        const isDominant = pct === maxPct;
+        const border = isDominant
+          ? `border: 3px solid ${color}; box-shadow: 0 0 8px ${color}59;`
+          : `border: 2px solid ${color};`;
+        const valColor = isDominant ? color : '#ffffff';
+        return `
+          <div class="psw-pill" data-pos="${pos}" style="${border}">
+            <div class="psw-pill-pos">${pos}</div>
+            <div class="psw-pill-val" style="color: ${valColor};">${pct}%</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="psw-group">
+          <div class="psw-group-label">${label}</div>
+          <div class="psw-strip">${pills}</div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      ${renderGroup('PLAYBOOKS', shotWeights.playbooks)}
+      ${renderGroup('PLAYCALL CENTER', shotWeights.playcall_center)}
+    `;
+  }
+
   class ConfirmModal {
     constructor() {
       this.root = document.getElementById("confirm-modal");
@@ -180,6 +231,37 @@
     }
   }
 
+  class SaveConfirmModal {
+    constructor() {
+      this.root = document.getElementById('save-confirm-modal');
+      this.doneBtn = document.getElementById('save-confirm-done-btn');
+      this.weightsRoot = document.getElementById('save-confirm-weights');
+    }
+
+    open(shotWeights) {
+      if (this.weightsRoot) {
+        renderShotWeights(this.weightsRoot, shotWeights);
+      }
+      this.root.classList.remove('hidden');
+      this.root.setAttribute('aria-hidden', 'false');
+
+      return new Promise((resolve) => {
+        const onDone = () => {
+          this.close();
+          this.doneBtn.removeEventListener('click', onDone);
+          resolve();
+        };
+
+        this.doneBtn.addEventListener('click', onDone, { once: true });
+      });
+    }
+
+    close() {
+      this.root.classList.add('hidden');
+      this.root.setAttribute('aria-hidden', 'true');
+    }
+  }
+
   class PlaybooksPage {
     constructor() {
       this.params = new URLSearchParams(window.location.search);
@@ -212,6 +294,7 @@
       this.toastHideTimer = null;
       this.dragContext = null;
       this.modal = new ConfirmModal();
+      this.saveConfirmModal = new SaveConfirmModal();
       this.draftStorageKey = this.buildDraftStorageKey();
       this.draftRestoreFlagKey = this.buildDraftRestoreFlagKey();
 
@@ -1021,7 +1104,13 @@
           throw new Error(`Save failed (${response.status})`);
         }
 
-        this.showToast("Playbooks Saved", "Changes applied successfully");
+        const responseData = await response.json();
+        const shotWeights = responseData.position_shot_weights || null;
+
+        const weightsContainer = document.getElementById('save-confirm-weights');
+        if (weightsContainer) renderShotWeights(weightsContainer, shotWeights);
+
+        await this.saveConfirmModal.open(shotWeights);
         this.state.playbookMeta.user_saved = true;
         this.clearDraftState();
         if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {

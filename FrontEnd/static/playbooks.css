@@ -916,6 +916,146 @@ input[type="reset"] {
   margin-top: 22px;
 }
 
+/* Save Confirm Modal */
+.save-confirm-panel {
+  max-width: 480px;
+}
+
+.save-confirm-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.save-confirm-accent {
+  width: 3px;
+  min-height: 36px;
+  background: #34EC27;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.save-confirm-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  color: #ffffff;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.save-confirm-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+}
+
+/* Position Shot Weights */
+.psw-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.psw-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.psw-group-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.psw-strip {
+  display: flex;
+  gap: 6px;
+}
+
+.psw-pill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  text-align: center;
+}
+
+.psw-pill-pos {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.psw-pill-val {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.psw-root[data-compact="true"] .psw-strip {
+  gap: 4px;
+}
+
+.psw-root[data-compact="true"] .psw-pill {
+  padding: 6px 4px;
+  border-radius: 7px;
+  min-width: 0;
+}
+
+.psw-root[data-compact="true"] .psw-pill-pos {
+  font-size: 12px;
+}
+
+.psw-root[data-compact="true"] .psw-pill-val {
+  font-size: 13px;
+}
+
+.psw-root[data-compact="true"] .psw-group {
+  gap: 4px;
+}
+
+.psw-root[data-compact="true"] {
+  gap: 10px;
+}
+
+.save-confirm-note {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255,255,255,0.28);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.save-confirm-actions {
+  justify-content: flex-end;
+}
+
+.save-confirm-actions .playbooks-save-btn {
+  width: auto;
+  min-width: 132px;
+}
+
+.psw-unavailable {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+  padding: 16px 0;
+}
+
 @media (max-width: 1280px) {
   .playbooks-layout {
     grid-template-columns: 1fr;
