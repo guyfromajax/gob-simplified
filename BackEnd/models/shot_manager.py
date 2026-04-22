@@ -61,6 +61,20 @@ RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| 
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
 
 
+def _hco_zone_shot_threshold_delta(defense_playcall, shot_type):
+    """
+    Zone-specific shot threshold adjustment for half-court / Final Turn only (Shot_System.md).
+    Higher threshold => harder to convert (shot_score must clear a higher bar).
+    """
+    if shot_type not in ("inside", "attack", "outside"):
+        return 0
+    if defense_playcall == "2-3 Zone":
+        return {"inside": 25, "attack": 10, "outside": -25}[shot_type]
+    if defense_playcall == "3-2 Zone":
+        return {"inside": -30, "attack": -30, "outside": 50}[shot_type]
+    return 0
+
+
 def _shooter_xy_from_roles(roles, shooter):
     shot_spot = roles.get("shot_spot")
     if isinstance(shot_spot, dict) and shot_spot.get("x") is not None and shot_spot.get("y") is not None:
@@ -578,6 +592,12 @@ class ShotManager:
         # Shot-at-1 (shot clock would hit 0, chose shot attempt at 1s): add 100 to threshold (Real_Time_Clock_System.md)
         if game_state.pop("shot_at_one_second", False):
             shot_threshold += 100
+
+        # Zone defense: shot-type threshold deltas (HCO + Final Turn only; Shot_System.md)
+        if not is_fast_break and game_state.get("offensive_state") == "HCO":
+            _zdelta = _hco_zone_shot_threshold_delta(defense_call, shot_type)
+            if _zdelta:
+                shot_threshold += _zdelta
 
         sx, sy = _shooter_xy_from_roles(roles, shooter)
         bx, by = _attacking_basket_xy(off_team, self.game)
