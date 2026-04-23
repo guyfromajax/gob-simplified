@@ -130,6 +130,37 @@ function resetPlayerMaximizerResolvedState() {
   resetCustomFocusCommitted();
 }
 
+/** Distant-training overlay: rotate user-team highlight lines */
+const TRAINING_DISTANT_HIGHLIGHT_MS = 3000;
+const TRAINING_HIGHLIGHT_FALLBACK = 'Finishing league training…';
+
+function shuffleArrayInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+  return arr;
+}
+
+/**
+ * Non-empty array of strings for the highlight stream (randomized). Uses fallback if API sent none.
+ * @param {unknown} trainingHighlights
+ * @returns {string[]}
+ */
+function buildRandomizedTrainingHighlightLines(trainingHighlights) {
+  const out = [];
+  if (Array.isArray(trainingHighlights)) {
+    trainingHighlights.forEach(function (h) {
+      if (typeof h === 'string' && h.trim()) out.push(h.trim());
+    });
+  }
+  if (out.length === 0) return [TRAINING_HIGHLIGHT_FALLBACK];
+  shuffleArrayInPlace(out);
+  return out;
+}
+
 async function fetchFranchiseCommandCenterData(franchiseId) {
   const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
     headers: API_CONFIG.getAuthHeaders()
@@ -1025,35 +1056,51 @@ submitBtn.addEventListener('click', async function() {
         if (userResult && userResult.detail) detail = userResult.detail;
         throw new Error(detail);
       } else {
-        const highlights = (userResult && userResult.training_highlights) || [];
+        const lines = buildRandomizedTrainingHighlightLines(
+          userResult && userResult.training_highlights
+        );
         const overlayTeamName = currentTeamName || 'Your team';
-        const hlText = Array.isArray(highlights) && highlights.length
-          ? highlights.slice(0, 4).join(' · ')
-          : '';
-        if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-          window.PageLoadOverlay.show({
-            variant: 'pulse',
-            title: overlayTeamName,
-            subtitle: hlText || 'Finishing league training…',
-            teamName: currentTeamName || '',
-            assetKey: 'banner_primary'
-          });
-        }
-        const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
-        const distantRes = await fetch(distantUrl, {
-          method: 'POST',
-          headers: jsonHeaders,
-          body: JSON.stringify({ franchise_id: franchiseId })
-        });
+        let highlightStreamId = null;
+        let currentIndex = 0;
         try {
-          result = await distantRes.json();
-        } catch (_e) {
-          result = null;
-        }
-        if (!distantRes.ok) {
-          let detail = `HTTP error! status: ${distantRes.status}`;
-          if (result && result.detail) detail = result.detail;
-          throw new Error(detail);
+          if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+            window.PageLoadOverlay.show({
+              variant: 'pulse',
+              title: overlayTeamName,
+              subtitle: lines[currentIndex],
+              teamName: currentTeamName || '',
+              assetKey: 'banner_primary'
+            });
+          }
+          highlightStreamId = window.setInterval(function () {
+            if (currentIndex < lines.length - 1) {
+              currentIndex += 1;
+              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
+                window.PageLoadOverlay.updatePulseSubtitle(lines[currentIndex]);
+              }
+            }
+          }, TRAINING_DISTANT_HIGHLIGHT_MS);
+
+          const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
+          const distantRes = await fetch(distantUrl, {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({ franchise_id: franchiseId })
+          });
+          try {
+            result = await distantRes.json();
+          } catch (_e) {
+            result = null;
+          }
+          if (!distantRes.ok) {
+            let detail = `HTTP error! status: ${distantRes.status}`;
+            if (result && result.detail) detail = result.detail;
+            throw new Error(detail);
+          }
+        } finally {
+          if (highlightStreamId !== null) {
+            window.clearInterval(highlightStreamId);
+          }
         }
       }
     } else {

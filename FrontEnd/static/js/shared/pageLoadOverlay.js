@@ -189,6 +189,19 @@
     pulse.style.display = 'block';
   }
 
+  /**
+   * Update pulse subtitle only (e.g. rotating training highlights) without re-running full show().
+   */
+  function updatePulseSubtitle(subtitleText) {
+    if (typeof document === 'undefined') return;
+    var overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    var pulse = overlay.querySelector('.page-load-overlay-pulse');
+    if (!pulse || pulse.style.display === 'none') return;
+    var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
+    if (pulseSubtitle) pulseSubtitle.textContent = subtitleText || '';
+  }
+
   function getOrCreateOverlay() {
     var existing = document.getElementById(OVERLAY_ID);
     if (existing) return ensureOverlayStructure(existing);
@@ -241,7 +254,7 @@
     }
   }
 
-  var api = { show: show, hide: hide };
+  var api = { show: show, hide: hide, updatePulseSubtitle: updatePulseSubtitle };
   global.PageLoadOverlay = api;
 
   if (typeof module !== 'undefined' && module.exports) {
