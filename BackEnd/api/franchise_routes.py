@@ -6917,6 +6917,8 @@ def run_franchise_training_distant_cpu(
 
 def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = "full"):
     """Inner implementation so run_franchise_training can be profiled with ?profile=1."""
+    import time
+
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:
