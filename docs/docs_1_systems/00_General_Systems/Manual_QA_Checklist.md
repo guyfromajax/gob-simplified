@@ -1,6 +1,9 @@
-# Final End-to-End Testing Checklist
+# Manual QA Checklist
 
-**Purpose:** Manual testing to verify full functionality before alpha launch  
+**Former title:** Final End-to-End Testing Checklist  
+**Location:** `docs/docs_1_systems/00_General_Systems/Manual_QA_Checklist.md` (moved from `docs/To Do/`).
+
+**Purpose:** Manual testing to verify full functionality before a release or major deploy  
 **Approach:** Play through the full game flow in each mode to catch any issues  
 **Estimated Time:** 1-2 hours  
 

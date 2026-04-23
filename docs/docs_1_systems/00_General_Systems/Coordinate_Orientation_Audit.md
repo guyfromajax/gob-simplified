@@ -1,5 +1,7 @@
 # Coordinate Orientation Audit
 
+**Location:** `docs/docs_1_systems/00_General_Systems/Coordinate_Orientation_Audit.md` (moved from `docs/To Do/`). Relative links below resolve to repo-root `BackEnd/`.
+
 ## Purpose
 
 Document how backend runtime coordinates are being set relative to frontend animation coordinates, and identify where the codebase is mixing:
@@ -20,8 +22,8 @@ The codebase clearly wants this rule:
 
 Relevant flip helper:
 
-- [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): `get_away_player_coords()` at lines 2086-2100
-- [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): `getAwayTeamCoords()` at lines 2102-2110
+- [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): `get_away_player_coords()` at lines 2086-2100
+- [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): `getAwayTeamCoords()` at lines 2102-2110
 
 ## Main Finding
 
@@ -46,7 +48,7 @@ That creates:
 
 `apply_coords_from_animations_list()` takes the final animation row and writes it straight into `player.coords` with no normalization:
 
-- [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): lines 2265-2290
+- [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): lines 2265-2290
 
 This is the most important write in the system, because animation rows are frequently built in away/display orientation when away is on offense.
 
@@ -61,8 +63,8 @@ HCO currently does this:
 
 Relevant code:
 
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 4806-4880
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): `set_shooter_coords_from_skeleton_last_step()` lines 3629-3663
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 4806-4880
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): `set_shooter_coords_from_skeleton_last_step()` lines 3629-3663
 
 Implication:
 
@@ -77,7 +79,7 @@ If the animation-final defender coords were persisted in away/display orientatio
 
 In `Animator.skeleton_to_animations()`, location-based coords are flipped for away offense:
 
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 1271-1278
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 1271-1278
 
 This means offensive animation movement rows are intentionally stored in away/display orientation when away is on offense.
 
@@ -91,9 +93,9 @@ Zone defensive placement explicitly says:
 
 Relevant code:
 
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 1723-1733
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 1821-1829
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 1853-1861
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 1723-1733
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 1821-1829
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 1853-1861
 
 This is internally coherent for animation, but it becomes dangerous once those animation finals are later written into canonical runtime state.
 
@@ -107,7 +109,7 @@ This is internally coherent for animation, but it becomes dangerous once those a
 
 Relevant code:
 
-- [BackEnd/utils/shared_defense.py](../../BackEnd/utils/shared_defense.py): lines 1521-1622
+- [BackEnd/utils/shared_defense.py](../../../BackEnd/utils/shared_defense.py): lines 1521-1622
 
 This is a valid contract for a wrapper, but it only works if callers know what orientation their input coords are in.
 
@@ -117,11 +119,11 @@ Right now the codebase often does not.
 
 Fast break logic contains explicit HOME-orientation assumptions:
 
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 1395-1432
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 1395-1432
 
 But the same fast-break path falls back to `player.coords` if release/get-back coords are unavailable:
 
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 1218-1236
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 1218-1236
 
 That is a concrete bug risk:
 
@@ -131,7 +133,7 @@ That is a concrete bug risk:
 
 Fast-break animation code is also mixed:
 
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 93-128
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 93-128
 
 That function says outlet start is "guaranteed HOME orientation", but coordinate flipping there was commented out. So FB depends heavily on upstream writers being correct and consistent.
 
@@ -141,33 +143,33 @@ That function says outlet start is "guaranteed HOME orientation", but coordinate
 
 These appear to write explicit gameplay positions rather than FE-facing animation positions.
 
-- [BackEnd/models/shot_manager.py](../../BackEnd/models/shot_manager.py): lines 1218-1265, 1348-1388, 1668-1708
+- [BackEnd/models/shot_manager.py](../../../BackEnd/models/shot_manager.py): lines 1218-1265, 1348-1388, 1668-1708
   - get-back, release, rebounder staging coords
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 1688-1700
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 1688-1700
   - fast-break shot spot written to shooter
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 2087-2091, 5686-5690, 6890-6894
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 2087-2091, 5686-5690, 6890-6894
   - stealer coords written from stored or extracted locations
-- [BackEnd/utils/quarter_start.py](../../BackEnd/utils/quarter_start.py): lines 136, 152
+- [BackEnd/utils/quarter_start.py](../../../BackEnd/utils/quarter_start.py): lines 136, 152
   - quarter-start destinations
 
 These still need orientation review, but they are not the main leak.
 
 ### Category B: Writers that are clearly dangerous
 
-- [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): lines 2265-2290
+- [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): lines 2265-2290
   - syncs animation finals directly into `player.coords`
-- [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): lines 2293-2350
+- [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): lines 2293-2350
   - `sync_lineup_coords_from_turn()` also persists animation finals and overlay coords directly into `player.coords`
 
 These are the most likely places where display-oriented coords are contaminating backend runtime state.
 
 ### Category C: Ambiguous / mixed-orientation writers
 
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 1230-1282
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 1230-1282
   - offensive animation coords built from HOME spots then flipped for away offense
-- [BackEnd/models/animator.py](../../BackEnd/models/animator.py): lines 1718-1861
+- [BackEnd/models/animator.py](../../../BackEnd/models/animator.py): lines 1718-1861
   - zone defender animation built from orientation-aware logic and then flipped again for away offense
-- [BackEnd/engine/rim_runner_fast_break.py](../../BackEnd/engine/rim_runner_fast_break.py): lines 263-266, 409, 950-952, 1140-1142, 1193-1195, 1323-1325
+- [BackEnd/engine/rim_runner_fast_break.py](../../../BackEnd/engine/rim_runner_fast_break.py): lines 263-266, 409, 950-952, 1140-1142, 1193-1195, 1323-1325
   - fast-break writers that may be fine if their source payload is canonical, but need contract review
 
 ## Specific Answer To "Skipped Flip Or Double Flip?"
@@ -281,9 +283,9 @@ Those are downstream concerns.
 These two functions should be treated as the primary entry points where display-oriented coords leak into backend runtime state:
 
 1. `apply_coords_from_animations_list()`
-   - [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): lines 2265-2290
+   - [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): lines 2265-2290
 2. `sync_lineup_coords_from_turn()`
-   - [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py): lines 2293-2350
+   - [BackEnd/utils/shared.py](../../../BackEnd/utils/shared.py): lines 2293-2350
 
 **Required change conceptually:**
 
@@ -314,7 +316,7 @@ Every handoff must choose one of these intentionally.
 
 After runtime coords are normalized, re-check HCO shot resolution:
 
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 4876-4879
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 4876-4879
 
 Current sequence:
 
@@ -336,11 +338,11 @@ Fast break is the next highest-risk branch because it explicitly assumes HOME or
 
 Key fallback:
 
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 1232-1236
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 1232-1236
 
 Key assumption:
 
-- [BackEnd/engine/phase_resolution.py](../../BackEnd/engine/phase_resolution.py): lines 1395-1432
+- [BackEnd/engine/phase_resolution.py](../../../BackEnd/engine/phase_resolution.py): lines 1395-1432
 
 After Phase 2:
 

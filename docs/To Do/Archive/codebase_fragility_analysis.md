@@ -213,10 +213,10 @@ This creates a **combinatorial explosion of edge cases** where formats/structure
 
 ## Related Documents
 
-- `team_id_resolution_system.md` - Details on team ID resolution duplication
-- `SS&S_Assessments/` - SS&S compliance assessments for various systems
-- `bugs.md` - Current bugs (many caused by fragility issues)
-- `Unified_State_Persistence_Work_Plan.md` - Previous SS&S work plan
+- Team ID / resolver utilities under `BackEnd/utils/` (grep `resolve_team` / `team_id`) — avoid adding parallel resolution paths
+- `docs/docs_1_systems/03_Data_Persistence/Unified_State_Persistence_Work_Plan.md` — SS&S persistence work plan
+- `docs/To Do/bugs.md` — current bugs (many caused by fragility issues)
+- `docs/docs_1_systems/` — subsystem source-of-truth docs
 
 ---
 

@@ -1,6 +1,6 @@
 /**
  * AG → movement speed (px/s) for player tweens. Pure helpers + agility lookup.
- * See docs/To Do/AG_Implementation.md.
+ * See docs/docs_1_systems/05_Animation_System/AG_Implementation.md.
  */
 
 /** Linear intercept: speed at AG 0 before global game-speed scale */

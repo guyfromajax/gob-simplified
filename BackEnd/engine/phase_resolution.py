@@ -4269,7 +4269,7 @@ def resolve_half_court_offense_logic(game):
         final_skeleton = copy.deepcopy(final_skeleton)
     
     # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Real_Time_Clock_System.md).
-    # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (docs/To Do/_motion_play_decision.md).
+    # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (Real_Time_Clock_System.md — Second Chance System).
     if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
         steps = final_skeleton["steps"]
         if steps:

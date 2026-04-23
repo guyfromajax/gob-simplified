@@ -1,5 +1,7 @@
 # Fast Break playcall at shot attempt — implementation plan
 
+> **April 2026:** DREB play key + `pending_dreb_fb_play_key` and FB eligibility decoupled from the Covert release list are **implemented** (`shot_manager.py`, `phase_resolution.py`, `fast_break_play_types.py`). **`Fast_Break_System.md` is authoritative** for current sim behavior. This doc remains for Rim Runner / frontend checklist items, review gates, and historical step-by-step context; the opening “Related code today” table still reflects the **pre-change** mental model in places.
+
 This document describes how to resolve **which DREB fast-break play** (Covert Release vs Rim Runner vs future `triangle`) **on the shot attempt** (same step as today’s release/get-back geometry), **gate Covert-only release behavior** on that playcall, **decouple fast-break eligibility** from “someone released,” and how **`resolve_fast_break_logic`** should consume a **precomputed** key without rolling twice.
 
 **Related code today**

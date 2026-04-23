@@ -312,5 +312,5 @@ When a **Motion** HCO turn would hit shot clock 0, the offense gets one chance t
 
 **Recalibration:** Pick a random step index in **[2, violation_step − 1]**. Resolve the motion shot from that step (same shot-type and execution logic as normal motion). Replace the turn’s skeleton with that shot sequence; game and shot clock elapse to the new shot. No new shot execution code—existing `resolve_motion_offense_shot` is called with a forced step index.
 
-**Location:** `BackEnd/engine/phase_resolution.py` — shot clock block in `resolve_half_court_offense_logic`, and downstream motion shot block when `_motion_shot_recalibrated` is set. See `docs/To Do/_motion_play_decision.md` for the original spec.
+**Location:** `BackEnd/engine/phase_resolution.py` — shot clock block in `resolve_half_court_offense_logic`, and downstream motion shot block when `_motion_shot_recalibrated` is set.
 

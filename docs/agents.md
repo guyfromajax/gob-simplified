@@ -108,3 +108,48 @@ Assigns `ballSprite` position to the player with `hasBallAtStep[stepIndex] === t
 
 ---
 
+## Repo-wide engineering playbook (additions)
+
+Cross-cutting rules for safe feature work. **Subsystem behavior** remains documented under `docs/docs_1_systems/`. Keep using the SS&S lens from the top of this file.
+
+### Canonical sources of truth (examples)
+
+- Franchise national rank: prefer **`natl_rank`** where the product means national standing; **`rank`** should only appear as an explicitly documented response alias.
+- Game documents: canonical **`team_id`** strings and documented shapes (see `docs/docs_1_systems/00_Data_Systems/`). Franchise masters may use ObjectId linkage—do not mix identifier styles without a shared resolver.
+- Prefer **one owner field per concept** and extend the **API contract** instead of letting each page infer a different shape.
+
+### UI feature change rules
+
+- Canonical data should come from the **backend** where possible, not be re-derived differently on each page.
+- **Filter, then rank/sort, then limit** when showing a scoped “top N.”
+- Say whether a **rank** is absolute (e.g. national) or within-scope—and keep that consistent across tabs.
+
+### Pre-merge checklist (micro-features)
+
+1. Which **system** owns the source of truth for this field?
+2. What **existing behavior** must stay unchanged?
+3. **Frontend-only** change, or **backend / contract** update too?
+4. Which **adjacent views** (FCC, stats, roster, box score) need re-verification?
+
+### Stats / rankings surfaces
+
+- Use **`natl_rank`** for national position where that is the promise.
+- Conference/Region: confirm copy matches **absolute vs within-scope** rank behavior.
+- National “Top 25” style filters: apply only where intended (e.g. team tables vs leader cards).
+- **Leaders:** top *k* after scope filter, not before.
+
+### FCC navigation
+
+- Keep **tab state** URL-addressable where the product expects bookmarks/sharing.
+- **`return_url`** is the return contract for FCC-launched flows; other entry points should use documented hub fallbacks.
+
+### Further reading
+
+- **Fragility patterns** (Jan 2025 examples; use as pattern guide, not a live bug list): `docs/To Do/Archive/codebase_fragility_analysis.md`
+- **FrontEnd page / modal map:** `docs/docs_1_systems/00_General_Systems/Active_Page_Analysis.md`
+- **HOME vs display coords / `player.coords`:** `docs/docs_1_systems/00_General_Systems/Coordinate_Orientation_Audit.md`
+- **AG → movement speed:** `docs/docs_1_systems/05_Animation_System/AG_Implementation.md`
+- **Manual QA before releases:** `docs/docs_1_systems/00_General_Systems/Manual_QA_Checklist.md`
+
+---
+

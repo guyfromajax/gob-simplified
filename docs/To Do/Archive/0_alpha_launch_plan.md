@@ -450,7 +450,7 @@ Prevent user data leakage via broken authorization, misconfigured DB access, and
 
 ## Step 10 — End-to-End "No Surprises" Testing (Go/No-Go)
 
-> **Note:** See `Final_Testing_Checklist.md` for detailed test scenarios.
+> **Note:** See `docs/docs_1_systems/00_General_Systems/Manual_QA_Checklist.md` for detailed test scenarios.
 
 ### 10.1 Full Flow Tests
 - [ ] Signup → login → play game → save → reload → continue
@@ -567,7 +567,7 @@ Prevent user data leakage via broken authorization, misconfigured DB access, and
 9. **Admin-Only Pages:** play-builder, HCT skeleton builder, and FCP skeleton builder are restricted to admin users. Applied in **production only**; staging/develop remain open for testing.
 
 ### Testing Reference
-- See `Final_Testing_Checklist.md` for detailed test scenarios (Step 10 references this)
+- See `docs/docs_1_systems/00_General_Systems/Manual_QA_Checklist.md` for detailed test scenarios (Step 10 references this)
 
 ### OTP Implementation Reference
 - See `OTP_Implementation_Guide.md` for detailed implementation guide for one-time passwords

@@ -2833,7 +2833,7 @@ The animation system uses a **universal speed management** model: player tween t
 
 **See also**
 
-- `docs/To Do/AG_Implementation.md` — AG ↔ movement mapping
+- `docs/docs_1_systems/05_Animation_System/AG_Implementation.md` — AG ↔ movement mapping
 - `docs/PHASE_2.5_BUG_LIST.md` — Bug 3 fix context
 - `docs/To Do/animation_speed_edge_cases.md` — remaining edge cases
 

@@ -491,7 +491,7 @@ This plan prioritizes getting the application live and functional. Frontend desi
    - Verify Bug #9 fix (Play Quarter quarter breaks)
    - Verify data persistence (Game Plan, Playbooks, Stats)
    - Verify performance is acceptable
-   - **Testing Guide:** See `docs/To Do/Final_Testing_Checklist.md` for detailed checklist
+   - **Testing Guide:** See `docs/docs_1_systems/00_General_Systems/Manual_QA_Checklist.md` for detailed checklist
 
 2. Basic monitoring
    - Check Railway logs for errors
