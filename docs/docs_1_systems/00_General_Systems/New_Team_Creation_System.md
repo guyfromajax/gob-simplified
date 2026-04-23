@@ -4,7 +4,7 @@
 **Creating New Teams**  
 - Jamie provides the following:
     - name, team_id, primary_color, secondary_color
-(See Expansion_Analysis and Database_System for team doc fields: name, team_id, primary_color, secondary_color, player_ids, optional mascot.)
+(See `docs/docs_1_systems/00_Data_Systems/Database_System.md` for team doc fields: name, team_id, primary_color, secondary_color, player_ids, optional mascot.)
 
 **Creating New Players**
 - Jamie provides the following:

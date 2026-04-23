@@ -119,7 +119,7 @@ Alternatively: compute play key **once** at start of miss handling and store on 
 
 ### Phase H — Docs and temporary flags
 
-1. Update **`Fast_Break_System.md`** and **`FB_Update_Brief.md`** when implementation lands.  
+1. Update **`Fast_Break_System.md`** when implementation lands (remove temp flags and align scouting/UI notes there).  
 2. Remove **TEMP** “100% Rim Runner” in `fast_break_play_types.py` when product restores mix (or gate behind settings).
 
 ---

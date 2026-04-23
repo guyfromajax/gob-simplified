@@ -15,7 +15,7 @@ This document should reflect the current franchise training implementation in co
    - `GET /franchise/training-points` - Get available training points (30 for training camp, 24 for regular training)
    - `POST /franchise/run-training` - Submit training
    - `GET /franchise/training-report` - Get training report data
-7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder
+7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
 8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
 9. **Pre-Training Decay**: Plays/defenses with effectiveness > 0 reduced by `random.randint(5, 15)`
 

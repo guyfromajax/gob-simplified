@@ -1,6 +1,6 @@
 ## Fast Break System ✅ **COMPLETE** (January 2025; Rim Runner March 2025; FB shot contest grid unification March 2026)
 
-> **Canonical reference (Bible):** This document is the **single source of truth** for sustained Fast Break knowledge—selection logic, coordinates, defensive stops, shot attempts, constants, and file touchpoints. Short-term project notes may live in `docs/To Do/FB_Update_Brief.md`; if something conflicts, **treat this file as authoritative** unless the team explicitly updates both.
+> **Canonical reference (Bible):** This document is the **single source of truth** for sustained Fast Break knowledge—selection logic, coordinates, defensive stops, shot attempts, constants, and file touchpoints. In-flight implementation checklists may live in `docs/To Do/FB_Playcall_Update.md`; SS&S process notes for FB shot routing live in `docs/To Do/Archive/fast_break_shot_spot_process_review.md`. If something conflicts, **treat this file as authoritative** unless the team explicitly updates both.
 
 **Base Constants**
 

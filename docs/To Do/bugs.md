@@ -1,6 +1,10 @@
-
+1, Computer timeout pop up timing when an announcment pop up precedes it.
 2. 3 pointer on P/T Break does not register as a 3
-
+3. Geo bug on Fast Break shots
+4. wire game plan tab/screen and lineup screen with %s by position for playbooks
+5. Cap player movement on Fast Break animations
+6. Don't animate rebound / BIP on Final Shot FT
+7. Wire slow it down and quick shot with tempo
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
 20. We need to clean up user Timeout implementation cadence
@@ -8,16 +12,14 @@
 36. Season & Career Stats for Players for special stats
 37. Player Foul Out Next Step bug
 38. Block on Hold for Final Shot snaps to the wrong end of the court.
-39. Missed bonsu FT, shot one, rebound is not attaching to the rebounder
+
 40. Batted ball out of bounds is not animating or executing properly
 41. OTB fouls causing clock not to run on the turn?
-42. OREB Putback Make + foul -- skip the BIP turn setup
-43. Shooting foul +1 on made OREB Putbacks going to BIP then FT
-
-
 44. Customize computer teams more strategically
 
-
+To Do
+5. Improve FCC API
+6. Leaderboard context explanation
 
 
 ## Future Cleanup (Non-Critical Warnings)
@@ -45,7 +47,7 @@
 
 ### Missing Team Background Images (404s)
 - **Issue**: 404 errors for team background images (e.g., `south_lancaster-background.png`, `little_york-background.png`)
-- **Location**: `FrontEnd/static/images/teams/{team_slug}/` ({team_slug}_background.png per image_naming_update.md)
+- **Location**: `FrontEnd/static/images/teams/{team_slug}/` (`{team_slug}_background.png`; see `docs/docs_1_systems/00_General_Systems/Team_Images_System.md` and `FrontEnd/static/common.js` asset helpers)
 - **Impact**: Low - missing assets, doesn't affect functionality
 - **Action**: Add missing team background images or update references
 - **Priority**: Low (cosmetic only)

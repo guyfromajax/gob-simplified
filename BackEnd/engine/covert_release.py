@@ -1,7 +1,7 @@
 """
 Covert Release — DREB → outlet fast break selection and coordinates.
 
-See docs/To Do/FB_Update_Brief.md. Steal-initiated fast breaks do not use this module.
+See docs/docs_1_systems/05_GP_Supporting_Systems/Fast_Break_System.md. Steal-initiated fast breaks do not use this module.
 Coordinates are in HOME orientation (x 0–100); x is mirrored when the future FB offense team is away.
 """
 
