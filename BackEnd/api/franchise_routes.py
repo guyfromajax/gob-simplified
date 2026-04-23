@@ -11,6 +11,7 @@ import random
 import re
 import uuid
 from copy import deepcopy
+from types import SimpleNamespace
 from typing import Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
@@ -1565,6 +1566,11 @@ class CompleteWeekRequest(BaseModel):
     game_document: dict | None = None  # Optional: complete game document from simulate-quarter (eliminates race condition)
 
 
+class CompleteWeekPhaseBRequest(BaseModel):
+    franchise_id: str
+    week: int
+
+
 class SaveRecruitingOrdersRequest(BaseModel):
     franchise_id: str
     recruit_ids: list[str] | None = None
@@ -2351,82 +2357,91 @@ def save_result(req: FranchiseResultRequest):
     return {"status": "success"}
 
 
-@router.post("/franchise/complete-week")
-def complete_week(req: CompleteWeekRequest):
-    logger.warning(
-        "🧭 [COMPLETE-WEEK-ENTRY] franchise_id=%s week=%s game_id=%s has_game_document=%s",
-        req.franchise_id,
-        req.week,
-        req.game_id,
-        bool(req.game_document),
-    )
+def _phase_a_user_week_done(franchise_doc: dict, week: int) -> bool:
+    pg = franchise_doc.get("post_game_status") or {}
     try:
-        franchise_id = ObjectId(req.franchise_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid ID format")
+        return int(pg.get("phase_a_user_week") or 0) == int(week)
+    except (TypeError, ValueError):
+        return False
 
-    franchise_doc = db.franchises.find_one({"_id": franchise_id})
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
 
+def _week_result_matchup_key(row: dict) -> frozenset:
+    return frozenset({str(row.get("away_id")), str(row.get("home_id"))})
+
+
+def _merge_phase_a_user_row_into_week_results(
+    existing_week_results: list | None, user_row: dict
+) -> list:
+    existing = list(existing_week_results or [])
+    ukey = _week_result_matchup_key(user_row)
+    merged = [r for r in existing if _week_result_matchup_key(r) != ukey]
+    merged.append(dict(user_row))
+    return merged
+
+
+def _resolve_complete_week_week_games(franchise_doc: dict, req: CompleteWeekRequest):
     schedule = franchise_doc.get("schedule", [])
     eos_active = bool(
         franchise_doc.get("eos_tournament_active")
-        and (franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament"))
+        and (
+            franchise_doc.get("conference_tournaments")
+            or franchise_doc.get("region_tournaments")
+            or franchise_doc.get("national_tournament")
+        )
     )
     eos_current_round = None
     week_games_meta = None
-    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
-    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
-
-    def _award_gp_sim(winner_tid: Any, eos_g: dict | None, matchup_ids: tuple[Any, Any]) -> None:
-        eos_meta = eos_g if req.week in ft.EOS_WEEKS else None
-        maybe_award_franchise_win_geek_points(
-            owner_user_id=franchise_doc.get("user_id"),
-            user_team_id_str=user_team_id_str,
-            winner_team_id=winner_tid,
-            week=req.week,
-            eos_game_meta=eos_meta,
-        )
-        maybe_award_franchise_loss_geek_points(
-            owner_user_id=franchise_doc.get("user_id"),
-            user_team_id_str=user_team_id_str,
-            winner_team_id=winner_tid,
-            participant_team_ids=matchup_ids,
-        )
-        maybe_award_franchise_eos_title_championship(
-            owner_user_id=franchise_doc.get("user_id"),
-            user_team_id_str=user_team_id_str,
-            winner_team_id=winner_tid,
-            week=req.week,
-            eos_game_meta=eos_meta,
-        )
     if req.week in ft.EOS_WEEKS and eos_active:
         week_games_meta = ft.get_eos_week_games(franchise_doc, req.week)
         week_games = [(g["away_id"], g["home_id"]) for g in week_games_meta]
-        eos_current_round = req.week - 26 if req.week <= 29 else (req.week - 29 if req.week <= 31 else req.week - 31)
+        eos_current_round = (
+            req.week - 26
+            if req.week <= 29
+            else (req.week - 29 if req.week <= 31 else req.week - 31)
+        )
     elif req.week <= ScheduleManager.REGULAR_SEASON_WEEKS:
         if req.week < 1 or req.week > len(schedule):
             raise HTTPException(status_code=400, detail="Invalid week")
         week_games = schedule[req.week - 1]
     else:
         raise HTTPException(status_code=400, detail="Invalid week")
-    results = []
+    return week_games, week_games_meta, eos_current_round
 
+
+def _find_user_franchise_week_matchup_normalized_ids(
+    week_games: list, user_team_id_str: str | None
+) -> tuple[Any, Any]:
+    if not user_team_id_str:
+        raise HTTPException(status_code=400, detail="Franchise has no user team")
+    ut = str(user_team_id_str)
+    for away_id, home_id in week_games:
+        if str(away_id) == ut or str(home_id) == ut:
+            return _normalize_team_id(str(away_id)), _normalize_team_id(str(home_id))
+    raise HTTPException(status_code=400, detail="User team has no game this week")
+
+
+def _complete_week_process_user_game_block(
+    franchise_doc: dict,
+    req: CompleteWeekRequest,
+    franchise_id: ObjectId,
+    week_games_meta: list | None,
+    user_team_id_str: Any,
+    _u_name: str | None,
+) -> tuple[dict, dict]:
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
-
+    
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
     user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week, franchise_id=req.franchise_id, game_id=user_game_id)
-    results.append({
+    user_row = {
         "away_id": user_res["team1_id"],
         "home_id": user_res["team2_id"],
         "away_score": user_res["team1_score"],
         "home_score": user_res["team2_score"],
-    })
-
+    }
+    
     # ✅ EOS (weeks 27–34): save user's game result to the correct bracket (conference/region/national)
     if week_games_meta and user_game_id:
         found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
@@ -2453,7 +2468,7 @@ def complete_week(req: CompleteWeekRequest):
                     franchise_doc, g["round"], g["matchup_index"],
                     str(user_game_id), str(winner_id), score,
                 )
-
+    
     user_winner_id = team1_id if user.team1_score > user.team2_score else team2_id
     eos_matchup_for_user = None
     if req.week in ft.EOS_WEEKS and week_games_meta:
@@ -2480,7 +2495,7 @@ def complete_week(req: CompleteWeekRequest):
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
     )
-
+    
     # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
     # ✅ FIX: Use game_document from request if provided (eliminates race condition)
     # This matches Tournament mode pattern where game document is already available
@@ -2611,7 +2626,7 @@ def complete_week(req: CompleteWeekRequest):
             franchise_id=req.franchise_id,
         )
         logger.info(f"✅ [COMPLETE_WEEK] User game - finalize_game completed for game_id: {user_game_id_final}")
-
+    
         # Recompute team attribute changes every time complete_week runs.
         # This prevents stale team_attribute_changes from bypassing new EOG logic.
         logger.warning(
@@ -2738,6 +2753,46 @@ def complete_week(req: CompleteWeekRequest):
                 logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
+    
+    return user_res, user_row
+
+
+def _complete_week_finish_cpu_and_persist(
+    franchise_doc: dict,
+    franchise_id: ObjectId,
+    franchise_id_str: str,
+    week: int,
+    week_games: list,
+    week_games_meta: list | None,
+    eos_current_round: int | None,
+    user_team_id_str: Any,
+    user_eos_sim_scope: Any,
+    team1_id: Any,
+    team2_id: Any,
+    results: list,
+) -> dict:
+    def _award_gp_sim(winner_tid: Any, eos_g: dict | None, matchup_ids: tuple[Any, Any]) -> None:
+        eos_meta = eos_g if week in ft.EOS_WEEKS else None
+        maybe_award_franchise_win_geek_points(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            winner_team_id=winner_tid,
+            week=week,
+            eos_game_meta=eos_meta,
+        )
+        maybe_award_franchise_loss_geek_points(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            winner_team_id=winner_tid,
+            participant_team_ids=matchup_ids,
+        )
+        maybe_award_franchise_eos_title_championship(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            winner_team_id=winner_tid,
+            week=week,
+            eos_game_meta=eos_meta,
+        )
 
     # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
     ftd_docs = list(franchise_team_data_collection.find(
@@ -2754,13 +2809,13 @@ def complete_week(req: CompleteWeekRequest):
     ))
     team_id_to_conference = {str(d["_id"]): d.get("conference") for d in team_conference_docs}
     user_conference = team_id_to_conference.get(str(user_team_id_str)) if user_team_id_str else None
-
+    
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
             continue
         existing = db.games.find_one({
-            "week": req.week,
-            "franchise_id": str(req.franchise_id),
+            "week": week,
+            "franchise_id": str(franchise_id_str),
             "$or": [
                 {"team1_id": away_id, "team2_id": home_id},
                 {"team1_id": home_id, "team2_id": away_id},
@@ -2774,10 +2829,10 @@ def complete_week(req: CompleteWeekRequest):
                 "home_score": existing["team2_score"],
             })
             continue
-
+    
         if week_games_meta and idx < len(week_games_meta):
             g = week_games_meta[idx]
-            if not _should_use_tbt_for_eos_game(req.week, g, user_eos_sim_scope):
+            if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
                 home_ftd = ftd_by_team_id.get(str(home_id), {})
                 away_ftd = ftd_by_team_id.get(str(away_id), {})
                 home_combined = (home_ftd.get("prestige") or 0) + int(0.1 * (home_ftd.get("total_player_attrs") or 0)) + 100
@@ -2786,7 +2841,7 @@ def complete_week(req: CompleteWeekRequest):
                 try:
                     sim_res, distant_game_id = _persist_distant_franchise_game(
                         franchise_id=franchise_id,
-                        week=req.week,
+                        week=week,
                         away_team_object_id=away_id,
                         home_team_object_id=home_id,
                         away_score=away_score,
@@ -2795,8 +2850,8 @@ def complete_week(req: CompleteWeekRequest):
                 except Exception:
                     logger.exception(
                         "❌ [COMPLETE-WEEK] EOS distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s",
-                        req.franchise_id,
-                        req.week,
+                        franchise_id_str,
+                        week,
                         away_id,
                         home_id,
                     )
@@ -2805,8 +2860,8 @@ def complete_week(req: CompleteWeekRequest):
                         home_id,
                         away_score,
                         home_score,
-                        req.week,
-                        franchise_id=req.franchise_id,
+                        week,
+                        franchise_id=franchise_id_str,
                     )
                     distant_game_id = ""
                 results.append({
@@ -2833,7 +2888,7 @@ def complete_week(req: CompleteWeekRequest):
                     )
                 _award_gp_sim(winner_id, g, (away_id, home_id))
                 continue
-
+    
         # Distant sim: regular season only; neither team in user's conference.
         away_conf = team_id_to_conference.get(str(away_id))
         home_conf = team_id_to_conference.get(str(home_id))
@@ -2852,7 +2907,7 @@ def complete_week(req: CompleteWeekRequest):
             try:
                 sim_res, _distant_game_id = _persist_distant_franchise_game(
                     franchise_id=franchise_id,
-                    week=req.week,
+                    week=week,
                     away_team_object_id=away_id,
                     home_team_object_id=home_id,
                     away_score=away_score,
@@ -2861,8 +2916,8 @@ def complete_week(req: CompleteWeekRequest):
             except Exception:
                 logger.exception(
                     "❌ [COMPLETE-WEEK] Regular-season distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s user_conference=%s away_conf=%s home_conf=%s",
-                    req.franchise_id,
-                    req.week,
+                    franchise_id_str,
+                    week,
                     away_id,
                     home_id,
                     user_conference,
@@ -2874,8 +2929,8 @@ def complete_week(req: CompleteWeekRequest):
                     home_id,
                     away_score,
                     home_score,
-                    req.week,
-                    franchise_id=req.franchise_id,
+                    week,
+                    franchise_id=franchise_id_str,
                 )
             results.append({
                 "away_id": sim_res["team1_id"],
@@ -2886,7 +2941,7 @@ def complete_week(req: CompleteWeekRequest):
             winner_id_rs = home_id if home_score > away_score else away_id
             _award_gp_sim(winner_id_rs, None, (away_id, home_id))
             continue
-
+    
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
@@ -2899,13 +2954,13 @@ def complete_week(req: CompleteWeekRequest):
             from BackEnd.utils.game_id_utils import generate_game_id
             computer_game_id = generate_game_id()
             summary["_id"] = computer_game_id
-            summary["franchise_id"] = str(req.franchise_id)
-            summary["week"] = req.week
+            summary["franchise_id"] = str(franchise_id_str)
+            summary["week"] = week
             db.games.update_one({"_id": computer_game_id}, {"$set": summary}, upsert=True)
             stat_updater.finalize_game(
-                computer_game_id, mode="franchise", franchise_id=req.franchise_id
+                computer_game_id, mode="franchise", franchise_id=franchise_id_str
             )
-            sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id, game_id=computer_game_id)
+            sim_res = _save_game_result(away_id, home_id, away_score, home_score, week, franchise_id=franchise_id_str, game_id=computer_game_id)
             # Run team attribute update once for this computer game and set on doc for box score display
             home_id_str = _normalize_team_id_to_string(home_id) or str(home_id)
             away_id_str = _normalize_team_id_to_string(away_id) or str(away_id)
@@ -2950,7 +3005,7 @@ def complete_week(req: CompleteWeekRequest):
         except Exception:
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
-            sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id)
+            sim_res = _save_game_result(away_id, home_id, away_score, home_score, week, franchise_id=franchise_id_str)
             ex_winner = (
                 sim_res["team1_id"]
                 if sim_res["team1_score"] > sim_res["team2_score"]
@@ -2964,22 +3019,22 @@ def complete_week(req: CompleteWeekRequest):
             "away_score": sim_res["team1_score"],
             "home_score": sim_res["team2_score"],
         })
-
+    
     existing_results = franchise_doc.get("results", {})
-    existing_results[str(req.week)] = results
-    _apply_complete_week_recruiting_lean_updates(franchise_doc, req.week, results)
+    existing_results[str(week)] = results
+    _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
     try:
-        _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, req.week, results)
+        _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, week, results)
     except Exception:
         logger.exception(
             "❌ [COMPLETE-WEEK] Rank/prestige update failed; continuing with franchise week/results persistence. franchise_id=%s week=%s results_count=%s",
-            req.franchise_id,
-            req.week,
+            franchise_id_str,
+            week,
             len(results),
         )
     
     # Reset training status for next week
-    next_week = req.week + 1
+    next_week = week + 1
     
     # ✅ EOS TOURNAMENT: Initialize tournament after week 26 (regular season) completion
     update_fields = {
@@ -2990,7 +3045,7 @@ def complete_week(req: CompleteWeekRequest):
         "training_status.session_type": "in-season"
     }
     
-    if req.week == ScheduleManager.REGULAR_SEASON_WEEKS:
+    if week == ScheduleManager.REGULAR_SEASON_WEEKS:
         # Regular season complete - initialize Conference Tournaments (EOS weeks 27–34)
         ftd_docs = list(franchise_team_data_collection.find(
             {"franchise_id": franchise_id},
@@ -3015,13 +3070,13 @@ def complete_week(req: CompleteWeekRequest):
             user_team_id_str=user_team_id_str,
             conference_tournaments=conference_tournaments,
         )
-    elif req.week in ft.EOS_WEEKS:
+    elif week in ft.EOS_WEEKS:
         # EOS week: advance brackets and set next week (or init region/national)
-        next_week = req.week + 1
-        if req.week in ft.EOS_CONFERENCE_WEEKS:
+        next_week = week + 1
+        if week in ft.EOS_CONFERENCE_WEEKS:
             for c in range(1, 17):
                 advanced, champ = ft.advance_conference_bracket(franchise_doc, c)
-            if req.week == ft.EOS_CONFERENCE_WEEKS[-1]:
+            if week == ft.EOS_CONFERENCE_WEEKS[-1]:
                 eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
                     {"franchise_id": franchise_id}, {"team_id": 1}
                 ) if d.get("team_id")]
@@ -3032,8 +3087,8 @@ def complete_week(req: CompleteWeekRequest):
                 next_week = ft.EOS_REGION_WEEKS[0]
             update_fields["week"] = next_week
             update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
-        elif req.week in ft.EOS_REGION_WEEKS:
-            if req.week == ft.EOS_REGION_WEEKS[-1]:
+        elif week in ft.EOS_REGION_WEEKS:
+            if week == ft.EOS_REGION_WEEKS[-1]:
                 region_champions = ft.get_region_champions(franchise_doc)
                 ftd_docs = list(franchise_team_data_collection.find(
                     {"franchise_id": franchise_id}, {"team_id": 1}
@@ -3049,23 +3104,24 @@ def complete_week(req: CompleteWeekRequest):
                 next_week = ft.EOS_REGION_WEEKS[1]
             update_fields["week"] = next_week
             update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
-        elif req.week in ft.EOS_NATIONAL_WEEKS:
+        elif week in ft.EOS_NATIONAL_WEEKS:
             advanced, champion = ft.advance_national_bracket(franchise_doc)
             update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
-            if req.week == ft.EOS_NATIONAL_WEEKS[-1]:
+            if week == ft.EOS_NATIONAL_WEEKS[-1]:
                 update_fields["eos_tournament_active"] = False
                 next_week = 35
             else:
-                next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(req.week) + 1]
+                next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
             update_fields["week"] = next_week
     logger.warning(
         "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
-        req.franchise_id,
-        req.week,
+        franchise_id_str,
+        week,
         update_fields.get("week"),
         len(results),
         sorted(update_fields.keys()),
     )
+    update_fields["post_game_status.phase_a_user_week"] = None
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": update_fields},
@@ -3074,7 +3130,7 @@ def complete_week(req: CompleteWeekRequest):
         refreshed = db.franchises.find_one({"_id": franchise_id})
         if refreshed:
             _persist_week_35_awards_if_needed(refreshed)
-
+    
     id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
     scoreboard = []
     for r in results:
@@ -3084,9 +3140,224 @@ def complete_week(req: CompleteWeekRequest):
             "team1_score": r["away_score"],
             "team2_score": r["home_score"],
         })
+    
+    return {"week": week, "results": scoreboard}
 
-    return {"week": req.week, "results": scoreboard}
+@router.post("/franchise/complete-week")
+def complete_week(req: CompleteWeekRequest):
+    logger.warning(
+        "🧭 [COMPLETE-WEEK-ENTRY] franchise_id=%s week=%s game_id=%s has_game_document=%s",
+        req.franchise_id,
+        req.week,
+        req.game_id,
+        bool(req.game_document),
+    )
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
 
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+
+    week_games, week_games_meta, eos_current_round = _resolve_complete_week_week_games(
+        franchise_doc, req
+    )
+
+    user = req.result
+    team1_id = _normalize_team_id(user.team1_id)
+    team2_id = _normalize_team_id(user.team2_id)
+
+    results = []
+    if _phase_a_user_week_done(franchise_doc, req.week):
+        week_key = str(req.week)
+        saved = franchise_doc.get("results", {}).get(week_key)
+        if isinstance(saved, list) and len(saved) > 0:
+            results = [dict(r) for r in saved]
+            logger.warning(
+                "🧭 [COMPLETE-WEEK] Skipping user game processing; phase-a already persisted week=%s",
+                req.week,
+            )
+        else:
+            _, user_row = _complete_week_process_user_game_block(
+                franchise_doc,
+                req,
+                franchise_id,
+                week_games_meta,
+                user_team_id_str,
+                _u_name,
+            )
+            results.append(user_row)
+    else:
+        _, user_row = _complete_week_process_user_game_block(
+            franchise_doc,
+            req,
+            franchise_id,
+            week_games_meta,
+            user_team_id_str,
+            _u_name,
+        )
+        results.append(user_row)
+
+    return _complete_week_finish_cpu_and_persist(
+        franchise_doc,
+        franchise_id,
+        str(req.franchise_id),
+        req.week,
+        week_games,
+        week_games_meta,
+        eos_current_round,
+        user_team_id_str,
+        user_eos_sim_scope,
+        team1_id,
+        team2_id,
+        results,
+    )
+
+
+
+
+@router.post("/franchise/complete-week/phase-a")
+def complete_week_phase_a(req: CompleteWeekRequest):
+    logger.warning(
+        "🧭 [COMPLETE-WEEK-PHASE-A] franchise_id=%s week=%s game_id=%s",
+        req.franchise_id,
+        req.week,
+        req.game_id,
+    )
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    if _phase_a_user_week_done(franchise_doc, req.week):
+        wk = str(req.week)
+        saved = franchise_doc.get("results", {}).get(wk) or []
+        n = len(saved) if isinstance(saved, list) else 0
+        return {
+            "status": "ok",
+            "phase": "a",
+            "idempotent": True,
+            "week": req.week,
+            "results_count": n,
+        }
+
+    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    _week_games, week_games_meta, _eos_cr = _resolve_complete_week_week_games(franchise_doc, req)
+
+    _, user_row = _complete_week_process_user_game_block(
+        franchise_doc,
+        req,
+        franchise_id,
+        week_games_meta,
+        user_team_id_str,
+        _u_name,
+    )
+
+    merged = _merge_phase_a_user_row_into_week_results(
+        franchise_doc.get("results", {}).get(str(req.week)),
+        user_row,
+    )
+
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {
+            "$set": {
+                f"results.{str(req.week)}": merged,
+                "season_inbox": franchise_doc.get("season_inbox", []),
+                "post_game_status.phase_a_user_week": req.week,
+            }
+        },
+    )
+
+    return {
+        "status": "ok",
+        "phase": "a",
+        "idempotent": False,
+        "week": req.week,
+        "results_count": len(merged),
+    }
+
+
+@router.post("/franchise/complete-week/phase-b")
+def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
+    logger.warning(
+        "🧭 [COMPLETE-WEEK-PHASE-B] franchise_id=%s week=%s",
+        req.franchise_id,
+        req.week,
+    )
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    current_week = int(franchise_doc.get("week", 1))
+    if current_week > req.week:
+        return {
+            "status": "ok",
+            "phase": "b",
+            "idempotent": True,
+            "week": req.week,
+            "results": [],
+        }
+    if current_week < req.week:
+        raise HTTPException(status_code=400, detail="Franchise week is behind requested week")
+
+    if not _phase_a_user_week_done(franchise_doc, req.week):
+        raise HTTPException(
+            status_code=409,
+            detail="Run POST /franchise/complete-week/phase-a first (or use monolithic complete-week).",
+        )
+
+    wk = str(req.week)
+    saved = franchise_doc.get("results", {}).get(wk)
+    if not isinstance(saved, list) or len(saved) == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="No saved results for this week; run phase A first.",
+        )
+
+    fake_req = SimpleNamespace(week=req.week, franchise_id=req.franchise_id)
+    week_games, week_games_meta, eos_current_round = _resolve_complete_week_week_games(
+        franchise_doc, fake_req  # type: ignore[arg-type]
+    )
+    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    team1_id, team2_id = _find_user_franchise_week_matchup_normalized_ids(
+        week_games, user_team_id_str
+    )
+    results = [dict(r) for r in saved]
+
+    out = _complete_week_finish_cpu_and_persist(
+        franchise_doc,
+        franchise_id,
+        req.franchise_id,
+        req.week,
+        week_games,
+        week_games_meta,
+        eos_current_round,
+        user_team_id_str,
+        user_eos_sim_scope,
+        team1_id,
+        team2_id,
+        results,
+    )
+    out["status"] = "ok"
+    out["phase"] = "b"
+    out["idempotent"] = False
+    return out
 
 @router.get("/franchise/current")
 def get_current_franchise(user: dict = Depends(get_current_user)):

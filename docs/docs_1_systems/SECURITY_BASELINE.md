@@ -47,6 +47,8 @@
 - `POST /franchise/play-next-game`
 - `POST /franchise/save-result`
 - `POST /franchise/complete-week`
+- `POST /franchise/complete-week/phase-a`
+- `POST /franchise/complete-week/phase-b`
 - `GET /franchise/command-center/data`
 - `GET /franchise/standings`
 - `GET /franchise/schedule`

@@ -182,3 +182,17 @@ def test_normalize_team_id_canonical_multi_word_no_mongo():
     assert out1 == id_fc
     assert out2 == id_ly
 
+
+def test_merge_phase_a_user_row_replaces_same_matchup():
+    """User row merge overwrites the same away/home pairing (order-insensitive keys)."""
+    existing = [
+        {"away_id": "a", "home_id": "b", "away_score": 1, "home_score": 2},
+        {"away_id": "c", "home_id": "d", "away_score": 3, "home_score": 4},
+    ]
+    user_row = {"away_id": "b", "home_id": "a", "away_score": 70, "home_score": 60}
+    merged = franchise_routes._merge_phase_a_user_row_into_week_results(existing, user_row)
+    assert len(merged) == 2
+    ab = next(x for x in merged if set(map(str, [x["away_id"], x["home_id"]])) == {"a", "b"})
+    assert ab["away_score"] == 70
+    assert ab["home_score"] == 60
+

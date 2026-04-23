@@ -64,6 +64,33 @@ function resolveBannerTeamNameFromParams(bannerParam, homeName, awayName) {
   return b;
 }
 
+/** User franchise team display name for Phase B pulse overlay (same rules as header banner). */
+function resolveUserTeamNameForPhaseBPulse(urlParams) {
+  if (!gameData || !urlParams) return '';
+  const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
+  const homeName = homeTeam.name || 'Home Team';
+  const awayName = awayTeam.name || 'Away Team';
+  const bannerTeamParam = (urlParams.get('banner_team') || '').trim();
+  const myTeamParam = urlParams.get('my_team');
+  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
+  let userTeamSide = null;
+  if (myTeamParam === 'home' || myTeamParam === 'away') {
+    userTeamSide = myTeamParam;
+  } else if (teamIdParam) {
+    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
+  }
+  if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('last_game_user_team_side');
+    if (stored === 'home' || stored === 'away') userTeamSide = stored;
+  }
+  if (bannerTeamParam) {
+    return resolveBannerTeamNameFromParams(bannerTeamParam, homeName, awayName) || '';
+  }
+  if (userTeamSide === 'away') return awayName;
+  if (userTeamSide === 'home') return homeName;
+  return '';
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -1880,6 +1907,70 @@ function setupLockerRoomButton() {
   cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Franchise EOG: if phase-a ran and user opened box score first, finish CPU week before FCC
+    if (navMode === 'franchise' && isFinalGame && typeof localStorage !== 'undefined') {
+      const pendingRaw = localStorage.getItem('franchise_complete_week_pending');
+      if (pendingRaw && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
+        try {
+          const pending = JSON.parse(pendingRaw);
+          const phaseBBody =
+            pending &&
+            pending.franchise_id != null &&
+            pending.week != null &&
+            !pending.body
+              ? { franchise_id: pending.franchise_id, week: pending.week }
+              : null;
+          const legacyBody = pending && pending.body;
+          const fetchBody = phaseBBody || legacyBody;
+          if (fetchBody && String(fetchBody.franchise_id) === String(urlFranchiseId)) {
+            cleanButton.disabled = true;
+            const prevText = cleanButton.textContent;
+            const pulseTeamName = resolveUserTeamNameForPhaseBPulse(urlParams);
+            const overlayTitle = pulseTeamName || 'Your team';
+            let usedStatusFallback = false;
+            if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+              window.PageLoadOverlay.show({
+                variant: 'pulse',
+                title: overlayTitle,
+                subtitle: 'Simulating Computer Games',
+                teamName: pulseTeamName || '',
+                assetKey: 'banner_primary',
+              });
+            } else {
+              cleanButton.textContent = 'Simulating computer games...';
+              usedStatusFallback = true;
+            }
+            const url = phaseBBody
+              ? API_CONFIG.buildUrl('/franchise/complete-week/phase-b')
+              : API_CONFIG.buildUrl('/franchise/complete-week');
+            try {
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fetchBody),
+              });
+              if (res.ok) {
+                localStorage.removeItem('franchise_complete_week_pending');
+              } else {
+                console.error('[BOX-SCORE] week finish failed:', res.status, await res.text());
+                alert('Could not finish the week (computer games). Try again.');
+                return;
+              }
+            } finally {
+              if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+                window.PageLoadOverlay.hide();
+              }
+              if (usedStatusFallback) {
+                cleanButton.textContent = prevText;
+              }
+              cleanButton.disabled = false;
+            }
+          }
+        } catch (err) {
+          console.warn('[BOX-SCORE] franchise_complete_week_pending handling failed:', err);
+        }
+      }
+    }
     // Single game: delete completed game from DB when user leaves for mode-select
     if (navMode === 'single' && lockerRoomUrl === '/mode-select.html') {
       const gameId = urlParams.get('game_id');

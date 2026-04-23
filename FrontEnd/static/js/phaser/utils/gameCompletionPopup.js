@@ -167,6 +167,20 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   }
   const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
 
+  const franchisePhaseBPending =
+    mode === 'franchise' &&
+    finalScore &&
+    (finalScore.franchisePhaseBPending ||
+      (finalScore.franchiseCompleteWeekPayload
+        ? {
+            franchise_id: finalScore.franchiseCompleteWeekPayload.franchise_id,
+            week: finalScore.franchiseCompleteWeekPayload.week,
+          }
+        : null));
+  const lockerActionHtml = franchisePhaseBPending
+    ? `<button type="button" class="completion-button locker-room-button franchise-sim-cpu-button">Sim Computer Games</button>`
+    : `<a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>`;
+
   console.log('📊 Box Score URL constructed:', {
     gameId,
     homeTeam,
@@ -244,7 +258,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       <section class="gc-section gc-actions-section">
         <div class="button-container">
           <a href="${boxScoreUrl}" class="completion-button box-score-button">Box Score</a>
-          <a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>
+          ${lockerActionHtml}
         </div>
       </section>
     </div>
@@ -558,6 +572,60 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
     });
   }
+
+  const simCpuBtn = popup.querySelector('.franchise-sim-cpu-button');
+  if (simCpuBtn && franchisePhaseBPending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
+    simCpuBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+      simCpuBtn.disabled = true;
+      let hideStatusFn = null;
+      if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+        window.PageLoadOverlay.show({
+          variant: 'pulse',
+          title: userTeamName || 'Your team',
+          subtitle: 'Simulating Computer Games',
+          teamName: userTeamName || '',
+          assetKey: 'banner_primary',
+        });
+      } else {
+        const { showStatus, hideStatus } = await import('./statusDisplay.js');
+        showStatus('Simulating Computer Games...');
+        hideStatusFn = hideStatus;
+      }
+      try {
+        const res = await fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-b'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(franchisePhaseBPending),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          console.error('❌ phase-b failed:', res.status, t);
+          alert('Could not finish the week (computer games). Check connection and try again.');
+          simCpuBtn.disabled = false;
+          return;
+        }
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('franchise_complete_week_pending');
+          }
+        } catch (_) {}
+        window.location.href = lockerRoomUrl;
+      } catch (err) {
+        console.error('🚨 phase-b error:', err);
+        alert('Could not finish the week (computer games). Check connection and try again.');
+        simCpuBtn.disabled = false;
+      } finally {
+        if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+          window.PageLoadOverlay.hide();
+        } else if (hideStatusFn) {
+          hideStatusFn();
+        }
+      }
+    });
+  }
+
   if (lockerRoomBtn && mode === 'single' && gameId) {
     lockerRoomBtn.addEventListener('click', async (e) => {
       e.preventDefault();
