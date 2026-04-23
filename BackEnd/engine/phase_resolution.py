@@ -6381,6 +6381,76 @@ def get_skeleton_by_lean(play_doc, lean_score):
     return skeleton, variant
 
 
+def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
+    """
+    Resolve a possibly stale ``current_playcall`` string to the current ``plays.name``
+    using the team's ``play_id`` when the name no longer exists in the universal collection.
+    """
+    if not game_context or not playcall or not isinstance(playcall, str):
+        return playcall
+
+    from bson import ObjectId
+
+    from BackEnd.db import games_collection, plays_collection
+    from BackEnd.utils.team_play_utils import resolve_team_play
+
+    try:
+        if plays_collection.find_one({"name": playcall}, {"_id": 1}):
+            return playcall
+    except Exception:
+        logging.debug("canonical playcall: universal name lookup failed for %r", playcall, exc_info=True)
+
+    offense_team = getattr(game_context, "offense_team", None)
+    play_obj = None
+    if offense_team and getattr(offense_team, "plays", None):
+        play_obj = resolve_team_play(offense_team.plays, playcall)
+
+    if not play_obj:
+        game_id = getattr(game_context, "game_id", None)
+        if game_id and offense_team is not None:
+            team_id = getattr(offense_team, "team_id", None)
+            try:
+                game_doc = games_collection.find_one({"_id": game_id})
+                if game_doc and isinstance(game_doc.get("teams"), dict) and team_id is not None:
+                    team_obj = game_doc["teams"].get(team_id) or game_doc["teams"].get(str(team_id))
+                    if isinstance(team_obj, dict):
+                        play_obj = resolve_team_play(team_obj.get("plays") or {}, playcall)
+            except Exception:
+                logging.debug("canonical playcall: game doc team plays lookup failed", exc_info=True)
+
+    if play_obj:
+        pid = play_obj.get("play_id")
+        if pid:
+            try:
+                doc = plays_collection.find_one({"_id": ObjectId(str(pid))}, {"name": 1})
+                if doc and isinstance(doc.get("name"), str) and doc["name"]:
+                    return doc["name"]
+            except Exception:
+                pass
+        embedded = play_obj.get("name")
+        if isinstance(embedded, str) and embedded:
+            try:
+                if plays_collection.find_one({"name": embedded}, {"_id": 1}):
+                    return embedded
+            except Exception:
+                pass
+
+    return playcall
+
+
+def _sync_current_playcall_to_canonical_name(game_context) -> None:
+    """Update ``game_state['current_playcall']`` when it still holds a pre-rename display name."""
+    if not game_context or not hasattr(game_context, "game_state"):
+        return
+    raw = game_context.game_state.get("current_playcall")
+    if not raw or not isinstance(raw, str):
+        return
+    canonical = _canonical_offensive_playcall_name(game_context, raw)
+    if canonical and canonical != raw:
+        game_context.game_state["current_playcall"] = canonical
+        logging.debug("Synced current_playcall %r -> %r", raw, canonical)
+
+
 def get_hco_skeleton(result_type, game_context, lean_score=None):
     """
     Get HCO skeleton based on the current playcall from team-specific play objects.
@@ -6396,6 +6466,9 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
         dict: Selected skeleton with steps
     """
     from BackEnd.db import plays_collection, games_collection, tournaments_collection, franchises_collection
+
+    if game_context:
+        _sync_current_playcall_to_canonical_name(game_context)
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"

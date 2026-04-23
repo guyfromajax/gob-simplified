@@ -1,33 +1,31 @@
 #!/usr/bin/env python3
 """
-Migrate set-play skeleton position keys in gob-staging.
+Migrate set-play skeleton position keys (PG/SG/SF/PF/C → target_shooter + pos1–pos4).
 
-Changes:
-- Universal plays in gob-staging.plays:
-  - For play_type == "set_play", rewrite HCO skeleton positions from
-    PG/SG/SF/PF/C to:
-      - target_shooter
-      - pos1
-      - pos2
-      - pos3
-      - pos4
-  - Applies to all set-play variants and all versions within each variant.
-  - Rewrites both step.pos_actions keys and event position references because
-    the engine reads event fields today.
+Default database: **gob-staging** (backward compatible). Use `--db gob` for production.
 
-- Team-specific play copies in gob-staging:
-  - Backfill target_shooter onto copied play objects in:
-    - franchise_team_data.plays
-    - tournaments.teams.{team_id}.plays
-    - games.teams.{team_id}.plays
+Changes per DB:
+- **plays** (play_type == set_play): remap skeletons for variants successful, mid_play_change,
+  contested, broken (including all entries in versions[]).
+- **franchise_team_data.plays**, **tournaments.teams.*.plays**, **games.teams.*.plays**:
+  backfill **target_shooter** on embedded play maps from universal plays (by play name).
 
-This script intentionally touches gob-staging only.
+**gob + `--sync-fields-from-staging`:** Before remapping skeletons, copy from **gob-staging**
+onto matching **gob** set_play docs (match by shared **`_id`**):
+`target_shooter`, `pos1`, `pos2`, `pos3`, `pos4` when present on staging.
+
+Usage:
+  python scripts/migrate_set_play_positions_to_target_shooter_staging.py
+  python scripts/migrate_set_play_positions_to_target_shooter_staging.py --db gob --sync-fields-from-staging
+  python scripts/migrate_set_play_positions_to_target_shooter_staging.py --db gob --dry-run
 """
 
 from __future__ import annotations
 
+import argparse
 import copy
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -35,10 +33,13 @@ from pymongo import MongoClient
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_NAME = "gob-staging"
+STAGING_DB = "gob-staging"
+PROD_DB = "gob"
 CANONICAL_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 SET_PLAY_VARIANTS = ("successful", "mid_play_change", "contested", "broken")
 EVENT_POSITION_FIELDS = ("by", "for", "from", "to")
+SET_PLAY_QUERY = {"play_type": "set_play"}
+DOC_META_FIELDS = ("target_shooter", "pos1", "pos2", "pos3", "pos4")
 
 
 def _load_env_file(path: Path) -> None:
@@ -62,6 +63,68 @@ def _load_mongo_uri() -> str:
     if not uri:
         raise RuntimeError("MONGO_URI not found in environment/.env files")
     return uri
+
+
+def _load_production_env() -> None:
+    prod = ROOT / ".env.production"
+    if prod.exists():
+        _load_env_file(prod)
+
+
+def sync_set_play_doc_fields_from_staging(
+    *,
+    dry_run: bool,
+) -> dict[str, int]:
+    """
+    Copy target_shooter + pos1–pos4 from gob-staging set_plays onto gob set_plays
+    when both documents share the same _id.
+    """
+    staging_uri = os.environ.get("MONGO_URI_STAGING") or os.environ.get("MONGO_URI")
+    prod_uri = (
+        os.environ.get("MONGO_URI_PRODUCTION")
+        or os.environ.get("MONGO_URI_PROD")
+        or os.environ.get("MONGO_URI")
+    )
+    if not staging_uri or not prod_uri:
+        raise RuntimeError("Need MONGO_URI (and optional MONGO_URI_PRODUCTION) for two-DB sync")
+
+    c_staging = MongoClient(staging_uri, serverSelectionTimeoutMS=10000)
+    c_prod = MongoClient(prod_uri, serverSelectionTimeoutMS=10000) if prod_uri != staging_uri else c_staging
+    staging_coll = c_staging[STAGING_DB]["plays"]
+    prod_coll = c_prod[PROD_DB]["plays"]
+
+    meta_by_id: dict[Any, dict[str, Any]] = {}
+    for doc in staging_coll.find(SET_PLAY_QUERY, dict.fromkeys(["_id", *DOC_META_FIELDS], 1)):
+        meta = {k: doc[k] for k in DOC_META_FIELDS if k in doc and doc[k] is not None}
+        meta_by_id[doc["_id"]] = meta
+
+    stats = {"matched": 0, "updated": 0, "skipped_no_staging": 0}
+    for doc in prod_coll.find(SET_PLAY_QUERY, dict.fromkeys(["_id", "name", *DOC_META_FIELDS], 1)):
+        staging_meta = meta_by_id.get(doc["_id"])
+        if staging_meta is None:
+            stats["skipped_no_staging"] += 1
+            print(
+                f"  [sync-meta] no staging set_play with same _id: prod _id={doc.get('_id')} name={doc.get('name')!r}",
+                file=sys.stderr,
+            )
+            continue
+        stats["matched"] += 1
+        set_payload: dict[str, Any] = {}
+        for k in DOC_META_FIELDS:
+            if k not in staging_meta:
+                continue
+            if doc.get(k) != staging_meta[k]:
+                set_payload[k] = staging_meta[k]
+        if not set_payload:
+            continue
+        stats["updated"] += 1
+        print(
+            f"  [sync-meta] {'WOULD SET' if dry_run else 'SET'} {doc.get('name')!r} _id={doc.get('_id')}: {set_payload}"
+        )
+        if not dry_run:
+            prod_coll.update_one({"_id": doc["_id"]}, {"$set": set_payload})
+
+    return stats
 
 
 def build_position_alias_map(target_shooter: str) -> dict[str, str]:
@@ -170,15 +233,25 @@ def migrate_universal_play(play_doc: dict[str, Any]) -> tuple[dict[str, Any] | N
     return {"skeletons": skeletons}, "updated"
 
 
-def migrate_universal_plays(db) -> dict[str, int]:
+def migrate_universal_plays(db, *, dry_run: bool = False) -> dict[str, int]:
     plays = db["plays"]
-    stats = {"updated": 0, "no_change": 0, "skip_non_set_play": 0}
+    stats = {"updated": 0, "no_change": 0, "skip_non_set_play": 0, "error_missing_target": 0}
 
-    for play in plays.find({}, {"name": 1, "play_type": 1, "target_shooter": 1, "skeletons": 1}):
-        update_doc, status = migrate_universal_play(play)
+    for play in plays.find(SET_PLAY_QUERY, {"name": 1, "play_type": 1, "target_shooter": 1, "skeletons": 1}):
+        try:
+            update_doc, status = migrate_universal_play(play)
+        except RuntimeError as e:
+            if "missing valid target_shooter" in str(e):
+                stats["error_missing_target"] += 1
+                print(f"  [skeletons] ERROR: {e}", file=sys.stderr)
+                continue
+            raise
         stats[status] = stats.get(status, 0) + 1
         if update_doc:
-            plays.update_one({"_id": play["_id"]}, {"$set": update_doc})
+            if dry_run:
+                print(f"  [skeletons] WOULD UPDATE {play.get('name')!r} _id={play.get('_id')}")
+            else:
+                plays.update_one({"_id": play["_id"]}, {"$set": update_doc})
 
     return stats
 
@@ -252,16 +325,58 @@ def backfill_nested_team_plays(db, collection_name: str, target_map: dict[str, s
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Remap set_play skeletons to target_shooter + pos1–pos4.")
+    parser.add_argument(
+        "--db",
+        choices=(STAGING_DB, PROD_DB),
+        default=STAGING_DB,
+        help=f"Database to modify (default: {STAGING_DB}).",
+    )
+    parser.add_argument(
+        "--sync-fields-from-staging",
+        action="store_true",
+        help=f"When --db {PROD_DB}: copy target_shooter + pos1–pos4 from {STAGING_DB} (match by shared _id) first.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print actions only; do not write.",
+    )
+    parser.add_argument(
+        "--production-env",
+        action="store_true",
+        help="Load .env.production before reading MONGO_URI* (optional for prod).",
+    )
+    args = parser.parse_args()
+
+    if args.sync_fields_from_staging and args.db != PROD_DB:
+        print(f"--sync-fields-from-staging only applies with --db {PROD_DB}", file=sys.stderr)
+        return 2
+
+    if args.production_env:
+        _load_production_env()
+
+    db_name = args.db
     uri = _load_mongo_uri()
     client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[DB_NAME]
+    db = client[db_name]
 
-    universal_stats = migrate_universal_plays(db)
+    if args.sync_fields_from_staging:
+        print(f"Sync doc fields from {STAGING_DB} → {PROD_DB}.plays (set_play only)...")
+        sync_stats = sync_set_play_doc_fields_from_staging(dry_run=args.dry_run)
+        print(f"  sync-meta: {sync_stats}")
+
+    universal_stats = migrate_universal_plays(db, dry_run=args.dry_run)
     print(
-        f"[{DB_NAME}.plays] updated={universal_stats['updated']} "
+        f"[{db_name}.plays] updated={universal_stats['updated']} "
         f"no_change={universal_stats['no_change']} "
-        f"skip_non_set_play={universal_stats['skip_non_set_play']}"
+        f"skip_non_set_play={universal_stats['skip_non_set_play']} "
+        f"error_missing_target={universal_stats.get('error_missing_target', 0)}"
     )
+
+    if args.dry_run:
+        print("Dry-run: skipping franchise_team_data / tournaments / games backfill.")
+        return 0
 
     target_map = {
         doc["name"]: doc["target_shooter"]
@@ -270,16 +385,16 @@ def main() -> int:
             {"_id": 0, "name": 1, "target_shooter": 1},
         )
     }
-    print(f"[{DB_NAME}.plays] loaded target_shooter map for {len(target_map)} set plays")
+    print(f"[{db_name}.plays] loaded target_shooter map for {len(target_map)} set plays")
 
     ftd_matched, ftd_modified = backfill_franchise_team_data(db, target_map)
-    print(f"[{DB_NAME}.franchise_team_data] matched={ftd_matched} modified={ftd_modified}")
+    print(f"[{db_name}.franchise_team_data] matched={ftd_matched} modified={ftd_modified}")
 
     tournaments_matched, tournaments_modified = backfill_nested_team_plays(db, "tournaments", target_map)
-    print(f"[{DB_NAME}.tournaments] matched={tournaments_matched} modified={tournaments_modified}")
+    print(f"[{db_name}.tournaments] matched={tournaments_matched} modified={tournaments_modified}")
 
     games_matched, games_modified = backfill_nested_team_plays(db, "games", target_map)
-    print(f"[{DB_NAME}.games] matched={games_matched} modified={games_modified}")
+    print(f"[{db_name}.games] matched={games_matched} modified={games_modified}")
 
     return 0
 
