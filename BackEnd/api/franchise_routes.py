@@ -43,6 +43,11 @@ from BackEnd.eog_attr_rules import (
 )
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
+from BackEnd.utils.franchise_training_state import (
+    franchise_training_fully_complete_for_week,
+    franchise_user_training_applied_for_week,
+)
+from BackEnd.utils.training_loading_highlights import build_training_loading_highlights
 from BackEnd.utils.franchise_geek_points import (
     maybe_award_franchise_loss_geek_points,
     maybe_award_franchise_win_geek_points,
@@ -3146,8 +3151,12 @@ def command_center_data(
                 fid = franchise_doc["_id"]
                 if franchise_doc:
                     team_name, team_id = get_user_team_from_franchise(franchise_doc)
-                    training_status = franchise_doc.get("training_status", {})
-                    training_completed = training_status.get("training_completed", False)
+                    training_status = franchise_doc.get("training_status", {}) or {}
+                    try:
+                        fcc_week = int(franchise_doc.get("week", 1) or 1)
+                    except (TypeError, ValueError):
+                        fcc_week = 1
+                    training_completed = franchise_training_fully_complete_for_week(training_status, fcc_week)
                     session_type = training_status.get("session_type", "in-season")
                     if team_id:
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
@@ -5210,7 +5219,7 @@ def _week_1_cut_requirement(
         return {"roster_count": 0, "cut_count": 0, "cut_required": False}
     week = int(franchise_doc.get("week", 1) or 1)
     training_status = franchise_doc.get("training_status", {}) or {}
-    if week != 1 or not training_status.get("training_completed", False):
+    if week != 1 or not franchise_training_fully_complete_for_week(training_status, week):
         return {"roster_count": 0, "cut_count": 0, "cut_required": False}
     try:
         team_object_id = ObjectId(user_team_id)
@@ -6480,6 +6489,225 @@ class FranchiseTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
+class FranchiseDistantTrainingRequest(BaseModel):
+    franchise_id: str
+
+
+def _apply_franchise_distant_cpu_training(
+    franchise_id: ObjectId,
+    *,
+    franchise_doc: dict,
+    user_team_id_str: str,
+    week: int,
+    is_first_training: bool,
+    franchise_players: dict,
+) -> None:
+    """Template-based distant CPU training for all non-user FTDs. Idempotent per FTD via cpu_distant_trained_week."""
+    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
+    training_type = "tc" if is_first_training else "regular"
+    eliminated_team_ids = set()
+    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
+        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
+    distant_templates = list(db["distant_training"].find({"training_type": training_type}))
+    if not distant_templates:
+        logger.warning(
+            f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams"
+        )
+        return
+    for ftd_doc in all_ftd_docs:
+        computer_team_oid = ftd_doc.get("team_id")
+        if computer_team_oid is None:
+            continue
+        computer_team_id_str = str(computer_team_oid)
+        if computer_team_id_str == str(user_team_id_str):
+            continue
+        if computer_team_id_str in eliminated_team_ids:
+            continue
+        if int(ftd_doc.get("cpu_distant_trained_week") or 0) == week:
+            continue
+        try:
+            template = random.choice(distant_templates)
+            team_values = template.get("team_values", {})
+            players_template = template.get("players", {})
+            current_team_attrs = ftd_doc.get("team_attributes", {})
+            ftd_update = {}
+            for attr_name, delta in team_values.items():
+                if attr_name not in TEAM_ATTR_CLAMPS:
+                    continue
+                current = current_team_attrs.get(attr_name, 0)
+                if isinstance(current, (int, float)) and isinstance(delta, (int, float)):
+                    lower, upper = TEAM_ATTR_CLAMPS[attr_name]
+                    delta_val = float(delta) if attr_name == "rebound_modifier" else int(delta)
+                    new_val = current + delta_val
+                    if upper is not None:
+                        new_val = max(lower, min(upper, new_val))
+                    else:
+                        new_val = max(lower, new_val)
+                    if attr_name == "rebound_modifier":
+                        new_val = round(new_val, 2)
+                    else:
+                        new_val = int(round(new_val))
+                    ftd_update[f"team_attributes.{attr_name}"] = new_val
+            set_payload = dict(ftd_update)
+            if template.get("community_engagement"):
+                set_payload["pending_community_engagement"] = True
+            if set_payload:
+                franchise_team_data_collection.update_one(
+                    {"franchise_id": franchise_id, "team_id": computer_team_oid},
+                    {"$set": set_payload},
+                )
+            player_order = ftd_doc.get("players")
+            if not player_order:
+                team_doc = db.teams.find_one({"_id": computer_team_oid}, {"player_ids": 1})
+                player_order = [str(pid) for pid in (team_doc.get("player_ids") or [])] if team_doc else []
+            else:
+                player_order = [str(pid) for pid in player_order]
+            for i in range(min(12, len(player_order))):
+                pid = player_order[i]
+                player_key = f"player_{i}"
+                if player_key not in players_template:
+                    continue
+                fpd = franchise_players.get(pid)
+                if not fpd:
+                    continue
+                deltas = players_template[player_key]
+                current_attrs = fpd.get("attributes", {})
+                fpd_set = {}
+                for attr_name, delta in deltas.items():
+                    if not isinstance(delta, (int, float)):
+                        continue
+                    current = current_attrs.get(attr_name, 0) or current_attrs.get(f"anchor_{attr_name}", 0)
+                    try:
+                        cur = int(current) if isinstance(current, (int, float)) else 0
+                    except (TypeError, ValueError):
+                        cur = 0
+                    new_val = cur + int(delta)
+                    new_val = max(PLAYER_ATTR_CLAMP[0], new_val)
+                    fpd_set[f"attributes.{attr_name}"] = new_val
+                    fpd_set[f"attributes.anchor_{attr_name}"] = new_val
+                if fpd_set:
+                    franchise_players_data_collection.update_one(
+                        {"franchise_id": str(franchise_id), "player_id": pid},
+                        {"$set": fpd_set},
+                    )
+                core_player = db.players.find_one({"_id": pid}, {"height": 1})
+                height = core_player.get("height") if core_player else None
+                updated_attrs = dict(current_attrs)
+                for k, v in fpd_set.items():
+                    if k.startswith("attributes."):
+                        updated_attrs[k.replace("attributes.", "")] = v
+                meta = fpd.get("meta", {})
+                player_for_ratings = {
+                    "attributes": updated_attrs,
+                    "height": height,
+                    "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}",
+                }
+                new_ratings = compute_position_ratings(player_for_ratings)
+                franchise_players_data_collection.update_one(
+                    {"franchise_id": str(franchise_id), "player_id": pid},
+                    {"$set": {"position_ratings": new_ratings}},
+                )
+            franchise_team_data_collection.update_one(
+                {"franchise_id": franchise_id, "team_id": computer_team_oid},
+                {"$set": {"cpu_distant_trained_week": week}},
+            )
+            logger.info(f"✅ [DISTANT TRAINING] Applied template for team_id={computer_team_id_str}")
+        except Exception as e:
+            logger.error(f"❌ [DISTANT TRAINING] Error for team_id={computer_team_id_str}: {e}", exc_info=True)
+            continue
+
+
+def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
+    """Finish franchise week training: distant CPU teams + optional camp cuts + training_completed."""
+    try:
+        franchise_id = ObjectId(franchise_id_str)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    training_status = franchise_doc.get("training_status", {}) or {}
+    week = int(franchise_doc.get("week", 1) or 1)
+    results = franchise_doc.get("results", {})
+    is_first_training = (week == 1 and not results.get("1"))
+
+    if franchise_training_fully_complete_for_week(training_status, week):
+        user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        redirect_team_id = user_team_object_id if user_team_object_id else None
+        return {
+            "status": "already_completed",
+            "week": week,
+            "redirect": f"/training-report.html?mode=franchise&franchise_id={franchise_id_str}&team_id={redirect_team_id}&week={week}&from=training",
+        }
+
+    if not franchise_user_training_applied_for_week(training_status, week):
+        raise HTTPException(
+            status_code=400,
+            detail="User training has not been applied for this week. Complete the training screen first.",
+        )
+
+    if int(training_status.get("cpu_distant_complete_week") or 0) == week:
+        db.franchises.update_one(
+            {"_id": franchise_id},
+            {
+                "$set": {
+                    "training_status.training_completed": True,
+                    "training_status.week": week,
+                    "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
+                }
+            },
+        )
+        user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        team_id = user_team_object_id
+        session_type = training_status.get("session_type", "in-season")
+        return {
+            "status": "success",
+            "week": week,
+            "session_type": session_type,
+            "redirect": f"/training-report.html?mode=franchise&franchise_id={franchise_id_str}&team_id={team_id}&week={week}&from=training",
+        }
+
+    user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id_name or not user_team_object_id:
+        raise HTTPException(status_code=404, detail="User team not found in franchise document")
+    team_id = user_team_object_id
+
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": franchise_id_str}))
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
+
+    _apply_franchise_distant_cpu_training(
+        franchise_id,
+        franchise_doc=franchise_doc,
+        user_team_id_str=str(team_id),
+        week=week,
+        is_first_training=is_first_training,
+        franchise_players=franchise_players,
+    )
+
+    cuts_ran_this_call = False
+    if is_first_training and not bool(training_status.get("cpu_training_camp_cuts_applied")):
+        _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
+        cuts_ran_this_call = True
+
+    session_type = training_status.get("session_type", "in-season")
+    distant_update: dict[str, Any] = {
+        "training_status.training_completed": True,
+        "training_status.cpu_distant_complete_week": week,
+        "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
+    }
+    if cuts_ran_this_call:
+        distant_update["training_status.cpu_training_camp_cuts_applied"] = True
+    db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
+    return {
+        "status": "success",
+        "week": week,
+        "session_type": session_type,
+        "redirect": f"/training-report.html?mode=franchise&franchise_id={franchise_id_str}&team_id={team_id}&week={week}&from=training",
+    }
+
+
 def _max_position_rating_from_fpd(fpd: dict) -> int:
     """Highest position rating (PG/SG/SF/PF/C) for sort order (custom modal + training report)."""
     pr = (fpd or {}).get("position_ratings") or {}
@@ -6639,10 +6867,56 @@ def run_franchise_training(req: FranchiseTrainingRequest, profile: bool = False)
     return _run_franchise_training_impl(req)
 
 
-def _run_franchise_training_impl(req: FranchiseTrainingRequest):
+@router.post("/franchise/run-training/user")
+def run_franchise_training_user(
+    req: FranchiseTrainingRequest,
+    user: dict = Depends(get_current_user),
+    profile: bool = False,
+):
+    """Persist user-team training only. Client should call /franchise/run-training/distant-cpu next."""
+    verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+
+        _out = [None]
+
+        def _wrapped():
+            _out[0] = _run_franchise_training_impl(req, phase="user_only")
+
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        if isinstance(result, dict):
+            result["profile_summary"] = profile_summary
+        return result
+    return _run_franchise_training_impl(req, phase="user_only")
+
+
+@router.post("/franchise/run-training/distant-cpu")
+def run_franchise_training_distant_cpu(
+    req: FranchiseDistantTrainingRequest,
+    user: dict = Depends(get_current_user),
+    profile: bool = False,
+):
+    """Apply distant CPU template training, camp cuts (week 1), and set training_completed."""
+    verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    if profile:
+        from BackEnd.utils.profiling import run_profiled
+
+        _out = [None]
+
+        def _wrapped():
+            _out[0] = _franchise_training_distant_phase_only(req.franchise_id)
+
+        profile_summary = run_profiled(_wrapped, top_n=60)
+        result = _out[0]
+        if isinstance(result, dict):
+            result["profile_summary"] = profile_summary
+        return result
+    return _franchise_training_distant_phase_only(req.franchise_id)
+
+
+def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = "full"):
     """Inner implementation so run_franchise_training can be profiled with ?profile=1."""
-    import time
-    endpoint_start = time.time()
     try:
         franchise_id = ObjectId(req.franchise_id)
     except Exception:
@@ -6657,9 +6931,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Get training status and check for duplicate submission
-    training_status = franchise_doc.get("training_status", {})
-    week = franchise_doc.get("week", 1)
+    training_status = franchise_doc.get("training_status", {}) or {}
+    try:
+        week = int(franchise_doc.get("week", 1) or 1)
+    except (TypeError, ValueError):
+        week = 1
     results = franchise_doc.get("results", {})
     
     # Check if it's first training (training camp) - week 1 and no results yet
@@ -6681,6 +6957,41 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
                     status_code=400,
                     detail="You must save recruiting orders before running training in week 20",
                 )
+
+    if phase == "full":
+        if franchise_training_fully_complete_for_week(training_status, week):
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+            redirect_team_id = user_team_object_id if user_team_object_id else req.team_id
+            return {
+                "status": "already_completed",
+                "week": week,
+                "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training",
+            }
+        if franchise_user_training_applied_for_week(training_status, week) and int(
+            training_status.get("cpu_distant_complete_week") or 0
+        ) != week:
+            return _franchise_training_distant_phase_only(req.franchise_id)
+    elif phase == "user_only":
+        if franchise_training_fully_complete_for_week(training_status, week):
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+            redirect_team_id = user_team_object_id if user_team_object_id else req.team_id
+            return {
+                "status": "already_completed",
+                "week": week,
+                "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training",
+            }
+        if franchise_user_training_applied_for_week(training_status, week):
+            lt = franchise_doc.get("latest_training") or {}
+            user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+            return {
+                "status": "user_training_already_applied",
+                "week": week,
+                "training_highlights": build_training_loading_highlights(lt),
+                "team_id": user_team_object_id,
+                "redirect": None,
+            }
+    else:
+        raise HTTPException(status_code=400, detail="Invalid training phase")
     
     # Validate total training points allocated
     training_data = req.training_data
@@ -6705,16 +7016,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
             status_code=400,
             detail=f"Invalid training points allocation. Expected {expected_points} points, got {total_allocated}."
         )
-    if training_status.get("training_completed", False) and training_status.get("week") == week:
-        # Training already completed for this week, redirect to report
-        # ✅ SS&S: Use user_team_object_id from franchise document for redirect (authoritative)
-        user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-        redirect_team_id = user_team_object_id if user_team_object_id else req.team_id
-        return {
-            "status": "already_completed",
-            "week": week,
-            "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training"
-        }
 
     # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
     # This ensures we're always using the correct team, even if URL params are wrong
@@ -6992,17 +7293,11 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
     if 20 <= week <= 26 and str(week) not in recruiting_results:
         _process_weekly_recruiting_invites(franchise_doc)
 
-    # Mark training as completed and update status (still in franchise doc)
     session_type = training_status.get("session_type", "in-season")
-    franchise_update["training_status.training_completed"] = True
-    franchise_update["training_status.week"] = week
-    franchise_update["training_status.last_training_date"] = datetime.now().strftime("%Y-%m-%d")
-    
-    # Store training report data
     training_report_data = {
         "week": week,
-        "player_logs": player_logs,  # Standardized name (was player_changes)
-        "team_log": team_log,  # Standardized name (was team_changes)
+        "player_logs": player_logs,
+        "team_log": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": training_report.get("training_notes", []),
         "plays_data": training_report.get("plays_data", {}),
@@ -7010,149 +7305,74 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest):
         "plays_effectiveness_changes": training_report.get("plays_effectiveness_changes", {}),
         "defenses_effectiveness_changes": training_report.get("defenses_effectiveness_changes", {}),
         "session_type": session_type,
-        "date": datetime.now().strftime("%Y-%m-%d")
+        "date": datetime.now().strftime("%Y-%m-%d"),
     }
-    
-    # ✅ FTD: Store training report in FTD collection
+
+    franchise_update_user = {
+        "training_status.user_training_applied_week": week,
+        "training_status.training_completed": False,
+        "training_status.week": week,
+        "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
+        "latest_training": training_report_data,
+    }
+
     ftd_update[f"training_reports.{week}"] = training_report_data
-    
-    # Also save latest training for quick access (still in franchise doc for backward compatibility)
-    franchise_update["latest_training"] = training_report_data
-    
-    # ✅ FTD: Update FTD collection with all changes
+
     if ftd_update:
         franchise_team_data_collection.update_one(
             {"franchise_id": franchise_id, "team_id": team_object_id},
-            {"$set": ftd_update}
+            {"$set": ftd_update},
         )
 
-    # ✅ Distant training: all non-user teams use template-based training (Distant_Team_Training_System.md)
-    # During EOS weeks, skip training for teams eliminated from tournament (Franchise_Tournament_System.md)
-    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
-    training_type = "tc" if is_first_training else "regular"
-    eliminated_team_ids = set()
-    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
-        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
-    distant_templates = list(db["distant_training"].find({"training_type": training_type}))
-    if not distant_templates:
-        logger.warning(f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams")
-    else:
-        for ftd_doc in all_ftd_docs:
-            computer_team_oid = ftd_doc.get("team_id")
-            if computer_team_oid is None:
-                continue
-            computer_team_id_str = str(computer_team_oid)
-            if computer_team_id_str == str(team_id):
-                continue
-            if computer_team_id_str in eliminated_team_ids:
-                continue
-            try:
-                template = random.choice(distant_templates)
-                team_values = template.get("team_values", {})
-                players_template = template.get("players", {})
-                current_team_attrs = ftd_doc.get("team_attributes", {})
-                ftd_update = {}
-                for attr_name, delta in team_values.items():
-                    if attr_name not in TEAM_ATTR_CLAMPS:
-                        continue
-                    current = current_team_attrs.get(attr_name, 0)
-                    if isinstance(current, (int, float)) and isinstance(delta, (int, float)):
-                        lower, upper = TEAM_ATTR_CLAMPS[attr_name]
-                        delta_val = float(delta) if attr_name == "rebound_modifier" else int(delta)
-                        new_val = current + delta_val
-                        if upper is not None:
-                            new_val = max(lower, min(upper, new_val))
-                        else:
-                            new_val = max(lower, new_val)
-                        if attr_name == "rebound_modifier":
-                            new_val = round(new_val, 2)
-                        else:
-                            new_val = int(round(new_val))
-                        ftd_update[f"team_attributes.{attr_name}"] = new_val
-                set_payload = dict(ftd_update)
-                if template.get("community_engagement"):
-                    set_payload["pending_community_engagement"] = True
-                if set_payload:
-                    franchise_team_data_collection.update_one(
-                        {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                        {"$set": set_payload},
-                    )
-                player_order = ftd_doc.get("players")
-                if not player_order:
-                    team_doc = db.teams.find_one({"_id": computer_team_oid}, {"player_ids": 1})
-                    player_order = [str(pid) for pid in (team_doc.get("player_ids") or [])] if team_doc else []
-                else:
-                    player_order = [str(pid) for pid in player_order]
-                for i in range(min(12, len(player_order))):
-                    pid = player_order[i]
-                    player_key = f"player_{i}"
-                    if player_key not in players_template:
-                        continue
-                    fpd = franchise_players.get(pid)
-                    if not fpd:
-                        continue
-                    deltas = players_template[player_key]
-                    current_attrs = fpd.get("attributes", {})
-                    fpd_set = {}
-                    for attr_name, delta in deltas.items():
-                        if not isinstance(delta, (int, float)):
-                            continue
-                        current = current_attrs.get(attr_name, 0) or current_attrs.get(f"anchor_{attr_name}", 0)
-                        try:
-                            cur = int(current) if isinstance(current, (int, float)) else 0
-                        except (TypeError, ValueError):
-                            cur = 0
-                        new_val = cur + int(delta)
-                        new_val = max(PLAYER_ATTR_CLAMP[0], new_val)
-                        fpd_set[f"attributes.{attr_name}"] = new_val
-                        fpd_set[f"attributes.anchor_{attr_name}"] = new_val
-                    if fpd_set:
-                        franchise_players_data_collection.update_one(
-                            {"franchise_id": str(franchise_id), "player_id": pid},
-                            {"$set": fpd_set},
-                        )
-                    core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                    height = core_player.get("height") if core_player else None
-                    updated_attrs = dict(current_attrs)
-                    for k, v in fpd_set.items():
-                        if k.startswith("attributes."):
-                            updated_attrs[k.replace("attributes.", "")] = v
-                    meta = fpd.get("meta", {})
-                    player_for_ratings = {
-                        "attributes": updated_attrs,
-                        "height": height,
-                        "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}",
-                    }
-                    new_ratings = compute_position_ratings(player_for_ratings)
-                    franchise_players_data_collection.update_one(
-                        {"franchise_id": str(franchise_id), "player_id": pid},
-                        {"$set": {"position_ratings": new_ratings}},
-                    )
-                logger.info(f"✅ [DISTANT TRAINING] Applied template for team_id={computer_team_id_str}")
-            except Exception as e:
-                logger.error(f"❌ [DISTANT TRAINING] Error for team_id={computer_team_id_str}: {e}", exc_info=True)
-                continue
+    db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update_user})
 
-    if is_first_training:
+    training_highlights = build_training_loading_highlights(training_report_data)
+
+    if phase == "user_only":
+        return {
+            "status": "success",
+            "week": week,
+            "training_highlights": training_highlights,
+            "player_changes": player_logs,
+            "team_changes": team_log,
+            "coaching_focus": training_report.get("coaching_focus", {}),
+            "session_type": session_type,
+            "team_id": team_id,
+            "redirect": None,
+        }
+
+    _apply_franchise_distant_cpu_training(
+        franchise_id,
+        franchise_doc=franchise_doc,
+        user_team_id_str=str(team_id),
+        week=week,
+        is_first_training=is_first_training,
+        franchise_players=franchise_players,
+    )
+
+    cuts_ran_this_call = False
+    if is_first_training and not bool(training_status.get("cpu_training_camp_cuts_applied")):
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
+        cuts_ran_this_call = True
 
-    # Save to franchise document (includes both user team and computer teams)
-    db_update_start = time.time()
-    db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
-    db_update_time = (time.time() - db_update_start) * 1000
-    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: franchises.update_one(): {db_update_time:.2f}ms")
-    
-    total_time = (time.time() - endpoint_start) * 1000
-    # logger.warning(f"⏱️ [DB TIMING] run_franchise_training TOTAL: {total_time:.2f}ms")
-    
+    distant_update: dict[str, Any] = {
+        "training_status.training_completed": True,
+        "training_status.cpu_distant_complete_week": week,
+        "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
+    }
+    if cuts_ran_this_call:
+        distant_update["training_status.cpu_training_camp_cuts_applied"] = True
+    db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
+
     return {
         "status": "success",
         "week": week,
+        "training_highlights": training_highlights,
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
-        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}&from=training"
+        "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}&from=training",
     }
 
 

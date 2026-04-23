@@ -6,6 +6,10 @@ MACRO OBJECTIVE: We're building a game engine that is simple, stable, and scalab
 
 This file documents key game engine agents, roles, and architectural logic used by the Geeked Out Basketball simulation engine. It exists to help Codex, collaborators, and future developers reason about the system consistently.
 
+## Product scope (Franchise-first)
+
+**While this section stays in the document:** treat **Franchise mode** as the only active product priority for new work, fixes, and SS&S improvements. **Tournament** and **Single game** are **sunset**—do not extend or assume parity with franchise unless we explicitly revive them. Legacy routes and UI may still exist; default assumptions, tests, and docs should be **franchise-shaped**. Remove this section when product scope changes.
+
 ---
 
 ## 🎮 Game Structure

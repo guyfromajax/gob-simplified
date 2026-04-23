@@ -967,7 +967,6 @@ submitBtn.addEventListener('click', async function() {
     if (teamId) {
       payload.team_id = teamId;
     }
-    endpoint = '/franchise/run-training';
   } else if (mode === 'tournament' && tournamentId) {
     payload = {
       tournament_id: tournamentId,
@@ -993,35 +992,89 @@ submitBtn.addEventListener('click', async function() {
       const overlayTeamName = currentTeamName || 'Your team';
       window.PageLoadOverlay.show({
         variant: 'pulse',
-        subtitle: `${overlayTeamName} is executing training.`,
+        title: overlayTeamName,
+        subtitle: 'Preparing your training…',
         teamName: currentTeamName || '',
         assetKey: 'banner_primary'
       });
     }
-    
-    console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
-    console.log('🔍 [TRAINING] Payload:', payload);
-    
-    const url = API_CONFIG.buildUrl(endpoint) + (endpoint === '/franchise/run-training' ? '?profile=1' : '');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-      let detail = `HTTP error! status: ${response.status}`;
+
+    const jsonHeaders = Object.assign(
+      { 'Content-Type': 'application/json' },
+      (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
+    );
+
+    let result;
+
+    if (mode === 'franchise' && franchiseId) {
+      console.log('🔍 [TRAINING] Phase 1 (user) payload:', payload);
+      const userUrl = API_CONFIG.buildUrl('/franchise/run-training/user');
+      let userRes = await fetch(userUrl, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(payload)
+      });
+      let userResult = null;
       try {
-        const err = await response.json();
-        if (err && err.detail) detail = err.detail;
+        userResult = await userRes.json();
       } catch (_e) {}
-      throw new Error(detail);
+      if (userResult && userResult.status === 'already_completed' && userResult.redirect) {
+        result = userResult;
+      } else if (!userRes.ok) {
+        let detail = `HTTP error! status: ${userRes.status}`;
+        if (userResult && userResult.detail) detail = userResult.detail;
+        throw new Error(detail);
+      } else {
+        const highlights = (userResult && userResult.training_highlights) || [];
+        const overlayTeamName = currentTeamName || 'Your team';
+        const hlText = Array.isArray(highlights) && highlights.length
+          ? highlights.slice(0, 4).join(' · ')
+          : '';
+        if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+          window.PageLoadOverlay.show({
+            variant: 'pulse',
+            title: overlayTeamName,
+            subtitle: hlText || 'Finishing league training…',
+            teamName: currentTeamName || '',
+            assetKey: 'banner_primary'
+          });
+        }
+        const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
+        const distantRes = await fetch(distantUrl, {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: JSON.stringify({ franchise_id: franchiseId })
+        });
+        try {
+          result = await distantRes.json();
+        } catch (_e) {
+          result = null;
+        }
+        if (!distantRes.ok) {
+          let detail = `HTTP error! status: ${distantRes.status}`;
+          if (result && result.detail) detail = result.detail;
+          throw new Error(detail);
+        }
+      }
+    } else {
+      console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
+      console.log('🔍 [TRAINING] Payload:', payload);
+      const response = await fetch(API_CONFIG.buildUrl(endpoint), {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        let detail = `HTTP error! status: ${response.status}`;
+        try {
+          const err = await response.json();
+          if (err && err.detail) detail = err.detail;
+        } catch (_e) {}
+        throw new Error(detail);
+      }
+      result = await response.json();
     }
-    
-    const result = await response.json();
-    
+
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
