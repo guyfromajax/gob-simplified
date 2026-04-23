@@ -1,122 +1,87 @@
-Rules to be involved in messaging. Note that all absolute values referned in the rules represent the final change, so they are inclusive of all multipliers
+# Training System — Live Feed
 
-**Player Drill Attributes**
-SC, SH, ID, OD, PS, BH, RB, AG, ST
--player's absolute gain must be > 3 or < -3
+All **loading-feed copy** lives in **`BackEnd/utils/training_feed_lines.py`**. This document describes **when** lines fire and **how** archetype routing works. Do not duplicate line lists here.
 
-**Team Drill Attributes**
-Offense Efficienty, Defense Efficiency, Fast Break Efficiency, P/T Efficiency, FB Opp Modifier, P/T Opp Modifer (scrimmage is excluded from this logic and has special logic below)
--Setting for the attribute traning must be > 1
+---
 
+## Values and thresholds
 
-**General Drill Attribures**
--ND, FT, and IQ -- same logic as Player Drills
--Breaks (special logic below)
+Rules use the **final** attribute change after multipliers (same as elsewhere in training docs).
 
-**Breaks Logic**
--Setting for breaks must be > 0
+### Player drill attributes
 
-**Scrimmages Logic**
--Setting for scrimmages must be > 0
+SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, FT, IQ
 
+- **Positive copy:** change **strictly greater than** 3 (i.e. 3 does **not** qualify).
+- **Negative copy:** change **strictly less than** -3 (i.e. -3 does **not** qualify).
 
+### Team drill attributes (report keys)
 
-**Player Attribute Message Structure**
-"{Player Name} {description} in {setting}."
--Player Name is the player's name
--Description is detailed below
--Setting is either "in drills" or "in team scrimmages"
- - in order to say "in team scrimmages" for any attribute, scrimmages setting must be > 0
- - in order to say "in drills", we take that on an attribute by attribute basis and each attribute's drill setting must be > 0
- - if one of scrimmages or drills language is omitted, use the other for 100% of messages
- - if both are omitted, omit all messages for that attribute
- - note two attributes do not read "in team drills" as an option, rather they use the following:
-    -ST: "in the weight room"
-    -ND: "in conditioning"
+Track changes for:
 
+- `offense_efficiency`
+- `defense_efficiency`
+- Fast break (same family of fields as in the training report; align with implementation)
+- `P_T` / press–trap efficiency (match stored key in report)
+- Fast break opponent modifier (match stored key, e.g. FB opp modifier)
+- P/T opponent modifier (match stored key)
 
-**Descriptions by Attribute**
-SC Positive
--is scoring well
--is dropping the ball through the hoop
--is showing great ball maneuvers near the basket
--is adjusting his inside shot well
+**Ignore for this feed:** anything tied to `shot_threshold` or `rebound_modifier` (per product direction).
 
-SC Negative
--is laying bricks
--is clanking his shots
--does not look good scoring
--is stuggling to finish shots
+Team lines use the **`TEAM_*`** pools in `training_feed_lines.py` (offense install, defense install, fast break install, press/trap install, scrimmages, breaks). Mapping from **which drill ran** → **which pool** is defined in code alongside the report shape.
 
-SH Positive
--is draining 3s
--is nailing his outside shots
--is unguardable on the outside
--is shooting extremely well
+### Breaks and scrimmages
 
-SH Negative
--is bricking his 3s
--is missing everything from outside the arc
--is not shooting well
--is not feeling his shot today
+- **Breaks:** include when breaks drill contribution / setting is **> 0** (copy from `TEAM_BREAKS_*`).
+- **Scrimmages:** include when scrimmage contribution / setting is **> 0** (copy from `TEAM_SCRIMMAGES_*`).
 
-ID Positive
--is guarding the rim well
--is playing great inside defense
--is looking strong on the inside, defensively,
+### Player line shape
 
-ID Negative
--is looking weak on the inside, defensively,
--is getting pushed around on the inside
--is not guarding the rim well
--is not guarding the inside well
+`{Player Name} {description}.`
 
-OD Positive
--is doing a great job guarding 3s
--is doing an awesome job guarding the perimeter
--is disrupting passing lanes
+- **Name:** player display name.
+- **Description:** one string chosen from the archetype pool for that attribute and direction (fragments in `training_feed_lines.py` are written to follow the name).
 
-OD Negative
--is letting too many easy 3s get shot
--is playing poor outside defense
--is not guarding the perimeter well
+---
 
-PS Positive
--is delivering crips passes
--is doing a great job finding the open man
--is setting up the outside shot with is passing well
+## Archetype routing (FTD + session)
 
-PS Negative
--is just off with is his passes
--is not passing well
--is missing open players
+**Inputs**
 
-BH Positive
+1. **FTD archetype counts** — four integer counters on the user franchise team doc (`authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder`). Used for **lead** and **combo** logic.
+2. **Current training session focus archetype** — the archetype selected for **this** training submission. Used together with FTD for weighted voice selection (implemented in `BackEnd/utils/training_loading_highlights.py`).
 
-BH Negative
+**Randomness:** use normal **`random`** for tie-breaks, line picks from pools, and weighted routing. Deterministic / seeded RNG is **not** required for tests.
 
-RB Positive
+**Lead archetype (from FTD only)**
 
-RB Negative
+- The archetype with the **highest** counter value is the **lead** archetype.
+- If two or more are **tied** for highest, pick the lead **at random** among those tied.
 
-ST Positive
+**Combo archetype (from FTD only)**
 
-ST Negative
+- Sort the four archetypes by counter **descending** (1st = highest, 4th = lowest).
+- A **combo** is in play **if and only if**  
+  **second-ranked value > third-ranked value + 3**  
+  (strict inequality on the gap). Otherwise there is **no** combo archetype for routing.
+- When combo is in play, the **second-ranked** archetype is the **combo** voice (exact blending with lead/session is implemented in code).
 
-AG Positive
+**Voice weights (non-generic draws)**
 
-AG Negative
+- **25%** of picks use the **`generic`** archetype bucket (per line / per flavor draw).
+- If **no combo**: **70%** session, **30%** lead.
+- If **combo** is in play: **70%** session, **15%** lead, **15%** combo (second-ranked archetype).
 
-ND Positive
+**Output cap:** **36** lines maximum (one flavor line first when present, then shuffled player/team/scrimmage/break lines; duplicates removed).
 
-ND Negative
+**`COACHING_FOCUS_FLAVOR`**
 
-IQ Positive
+- Session-level one-liners in `training_feed_lines.py`.
+- Emit **exactly one** flavor line **every** time the loading feed is built for a training session, chosen from `COACHING_FOCUS_FLAVOR` using the same archetype routing weights as other session copy (implementation detail in `training_loading_highlights.py`).
 
-IQ Negative
+---
 
-FT Positive
+## Highlight builder behavior (product direction)
 
-FT Negative
-
-
+- **Replace** legacy loading lines: remove standalone SH-only blurbs, **training_notes**, **coaching focus label** line, **play effectiveness** and **defense effectiveness** delta lines from the previous highlight builder; drive the feed from **`training_feed_lines.py`** plus the rules above.
+- Output cap and ordering are defined in **`BackEnd/utils/training_loading_highlights.py`** (max **36** lines; flavor first).

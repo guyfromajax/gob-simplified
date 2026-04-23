@@ -48,6 +48,11 @@ from BackEnd.utils.franchise_training_state import (
     franchise_user_training_applied_for_week,
 )
 from BackEnd.utils.training_loading_highlights import build_training_loading_highlights
+from BackEnd.utils.franchise_coaching_focus_counts import (
+    COACHING_FOCUS_FTD_COUNT_KEYS,
+    carryover_coaching_focus_counts_for_new_season,
+    user_ftd_coaching_focus_increment,
+)
 from BackEnd.utils.franchise_geek_points import (
     maybe_award_franchise_loss_geek_points,
     maybe_award_franchise_win_geek_points,
@@ -6985,10 +6990,22 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         if franchise_user_training_applied_for_week(training_status, week):
             lt = franchise_doc.get("latest_training") or {}
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+            ftd_override = lt.get("ftd_coaching_focus")
+            if not isinstance(ftd_override, dict):
+                ftd_row = franchise_team_data_collection.find_one(
+                    {"franchise_id": franchise_id, "team_id": ObjectId(user_team_object_id)},
+                    {"coaching_focus": 1},
+                ) or {}
+                raw_cf = ftd_row.get("coaching_focus") or {}
+                ftd_override = {
+                    k: int(raw_cf.get(k, 0) or 0) for k in COACHING_FOCUS_FTD_COUNT_KEYS
+                }
             return {
                 "status": "user_training_already_applied",
                 "week": week,
-                "training_highlights": build_training_loading_highlights(lt),
+                "training_highlights": build_training_loading_highlights(
+                    lt, ftd_coaching_focus=ftd_override
+                ),
                 "team_id": user_team_object_id,
                 "redirect": None,
             }
@@ -7296,6 +7313,14 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         _process_weekly_recruiting_invites(franchise_doc)
 
     session_type = training_status.get("session_type", "in-season")
+    ftd_counts_for_highlights: dict[str, int] = {}
+    pre_cf = ftd_doc.get("coaching_focus") or {}
+    for _k in COACHING_FOCUS_FTD_COUNT_KEYS:
+        try:
+            ftd_counts_for_highlights[_k] = int(pre_cf.get(_k, 0) or 0)
+        except (TypeError, ValueError):
+            ftd_counts_for_highlights[_k] = 0
+
     training_report_data = {
         "week": week,
         "player_logs": player_logs,
@@ -7308,6 +7333,8 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "defenses_effectiveness_changes": training_report.get("defenses_effectiveness_changes", {}),
         "session_type": session_type,
         "date": datetime.now().strftime("%Y-%m-%d"),
+        "ftd_coaching_focus": ftd_counts_for_highlights,
+        "team_drills": training_data.get("team_drills") or {},
     }
 
     franchise_update_user = {
@@ -7320,10 +7347,24 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
 
     ftd_update[f"training_reports.{week}"] = training_report_data
 
+    ftd_ops: dict[str, Any] = {}
     if ftd_update:
+        ftd_ops["$set"] = ftd_update
+    cf_inc = user_ftd_coaching_focus_increment(
+        coaching_focus,
+        training_camp_first_week=is_first_training,
+    )
+    if cf_inc:
+        ftd_ops["$inc"] = cf_inc
+        for _path, _inc in cf_inc.items():
+            _sub = _path.replace("coaching_focus.", "")
+            if _sub in ftd_counts_for_highlights:
+                ftd_counts_for_highlights[_sub] = ftd_counts_for_highlights.get(_sub, 0) + int(_inc)
+        training_report_data["ftd_coaching_focus"] = ftd_counts_for_highlights
+    if ftd_ops:
         franchise_team_data_collection.update_one(
             {"franchise_id": franchise_id, "team_id": team_object_id},
-            {"$set": ftd_update},
+            ftd_ops,
         )
 
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update_user})
@@ -8276,6 +8317,9 @@ def finish_season(req: FinishSeasonRequest):
             RECRUITING_ORDERS_WEEK_35_FIELD: {},
             "recruit_visit": None,
             "training_reports": {},
+            "coaching_focus": carryover_coaching_focus_counts_for_new_season(
+                existing_ftd.get("coaching_focus")
+            ),
             "total_player_attrs": total_player_attrs,
             "prestige": int(existing_ftd.get("prestige", 0) or 0),
             "sos_avg": SOS_AVG_DEFAULT,
@@ -8323,6 +8367,7 @@ def finish_season(req: FinishSeasonRequest):
                     RECRUITING_ORDERS_WEEK_35_FIELD: state[RECRUITING_ORDERS_WEEK_35_FIELD],
                     "recruit_visit": state["recruit_visit"],
                     "training_reports": state["training_reports"],
+                    "coaching_focus": state["coaching_focus"],
                     "total_player_attrs": state["total_player_attrs"],
                     "sos_avg": state["sos_avg"],
                     "sos_rank_sum": state["sos_rank_sum"],

@@ -47,10 +47,9 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 **Backend — highlight list**
 
-- Module: `BackEnd/utils/training_loading_highlights.py` — `build_training_loading_highlights(training_report)`.
-- Sources include: structured `training_notes` (`title: body` lines), per-player **SH** deltas (“shooting well / poorly in practice”), `coaching_focus.leaf_display_name`, top play/defense **effectiveness deltas**.
-- **`plays_effectiveness_changes`** keys are canonical **`play_id`** strings; copy resolves **display names** using `plays_data` and `BackEnd/utils/team_play_utils.py` (`resolve_team_play`, `get_team_play_display_name`). **`defenses_effectiveness_changes`** keys are defense **set names** (not ObjectIds).
-- Returns up to 24 de-duplicated lines for the client to consume.
+- Module: `BackEnd/utils/training_loading_highlights.py` — `build_training_loading_highlights(training_report, ftd_coaching_focus=...)`.
+- Copy comes from `BackEnd/utils/training_feed_lines.py`: archetyped player/team/scrimmage/break lines plus one **`COACHING_FOCUS_FLAVOR`** line per build. Uses `training_report.coaching_focus.archetype` (session) and `training_report.ftd_coaching_focus` (FTD counters; optional kwarg override). See `Training_System_Live_Feed.md`.
+- Returns up to **36** de-duplicated lines for the client to consume.
 
 **Frontend — stream behavior**
 
@@ -666,6 +665,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 - `plays` - User-team plays data after training
 - `scouting_data` - User-team scouting data after training
 - `pending_community_engagement` - Optional flag for next-game crowd impact
+- **`coaching_focus` (user team only, lazy from deploy forward):** object with integer counters for how many times the coach submitted training with each **archetype** in the current franchise season: `authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder`. Incremented on each successful **user** training execution (same moment as FTD `training_reports` / report persistence), normally by **+1** per archetype chosen. **Training camp** (franchise week 1 before the first game): that increment is **`random.randint(2, 4)`** instead of 1 (one roll per submit). **New season** (`POST /franchise/finish-season`): each of the four counters is replaced with **`int(round(prior * 0.25))`** — i.e. a **75% reduction**, carrying over 25% as the starting totals for the new season. Not backfilled for past weeks. CPU FTDs do not use this field. Implementation: `BackEnd/utils/franchise_coaching_focus_counts.py`; rollover applied in `finish_season` when FTDs are rewritten for the new year.
 
 **FPD / Franchise Player Data:**
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
@@ -705,11 +705,12 @@ In Franchise mode, when the user submits training for their team, all non-user t
 - `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/distant-cpu`, distant helper + idempotency); also `GET /franchise/training-report`, `GET /franchise/schedule`
 - `BackEnd/utils/training_loading_highlights.py` - `training_highlights` for loading feed
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
+- `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)
 
 ### Current Play / Report Identity Notes
 
 - Training report play deltas use `play_id` as the canonical key when available
 - `training_report["plays_effectiveness_changes"]` is keyed by `play_id` for offense and by defense name for defensive sets
 - The Training Report frontend resolves offensive deltas by `play_id` first, while still displaying the play `name`
-- **Training loading feed** (`build_training_loading_highlights`) resolves offensive delta keys to **play display names** using `plays_data` in the same report payload (so feed lines do not show raw ObjectId strings for plays)
+- **Training loading feed** (`build_training_loading_highlights`) does **not** surface play/defense effectiveness deltas; it uses archetyped copy from `training_feed_lines.py` (see `Training_System_Live_Feed.md`).
 - Offensive `playbook_settings` are now expected to be `play_id`-keyed, though runtime compatibility still tolerates older name-keyed maps
