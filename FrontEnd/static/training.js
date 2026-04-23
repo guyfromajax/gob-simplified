@@ -131,7 +131,7 @@ function resetPlayerMaximizerResolvedState() {
 }
 
 /** Distant-training overlay: rotate user-team highlight lines */
-const TRAINING_DISTANT_HIGHLIGHT_MS = 3000;
+const TRAINING_DISTANT_HIGHLIGHT_MS = 5000;
 const TRAINING_HIGHLIGHT_FALLBACK = 'Finishing league training…';
 
 function shuffleArrayInPlace(arr) {

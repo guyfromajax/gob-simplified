@@ -55,7 +55,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 - Files: `FrontEnd/static/training.js`, `FrontEnd/static/js/shared/pageLoadOverlay.js`.
 - Phase 1 overlay subtitle: **“Preparing your training…”** (team name as pulse title).
-- After phase 1 succeeds: highlights are **copied, Fisher–Yates shuffled**, and shown **one line at a time** (first line immediately, then every **3 seconds**). When the list is exhausted, the **last line stays** until distant training completes. If there are no highlights, a single fallback line is used: **“Finishing league training…”**.
+- After phase 1 succeeds: highlights are **copied, Fisher–Yates shuffled**, and shown **one line at a time** (first line immediately, then every **5 seconds**). When the list is exhausted, the **last line stays** until distant training completes. If there are no highlights, a single fallback line is used: **“Finishing league training…”**.
 - `PageLoadOverlay.updatePulseSubtitle(text)` updates only the subtitle between ticks (avoids re-running full `show()` each time).
 - Phase 1 and phase 2 requests include `API_CONFIG.getAuthHeaders()` (Bearer token).
 
