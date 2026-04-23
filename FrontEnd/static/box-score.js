@@ -1902,7 +1902,33 @@ function setupLockerRoomButton() {
     lockerRoomUrl = '/mode-select.html';
   }
 
-  cleanButton.textContent = 'Back to Locker Room';
+  const postGamePhaseBFromEog = urlParams.get('post_game_phase_b') === '1';
+  let showSimComputerGamesLabel = false;
+  if (
+    postGamePhaseBFromEog &&
+    navMode === 'franchise' &&
+    isFinalGame &&
+    urlFranchiseId &&
+    typeof localStorage !== 'undefined'
+  ) {
+    const pendingRaw = localStorage.getItem('franchise_complete_week_pending');
+    if (pendingRaw) {
+      try {
+        const pending = JSON.parse(pendingRaw);
+        if (
+          pending &&
+          pending.franchise_id != null &&
+          String(pending.franchise_id) === String(urlFranchiseId)
+        ) {
+          showSimComputerGamesLabel = true;
+        }
+      } catch (_e) {}
+    }
+  }
+
+  cleanButton.textContent = showSimComputerGamesLabel
+    ? 'Sim Computer Games'
+    : 'Back to Locker Room';
 
   cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();

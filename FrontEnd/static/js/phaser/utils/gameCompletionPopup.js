@@ -150,7 +150,19 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     ? `${potg.stats.pts} PTS · ${potg.stats.reb} REB · ${potg.stats.ast} AST · ${potg.stats.defPct} DEF%`
     : '';
 
-  // Box Score URL — after user side is resolved so `my_team` matches header banner on box-score
+  const franchisePhaseBPending =
+    mode === 'franchise' &&
+    finalScore &&
+    (finalScore.franchisePhaseBPending ||
+      (finalScore.franchiseCompleteWeekPayload
+        ? {
+            franchise_id: finalScore.franchiseCompleteWeekPayload.franchise_id,
+            week: finalScore.franchiseCompleteWeekPayload.week,
+          }
+        : null));
+
+  // Box Score URL — after user side is resolved so `my_team` matches header banner on box-score.
+  // post_game_phase_b=1: opened from EOG while phase B is pending; box-score shows "Sim Computer Games" when localStorage matches.
   const boxScoreParams = new URLSearchParams();
   if (gameId) boxScoreParams.set('game_id', gameId);
   if (homeTeam) boxScoreParams.set('home', homeTeam);
@@ -165,18 +177,11 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       boxScoreParams.set('banner_team', userTeamName);
     }
   }
+  if (franchisePhaseBPending) {
+    boxScoreParams.set('post_game_phase_b', '1');
+  }
   const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
 
-  const franchisePhaseBPending =
-    mode === 'franchise' &&
-    finalScore &&
-    (finalScore.franchisePhaseBPending ||
-      (finalScore.franchiseCompleteWeekPayload
-        ? {
-            franchise_id: finalScore.franchiseCompleteWeekPayload.franchise_id,
-            week: finalScore.franchiseCompleteWeekPayload.week,
-          }
-        : null));
   const lockerActionHtml = franchisePhaseBPending
     ? `<button type="button" class="completion-button locker-room-button franchise-sim-cpu-button">Sim Computer Games</button>`
     : `<a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>`;
