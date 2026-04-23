@@ -19,3 +19,16 @@ def test_player_changes_alias():
     report = {"player_changes": {"Pat Jones": {"SH": 1}}}
     lines = build_training_loading_highlights(report)
     assert "Pat Jones is shooting well in practice" in lines
+
+
+def test_play_effectiveness_uses_display_name_from_plays_data():
+    pid = "507f1f77bcf86cd799439011"
+    report = {
+        "plays_effectiveness_changes": {pid: 3},
+        "plays_data": {
+            pid: {"play_id": pid, "name": "Horns Flare", "effectiveness": 100},
+        },
+    }
+    lines = build_training_loading_highlights(report)
+    assert any("Play effectiveness Horns Flare: +3" in ln for ln in lines)
+    assert not any(f"Play effectiveness {pid}" in ln for ln in lines)

@@ -5,6 +5,15 @@ from __future__ import annotations
 from typing import Any, List, Mapping
 
 from BackEnd.models.training_notes import NSS
+from BackEnd.utils.team_play_utils import get_team_play_display_name, resolve_team_play
+
+
+def _play_effectiveness_display_name(play_key: str, plays_data: Any) -> str:
+    """Map plays_effectiveness_changes keys (often Mongo play_id) to human-readable play names."""
+    if not isinstance(plays_data, dict):
+        return play_key
+    pdata = resolve_team_play(plays_data, str(play_key))
+    return get_team_play_display_name(str(play_key), pdata)
 
 
 def build_training_loading_highlights(training_report: Mapping[str, Any] | None) -> List[str]:
@@ -58,6 +67,7 @@ def build_training_loading_highlights(training_report: Mapping[str, Any] | None)
             out.append(f"Coaching focus: {leaf}")
 
     pec = training_report.get("plays_effectiveness_changes") or {}
+    plays_data = training_report.get("plays_data") or {}
     if isinstance(pec, dict) and pec:
         ranked = sorted(
             ((str(k), int(v)) for k, v in pec.items() if isinstance(v, (int, float)) and int(v) != 0),
@@ -65,7 +75,8 @@ def build_training_loading_highlights(training_report: Mapping[str, Any] | None)
         )
         for play_key, delta in ranked[:2]:
             sign = "+" if delta > 0 else ""
-            out.append(f"Play effectiveness {play_key}: {sign}{delta}")
+            label = _play_effectiveness_display_name(play_key, plays_data)
+            out.append(f"Play effectiveness {label}: {sign}{delta}")
 
     dec = training_report.get("defenses_effectiveness_changes") or {}
     if isinstance(dec, dict) and dec:
