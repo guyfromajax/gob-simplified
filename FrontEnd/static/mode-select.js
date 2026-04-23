@@ -292,7 +292,7 @@ async function loadLeadersByTeam() {
               '<div class="lbt-leader-row">' +
               '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
               '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
-              '<span class="lbt-leader-points" style="color: ' + team.primary + ';">' + pts + '</span>' +
+              '<span class="lbt-leader-points">' + pts + '</span>' +
               '</div>'
             );
           }).join('')
