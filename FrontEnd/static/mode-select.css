@@ -152,6 +152,7 @@ body.mode-select-page .community-panel {
   padding: 16px 20px 10px;
   height: 100%;
   width: 100%;
+  box-sizing: border-box;
 }
 
 body.mode-select-page .community-panel-header {
