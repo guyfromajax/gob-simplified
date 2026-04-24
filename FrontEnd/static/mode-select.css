@@ -153,7 +153,6 @@ body.mode-select-page .community-highlights-loading {
 
 body.mode-select-page .community-highlight-row {
   position: relative;
-  margin-left: 2px;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -170,7 +169,9 @@ body.mode-select-page .community-highlight-row-inner {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 14px;
+  margin: 1px;
+  padding: 11px 13px;
+  border-radius: 11px;
   background: rgba(15, 17, 22, 0.55);
 }
 
