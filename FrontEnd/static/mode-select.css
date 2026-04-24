@@ -22,6 +22,7 @@ body.mode-select-page .mode-wrapper {
   grid-template-rows: auto auto;
   column-gap: 28px;
   row-gap: 24px;
+  margin-bottom: 28px;
 }
 
 body.mode-select-page .alpha-disclaimer {
@@ -97,6 +98,11 @@ body.mode-select-page .franchise-home-card {
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
 }
 
+body.mode-select-page .community-section,
+body.mode-select-page .franchise-home-section {
+  display: flex;
+}
+
 body.mode-select-page .community-highlights-panel {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -128,6 +134,8 @@ body.mode-select-page .community-highlights-coming-soon {
 
 body.mode-select-page .community-panel {
   padding: 16px 20px 10px;
+  height: 100%;
+  width: 100%;
 }
 
 body.mode-select-page .community-panel-header {
