@@ -116,7 +116,7 @@ Steps are listed in the order they run today. Tags:
 
 ### 7. Documentation updates (after implementation)
 
-- [ ] `docs/docs_1_systems/05_GP_Supporting_Systems/End_Of_Game_System.md` — two-step flow.
+- [x] `docs/docs_1_systems/05_GP_Supporting_Systems/End_Of_Game_System.md` — two-step flow (phase-a / phase-b, monolith fallback, box-score flag, key files).
 - [ ] `docs/Franchise_Mode/Franchise_Weekly_Database_Saves.md` — Phase A vs B writes.
 
 ---

@@ -17,19 +17,21 @@
    - Single Game Mode: `/static/mode-select.html`
 5. **Key Files**:
    - `FrontEnd/static/js/phaser/gameScene.js` - Detects game completion, calls completion popup
-   - `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Creates completion popup, constructs navigation URLs
-   - `FrontEnd/static/box-score.js` - Handles "Go To Locker Room" button navigation
+   - `FrontEnd/static/js/phaser/finalizeGame.js` - Tournament save-result; franchise **phase-a** at EOG (see split API below)
+   - `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Creates completion popup, constructs navigation URLs, **Sim Computer Games** → **phase-b**
+   - `FrontEnd/static/box-score.js` - Locker room navigation; franchise **phase-b** when week finish is pending
+   - `FrontEnd/static/js/shared/pageLoadOverlay.js` - Full-page pulse overlay during **phase-b** (banner + copy + green bar)
+   - `BackEnd/api/franchise_routes.py` - `complete_week_phase_a`, `complete_week_phase_b`, monolithic `complete_week`
    - `BackEnd/api/api.py` - ObjectId serialization for tournament/franchise endpoints
 
 **End of Game System Flow (6 Steps)**
 
 1. **Game Completion Detection**: Game completes when Q4 ends (or overtime), detected in `gameScene.js` when `quarter === 4` and game is finalized
-2. **Backend Game Finalization** (Franchise Mode Only): 
-   - Frontend calls `/franchise/complete-week` with `result: { team1_id, team2_id, team1_score, team2_score }` (and optional `game_document`)
-   - Backend resolves team ids via `_normalize_team_id()` (ObjectId, or universal `teams` by _id/name/code, or canonical → name; see below)
-   - Player stats are finalized via `stat_updater.finalize_game()`
-   - **Team attributes are updated** based on game performance (win/loss, score differential, etc.)
-   - Updated team attributes are saved via the franchise team data persistence path (FTD) and reflected in the game's box score
+2. **Backend Game Finalization** (Franchise Mode — **split API**, April 2026): 
+   - **Phase A (automatic at EOG):** `POST /franchise/complete-week/phase-a` with the same body as the historical monolith (`franchise_id`, `week`, `game_id`, `result`, optional `game_document`). Persists the **user** game: `games` / EOG / inbox / `franchise.results[week]` user row, sets `post_game_status.phase_a_user_week`. Idempotent if phase A already completed for that week.
+   - **Phase B (user-triggered):** `POST /franchise/complete-week/phase-b` with **`{ franchise_id, week }` only**. Runs CPU games for the rest of the week, recruiting / rank-prestige / EOS side effects, week advance, and clears `post_game_status.phase_a_user_week`. Requires phase A done and non-empty `results[week]`; idempotent if franchise `week` already advanced past the request.
+   - **Monolith (fallback / legacy):** `POST /franchise/complete-week` still runs user block + CPU + advance in one call; if phase A already persisted the week row, the user block is skipped (see `franchise_routes.py`).
+   - Team id normalization, `stat_updater.finalize_game()`, and **team attribute updates** follow the same rules as before; see **Franchise post-game split (phase A / phase B)** below.
 3. **Completion Popup Display**: Shows final score, "Box Score" button, and "Go To Locker Room" button with all navigation parameters
 4. **Navigation Anchor Preservation**: Preserves complete navigation anchor set (mode, doc_id, team_id) for seamless return to command center
 5. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved (box score reflects updated team attributes)
@@ -135,7 +137,7 @@ The End of Game System handles game completion, displays final scores, and provi
 
 **Completion Popup:**
 - **Location:** `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`
-- **Display:** Shows final score, "Box Score" button, and "Go To Locker Room" button
+- **Display:** Shows final score, **Box Score**, and either **Sim Computer Games** (franchise, phase B pending) or **Go To Locker Room**. **Sim Computer Games** runs phase-b (pulse overlay), clears pending, navigates to the franchise command center.
 - **Parameters Passed:**
   - `gameId` - Game document ID
   - `mode` - Game mode: 'single', 'tournament', or 'franchise'
@@ -178,7 +180,7 @@ The End of Game System handles game completion, displays final scores, and provi
   - `away` - Away team name
   - **✅ SS&S (January 2025):** Also includes `mode`, `tournament_id`, `franchise_id`, and `team_id` for proper navigation from Box Score page
 
-**Box Score "Go To Locker Room" Button:**
+**Box Score primary action (Back to Locker Room / Sim Computer Games):**
 - **Location:** `FrontEnd/static/box-score.js` - `setupLockerRoomButton()` function
 - **Navigation Logic (Priority Order):**
   1. **Mode Parameter (Highest Priority):** If `mode` is set in URL params, use it directly
@@ -194,16 +196,47 @@ The End of Game System handles game completion, displays final scores, and provi
 - Navigation logic prioritizes URL parameters over localStorage to prevent stale data issues
 - Franchise mode uses correct path: `/static/franchise-command-center.html` (not `/franchise/command-center`)
 
+### Franchise post-game split (phase A / phase B) — April 2026
+
+Canonical franchise week completion is a **two-step HTTP flow** so the user’s game and box score are safe before CPU games run. Deeper design notes and inventory live in `docs/To Do/Post_Game_Split.md`.
+
+**Phase A — `POST /franchise/complete-week/phase-a`**
+
+- **Body:** Same as `CompleteWeekRequest`: `franchise_id`, `week`, `result` (`team1_id`, `team2_id`, `team1_score`, `team2_score`), optional `game_id`, optional `game_document`.
+- **Behavior:** Runs the shared user-game pipeline (`_complete_week_process_user_game_block`), merges the user row into `franchise.results[str(week)]`, persists `season_inbox`, sets `post_game_status.phase_a_user_week` to `week`.
+- **Response (success):** `{ status, phase: "a", idempotent, week, results_count }`. If phase A already completed for that week, returns **`idempotent: true`** without re-running side effects.
+- **Frontend:** `finalizeGame.js` shows **“Saving game…”**, POSTs phase-a when `canCompleteWeek` (franchise, no tournament, valid `week`). On success, writes `localStorage.franchise_complete_week_pending` as `JSON.stringify({ franchise_id, week })` and passes `franchisePhaseBPending` / `franchisePhaseAOk` into `finalScore` for the EOG popup.
+
+**Phase B — `POST /franchise/complete-week/phase-b`**
+
+- **Body:** `CompleteWeekPhaseBRequest`: **`franchise_id`**, **`week`** only.
+- **Preconditions:** Let `current_week` be the franchise doc’s `week`. If **`current_week > req.week`**, the week already advanced — returns **200** with **`idempotent: true`** (no-op). If **`current_week < req.week`**, **400**. If **`current_week == req.week`**, phase A must be done and `results[week]` must be a non-empty list; otherwise **409** (run phase-a or use the monolith).
+- **Behavior:** Loads saved week results from DB, runs `_complete_week_finish_cpu_and_persist` (CPU sims, recruiting, rank/prestige, EOS, week advance). Clears `post_game_status.phase_a_user_week` on successful persist.
+- **Response:** Extends the usual complete-week payload with `status`, `phase: "b"`, `idempotent`.
+- **Frontend triggers:**
+  - EOG popup: **Sim Computer Games** (`gameCompletionPopup.js`) — `PageLoadOverlay` pulse (team banner, **Simulating Computer Games**, green bar), then phase-b, clear `franchise_complete_week_pending`, navigate to FCC.
+  - Box score: **Back to Locker Room** or **Sim Computer Games** (see below) — same POST and overlay when pending matches URL `franchise_id`. Legacy pending shape `{ body: full CompleteWeekRequest }` still POSTs monolithic **`/franchise/complete-week`**.
+
+**Monolith — `POST /franchise/complete-week`**
+
+- **Body:** Same as phase A. Runs user block then `_complete_week_finish_cpu_and_persist` unless phase A already persisted `results[week]` (user block skipped to avoid double finalize / GP).
+- **Use:** Escape hatch for old clients or the box-score legacy pending `{ body }` path.
+
+**Box score URL flag (`post_game_phase_b=1`)**
+
+- When the EOG popup builds the **Box Score** link and phase B is pending, it appends **`post_game_phase_b=1`**.
+- `box-score.js` shows **Sim Computer Games** only if that flag is present **and** `localStorage.franchise_complete_week_pending` exists **and** `franchise_id` matches the URL. All other entry paths keep **Back to Locker Room**; phase-b wiring when pending is unchanged.
+
 ### Franchise complete-week team id resolution (February 2026)
 
-- **Endpoint:** `POST /franchise/complete-week` (request body: `franchise_id`, `week`, `result: { team1_id, team2_id, team1_score, team2_score }`, optional `game_id`, optional `game_document`).
-- **Frontend week resolution:** `finalizeGame()` in `FrontEnd/static/js/phaser/finalizeGame.js` resolves `week` in this order before posting `complete-week`:
+- **Endpoints:** Team ids in `result` apply to **phase-a** and the **monolith** the same way. **Phase-b** does not send `result`; the server uses the saved week row and schedule.
+- **Frontend week resolution:** `finalizeGame()` resolves `week` in this order **before posting phase-a**:
   1. `window.location.search`
   2. `localStorage.franchise_week`
   3. `simData.week`
   4. `simData.final_game_document.week`
   5. backend franchise state fallback via `/franchise/command-center/data`, then `/franchise/state`
-- **Reason for backend fallback:** Prevent intermittent franchise EOG failures where command-center navigation context is incomplete at game end; if local/frontend week sources are missing, the finalizer recovers the authoritative current franchise week instead of silently skipping `/franchise/complete-week`.
+- **Reason for backend fallback:** Prevent intermittent franchise EOG failures where command-center navigation context is incomplete at game end; if local/frontend week sources are missing, the finalizer recovers the authoritative current franchise week instead of silently skipping franchise completion.
 - **Team ids:** Backend normalizes `result.team1_id` and `result.team2_id` via `_normalize_team_id()` in `BackEnd/api/franchise_routes.py`:
   1. If the value is a valid ObjectId string, it is returned.
   2. Else lookup in universal `teams` by `_id`, `name`, or `code`; if found, return that document’s `_id`.
@@ -233,8 +266,11 @@ The End of Game System handles game completion, displays final scores, and provi
 ### Key Files
 
 - **`FrontEnd/static/js/phaser/gameScene.js`** - Detects game completion, calls completion popup
-- **`FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`** - Creates completion popup, constructs navigation URLs
-- **`FrontEnd/static/box-score.js`** - Handles "Go To Locker Room" button navigation
+- **`FrontEnd/static/js/phaser/finalizeGame.js`** - Franchise EOG: **phase-a**; builds `finalScore` with phase B pending for popup
+- **`FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`** - Completion popup; **phase-b** from **Sim Computer Games**; `post_game_phase_b` on box-score link when pending
+- **`FrontEnd/static/box-score.js`** - **phase-b** when `franchise_complete_week_pending` matches; label branching per `post_game_phase_b`
+- **`FrontEnd/static/js/shared/pageLoadOverlay.js`** - Pulse overlay during phase-b
+- **`BackEnd/api/franchise_routes.py`** - `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`
 - **`BackEnd/api/api.py`** - ObjectId serialization for tournament/franchise endpoints
 
 ### EOG Data Source & Access Method
