@@ -156,6 +156,7 @@ body.mode-select-page .community-highlight-row {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
   background: linear-gradient(
     125deg,
     var(--ch-primary, #27408e) 0%,
