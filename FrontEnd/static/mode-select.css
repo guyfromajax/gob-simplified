@@ -267,6 +267,7 @@ body.mode-select-page .leaders-by-team-link:hover {
 
 body.mode-select-page .franchise-home-slot {
   width: 100%;
+  display: flex;
 }
 
 body.mode-select-page .franchise-delete-row {
@@ -277,6 +278,8 @@ body.mode-select-page .franchise-delete-row {
 body.mode-select-page .franchise-home-card {
   margin: 0;
   overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 body.mode-select-page .franchise-home-card-empty {
