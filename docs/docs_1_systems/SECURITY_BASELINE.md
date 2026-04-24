@@ -49,6 +49,9 @@
 - `POST /franchise/complete-week`
 - `POST /franchise/complete-week/phase-a`
 - `POST /franchise/complete-week/phase-b`
+- `POST /franchise/press-conference/session` — create session (auth + franchise ownership)
+- `POST /franchise/press-conference/session/{session_id}/answer` — append answer
+- `POST /franchise/press-conference/session/{session_id}/complete` — mark session completed
 - `GET /franchise/command-center/data`
 - `GET /franchise/standings`
 - `GET /franchise/schedule`

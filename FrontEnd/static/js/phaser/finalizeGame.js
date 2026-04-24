@@ -320,7 +320,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       franchiseCompleteWeekPayload = requestBody;
       franchisePhaseBPending = { franchise_id: franchiseId, week };
 
-      // Phase A: persist user game only; EOG "Sim Computer Games" → phase-b (CPU + week advance)
+      // Phase A: persist user game only; EOG "Post-Game Press Conference" → phase-b (CPU + week advance) in PGPC modal
       showStatus('Saving game...');
       console.warn('[COMPLETE-WEEK TRACE] POSTing /franchise/complete-week/phase-a', { week, gameId, franchiseId });
       const res = await fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-a'), {
@@ -339,6 +339,26 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
             localStorage.setItem(
               'franchise_complete_week_pending',
               JSON.stringify({ franchise_id: franchiseId, week })
+            );
+            const teamIdSnap =
+              params.get('team_id') || params.get('home_id') || params.get('away_id') || null;
+            const gid = simData.game_id || simData._id;
+            localStorage.setItem(
+              'franchise_eog_pgpc_snapshot',
+              JSON.stringify({
+                gameId: gid,
+                franchiseId,
+                teamId: teamIdSnap,
+                week,
+                my_team: params.get('my_team'),
+                homeTeam: homeTeamObj.name,
+                awayTeam: awayTeamObj.name,
+                homeScore,
+                awayScore,
+                winner,
+                franchisePhaseBPending: { franchise_id: franchiseId, week },
+                franchisePhaseAOk: true,
+              })
             );
           }
         } catch (_) {}
