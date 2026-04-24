@@ -146,7 +146,7 @@ body.mode-select-page .community-highlights-coming-soon {
 
 body.mode-select-page .community-panel {
   padding: 16px 20px 10px;
-  height: 100%;
+  height: auto;
   width: 100%;
 }
 
@@ -271,6 +271,8 @@ body.mode-select-page .franchise-home-slot {
 body.mode-select-page .franchise-delete-row {
   width: 100%;
   padding-top: 10px;
+  height: 0;
+  overflow: visible;
 }
 
 body.mode-select-page .franchise-home-card {
