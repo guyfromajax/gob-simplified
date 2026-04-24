@@ -21,11 +21,11 @@ body.mode-select-page .mode-wrapper {
   grid-template-columns: 60fr 40fr;
   grid-template-areas:
     "franchise community"
+    "delete ."
     "highlights highlights";
   column-gap: 28px;
   row-gap: 24px;
   margin-bottom: 28px;
-  align-items: start;
 }
 
 body.mode-select-page .alpha-disclaimer {
@@ -109,11 +109,14 @@ body.mode-select-page .franchise-home-section {
 body.mode-select-page .franchise-home-section {
   grid-area: franchise;
   display: flex;
-  flex-direction: column;
 }
 
 body.mode-select-page .community-section {
   grid-area: community;
+}
+
+body.mode-select-page .franchise-delete-section {
+  grid-area: delete;
 }
 
 body.mode-select-page .community-highlights-panel {
@@ -147,7 +150,7 @@ body.mode-select-page .community-highlights-coming-soon {
 
 body.mode-select-page .community-panel {
   padding: 16px 20px 10px;
-  height: auto;
+  height: 100%;
   width: 100%;
 }
 
@@ -264,7 +267,6 @@ body.mode-select-page .leaders-by-team-link:hover {
 }
 
 body.mode-select-page .franchise-home-slot {
-  flex: 1;
   width: 100%;
   display: flex;
 }
@@ -278,6 +280,7 @@ body.mode-select-page .franchise-home-card {
   margin: 0;
   overflow: hidden;
   width: 100%;
+  height: 100%;
 }
 
 body.mode-select-page .franchise-home-card-empty {
@@ -828,6 +831,7 @@ body.mode-select-page .lbt-no-leaders {
     grid-template-columns: 1fr;
     grid-template-areas:
       "franchise"
+      "delete"
       "community"
       "highlights";
   }
