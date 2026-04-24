@@ -15,7 +15,7 @@ Modal over `court.html` with dummy copy for plumbing:
 
 - **10 questions:** “Question 1” … “Question 10”
 - **5 options each:** “Answer A” … “Answer E”, rows labeled **A–E**, `click-tiny.wav` on choice
-- **While user finishes before phase B:** team banner, **“Simming Computer Games”**, green horizontal pulse (in-modal, not `PageLoadOverlay`)
+- **While user finishes before phase B:** team **logo** (square asset), **“Simming Computer Games”**, green horizontal pulse — no PGPC title or team name on this screen (in-modal, not `PageLoadOverlay`)
 - **After phase B and all questions:** “Week {week} complete.”, small summary line **`A: n, B: n, …`**, **Go To Locker Room** → FCC; `POST .../complete` marks the session; pending localStorage cleared on successful phase B
 
 If phase B finishes first, after the last answer the same completion view appears immediately.

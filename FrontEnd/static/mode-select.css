@@ -157,7 +157,7 @@ body.mode-select-page .community-panel {
 
 body.mode-select-page .community-panel-header {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
@@ -175,6 +175,35 @@ body.mode-select-page .community-panel-title {
 body.mode-select-page .community-panel-metric {
   font-size: 12px;
   color: #9e9d9d;
+}
+
+.ms-leaderboard-toggle-wrap {
+  display: inline-flex;
+}
+
+.ms-leaderboard-toggle {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: transparent;
+  color: rgba(255,255,255,0.38);
+  font-family: 'Bebas Neue', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.ms-leaderboard-toggle.active {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.22);
+  color: #ffffff;
+}
+
+.ms-leaderboard-toggle:hover {
+  border-color: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.6);
 }
 
 .ms-leaderboard-subtitle {
@@ -221,6 +250,14 @@ body.mode-select-page .community-username {
   font-size: 15px;
   font-weight: 600;
   color: #ffffff;
+}
+
+body.mode-select-page .community-username-fragment {
+  color: #ffffff;
+}
+
+body.mode-select-page .community-team-name {
+  font-weight: 600;
 }
 
 body.mode-select-page .community-leaderboard-row.is-current-user .community-username {

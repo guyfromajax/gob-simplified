@@ -108,26 +108,21 @@ function ensurePgpcStyles() {
       color: #F79420;
       min-width: 28px;
     }
-    .pgpc-wait-banner {
-      width: 100%;
-      border-radius: 14px;
+    .pgpc-wait-logo {
+      width: 140px;
+      max-width: 55%;
+      height: auto;
       display: block;
+      margin: 0 auto;
+      border-radius: 12px;
       box-shadow: 0 14px 28px rgba(0,0,0,0.35);
-    }
-    .pgpc-wait-headline {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 40px;
-      color: #fff;
-      text-align: center;
-      margin: 18px 0 10px;
-      line-height: 1;
     }
     .pgpc-wait-sub {
       font-family: 'Inter', sans-serif;
       font-size: 15px;
       color: rgba(255,255,255,0.68);
       text-align: center;
-      margin: 0 0 20px;
+      margin: 22px 0 20px;
     }
     .pgpc-pulse-track {
       width: min(220px, 100%);
@@ -180,11 +175,12 @@ function formatSummary(counts) {
   return ['A', 'B', 'C', 'D', 'E'].map((k) => `${k}: ${c[k] != null ? c[k] : 0}`).join(', ');
 }
 
-function bannerSrcForTeam(userTeamName) {
+/** Square team logo for the “still simming” waiting state (after all PC questions). */
+function logoSrcForTeam(userTeamName) {
   if (userTeamName && typeof getTeamAssetPath === 'function') {
-    return getTeamAssetPath(userTeamName, 'banner_primary');
+    return getTeamAssetPath(userTeamName, 'logo_square');
   }
-  return '/images/teams/general/general_banner_primary.jpg';
+  return '/images/teams/general/general_logo_square.png';
 }
 
 /**
@@ -345,11 +341,9 @@ export async function launchPostGamePressConference(opts) {
   }
 
   function renderWaitingView() {
-    const src = bannerSrcForTeam(userTeamName);
+    const src = logoSrcForTeam(userTeamName);
     renderBody(`
-      <p class="pgpc-title">Post-Game Press Conference</p>
-      <img class="pgpc-wait-banner" src="${src}" alt="" />
-      <h2 class="pgpc-wait-headline">${(userTeamName || 'Your team').replace(/</g, '')}</h2>
+      <img class="pgpc-wait-logo" src="${src}" alt="" />
       <p class="pgpc-wait-sub">Simming Computer Games</p>
       <div class="pgpc-pulse-track" aria-hidden="true"><span class="pgpc-pulse-bar"></span></div>
     `);
