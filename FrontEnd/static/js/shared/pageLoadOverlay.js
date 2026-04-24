@@ -51,15 +51,32 @@
       overlay.appendChild(content);
     }
 
-    var img = content.querySelector('img');
-    if (!img) {
-      img = document.createElement('img');
-      img.className = 'page-load-overlay-spinner';
-      img.alt = 'Loading…';
-      content.appendChild(img);
+    // Spinner must use .page-load-overlay-spinner so applyPulseVariant can hide it. Static HTML
+    // (e.g. court.html) may inject a bare <img> loader without that class.
+    var spinnerImg = content.querySelector('.page-load-overlay-spinner');
+    if (!spinnerImg) {
+      for (var ci = 0; ci < content.children.length; ci++) {
+        var ch = content.children[ci];
+        if (
+          ch &&
+          ch.tagName === 'IMG' &&
+          !ch.classList.contains('page-load-overlay-pulse-image')
+        ) {
+          ch.className = 'page-load-overlay-spinner';
+          ch.alt = 'Loading…';
+          spinnerImg = ch;
+          break;
+        }
+      }
     }
-    img.src = LOADER_IMG_PATH;
-    img.style.cssText = 'width:240px;height:auto;max-width:90vw;';
+    if (!spinnerImg) {
+      spinnerImg = document.createElement('img');
+      spinnerImg.className = 'page-load-overlay-spinner';
+      spinnerImg.alt = 'Loading…';
+      content.appendChild(spinnerImg);
+    }
+    spinnerImg.src = LOADER_IMG_PATH;
+    spinnerImg.style.cssText = 'width:240px;height:auto;max-width:90vw;';
 
     var message = content.querySelector('.page-load-overlay-message');
     if (!message) {
@@ -156,10 +173,12 @@
   function applyPulseVariant(overlay, options) {
     var content = overlay.querySelector('.page-load-overlay-content');
     if (!content) return;
-    var spinner = content.querySelector('.page-load-overlay-spinner');
+    var spinners = content.querySelectorAll('.page-load-overlay-spinner');
+    for (var si = 0; si < spinners.length; si++) {
+      spinners[si].style.display = 'none';
+    }
     var message = content.querySelector('.page-load-overlay-message');
     var pulse = content.querySelector('.page-load-overlay-pulse');
-    if (spinner) spinner.style.display = 'none';
     if (message) message.style.display = 'none';
     if (!pulse) return;
 
