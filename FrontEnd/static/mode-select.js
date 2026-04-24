@@ -336,7 +336,9 @@ async function loadLeadersByTeam() {
   grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Loading...</div>';
 
   try {
-    var response = await fetch(API_CONFIG.buildUrl('/api/leaderboard/by-team'), {
+    var leaderboardView = currentLeaderboardView === 'rank' ? 'rank' : 'geek_points';
+    var endpoint = API_CONFIG.buildUrl('/api/leaderboard/by-team?view=' + encodeURIComponent(leaderboardView));
+    var response = await fetch(endpoint, {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch');
@@ -353,12 +355,14 @@ async function loadLeadersByTeam() {
 
       var leadersHtml = leaders.length > 0
         ? leaders.map(function (entry, i) {
-            var pts = displayLbtPoints(entry.geek_points);
+            var value = leaderboardView === 'rank'
+              ? (Number.isFinite(parseInt(entry.natl_rank, 10)) ? String(parseInt(entry.natl_rank, 10)) : '--')
+              : displayLbtPoints(entry.geek_points);
             return (
               '<div class="lbt-leader-row">' +
               '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
               '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
-              '<span class="lbt-leader-points">' + pts + '</span>' +
+              '<span class="lbt-leader-points">' + value + '</span>' +
               '</div>'
             );
           }).join('')
