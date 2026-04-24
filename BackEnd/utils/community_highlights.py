@@ -28,6 +28,17 @@ logger = logging.getLogger(__name__)
 FEED_DOC_ID = "global_feed"
 
 
+def _display_username_for_highlight(user_doc: dict | None) -> str:
+    """Match leaderboard naming: users.username, else email local-part, else Coach."""
+    if not user_doc:
+        return "Coach"
+    username = str(user_doc.get("username") or "").strip()
+    if username:
+        return username
+    email = str(user_doc.get("email") or "").strip()
+    return email.split("@", 1)[0].strip() if email else "Coach"
+
+
 def get_user_team_from_franchise_doc(franchise_doc: dict) -> tuple[str | None, str | None]:
     """Same behavior as franchise_routes.get_user_team_from_franchise (no import cycle)."""
     user_team_id = franchise_doc.get("user_team_id")
@@ -155,10 +166,13 @@ def flush_community_highlight_pending_after_week(
     user_doc = None
     if owner_id:
         try:
-            user_doc = users_collection.find_one({"_id": ObjectId(str(owner_id))}, {"user_name": 1})
+            user_doc = users_collection.find_one(
+                {"_id": ObjectId(str(owner_id))},
+                {"username": 1, "email": 1},
+            )
         except Exception:
             user_doc = None
-    user_name = (user_doc or {}).get("user_name") or "Coach"
+    display_username = _display_username_for_highlight(user_doc)
 
     _u_name, user_team_id_str = get_user_team_from_franchise_doc(fresh)
     if not user_team_id_str:
@@ -183,7 +197,7 @@ def flush_community_highlight_pending_after_week(
     now = datetime.now(timezone.utc)
     entry = {
         "at": now.isoformat(),
-        "user_name": user_name,
+        "username": display_username,
         "user_team_name": ut_name,
         "opponent_name": opp_name,
         "user_won": user_won,

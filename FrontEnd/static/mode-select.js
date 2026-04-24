@@ -317,7 +317,7 @@ function renderCommunityHighlights(data) {
     return;
   }
   communityHighlightsBody.innerHTML = entries.map(function (entry) {
-    var uname = escapeHtmlMs(entry.user_name || 'Coach');
+    var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
     var ut = escapeHtmlMs(entry.user_team_name || '?');
     var opp = escapeHtmlMs(entry.opponent_name || '?');
     var beatLost = entry.user_won ? 'beat' : 'lost to';
@@ -406,12 +406,18 @@ function displayLbtPoints(geekPoints) {
 
 async function loadLeadersByTeam() {
   var grid = document.getElementById('leaders-by-team-grid');
+  var title = document.querySelector('.leaders-by-team-title');
   if (!grid) return;
 
+  var leaderboardView = currentLeaderboardView === 'rank' ? 'rank' : 'geek_points';
+  if (title) {
+    title.textContent = leaderboardView === 'rank'
+      ? 'Leaders By Team (Rank)'
+      : 'Leaders By Team (Geek Points)';
+  }
   grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Loading...</div>';
 
   try {
-    var leaderboardView = currentLeaderboardView === 'rank' ? 'rank' : 'geek_points';
     var endpoint = API_CONFIG.buildUrl('/api/leaderboard/by-team?view=' + encodeURIComponent(leaderboardView));
     var response = await fetch(endpoint, {
       headers: getAuthHeaders(),

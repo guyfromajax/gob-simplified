@@ -11,7 +11,7 @@ Feed for the **Community Highlights** panel on **Mode Select** (`FrontEnd/static
 | **Audience** | **Universal** — every signed-in user sees the same feed (everyone’s entries). |
 | **Retention** | **20 rows maximum.** New rows insert at the top; when a 21st is added, **delete** the overflow from persistence so data does not grow beyond the visible list. |
 | **When to create an entry** | **Only after franchise `POST /franchise/complete-week/phase-b` completes successfully** — not after phase A. |
-| **Display name** | `user_name` from the user’s MongoDB `users` document. |
+| **Display name** | `username` from the user’s MongoDB `users` document (email local-part when unset), same idea as the alpha leaderboard. |
 | **National rank** | User team’s **`natl_rank` from FTD** (`franchise_team_data`) **after** phase B persistence, with caveats below. |
 | **Geek Points (display)** | **Net GP earned from that completed user game only** — not season total, not lifetime account total. |
 | **V1 copy** | Single summary line per row (no box-score “highlights” stats in v1). |

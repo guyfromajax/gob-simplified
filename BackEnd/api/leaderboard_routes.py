@@ -78,11 +78,18 @@ async def get_leaderboard_by_team(
                 {"_id": 1, "user_id": 1, "user_team_id": 1, "user_team_object_id": 1},
             )
         )
+        latest_franchise_by_user_id: dict[str, dict] = {}
+        for franchise_doc in franchise_docs:
+            user_id = str(franchise_doc.get("user_id") or "").strip()
+            if not user_id:
+                continue
+            existing = latest_franchise_by_user_id.get(user_id)
+            if existing is None or franchise_doc["_id"] > existing["_id"]:
+                latest_franchise_by_user_id[user_id] = franchise_doc
 
         result: dict[str, list[dict[str, str | int]]] = {slug: [] for slug in A1_SLUG_TO_CANONICAL}
 
-        for franchise_doc in franchise_docs:
-            user_id = str(franchise_doc.get("user_id") or "").strip()
+        for user_id, franchise_doc in latest_franchise_by_user_id.items():
             username = usernames_by_user_id.get(user_id)
             if not username:
                 continue

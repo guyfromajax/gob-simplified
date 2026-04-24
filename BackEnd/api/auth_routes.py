@@ -619,11 +619,22 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
         }
     ))
     users_by_id = {entry["_id"]: entry for entry in entries}
+    latest_franchise_by_user_id = {}
+    for franchise_doc in franchise_docs:
+        user_id = str(franchise_doc.get("user_id") or "").strip()
+        if not user_id:
+            continue
+        existing = latest_franchise_by_user_id.get(user_id)
+        if existing is None or franchise_doc["_id"] > existing["_id"]:
+            latest_franchise_by_user_id[user_id] = franchise_doc
     team_ids = []
-    for doc in franchise_docs:
+    for doc in latest_franchise_by_user_id.values():
         team_oid = str(doc.get("user_team_object_id") or "").strip()
         if team_oid:
-            team_ids.append(ObjectId(team_oid))
+            try:
+                team_ids.append(ObjectId(team_oid))
+            except Exception:
+                pass
     teams_by_id = {}
     if team_ids:
         teams_by_id = {
@@ -635,8 +646,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
         }
 
     rank_entries_raw = []
-    for franchise_doc in franchise_docs:
-        user_id = str(franchise_doc.get("user_id") or "").strip()
+    for user_id, franchise_doc in latest_franchise_by_user_id.items():
         if not user_id:
             continue
         user_entry = users_by_id.get(user_id)
