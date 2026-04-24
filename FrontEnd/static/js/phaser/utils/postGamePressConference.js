@@ -353,7 +353,6 @@ export async function launchPostGamePressConference(opts) {
     const summary = formatSummary(choiceCounts);
     const weekLabel = Number.isFinite(weekNum) ? weekNum : '?';
     renderBody(`
-      <p class="pgpc-title">Post-Game Press Conference</p>
       <h2 class="pgpc-question" style="text-align:center;">Week ${weekLabel} complete.</h2>
       <p class="pgpc-complete-summary">${summary}</p>
       <button type="button" class="pgpc-primary-btn pgpc-gtlr">Go To Locker Room</button>
@@ -388,7 +387,6 @@ export async function launchPostGamePressConference(opts) {
     }
     if (!phaseBOk) {
       renderBody(`
-        <p class="pgpc-title">Post-Game Press Conference</p>
         <p class="pgpc-question" style="font-size:20px;">Could not finish computer games for this week. Check your connection and try again from the command center.</p>
         <button type="button" class="pgpc-primary-btn pgpc-dismiss">OK</button>
       `);
