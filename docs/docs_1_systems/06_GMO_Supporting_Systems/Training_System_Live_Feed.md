@@ -15,6 +15,8 @@ SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, FT, IQ
 - **Positive copy:** change **strictly greater than** 3 (i.e. 3 does **not** qualify).
 - **Negative copy:** change **strictly less than** -3 (i.e. -3 does **not** qualify).
 
+**Freshman** (`year` on the player, normalized to lowercase in the training report): use a wider dead band — **positive** only if change is **strictly greater than** 4; **negative** only if **strictly less than** -4. (4 and -4 do not qualify.)
+
 ### Team drill attributes (report keys)
 
 Track changes for:

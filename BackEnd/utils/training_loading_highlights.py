@@ -54,6 +54,17 @@ def _to_int_delta(raw: Any) -> Optional[int]:
             return None
 
 
+def _is_freshman_year(year_raw: Any) -> bool:
+    return str(year_raw or "").strip().lower() == "freshman"
+
+
+def _player_attr_delta_qualifies_for_feed(d: int, *, is_freshman: bool) -> bool:
+    """Match Training_System_Live_Feed.md: default ±3 band excluded; freshman ±4 band excluded."""
+    if is_freshman:
+        return d > 4 or d < -4
+    return d > 3 or d < -3
+
+
 def _session_archetype_to_pool_key(archetype: Optional[str]) -> str:
     if not archetype:
         return "generic"
@@ -158,15 +169,17 @@ def build_training_loading_highlights(
             name = str(player_name).strip()
             if not name:
                 continue
+            is_fr = _is_freshman_year(changes.get("year"))
             for attr, pools in _PLAYER_ATTR_POOLS.items():
                 d = _to_int_delta(changes.get(attr))
                 if d is None:
                     continue
-                if d <= 3 and d >= -3:
+                if not _player_attr_delta_qualifies_for_feed(d, is_freshman=is_fr):
                     continue
                 voice = _pick_voice_key(session_key, lead_key, combo_key)
                 pos_pool, neg_pool = pools
-                if d > 3:
+                pos_cut = 4 if is_fr else 3
+                if d > pos_cut:
                     frag = _choose_line_from_pool(pos_pool, voice)
                 else:
                     frag = _choose_line_from_pool(neg_pool, voice)

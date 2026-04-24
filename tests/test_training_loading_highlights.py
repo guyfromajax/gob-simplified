@@ -41,11 +41,11 @@ def test_delta_three_does_not_fire_player_line():
     assert len(lines) >= 1
 
 
-def test_strict_positive_four_fires_sc_line():
+def test_strict_positive_four_fires_sc_line_non_freshman():
     report = {
         "coaching_focus": {"archetype": "authoritarian"},
         "ftd_coaching_focus": _ftd(authoritarian=5),
-        "player_logs": {"Alex Smith": {"SC": 4}},
+        "player_logs": {"Alex Smith": {"SC": 4, "year": "senior"}},
     }
     with patch(
         "BackEnd.utils.training_loading_highlights.random.choice",
@@ -62,6 +62,50 @@ def test_strict_positive_four_fires_sc_line():
                 lines = build_training_loading_highlights(report)
     assert any("Alex Smith" in ln for ln in lines)
     assert lines[0]  # flavor line
+
+
+def test_freshman_positive_four_does_not_fire_player_line():
+    report = {
+        "coaching_focus": {"archetype": "authoritarian"},
+        "ftd_coaching_focus": _ftd(authoritarian=5),
+        "player_logs": {"Alex Smith": {"SC": 4, "year": "freshman"}},
+    }
+    with patch(
+        "BackEnd.utils.training_loading_highlights.random.choice",
+        lambda seq: seq[0],
+    ):
+        with patch(
+            "BackEnd.utils.training_loading_highlights.random.random",
+            return_value=0.99,
+        ):
+            with patch(
+                "BackEnd.utils.training_loading_highlights.random.shuffle",
+                lambda x: None,
+            ):
+                lines = build_training_loading_highlights(report)
+    assert not any("Alex Smith" in ln for ln in lines)
+
+
+def test_freshman_positive_five_fires_sc_line():
+    report = {
+        "coaching_focus": {"archetype": "authoritarian"},
+        "ftd_coaching_focus": _ftd(authoritarian=5),
+        "player_logs": {"Alex Smith": {"SC": 5, "year": "freshman"}},
+    }
+    with patch(
+        "BackEnd.utils.training_loading_highlights.random.choice",
+        lambda seq: seq[0],
+    ):
+        with patch(
+            "BackEnd.utils.training_loading_highlights.random.random",
+            return_value=0.99,
+        ):
+            with patch(
+                "BackEnd.utils.training_loading_highlights.random.shuffle",
+                lambda x: None,
+            ):
+                lines = build_training_loading_highlights(report)
+    assert any("Alex Smith" in ln for ln in lines)
 
 
 def test_player_changes_alias():
