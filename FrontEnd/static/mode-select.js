@@ -212,7 +212,7 @@ function displayCommunityLeaderboardPoints(geekPoints) {
 function renderCommunityLeaderboard(leaderboardData, currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  const topFive = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 6) : [];
+  const topFive = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 5) : [];
   const currentTopEntry = currentUserNormalized
     ? topFive.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
     : null;
