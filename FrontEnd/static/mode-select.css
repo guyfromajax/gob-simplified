@@ -276,6 +276,7 @@ body.mode-select-page .franchise-home-slot {
 body.mode-select-page .franchise-delete-row {
   width: 100%;
   padding-top: 10px;
+  transform: translateY(-8px);
 }
 
 body.mode-select-page .franchise-home-card {
