@@ -153,6 +153,7 @@ body.mode-select-page .community-highlights-loading {
 
 body.mode-select-page .community-highlight-row {
   position: relative;
+  margin-left: 2px;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
