@@ -25,6 +25,7 @@ const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
 const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
+const communityHighlightsBody = document.querySelector('.community-highlights-body');
 const leaderboardGeekPointsToggle = document.getElementById('leaderboard-view-geek-points');
 const leaderboardRankToggle = document.getElementById('leaderboard-view-rank');
 
@@ -298,6 +299,80 @@ async function loadCommunityLeaderboard(currentUsername) {
   });
   currentLeaderboardData = leaderboardData;
   renderCommunityLeaderboard(leaderboardData, currentUsername);
+}
+
+function formatHighlightGpLabel(gpDelta) {
+  var n = parseInt(gpDelta, 10);
+  if (!Number.isFinite(n) || n === 0) return '0 GP';
+  if (n > 0) return '+' + n + ' GP';
+  return String(n) + ' GP';
+}
+
+function renderCommunityHighlights(data) {
+  if (!communityHighlightsBody) return;
+  var entries = data && Array.isArray(data.entries) ? data.entries : [];
+  if (!entries.length) {
+    communityHighlightsBody.innerHTML =
+      '<div class="community-highlights-empty">No highlights yet — finish a franchise week to show up here.</div>';
+    return;
+  }
+  communityHighlightsBody.innerHTML = entries.map(function (entry) {
+    var uname = escapeHtmlMs(entry.user_name || 'Coach');
+    var ut = escapeHtmlMs(entry.user_team_name || '?');
+    var opp = escapeHtmlMs(entry.opponent_name || '?');
+    var beatLost = entry.user_won ? 'beat' : 'lost to';
+    var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
+    var primary = escapeHtmlMs(entry.primary_color || '#27408E');
+    var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
+    var gpLabel = formatHighlightGpLabel(entry.gp_delta);
+    var gpNum = parseInt(entry.gp_delta, 10);
+    var gpClass = 'community-highlight-gp' + ((Number.isFinite(gpNum) && gpNum < 0) ? ' is-neg' : ' is-pos');
+    var copy =
+      uname +
+      ', coaching ' +
+      ut +
+      ' ' +
+      beatLost +
+      ' ' +
+      opp +
+      '. ' +
+      ut +
+      ' is now ranked ' +
+      rankLabel +
+      ' in the nation.';
+    return (
+      '<div class="community-highlight-row" style="--ch-primary:' +
+      primary +
+      ';--ch-secondary:' +
+      secondary +
+      '">' +
+      '<div class="community-highlight-row-inner">' +
+      '<div class="community-highlight-copy">' +
+      copy +
+      '</div>' +
+      '<div class="' +
+      gpClass +
+      '">' +
+      escapeHtmlMs(gpLabel) +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+async function loadCommunityHighlights() {
+  if (!communityHighlightsBody) return;
+  communityHighlightsBody.innerHTML = '<div class="community-highlights-loading">Loading…</div>';
+  var data = await safeJsonFetch(API_CONFIG.buildUrl('/api/community/highlights'), {
+    headers: getAuthHeaders()
+  });
+  if (!data) {
+    communityHighlightsBody.innerHTML =
+      '<div class="community-highlights-empty">Sign in to see community highlights.</div>';
+    return;
+  }
+  renderCommunityHighlights(data);
 }
 
 function wireLeaderboardViewToggles(currentUsername) {
@@ -650,6 +725,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   setLeaderboardView('geek_points');
   wireLeaderboardViewToggles(currentUsername);
   await loadCommunityLeaderboard(currentUsername);
+  await loadCommunityHighlights();
   wireLeadersByTeamModal();
 
   if (logoutBtn) {

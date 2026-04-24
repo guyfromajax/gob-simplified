@@ -58,6 +58,12 @@ from BackEnd.utils.franchise_geek_points import (
     maybe_award_franchise_loss_geek_points,
     maybe_award_franchise_win_geek_points,
 )
+from BackEnd.utils.community_highlights import (
+    build_community_highlight_pending,
+    flush_community_highlight_pending_after_week,
+    user_geek_points_delta_for_user_game_block,
+    user_geek_points_snapshot_for_franchise,
+)
 from BackEnd.utils.franchise_championships import (
     maybe_award_conference_rs_championship,
     maybe_award_franchise_eos_title_championship,
@@ -2427,7 +2433,8 @@ def _complete_week_process_user_game_block(
     week_games_meta: list | None,
     user_team_id_str: Any,
     _u_name: str | None,
-) -> tuple[dict, dict]:
+) -> tuple[dict, dict, int]:
+    gp_before = user_geek_points_snapshot_for_franchise(franchise_doc)
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
@@ -2754,7 +2761,8 @@ def _complete_week_process_user_game_block(
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
     
-    return user_res, user_row
+    gp_delta = user_geek_points_delta_for_user_game_block(franchise_doc, gp_before)
+    return user_res, user_row, gp_delta
 
 
 def _complete_week_finish_cpu_and_persist(
@@ -2770,6 +2778,7 @@ def _complete_week_finish_cpu_and_persist(
     team1_id: Any,
     team2_id: Any,
     results: list,
+    community_highlight_pending: dict | None = None,
 ) -> dict:
     def _award_gp_sim(winner_tid: Any, eos_g: dict | None, matchup_ids: tuple[Any, Any]) -> None:
         eos_meta = eos_g if week in ft.EOS_WEEKS else None
@@ -3122,10 +3131,20 @@ def _complete_week_finish_cpu_and_persist(
         sorted(update_fields.keys()),
     )
     update_fields["post_game_status.phase_a_user_week"] = None
+    if community_highlight_pending is not None:
+        update_fields["post_game_status.community_highlight_pending"] = community_highlight_pending
     db.franchises.update_one(
         {"_id": franchise_id},
         {"$set": update_fields},
     )
+    try:
+        flush_community_highlight_pending_after_week(franchise_id, week)
+    except Exception:
+        logger.exception(
+            "[COMMUNITY_HIGHLIGHTS] flush after week persist failed franchise_id=%s week=%s",
+            franchise_id_str,
+            week,
+        )
     if update_fields.get("week") == 35:
         refreshed = db.franchises.find_one({"_id": franchise_id})
         if refreshed:
@@ -3173,6 +3192,7 @@ def complete_week(req: CompleteWeekRequest):
     team2_id = _normalize_team_id(user.team2_id)
 
     results = []
+    community_highlight_pending = None
     if _phase_a_user_week_done(franchise_doc, req.week):
         week_key = str(req.week)
         saved = franchise_doc.get("results", {}).get(week_key)
@@ -3183,7 +3203,7 @@ def complete_week(req: CompleteWeekRequest):
                 req.week,
             )
         else:
-            _, user_row = _complete_week_process_user_game_block(
+            _, user_row, gp_delta = _complete_week_process_user_game_block(
                 franchise_doc,
                 req,
                 franchise_id,
@@ -3192,8 +3212,14 @@ def complete_week(req: CompleteWeekRequest):
                 _u_name,
             )
             results.append(user_row)
+            community_highlight_pending = build_community_highlight_pending(
+                week=req.week,
+                user_team_id_str=user_team_id_str,
+                user_row=user_row,
+                gp_delta=gp_delta,
+            )
     else:
-        _, user_row = _complete_week_process_user_game_block(
+        _, user_row, gp_delta = _complete_week_process_user_game_block(
             franchise_doc,
             req,
             franchise_id,
@@ -3202,6 +3228,12 @@ def complete_week(req: CompleteWeekRequest):
             _u_name,
         )
         results.append(user_row)
+        community_highlight_pending = build_community_highlight_pending(
+            week=req.week,
+            user_team_id_str=user_team_id_str,
+            user_row=user_row,
+            gp_delta=gp_delta,
+        )
 
     return _complete_week_finish_cpu_and_persist(
         franchise_doc,
@@ -3216,6 +3248,7 @@ def complete_week(req: CompleteWeekRequest):
         team1_id,
         team2_id,
         results,
+        community_highlight_pending=community_highlight_pending,
     )
 
 
@@ -3253,7 +3286,7 @@ def complete_week_phase_a(req: CompleteWeekRequest):
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     _week_games, week_games_meta, _eos_cr = _resolve_complete_week_week_games(franchise_doc, req)
 
-    _, user_row = _complete_week_process_user_game_block(
+    _, user_row, gp_delta = _complete_week_process_user_game_block(
         franchise_doc,
         req,
         franchise_id,
@@ -3267,6 +3300,13 @@ def complete_week_phase_a(req: CompleteWeekRequest):
         user_row,
     )
 
+    ch_pending = build_community_highlight_pending(
+        week=req.week,
+        user_team_id_str=user_team_id_str,
+        user_row=user_row,
+        gp_delta=gp_delta,
+    )
+
     db.franchises.update_one(
         {"_id": franchise_id},
         {
@@ -3274,6 +3314,7 @@ def complete_week_phase_a(req: CompleteWeekRequest):
                 f"results.{str(req.week)}": merged,
                 "season_inbox": franchise_doc.get("season_inbox", []),
                 "post_game_status.phase_a_user_week": req.week,
+                "post_game_status.community_highlight_pending": ch_pending,
             }
         },
     )
@@ -3353,6 +3394,7 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
         team1_id,
         team2_id,
         results,
+        community_highlight_pending=None,
     )
     out["status"] = "ok"
     out["phase"] = "b"

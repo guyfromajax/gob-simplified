@@ -39,6 +39,7 @@
 
 #### Auth-Required (already)
 - `GET /api/auth/me` — returns user_id, email (requires `get_current_user`)
+- `GET /api/community/highlights` — universal franchise game highlight feed (requires `get_current_user`)
 
 #### User-Data Endpoints (require auth + ownership)
 

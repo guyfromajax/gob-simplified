@@ -135,17 +135,68 @@ body.mode-select-page .community-highlights-section {
 
 body.mode-select-page .community-highlights-body {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
   min-height: 200px;
 }
 
-body.mode-select-page .community-highlights-coming-soon {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  letter-spacing: 0.12em;
-  color: rgba(255,255,255,0.18);
-  text-transform: uppercase;
+body.mode-select-page .community-highlights-empty,
+body.mode-select-page .community-highlights-loading {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  padding: 28px 12px;
+}
+
+body.mode-select-page .community-highlight-row {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    125deg,
+    var(--ch-primary, #27408e) 0%,
+    var(--ch-secondary, #15181f) 100%
+  );
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+body.mode-select-page .community-highlight-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: rgba(15, 17, 22, 0.55);
+}
+
+body.mode-select-page .community-highlight-copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.94);
+  font-family: 'Inter', sans-serif;
+}
+
+body.mode-select-page .community-highlight-gp {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  min-width: 4.5rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body.mode-select-page .community-highlight-gp.is-pos {
+  color: #e8c36a;
+}
+
+body.mode-select-page .community-highlight-gp.is-neg {
+  color: #ff6b6b;
 }
 
 body.mode-select-page .community-panel {

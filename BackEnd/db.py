@@ -95,6 +95,7 @@ if client:
     # Password reset tokens (Step 11 - minimal email)
     password_reset_tokens_collection = db["password_reset_tokens"]
     press_conference_sessions_collection = db["press_conference_sessions"]
+    community_highlights_collection = db["community_highlights"]
     print("🔵 [DEBUG] db.py: Collections initialized", file=sys.stderr, flush=True)
 else:
     print("🔵 [DEBUG] db.py: Using mongomock (no MongoDB connection)", file=sys.stderr, flush=True)
@@ -124,6 +125,7 @@ else:
     # Password reset tokens (Step 11 - minimal email)
     password_reset_tokens_collection = db["password_reset_tokens"]
     press_conference_sessions_collection = db["press_conference_sessions"]
+    community_highlights_collection = db["community_highlights"]
     print("🔵 [DEBUG] db.py: Mongomock collections initialized", file=sys.stderr, flush=True)
 
 print("🔵 [DEBUG] db.py: Module initialization complete", file=sys.stderr, flush=True)
