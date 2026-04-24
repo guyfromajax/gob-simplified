@@ -25,6 +25,7 @@ body.mode-select-page .mode-wrapper {
   column-gap: 28px;
   row-gap: 24px;
   margin-bottom: 28px;
+  align-items: start;
 }
 
 body.mode-select-page .alpha-disclaimer {
@@ -271,8 +272,6 @@ body.mode-select-page .franchise-home-slot {
 body.mode-select-page .franchise-delete-row {
   width: 100%;
   padding-top: 10px;
-  height: 0;
-  overflow: visible;
 }
 
 body.mode-select-page .franchise-home-card {
