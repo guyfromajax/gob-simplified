@@ -96,6 +96,9 @@ function ensurePgpcStyles() {
       text-align: left;
       transition: background 0.12s ease, border-color 0.12s ease;
       font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: normal;
       color: rgba(255,255,255,0.92);
     }
     .pgpc-choice-row:hover {

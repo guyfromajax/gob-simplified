@@ -5,6 +5,12 @@
 5. Cap player movement on Fast Break animations
 6. Don't animate rebound / BIP on Final Shot FT
 7. Wire slow it down and quick shot with tempo
+8. OTB fouls need to animate the rebound
+9. Dunks! I need DUNKS!
+10. Block bug, away team had ball, away team was teh blocker in Announcment System and teh ball bounced to a location on the hoem side of the court
+11. More action in recruiting
+12. Better player progression between seasons
+
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
 20. We need to clean up user Timeout implementation cadence
@@ -16,6 +22,7 @@
 40. Batted ball out of bounds is not animating or executing properly
 41. OTB fouls causing clock not to run on the turn?
 44. Customize computer teams more strategically
+45. Direct sim games for user team's next week opponent so we have full scouting notes
 
 To Do
 5. Improve FCC API
