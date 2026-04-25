@@ -20,7 +20,10 @@ from BackEnd.db import (
     press_conference_sessions_collection,
 )
 from BackEnd.pgpc_context import build_franchise_context_for_pgpc
-from BackEnd.pgpc_player_slot import resolve_player_name_for_slot
+from BackEnd.pgpc_player_slot import (
+    answer_name_for_pgpc_answers,
+    resolve_player_display_names_for_slot,
+)
 from BackEnd.pgpc_qualification import get_qualifying_pgpc_questions
 from BackEnd.pgpc_selection import select_pgpc_questions_for_session, shuffle_answers_for_display
 from BackEnd.pgpc_snapshot_storage import build_pgpc_snapshot
@@ -113,19 +116,25 @@ def _prepare_session_questions(
     out: list[dict[str, Any]] = []
     for q in selected:
         disp = shuffle_answers_for_display(q, rng)
-        name = resolve_player_name_for_slot(
+        full, first = resolve_player_display_names_for_slot(
             disp.get("player_slot"), game_doc, user_tid, ctx
         )
         text = str(disp.get("text") or "")
-        if name and "{player_name}" in text:
-            text = text.replace("{player_name}", name)
+        question_had_player_placeholder = "{player_name}" in text
+        if full and question_had_player_placeholder:
+            text = text.replace("{player_name}", full)
         disp["text"] = text
-        if name:
+        answer_token = answer_name_for_pgpc_answers(
+            question_included_player_placeholder=question_had_player_placeholder,
+            full_name=full,
+            first_name=first,
+        )
+        if full:
             for ans in disp.get("answers") or []:
                 if isinstance(ans, dict):
                     at = str(ans.get("text") or "")
                     if "{player_name}" in at:
-                        ans["text"] = at.replace("{player_name}", name)
+                        ans["text"] = at.replace("{player_name}", answer_token)
         out.append(disp)
     return out, dict(ctx), qualified_count
 

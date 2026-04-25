@@ -1,6 +1,10 @@
 """Tests for PGPC `{player_name}` resolution by ``player_slot``."""
 
-from BackEnd.pgpc_player_slot import resolve_player_name_for_slot
+from BackEnd.pgpc_player_slot import (
+    answer_name_for_pgpc_answers,
+    resolve_player_display_names_for_slot,
+    resolve_player_name_for_slot,
+)
 
 
 def _player(pid, name, pts, *, em=50, **stats_kw):
@@ -85,3 +89,46 @@ def test_zero_star_high_rt_no_points():
         ]
     }
     assert resolve_player_name_for_slot("zero_star", game, "T1", ctx) == "Frozen"
+
+
+def test_full_name_prefers_first_last_fields():
+    p = {
+        "playerId": "9",
+        "first_name": "Jamie",
+        "last_name": "Nguyen",
+        "name": "Wrong Display",
+        "team_id": "T1",
+        "stats": {"PTS": 40, "REB": 0, "3PTM": 0, "F": 0, "FTA": 0, "FTM": 0, "MIN": 32, "DEF_A": 0, "DEF_S": 0},
+        "attributes": {"EM": 50},
+    }
+    game = {"players": [p, _player("2", "Beta", 12)]}
+    full, first = resolve_player_display_names_for_slot("high_scorer", game, "T1")
+    assert full == "Jamie Nguyen"
+    assert first == "Jamie"
+
+
+def test_answer_token_first_only_when_question_used_placeholder():
+    assert (
+        answer_name_for_pgpc_answers(
+            question_included_player_placeholder=True,
+            full_name="Jamie Nguyen",
+            first_name="Jamie",
+        )
+        == "Jamie"
+    )
+    assert (
+        answer_name_for_pgpc_answers(
+            question_included_player_placeholder=False,
+            full_name="Jamie Nguyen",
+            first_name="Jamie",
+        )
+        == "Jamie Nguyen"
+    )
+    assert (
+        answer_name_for_pgpc_answers(
+            question_included_player_placeholder=True,
+            full_name="Cher",
+            first_name="Cher",
+        )
+        == "Cher"
+    )
