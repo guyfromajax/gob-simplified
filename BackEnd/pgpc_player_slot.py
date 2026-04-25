@@ -263,6 +263,43 @@ def _pick_player_record_for_slot(
     return _pick(players, lambda x: (_int(_stats(x), "PTS"),))
 
 
+def resolve_player_record_for_slot(
+    player_slot: str | None,
+    game_doc: Mapping[str, Any],
+    user_team_id: str,
+    context: Mapping[str, Any] | None = None,
+) -> Optional[Dict[str, Any]]:
+    """User-team player row chosen for ``player_slot``, or ``None`` if N/A."""
+    if not player_slot:
+        return None
+
+    players = _user_team_players(game_doc, user_team_id)
+    if not players:
+        return None
+
+    starters = _starter_ids(game_doc, user_team_id)
+    bench = [p for p in players if _pid(p) not in starters] if starters else list(players)
+
+    return _pick_player_record_for_slot(str(player_slot), players, bench, context)
+
+
+def resolve_pgpc_slot_for_session(
+    player_slot: str | None,
+    game_doc: Mapping[str, Any],
+    user_team_id: str,
+    context: Mapping[str, Any] | None = None,
+) -> tuple[Optional[Dict[str, Any]], str, str]:
+    """
+    Single pick for PGPC: ``(player_row | None, full_name, first_name)``.
+    When ``player_slot`` is None, returns ``(None, \"\", \"\")``.
+    """
+    if not player_slot:
+        return None, "", ""
+    row = resolve_player_record_for_slot(player_slot, game_doc, user_team_id, context)
+    full, first = _finalize_player_names(row)
+    return row, full, first
+
+
 def resolve_player_display_names_for_slot(
     player_slot: str | None,
     game_doc: Mapping[str, Any],
@@ -273,18 +310,10 @@ def resolve_player_display_names_for_slot(
     Returns (full_display_name, first_name) for PGPC substitution.
     Falls back to ``(\"your player\", \"your player\")`` when unresolved.
     """
-    if not player_slot:
-        return "", ""
-
-    players = _user_team_players(game_doc, user_team_id)
-    if not players:
-        return "your player", "your player"
-
-    starters = _starter_ids(game_doc, user_team_id)
-    bench = [p for p in players if _pid(p) not in starters] if starters else list(players)
-
-    p = _pick_player_record_for_slot(str(player_slot), players, bench, context)
-    return _finalize_player_names(p)
+    _, full, first = resolve_pgpc_slot_for_session(
+        player_slot, game_doc, user_team_id, context
+    )
+    return full, first
 
 
 def resolve_player_name_for_slot(
@@ -300,6 +329,8 @@ def resolve_player_name_for_slot(
 
 __all__ = [
     "answer_name_for_pgpc_answers",
+    "resolve_pgpc_slot_for_session",
     "resolve_player_display_names_for_slot",
     "resolve_player_name_for_slot",
+    "resolve_player_record_for_slot",
 ]

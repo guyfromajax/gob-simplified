@@ -22,9 +22,13 @@ from BackEnd.db import (
 from BackEnd.pgpc_context import build_franchise_context_for_pgpc
 from BackEnd.pgpc_player_slot import (
     answer_name_for_pgpc_answers,
-    resolve_player_display_names_for_slot,
+    resolve_pgpc_slot_for_session,
 )
 from BackEnd.pgpc_qualification import get_qualifying_pgpc_questions
+from BackEnd.pgpc_template_substitution import (
+    apply_pgpc_substitutions,
+    build_pgpc_substitutions,
+)
 from BackEnd.pgpc_selection import select_pgpc_questions_for_session, shuffle_answers_for_display
 from BackEnd.pgpc_snapshot_storage import build_pgpc_snapshot
 from BackEnd.utils.auth import get_current_user
@@ -116,11 +120,16 @@ def _prepare_session_questions(
     out: list[dict[str, Any]] = []
     for q in selected:
         disp = shuffle_answers_for_display(q, rng)
-        full, first = resolve_player_display_names_for_slot(
-            disp.get("player_slot"), game_doc, user_tid, ctx
+        slot = disp.get("player_slot")
+        slot_row, full, first = resolve_pgpc_slot_for_session(
+            str(slot) if slot else None, game_doc, user_tid, ctx
+        )
+        subs = build_pgpc_substitutions(
+            game_doc, ctx, slot_player=slot_row, player_slot=str(slot) if slot else None
         )
         text = str(disp.get("text") or "")
         question_had_player_placeholder = "{player_name}" in text
+        text = apply_pgpc_substitutions(text, subs)
         if full and question_had_player_placeholder:
             text = text.replace("{player_name}", full)
         disp["text"] = text
@@ -129,12 +138,13 @@ def _prepare_session_questions(
             full_name=full,
             first_name=first,
         )
-        if full:
-            for ans in disp.get("answers") or []:
-                if isinstance(ans, dict):
-                    at = str(ans.get("text") or "")
-                    if "{player_name}" in at:
-                        ans["text"] = at.replace("{player_name}", answer_token)
+        for ans in disp.get("answers") or []:
+            if isinstance(ans, dict):
+                at = str(ans.get("text") or "")
+                at = apply_pgpc_substitutions(at, subs)
+                if full and "{player_name}" in at:
+                    at = at.replace("{player_name}", answer_token)
+                ans["text"] = at
         out.append(disp)
     return out, dict(ctx), qualified_count
 
