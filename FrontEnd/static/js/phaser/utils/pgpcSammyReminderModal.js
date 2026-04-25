@@ -3,6 +3,8 @@
  * Uses /css/fte.css (same shell as username / tutorial popups).
  */
 
+const PGPC_SAMMY_SUPPRESS_LS_KEY = 'gob_pgpc_sammy_reminder_suppress';
+
 const PGPC_COACH_TEAM_MAP = {
   'Four Corners': 'FC',
   'Bentley-Truman': 'BT',
@@ -29,6 +31,15 @@ function coachSammyImageSrc(userTeamName) {
   const abbr = PGPC_COACH_TEAM_MAP[fmt];
   if (abbr) return `/images/coaches/${abbr}/Sammy-${abbr}.png`;
   return '/images/sammy_tutorial.png';
+}
+
+/** When true, skip Sammy reminder and go straight into the press conference flow. */
+export function isPgpcSammyReminderSuppressed() {
+  try {
+    return localStorage.getItem(PGPC_SAMMY_SUPPRESS_LS_KEY) === '1';
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -60,6 +71,10 @@ export function showPgpcSammyReminderModal(opts) {
     `    <img src="${sammySrc}" alt="" class="fte-content-img pgpc-sammy-reminder-img" style="border-color: ${ringColor}; box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 0 0 2px ${ringColor}33;" />`,
     '    <div class="fte-content-main">',
     '      <p id="pgpc-sammy-reminder-title">Hey Coach, remember to be strategic at the press conference. Your answers may impact any number of things related to the squad.</p>',
+    '      <label class="pgpc-sammy-dont-show">',
+    '        <input type="checkbox" id="pgpc-sammy-dont-show-again" />',
+    '        <span>Don\'t show this message again</span>',
+    '      </label>',
     '    </div>',
     '  </div>',
     '  <div class="fte-footer">',
@@ -81,6 +96,28 @@ export function showPgpcSammyReminderModal(opts) {
       .pgpc-sammy-reminder-img {
         width: 72px;
         height: 72px;
+      }
+      .pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        font-weight: 400;
+        color: rgba(0, 0, 0, 0.45);
+        cursor: pointer;
+        margin-top: 14px;
+        line-height: 1.3;
+      }
+      .pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show:hover {
+        color: rgba(0, 0, 0, 0.65);
+      }
+      .pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show input[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+        accent-color: #F79420;
+        flex-shrink: 0;
       }
     `;
     document.head.appendChild(st);
@@ -105,6 +142,12 @@ export function showPgpcSammyReminderModal(opts) {
   if (btn) {
     btn.addEventListener('click', () => {
       if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+      const suppress = backdrop.querySelector('#pgpc-sammy-dont-show-again');
+      if (suppress && suppress.checked) {
+        try {
+          localStorage.setItem(PGPC_SAMMY_SUPPRESS_LS_KEY, '1');
+        } catch (_) {}
+      }
       close();
       if (typeof onGotIt === 'function') onGotIt();
     });

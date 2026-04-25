@@ -229,7 +229,9 @@ def build_franchise_context_for_pgpc(
         quarter_int = int(q) if q is not None else 0
     except (TypeError, ValueError):
         quarter_int = 0
-    overtime = quarter_int > 4
+    # Final saves bump quarter past the last *played* period (Q4 end → 5, OT1 end → 6).
+    # So quarter==5 is regulation-only; true OT requires >=6 or extra scoring periods below.
+    overtime = quarter_int >= 6
     if not overtime and user_blob:
         pbq = user_blob.get("points_by_quarter")
         if isinstance(pbq, list) and len(pbq) > 4:

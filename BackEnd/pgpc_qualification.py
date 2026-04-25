@@ -88,7 +88,7 @@ def _overtime(ctx: Mapping[str, Any], game_doc: Mapping[str, Any]) -> bool:
     if ctx.get("overtime") is True:
         return True
     q = _int(game_doc.get("quarter"))
-    if q > 4:
+    if q >= 6:
         return True
     ut = _user_team_id(ctx)
     ub = _team_blob_from_game_doc(game_doc, ut)

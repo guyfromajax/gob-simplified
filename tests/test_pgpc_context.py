@@ -36,7 +36,8 @@ def test_build_franchise_context_scores_and_margin():
     assert ctx["week"] == 3
 
 
-def test_build_franchise_context_overtime_from_quarter():
+def test_build_franchise_context_overtime_from_extra_period_scoring():
+    """OT leaves 5+ buckets; quarter may still be 5 before final bump in some saves."""
     game_doc = {
         "quarter": 5,
         "teams": {
@@ -51,6 +52,39 @@ def test_build_franchise_context_overtime_from_quarter():
     )
     assert ctx["overtime"] is True
     assert ctx["user_won"] is True
+
+
+def test_build_franchise_context_regulation_end_quarter_5_not_overtime():
+    """After Q4 the engine stores quarter=5 even when no OT was played."""
+    game_doc = {
+        "quarter": 5,
+        "teams": {
+            "a": {"team_id": "a", "score": 80, "points_by_quarter": [20, 20, 20, 20]},
+            "b": {"team_id": "b", "score": 70, "points_by_quarter": [18, 18, 17, 17]},
+        },
+    }
+    ctx = build_franchise_context_for_pgpc(
+        game_doc,
+        user_team_id="a",
+        opponent_team_id="b",
+    )
+    assert ctx["overtime"] is False
+
+
+def test_build_franchise_context_overtime_from_quarter_six_plus():
+    game_doc = {
+        "quarter": 6,
+        "teams": {
+            "a": {"team_id": "a", "score": 85, "points_by_quarter": [20, 20, 20, 15, 10]},
+            "b": {"team_id": "b", "score": 82, "points_by_quarter": [18, 22, 20, 15, 7]},
+        },
+    }
+    ctx = build_franchise_context_for_pgpc(
+        game_doc,
+        user_team_id="a",
+        opponent_team_id="b",
+    )
+    assert ctx["overtime"] is True
 
 
 def test_build_franchise_context_team_lookup_by_nested_team_id():

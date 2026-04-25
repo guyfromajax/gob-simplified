@@ -1,5 +1,8 @@
 import { launchPostGamePressConference } from './postGamePressConference.js';
-import { showPgpcSammyReminderModal } from './pgpcSammyReminderModal.js';
+import {
+  isPgpcSammyReminderSuppressed,
+  showPgpcSammyReminderModal,
+} from './pgpcSammyReminderModal.js';
 
 /**
  * Shows a game completion popup with Box Score and Go To Locker Room buttons
@@ -618,23 +621,31 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       e.preventDefault();
       if (document.getElementById('pgpc-sammy-reminder-backdrop')) return;
       if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+
+      const beginPgpc = () => {
+        pgpcBtn.disabled = true;
+        launchPostGamePressConference({
+          franchisePhaseBPending,
+          userTeamName,
+          gameId,
+          lockerRoomUrl,
+          onCloseParentPopup: () => {
+            try {
+              popup.remove();
+            } catch (_) {}
+          },
+        });
+      };
+
+      if (isPgpcSammyReminderSuppressed()) {
+        beginPgpc();
+        return;
+      }
+
       showPgpcSammyReminderModal({
         userTeamName,
         userPrimaryColor: userTeamPrimaryColor,
-        onGotIt: () => {
-          pgpcBtn.disabled = true;
-          launchPostGamePressConference({
-            franchisePhaseBPending,
-            userTeamName,
-            gameId,
-            lockerRoomUrl,
-            onCloseParentPopup: () => {
-              try {
-                popup.remove();
-              } catch (_) {}
-            },
-          });
-        },
+        onGotIt: beginPgpc,
       });
     });
   }

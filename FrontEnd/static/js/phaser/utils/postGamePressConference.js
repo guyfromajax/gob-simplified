@@ -58,10 +58,10 @@ function ensurePgpcStyles() {
       padding: 22px 24px 26px;
       box-shadow: 0 24px 48px rgba(0,0,0,0.55);
     }
-    .pgpc-title {
+    .pgpc-modal-title {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 22px;
-      color: rgba(255,255,255,0.55);
+      color: rgba(255,255,255,0.92);
       letter-spacing: 0.08em;
       text-transform: uppercase;
       margin: 0 0 14px;
@@ -72,12 +72,6 @@ function ensurePgpcStyles() {
       color: #fff;
       line-height: 1.15;
       margin: 0 0 16px;
-    }
-    .pgpc-progress {
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      color: rgba(255,255,255,0.45);
-      margin-bottom: 8px;
     }
     .pgpc-choices {
       display: flex;
@@ -148,13 +142,6 @@ function ensurePgpcStyles() {
       0%, 100% { opacity: 0.5; transform: scaleX(0.35); }
       50% { opacity: 1; transform: scaleX(1); }
     }
-    .pgpc-complete-summary {
-      font-family: 'Inter', sans-serif;
-      font-size: 12px;
-      color: rgba(255,255,255,0.55);
-      margin: 14px 0 0;
-      line-height: 1.4;
-    }
     .pgpc-primary-btn {
       margin-top: 18px;
       width: 100%;
@@ -171,11 +158,6 @@ function ensurePgpcStyles() {
     .pgpc-primary-btn:hover { filter: brightness(1.06); }
   `;
   document.head.appendChild(style);
-}
-
-function formatSummary(counts) {
-  const c = counts || {};
-  return ['A', 'B', 'C', 'D', 'E'].map((k) => `${k}: ${c[k] != null ? c[k] : 0}`).join(', ');
 }
 
 /** Square team logo for the “still simming” waiting state (after all PC questions). */
@@ -226,7 +208,6 @@ export async function launchPostGamePressConference(opts) {
   const franchiseId = String(franchisePhaseBPending.franchise_id);
 
   let sessionId = null;
-  let choiceCounts = { A: 0, B: 0, C: 0, D: 0, E: 0 };
   let questionIndex = 0;
   let phaseBResolved = false;
   let phaseBOk = false;
@@ -294,8 +275,7 @@ export async function launchPostGamePressConference(opts) {
       )
       .join('');
     renderBody(`
-      <p class="pgpc-title">Post-Game Press Conference</p>
-      <p class="pgpc-progress">Question ${questionIndex + 1} of ${questions.length}</p>
+      <h1 class="pgpc-modal-title">Question ${questionIndex + 1} of ${questions.length}</h1>
       <h2 class="pgpc-question">${q.text}</h2>
       <div class="pgpc-choices">${rows}</div>
     `);
@@ -320,19 +300,13 @@ export async function launchPostGamePressConference(opts) {
           body: JSON.stringify({ question_index: questionIndex, choice }),
         }
       );
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.choice_counts && typeof data.choice_counts === 'object') {
-          choiceCounts = Object.assign(choiceCounts, data.choice_counts);
-        } else {
-          choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
-        }
-      } else {
-        choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
+      if (!res.ok) {
+        try {
+          console.warn('[PGPC] answer save failed:', res.status, await res.text());
+        } catch (_) {}
       }
     } catch (err) {
       console.warn('[PGPC] answer save failed:', err);
-      choiceCounts[choice] = (choiceCounts[choice] || 0) + 1;
     }
 
     questionIndex += 1;
@@ -353,11 +327,9 @@ export async function launchPostGamePressConference(opts) {
   }
 
   function renderCompleteView() {
-    const summary = formatSummary(choiceCounts);
     const weekLabel = Number.isFinite(weekNum) ? weekNum : '?';
     renderBody(`
       <h2 class="pgpc-question" style="text-align:center;">Week ${weekLabel} complete.</h2>
-      <p class="pgpc-complete-summary">${summary}</p>
       <button type="button" class="pgpc-primary-btn pgpc-gtlr">Go To Locker Room</button>
     `);
     const gtlr = panel.querySelector('.pgpc-gtlr');
@@ -420,7 +392,7 @@ export async function launchPostGamePressConference(opts) {
       const t = await createRes.text();
       console.error('[PGPC] session create failed:', createRes.status, t);
       renderBody(`
-        <p class="pgpc-title">Post-Game Press Conference</p>
+        <h1 class="pgpc-modal-title">Press conference unavailable</h1>
         <p class="pgpc-question" style="font-size:18px;">Could not start press conference (${createRes.status}). You can still finish the week from the franchise command center.</p>
         <button type="button" class="pgpc-primary-btn pgpc-dismiss">Go To Locker Room</button>
       `);
@@ -443,7 +415,7 @@ export async function launchPostGamePressConference(opts) {
   } catch (err) {
     console.error('[PGPC] session create error:', err);
     renderBody(`
-      <p class="pgpc-title">Post-Game Press Conference</p>
+      <h1 class="pgpc-modal-title">Press conference unavailable</h1>
       <p class="pgpc-question" style="font-size:18px;">Network error starting press conference.</p>
       <button type="button" class="pgpc-primary-btn pgpc-dismiss">Go To Locker Room</button>
     `);
