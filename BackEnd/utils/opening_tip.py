@@ -1,5 +1,6 @@
 import random
 
+from BackEnd.opening_lineup_snapshot import snapshot_opening_lineups_to_game_state
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
     build_opening_tip_snapshot_from_animations,
@@ -57,6 +58,8 @@ def execute_opening_tip(game):
     away_tipper = game.away_team.lineup["C"]
     home_lineup = game.home_team.lineup
     away_lineup = game.away_team.lineup
+
+    snapshot_opening_lineups_to_game_state(game)
 
     # Calculate tip scores
     home_scale = get_height_scale_value(home_tipper.height)

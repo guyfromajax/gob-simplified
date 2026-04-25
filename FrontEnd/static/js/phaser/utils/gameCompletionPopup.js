@@ -1,4 +1,5 @@
 import { launchPostGamePressConference } from './postGamePressConference.js';
+import { showPgpcSammyReminderModal } from './pgpcSammyReminderModal.js';
 
 /**
  * Shows a game completion popup with Box Score and Go To Locker Room buttons
@@ -135,6 +136,21 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     : resolvedUserTeamSide === 'home'
     ? canonicalHomeName
     : null;
+
+  let userTeamPrimaryColor = '#F79420';
+  if (resolvedUserTeamSide === 'home' && docHomeId) {
+    const ub = teamRec(docHomeId);
+    if (ub && typeof ub === 'object') {
+      const col = ub.colors?.primary_color || ub.colors?.primary;
+      if (col && typeof col === 'string') userTeamPrimaryColor = col;
+    }
+  } else if (resolvedUserTeamSide === 'away' && docAwayId) {
+    const ub = teamRec(docAwayId);
+    if (ub && typeof ub === 'object') {
+      const col = ub.colors?.primary_color || ub.colors?.primary;
+      if (col && typeof col === 'string') userTeamPrimaryColor = col;
+    }
+  }
   const bannerUrl = userTeamName && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
@@ -600,17 +616,24 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   if (pgpcBtn && franchisePhaseBPending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
     pgpcBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      if (document.getElementById('pgpc-sammy-reminder-backdrop')) return;
       if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-      pgpcBtn.disabled = true;
-      launchPostGamePressConference({
-        franchisePhaseBPending,
+      showPgpcSammyReminderModal({
         userTeamName,
-        gameId,
-        lockerRoomUrl,
-        onCloseParentPopup: () => {
-          try {
-            popup.remove();
-          } catch (_) {}
+        userPrimaryColor: userTeamPrimaryColor,
+        onGotIt: () => {
+          pgpcBtn.disabled = true;
+          launchPostGamePressConference({
+            franchisePhaseBPending,
+            userTeamName,
+            gameId,
+            lockerRoomUrl,
+            onCloseParentPopup: () => {
+              try {
+                popup.remove();
+              } catch (_) {}
+            },
+          });
         },
       });
     });

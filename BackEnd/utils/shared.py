@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
+from BackEnd.pgpc_context import build_franchise_context_for_pgpc
 from BackEnd.constants import (
     TURNOVER_CALC_DICT,
     POSITION_LIST,
@@ -1990,6 +1991,9 @@ def summarize_game_state(game, exclude_animations=True):
         "quarter": game.quarter,
         "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
+        "opening_lineup": deepcopy(game.game_state["opening_lineup"])
+        if isinstance(game.game_state.get("opening_lineup"), dict)
+        else None,
         # Home crowd (rolled once per game; persist so DB load / timeout resume does not re-roll)
         "home_crowd_factor": game.game_state.get("home_crowd_factor"),
         "home_crowd_away_shot_threshold_delta": game.game_state.get("home_crowd_away_shot_threshold_delta"),

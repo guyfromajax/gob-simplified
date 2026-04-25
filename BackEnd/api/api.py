@@ -1440,6 +1440,8 @@ try:
             gm.game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
         if saved.get("rim_runner_by_team_id"):
             gm.game_state["rim_runner_by_team_id"] = dict(saved["rim_runner_by_team_id"])
+        if saved.get("opening_lineup"):
+            gm.game_state["opening_lineup"] = copy.deepcopy(saved["opening_lineup"])
 
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
 
@@ -2813,10 +2815,13 @@ try:
                                         "Restored opening_tip_winner: %s",
                                         saved["opening_tip_winner"]
                                     )
+                            if should_restore_stats and saved.get("opening_lineup"):
+                                gm.game_state["opening_lineup"] = copy.deepcopy(saved["opening_lineup"])
                             elif not should_restore_stats:
                                 # New Q1 game - clear opening_tip_winner and old turns so opening tip can run
                                 if "opening_tip_winner" in gm.game_state:
                                     del gm.game_state["opening_tip_winner"]
+                                gm.game_state.pop("opening_lineup", None)
                                 # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                                 gm.turns = []
                             

@@ -227,7 +227,7 @@ export async function launchPostGamePressConference(opts) {
   let questionIndex = 0;
   let phaseBResolved = false;
   let phaseBOk = false;
-  const questions = PGPC_DUMMY_QUESTIONS;
+  let questions = PGPC_DUMMY_QUESTIONS;
 
   const renderBody = (html) => {
     panel.innerHTML = html;
@@ -410,7 +410,7 @@ export async function launchPostGamePressConference(opts) {
         franchise_id: franchiseId,
         week: weekNum,
         game_id: gameId || null,
-        question_set_id: 'dummy_v1',
+        question_set_id: 'bank_v1',
       }),
     });
     if (!createRes.ok) {
@@ -432,6 +432,9 @@ export async function launchPostGamePressConference(opts) {
     }
     const created = await createRes.json();
     sessionId = created.session_id;
+    if (Array.isArray(created.questions) && created.questions.length > 0) {
+      questions = created.questions;
+    }
     phaseBPromise = startPhaseBFetch();
     attachPhaseBHandlers(phaseBPromise);
   } catch (err) {
