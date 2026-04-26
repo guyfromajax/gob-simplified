@@ -6,7 +6,8 @@ function playSound(filename) {
   } catch (e) {}
 }
 
-const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_v1';
+const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
+const ALPHA_DISCLAIMER_VERSION = '2026-04-26-post-game-press-conference';
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
@@ -506,7 +507,7 @@ function wireAlphaBanner() {
   if (!alphaDisclaimer || !alphaDisclaimerDismiss) return;
   alphaDisclaimerDismiss.addEventListener('click', function () {
     try {
-      localStorage.setItem(ALPHA_DISMISS_STORAGE_KEY, '1');
+      localStorage.setItem(ALPHA_DISMISS_STORAGE_KEY, ALPHA_DISCLAIMER_VERSION);
     } catch (e) {}
     alphaDisclaimer.classList.add('is-dismissing');
     window.setTimeout(function () {
@@ -673,7 +674,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const appConfig = await API_CONFIG.loadAppConfig();
     if (appConfig.isAlpha) {
       const alphaBadge = document.getElementById('alpha-badge');
-      const isDismissed = typeof localStorage !== 'undefined' && localStorage.getItem(ALPHA_DISMISS_STORAGE_KEY) === '1';
+      const isDismissed = typeof localStorage !== 'undefined' && localStorage.getItem(ALPHA_DISMISS_STORAGE_KEY) === ALPHA_DISCLAIMER_VERSION;
       if (alphaBadge) alphaBadge.classList.add('visible');
       if (alphaDisclaimer && !isDismissed) {
         alphaDisclaimer.hidden = false;
