@@ -7,11 +7,12 @@ Consumer code may also use `BackEnd.utils.shared.build_franchise_context_for_pgp
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from bson import ObjectId
 
 from BackEnd.models.pgpc_snapshot import FranchiseContextForPGPC
+from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,80 @@ def _record_through_weeks(
         elif o is False:
             l += 1
     return w, l
+
+
+def _results_subset_weeks_lt(results_root: Dict[str, Any], before_week: int) -> Dict[str, Any]:
+    """All completed ``results`` weeks strictly before ``before_week`` (context week)."""
+    out: Dict[str, Any] = {}
+    bw = int(before_week)
+    for key, val in results_root.items():
+        try:
+            wn = int(key)
+        except (TypeError, ValueError):
+            continue
+        if wn >= bw:
+            continue
+        if isinstance(val, list):
+            out[str(wn)] = val
+    return out
+
+
+def _pgpc_user_team_id_candidates(
+    franchise_doc: Optional[Dict[str, Any]], user_team_id: str
+) -> List[str]:
+    """
+    PGPC resolves the user team from the game doc; ``franchise.results`` rows may use the same
+    id or ``franchise.user_team_object_id``. Include both so standings match persisted results.
+    """
+    keys: List[str] = []
+    u = str(user_team_id).strip()
+    if u:
+        keys.append(u)
+    if isinstance(franchise_doc, dict):
+        o = franchise_doc.get("user_team_object_id")
+        if o is not None:
+            s = str(o).strip()
+            if s and s not in keys:
+                keys.append(s)
+    return keys
+
+
+def _wl_for_user_from_standings(
+    standings: Dict[str, Dict[str, int]], team_keys: Sequence[str]
+) -> Tuple[int, int]:
+    for k in team_keys:
+        row = standings.get(k)
+        if row:
+            return int(row.get("W", 0) or 0), int(row.get("L", 0) or 0)
+    return 0, 0
+
+
+def _user_wl_before_week_via_standings(
+    results_root: Dict[str, Any],
+    franchise_doc: Optional[Dict[str, Any]],
+    user_team_id: str,
+    before_week: int,
+) -> Tuple[int, int]:
+    """
+    Season W/L before the context week, using the same aggregation as franchise standings.
+    """
+    prior = _results_subset_weeks_lt(results_root, before_week)
+    team_keys = _pgpc_user_team_id_candidates(franchise_doc, user_team_id)
+    if not team_keys:
+        team_keys = [str(user_team_id)]
+    seed = {k: {} for k in team_keys}
+    standings = calculate_franchise_standings(prior, seed)
+    w_s, l_s = _wl_for_user_from_standings(standings, team_keys)
+    w_rw, l_rw = _record_through_weeks(results_root, team_keys[0], before_week)
+    for alt in team_keys[1:]:
+        a, b = _record_through_weeks(results_root, alt, before_week)
+        if a + b > w_rw + l_rw:
+            w_rw, l_rw = a, b
+    # Prefer standings (same aggregation as /standings). If ids still mismatch, week-walk may
+    # find rows under an alternate key — use it only when standings saw no games.
+    if w_s + l_s == 0 and w_rw + l_rw > 0:
+        return w_rw, l_rw
+    return w_s, l_s
 
 
 def _best_position_rating(position_ratings: Any) -> float:
@@ -290,7 +365,9 @@ def build_franchise_context_for_pgpc(
     ctx["first_game_of_season"] = wk == 1
     ctx["last_regular_season_game"] = wk == _REGULAR_SEASON_WEEKS
 
-    w_before, l_before = _record_through_weeks(results_root, ut, wk)
+    w_before, l_before = _user_wl_before_week_via_standings(
+        results_root, franchise_doc, ut, wk
+    )
     w_after, l_after = w_before, l_before
     if user_won:
         w_after += 1
