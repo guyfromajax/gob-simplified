@@ -705,6 +705,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
+- `meta.height` and `meta.weight` (integer inches / pounds) - **Training camp only** (freshman/sophomore): camp bonuses add to existing values; persisted via `$set`. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before camp runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
 
 **Franchise Document:**
 - `latest_training` - Most recent training report (backward-compatible quick access)

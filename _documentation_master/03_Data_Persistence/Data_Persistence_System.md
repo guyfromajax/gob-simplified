@@ -121,11 +121,11 @@ This system documents data persistence across all three game modes when users ar
 
 **Initialization:** Team objects are created for all 8 teams when franchise is initialized via `FranchiseManager.initialize_season()` or lazily via `ensure_team_objects_exist()` when accessing Game Plan/Playbooks.
 
-#### C. Player Objects (`players.{player_id}`)
+#### C. Player Objects (`franchise_players_data` collection, keyed by `franchise_id` + `player_id`)
 
-**For each player in the franchise:**
+**For each player row in FPD:**
 
-- **Player Metadata** (`meta`: first_name, last_name, team, team_id)
+- **Player Metadata** (`meta`: first_name, last_name, team, team_id, and roster fields **height**, **weight**, **year**, **jersey** when seeded — franchise init copies these from universal `players`; recruiting signings set them from the recruit; lazy FPD creation on `finalize_game` copies physique/year/jersey from `players` into `meta` alongside `attributes`.)
 - **Evolved Attributes** (`attributes`: all 30+ attributes with `anchor_` prefixed versions, updated by training)
 - **Evolved Position Ratings** (`position_ratings`: PG, SG, SF, PF, C ratings, updated by training)
 - **Statistics** (`season`: season stats, `career`: career stats)
