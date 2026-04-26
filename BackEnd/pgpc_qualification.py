@@ -228,15 +228,17 @@ def _eval_win_loss_filters(
     if filters.get("overtime") is True and not _overtime(ctx, game_doc):
         return False
 
-    orank = ctx.get("opponent_natl_rank")
-    if orank is not None:
+    if "opponent_max_rank" in filters or "opponent_min_rank" in filters:
+        orank = ctx.get("opponent_natl_rank")
+        if orank is None:
+            return False
         orank_i = _int(orank, -1)
-        if "opponent_max_rank" in filters:
-            if orank_i < 0 or orank_i > _int(filters.get("opponent_max_rank")):
-                return False
-        if "opponent_min_rank" in filters:
-            if orank_i < _int(filters.get("opponent_min_rank")):
-                return False
+        if orank_i < 0:
+            return False
+        if "opponent_max_rank" in filters and orank_i > _int(filters.get("opponent_max_rank")):
+            return False
+        if "opponent_min_rank" in filters and orank_i < _int(filters.get("opponent_min_rank")):
+            return False
 
     if "opponent_is_conference_leader" in filters:
         if bool(filters.get("opponent_is_conference_leader")) != bool(

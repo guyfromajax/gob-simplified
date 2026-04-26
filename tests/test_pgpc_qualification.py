@@ -212,6 +212,27 @@ def test_low_chemistry_gated_until_week_5():
     assert "chemistry_low_01" in ok
 
 
+def test_win_top_10_requires_known_opponent_rank():
+    game = {
+        "quarter": 4,
+        "teams": _base_teams(
+            u_score=70,
+            o_score=60,
+            u_pbq=[18, 18, 17, 17],
+            o_pbq=[15, 15, 15, 15],
+        ),
+        "players": [],
+    }
+    missing = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx())}
+    assert "win_top_10_01" not in missing
+
+    in_top10 = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx(opponent_natl_rank=7))}
+    assert "win_top_10_01" in in_top10
+
+    not_top10 = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx(opponent_natl_rank=40))}
+    assert "win_top_10_01" not in not_top10
+
+
 def test_major_upset_rank_gap():
     game = {
         "quarter": 4,
