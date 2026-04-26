@@ -5,6 +5,31 @@ import {
 } from './pgpcSammyReminderModal.js';
 
 /**
+ * Push final scores (and a simple FINAL clock readout) to the court scoreboard DOM
+ * so the background behind the EOG modal matches the popup, not a stale Q1/0–0 state.
+ */
+function syncBackgroundScoreboardFromFinalScore(finalScore) {
+  if (typeof document === 'undefined' || !finalScore) return;
+  const hs = Number(finalScore.homeScore);
+  const as = Number(finalScore.awayScore);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return;
+
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  if (homeScoreEl) homeScoreEl.textContent = String(hs);
+  if (awayScoreEl) awayScoreEl.textContent = String(as);
+
+  const quarterEl = document.getElementById('quarter');
+  if (quarterEl) quarterEl.textContent = 'FINAL';
+
+  const gameClockEl = document.getElementById('game-clock');
+  if (gameClockEl) gameClockEl.textContent = '0:00';
+
+  const shotClockEl = document.getElementById('shot-clock');
+  if (shotClockEl) shotClockEl.textContent = '0';
+}
+
+/**
  * Shows a game completion popup with Box Score and Go To Locker Room buttons
  * @param {Object} options
  * @param {string} options.gameId - The game ID
@@ -22,6 +47,8 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   if (existingPopup) {
     existingPopup.remove();
   }
+
+  syncBackgroundScoreboardFromFinalScore(finalScore);
 
   // ✅ SS&S: Fallback to reading teamId / user side from URL params if not provided
   if (typeof window !== 'undefined') {
