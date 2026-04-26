@@ -100,6 +100,28 @@ class TestTrainingNotes(unittest.TestCase):
         self.assertEqual(sections[0]["title"], "Training Camp MVP")
         self.assertEqual(sections[0]["body"], "Junior Varsity")
 
+    def test_misc_physique_section_before_energy(self):
+        attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH"]
+        base = {"1": {a: 50 for a in attrs_keys}}
+        attrs = {f"anchor_{a}": 50 for a in attrs_keys}
+        players = [{"_id": "1", "first_name": "A", "last_name": "One", "attributes": attrs}]
+        team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
+        physique = ["Test Player grew one inch during the offseason."]
+        sections = build_structured_training_report_notes(
+            is_training_camp=True,
+            players=players,
+            original_player_baselines=base,
+            team=team,
+            plays_data={},
+            scouting_data={},
+            legacy_energy_notes=["Energy line"],
+            training_camp_physique_notes=physique,
+        )
+        self.assertEqual(sections[-1]["title"], "Player Energy Levels")
+        misc = next(s for s in sections if s["title"] == "Misc")
+        self.assertEqual(misc["body"], physique[0])
+        self.assertLess(sections.index(misc), len(sections) - 1)
+
 
 if __name__ == "__main__":
     unittest.main()

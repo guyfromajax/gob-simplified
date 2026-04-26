@@ -2,54 +2,42 @@
 **Franchise Init**
 0. Add a new "Recruits" field to the FTD docs (this will be a dict with 1-10 key/value pairs wiht the keys being "1", "2", "3", an so on, values will init as None, and will hold FRD string ids in the future)
 1. Add two new fields to each docment in the FRD collection, note these do not need to be retrofitted to any existing FRD documents
-    - "Home Region" -- assign a random.randint(1,8) (this will be an integer field)
-        - Note this will sync to the teams' regions
-    -"Lean" (this will be a dict with 1-3 key/value pairs wiht the keys being "1", "2", "3")
-        -if key 1 == "open", keys 2 and 3 each == "" or none
-        -upon season init
-            - each player's key 1 value is determined as follows:
-                - 75% chance == "open"
-                - 25% chance it's one of the 16 teams in their assigned region (represetned as a string value of the team's name)
-            - if that player's key 1 value != "open"
-                -80% chance key 2 == "" or none
-                -20% chance key 2 is another team in the palyers assigned region, omitting the team that is their key 1 value from the random draw
-            - all key 3 values == "" or None
-2. Upon new franchise init and the start of each new season within a franchise instance, create 200 new recruits per our recruit generation logic.
+    - "Home Region" -- a **region letter** `A`–`H` (stored as a string; one letter matching franchise geography), same convention as team `region` in the teams collection
+    - "Lean" (dict with keys `"1"`, `"2"`, `"3"`; values are **`None`**, the literal **`"open"`**, or a **team id string** — the string form of that team’s MongoDB `ObjectId`, **not** the display name)
+        - If key `1` == `"open"`, keys `2` and `3` are `None` (or empty, normalized to `None`).
+        - **Upon season init (matches `FranchiseManager._build_recruit_lean`):**
+            - **75%** key `1` == `"open"`
+            - **25%** key `1` == random team id from the 16 teams whose `region` matches the recruit’s **Home Region**
+            - If key `1` != `"open"`: **80%** key `2` is `None`; **20%** key `2` == random **other** team id from that same region (never the same id as key `1`)
+            - Key `3` is always `None` at init
+2. Upon new franchise init and the start of each new season within a franchise instance, create **300** new recruits per recruit generation (`generate_recruits_list(count=300)`).
 
-**FCC Update**
--Remove the Recruits tab from the FCC
--Add a "Recruits" button to the Resources tab that links to the recruiting.html screen
-
-**FCC Recruiting Button**
--Place a Recruiting button in the upper right of the FCC, below the Run Training / Play Next Game button -- give it a green fill with bold silver copy. When active, button takes the user to the recruiting.html page.
-    -Weeks 1-18, replace the button with green bold copy that reads `Recruiting Invites Begin Week 20`
-    -Week 19, replace the button with green bold copy that reads `Recruiting Invites Begin Next Week`
-    -Weeks 20-26 before that week's training is submitted, replace the button with green bold copy that reads `Recruiting Invites Active`
-    -Weeks 20-26 after that week's training/recruiting processing is complete, show an active button with copy `Week ## Recruiting Visits`. Pressing it takes the user to the recruiting-results.html page.
-    -Weeks 27-34 -- button is inactive and recruiting is not live.
-    -Week 35 -- the main FCC CTA becomes `Recruiting`, and bold green copy below it reads `Recruiting Is Live`
-    -Week 36 -- the main FCC CTA becomes `Go To Next Season`
+**FCC Recruiting Tab**
+-Place copy at the top of the Recruiting tab in the FCC, in smaller copy than the recurits list below.
+    -Weeks 1-18: `Recruiting Invites Begin Week 20`
+    -Week 19: `Recruiting Invites Begin Next Week`
+    -Weeks 20-26: `Recruiting Invites Active`
+    -Weeks 20-26 after that week's training/recruiting processing is complete, show an active link with copy `Week ## Recruiting Visits`. Pressing it takes the user to the recruiting-results.html page.
+    -Weeks 27-34: same live copy as other post–regular-season weeks before week 35: `Recruiting Runs After National Tourney` (see FCC recruiting button logic in `franchise-command-center.js`)
+    -Week 35 -- the main FCC CTA becomes `Recruiting`, and the copy in the Recruiting tab reads`Recruiting Is Live`
+    -Week 36 -- the main FCC CTA becomes `Go To Next Season`, and teh copy in the Recruiting tab reads `Recruiting Is Complete`
 
 
-**Recruiting.html Screen**
-1. Display all 300 recruits, in descending order of their top RT value, from highest value to lowest
-2. Use the same display that we use for the current Recruits tab in teh FCC that we're sunsetting in this task. Add the following columns:
-    - After "Name" and before "Archetype" add "Home Region" and dispaly the recruit's home region
-    - After "RT" add "Current Lean" and display all values associated with that recruit, separated by commas, in order of key 1, key 2, key 3. Do not display the key. If the recruit's key 1 value us "open", display open.
-        - Example of recruit with key 1 == open: "open"
-        - Exmaple of recruit with only a key 1 value: "Morristown"
-        - Example of recruit with key 1 and key 2 values: "Morristown, Bentley-Truaman"
-        - Example of recruit with key 1, key 2, and key 3 values: "Morristown, Bentley-Truman, Xavien"
-3. Remove the top-right Recruiting Orders button from this screen.
-4. In week `36`, this screen becomes the signed-results page
-    - replace `Current Lean` with `Signed`
-    - show all recruits
-    - append walk-ons below the recruit pool
+**Recruiting.html Screen** (current implementation: `FrontEnd/static/recruiting.html`, `FrontEnd/static/recruiting.js`, shared table/sort/lean helpers in `FrontEnd/static/recruiting-common.js`; data from `GET /franchise/recruiting-data`)
+
+1. **Layout:** Eight stacked **region cards** (`Region A` … `Region H`). Each card holds a scrollable table of recruits whose **`Home Region`** value resolves to that letter (first character of the stored home-region label, uppercased). There is **no** separate “Home Region” column—the region is implied by the card title.
+2. **Row count:** All recruits returned for the franchise in `recruiting-data` are shown (canonical pool size **300** per season init / new season).
+3. **Default ordering:** Within each region, recruits are sorted by **RT descending** by default. **Clickable column headers** reorder rows (per region table) and apply the same sort key across all eight tables on re-render.
+4. **Columns (weeks ≠ 36), left to right:** `Name`, `Archetype`, `HT`, `WT`, `POS`, the twelve attributes `SC` … `FT` (display values are raw recruit attributes **floor-divided by 10**), `RT`, **`Current Lean`**.
+5. **`Current Lean` cell:** Built from the recruit’s `Lean` map keys `"1"`, `"2"`, `"3"` in order. Empty slots are skipped. Literal `"open"` stays `open`; otherwise values are resolved through the global **team id → team name** map when the stored value is an id, else shown as-is. Multiple values are comma-separated (same rules as the examples in the prior spec: e.g. `open`; `Morristown`; `Morristown, Bentley-Truman`; etc.).
+6. **Header / chrome:** Center title **“Recruiting”**; **Back** link returns to the FCC locker room (via `buildFccUrl` / query context). **No** Recruiting Orders button on this page.
+7. **Status line:** Subtitle under the header explains grouping/sorting for non–week-36 (`Recruits are grouped by home region and sorted by RT by default. Click any header to reorder all regions.`).
+8. **Week 36 (signed results):** Franchise `week === 36` triggers results mode: page title **“Recruiting Results”**, subtitle **“Signed recruits are grouped below by home region.”**, last column header **`Signed`** instead of **`Current Lean`**. Signed text comes from `week_35_recruiting_results.signed_by_recruit_id` (team name, plus ` (walk on)` when applicable); unsigned recruits show **`--`**. Walk-on rows from `signed_players` are merged into the same sort pipeline as recruits; they use the same column layout. **Implementation note:** walk-ons are currently normalized with `homeRegion: '--'`, which does not bucket into `A`–`H`; confirm whether a dedicated “Walk-ons” section or a real region letter is required so all rows appear in a card.
 
 
 **Recruiting-Orders.html Screen**
 0. Weeks 20-26 keep the visit-order flow. Week 35 uses `Save Orders` and `Run Recruiting` instead.
-1. Top Grid witih teh following columms from left to right
+1. Top Grid witih the following columms from left to right
     a. header row "Priority", "Recruit", "Home Region", "Archetype, "Pos", "RT", "Current Lean", "Adjust", "Remove"
     b. the grid start empty if the user has not saved any recruiting orders, adding players will is detailed below. 
     c. give the grid drag & drop functionality, same as our lineup screen, so the user can swap assigned rows for recruits by using the D&D functioality. Play Click tiny on this action
@@ -111,23 +99,41 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 
 **Complete Week Recruiting Logic**
 
+- **Code:** Weeks **1–19** and **27–34** (this section’s win / quality-loss rolls) run in `BackEnd/api/franchise_routes.py` as `_apply_performance_based_recruiting_lean_updates` from `_complete_week_finish_cpu_and_persist` (before visit-week lean logic). Idempotency: `franchise.recruiting_performance_lean_applied[<week>]`. Weeks **20–26** visit-based lean updates remain in `_apply_complete_week_recruiting_lean_updates` with `recruiting_lean_updates_applied`.
+
 ##Weeks 1-10##
 - same logic applies to user team and all computer teams
+- **Teams that do not play a game that week (bye):** no lean updates from this block.
+- **National rank:** lower `natl_rank` is better (#1 is best). A **better-ranked opponent** means the opponent’s `natl_rank` is **less than** the team’s.
+- **Quality loss margin:** “loss by 8 points or less” means the team’s score is **8 or fewer** points below the opponent’s (i.e. **inclusive** of an 8-point loss).
 - if the team wins their game that week
-    - 15% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 10% chance hits, choose one recruit in their region who meets that criteria at random
-    - 5% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 5% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 50% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random
+    - 25% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random. 
+- if the team **loses** to a **better-ranked** opponent (`opponent.natl_rank < team.natl_rank`) **and** the loss margin is **at most 8 points** (inclusive):
+    - 25% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random
+    - 15% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 15% chance hits, choose one recruit in their region who meets that criteria at random.
 
 ##Weeks 11-15##
 - same logic applies to user team and all computer teams
+- **Bye weeks:** no lean updates from this block.
+- **Quality loss** uses the same rank and margin rules as weeks 1–10.
 - if the team wins their game that week
-    - 40% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 10% chance hits, choose one recruit in their region who meets that criteria at random
-    - 10% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 5% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random
+    - 50% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random. 
+- if the team loses to a better-ranked opponent and the loss margin is at most 8 points (inclusive):
+    - 30% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 30% chance hits, choose one recruit in their region who meets that criteria at random
+    - 25% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random.
 
 ##Weeks 16-19##
 - same logic applies to user team and all computer teams
+- **Bye weeks:** no lean updates from this block.
+- **Quality loss** uses the same rank and margin rules as weeks 1–10.
 - if the team wins their game that week
-    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 10% chance hits, choose one recruit in their region who meets that criteria at random
-    - 20% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 5% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 70% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 70% chance hits, choose one recruit in their region who meets that criteria at random
+    - 60% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random. 
+- if the team loses to a better-ranked opponent and the loss margin is at most 8 points (inclusive):
+    - 35% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 35% chance hits, choose one recruit in their region who meets that criteria at random
+    - 30% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 30% chance hits, choose one recruit in their region who meets that criteria at random. 
 
 
 ##Weeks 20-26##
@@ -155,9 +161,14 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 
 ##Weeks 27-34##
 - same logic applies to user team and all computer teams
+- **Bye weeks:** no lean updates from this block.
+- **Quality loss** uses the same rank and margin rules as weeks 1–10 (better opponent = lower `natl_rank`; margin **≤ 8** inclusive).
 - if the team wins their game that week
-    - 80% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 10% chance hits, choose one recruit in their region who meets that criteria at random
-    - 50% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 5% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 90% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 90% chance hits, choose one recruit in their region who meets that criteria at random
+    - 75% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 75% chance hits, choose one recruit in their region who meets that criteria at random. 
+- if the team loses to a **better-ranked** opponent and the loss margin is at most 8 points (inclusive):
+    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random
+    - 50% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random. 
         
 
 ##Weeks 1-19 & 27-34 Player Lean List Additon Logic##

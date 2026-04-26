@@ -158,6 +158,7 @@ def execute_training(
         plays_data=updated_plays,
         scouting_data=updated_scouting_data,
         legacy_energy_notes=_legacy_energy,
+        training_camp_physique_notes=training_report.get("training_camp_physique_notes"),
     )
 
     return players, team, updated_plays, updated_scouting_data, training_report
@@ -723,10 +724,12 @@ def apply_training_points(
     else:
         logger.warning(f"🔋 [TRAINING] No conditioning in normalized_allocations: {list(normalized_allocations.keys())}")
 
-    # Training Camp bonus (first training only): apply CH/RT-position-based core-attribute bonus.
+    # Training Camp bonus (first training only): CH/highest-RT cores, then year-based bonus.
+    camp_physique_notes: List[str] = []
     if is_training_camp:
-        _apply_training_camp_bonus(players)
-    
+        _apply_training_camp_bonus(players, player_baselines)
+        camp_physique_notes = _apply_training_camp_height_weight_bonuses(players)
+
     # Clamp all values
     for player in players:
         attrs = player.get("attributes", {})
@@ -794,7 +797,8 @@ def apply_training_points(
             "sub_option": sub_option,
             "leaf_display_name": coaching_focus_leaf_display_name(sub_option),
         },
-        "training_notes": training_notes
+        "training_notes": training_notes,
+        "training_camp_physique_notes": camp_physique_notes,
     }
     
     return players, team, training_report
@@ -906,15 +910,15 @@ def _apply_player_training_points(
 
 
 def _training_camp_bonus_range_for_ch(ch_value: int) -> Optional[Tuple[int, int]]:
-    """Return training-camp bonus range based on CH value."""
+    """Return training-camp bonus range based on CH value (Training_System.md)."""
     if ch_value > 80:
-        return (4, 8)
+        return (4, 10)
     if ch_value > 60:
-        return (3, 6)
+        return (3, 8)
     if ch_value > 40:
-        return (2, 4)
+        return (2, 6)
     if ch_value > 20:
-        return (1, 2)
+        return (1, 4)
     return None
 
 
@@ -935,6 +939,119 @@ def _training_camp_core_attrs_for_position(position: str) -> List[str]:
     return []
 
 
+def _top_two_rt_positions(player: dict) -> List[str]:
+    """
+    Top two positions by RT for training-camp year bonus.
+    Two tied for first -> those two. More than two tied for first -> pick two at random.
+    Unique first, multiple tied for second -> first + random among second tier.
+    """
+    ratings = player.get("position_ratings") or {}
+    valid_positions = ["PG", "SG", "SF", "PF", "C"]
+    items: List[Tuple[str, int]] = []
+    for pos in valid_positions:
+        raw = ratings.get(pos)
+        if isinstance(raw, (int, float)):
+            r = int(raw)
+        else:
+            try:
+                r = int(raw or 0)
+            except (TypeError, ValueError):
+                r = 0
+        items.append((pos, r))
+    distinct_rts = sorted({r for _, r in items}, reverse=True)
+    max_rt = distinct_rts[0]
+    first_group = [pos for pos, r in items if r == max_rt]
+    if len(first_group) >= 2:
+        if len(first_group) == 2:
+            return first_group
+        return random.sample(first_group, 2)
+    first_pos = first_group[0]
+    second_rt = distinct_rts[1]
+    second_group = [pos for pos, r in items if r == second_rt]
+    return [first_pos, random.choice(second_group)]
+
+
+def _training_camp_core_attrs_union_for_positions(positions: List[str]) -> List[str]:
+    ordered: List[str] = []
+    seen: set[str] = set()
+    for pos in positions:
+        for attr in _training_camp_core_attrs_for_position(pos):
+            if attr not in seen:
+                seen.add(attr)
+                ordered.append(attr)
+    return ordered
+
+
+TRAINING_CAMP_YEAR_BONUS_RANGES = {
+    "senior": (-1, 2),
+    "junior": (-3, 3),
+    "sophomore": (-5, 5),
+    "freshman": (-10, 22),
+}
+
+
+def _apply_training_camp_attribute_delta(
+    player: dict,
+    attr: str,
+    delta: int,
+    player_baselines: Dict[Any, Dict[str, int]],
+) -> None:
+    """Apply a single camp delta; positive gains halved if session-start baseline > 100."""
+    pid = player.get("_id")
+    start = 0
+    if pid is not None and player_baselines:
+        start = int((player_baselines.get(pid) or {}).get(attr, 0) or 0)
+    if delta > 0 and start > 100:
+        delta = int(math.floor((delta * 0.5) + 0.5))
+
+    attrs = player.get("attributes", {})
+    anchor_key = f"anchor_{attr}"
+    if anchor_key not in attrs and attr not in attrs:
+        return
+    current = int(attrs.get(anchor_key, attrs.get(attr, 0)) or 0)
+    attrs[anchor_key] = current + delta
+    attrs[attr] = attrs[anchor_key]
+
+
+def _apply_training_camp_year_bonus(
+    players: List[dict],
+    player_baselines: Dict[Any, Dict[str, int]],
+) -> None:
+    """Second training-camp block: top-two-position cores + ND/IQ/FT/CH + one random (all players)."""
+    extra_pool_exclude = {"EM", "MO", "NG", "RT"}
+
+    for player in players:
+        year = (player.get("year") or "").strip().lower()
+        roll_range = TRAINING_CAMP_YEAR_BONUS_RANGES.get(year)
+        if not roll_range:
+            continue
+
+        two_pos = _top_two_rt_positions(player)
+        if len(two_pos) < 2:
+            continue
+
+        attr_list = _training_camp_core_attrs_union_for_positions(two_pos)
+        seen = set(attr_list)
+        for a in ("ND", "IQ", "FT", "CH"):
+            if a not in seen:
+                seen.add(a)
+                attr_list.append(a)
+
+        pool = [
+            a
+            for a in TRAINABLE_PLAYER_ATTRS
+            if a not in seen and a not in extra_pool_exclude
+        ]
+        if pool:
+            extra = random.choice(pool)
+            attr_list.append(extra)
+
+        lo, hi = roll_range
+        for attr in attr_list:
+            delta = random.randint(lo, hi)
+            _apply_training_camp_attribute_delta(player, attr, delta, player_baselines)
+
+
 def _highest_rt_position(player: dict) -> Optional[str]:
     """Pick one highest-RT position (random tie-break) from player.position_ratings."""
     ratings = player.get("position_ratings") or {}
@@ -949,29 +1066,112 @@ def _highest_rt_position(player: dict) -> Optional[str]:
     return random.choice(tied) if tied else None
 
 
-def _apply_training_camp_bonus(players: List[dict]) -> None:
-    """Apply Training Camp CH/RT-position bonus to player anchor attributes."""
+_TRAINING_CAMP_PHYSIQUE_CLOSINGS = (
+    "this offseason.",
+    "during the offseason.",
+    "over the summer.",
+    "since last season.",
+    "since last year.",
+)
+
+
+def _training_camp_inch_phrase(n: int) -> str:
+    if n == 1:
+        return "one inch"
+    return f"{n} inches"
+
+
+def _training_camp_pound_phrase(n: int) -> str:
+    if n == 1:
+        return "one pound"
+    return f"{n} pounds"
+
+
+def _roll_training_camp_height_delta(year: str) -> int:
+    if year == "sophomore":
+        return random.choices([0, 1, 2], weights=[60, 30, 10], k=1)[0]
+    if year == "freshman":
+        return random.choices([0, 1, 2, 3, 4, 5], weights=[20, 20, 30, 20, 5, 5], k=1)[0]
+    return 0
+
+
+def _roll_training_camp_weight_delta(year: str, height_after: int) -> int:
+    if year == "sophomore":
+        if height_after > 75:
+            return random.randint(0, 10)
+        return random.randint(0, 5)
+    if year == "freshman":
+        if height_after > 75:
+            return random.randint(10, 30)
+        if height_after > 72:
+            return random.randint(5, 15)
+        return random.randint(0, 10)
+    return 0
+
+
+def _training_camp_physique_line(name: str, dh: int, dw: int) -> str:
+    closing = random.choice(_TRAINING_CAMP_PHYSIQUE_CLOSINGS)
+    if dh and dw:
+        return (
+            f"{name} grew {_training_camp_inch_phrase(dh)} and "
+            f"gained {_training_camp_pound_phrase(dw)} {closing}"
+        )
+    if dh:
+        return f"{name} grew {_training_camp_inch_phrase(dh)} {closing}"
+    return f"{name} gained {_training_camp_pound_phrase(dw)} {closing}"
+
+
+def _apply_training_camp_height_weight_bonuses(players: List[dict]) -> List[str]:
+    """Training camp only: sophomore/freshman height then weight; one report line per player with any gain."""
+    lines: List[str] = []
+    for player in players:
+        meta = player.get("meta")
+        if not isinstance(meta, dict):
+            continue
+        yr_raw = meta.get("year") if meta.get("year") is not None else player.get("year")
+        year = str(yr_raw or "").strip().lower()
+        if year not in ("freshman", "sophomore"):
+            continue
+        try:
+            h0 = int(meta["height"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        try:
+            w0 = int(meta["weight"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        dh = _roll_training_camp_height_delta(year)
+        new_h = h0 + dh
+        dw = _roll_training_camp_weight_delta(year, new_h)
+        if dh == 0 and dw == 0:
+            continue
+        meta["height"] = new_h
+        meta["weight"] = w0 + dw
+        name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip() or str(
+            player.get("_id", "")
+        )
+        lines.append(_training_camp_physique_line(name, dh, dw))
+    return lines
+
+
+def _apply_training_camp_bonus(
+    players: List[dict],
+    player_baselines: Dict[Any, Dict[str, int]],
+) -> None:
+    """Training camp: (1) CH / highest-RT core bonus, (2) year-based bonus on expanded attr set."""
     for player in players:
         attrs = player.get("attributes", {})
-        ch_value = attrs.get("anchor_CH", attrs.get("CH", 0))
+        ch_value = int(attrs.get("anchor_CH", attrs.get("CH", 0)) or 0)
         bonus_range = _training_camp_bonus_range_for_ch(ch_value)
-        if not bonus_range:
-            continue
+        if bonus_range:
+            highest_pos = _highest_rt_position(player)
+            if highest_pos:
+                core_attrs = _training_camp_core_attrs_for_position(highest_pos)
+                for attr in core_attrs:
+                    delta = random.randint(bonus_range[0], bonus_range[1])
+                    _apply_training_camp_attribute_delta(player, attr, delta, player_baselines)
 
-        highest_pos = _highest_rt_position(player)
-        if not highest_pos:
-            continue
-
-        core_attrs = _training_camp_core_attrs_for_position(highest_pos)
-        for attr in core_attrs:
-            anchor_key = f"anchor_{attr}"
-            if anchor_key not in attrs and attr not in attrs:
-                continue
-            current = attrs.get(anchor_key, attrs.get(attr, 0))
-            delta = random.randint(bonus_range[0], bonus_range[1])
-            updated = max(PLAYER_ATTR_CLAMP[0], current + delta)
-            attrs[anchor_key] = updated
-            attrs[attr] = updated
+    _apply_training_camp_year_bonus(players, player_baselines)
 
 
 def _normalize_allocations(allocations: Dict) -> Dict:

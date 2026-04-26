@@ -2030,7 +2030,18 @@ def finalize_game(
                 try:
                     player_doc = players_collection.find_one(
                         {"_id": pid_str},
-                        {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
+                        {
+                            "first_name": 1,
+                            "last_name": 1,
+                            "team": 1,
+                            "team_id": 1,
+                            "attributes": 1,
+                            "position_ratings": 1,
+                            "height": 1,
+                            "weight": 1,
+                            "year": 1,
+                            "jersey": 1,
+                        },
                     )
                     if player_doc:
                         zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
@@ -2040,6 +2051,10 @@ def finalize_game(
                             "last_name": player_doc.get("last_name", ""),
                             "team": player_doc.get("team", ""),
                         }
+                        for _k in ("height", "weight", "year", "jersey"):
+                            _v = player_doc.get(_k)
+                            if _v is not None:
+                                meta[_k] = _v
                         if pid_str in player_to_team and player_to_team[pid_str] in team_name_to_id:
                             meta["team_id"] = team_name_to_id[player_to_team[pid_str]]
                         else:

@@ -196,6 +196,145 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   text-decoration: underline;
 }
 
+.brand-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.76);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.brand-back-link:hover {
+  background: none;
+  color: #ffffff;
+  transform: translateX(-1px);
+}
+
+.brand-back-link::before {
+  content: "<";
+  font-size: 16px;
+  line-height: 1;
+}
+
+.gob-page-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.gob-page-header .brand-back-link {
+  justify-self: start;
+}
+
+.gob-page-header h1 {
+  margin: 0;
+  text-align: center;
+}
+
+.gob-page-header-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gob-action-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 138px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(247, 148, 32, 0.45);
+  background: #F79420;
+  color: #15181f;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.14s ease, opacity 0.14s ease;
+}
+
+.gob-action-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.gob-action-btn:active {
+  transform: translateY(0);
+}
+
+.gob-action-btn.is-green {
+  background: #34EC27;
+  border-color: rgba(52, 236, 39, 0.5);
+}
+
+.gob-action-btn.is-dead,
+.gob-action-btn:disabled {
+  opacity: 0.42;
+  cursor: default;
+  filter: none;
+  transform: none;
+}
+
+.gob-page-panel {
+  margin-bottom: 18px;
+}
+
+.gob-page-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.gob-page-panel h2,
+.gob-page-panel h3 {
+  margin: 0;
+  color: #f7f9ff;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+.gob-page-panel h2 {
+  font-size: 28px;
+}
+
+.gob-page-panel h3 {
+  font-size: 22px;
+}
+
+.gob-page-help,
+.gob-page-status {
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .resource-page-container.fcc-brand-page-shell h1 {
   color: #f7f9ff;
   font-family: 'Bebas Neue', cursive;
@@ -204,6 +343,12 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   line-height: 1;
   margin: 0 0 18px;
 }
+
+.resource-page-container.fcc-brand-page-shell .gob-page-header h1 {
+  margin: 0;
+  text-align: center;
+}
+
 .resource-page-container h1 {
   font-size: 1.5rem;
   margin-bottom: 16px;
@@ -385,6 +530,25 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.24);
   color: #ffffff;
+}
+
+@media (max-width: 760px) {
+  .gob-page-header {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .gob-page-header h1 {
+    text-align: left;
+  }
+
+  .gob-page-header-actions {
+    justify-self: stretch;
+  }
+
+  .gob-page-header-actions .gob-action-btn {
+    flex: 1;
+  }
 }
 
 /* Position Shot Weights */

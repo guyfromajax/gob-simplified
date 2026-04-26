@@ -1,12 +1,29 @@
+body {
+  background:
+    linear-gradient(180deg, rgba(74, 144, 217, 0.16), rgba(28, 45, 96, 0.22)),
+    #27408E;
+  color: #f7f9ff;
+}
+
 .cut-players-header {
   align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 0 0 12px;
+  backdrop-filter: blur(8px);
+}
+
+.cut-players-section {
+  margin-bottom: 18px;
+}
+
+#cut-players-table {
+  --gob-data-grid-min-width: 1120px;
 }
 
 .cut-player-name-link {
-  color: inherit;
+  color: #ffffff;
   text-decoration: none;
 }
 
@@ -19,7 +36,32 @@
 }
 
 .cut-player-checkbox {
+  accent-color: #34EC27;
   cursor: pointer;
   height: 18px;
   width: 18px;
+}
+
+.cut-player-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.cut-player-badge.is-ptp {
+  background: rgba(255, 109, 109, 0.18);
+  color: #ff9a9a;
+}
+
+.cut-player-badge.is-graduating {
+  background: rgba(52, 236, 39, 0.14);
+  color: #d9ffd6;
 }

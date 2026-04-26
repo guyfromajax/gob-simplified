@@ -35,24 +35,33 @@
 
   function showModal(config) {
     var backdrop = document.getElementById('cut-modal-backdrop');
+    var accent = document.getElementById('cut-modal-accent');
     var title = document.getElementById('cut-modal-title');
     var message = document.getElementById('cut-modal-message');
     var actions = document.getElementById('cut-modal-actions');
     title.textContent = config.title || 'Cut Players';
     message.textContent = config.message || '';
+    if (accent) {
+      accent.className = 'gob-modal-accent';
+      accent.classList.add(config.accent || 'is-red');
+    }
     actions.innerHTML = '';
     (config.actions || []).forEach(function (action) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'fcc-modal-btn ' + (action.variant || 'fcc-modal-btn-secondary');
+      btn.className = action.variant === 'gob-modal-btn-primary'
+        ? 'gob-modal-btn-primary'
+        : 'gob-modal-btn-secondary';
       btn.textContent = action.label;
       btn.addEventListener('click', function () {
-        backdrop.style.display = 'none';
+        backdrop.classList.remove('is-visible');
+        backdrop.setAttribute('aria-hidden', 'true');
         if (action.onClick) action.onClick();
       });
       actions.appendChild(btn);
     });
-    backdrop.style.display = 'flex';
+    backdrop.classList.add('is-visible');
+    backdrop.setAttribute('aria-hidden', 'false');
   }
 
   function formatAttr(attrs, key) {
@@ -117,16 +126,14 @@
       nameTd.appendChild(link);
       if (player.hasPlayingTimePromise) {
         var ptp = document.createElement('span');
-        ptp.textContent = ' (PTP)';
-        ptp.style.color = '#bb2f35';
-        ptp.style.fontWeight = '700';
+        ptp.textContent = 'PTP';
+        ptp.className = 'cut-player-badge is-ptp';
         nameTd.appendChild(ptp);
       }
       if (player.isGraduating) {
         var gr = document.createElement('span');
-        gr.textContent = ' (GR)';
-        gr.style.color = '#2f8f46';
-        gr.style.fontWeight = '700';
+        gr.textContent = 'GR';
+        gr.className = 'cut-player-badge is-graduating';
         nameTd.appendChild(gr);
       }
       tr.appendChild(nameTd);
@@ -163,6 +170,9 @@
       tbody.appendChild(tr);
     });
     updateStatus();
+    if (typeof window.initAttributeTooltips === 'function') {
+      window.initAttributeTooltips(document.getElementById('cut-players-table'), ['th', 'td']);
+    }
   }
 
   function navigateBack() {
@@ -178,9 +188,10 @@
     showModal({
       title: 'Leave Cut Players?',
       message: 'You have selected players to cut but have not submitted them. Are you sure you want to leave?',
+      accent: 'is-red',
       actions: [
-        { label: 'Stay', variant: 'fcc-modal-btn-primary' },
-        { label: 'Leave', variant: 'fcc-modal-btn-secondary', onClick: navigateBack }
+        { label: 'Stay', variant: 'gob-modal-btn-primary' },
+        { label: 'Leave', variant: 'gob-modal-btn-secondary', onClick: navigateBack }
       ]
     });
   }
@@ -195,11 +206,12 @@
     showModal({
       title: 'Confirm Cuts',
       message: 'You are going to cut ' + formatNames(namesInOrder) + '. This cannot be undone. Are you sure you want to proceed with the cuts?',
+      accent: 'is-red',
       actions: [
-        { label: 'Cancel', variant: 'fcc-modal-btn-secondary' },
+        { label: 'Cancel', variant: 'gob-modal-btn-secondary' },
         {
           label: 'Confirm',
-          variant: 'fcc-modal-btn-primary',
+          variant: 'gob-modal-btn-primary',
           onClick: function () {
             fetch(API_CONFIG.buildUrl('/franchise/cut-players'), {
               method: 'POST',
@@ -218,9 +230,10 @@
                 showModal({
                   title: 'Cuts Processed',
                   message: formatNames(data.cut_names || namesInOrder) + ' have been cut.',
+                  accent: 'is-green',
                   actions: [{
                     label: 'Back To Locker Room',
-                    variant: 'fcc-modal-btn-primary',
+                    variant: 'gob-modal-btn-primary',
                     onClick: function () {
                       allowLeave = true;
                       window.location.href = buildFccUrl();
@@ -233,7 +246,7 @@
                 showModal({
                   title: 'Cuts Failed',
                   message: 'Unable to process player cuts.',
-                  actions: [{ label: 'Close', variant: 'fcc-modal-btn-secondary' }]
+                  actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
                 });
               });
           }
@@ -278,9 +291,10 @@
         showModal({
           title: 'No Cuts Required',
           message: 'Your roster is already at the legal 12-player limit.',
+          accent: 'is-green',
           actions: [{
             label: 'Back To Locker Room',
-            variant: 'fcc-modal-btn-primary',
+            variant: 'gob-modal-btn-primary',
             onClick: navigateBack
           }]
         });
@@ -290,7 +304,8 @@
       showModal({
         title: 'Cut Players',
         message: 'Unable to load cut players data.',
-        actions: [{ label: 'Back To Locker Room', variant: 'fcc-modal-btn-primary', onClick: navigateBack }]
+        accent: 'is-red',
+        actions: [{ label: 'Back To Locker Room', variant: 'gob-modal-btn-primary', onClick: navigateBack }]
       });
     });
   }

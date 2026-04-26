@@ -313,11 +313,45 @@ For training camp only, the following bonus will be run for each player, based o
 - Note: if a player has multiple positions tied for the highest RT, choose one at random
 
 Then use the following CH scale for each player:
-- If CH > 80, for each core attribute `+= random.randint(4, 8)`
-- `elif CH > 60`: for each core attribute `+= random.randint(3, 6)`
-- `elif CH > 40`: for each core attribute `+= random.randint(2, 4)`
-- `elif CH > 20`: for each core attribute `+= random.randint(1, 2)`
+- If CH > 80, for each core attribute `+= random.randint(4, 10)`
+- `elif CH > 60`: for each core attribute `+= random.randint(3, 8)`
+- `elif CH > 40`: for each core attribute `+= random.randint(2, 6)`
+- `elif CH > 20`: for each core attribute `+= random.randint(1, 4)`
 - else: no bonus applied
+
+Then apply a final **Training Camp bonus by year** (runs for every player with a recognized `year`, regardless of CH). **Positive** rolls on an attribute use the same **high-attribute rule** as drill gains: if that attribute’s value **at the start of the training session** is `> 100`, halve the positive gain (rounded). Negative rolls are not halved. After all camp bonuses, player attributes are clamped to a **minimum of 1**.
+
+- **Top two positions:** Sort `PG`–`C` by RT. If **two** positions tie for highest RT, those are the two. If **more than two** tie for highest, choose **two** at random. If **one** is uniquely first and **two or more** tie for second, use the first and choose **one** of the tied second-tier positions at random. (All five positions are expected to have RT values.)
+- **Attribute set:** Union of core attributes for each of those two positions (same mapping as above; SF still draws two random attrs per SF definition), then add **ND**, **IQ**, **FT**, and **CH** if not already present, then add **exactly one** random attribute from trainable player attrs not in the set, **excluding** EM, MO, NG, and RT.
+- **Rolls:** Each attribute in that final list gets its **own** `random.randint`:
+  - **senior:** `+= random.randint(-1, 2)`
+  - **junior:** `+= random.randint(-3, 3)`
+  - **sophomore:** `+= random.randint(-5, 5)`
+  - **freshman:** `+= random.randint(-10, 22)`
+
+Traning Camp Height / Weight bonsuses
+-senior junior: none
+-sophomore:
+  - height
+    - +0: 60% chance
+    - +1: 30% chance
+    - +2: 10% chance
+  - weight (note height filters are applied after the height change noted above)
+    - height > 75: += random.randint(0,10)
+    - else: += random.randint(0,5)
+-freshman:
+  - height
+    - +0: 20% chance
+    - +1: 20% chance
+    - +2: 30% chance
+    - +3: 20% chance
+    - +4: 5% chance
+    - +5: 5% chance
+  - weight (note height filters are applied after the height change noted above)
+    - height > 75: += random.randint(10,30)
+    - elif height > 72: += random.randint(5,15)
+    - else: += random.randint(0,10)
+
 
 **Team Attributes (training ranges by group):**
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
@@ -671,6 +705,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
+- `meta.height` and `meta.weight` (integer inches / pounds) - **Training camp only** (freshman/sophomore): camp bonuses add to existing values; persisted via `$set`. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before camp runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
 
 **Franchise Document:**
 - `latest_training` - Most recent training report (backward-compatible quick access)

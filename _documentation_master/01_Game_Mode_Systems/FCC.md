@@ -762,7 +762,7 @@ Current logic:
 - week 35:
   - live copy: `Recruiting Is Live`
 - week 36:
-  - live copy: `Recruiting Closed`
+  - live copy: `Recruiting Is Complete`
 - post-26 otherwise:
   - live copy: `Recruiting Runs After National Tourney`
 
