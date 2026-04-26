@@ -7,7 +7,7 @@ conditioning/scrimmage strings from apply_training_points.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import random
 
@@ -205,6 +205,7 @@ def build_structured_training_report_notes(
     plays_data: dict,
     scouting_data: dict,
     legacy_energy_notes: List[str],
+    training_camp_physique_notes: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     sections: List[Dict[str, str]] = []
     players_by_name = {_player_name(p): p for p in players}
@@ -281,6 +282,12 @@ def build_structured_training_report_notes(
 
     pt = float(team.get("pt_efficiency", 0) or 0) + float(team.get("pt_opp_modifier", 0) or 0)
     sections.append({"title": "Press/Trap Readiness", "body": _readiness_label(pt)})
+
+    if is_training_camp and training_camp_physique_notes:
+        sections.append({
+            "title": "Misc",
+            "body": "\n\n".join(training_camp_physique_notes),
+        })
 
     if legacy_energy_notes:
         energy_body = "\n\n".join(legacy_energy_notes)

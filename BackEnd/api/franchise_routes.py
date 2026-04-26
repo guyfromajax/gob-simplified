@@ -7633,7 +7633,8 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
             "attributes": franchise_player_data.get("attributes", {}),
             "position_ratings": franchise_player_data.get("position_ratings", {}),
-            "year": meta.get("year")
+            "year": meta.get("year"),
+            "meta": dict(meta) if isinstance(meta, dict) else {},
         }
         players_for_training.append(player)
 
@@ -7765,7 +7766,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     
     for player in players_for_training:
         pid = player["_id"]
-        meta = (franchise_players.get(pid) or {}).get("meta", {})
+        meta = player.get("meta") or {}
         height = meta.get("height")
         if height is None:
             core_player = db.players.find_one({"_id": pid}, {"height": 1}) or {}
@@ -7802,6 +7803,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             fpd_set["attributes.NG"] = attrs["NG"]
         if pid in position_ratings_updates:
             fpd_set["position_ratings"] = position_ratings_updates[pid]
+        pm = player.get("meta") or {}
+        if isinstance(pm, dict):
+            if "height" in pm:
+                fpd_set["meta.height"] = pm["height"]
+            if "weight" in pm:
+                fpd_set["meta.weight"] = pm["weight"]
         if fpd_set:
             franchise_players_data_collection.update_one(
                 {"franchise_id": str(req.franchise_id), "player_id": pid},

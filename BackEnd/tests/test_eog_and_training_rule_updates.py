@@ -116,6 +116,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
     def test_training_camp_bonus_applies_for_high_ch_pg(self):
         player = {
+            "_id": "camp_pg",
             "position_ratings": {"PG": 90, "SG": 80, "SF": 70, "PF": 60, "C": 50},
             "attributes": {
                 "anchor_CH": 85,
@@ -125,18 +126,27 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                 "anchor_IQ": 50, "IQ": 50,
             },
         }
+        baselines = {
+            "camp_pg": {
+                "PS": 50,
+                "BH": 50,
+                "IQ": 50,
+                "CH": 85,
+            }
+        }
         with patch.object(random, "randint", return_value=4) as fake_randint:
-            _apply_training_camp_bonus([player])
+            _apply_training_camp_bonus([player], baselines)
 
         self.assertEqual(player["attributes"]["anchor_PS"], 54)
         self.assertEqual(player["attributes"]["anchor_BH"], 54)
         self.assertEqual(player["attributes"]["anchor_IQ"], 54)
         self.assertEqual(fake_randint.call_count, 3)
         for call in fake_randint.call_args_list:
-            self.assertEqual(call.args, (4, 8))
+            self.assertEqual(call.args, (4, 10))
 
     def test_training_camp_bonus_sf_uses_ag_plus_two_random_attrs(self):
         player = {
+            "_id": "camp_sf",
             "position_ratings": {"PG": 70, "SG": 75, "SF": 90, "PF": 60, "C": 55},
             "attributes": {
                 "anchor_CH": 65,
@@ -148,8 +158,16 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                 "anchor_OD": 40, "OD": 40,
             },
         }
+        baselines = {
+            "camp_sf": {
+                "AG": 40,
+                "SC": 40,
+                "ID": 40,
+                "CH": 65,
+            }
+        }
         with patch.object(random, "sample", return_value=["SC", "ID"]), patch.object(random, "randint", return_value=3) as fake_randint:
-            _apply_training_camp_bonus([player])
+            _apply_training_camp_bonus([player], baselines)
 
         self.assertEqual(player["attributes"]["anchor_AG"], 43)
         self.assertEqual(player["attributes"]["anchor_SC"], 43)
@@ -158,7 +176,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(player["attributes"]["anchor_OD"], 40)
         self.assertEqual(fake_randint.call_count, 3)
         for call in fake_randint.call_args_list:
-            self.assertEqual(call.args, (3, 6))
+            self.assertEqual(call.args, (3, 8))
 
     def test_eog_totals_source_prefers_team_totals_over_box_score(self):
         team_totals_obj = {
