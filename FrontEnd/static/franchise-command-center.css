@@ -328,6 +328,25 @@ input[type="reset"] {
   text-decoration: none;
 }
 
+/* Embedded footnotes: Coach's Office Recruiting card + Recruits tab */
+.fcc-recruiting-footnote--embed {
+  margin-top: 12px;
+  margin-bottom: 0;
+  padding: 10px 0 2px;
+}
+
+#franchise-container #home-tab .fcc-home-card-recruiting .fcc-recruiting-footnote--embed {
+  margin-top: 10px;
+  padding-top: 10px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+#franchise-container #recruits-tab .fcc-recruiting-footnote--embed {
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
 #franchise-container .tab-buttons {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

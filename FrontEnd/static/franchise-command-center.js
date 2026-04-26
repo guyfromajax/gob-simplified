@@ -2963,9 +2963,6 @@ function updatePlayButton(data) {
 }
 
 function updateRecruitingButton(data) {
-  const recruitingBtn = document.getElementById('fcc-recruiting-btn');
-  const liveCopy = document.getElementById('fcc-recruiting-live-copy');
-  if (!recruitingBtn || !liveCopy) return;
   const week = Number(data?.week || 1);
   const resultsWeek = Number(data?.current_recruiting_results_week || 0);
   let text = 'Recruiting Invites Begin Week 20';
@@ -2996,17 +2993,26 @@ function updateRecruitingButton(data) {
     text = 'Recruiting Runs After National Tourney';
   }
 
-  liveCopy.textContent = text;
-  liveCopy.style.display = showButton ? 'none' : 'block';
-  recruitingBtn.style.display = showButton ? 'inline-flex' : 'none';
-  recruitingBtn.textContent = text;
-  recruitingBtn.disabled = !showButton;
-  recruitingBtn.classList.toggle('is-dead', !showButton);
-  recruitingBtn.onclick = null;
-  if (showButton && href) {
-    recruitingBtn.onclick = () => {
-      window.location.href = href;
-    };
+  const slots = [
+    ['fcc-recruiting-live-copy-home', 'fcc-recruiting-btn-home'],
+    ['fcc-recruiting-live-copy-tab', 'fcc-recruiting-btn-tab'],
+  ];
+  for (const [copyId, btnId] of slots) {
+    const recruitingBtn = document.getElementById(btnId);
+    const liveCopy = document.getElementById(copyId);
+    if (!recruitingBtn || !liveCopy) continue;
+    liveCopy.textContent = text;
+    liveCopy.style.display = showButton ? 'none' : 'block';
+    recruitingBtn.style.display = showButton ? 'inline-flex' : 'none';
+    recruitingBtn.textContent = text;
+    recruitingBtn.disabled = !showButton;
+    recruitingBtn.classList.toggle('is-dead', !showButton);
+    recruitingBtn.onclick = null;
+    if (showButton && href) {
+      recruitingBtn.onclick = () => {
+        window.location.href = href;
+      };
+    }
   }
 }
 
