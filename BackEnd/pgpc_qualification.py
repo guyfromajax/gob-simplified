@@ -27,8 +27,9 @@ TIER_C_CONDITIONS = frozenset(
     }
 )
 
-# `chemistry_low` bank rows use team_chemistry + max_chemistry; hold until week 5 is in the books.
-PGPC_MIN_WEEK_FOR_LOW_CHEMISTRY_QUESTIONS = 5
+# Extended program-narrative questions wait until week 5+ (session ``ctx["week"]``).
+# Applies to: ``chemistry_low`` (team_chemistry + max_chemistry), ``above_500_first_time_season``.
+PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS = 5
 
 
 def _press_conference_questions() -> List[Dict[str, Any]]:
@@ -479,13 +480,15 @@ def _condition_holds(
         return ctx.get("fell_out_top_25") is True
 
     if condition == "above_500_first_time_season":
+        if _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS:
+            return False
         return ctx.get("above_500_first_time_season") is True
 
     if condition == "fell_below_500":
         return ctx.get("fell_below_500") is True
 
     if condition == "team_chemistry":
-        if "max_chemistry" in filters and _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_LOW_CHEMISTRY_QUESTIONS:
+        if "max_chemistry" in filters and _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS:
             return False
         blob = _team_blob_from_game_doc(game_doc, ut)
         chem = None

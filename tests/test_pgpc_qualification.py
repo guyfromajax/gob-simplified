@@ -168,6 +168,24 @@ def test_tier_c_lead_changes_requires_blob():
     assert "lead_changes_high_01" in with_blob
 
 
+def test_above_500_first_time_gated_until_week_5():
+    game = {
+        "quarter": 4,
+        "teams": _base_teams(
+            u_score=65,
+            o_score=60,
+            u_pbq=[16, 16, 16, 17],
+            o_pbq=[15, 15, 15, 15],
+        ),
+        "players": [],
+    }
+    early = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx(week=4, above_500_first_time_season=True))}
+    assert "above_500_first_time_01" not in early
+
+    ok = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx(week=5, above_500_first_time_season=True))}
+    assert "above_500_first_time_01" in ok
+
+
 def test_low_chemistry_gated_until_week_5():
     game = {
         "quarter": 4,
