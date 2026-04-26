@@ -1,4 +1,4 @@
-button:not([data-tab]):not([role="tab"]):not(.tab-button):not(.stats-scope-btn):not(.traits-scope-btn):not(.standings-region-btn):not(.schedule-conference-btn):not(.rankings-toggle):not(.team-toggle-btn),
+button:not([data-tab]):not([role="tab"]):not(.tab-button):not(.stats-scope-btn):not(.traits-scope-btn):not(.standings-region-btn):not(.schedule-conference-btn):not(.rankings-toggle):not(.team-toggle-btn):not(.pgpc-choice-row),
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {

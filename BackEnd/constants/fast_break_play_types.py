@@ -2,7 +2,7 @@
 Fast break play identifiers (DREB → outlet) and steal bucket.
 
 - Code / persistence: snake_case keys below.
-- UI label for ``TRIANGLE`` is "Triangle" (see Fast_Break_System / FB_Update_Brief).
+- UI label for ``TRIANGLE`` is "Triangle" (see Fast_Break_System.md).
 
 ``triangle`` reuses the Rim Runner entry/denied-outlet family, then branches into
 its own setup / decision / finish payload once the RR lane-pass read is declined.

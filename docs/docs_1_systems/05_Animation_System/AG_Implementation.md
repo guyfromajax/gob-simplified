@@ -1,5 +1,7 @@
 # AG → Movement Speed (implementation brief)
 
+**Location:** `docs/docs_1_systems/05_Animation_System/AG_Implementation.md` (moved from `docs/To Do/`).
+
 **Status:** AG v1 implemented (per-player speed in `getPlayerDuration`); tuning + HCO context scalars optional  
 **Scope:** Universal player movement duration/speed from **effective in-game Agility (AG)**, starting with fast-break–style coverage; applicable to all steps/turns that use shared duration helpers.
 

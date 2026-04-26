@@ -39,6 +39,7 @@
 
 #### Auth-Required (already)
 - `GET /api/auth/me` — returns user_id, email (requires `get_current_user`)
+- `GET /api/community/highlights` — universal franchise game highlight feed (requires `get_current_user`)
 
 #### User-Data Endpoints (require auth + ownership)
 
@@ -47,6 +48,11 @@
 - `POST /franchise/play-next-game`
 - `POST /franchise/save-result`
 - `POST /franchise/complete-week`
+- `POST /franchise/complete-week/phase-a`
+- `POST /franchise/complete-week/phase-b`
+- `POST /franchise/press-conference/session` — create session (auth + franchise ownership)
+- `POST /franchise/press-conference/session/{session_id}/answer` — append answer
+- `POST /franchise/press-conference/session/{session_id}/complete` — mark session completed
 - `GET /franchise/command-center/data`
 - `GET /franchise/standings`
 - `GET /franchise/schedule`

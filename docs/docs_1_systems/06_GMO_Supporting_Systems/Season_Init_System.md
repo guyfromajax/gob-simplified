@@ -36,6 +36,11 @@ Season init does not intentionally wipe:
 - the franchise team’s play library metadata
 - the team’s playbook identity model
 
+## Coaching focus counters (`coaching_focus` on FTD)
+
+- **`training_reports`** are cleared for the new season, but **`coaching_focus`** archetype totals are **carried over** with a **75% reduction**: each of `authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder` becomes **`int(round(old_value × 0.25))`** when `finish_season` writes the next-season FTD row (see `carryover_coaching_focus_counts_for_new_season` in `BackEnd/utils/franchise_coaching_focus_counts.py`).
+- During **week 1 training camp** (first training before any `results["1"]`), new increments use weight **`random.randint(2, 4)`** per submit instead of `+1`. Full detail: `Training_System.md` → Data Storage → FTD `coaching_focus`.
+
 ## Rename / Identity Note
 
 Because the current rollout moved playbook settings to `play_id`, season-init continuity should treat:

@@ -1,3 +1,34 @@
+import { launchPostGamePressConference } from './postGamePressConference.js';
+import {
+  isPgpcSammyReminderSuppressed,
+  showPgpcSammyReminderModal,
+} from './pgpcSammyReminderModal.js';
+
+/**
+ * Push final scores (and a simple FINAL clock readout) to the court scoreboard DOM
+ * so the background behind the EOG modal matches the popup, not a stale Q1/0–0 state.
+ */
+function syncBackgroundScoreboardFromFinalScore(finalScore) {
+  if (typeof document === 'undefined' || !finalScore) return;
+  const hs = Number(finalScore.homeScore);
+  const as = Number(finalScore.awayScore);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return;
+
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  if (homeScoreEl) homeScoreEl.textContent = String(hs);
+  if (awayScoreEl) awayScoreEl.textContent = String(as);
+
+  const quarterEl = document.getElementById('quarter');
+  if (quarterEl) quarterEl.textContent = 'FINAL';
+
+  const gameClockEl = document.getElementById('game-clock');
+  if (gameClockEl) gameClockEl.textContent = '0:00';
+
+  const shotClockEl = document.getElementById('shot-clock');
+  if (shotClockEl) shotClockEl.textContent = '0';
+}
+
 /**
  * Shows a game completion popup with Box Score and Go To Locker Room buttons
  * @param {Object} options
@@ -16,6 +47,8 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   if (existingPopup) {
     existingPopup.remove();
   }
+
+  syncBackgroundScoreboardFromFinalScore(finalScore);
 
   // ✅ SS&S: Fallback to reading teamId / user side from URL params if not provided
   if (typeof window !== 'undefined') {
@@ -133,6 +166,21 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     : resolvedUserTeamSide === 'home'
     ? canonicalHomeName
     : null;
+
+  let userTeamPrimaryColor = '#F79420';
+  if (resolvedUserTeamSide === 'home' && docHomeId) {
+    const ub = teamRec(docHomeId);
+    if (ub && typeof ub === 'object') {
+      const col = ub.colors?.primary_color || ub.colors?.primary;
+      if (col && typeof col === 'string') userTeamPrimaryColor = col;
+    }
+  } else if (resolvedUserTeamSide === 'away' && docAwayId) {
+    const ub = teamRec(docAwayId);
+    if (ub && typeof ub === 'object') {
+      const col = ub.colors?.primary_color || ub.colors?.primary;
+      if (col && typeof col === 'string') userTeamPrimaryColor = col;
+    }
+  }
   const bannerUrl = userTeamName && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
@@ -150,7 +198,19 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     ? `${potg.stats.pts} PTS · ${potg.stats.reb} REB · ${potg.stats.ast} AST · ${potg.stats.defPct} DEF%`
     : '';
 
-  // Box Score URL — after user side is resolved so `my_team` matches header banner on box-score
+  const franchisePhaseBPending =
+    mode === 'franchise' &&
+    finalScore &&
+    (finalScore.franchisePhaseBPending ||
+      (finalScore.franchiseCompleteWeekPayload
+        ? {
+            franchise_id: finalScore.franchiseCompleteWeekPayload.franchise_id,
+            week: finalScore.franchiseCompleteWeekPayload.week,
+          }
+        : null));
+
+  // Box Score URL — after user side is resolved so `my_team` matches header banner on box-score.
+  // post_game_phase_b=1: opened from EOG while phase B is pending; box-score shows "Sim Computer Games" when localStorage matches.
   const boxScoreParams = new URLSearchParams();
   if (gameId) boxScoreParams.set('game_id', gameId);
   if (homeTeam) boxScoreParams.set('home', homeTeam);
@@ -165,7 +225,31 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       boxScoreParams.set('banner_team', userTeamName);
     }
   }
+  if (franchisePhaseBPending) {
+    boxScoreParams.set('post_game_phase_b', '1');
+  }
   const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
+
+  const lockerActionHtml = franchisePhaseBPending
+    ? `<button type="button" class="completion-button locker-room-button franchise-pgpc-button">Post-Game Press Conference</button>`
+    : `<a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>`;
+
+  const actionsSectionHtml = franchisePhaseBPending
+    ? `
+      <section class="gc-section gc-actions-section">
+        <div class="button-container gc-actions-pgpc-only">
+          ${lockerActionHtml}
+        </div>
+      </section>
+    `
+    : `
+      <section class="gc-section gc-actions-section">
+        <div class="button-container">
+          <a href="${boxScoreUrl}" class="completion-button box-score-button">Box Score</a>
+          ${lockerActionHtml}
+        </div>
+      </section>
+    `;
 
   console.log('📊 Box Score URL constructed:', {
     gameId,
@@ -241,12 +325,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
           </div>
         </section>
       ` : ''}
-      <section class="gc-section gc-actions-section">
-        <div class="button-container">
-          <a href="${boxScoreUrl}" class="completion-button box-score-button">Box Score</a>
-          <a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>
-        </div>
-      </section>
+      ${actionsSectionHtml}
     </div>
   `;
 
@@ -397,6 +476,10 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         gap: 12px;
         width: 100%;
         margin-top: 20px;
+      }
+
+      .gc-actions-pgpc-only .completion-button {
+        flex: 1;
       }
 
       .potg-image {
@@ -558,6 +641,42 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
     });
   }
+
+  const pgpcBtn = popup.querySelector('.franchise-pgpc-button');
+  if (pgpcBtn && franchisePhaseBPending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
+    pgpcBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (document.getElementById('pgpc-sammy-reminder-backdrop')) return;
+      if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+
+      const beginPgpc = () => {
+        pgpcBtn.disabled = true;
+        launchPostGamePressConference({
+          franchisePhaseBPending,
+          userTeamName,
+          gameId,
+          lockerRoomUrl,
+          onCloseParentPopup: () => {
+            try {
+              popup.remove();
+            } catch (_) {}
+          },
+        });
+      };
+
+      if (isPgpcSammyReminderSuppressed()) {
+        beginPgpc();
+        return;
+      }
+
+      showPgpcSammyReminderModal({
+        userTeamName,
+        userPrimaryColor: userTeamPrimaryColor,
+        onGotIt: beginPgpc,
+      });
+    });
+  }
+
   if (lockerRoomBtn && mode === 'single' && gameId) {
     lockerRoomBtn.addEventListener('click', async (e) => {
       e.preventDefault();

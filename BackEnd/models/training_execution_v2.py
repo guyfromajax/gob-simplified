@@ -756,6 +756,9 @@ def apply_training_points(
             if delta != 0:
                 changes[attr] = delta
         if changes:
+            yr = player.get("year")
+            if yr is not None and str(yr).strip():
+                changes["year"] = str(yr).strip().lower()
             player_changes[name] = changes
     
     team_changes = {}

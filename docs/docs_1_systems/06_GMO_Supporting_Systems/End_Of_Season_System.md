@@ -74,3 +74,8 @@ When the user confirms `Go To Next Season`:
   - signed recruits and walk-ons do not need universal `players` docs to appear on roster pages
 
 For the detailed franchise-instance rollover process, see `Season_Init_System.md`.
+
+### Coaching focus habit counters (FTD)
+
+- Each franchise team’s FTD may store **`coaching_focus`** tallies (archetype usage during the season).
+- When the user confirms **Go To Next Season** and `finish_season` runs, each team’s four counters are **not** wiped: they are set to **`round(prior × 0.25)`** (integer), i.e. **75% of the prior value is removed** and the remainder seeds the new season. See `Training_System.md` (Data Storage → FTD) and `BackEnd/utils/franchise_coaching_focus_counts.py` (`carryover_coaching_focus_counts_for_new_season`).

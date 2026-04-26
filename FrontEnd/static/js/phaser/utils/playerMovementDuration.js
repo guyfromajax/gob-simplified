@@ -1,7 +1,7 @@
 /**
  * Universal player movement duration: distance ÷ (AG-based px/s × game speed preset).
  * Single source of truth for run speed — use from tweenPlayerTo and turnAnimation.getPlayerDuration.
- * See docs/To Do/AG_Implementation.md
+ * See docs/docs_1_systems/05_Animation_System/AG_Implementation.md
  */
 import { getEffectiveAgilityForMovement, agToSpeedPxPerSec } from "./playerMovementSpeed.js";
 import { getCurrentOwner } from "../animation/BallControllerAdapter.js";

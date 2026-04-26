@@ -130,6 +130,37 @@ function resetPlayerMaximizerResolvedState() {
   resetCustomFocusCommitted();
 }
 
+/** Distant-training overlay: rotate user-team highlight lines */
+const TRAINING_DISTANT_HIGHLIGHT_MS = 5000;
+const TRAINING_HIGHLIGHT_FALLBACK = 'Finishing league training…';
+
+function shuffleArrayInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+  return arr;
+}
+
+/**
+ * Non-empty array of strings for the highlight stream (randomized). Uses fallback if API sent none.
+ * @param {unknown} trainingHighlights
+ * @returns {string[]}
+ */
+function buildRandomizedTrainingHighlightLines(trainingHighlights) {
+  const out = [];
+  if (Array.isArray(trainingHighlights)) {
+    trainingHighlights.forEach(function (h) {
+      if (typeof h === 'string' && h.trim()) out.push(h.trim());
+    });
+  }
+  if (out.length === 0) return [TRAINING_HIGHLIGHT_FALLBACK];
+  shuffleArrayInPlace(out);
+  return out;
+}
+
 async function fetchFranchiseCommandCenterData(franchiseId) {
   const response = await fetch(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}`, {
     headers: API_CONFIG.getAuthHeaders()
@@ -967,7 +998,6 @@ submitBtn.addEventListener('click', async function() {
     if (teamId) {
       payload.team_id = teamId;
     }
-    endpoint = '/franchise/run-training';
   } else if (mode === 'tournament' && tournamentId) {
     payload = {
       tournament_id: tournamentId,
@@ -990,38 +1020,106 @@ submitBtn.addEventListener('click', async function() {
     this.disabled = true;
     this.textContent = 'Submitting...';
     if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      const overlayTeamName = currentTeamName || 'Your team';
       window.PageLoadOverlay.show({
         variant: 'pulse',
-        subtitle: `${overlayTeamName} is executing training.`,
+        title: '',
+        subtitle: 'Preparing your training…',
         teamName: currentTeamName || '',
         assetKey: 'banner_primary'
       });
     }
-    
-    console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
-    console.log('🔍 [TRAINING] Payload:', payload);
-    
-    const url = API_CONFIG.buildUrl(endpoint) + (endpoint === '/franchise/run-training' ? '?profile=1' : '');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-      let detail = `HTTP error! status: ${response.status}`;
+
+    const jsonHeaders = Object.assign(
+      { 'Content-Type': 'application/json' },
+      (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
+    );
+
+    let result;
+
+    if (mode === 'franchise' && franchiseId) {
+      console.log('🔍 [TRAINING] Phase 1 (user) payload:', payload);
+      const userUrl = API_CONFIG.buildUrl('/franchise/run-training/user');
+      let userRes = await fetch(userUrl, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(payload)
+      });
+      let userResult = null;
       try {
-        const err = await response.json();
-        if (err && err.detail) detail = err.detail;
+        userResult = await userRes.json();
       } catch (_e) {}
-      throw new Error(detail);
+      if (userResult && userResult.status === 'already_completed' && userResult.redirect) {
+        result = userResult;
+      } else if (!userRes.ok) {
+        let detail = `HTTP error! status: ${userRes.status}`;
+        if (userResult && userResult.detail) detail = userResult.detail;
+        throw new Error(detail);
+      } else {
+        const lines = buildRandomizedTrainingHighlightLines(
+          userResult && userResult.training_highlights
+        );
+        let highlightStreamId = null;
+        let currentIndex = 0;
+        try {
+          if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+            window.PageLoadOverlay.show({
+              variant: 'pulse',
+              title: '',
+              subtitle: lines[currentIndex],
+              teamName: currentTeamName || '',
+              assetKey: 'banner_primary'
+            });
+          }
+          highlightStreamId = window.setInterval(function () {
+            if (currentIndex < lines.length - 1) {
+              currentIndex += 1;
+              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
+                window.PageLoadOverlay.updatePulseSubtitle(lines[currentIndex]);
+              }
+            }
+          }, TRAINING_DISTANT_HIGHLIGHT_MS);
+
+          const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
+          const distantRes = await fetch(distantUrl, {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({ franchise_id: franchiseId })
+          });
+          try {
+            result = await distantRes.json();
+          } catch (_e) {
+            result = null;
+          }
+          if (!distantRes.ok) {
+            let detail = `HTTP error! status: ${distantRes.status}`;
+            if (result && result.detail) detail = result.detail;
+            throw new Error(detail);
+          }
+        } finally {
+          if (highlightStreamId !== null) {
+            window.clearInterval(highlightStreamId);
+          }
+        }
+      }
+    } else {
+      console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
+      console.log('🔍 [TRAINING] Payload:', payload);
+      const response = await fetch(API_CONFIG.buildUrl(endpoint), {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        let detail = `HTTP error! status: ${response.status}`;
+        try {
+          const err = await response.json();
+          if (err && err.detail) detail = err.detail;
+        } catch (_e) {}
+        throw new Error(detail);
+      }
+      result = await response.json();
     }
-    
-    const result = await response.json();
-    
+
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility

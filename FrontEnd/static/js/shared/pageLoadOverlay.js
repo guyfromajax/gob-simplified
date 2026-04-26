@@ -51,15 +51,32 @@
       overlay.appendChild(content);
     }
 
-    var img = content.querySelector('img');
-    if (!img) {
-      img = document.createElement('img');
-      img.className = 'page-load-overlay-spinner';
-      img.alt = 'Loading…';
-      content.appendChild(img);
+    // Spinner must use .page-load-overlay-spinner so applyPulseVariant can hide it. Static HTML
+    // (e.g. court.html) may inject a bare <img> loader without that class.
+    var spinnerImg = content.querySelector('.page-load-overlay-spinner');
+    if (!spinnerImg) {
+      for (var ci = 0; ci < content.children.length; ci++) {
+        var ch = content.children[ci];
+        if (
+          ch &&
+          ch.tagName === 'IMG' &&
+          !ch.classList.contains('page-load-overlay-pulse-image')
+        ) {
+          ch.className = 'page-load-overlay-spinner';
+          ch.alt = 'Loading…';
+          spinnerImg = ch;
+          break;
+        }
+      }
     }
-    img.src = LOADER_IMG_PATH;
-    img.style.cssText = 'width:240px;height:auto;max-width:90vw;';
+    if (!spinnerImg) {
+      spinnerImg = document.createElement('img');
+      spinnerImg.className = 'page-load-overlay-spinner';
+      spinnerImg.alt = 'Loading…';
+      content.appendChild(spinnerImg);
+    }
+    spinnerImg.src = LOADER_IMG_PATH;
+    spinnerImg.style.cssText = 'width:240px;height:auto;max-width:90vw;';
 
     var message = content.querySelector('.page-load-overlay-message');
     if (!message) {
@@ -156,10 +173,12 @@
   function applyPulseVariant(overlay, options) {
     var content = overlay.querySelector('.page-load-overlay-content');
     if (!content) return;
-    var spinner = content.querySelector('.page-load-overlay-spinner');
+    var spinners = content.querySelectorAll('.page-load-overlay-spinner');
+    for (var si = 0; si < spinners.length; si++) {
+      spinners[si].style.display = 'none';
+    }
     var message = content.querySelector('.page-load-overlay-message');
     var pulse = content.querySelector('.page-load-overlay-pulse');
-    if (spinner) spinner.style.display = 'none';
     if (message) message.style.display = 'none';
     if (!pulse) return;
 
@@ -179,14 +198,39 @@
     }
     if (pulseSubtitle) {
       pulseSubtitle.textContent = subtitleText;
-      pulseSubtitle.style.fontFamily = titleText ? "'Inter', sans-serif" : "'Bebas Neue', sans-serif";
-      pulseSubtitle.style.fontSize = titleText ? '16px' : '48px';
-      pulseSubtitle.style.lineHeight = titleText ? '1.4' : '1';
-      pulseSubtitle.style.letterSpacing = titleText ? '0' : '0.03em';
-      pulseSubtitle.style.color = titleText ? 'rgba(255,255,255,0.68)' : '#ffffff';
-      pulseSubtitle.style.margin = titleText ? '0 0 22px' : '26px 0 22px';
+      // With a title, subtitle is secondary. With no title (e.g. training load: logo + feed only),
+      // subtitle is the main copy — use readable body type, not oversized display type.
+      if (titleText) {
+        pulseSubtitle.style.fontFamily = "'Inter', sans-serif";
+        pulseSubtitle.style.fontSize = '16px';
+        pulseSubtitle.style.lineHeight = '1.4';
+        pulseSubtitle.style.letterSpacing = '0';
+        pulseSubtitle.style.color = 'rgba(255,255,255,0.68)';
+        pulseSubtitle.style.margin = '0 0 22px';
+      } else {
+        pulseSubtitle.style.fontFamily = "'Inter', sans-serif";
+        pulseSubtitle.style.fontSize = '17px';
+        pulseSubtitle.style.lineHeight = '1.45';
+        pulseSubtitle.style.letterSpacing = '0';
+        pulseSubtitle.style.color = 'rgba(255,255,255,0.88)';
+        pulseSubtitle.style.margin = '26px 0 22px';
+        pulseSubtitle.style.maxWidth = 'min(520px, 92vw)';
+      }
     }
     pulse.style.display = 'block';
+  }
+
+  /**
+   * Update pulse subtitle only (e.g. rotating training highlights) without re-running full show().
+   */
+  function updatePulseSubtitle(subtitleText) {
+    if (typeof document === 'undefined') return;
+    var overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    var pulse = overlay.querySelector('.page-load-overlay-pulse');
+    if (!pulse || pulse.style.display === 'none') return;
+    var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
+    if (pulseSubtitle) pulseSubtitle.textContent = subtitleText || '';
   }
 
   function getOrCreateOverlay() {
@@ -241,7 +285,7 @@
     }
   }
 
-  var api = { show: show, hide: hide };
+  var api = { show: show, hide: hide, updatePulseSubtitle: updatePulseSubtitle };
   global.PageLoadOverlay = api;
 
   if (typeof module !== 'undefined' && module.exports) {

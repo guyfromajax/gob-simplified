@@ -1,5 +1,7 @@
 # Active Page Analysis
 
+**Location:** `docs/docs_1_systems/00_General_Systems/Active_Page_Analysis.md` (moved from `docs/To Do/`).
+
 Generated from a static trace of the FrontEnd codebase (Spring 2026). This is a **best-effort navigation map**, not a formal route table. Dynamic URLs (`?game_id=`, `?franchise_id=`, etc.) are omitted; only **page shells** are listed.
 
 ## Methodology

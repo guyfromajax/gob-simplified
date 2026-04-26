@@ -5,7 +5,7 @@
 Define the canonical runtime contract that keeps backend movement/decision logic, game-clock expiration, and frontend sprite/ball animation fully synchronized.
 
 This file is the system-level source of truth for UESS cards.
-Implementation sequencing and migration notes remain in `docs/To Do/Unified_Animation.md`.
+Implementation sequencing and migration notes remain in `docs/docs_1_systems/00_General_Systems/Unified_Animation_System.md`.
 
 ## UESS Launch Status Board
 

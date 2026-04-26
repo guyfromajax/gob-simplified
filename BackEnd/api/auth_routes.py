@@ -28,7 +28,14 @@ try:
 except Exception:
     def _auth_rate_limit(f):
         return f
-from BackEnd.db import users_collection, password_reset_tokens_collection, access_code_requests_collection
+from BackEnd.db import (
+    users_collection,
+    password_reset_tokens_collection,
+    access_code_requests_collection,
+    franchises_collection,
+    franchise_team_data_collection,
+    teams_collection,
+)
 from BackEnd.utils.auth import (
     hash_password,
     verify_password,
@@ -105,10 +112,21 @@ class LeaderboardEntry(BaseModel):
     is_current_user: bool = False
 
 
+class LeaderboardRankEntry(BaseModel):
+    """Franchise rank leaderboard entry."""
+    rank: int
+    username: str
+    team_name: str
+    team_primary_color: str = "#27408E"
+    natl_rank: int
+    is_current_user: bool = False
+
+
 class LeaderboardResponse(BaseModel):
     """Leaderboard response."""
     top: list[LeaderboardEntry]
     current_user: Optional[LeaderboardEntry] = None
+    rank_top: list[LeaderboardRankEntry] = []
 
 
 class ResetRequest(BaseModel):
@@ -591,9 +609,104 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
         if ranked.is_current_user:
             current_user_entry = ranked
 
+    franchise_docs = list(franchises_collection.find(
+        {},
+        {
+            "_id": 1,
+            "user_id": 1,
+            "user_team_id": 1,
+            "user_team_object_id": 1,
+        }
+    ))
+    users_by_id = {entry["_id"]: entry for entry in entries}
+    latest_franchise_by_user_id = {}
+    for franchise_doc in franchise_docs:
+        user_id = str(franchise_doc.get("user_id") or "").strip()
+        if not user_id:
+            continue
+        existing = latest_franchise_by_user_id.get(user_id)
+        if existing is None or franchise_doc["_id"] > existing["_id"]:
+            latest_franchise_by_user_id[user_id] = franchise_doc
+    team_ids = []
+    for doc in latest_franchise_by_user_id.values():
+        team_oid = str(doc.get("user_team_object_id") or "").strip()
+        if team_oid:
+            try:
+                team_ids.append(ObjectId(team_oid))
+            except Exception:
+                pass
+    teams_by_id = {}
+    if team_ids:
+        teams_by_id = {
+            str(doc["_id"]): doc
+            for doc in teams_collection.find(
+                {"_id": {"$in": team_ids}},
+                {"name": 1, "primary_color": 1},
+            )
+        }
+
+    rank_entries_raw = []
+    for user_id, franchise_doc in latest_franchise_by_user_id.items():
+        if not user_id:
+            continue
+        user_entry = users_by_id.get(user_id)
+        if not user_entry:
+            continue
+
+        team_object_id = str(franchise_doc.get("user_team_object_id") or "").strip()
+        team_name = str(franchise_doc.get("user_team_id") or "").strip()
+        if not team_object_id or not team_name:
+            continue
+
+        try:
+            ftd_doc = franchise_team_data_collection.find_one(
+                {
+                    "franchise_id": franchise_doc["_id"],
+                    "team_id": ObjectId(team_object_id),
+                },
+                {"natl_rank": 1},
+            )
+        except Exception:
+            continue
+        if not ftd_doc:
+            continue
+
+        natl_rank_raw = ftd_doc.get("natl_rank")
+        try:
+            natl_rank = int(natl_rank_raw)
+        except Exception:
+            continue
+        if natl_rank <= 0:
+            continue
+
+        team_doc = teams_by_id.get(team_object_id) or {}
+        team_primary_color = str(team_doc.get("primary_color") or "#27408E")
+
+        rank_entries_raw.append({
+            "_id": user_entry["_id"],
+            "username": user_entry["username"],
+            "team_name": team_name,
+            "team_primary_color": team_primary_color,
+            "natl_rank": natl_rank,
+        })
+
+    rank_entries_raw.sort(key=lambda entry: (entry["natl_rank"], entry["username"].lower()))
+    ranked_rank_entries = [
+        LeaderboardRankEntry(
+            rank=index,
+            username=entry["username"],
+            team_name=entry["team_name"],
+            team_primary_color=entry["team_primary_color"],
+            natl_rank=entry["natl_rank"],
+            is_current_user=(entry["_id"] == current_user_id),
+        )
+        for index, entry in enumerate(rank_entries_raw, start=1)
+    ]
+
     return LeaderboardResponse(
         top=ranked_entries[:10],
         current_user=(None if current_user_entry and current_user_entry.rank <= 10 else current_user_entry),
+        rank_top=ranked_rank_entries[:5],
     )
 
 

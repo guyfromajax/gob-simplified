@@ -269,6 +269,10 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       fromFinalDoc: simData?.final_game_document?.week,
     });
   }
+  let franchiseCompleteWeekPayload = undefined;
+  let franchisePhaseBPending = undefined;
+  let franchisePhaseAOk = undefined;
+
   if (canCompleteWeek) {
     try {
       const team1Id =
@@ -296,11 +300,10 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       );
       console.log(`🔍 [FRONTEND] finalizeGame() called with simData: game_id=${gameId}, quarter=${quarter}, is_final=${isFinal}`);
       // ✅ FIX: Pass game_document if available (from simulate-quarter when is_final=True)
-      // This eliminates race condition where complete_week() is called before Q4 save completes
       const requestBody = {
         franchise_id: franchiseId,
         week: week,
-        game_id: gameId,  // ✅ SS&S: Pass actual gameplay game_id
+        game_id: gameId,
         result: {
           team1_id: team1Id,
           team2_id: team2Id,
@@ -308,33 +311,62 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
           team2_score: homeScore,
         },
       };
-      
-      // If simData contains final_game_document (from simulate-quarter), pass it to eliminate race condition
+
       if (simData && simData.final_game_document) {
-        console.log('✅ Passing final_game_document to complete_week (eliminates race condition)');
+        console.log('✅ Passing final_game_document to phase-a (eliminates race condition)');
         requestBody.game_document = simData.final_game_document;
       }
-      
-      // ✅ Show "Simulating Computer Games" when transitioning to computer games
-      showStatus('Simulating Computer Games...');
-      
-      console.warn('[COMPLETE-WEEK TRACE] POSTing /franchise/complete-week', { week, gameId, franchiseId });
-      const res = await fetch(API_CONFIG.buildUrl("/franchise/complete-week"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+
+      franchiseCompleteWeekPayload = requestBody;
+      franchisePhaseBPending = { franchise_id: franchiseId, week };
+
+      // Phase A: persist user game only; EOG "Post-Game Press Conference" → phase-b (CPU + week advance) in PGPC modal
+      showStatus('Saving game...');
+      console.warn('[COMPLETE-WEEK TRACE] POSTing /franchise/complete-week/phase-a', { week, gameId, franchiseId });
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-a'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       });
-      
-      // Hide status after response (whether success or error)
       hideStatus();
-      
+      franchisePhaseAOk = res.ok;
       if (!res.ok) {
-        console.error("❌ Failed to complete franchise week:", await res.text());
+        console.error('❌ Failed franchise phase-a:', await res.text());
       } else {
-        console.log("✅ Franchise week completed.");
+        console.log('✅ Franchise phase-a completed.');
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(
+              'franchise_complete_week_pending',
+              JSON.stringify({ franchise_id: franchiseId, week })
+            );
+            const teamIdSnap =
+              params.get('team_id') || params.get('home_id') || params.get('away_id') || null;
+            const gid = simData.game_id || simData._id;
+            localStorage.setItem(
+              'franchise_eog_pgpc_snapshot',
+              JSON.stringify({
+                gameId: gid,
+                franchiseId,
+                teamId: teamIdSnap,
+                week,
+                my_team: params.get('my_team'),
+                homeTeam: homeTeamObj.name,
+                awayTeam: awayTeamObj.name,
+                homeScore,
+                awayScore,
+                winner,
+                franchisePhaseBPending: { franchise_id: franchiseId, week },
+                franchisePhaseAOk: true,
+              })
+            );
+          }
+        } catch (_) {}
       }
     } catch (err) {
-      console.error("🚨 Error during franchise week completion:", err);
+      hideStatus();
+      console.error('🚨 Error during franchise phase-a:', err);
+      franchisePhaseAOk = false;
     }
   }
 
@@ -346,6 +378,9 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
     winner,
     homeTeamData: homeTeamObj,
     awayTeamData: awayTeamObj,
+    franchiseCompleteWeekPayload,
+    franchisePhaseBPending,
+    franchisePhaseAOk,
   };
 
   if (game && game.events) {

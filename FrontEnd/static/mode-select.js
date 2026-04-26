@@ -25,6 +25,9 @@ const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
 const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
+const communityHighlightsBody = document.querySelector('.community-highlights-body');
+const leaderboardGeekPointsToggle = document.getElementById('leaderboard-view-geek-points');
+const leaderboardRankToggle = document.getElementById('leaderboard-view-rank');
 
 // Primary/secondary from scripts/align_core8_team_colors.py (Mongo teams.primary_color / secondary_color)
 const A1_CONFERENCE_TEAMS = [
@@ -39,6 +42,8 @@ const A1_CONFERENCE_TEAMS = [
 ];
 
 let currentFranchise = null;
+let currentLeaderboardData = null;
+let currentLeaderboardView = 'geek_points';
 
 // Team name → square logo filename prefix (from images/square-logos/{code}_square.png)
 const TEAM_LOGO_CODE = {
@@ -209,7 +214,22 @@ function displayCommunityLeaderboardPoints(geekPoints) {
   return (Number.isFinite(n) && n > 0) ? n : '--';
 }
 
-function renderCommunityLeaderboard(leaderboardData, currentUsername) {
+function escapeHtmlMs(text) {
+  if (text == null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setLeaderboardView(view) {
+  currentLeaderboardView = view === 'rank' ? 'rank' : 'geek_points';
+  if (leaderboardGeekPointsToggle) leaderboardGeekPointsToggle.classList.toggle('active', currentLeaderboardView === 'geek_points');
+  if (leaderboardRankToggle) leaderboardRankToggle.classList.toggle('active', currentLeaderboardView === 'rank');
+}
+
+function renderGeekPointsLeaderboard(leaderboardData, currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
   const topFive = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 5) : [];
@@ -241,12 +261,133 @@ function renderCommunityLeaderboard(leaderboardData, currentUsername) {
   leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
 }
 
+function renderRankLeaderboard(leaderboardData, currentUsername) {
+  if (!leaderboardHost) return;
+  const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
+  const topFive = Array.isArray(leaderboardData && leaderboardData.rank_top) ? leaderboardData.rank_top.slice(0, 5) : [];
+  const rows = topFive.map(function (entry) {
+    const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
+    const natlRank = parseInt(entry.natl_rank, 10);
+    const displayRank = Number.isFinite(natlRank) ? natlRank : '--';
+    const teamColor = safeText(entry.team_primary_color, '#27408E');
+    return `
+      <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
+        <div class="community-rank">${entry.rank}.</div>
+        <div class="community-username">
+          <span class="community-username-fragment">${escapeHtmlMs(entry.username)}</span>
+          <span class="community-username-fragment"> (</span><span class="community-team-name" style="color: ${escapeHtmlMs(teamColor)};">${escapeHtmlMs(entry.team_name)}</span><span class="community-username-fragment">):</span>
+        </div>
+        <div class="community-score">${displayRank}</div>
+      </div>
+    `;
+  }).join('');
+  leaderboardHost.innerHTML = rows || '<div class="community-leaderboard-empty">No franchise rank data yet</div>';
+}
+
+function renderCommunityLeaderboard(leaderboardData, currentUsername) {
+  if (currentLeaderboardView === 'rank') {
+    renderRankLeaderboard(leaderboardData, currentUsername);
+    return;
+  }
+  renderGeekPointsLeaderboard(leaderboardData, currentUsername);
+}
+
 async function loadCommunityLeaderboard(currentUsername) {
   if (!leaderboardHost) return;
   const leaderboardData = await safeJsonFetch(API_CONFIG.buildUrl('/api/auth/leaderboard'), {
     headers: getAuthHeaders()
   });
+  currentLeaderboardData = leaderboardData;
   renderCommunityLeaderboard(leaderboardData, currentUsername);
+}
+
+function formatHighlightGpLabel(gpDelta) {
+  var n = parseInt(gpDelta, 10);
+  if (!Number.isFinite(n) || n === 0) return '0 GP';
+  if (n > 0) return '+' + n + ' GP';
+  return String(n) + ' GP';
+}
+
+function renderCommunityHighlights(data) {
+  if (!communityHighlightsBody) return;
+  var entries = data && Array.isArray(data.entries) ? data.entries : [];
+  if (!entries.length) {
+    communityHighlightsBody.innerHTML =
+      '<div class="community-highlights-empty">No highlights yet — finish a franchise week to show up here.</div>';
+    return;
+  }
+  communityHighlightsBody.innerHTML = entries.map(function (entry) {
+    var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
+    var ut = escapeHtmlMs(entry.user_team_name || '?');
+    var opp = escapeHtmlMs(entry.opponent_name || '?');
+    var beatLost = entry.user_won ? 'beat' : 'lost to';
+    var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
+    var primary = escapeHtmlMs(entry.primary_color || '#27408E');
+    var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
+    var gpLabel = formatHighlightGpLabel(entry.gp_delta);
+    var gpNum = parseInt(entry.gp_delta, 10);
+    var gpClass = 'community-highlight-gp' + ((Number.isFinite(gpNum) && gpNum < 0) ? ' is-neg' : ' is-pos');
+    var copy =
+      uname +
+      ', coaching ' +
+      ut +
+      ' ' +
+      beatLost +
+      ' ' +
+      opp +
+      '. ' +
+      ut +
+      ' is now ranked ' +
+      rankLabel +
+      ' in the nation.';
+    return (
+      '<div class="community-highlight-row" style="--ch-primary:' +
+      primary +
+      ';--ch-secondary:' +
+      secondary +
+      '">' +
+      '<div class="community-highlight-row-inner">' +
+      '<div class="community-highlight-copy">' +
+      copy +
+      '</div>' +
+      '<div class="' +
+      gpClass +
+      '">' +
+      escapeHtmlMs(gpLabel) +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+async function loadCommunityHighlights() {
+  if (!communityHighlightsBody) return;
+  communityHighlightsBody.innerHTML = '<div class="community-highlights-loading">Loading…</div>';
+  var data = await safeJsonFetch(API_CONFIG.buildUrl('/api/community/highlights'), {
+    headers: getAuthHeaders()
+  });
+  if (!data) {
+    communityHighlightsBody.innerHTML =
+      '<div class="community-highlights-empty">Sign in to see community highlights.</div>';
+    return;
+  }
+  renderCommunityHighlights(data);
+}
+
+function wireLeaderboardViewToggles(currentUsername) {
+  if (leaderboardGeekPointsToggle) {
+    leaderboardGeekPointsToggle.addEventListener('click', function () {
+      setLeaderboardView('geek_points');
+      renderCommunityLeaderboard(currentLeaderboardData, currentUsername);
+    });
+  }
+  if (leaderboardRankToggle) {
+    leaderboardRankToggle.addEventListener('click', function () {
+      setLeaderboardView('rank');
+      renderCommunityLeaderboard(currentLeaderboardData, currentUsername);
+    });
+  }
 }
 
 function escapeHtmlLbt(text) {
@@ -265,12 +406,20 @@ function displayLbtPoints(geekPoints) {
 
 async function loadLeadersByTeam() {
   var grid = document.getElementById('leaders-by-team-grid');
+  var title = document.querySelector('.leaders-by-team-title');
   if (!grid) return;
 
+  var leaderboardView = currentLeaderboardView === 'rank' ? 'rank' : 'geek_points';
+  if (title) {
+    title.textContent = leaderboardView === 'rank'
+      ? 'Leaders By Team (Rank)'
+      : 'Leaders By Team (Geek Points)';
+  }
   grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Loading...</div>';
 
   try {
-    var response = await fetch(API_CONFIG.buildUrl('/api/leaderboard/by-team'), {
+    var endpoint = API_CONFIG.buildUrl('/api/leaderboard/by-team?view=' + encodeURIComponent(leaderboardView));
+    var response = await fetch(endpoint, {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch');
@@ -287,12 +436,14 @@ async function loadLeadersByTeam() {
 
       var leadersHtml = leaders.length > 0
         ? leaders.map(function (entry, i) {
-            var pts = displayLbtPoints(entry.geek_points);
+            var value = leaderboardView === 'rank'
+              ? (Number.isFinite(parseInt(entry.natl_rank, 10)) ? String(parseInt(entry.natl_rank, 10)) : '--')
+              : displayLbtPoints(entry.geek_points);
             return (
               '<div class="lbt-leader-row">' +
               '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
               '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
-              '<span class="lbt-leader-points" style="color: ' + team.primary + ';">' + pts + '</span>' +
+              '<span class="lbt-leader-points">' + value + '</span>' +
               '</div>'
             );
           }).join('')
@@ -577,7 +728,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  setLeaderboardView('geek_points');
+  wireLeaderboardViewToggles(currentUsername);
   await loadCommunityLeaderboard(currentUsername);
+  await loadCommunityHighlights();
   wireLeadersByTeamModal();
 
   if (logoutBtn) {

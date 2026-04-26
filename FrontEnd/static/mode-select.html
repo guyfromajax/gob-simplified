@@ -71,11 +71,6 @@
             <button id="franchise-enter-btn" class="franchise-enter-btn" type="button">Enter Franchise →</button>
           </div>
         </div>
-        <div id="franchise-delete-row" class="franchise-delete-row" style="display: none;">
-          <button id="franchise-delete-link" class="franchise-delete-link" type="button">
-            Delete existing franchise and start a new one
-          </button>
-        </div>
       </div>
     </section>
 
@@ -83,7 +78,10 @@
       <div class="community-panel">
         <div class="community-panel-header">
           <h2 class="community-panel-title">Alpha Leaderboard</h2>
-          <div class="community-panel-metric">Geek Points</div>
+          <div class="ms-leaderboard-toggle-wrap">
+            <button type="button" id="leaderboard-view-geek-points" class="ms-leaderboard-toggle active">Geek Points</button>
+            <button type="button" id="leaderboard-view-rank" class="ms-leaderboard-toggle">Rank</button>
+          </div>
         </div>
         <div class="ms-leaderboard-subtitle">Earn Geek Points at the end of each game based on your coaching performance.</div>
         <div id="community-leaderboard" class="community-leaderboard">
@@ -91,6 +89,24 @@
         </div>
         <div class="leaders-by-team-trigger">
           <button id="leaders-by-team-btn" class="leaders-by-team-link" type="button">→ View leaders by team</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="franchise-delete-section">
+      <div id="franchise-delete-row" class="franchise-delete-row" style="display: none;">
+        <button id="franchise-delete-link" class="franchise-delete-link" type="button">
+          Delete existing franchise and start a new one
+        </button>
+      </div>
+    </section>
+
+    <section class="community-highlights-section">
+      <div class="community-highlights-panel">
+        <div class="community-panel-header">
+          <h2 class="community-panel-title">Community Highlights</h2>
+        </div>
+        <div class="community-highlights-body" aria-live="polite">
         </div>
       </div>
     </section>
