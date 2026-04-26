@@ -39,20 +39,28 @@ Do **not** merge your feature branch yet. Deploy only the banner config.
 
    - Set `"enabled": true`.
    - Set `"id"` to a **new** value (e.g. `maintenance-2026-02-17`). Changing the id ensures returning users who dismissed a previous banner will see this one.
-   - Set `"starts_at_iso"` to the **exact UTC time** when you plan to start the real maintenance (when you’ll turn on the maintenance page and set Railway `MAINTENANCE_MODE=true`). The banner will appear **60 minutes before** that time (or immediately if that time is less than 60 minutes away).
+   - Set `"starts_at_iso"` to the **planned maintenance start** (when you’ll turn on the maintenance page and set Railway `MAINTENANCE_MODE=true`). The banner appears **60 minutes before** that instant (or immediately if that time is less than 60 minutes away).
+   - **Recommended (US Eastern / Philadelphia):** use a **naive** local time string with **no** `Z` and **no** `±hh:mm` offset, e.g. `"2026-02-17T15:00:00"`. That is interpreted as **wall clock in `America/New_York`** (Eastern Standard or Eastern Daylight, depending on the date). Optional `"starts_at_timezone"` overrides the IANA zone if you need something other than New York (rare).
+   - **Alternate (absolute / UTC):** you may still pass a full ISO instant with `Z` or an explicit offset (e.g. `"2026-02-17T20:00:00Z"`). In that case `starts_at_timezone` is ignored for parsing.
    - Optionally keep or edit `"message"` and leave `"details_url": ""` unless you have a link.
 
-   Example (replace the date/time with your planned maintenance start in UTC):
+   Example — maintenance starts **3:00 PM US Eastern** on 17 Feb 2026 (no UTC math required):
 
    ```json
    {
      "id": "maintenance-2026-02-17",
      "enabled": true,
-     "starts_at_iso": "2026-02-17T20:00:00Z",
+     "starts_at_iso": "2026-02-17T15:00:00",
      "show_minutes_before": 60,
      "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
      "details_url": ""
    }
+   ```
+
+   Example — same instant expressed explicitly in UTC (optional):
+
+   ```json
+   "starts_at_iso": "2026-02-17T20:00:00Z"
    ```
 
 3. Commit and push only that file:
@@ -92,4 +100,7 @@ Users will now see the live site with the new code.
 
 ---
 
-**Reference:** Banner dismissal is stored in browser localStorage by `id`; changing `id` in the config makes the banner show again for returning users.
+**Reference:**
+
+- Banner dismissal is stored in browser localStorage by `id`; changing `id` in the config makes the banner show again for returning users.
+- Time math is implemented in `FrontEnd/static/js/shared/maintenanceBanner.js`: naive `starts_at_iso` values use **IANA `America/New_York`** (US Eastern, including EST and EDT), not the viewer’s browser local zone and not “UTC only.”

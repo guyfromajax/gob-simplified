@@ -36,7 +36,7 @@ Generated from a static trace of the FrontEnd codebase (Spring 2026). This is a 
 | **First-time experience (FTE)** | `authBarInit.js` → `#fte-backdrop`, `.fte-modal` | Injected on pages that load auth bar (most authenticated pages). |
 | **Choose username** | `authBarInit.js` → `#fte-username-backdrop` | Same. |
 | **Account settings** | `authBarInit.js` → `#account-settings-backdrop` | Same. |
-| **Maintenance banner** | `maintenanceBanner.js` | Dismissible **top banner** (not a centered modal); loaded from `authGuard` on all pages. |
+| **Maintenance banner** | `maintenanceBanner.js` | Dismissible **top banner** (not a centered modal); loaded from `authGuard` on all pages. `starts_at_iso` without `Z`/offset is interpreted as **US Eastern** (`America/New_York`); see `Deploy_To_Live_System.md`. |
 | **Page load overlay** | `pageLoadOverlay.js` / inline `#page-load-overlay` | `franchise-command-center.html`, `set-lineup.html`, `court.html`, etc.—full-screen until data ready. |
 
 ### By page (static HTML or page-specific script)
