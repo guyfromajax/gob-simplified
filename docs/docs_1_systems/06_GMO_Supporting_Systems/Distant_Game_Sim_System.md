@@ -4,6 +4,12 @@
 ## Overview
 Efficient simulation for 56-60 distant games per week (all non-user-conference matchups). User's 4-8 conference games run full turn-based sim.
 
+### Exception — next opponent (regular season, complete week)
+
+When **`complete_week`** simulates CPU games (`_complete_week_finish_cpu_and_persist` in `BackEnd/api/franchise_routes.py`), a matchup that would normally be **distant** (neither team in the user’s conference) still uses the **full step-by-step** sim (`run_simulation` + persisted game doc + `finalize_game`) if **either team is the user’s scheduled opponent in the next regular-season week** (week **N+1**, weeks **1–26** only). The upcoming opponent’s **conference does not matter** for this rule.
+
+Resolution of “who is the user’s next-week opponent” is **`_user_next_regular_season_opponent_id`**, which reads **`franchise_doc["schedule"][week]`** for **`current_week + 1`**. EOS / tournament weeks are unchanged by this override.
+
 ## EOG Team Attributes
 
 - Distant-simmed franchise games now persist full game documents with:
@@ -53,7 +59,7 @@ drives the margin — the further from the threshold, the larger the blowout.
    - If `gap > 0.35` (large mismatch): `margin = int(margin * 1.50)`
    - If `gap <= 0.20` (closely matched): no modifier
 
-##Final Scores (implement now)
+## Final Scores (implement now)
 
 1. Generate total points:
    `total_points = max(78, min(220, normal(mean=138, sd=15)))`

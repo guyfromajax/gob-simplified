@@ -1,30 +1,77 @@
 
+# Post-Game Press Conference (PGPC)
 
-**Post Game Press Conference**
-Occurs after the user's game completes (complete week / phase A) and before/during simulating of computer games (complete week / phase B)
+Franchise-only flow that runs **after the user’s game is saved** (`POST /franchise/complete-week/phase-a`) and **overlaps** simulation of CPU games (`POST /franchise/complete-week/phase-b`). The user answers press questions in a modal on `court.html` while phase B may still be running.
 
-##After user's game completes##
-EOG modal appears with current data and design. **Franchise, phase B pending:** Box Score is hidden; the primary CTA is **Post-Game Press Conference** (replaces the old “Sim Computer Games” control on this popup only). Other modes keep Box Score + Go To Locker Room.
+---
 
-When the user presses **Post-Game Press Conference**, a dedicated modal opens on `court.html`, **`POST /franchise/complete-week/phase-b` starts only after** a press-conference session is created successfully (so the week is not advanced if PGPC cannot start). The user works through questions while phase B runs in parallel.
+## When it runs
 
-If the user closes the browser before PGPC, `localStorage.franchise_eog_pgpc_snapshot` (plus `franchise_complete_week_pending`) is written after phase A for a future **resume** hook (not fully wired in v1).
+1. **End of game:** `finalizeGame` runs (tournament save, franchise **phase A**, etc.). For franchise mode, phase A persists the user result and sets pending state (`localStorage`: `franchise_complete_week_pending`, `franchise_eog_pgpc_snapshot`) for optional resume—not fully productized, but written after successful phase A.
+2. **EOG modal:** `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` shows **Game Complete** with real score / POTG.
+   - **Franchise with phase B pending:** **Box Score** is hidden on this popup; primary CTA is **Post-Game Press Conference** (replaces “Sim Computer Games” on this surface only). Other modes keep Box Score + Go To Locker Room.
+   - **Background scoreboard:** When the EOG popup opens, the court scoreboard DOM is synced to **final** home/away scores and a **FINAL / 0:00** clock readout so the dimmed court behind the modal is not stuck at Q1 / 0–0.
+3. **PGPC CTA:** Optional **Sammy reminder** modal (`pgpcSammyReminderModal.js`) unless suppressed; then `launchPostGamePressConference` opens the PGPC overlay.
+4. **Phase B gating:** `POST /franchise/complete-week/phase-b` is started **only after** `POST /franchise/press-conference/session` succeeds, so the franchise week is not advanced if PGPC cannot start.
 
-##Post-Game PC Experience##
-Modal over `court.html` with dummy copy for plumbing:
+---
 
-- **10 questions:** “Question 1” … “Question 10”
-- **5 options each:** “Answer A” … “Answer E”, rows labeled **A–E**, `click-tiny.wav` on choice
-- **While user finishes before phase B:** team **logo** (square asset), **“Simming Computer Games”**, green horizontal pulse — no PGPC title or team name on this screen (in-modal, not `PageLoadOverlay`)
-- **After phase B and all questions:** “Week {week} complete.”, small summary line **`A: n, B: n, …`**, **Go To Locker Room** → FCC; `POST .../complete` marks the session; pending localStorage cleared on successful phase B
+## Question content (live sessions)
 
-If phase B finishes first, after the last answer the same completion view appears immediately.
+When the session request includes **`game_id`** and the game exists in Mongo:
 
-##Data Storage##
-Collection **`press_conference_sessions`**: per-session doc with `user_id`, `franchise_id`, `week`, optional `game_id`, `question_set_id` (e.g. `dummy_v1`), `answers[]`, `choice_counts`, `status`, timestamps. **FTD / gameplay effects from answers are not applied yet.**
+1. **Context:** `BackEnd/pgpc_context.py` — `build_franchise_context_for_pgpc(game_doc, franchise_doc, …)` merges box score / game doc with franchise `results` (streaks, season series vs opponent, first/last week flags, **above .500 / below .500** flags, etc.). Optional DB fields: national ranks and player RT from franchise collections.
+2. **Qualification:** `BackEnd/pgpc_qualification.py` — `get_qualifying_pgpc_questions(game_doc, ctx)` filters `PRESS_CONFERENCE_QUESTIONS` from `BackEnd/utils/press_conference_questions.py` by `trigger.condition` + filters. Question bank is loaded via importlib from that file (avoids heavy `BackEnd.utils` import).
+3. **Selection:** `BackEnd/pgpc_selection.py` — `select_pgpc_questions_for_session`: **`random.randint(6, 8)`** distinct questions (capped by pool size), **weighted** by `weight`, preferring non-`always` triggers; up to **3** `always` questions in the first vanilla fill, then more vanilla if needed to hit the target.
+4. **Per-question display:** `shuffle_answers_for_display` **shuffles** all answer rows from the bank, then returns only the **first four** with letters **A–D**. The bank may still define **five** answers; the fifth is omitted at random by shuffle order (not a fixed “drop E”).
+5. **Templates & slots:** `BackEnd/pgpc_template_substitution.py` resolves placeholders (`{player_name}`, `{opponent_name}`, stat tokens, Tier-C tokens from `game_doc["pgpc_tier_c"]`). `BackEnd/pgpc_player_slot.py` resolves `player_slot` (e.g. high scorer) from the game doc.
+6. **Week 5+ narrative gates:** Until **`ctx["week"] >= 5`** (`PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS`), these do **not** qualify: **`team_chemistry`** with **`max_chemistry`** (chemistry_low), and **`above_500_first_time_season`**. High-chemistry (`min_chemistry`) rows are not gated by week.
 
-##Code references##
-- UI: `FrontEnd/static/js/phaser/utils/postGamePressConference.js`
-- EOG wiring: `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`
-- Snapshot after phase A: `FrontEnd/static/js/phaser/finalizeGame.js` (`franchise_eog_pgpc_snapshot`)
-- API: `BackEnd/api/press_conference_routes.py`, DB handle `press_conference_sessions_collection` in `BackEnd/db.py`
+**Caveats**
+
+- The same **condition** can match **multiple** bank rows (e.g. several “first time above .500” variants). Selection does **not** dedupe by subcategory; several similar questions can appear in one session.
+- Season flags that use `franchise_doc["results"]` depend on correct **`week`** and complete prior-week rows; misaligned week or gaps in `results` can skew flags (see `[PGPC_CONTEXT]` logs in `BackEnd/pgpc_context.py`).
+
+---
+
+## API
+
+Base path: **`/franchise/press-conference`** (FastAPI router in `BackEnd/api/press_conference_routes.py`). Auth: current user; franchise ownership verified on create.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/franchise/press-conference/session` | Create session. Body: `franchise_id`, `week` (≥ 1), optional `game_id`, `question_set_id` (default **`bank_v1`**). Returns `session_id`, `questions`, `question_count`. |
+| `POST` | `/franchise/press-conference/session/{id}/answer` | Body: `question_index`, `choice` **`A`–`E`**. Updates `answers[]`, `choice_counts`. UI currently sends **A–D** only. |
+| `POST` | `/franchise/press-conference/session/{id}/complete` | Marks session `completed`. |
+
+If **`game_id`** is missing or the game is not found, the server builds **dummy** questions (10 × placeholder A–E) for plumbing—**not** the normal franchise UX. The live client always sends `game_id` when starting PGPC from EOG.
+
+**Session document** (`press_conference_sessions` collection, `BackEnd/db.py`): `user_id`, `franchise_id`, `week`, `game_id`, `question_set_id`, **`questions`** (resolved list shown to the user), **`answers`**, **`choice_counts`**, `status`, timestamps, optional **`pgpc_context`**, **`qualified_question_count`**, **`pgpc_snapshot`** (`BackEnd/pgpc_snapshot_storage.py`: pruned game + context for audit/debug).
+
+**Gameplay / franchise effects** from answer `effect_tags` are **not** applied yet (storage and analytics only).
+
+---
+
+## Frontend
+
+| File | Role |
+|------|------|
+| `FrontEnd/static/js/phaser/utils/postGamePressConference.js` | Modal UI: waiting state (logo, “Simming Computer Games”, pulse), question loop (**A–D** from API), completion (“Week *n* complete.”, **Go To Locker Room** → FCC), `POST` answer + complete. |
+| `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` | EOG popup, franchise PGPC button, Sammy reminder, scoreboard sync. |
+| `FrontEnd/static/js/phaser/finalizeGame.js` | Phase A, `finalScore` / localStorage snapshot for PGPC. |
+| `FrontEnd/static/js/phaser/gameScene.js` | Calls `showGameCompletionPopup` with `finalScore` after `finalizeGame`. |
+
+Placeholder **`PGPC_DUMMY_QUESTIONS`** in `postGamePressConference.js` uses **10** questions × **4** letters only for the brief period before the API returns; the server-driven list is **6–8** questions with **four** shuffled answers each.
+
+---
+
+## Related specs / types
+
+- Question bank shape and effect tags: header docstring in `BackEnd/utils/press_conference_questions.py`.
+- Context / snapshot typing: `BackEnd/models/pgpc_snapshot.py`, `docs/To Do/PGPC_Snapshot_Schema.md`.
+
+---
+
+## Observability
+
+`build_franchise_context_for_pgpc` emits **`INFO`** lines prefixed with **`[PGPC_CONTEXT]`** (week, record before/after, flags, `results` week keys, weeks missing a user row). Use to debug wrong eligibility (e.g. “first time above .500”) when `week` or `results` do not match the command center.

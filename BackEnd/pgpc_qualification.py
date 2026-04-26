@@ -27,8 +27,9 @@ TIER_C_CONDITIONS = frozenset(
     }
 )
 
-# `chemistry_low` bank rows use team_chemistry + max_chemistry; hold until week 5 is in the books.
-PGPC_MIN_WEEK_FOR_LOW_CHEMISTRY_QUESTIONS = 5
+# Extended program-narrative questions wait until week 5+ (session ``ctx["week"]``).
+# Applies to: ``chemistry_low`` (team_chemistry + max_chemistry), ``above_500_first_time_season``.
+PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS = 5
 
 
 def _press_conference_questions() -> List[Dict[str, Any]]:
@@ -227,15 +228,17 @@ def _eval_win_loss_filters(
     if filters.get("overtime") is True and not _overtime(ctx, game_doc):
         return False
 
-    orank = ctx.get("opponent_natl_rank")
-    if orank is not None:
+    if "opponent_max_rank" in filters or "opponent_min_rank" in filters:
+        orank = ctx.get("opponent_natl_rank")
+        if orank is None:
+            return False
         orank_i = _int(orank, -1)
-        if "opponent_max_rank" in filters:
-            if orank_i < 0 or orank_i > _int(filters.get("opponent_max_rank")):
-                return False
-        if "opponent_min_rank" in filters:
-            if orank_i < _int(filters.get("opponent_min_rank")):
-                return False
+        if orank_i < 0:
+            return False
+        if "opponent_max_rank" in filters and orank_i > _int(filters.get("opponent_max_rank")):
+            return False
+        if "opponent_min_rank" in filters and orank_i < _int(filters.get("opponent_min_rank")):
+            return False
 
     if "opponent_is_conference_leader" in filters:
         if bool(filters.get("opponent_is_conference_leader")) != bool(
@@ -479,13 +482,15 @@ def _condition_holds(
         return ctx.get("fell_out_top_25") is True
 
     if condition == "above_500_first_time_season":
+        if _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS:
+            return False
         return ctx.get("above_500_first_time_season") is True
 
     if condition == "fell_below_500":
         return ctx.get("fell_below_500") is True
 
     if condition == "team_chemistry":
-        if "max_chemistry" in filters and _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_LOW_CHEMISTRY_QUESTIONS:
+        if "max_chemistry" in filters and _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_PROGRAM_NARRATIVE_QUESTIONS:
             return False
         blob = _team_blob_from_game_doc(game_doc, ut)
         chem = None

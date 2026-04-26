@@ -2414,6 +2414,38 @@ def _resolve_complete_week_week_games(franchise_doc: dict, req: CompleteWeekRequ
     return week_games, week_games_meta, eos_current_round
 
 
+def _user_next_regular_season_opponent_id(
+    franchise_doc: dict,
+    *,
+    current_week: int,
+    user_team_id_str: Any,
+) -> str | None:
+    """
+    Return the other team's id (as str) scheduled vs the user in regular-season week current_week + 1.
+    Used to force full step-by-step CPU sim for that opponent's current-week game instead of distant sim.
+    """
+    if not user_team_id_str:
+        return None
+    next_w = int(current_week) + 1
+    if next_w < 1 or next_w > ScheduleManager.REGULAR_SEASON_WEEKS:
+        return None
+    schedule = franchise_doc.get("schedule") or []
+    idx = next_w - 1
+    if idx < 0 or idx >= len(schedule):
+        return None
+    uid = str(user_team_id_str)
+    for pair in schedule[idx]:
+        if not pair or len(pair) < 2:
+            continue
+        away_id, home_id = pair[0], pair[1]
+        a, h = str(away_id), str(home_id)
+        if a == uid:
+            return h
+        if h == uid:
+            return a
+    return None
+
+
 def _find_user_franchise_week_matchup_normalized_ids(
     week_games: list, user_team_id_str: str | None
 ) -> tuple[Any, Any]:
@@ -2907,6 +2939,16 @@ def _complete_week_finish_cpu_and_persist(
             and away_conf != user_conference
             and home_conf != user_conference
         )
+        # Scout next opponent: always full sim for their game this week (not distant), any conference.
+        next_opp = _user_next_regular_season_opponent_id(
+            franchise_doc,
+            current_week=week,
+            user_team_id_str=user_team_id_str,
+        )
+        if is_distant and next_opp and (
+            str(away_id) == str(next_opp) or str(home_id) == str(next_opp)
+        ):
+            is_distant = False
         if is_distant:
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             away_ftd = ftd_by_team_id.get(str(away_id), {})
