@@ -6,11 +6,14 @@ Consumer code may also use `BackEnd.utils.shared.build_franchise_context_for_pgp
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from bson import ObjectId
 
 from BackEnd.models.pgpc_snapshot import FranchiseContextForPGPC
+
+logger = logging.getLogger(__name__)
 
 _REGULAR_SEASON_WEEKS = 26
 
@@ -297,6 +300,39 @@ def build_franchise_context_for_pgpc(
         w_after + l_after
     ) > 0
     ctx["fell_below_500"] = (w_after < l_after) and (w_before >= l_before) and (w_before + l_before) > 0
+
+    franchise_week_field: Any = None
+    if isinstance(franchise_doc, dict):
+        franchise_week_field = franchise_doc.get("week")
+    numeric_result_weeks: List[int] = []
+    for key in results_root.keys():
+        try:
+            numeric_result_weeks.append(int(key))
+        except (TypeError, ValueError):
+            continue
+    numeric_result_weeks.sort()
+    missing_prior_user_weeks = [
+        i for i in range(1, wk) if _user_game_for_week(results_root, i, ut) is None
+    ]
+    logger.info(
+        "[PGPC_CONTEXT] context_week=%s franchise_doc.week=%s game_doc.week=%s user_team_id=%s "
+        "w_before=%s l_before=%s w_after=%s l_after=%s user_won=%s "
+        "above_500_first_time_season=%s fell_below_500=%s "
+        "results_numeric_week_keys=%s missing_user_row_weeks_before_context_week=%s",
+        wk,
+        franchise_week_field,
+        game_doc.get("week"),
+        ut,
+        w_before,
+        l_before,
+        w_after,
+        l_after,
+        user_won,
+        ctx["above_500_first_time_season"],
+        ctx["fell_below_500"],
+        numeric_result_weeks,
+        missing_prior_user_weeks,
+    )
 
     fid_for_db = franchise_id
     if isinstance(franchise_doc, dict) and franchise_doc.get("_id") is not None:

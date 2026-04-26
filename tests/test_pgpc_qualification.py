@@ -168,6 +168,32 @@ def test_tier_c_lead_changes_requires_blob():
     assert "lead_changes_high_01" in with_blob
 
 
+def test_low_chemistry_gated_until_week_5():
+    game = {
+        "quarter": 4,
+        "teams": {
+            "T_USER": {
+                "team_id": "T_USER",
+                "score": 60,
+                "points_by_quarter": [15, 15, 15, 15],
+                "attributes": {"team_chemistry": 5},
+            },
+            "T_OPP": {
+                "team_id": "T_OPP",
+                "score": 55,
+                "points_by_quarter": [14, 14, 14, 13],
+                "attributes": {"team_chemistry": 18},
+            },
+        },
+        "players": [],
+    }
+    early = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx(week=4))}
+    assert "chemistry_low_01" not in early
+
+    ok = {q["id"] for q in get_qualifying_pgpc_questions(game, _ctx(week=5))}
+    assert "chemistry_low_01" in ok
+
+
 def test_major_upset_rank_gap():
     game = {
         "quarter": 4,

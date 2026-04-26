@@ -27,6 +27,9 @@ TIER_C_CONDITIONS = frozenset(
     }
 )
 
+# `chemistry_low` bank rows use team_chemistry + max_chemistry; hold until week 5 is in the books.
+PGPC_MIN_WEEK_FOR_LOW_CHEMISTRY_QUESTIONS = 5
+
 
 def _press_conference_questions() -> List[Dict[str, Any]]:
     global _QUESTION_BANK_CACHE
@@ -482,6 +485,8 @@ def _condition_holds(
         return ctx.get("fell_below_500") is True
 
     if condition == "team_chemistry":
+        if "max_chemistry" in filters and _int(ctx.get("week")) < PGPC_MIN_WEEK_FOR_LOW_CHEMISTRY_QUESTIONS:
+            return False
         blob = _team_blob_from_game_doc(game_doc, ut)
         chem = None
         if blob:

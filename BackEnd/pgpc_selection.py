@@ -1,5 +1,5 @@
 """
-PGPC question selection: weighted sample 10–15 from qualified pool with vanilla (``always``) cap.
+PGPC question selection: weighted sample 6–8 from qualified pool with vanilla (``always``) cap.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ def select_pgpc_questions_for_session(
     rng: Optional[random.Random] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Choose up to ``random.randint(10, 15)`` questions, capped by ``len(qualified)``
+    Choose up to ``random.randint(6, 8)`` questions, capped by ``len(qualified)``
     (no duplicate rows; if the pool is small, the session is shorter).
 
     Prefer non-vanilla, **weighted** by ``weight``. At most **3** ``always`` questions
@@ -68,7 +68,7 @@ def select_pgpc_questions_for_session(
     if not qualified:
         return []
     r = rng or random.Random()
-    target = r.randint(10, 15)
+    target = r.randint(6, 8)
     n_eff = min(target, len(qualified))
 
     specific = [q for q in qualified if not _is_vanilla(q)]

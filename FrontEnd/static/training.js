@@ -1020,10 +1020,9 @@ submitBtn.addEventListener('click', async function() {
     this.disabled = true;
     this.textContent = 'Submitting...';
     if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      const overlayTeamName = currentTeamName || 'Your team';
       window.PageLoadOverlay.show({
         variant: 'pulse',
-        title: overlayTeamName,
+        title: '',
         subtitle: 'Preparing your training…',
         teamName: currentTeamName || '',
         assetKey: 'banner_primary'
@@ -1059,14 +1058,13 @@ submitBtn.addEventListener('click', async function() {
         const lines = buildRandomizedTrainingHighlightLines(
           userResult && userResult.training_highlights
         );
-        const overlayTeamName = currentTeamName || 'Your team';
         let highlightStreamId = null;
         let currentIndex = 0;
         try {
           if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
             window.PageLoadOverlay.show({
               variant: 'pulse',
-              title: overlayTeamName,
+              title: '',
               subtitle: lines[currentIndex],
               teamName: currentTeamName || '',
               assetKey: 'banner_primary'

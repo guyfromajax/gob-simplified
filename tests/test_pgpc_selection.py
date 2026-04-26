@@ -28,13 +28,13 @@ def test_weighted_sampling_favors_higher_weight():
     assert heavy_hits > 400
 
 
-def test_selection_count_between_10_and_15():
+def test_selection_count_between_6_and_8():
     qualified = [_q("win", f"w{i}") for i in range(40)]
     qualified += [_q("always", f"a{i}") for i in range(20)]
     rng = random.Random(42)
     for _ in range(30):
         sel = select_pgpc_questions_for_session(qualified, rng=rng)
-        assert 10 <= len(sel) <= 15
+        assert 6 <= len(sel) <= 8
 
 
 def test_no_vanilla_when_specific_pool_covers_target():
@@ -46,23 +46,23 @@ def test_no_vanilla_when_specific_pool_covers_target():
 
 
 def test_first_wave_adds_at_most_three_vanilla():
-    specifics = [_q("win", f"w{i}") for i in range(12)]
+    specifics = [_q("win", f"w{i}") for i in range(5)]
     vanilla = [_q("always", f"a{i}") for i in range(20)]
     qualified = specifics + vanilla
     rng = random.Random(99)
-    with patch.object(rng, "randint", return_value=15):
+    with patch.object(rng, "randint", return_value=8):
         sel = select_pgpc_questions_for_session(qualified, rng=rng)
-    assert len(sel) == 15
+    assert len(sel) == 8
     vanilla_ids = {q["id"] for q in sel if q["trigger"]["condition"] == "always"}
     specific_ids = {q["id"] for q in sel if q["trigger"]["condition"] != "always"}
-    assert len(specific_ids) == 12
+    assert len(specific_ids) == 5
     assert len(vanilla_ids) == 3
 
 
 def test_session_length_never_exceeds_qualified_pool():
     qualified = [_q("win", f"w{i}") for i in range(5)]
     rng = random.Random(2)
-    with patch.object(rng, "randint", return_value=15):
+    with patch.object(rng, "randint", return_value=8):
         sel = select_pgpc_questions_for_session(qualified, rng=rng)
     assert len(sel) == 5
 
@@ -72,8 +72,8 @@ def test_padding_adds_extra_vanilla_beyond_three_when_pool_is_tiny():
     vanilla = [_q("always", f"a{i}") for i in range(25)]
     qualified = specifics + vanilla
     rng = random.Random(1)
-    with patch.object(rng, "randint", return_value=15):
+    with patch.object(rng, "randint", return_value=8):
         sel = select_pgpc_questions_for_session(qualified, rng=rng)
-    assert len(sel) == 15
+    assert len(sel) == 8
     v_count = sum(1 for q in sel if q["trigger"]["condition"] == "always")
-    assert v_count == 13
+    assert v_count == 6

@@ -198,12 +198,24 @@
     }
     if (pulseSubtitle) {
       pulseSubtitle.textContent = subtitleText;
-      pulseSubtitle.style.fontFamily = titleText ? "'Inter', sans-serif" : "'Bebas Neue', sans-serif";
-      pulseSubtitle.style.fontSize = titleText ? '16px' : '48px';
-      pulseSubtitle.style.lineHeight = titleText ? '1.4' : '1';
-      pulseSubtitle.style.letterSpacing = titleText ? '0' : '0.03em';
-      pulseSubtitle.style.color = titleText ? 'rgba(255,255,255,0.68)' : '#ffffff';
-      pulseSubtitle.style.margin = titleText ? '0 0 22px' : '26px 0 22px';
+      // With a title, subtitle is secondary. With no title (e.g. training load: logo + feed only),
+      // subtitle is the main copy — use readable body type, not oversized display type.
+      if (titleText) {
+        pulseSubtitle.style.fontFamily = "'Inter', sans-serif";
+        pulseSubtitle.style.fontSize = '16px';
+        pulseSubtitle.style.lineHeight = '1.4';
+        pulseSubtitle.style.letterSpacing = '0';
+        pulseSubtitle.style.color = 'rgba(255,255,255,0.68)';
+        pulseSubtitle.style.margin = '0 0 22px';
+      } else {
+        pulseSubtitle.style.fontFamily = "'Inter', sans-serif";
+        pulseSubtitle.style.fontSize = '17px';
+        pulseSubtitle.style.lineHeight = '1.45';
+        pulseSubtitle.style.letterSpacing = '0';
+        pulseSubtitle.style.color = 'rgba(255,255,255,0.88)';
+        pulseSubtitle.style.margin = '26px 0 22px';
+        pulseSubtitle.style.maxWidth = 'min(520px, 92vw)';
+      }
     }
     pulse.style.display = 'block';
   }
