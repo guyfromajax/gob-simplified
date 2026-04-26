@@ -6,7 +6,8 @@
  */
 
 const PGPC_STYLE_ID = 'post-game-press-conference-styles';
-const CHOICE_LABELS = ['A', 'B', 'C', 'D', 'E'];
+/** Dummy / placeholder UI only; live sessions use four choices (A–D) from the API. */
+const CHOICE_LABELS = ['A', 'B', 'C', 'D'];
 
 function buildDummyQuestions() {
   const out = [];

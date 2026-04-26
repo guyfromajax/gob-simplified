@@ -6,11 +6,34 @@ from unittest.mock import patch
 from BackEnd.pgpc_selection import (
     _weighted_sample_without_replacement,
     select_pgpc_questions_for_session,
+    shuffle_answers_for_display,
 )
 
 
 def _q(cond: str, qid: str) -> dict:
     return {"id": qid, "trigger": {"condition": cond, "filters": {}}, "answers": []}
+
+
+def test_shuffle_answers_shows_at_most_four_after_shuffle():
+    q = {
+        "id": "q1",
+        "text": "Q?",
+        "answers": [
+            {"letter": "A", "text": "t1", "archetype": "x1"},
+            {"letter": "B", "text": "t2", "archetype": "x2"},
+            {"letter": "C", "text": "t3", "archetype": "x3"},
+            {"letter": "D", "text": "t4", "archetype": "x4"},
+            {"letter": "E", "text": "t5", "archetype": "x5"},
+        ],
+    }
+    rng = random.Random(0)
+    out = shuffle_answers_for_display(q, rng)
+    assert len(out["answers"]) == 4
+    assert {a["letter"] for a in out["answers"]} == {"A", "B", "C", "D"}
+
+    q3 = {"id": "q2", "text": "Q2?", "answers": q["answers"][:3]}
+    out3 = shuffle_answers_for_display(q3, random.Random(1))
+    assert len(out3["answers"]) == 3
 
 
 def test_weighted_sampling_favors_higher_weight():

@@ -96,14 +96,20 @@ def select_pgpc_questions_for_session(
 def shuffle_answers_for_display(
     question: Dict[str, Any], rng: random.Random
 ) -> Dict[str, Any]:
-    """Return a JSON-safe question dict with answers shuffled and letters A–E reassigned."""
-    letters: MutableSequence[str] = ["A", "B", "C", "D", "E"]
+    """Return a JSON-safe question dict with answers shuffled, letters A–D only.
+
+    All options from the bank are still shuffled together; only the first four after
+    the shuffle are returned (fifth and beyond omitted from this session). Source
+    questions may keep five rows for future use.
+    """
+    letters: MutableSequence[str] = ["A", "B", "C", "D"]
     answers_in = list(question.get("answers") or [])
     rows: List[Dict[str, Any]] = []
     for a in answers_in:
         if isinstance(a, dict):
             rows.append(dict(a))
     rng.shuffle(rows)
+    rows = rows[: len(letters)]
     out_answers: List[Dict[str, Any]] = []
     for i, a in enumerate(rows):
         letter = letters[i] if i < len(letters) else str(i)
