@@ -31,10 +31,12 @@
         conferenceHeading.textContent = 'Conference ' + regionBlock.region + conferenceBlock.conference;
         regionSection.appendChild(conferenceHeading);
 
+        var shell = document.createElement('div');
+        shell.className = 'gob-data-grid-shell';
         var tableWrap = document.createElement('div');
-        tableWrap.className = 'scroll-x';
+        tableWrap.className = 'gob-data-grid-scroll scroll-x';
         var table = document.createElement('table');
-        table.className = 'roster-table recruiting-results-table';
+        table.className = 'gob-data-grid recruiting-results-table';
         table.innerHTML = '<thead><tr><th>Team</th><th>Recruit</th><th>Home Region</th><th>Archetype</th><th>HT</th><th>WT</th><th>Pos</th><th>RT</th></tr></thead><tbody></tbody>';
         var tbody = table.querySelector('tbody');
 
@@ -61,7 +63,8 @@
         });
 
         tableWrap.appendChild(table);
-        regionSection.appendChild(tableWrap);
+        shell.appendChild(tableWrap);
+        regionSection.appendChild(shell);
       });
 
       container.appendChild(regionSection);

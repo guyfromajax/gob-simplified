@@ -90,25 +90,31 @@
 
   function showModal(config) {
     var backdrop = document.getElementById('recruiting-modal-backdrop');
+    var accent = document.getElementById('recruiting-modal-accent');
     var title = document.getElementById('recruiting-modal-title');
     var message = document.getElementById('recruiting-modal-message');
     var actions = document.getElementById('recruiting-modal-actions');
     title.textContent = config.title || 'Recruiting';
     message.textContent = config.message || '';
+    if (accent) {
+      accent.className = 'gob-modal-accent';
+      if (config.accent) accent.classList.add(config.accent);
+    }
     actions.innerHTML = '';
     (config.actions || []).forEach(function (action) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'recruiting-modal-btn ' + (action.variant || 'secondary');
+      var variant = action.variant || 'secondary';
+      btn.className = variant === 'primary' ? 'gob-modal-btn-primary' : 'gob-modal-btn-secondary';
       btn.textContent = action.label;
       btn.addEventListener('click', function () {
-        backdrop.classList.remove('open');
+        backdrop.classList.remove('open', 'is-visible');
         backdrop.setAttribute('aria-hidden', 'true');
         if (action.onClick) action.onClick();
       });
       actions.appendChild(btn);
     });
-    backdrop.classList.add('open');
+    backdrop.classList.add('open', 'is-visible');
     backdrop.setAttribute('aria-hidden', 'false');
   }
 

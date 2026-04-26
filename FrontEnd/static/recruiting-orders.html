@@ -12,31 +12,36 @@
   <link rel="stylesheet" href="/recruiting.css">
 </head>
 <body>
-  <div class="resource-page-container recruiting-page">
-    <div class="recruiting-header">
-      <button id="back-btn" class="recruiting-back-btn" type="button">Back</button>
-      <div class="recruiting-actions">
-        <button id="save-btn" class="recruiting-btn is-dead" type="button" disabled>Save Orders</button>
-        <button id="run-btn" class="recruiting-btn recruiting-btn-orange is-dead" type="button" disabled style="display:none;">Run Recruiting</button>
+  <div class="resource-page-container fcc-brand-page-shell recruiting-page recruiting-orders-shell">
+    <div class="gob-page-header recruiting-header">
+      <button id="back-btn" class="brand-back-link" type="button">Back To Locker Room</button>
+      <h1 id="orders-title">Recruiting Orders</h1>
+      <div class="gob-page-header-actions recruiting-actions">
+        <button id="save-btn" class="gob-action-btn is-dead" type="button" disabled>Save Orders</button>
+        <button id="run-btn" class="gob-action-btn is-green is-dead" type="button" disabled style="display:none;">Run Recruiting</button>
       </div>
     </div>
 
-    <div class="recruiting-section">
-      <h1 id="orders-title">Recruiting Orders</h1>
-      <p id="orders-help" class="recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
-      <p id="orders-status" class="recruiting-status-text"></p>
-      <div class="scroll-x">
-        <table class="roster-table orders-grid-table" id="orders-grid-table">
+    <section class="gob-page-panel recruiting-section">
+      <p id="orders-help" class="gob-page-help recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
+      <p id="orders-status" class="gob-page-status recruiting-status-text"></p>
+      <div class="gob-data-grid-shell">
+        <div class="gob-data-grid-scroll scroll-x">
+        <table class="gob-data-grid orders-grid-table" id="orders-grid-table">
           <thead id="orders-grid-head"></thead>
           <tbody id="orders-grid-body"></tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </section>
 
-    <div class="recruiting-section">
-      <h2>All Recruits</h2>
-      <div class="scroll-x">
-        <table id="recruits-table" class="roster-table recruiting-table">
+    <section class="gob-page-panel recruiting-section">
+      <div class="gob-page-panel-header">
+        <h2>All Recruits</h2>
+      </div>
+      <div class="gob-data-grid-shell">
+        <div class="gob-data-grid-scroll scroll-x">
+        <table id="recruits-table" class="gob-data-grid recruiting-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -65,14 +70,19 @@
           <tbody id="recruits-body"></tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </section>
   </div>
 
-  <div id="recruiting-modal-backdrop" class="recruiting-modal-backdrop" aria-hidden="true">
-    <div class="recruiting-modal" role="dialog" aria-modal="true" aria-labelledby="recruiting-modal-title">
-      <h3 id="recruiting-modal-title">Recruiting</h3>
-      <p id="recruiting-modal-message"></p>
-      <div id="recruiting-modal-actions" class="recruiting-modal-actions"></div>
+  <div id="recruiting-modal-backdrop" class="gob-modal-overlay recruiting-modal-backdrop" aria-hidden="true">
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box recruiting-modal" role="dialog" aria-modal="true" aria-labelledby="recruiting-modal-title">
+      <div id="recruiting-modal-accent" class="gob-modal-accent"></div>
+      <div class="gob-modal-body">
+        <h3 id="recruiting-modal-title" class="gob-modal-title">Recruiting</h3>
+        <p id="recruiting-modal-message" class="gob-modal-subtitle"></p>
+      </div>
+      <div id="recruiting-modal-actions" class="gob-modal-actions recruiting-modal-actions"></div>
     </div>
   </div>
 
