@@ -7615,6 +7615,16 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     if not team_player_ids:
         raise HTTPException(status_code=404, detail=f"No player_ids on team for team_id: {team_id}")
 
+    # Core players height/weight when FPD meta omitted them (lazy FPD insert, legacy rows).
+    roster_ids_for_core = [pid for pid in team_player_ids if franchise_players.get(str(pid), {})]
+    core_physique_by_id: dict[str, dict] = {}
+    if roster_ids_for_core:
+        for doc in db.players.find(
+            {"_id": {"$in": roster_ids_for_core}},
+            {"height": 1, "weight": 1},
+        ):
+            core_physique_by_id[str(doc["_id"])] = doc
+
     # Build player list with franchise-specific attributes
     players_load_start = time.time()
     players_for_training = []
@@ -7623,8 +7633,15 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         franchise_player_data = franchise_players.get(pid_str, {})
         if not franchise_player_data:
             continue
-        
-        meta = franchise_player_data.get("meta", {})
+
+        meta_src = franchise_player_data.get("meta", {})
+        meta = dict(meta_src) if isinstance(meta_src, dict) else {}
+        core_doc = core_physique_by_id.get(pid_str) or {}
+        if meta.get("height") is None and core_doc.get("height") is not None:
+            meta["height"] = core_doc["height"]
+        if meta.get("weight") is None and core_doc.get("weight") is not None:
+            meta["weight"] = core_doc["weight"]
+
         # Build player dict for training
         player = {
             "_id": pid_str,
@@ -7634,7 +7651,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "attributes": franchise_player_data.get("attributes", {}),
             "position_ratings": franchise_player_data.get("position_ratings", {}),
             "year": meta.get("year"),
-            "meta": dict(meta) if isinstance(meta, dict) else {},
+            "meta": meta,
         }
         players_for_training.append(player)
 
