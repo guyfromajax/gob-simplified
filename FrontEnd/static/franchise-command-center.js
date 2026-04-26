@@ -2968,7 +2968,7 @@ function updateRecruitingButton(data) {
   if (!recruitingBtn || !liveCopy) return;
   const week = Number(data?.week || 1);
   const resultsWeek = Number(data?.current_recruiting_results_week || 0);
-  let text = 'Recruiting Begins Week 20';
+  let text = 'Recruiting Invites Begin Week 20';
   let href = null;
   let showButton = false;
 

@@ -29,8 +29,13 @@ input[type="reset"] {
   position: relative;
   width: min(1400px, calc(100vw - 24px));
   margin: 12px auto 18px;
-  padding: 16px 18px 20px;
+  padding: 16px 18px 12px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 36px);
+  max-height: calc(100vh - 36px);
+  box-sizing: border-box;
 }
 
 #franchise-container::before {
@@ -90,6 +95,7 @@ input[type="reset"] {
   padding: 0 4px 24px;
   margin-bottom: 0;
   align-items: start;
+  flex-shrink: 0;
 }
 
 #franchise-container #top-left,
@@ -249,6 +255,77 @@ input[type="reset"] {
 
 #franchise-container #tournament-tabs {
   padding: 6px 4px 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+#franchise-container #tournament-tabs > .tab-buttons {
+  grid-row: 1;
+}
+
+#franchise-container #tournament-tabs > .tab-content.active {
+  grid-row: 2;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Footnote: recruiting status; pinned below tab panel inside the FCC card */
+.fcc-recruiting-footnote {
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding: 10px 8px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: var(--fcc-muted);
+  text-align: center;
+}
+
+.fcc-recruiting-footnote__text {
+  margin: 0;
+  max-width: 56rem;
+}
+
+.fcc-recruiting-footnote__btn {
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8eeff;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fcc-recruiting-footnote__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.fcc-recruiting-footnote__btn:disabled,
+.fcc-recruiting-footnote__btn.is-dead {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: none;
 }
 
 #franchise-container .tab-buttons {
@@ -366,7 +443,8 @@ input[type="reset"] {
 }
 
 #franchise-container .tab-content.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 
 #franchise-container .tab-content > h3,
@@ -386,7 +464,7 @@ input[type="reset"] {
 }
 
 #franchise-container .fcc-placeholder-tab {
-  min-height: 420px;
+  min-height: 0;
 }
 
 #franchise-container .fcc-placeholder-tab.active {
@@ -410,7 +488,7 @@ input[type="reset"] {
 }
 
 #home-tab {
-  min-height: auto;
+  min-height: 0;
 }
 
 .fcc-home-grid {
