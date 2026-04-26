@@ -27,6 +27,24 @@ def override_auth_for_tests():
         del app.dependency_overrides[get_current_user]
 
 
+@pytest.fixture(autouse=True)
+def seed_canonical_teams_for_mongomock():
+    """Mongomock starts empty; API tests need teams.name → team_id for summarize_game_state keys."""
+    from BackEnd.db import teams_collection
+
+    for name, team_id in (
+        ("Morristown", "MORRISTOWN"),
+        ("Lancaster", "LANCASTER"),
+        ("Bentley-Truman", "BENTLEY_TRUMAN"),
+    ):
+        teams_collection.update_one(
+            {"name": name},
+            {"$set": {"name": name, "team_id": team_id}},
+            upsert=True,
+        )
+    yield
+
+
 @pytest.fixture
 def mock_game_manager():
     # Uses team names that must exist in your database

@@ -67,16 +67,19 @@ def save_team_settings(
                     logger.error(f"❌ [SAVE-TEAM-SETTINGS] Validation failed: {e}")
                     return False, None, None
             
-            # Update database
-            try:
-                doc_id_obj = ObjectId(doc_id)
-            except:
-                doc_id_obj = doc_id
-            
-            collection.update_one(
-                {"_id": doc_id_obj},
-                {"$set": {update_path: settings_data}}
+            # Update database — init-game stores game _id as string; match that first, then ObjectId
+            result = collection.update_one(
+                {"_id": doc_id},
+                {"$set": {update_path: settings_data}},
             )
+            if result.matched_count == 0 and doc_id and len(str(doc_id)) == 24:
+                try:
+                    collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {update_path: settings_data}},
+                    )
+                except Exception:
+                    pass
             
         elif mode == "franchise":
             # Franchise playbook persistence is split intentionally:

@@ -254,14 +254,11 @@ After completing the regular season (week 14), the top 8 teams advance to a sing
 
 #### 3. Team Object Loading
 
-**Location:** `BackEnd/api/api.py` - `load_team_attributes_from_doc()` (lines 196-244)
+**Master store:** Per-team progression lives in **`franchise_team_data`** (FTD), keyed by `franchise_id` + `team_id` (ObjectId referencing `teams._id`), not under `franchises.franchise_teams`.
 
-**Process:**
-1. `load_team_attributes_from_doc()` is called with `mode="franchise"` and `doc_id=franchise_id`
-2. Loads team attributes from `franchises.{franchise_id}.franchise_teams.{team_id}`
-3. If not found, falls back to the **universal `teams` collection** in MongoDB
-4. Attributes are passed to `GameManager()` constructor
-5. If no attributes are loaded, `TeamManager.init_team_attributes(mode="franchise")` generates random values
+**Active game (recommended path):** `POST /api/init-game` with `mode=franchise` loads FTD for **both** sides via `load_ftd_data_for_team()`, normalizes with `prepare_ftd_for_new_game()` (`BackEnd/utils/franchise_ftd_game_seed.py`), and constructs `GameManager` with **`home_team_attributes` / `away_team_attributes`**, strategy, plays, scouting, plus **`playbook_settings`** on each team. The summarized game document then holds the same under `teams.{canonical_team_id}`.
+
+**Other call sites:** `load_team_attributes_from_doc(mode="franchise", …)` still reads **`team_attributes` only** from FTD for reload/helper paths. If nothing is found, behavior falls back as implemented in that helper (including universal `teams` / random franchise init where applicable).
 
 **Team Data API Endpoint:**
 - **Location:** `BackEnd/api/franchise_routes.py` - `get_franchise_team_data()`

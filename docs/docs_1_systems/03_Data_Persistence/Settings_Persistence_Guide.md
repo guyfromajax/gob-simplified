@@ -26,6 +26,8 @@
 
 **Key Point:** Settings stored in database only. Never localStorage or URL params. Franchise and tournament use the master store before game start, then use the game document after game initialization.
 
+**Franchise `POST /api/init-game`:** For `mode=franchise`, the backend loads **both** teams’ rows from `franchise_team_data` (by `franchise_id` + each team’s `teams` collection `_id`, resolved from `home_team` / `away_team` names). It seeds `GameManager` with **`team_attributes`**, **`strategy_settings`**, **`plays`** (per-game stats reset; effectiveness/cloaking/momentum preserved), **`scouting_data`** (defense `game_stats` reset), and assigns **`playbook_settings`** on each `TeamManager`. The first `summarize_game_state` persists those fields under `games.teams.{canonical_team_id}`. This matches the franchise greenfield Q1 path in `simulate-quarter` (shared normalizer: `BackEnd/utils/franchise_ftd_game_seed.py`).
+
 ---
 
 ### 2. **Save Flow** (How settings are saved)

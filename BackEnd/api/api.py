@@ -830,15 +830,62 @@ try:
                                     logging.warning(f"✅ [LOAD-TEAM-SETTINGS] Loaded from FTD for franchise {doc_id}, team {user_team_object_id}")
                 except Exception as e:
                     logging.warning(f"⚠️ Error loading franchise master settings from FTD: {e}", exc_info=True)
-            else:
-                # Tournament: load master doc and extract from teams
+            elif mode == "single":
+                try:
+                    # For single game mode, try both string _id (init-game) and ObjectId formats
+                    doc = games_collection.find_one(
+                        {"_id": doc_id},
+                        {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                    )
+                    if not doc:
+                        try:
+                            doc = games_collection.find_one(
+                                {"_id": ObjectId(doc_id)},
+                                {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
+                            )
+                        except Exception:
+                            pass
+                    if doc:
+                        teams_obj = doc.get("teams", {})
+                        resolved_team_id = None
+                        if team_id:
+                            if team_id in teams_obj and (team_id.isupper() and "_" in team_id):
+                                resolved_team_id = team_id
+                            if not resolved_team_id:
+                                for tid in teams_obj.keys():
+                                    team_obj = teams_obj.get(tid, {})
+                                    if team_obj.get("name") == team_id:
+                                        resolved_team_id = tid
+                                        break
+                        if not resolved_team_id and team_name:
+                            for tid in teams_obj.keys():
+                                team_obj = teams_obj.get(tid, {})
+                                if team_obj.get("name") == team_name:
+                                    resolved_team_id = tid
+                                    break
+                        if resolved_team_id:
+                            team_obj = teams_obj.get(resolved_team_id, {})
+                            strategy_settings = team_obj.get("strategy_settings")
+                            playbook_settings = team_obj.get("playbook_settings")
+                            trace_id_load = f"load_{doc_id}_{resolved_team_id}"
+                            logging.warning(
+                                f"🟢 [TRACE-LOAD] {trace_id_load} | LOAD-TEAM-SETTINGS | resolved_team_id={resolved_team_id}, team_name={team_name}"
+                            )
+                            logging.warning(
+                                f"🟢 [TRACE-LOAD] {trace_id_load} | FOUND IN DB | strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}"
+                            )
+                        else:
+                            logging.warning(
+                                f"⚠️ [LOAD-SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}"
+                            )
+                except Exception as e:
+                    logging.warning(f"⚠️ Error loading team settings from game doc: {e}", exc_info=True)
+            elif mode == "tournament":
                 master_doc = None
-                if mode == "tournament":
-                    try:
-                        master_doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
-                    except Exception as e:
-                        logging.warning(f"⚠️ Error loading tournament doc: {e}")
-                
+                try:
+                    master_doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+                except Exception as e:
+                    logging.warning(f"⚠️ Error loading tournament doc: {e}")
                 if master_doc:
                     team_identifier = team_name or team_id
                     if team_identifier:
@@ -856,76 +903,6 @@ try:
                             mode=mode,
                             game_doc=None
                         )
-        elif mode == "single":
-            try:
-                # For single game mode, try both UUID string and ObjectId formats
-                doc = games_collection.find_one(
-                    {"_id": doc_id},
-                    {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
-                )
-                if not doc:
-                    try:
-                        doc = games_collection.find_one(
-                            {"_id": ObjectId(doc_id)},
-                            {"teams": 1, "home_team_id": 1, "away_team_id": 1, "_id": 1}
-                        )
-                    except:
-                        pass
-                if doc:
-                    teams_obj = doc.get("teams", {})
-                    home_team_id = doc.get("home_team_id")
-                    away_team_id = doc.get("away_team_id")
-                    
-                    # ✅ PHASE 1.1: Use same team ID resolution as save_playbooks()/update_gameplan()
-                    # Resolve team_id from team_name if needed (using game document's teams object)
-                    resolved_team_id = None
-                    
-                    # If team_id was provided, try to use it directly (if it's a team_id key)
-                    if team_id:
-                        # Step 1: Try direct key match (if team_id looks like a team_id key)
-                        if team_id in teams_obj and (team_id.isupper() and "_" in team_id):
-                            resolved_team_id = team_id
-                        # Step 2: If not found, iterate through teams to find by name match
-                        if not resolved_team_id:
-                            for tid in teams_obj.keys():
-                                team_obj = teams_obj.get(tid, {})
-                                if team_obj.get("name") == team_id:
-                                    resolved_team_id = tid
-                                    break
-                    
-                    # If team_name was provided but team_id wasn't resolved, try name matching
-                    # ✅ PHASE 5.2: Simplified - removed home/away fallback (not needed for new games)
-                    if not resolved_team_id and team_name:
-                        for tid in teams_obj.keys():
-                            team_obj = teams_obj.get(tid, {})
-                            if team_obj.get("name") == team_name:
-                                resolved_team_id = tid
-                                break
-                    
-                    # Load settings from resolved team_id key
-                    if resolved_team_id:
-                        team_obj = teams_obj.get(resolved_team_id, {})
-                        strategy_settings = team_obj.get("strategy_settings")
-                        playbook_settings = team_obj.get("playbook_settings")
-                        
-                        # ✅ TRACE: Log what we found in DB
-                        trace_id_load = f"load_{doc_id}_{resolved_team_id}"
-                        logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | LOAD-TEAM-SETTINGS | resolved_team_id={resolved_team_id}, team_name={team_name}")
-                        logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | FOUND IN DB | strategy={bool(strategy_settings)}, playbook={bool(playbook_settings)}")
-                        
-                        if strategy_settings:
-                            strategy_inside = strategy_settings.get('inside', 'MISSING')
-                            logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | STRATEGY LOADED | inside={strategy_inside}")
-                        
-                        if playbook_settings:
-                            slot_count = len(playbook_settings.get("slot_assignments", {}))
-                            logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | PLAYBOOK LOADED | slot_assignments={slot_count}")
-                        else:
-                            logging.warning(f"🟢 [TRACE-LOAD] {trace_id_load} | PLAYBOOK MISSING | No playbook_settings found in DB")
-                    else:
-                        logging.warning(f"⚠️ [LOAD-SETTINGS] Could not resolve team_id for team_name={team_name}, team_id={team_id}")
-            except Exception as e:
-                logging.warning(f"⚠️ Error loading team settings from game doc: {e}", exc_info=True)
         
         return {
             "strategy_settings": strategy_settings,
@@ -2884,6 +2861,8 @@ try:
                         away_plays_data = None
                         home_scouting_data = None
                         away_scouting_data = None
+                        home_playbook_franchise: dict = {}
+                        away_playbook_franchise: dict = {}
                         
                         if mode == "tournament" and body.tournament_id:
                             # Load team attributes from tournament document
@@ -2923,6 +2902,8 @@ try:
                                 away_team_attributes = away_attrs
                         elif mode == "franchise" and body.franchise_id:
                             # ✅ FTD: Load team data from FTD collection instead of franchise doc
+                            from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
+
                             home_ftd = load_ftd_data_for_team(
                                 body.franchise_id,
                                 None,  # team_id will be resolved from team_name
@@ -2933,120 +2914,21 @@ try:
                                 None,  # team_id will be resolved from team_name
                                 body.away_team
                             )
-                            
-                            # Extract team_attributes, plays, and scouting_data from FTD
-                            if home_ftd:
-                                home_team_attributes = home_ftd.get("team_attributes")
-                                home_plays_data = home_ftd.get("plays", {})
-                                home_scouting_data = home_ftd.get("scouting_data", {})
-                                # Initialize game_stats for plays (copy effectiveness/cloaking/momentum, reset game_stats)
-                                if home_plays_data:
-                                    for play_name, play_data in home_plays_data.items():
-                                        # Copy effectiveness/cloaking/momentum from FTD
-                                        # Preserve team-owned play config needed by gameplay runtime
-                                        # (for example target_shooter / motion_focus), while
-                                        # initializing fresh per-game tracking stats.
-                                        home_plays_data[play_name] = {
-                                            "play_id": play_data.get("play_id", ""),
-                                            "name": play_data.get("name", play_name),
-                                            "play_type": play_data.get("play_type", ""),
-                                            "play_focus": play_data.get("play_focus", ""),
-                                            "target_shooter": play_data.get("target_shooter"),
-                                            "motion_focus": play_data.get("motion_focus"),
-                                            "effectiveness": play_data.get("effectiveness", 0),
-                                            "cloaking": play_data.get("cloaking", 0),
-                                            "momentum": play_data.get("momentum", 0),
-                                            "game_stats": {
-                                                "times_run": 0,
-                                                "successes": 0,
-                                                "player_points": {},
-                                                "effectiveness": 0.0
-                                            }
-                                            # NO season_stats - that stays in FTD
-                                        }
-                                # Initialize game_stats for scouting_data defense
-                                if home_scouting_data and "defense" in home_scouting_data:
-                                    for defense_name, defense_data in home_scouting_data["defense"].items():
-                                        if isinstance(defense_data, dict):
-                                            # Copy effectiveness/momentum/cloaking, reset game_stats
-                                            home_scouting_data["defense"][defense_name] = {
-                                                "effectiveness": defense_data.get("effectiveness", 0),
-                                                "momentum": defense_data.get("momentum", 0),
-                                                "cloaking": defense_data.get("cloaking", 0),
-                                                "game_stats": {
-                                                    "used": 0,
-                                                    "success": 0,
-                                                    "ev_scores": [],
-                                                    "lean_scores": [],
-                                                    "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
-                                                }
-                                                # NO season_stats - that stays in FTD
-                                            }
-                                # Initialize game_stats for scouting_data offense
-                                if home_scouting_data and "offense" in home_scouting_data:
-                                    # Offense tracking starts fresh each game
-                                    pass  # Will be initialized by TeamManager if needed
-                            
-                            if away_ftd:
-                                away_team_attributes = away_ftd.get("team_attributes")
-                                away_plays_data = away_ftd.get("plays", {})
-                                away_scouting_data = away_ftd.get("scouting_data", {})
-                                # Initialize game_stats for plays (same as home)
-                                if away_plays_data:
-                                    for play_name, play_data in away_plays_data.items():
-                                        away_plays_data[play_name] = {
-                                            "play_id": play_data.get("play_id", ""),
-                                            "name": play_data.get("name", play_name),
-                                            "play_type": play_data.get("play_type", ""),
-                                            "play_focus": play_data.get("play_focus", ""),
-                                            "target_shooter": play_data.get("target_shooter"),
-                                            "motion_focus": play_data.get("motion_focus"),
-                                            "effectiveness": play_data.get("effectiveness", 0),
-                                            "cloaking": play_data.get("cloaking", 0),
-                                            "momentum": play_data.get("momentum", 0),
-                                            "game_stats": {
-                                                "times_run": 0,
-                                                "successes": 0,
-                                                "player_points": {},
-                                                "effectiveness": 0.0
-                                            }
-                                        }
-                                # Initialize game_stats for scouting_data defense (same as home)
-                                if away_scouting_data and "defense" in away_scouting_data:
-                                    for defense_name, defense_data in away_scouting_data["defense"].items():
-                                        if isinstance(defense_data, dict):
-                                            away_scouting_data["defense"][defense_name] = {
-                                                "effectiveness": defense_data.get("effectiveness", 0),
-                                                "momentum": defense_data.get("momentum", 0),
-                                                "cloaking": defense_data.get("cloaking", 0),
-                                                "game_stats": {
-                                                    "used": 0,
-                                                    "success": 0,
-                                                    "ev_scores": [],
-                                                    "lean_scores": [],
-                                                    "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                                                    "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
-                                                }
-                                            }
+                            home_prepared = prepare_ftd_for_new_game(home_ftd)
+                            away_prepared = prepare_ftd_for_new_game(away_ftd)
+                            home_team_attributes = home_prepared["team_attributes"]
+                            away_team_attributes = away_prepared["team_attributes"]
+                            home_plays_data = home_prepared["plays_data"]
+                            away_plays_data = away_prepared["plays_data"]
+                            home_scouting_data = home_prepared["scouting_data"]
+                            away_scouting_data = away_prepared["scouting_data"]
+                            # When request omits strategy for a side, use FTD (matches /api/init-game seeding)
+                            if home_strategy is None and home_prepared.get("strategy_settings"):
+                                home_strategy = home_prepared["strategy_settings"]
+                            if away_strategy is None and away_prepared.get("strategy_settings"):
+                                away_strategy = away_prepared["strategy_settings"]
+                            home_playbook_franchise = home_prepared["playbook_settings"]
+                            away_playbook_franchise = away_prepared["playbook_settings"]
                         
                         ce_crowd_shift = "none"
                         if mode == "franchise" and body.franchise_id and body.user_team_side:
@@ -3065,15 +2947,18 @@ try:
                             away_strategy_settings=away_strategy,
                             home_team_attributes=home_team_attributes,
                             away_team_attributes=away_team_attributes,
-                            home_scouting_data=home_scouting_data if mode == "franchise" and body.franchise_id and home_ftd else None,
-                            away_scouting_data=away_scouting_data if mode == "franchise" and body.franchise_id and away_ftd else None,
-                            home_plays_data=home_plays_data if mode == "franchise" and body.franchise_id and home_ftd else None,
-                            away_plays_data=away_plays_data if mode == "franchise" and body.franchise_id and away_ftd else None,
+                            home_scouting_data=home_scouting_data if mode == "franchise" and body.franchise_id else None,
+                            away_scouting_data=away_scouting_data if mode == "franchise" and body.franchise_id else None,
+                            home_plays_data=home_plays_data if mode == "franchise" and body.franchise_id else None,
+                            away_plays_data=away_plays_data if mode == "franchise" and body.franchise_id else None,
                             mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
                             user_team_side=body.user_team_side,  # ✅ SS&S: Set is_user_team flags
                             franchise_id=body.franchise_id if mode == "franchise" else None,  # ✅ FRANCHISE MODE: Pass franchise_id for loading trained attributes
                             community_engagement_crowd_shift=ce_crowd_shift,
                         )
+                        if mode == "franchise" and body.franchise_id:
+                            gm.home_team.playbook_settings = dict(home_playbook_franchise)
+                            gm.away_team.playbook_settings = dict(away_playbook_franchise)
                         
                         # ✅ SS&S: Ensure user_team_side is set in game_state (GameManager should set it, but double-check)
                         if body.user_team_side and not gm.game_state.get("user_team_side"):
@@ -5368,6 +5253,47 @@ try:
                 franchise_id, home_team, away_team, user_team_side,
             )
 
+        home_team_attributes = None
+        away_team_attributes = None
+        home_strategy_settings = None
+        away_strategy_settings = None
+        home_plays_data = None
+        away_plays_data = None
+        home_scouting_data = None
+        away_scouting_data = None
+        home_playbook_for_gm: dict = {}
+        away_playbook_for_gm: dict = {}
+
+        if mode == "franchise" and franchise_id:
+            from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
+
+            home_ftd_row = load_ftd_data_for_team(franchise_id, None, home_team)
+            away_ftd_row = load_ftd_data_for_team(franchise_id, None, away_team)
+            if not home_ftd_row:
+                logging.warning(
+                    "⚠️ [INIT-GAME] No FTD row for home team=%s franchise_id=%s",
+                    home_team,
+                    franchise_id,
+                )
+            if not away_ftd_row:
+                logging.warning(
+                    "⚠️ [INIT-GAME] No FTD row for away team=%s franchise_id=%s",
+                    away_team,
+                    franchise_id,
+                )
+            hp = prepare_ftd_for_new_game(home_ftd_row)
+            ap = prepare_ftd_for_new_game(away_ftd_row)
+            home_team_attributes = hp["team_attributes"]
+            away_team_attributes = ap["team_attributes"]
+            home_strategy_settings = hp["strategy_settings"]
+            away_strategy_settings = ap["strategy_settings"]
+            home_playbook_for_gm = hp["playbook_settings"]
+            away_playbook_for_gm = ap["playbook_settings"]
+            home_plays_data = hp["plays_data"]
+            away_plays_data = ap["plays_data"]
+            home_scouting_data = hp["scouting_data"]
+            away_scouting_data = ap["scouting_data"]
+
         # Create GameManager (this initializes teams and players)
         gm_start = time.time()
         profile_summary = None
@@ -5376,7 +5302,18 @@ try:
             _gm_ref = [None]
             def _create_gm():
                 _gm_ref[0] = GameManager(
-                    home_team, away_team, mode=mode, user_team_side=user_team_side,
+                    home_team,
+                    away_team,
+                    home_strategy_settings=home_strategy_settings,
+                    away_strategy_settings=away_strategy_settings,
+                    home_team_attributes=home_team_attributes,
+                    away_team_attributes=away_team_attributes,
+                    home_scouting_data=home_scouting_data,
+                    away_scouting_data=away_scouting_data,
+                    home_plays_data=home_plays_data,
+                    away_plays_data=away_plays_data,
+                    mode=mode,
+                    user_team_side=user_team_side,
                     franchise_id=franchise_id if mode == "franchise" else None,
                     community_engagement_crowd_shift=ce_crowd_shift,
                 )
@@ -5384,13 +5321,28 @@ try:
             gm = _gm_ref[0]
         else:
             gm = GameManager(
-                home_team, away_team, mode=mode, user_team_side=user_team_side,
+                home_team,
+                away_team,
+                home_strategy_settings=home_strategy_settings,
+                away_strategy_settings=away_strategy_settings,
+                home_team_attributes=home_team_attributes,
+                away_team_attributes=away_team_attributes,
+                home_scouting_data=home_scouting_data,
+                away_scouting_data=away_scouting_data,
+                home_plays_data=home_plays_data,
+                away_plays_data=away_plays_data,
+                mode=mode,
+                user_team_side=user_team_side,
                 franchise_id=franchise_id if mode == "franchise" else None,
                 community_engagement_crowd_shift=ce_crowd_shift,
             )
         # ✅ CRITICAL: Set game_id on GameManager immediately after creation
         gm.game_id = game_id
         gm_create_time = (time.time() - gm_start) * 1000
+
+        if mode == "franchise" and franchise_id:
+            gm.home_team.playbook_settings = dict(home_playbook_for_gm)
+            gm.away_team.playbook_settings = dict(away_playbook_for_gm)
         
         # ✅ CRITICAL: Store user_team_side in game_state for persistence
         # This ensures is_user_team flags persist across game loads
@@ -5458,79 +5410,6 @@ try:
             # ✅ FIX: Always set playbook_settings on GameManager (even if empty) to prevent DB fallbacks during gameplay
             gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
             gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
-        elif mode == "franchise" and franchise_id:
-            # ✅ FTD: Copy master settings from FTD to game doc as baseline
-            from BackEnd.api.franchise_routes import get_user_team_from_franchise
-            from BackEnd.db import franchises_collection, franchise_team_data_collection
-            
-            try:
-                # Get user team info from franchise doc
-                franchise_doc = franchises_collection.find_one(
-                    {"_id": ObjectId(franchise_id)},
-                    {"user_team_id": 1, "user_team_object_id": 1, "_id": 1}
-                )
-                if franchise_doc:
-                    user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-                    if user_team_object_id:
-                        try:
-                            user_team_object_id_obj = ObjectId(user_team_object_id)
-                        except Exception:
-                            logging.warning(
-                                "⚠️ [FTD] init-game invalid user_team_object_id=%r for franchise_id=%s",
-                                user_team_object_id,
-                                franchise_id,
-                            )
-                            user_team_object_id_obj = None
-                        # Load FTD for user team
-                        if user_team_object_id_obj is not None:
-                            user_ftd = franchise_team_data_collection.find_one(
-                                {"franchise_id": ObjectId(franchise_id), "team_id": user_team_object_id_obj},
-                                {"playbook_settings": 1, "strategy_settings": 1, "plays": 1}
-                            )
-                        else:
-                            user_ftd = None
-                        
-                        if user_ftd:
-                            # Copy master settings to game doc for user team
-                            master_playbook = user_ftd.get("playbook_settings", {})
-                            master_strategy = user_ftd.get("strategy_settings", {})
-                            master_plays = user_ftd.get("plays", {})
-                            
-                            # Determine which team is the user team
-                            user_team_id_in_game = None
-                            if user_team_side == "home" or (not user_team_side and home_team == user_team_name):
-                                user_team_id_in_game = home_team_id
-                            elif user_team_side == "away" or (not user_team_side and away_team == user_team_name):
-                                user_team_id_in_game = away_team_id
-                            
-                            if user_team_id_in_game:
-                                if master_playbook:
-                                    summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
-                                    logging.warning(f"✅ [FTD] Copied playbook_settings from FTD to game doc for team {user_team_id_in_game}")
-                                    # ✅ FIX: Apply to GameManager so settings are available during gameplay (prevents 37 DB lookups per quarter)
-                                    if user_team_id_in_game == home_team_id:
-                                        gm.home_team.playbook_settings = dict(master_playbook) if master_playbook else {}
-                                    elif user_team_id_in_game == away_team_id:
-                                        gm.away_team.playbook_settings = dict(master_playbook) if master_playbook else {}
-                                if master_strategy:
-                                    summary["teams"][user_team_id_in_game]["strategy_settings"] = master_strategy.copy()
-                                    logging.warning(f"✅ [FTD] Copied strategy_settings from FTD to game doc for team {user_team_id_in_game}")
-                                    # ✅ FIX: Apply to GameManager so settings are available during gameplay
-                                    if user_team_id_in_game == home_team_id:
-                                        gm.home_team.strategy_settings = dict(master_strategy) if master_strategy else {}
-                                    elif user_team_id_in_game == away_team_id:
-                                        gm.away_team.strategy_settings = dict(master_strategy) if master_strategy else {}
-                                if master_plays:
-                                    summary["teams"][user_team_id_in_game]["plays"] = copy.deepcopy(master_plays)
-                                    logging.warning(f"✅ [FTD] Copied plays from FTD to game doc for team {user_team_id_in_game}")
-                                    if user_team_id_in_game == home_team_id:
-                                        gm.home_team.plays = copy.deepcopy(master_plays)
-                                    elif user_team_id_in_game == away_team_id:
-                                        gm.away_team.plays = copy.deepcopy(master_plays)
-            except Exception as e:
-                logging.warning(f"⚠️ [FTD] Error copying settings from FTD: {e}")
-                import traceback
-                traceback.print_exc()
         elif mode == "tournament" and tournament_id:
             # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
             from BackEnd.api.tournament_routes import get_user_team_from_tournament

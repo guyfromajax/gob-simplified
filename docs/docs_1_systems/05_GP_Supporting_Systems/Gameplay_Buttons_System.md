@@ -161,7 +161,7 @@
 
 ### Play Quarter Flow
 
-1. **Initialization**: `/api/init-game` creates game document in `games_collection`
+1. **Initialization**: `/api/init-game` creates the game document in `games_collection`. **Franchise:** seeds **home and away** from each team’s FTD (`team_attributes`, playbook, game plan, plays, scouting) before the first save so the live game matches FCC/master data (see Settings Persistence Guide).
 2. **During Gameplay**: Each turn saves to DB via `summarize_game_state()`
 3. **Cache**: `ongoing_games` dict keeps GameManager in memory for performance
 4. **Lineup Screen**: Always reads from DB (`source=db`) for consistency
