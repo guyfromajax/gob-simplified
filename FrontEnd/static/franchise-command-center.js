@@ -2991,7 +2991,7 @@ function updateRecruitingButton(data) {
   } else if (week === 35) {
     text = 'Recruiting Is Live';
   } else if (week === 36) {
-    text = 'Recruiting Closed';
+    text = 'Recruiting Is Complete';
   } else if (week > 26) {
     text = 'Recruiting Runs After National Tourney';
   }

@@ -3073,6 +3073,7 @@ def _complete_week_finish_cpu_and_persist(
     
     existing_results = franchise_doc.get("results", {})
     existing_results[str(week)] = results
+    _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
     _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
     try:
         _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, week, results)
@@ -4916,7 +4917,182 @@ def _insert_team_into_highest_open_lean_slot(lean_doc: dict[str, str | None], te
         return updated
     if updated.get("3") is None:
         updated["3"] = team_id
+        return updated
     return updated
+
+
+def _apply_team_to_recruit_performance_lean(lean_doc: dict | None, team_id: str) -> dict[str, str | None]:
+    """Weeks 1–19 & 27–34 complete-week rules: add/move team on recruit lean (Recruiting_System.md)."""
+    updated = _normalize_recruit_lean_doc(lean_doc)
+    existing_rank = next((rank for rank in ("1", "2", "3") if updated.get(rank) == team_id), None)
+    if existing_rank == "1":
+        if updated.get("3") is not None:
+            updated["3"] = None
+        elif updated.get("2") is not None:
+            updated["2"] = None
+        return updated
+    if existing_rank == "2":
+        updated["2"], updated["1"] = updated.get("1"), updated.get("2")
+        return updated
+    if existing_rank == "3":
+        updated["3"], updated["2"] = updated.get("2"), updated.get("3")
+        return updated
+    if _lean_has_open_slot(updated):
+        return _insert_team_into_highest_open_lean_slot(updated, team_id)
+    updated["3"] = team_id
+    return updated
+
+
+def _game_performance_lean_chances_for_week(week: int) -> dict[str, tuple[float, float]] | None:
+    """Returns win and quality_loss (low_rt, high_rt) probability pairs; None if not a performance-lean week."""
+    if 1 <= week <= 10:
+        return {"win": (0.50, 0.25), "quality_loss": (0.25, 0.15)}
+    if 11 <= week <= 15:
+        return {"win": (0.60, 0.50), "quality_loss": (0.30, 0.25)}
+    if 16 <= week <= 19:
+        return {"win": (0.70, 0.60), "quality_loss": (0.35, 0.30)}
+    if 27 <= week <= 34:
+        return {"win": (0.90, 0.75), "quality_loss": (0.60, 0.50)}
+    return None
+
+
+def _apply_performance_based_recruiting_lean_updates(
+    franchise_doc: dict,
+    week: int,
+    results: list[dict],
+) -> None:
+    chances = _game_performance_lean_chances_for_week(week)
+    if chances is None:
+        return
+
+    fid = franchise_doc["_id"]
+    applied_map = franchise_doc.get("recruiting_performance_lean_applied") or {}
+    if applied_map.get(str(week)):
+        logger.info(
+            "Skipping performance recruiting lean updates for franchise=%s week=%s; already applied",
+            franchise_doc.get("_id"),
+            week,
+        )
+        return
+
+    ftd_docs = list(
+        franchise_team_data_collection.find(
+            {"franchise_id": fid},
+            {"team_id": 1, "natl_rank": 1},
+        )
+    )
+    natl_by_team_id = {
+        str(d["team_id"]): int(d.get("natl_rank", 999) or 999)
+        for d in ftd_docs
+        if d.get("team_id") is not None
+    }
+    if not natl_by_team_id:
+        db.franchises.update_one(
+            {"_id": fid},
+            {"$set": {f"recruiting_performance_lean_applied.{week}": True}},
+        )
+        franchise_doc.setdefault("recruiting_performance_lean_applied", {})
+        franchise_doc["recruiting_performance_lean_applied"][str(week)] = True
+        return
+
+    team_oid_list = [ObjectId(tid) for tid in natl_by_team_id]
+    team_region_by_id: dict[str, str] = {}
+    for team in db.teams.find({"_id": {"$in": team_oid_list}}, {"region": 1}):
+        team_region_by_id[str(team["_id"])] = str(team.get("region") or "").upper()
+
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(fid)},
+            {"_id": 0, "franchise_id": 0},
+        )
+    )
+    recruit_by_id = {r["recruit_id"]: r for r in recruits}
+
+    played: set[str] = set()
+    game_by_team: dict[str, dict] = {}
+    for row in results:
+        away_id = str(row.get("away_id") or "")
+        home_id = str(row.get("home_id") or "")
+        if not away_id or not home_id:
+            continue
+        played.add(away_id)
+        played.add(home_id)
+        game_by_team[away_id] = row
+        game_by_team[home_id] = row
+
+    def _maybe_roll(team_id: str, probability: float, rt_low: bool) -> None:
+        if probability <= 0 or random.random() > probability:
+            return
+        region = team_region_by_id.get(team_id) or ""
+        if len(region) != 1:
+            return
+
+        def pool_pred(doc: dict) -> bool:
+            if str(doc.get("Home Region") or "").upper() != region:
+                return False
+            rt = _recruit_rt(doc)
+            return rt < 30 if rt_low else rt >= 30
+
+        pool = [r for r in recruits if pool_pred(r)]
+        if not pool:
+            return
+        chosen = random.choice(pool)
+        rid = chosen["recruit_id"]
+        doc = recruit_by_id.get(rid)
+        if not doc:
+            return
+        new_lean = _apply_team_to_recruit_performance_lean(doc.get("Lean"), team_id)
+        doc["Lean"] = new_lean
+        franchise_recruits_data_collection.update_one(
+            {"franchise_id": str(fid), "recruit_id": rid},
+            {"$set": {"Lean": new_lean}},
+        )
+
+    win_chances = chances["win"]
+    loss_chances = chances["quality_loss"]
+
+    for team_id in played:
+        row = game_by_team.get(team_id)
+        if not row:
+            continue
+        away_id = str(row.get("away_id") or "")
+        home_id = str(row.get("home_id") or "")
+        away_score = int(row.get("away_score", 0) or 0)
+        home_score = int(row.get("home_score", 0) or 0)
+
+        if away_score == home_score:
+            continue
+
+        if team_id == away_id:
+            my_score, opp_score = away_score, home_score
+            opponent_id = home_id
+        elif team_id == home_id:
+            my_score, opp_score = home_score, away_score
+            opponent_id = away_id
+        else:
+            continue
+
+        won = my_score > opp_score
+        if won:
+            _maybe_roll(team_id, win_chances[0], rt_low=True)
+            _maybe_roll(team_id, win_chances[1], rt_low=False)
+            continue
+
+        opp_rank = natl_by_team_id.get(opponent_id, 999)
+        my_rank = natl_by_team_id.get(team_id, 999)
+        loss_margin = opp_score - my_score
+        quality = opp_rank < my_rank and loss_margin <= 8
+        if not quality:
+            continue
+        _maybe_roll(team_id, loss_chances[0], rt_low=True)
+        _maybe_roll(team_id, loss_chances[1], rt_low=False)
+
+    db.franchises.update_one(
+        {"_id": fid},
+        {"$set": {f"recruiting_performance_lean_applied.{week}": True}},
+    )
+    franchise_doc.setdefault("recruiting_performance_lean_applied", {})
+    franchise_doc["recruiting_performance_lean_applied"][str(week)] = True
 
 
 def _update_recruit_lean_after_visit(
@@ -8781,6 +8957,7 @@ def finish_season(req: FinishSeasonRequest):
             "national_tournament": {},
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
+            "recruiting_performance_lean_applied": {},
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},
             AWARDS_FIELD: awards_reset,

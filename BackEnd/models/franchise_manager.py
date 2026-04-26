@@ -320,6 +320,7 @@ class FranchiseManager:
             "season_inbox": [],
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
+            "recruiting_performance_lean_applied": {},
             "applied_games": [],
             "rank_prestige_system_version": FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
             "rank_prestige_last_applied_week": 0,
