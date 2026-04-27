@@ -2465,7 +2465,7 @@ def _complete_week_process_user_game_block(
     week_games_meta: list | None,
     user_team_id_str: Any,
     _u_name: str | None,
-) -> tuple[dict, dict, int]:
+) -> tuple[dict, dict, int, dict | None, str | None]:
     gp_before = user_geek_points_snapshot_for_franchise(franchise_doc)
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
@@ -2510,6 +2510,7 @@ def _complete_week_process_user_game_block(
     
     user_winner_id = team1_id if user.team1_score > user.team2_score else team2_id
     eos_matchup_for_user = None
+    ch_game_id: str | None = None
     if req.week in ft.EOS_WEEKS and week_games_meta:
         found_user_eos = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
         if found_user_eos:
@@ -2723,6 +2724,7 @@ def _complete_week_process_user_game_block(
             season_inbox = [item for item in season_inbox if str(item.get("game_id") or "") != str(user_game_id_final)]
             season_inbox.insert(0, inbox_entry)
             franchise_doc["season_inbox"] = season_inbox
+        ch_game_id = str(user_game_id_final)
     else:
         # Fallback: Try to find game by week + team IDs (legacy behavior)
         logger.warning(f"⚠️ [COMPLETE_WEEK] No game_id provided, attempting legacy lookup: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
@@ -2788,13 +2790,14 @@ def _complete_week_process_user_game_block(
                     season_inbox = [item for item in season_inbox if str(item.get("game_id") or "") != str(user_game_id)]
                     season_inbox.insert(0, inbox_entry)
                     franchise_doc["season_inbox"] = season_inbox
+                ch_game_id = str(user_game_id)
             else:
                 logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
     
     gp_delta = user_geek_points_delta_for_user_game_block(franchise_doc, gp_before)
-    return user_res, user_row, gp_delta
+    return user_res, user_row, gp_delta, eos_matchup_for_user, ch_game_id
 
 
 def _complete_week_finish_cpu_and_persist(
@@ -3246,7 +3249,7 @@ def complete_week(req: CompleteWeekRequest):
                 req.week,
             )
         else:
-            _, user_row, gp_delta = _complete_week_process_user_game_block(
+            _, user_row, gp_delta, eos_meta, ch_gid = _complete_week_process_user_game_block(
                 franchise_doc,
                 req,
                 franchise_id,
@@ -3255,14 +3258,17 @@ def complete_week(req: CompleteWeekRequest):
                 _u_name,
             )
             results.append(user_row)
+            _gid = (str(req.game_id).strip() if getattr(req, "game_id", None) else None) or ch_gid
             community_highlight_pending = build_community_highlight_pending(
                 week=req.week,
                 user_team_id_str=user_team_id_str,
                 user_row=user_row,
                 gp_delta=gp_delta,
+                game_id=_gid,
+                eos_game_meta=eos_meta,
             )
     else:
-        _, user_row, gp_delta = _complete_week_process_user_game_block(
+        _, user_row, gp_delta, eos_meta, ch_gid = _complete_week_process_user_game_block(
             franchise_doc,
             req,
             franchise_id,
@@ -3271,11 +3277,14 @@ def complete_week(req: CompleteWeekRequest):
             _u_name,
         )
         results.append(user_row)
+        _gid = (str(req.game_id).strip() if getattr(req, "game_id", None) else None) or ch_gid
         community_highlight_pending = build_community_highlight_pending(
             week=req.week,
             user_team_id_str=user_team_id_str,
             user_row=user_row,
             gp_delta=gp_delta,
+            game_id=_gid,
+            eos_game_meta=eos_meta,
         )
 
     return _complete_week_finish_cpu_and_persist(
@@ -3329,7 +3338,7 @@ def complete_week_phase_a(req: CompleteWeekRequest):
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     _week_games, week_games_meta, _eos_cr = _resolve_complete_week_week_games(franchise_doc, req)
 
-    _, user_row, gp_delta = _complete_week_process_user_game_block(
+    _, user_row, gp_delta, eos_meta, ch_gid = _complete_week_process_user_game_block(
         franchise_doc,
         req,
         franchise_id,
@@ -3343,11 +3352,14 @@ def complete_week_phase_a(req: CompleteWeekRequest):
         user_row,
     )
 
+    _gid = (str(req.game_id).strip() if getattr(req, "game_id", None) else None) or ch_gid
     ch_pending = build_community_highlight_pending(
         week=req.week,
         user_team_id_str=user_team_id_str,
         user_row=user_row,
         gp_delta=gp_delta,
+        game_id=_gid,
+        eos_game_meta=eos_meta,
     )
 
     db.franchises.update_one(
