@@ -366,10 +366,39 @@ function getLineupPlaybookUrl() {
 }
 
 async function fetchLineupPlaybooksData() {
-  const response = await fetch(getLineupPlaybookUrl(), { headers: API_CONFIG.getAuthHeaders() });
+  const apiUrl = getLineupPlaybookUrl();
+  const __debugPc = urlParams.get('debug_pc') === '1';
+  const response = await fetch(apiUrl, { headers: API_CONFIG.getAuthHeaders() });
   if (abortIfAccessDenied(response)) return null;
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-  return response.json();
+  const data = await response.json();
+  if (__debugPc) {
+    const slotAssignments = data.slot_assignments || {};
+    const offensePcOrder = (((data || {}).pc_order || {}).offense || []);
+    let qsTeamId = null;
+    try {
+      const u = new URL(apiUrl, typeof window !== 'undefined' ? window.location.origin : 'http://local');
+      qsTeamId = u.searchParams.get('team_id');
+    } catch (e) {
+      qsTeamId = null;
+    }
+    console.warn('[DEBUG_PC] set-lineup GET /api/playbooks response', {
+      page: 'set-lineup',
+      apiUrl,
+      mode: modeParam || 'single',
+      gameId: gameId || null,
+      franchiseId: franchiseId || null,
+      tournamentId: tournamentId || null,
+      myTeamSide: myTeamSide || null,
+      teamIdParam: teamIdParam || null,
+      userTeamIdParam: userTeamIdParam || null,
+      queryTeamId: qsTeamId,
+      offensePcOrderLen: Array.isArray(offensePcOrder) ? offensePcOrder.length : 0,
+      slotAssignmentKeyCount: Object.keys(slotAssignments).length,
+      motionPlays: (data.motion || []).length,
+    });
+  }
+  return data;
 }
 
 function renderLineupShotWeights(playbookData) {
