@@ -2028,6 +2028,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             teams = doc.get("teams", {})
             team_obj = teams.get(authoritative_team_id, {})
             actual_team_id = authoritative_team_id
+            ftd_merged_playbook_settings = None
             # Franchise gameplay should read only from the game snapshot once the
             # game exists. Do not silently merge FTD or cached populated plays here,
             # because that masks init/snapshot bugs and causes UI/runtime drift.
@@ -2108,7 +2109,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                 _fb_pb = _ftd_row.get("playbook_settings") or {}
                                 if _need_ftd_pb:
                                     if _franchise_playbook_snapshot_meaningful(_fb_pb):
-                                        team_obj["playbook_settings"] = dict(_fb_pb)
+                                        ftd_merged_playbook_settings = dict(_fb_pb)
+                                        team_obj["playbook_settings"] = ftd_merged_playbook_settings
                                         logger.warning(
                                             "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD playbook_settings "
                                             "(game snapshot empty or non-meaningful) franchise=%s game_id=%s team=%s",
@@ -2121,7 +2123,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                     for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
                                         if _fb_pb.get(_pc_key):
                                             _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
-                                    team_obj["playbook_settings"] = _merged_pb
+                                    ftd_merged_playbook_settings = _merged_pb
+                                    team_obj["playbook_settings"] = ftd_merged_playbook_settings
                                     logger.warning(
                                         "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD Playcall Center order "
                                         "(game snapshot missing PC order) franchise=%s game_id=%s team=%s",
@@ -2225,6 +2228,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 }
             
             actual_team_id = authoritative_team_id
+            ftd_merged_playbook_settings = None
         else:
             # Tournament or single mode - use existing logic
             teams_dict = ensure_team_objects_exist(
@@ -2237,11 +2241,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
                 team_obj = teams.get(authoritative_team_id, {})
                 actual_team_id = authoritative_team_id
+                ftd_merged_playbook_settings = None
             else:
                 # ✅ PHASE 5.1: Use normalization helper for single mode
                 actual_team_id = normalize_team_id_to_canonical(team_id, mode, doc)
                 teams = teams_dict if isinstance(teams_dict, dict) else doc.get("teams", {})
                 team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+                ftd_merged_playbook_settings = None
         
         # ✅ FTD: For franchise mode, ensure playbook_settings exists in FTD (not franchise doc)
         if mode == "franchise" and not load_from_game_doc:
@@ -2465,6 +2471,26 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                     pass
             teams = doc.get("teams", {}) if doc else {}
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
+
+        if mode == "franchise" and load_from_game_doc and ftd_merged_playbook_settings:
+            current_pb = (team_obj or {}).get("playbook_settings") or {}
+            if (
+                _franchise_playbook_has_pc_order(ftd_merged_playbook_settings)
+                and not _franchise_playbook_has_pc_order(current_pb)
+            ):
+                restored_pb = dict(current_pb)
+                for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
+                    if ftd_merged_playbook_settings.get(_pc_key):
+                        restored_pb[_pc_key] = ftd_merged_playbook_settings.get(_pc_key)
+                team_obj = dict(team_obj or {})
+                team_obj["playbook_settings"] = restored_pb
+                logger.warning(
+                    "⚠️ [GET PLAYBOOKS] franchise+game_doc: restored FTD Playcall Center order after doc reload "
+                    "franchise=%s game_id=%s team=%s",
+                    doc_id,
+                    game_id,
+                    actual_team_id,
+                )
         
         # Get playbook settings.
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
