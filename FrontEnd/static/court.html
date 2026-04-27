@@ -104,7 +104,9 @@
       max-width: 100%; /* Constrain to grid cell */
       max-height: none !important;
       min-height: 0;
-      overflow-y: auto;
+      /* Was overflow-y: auto — vertical scroll exposed stacked offense rows when collapse missed. */
+      overflow-y: hidden;
+      overflow-x: hidden;
       box-sizing: border-box;
     }
 
@@ -3133,6 +3135,37 @@
       }
     }
 
+    /**
+     * Offense Playcall Center: exactly one visible row + one .selected.
+     * Lives in THIS script (not the later slot-nav block) so the first GET /api/playbooks
+     * can collapse slots even if the later script has not executed yet — avoids every row
+     * staying display:flex and looking “all selected” when #playcall-center scrolls.
+     */
+    window.__pccSlotSyncIndex = 0;
+    function applyOffensePccSlotSync(activeIndex) {
+      const scrollerEl = document.getElementById('offense-play-scroller');
+      if (!scrollerEl) return;
+      const nodes = Array.from(scrollerEl.querySelectorAll('.play-option'));
+      if (!nodes.length) {
+        scrollerEl.removeAttribute('data-pcc-slots-ready');
+        window.__pccSlotSyncIndex = 0;
+        return;
+      }
+      const n = nodes.length;
+      let idx = Number(activeIndex);
+      if (!Number.isFinite(idx)) idx = 0;
+      const safeIndex = ((idx % n) + n) % n;
+      scrollerEl.setAttribute('data-pcc-slots-ready', '1');
+      nodes.forEach((el, i) => {
+        el.classList.toggle('pcc-slot-active', i === safeIndex);
+        el.style.removeProperty('display');
+      });
+      nodes.forEach((el) => el.classList.remove('selected'));
+      nodes[safeIndex].classList.add('selected');
+      window.__pccSlotSyncIndex = safeIndex;
+    }
+    window.applyOffensePccSlotSync = applyOffensePccSlotSync;
+
     function buildOffensePcOrderIdsFromDom() {
       const nodes = document.querySelectorAll('#offense-play-scroller .play-option');
       const map = (lastPlaybookDataForSave && lastPlaybookDataForSave.playNameToPlayId) || {};
@@ -3537,6 +3570,7 @@
         loadSig === _playcallAppliedSignature &&
         document.querySelectorAll('#offense-play-scroller .play-option').length > 0
       ) {
+        applyOffensePccSlotSync(typeof window.__pccSlotSyncIndex === 'number' ? window.__pccSlotSyncIndex : 0);
         return;
       }
 
@@ -3730,12 +3764,19 @@
             (!playFocus || p.getAttribute('data-focus') === playFocus)
           );
 
-          const playOption = existingPlay || createPlayOptionElement(
-            playName,
-            playFocus,
-            playObj?.play_id || resolvedPlayId || assignment?.playId || '',
-            playObj
-          );
+          let playOption;
+          if (existingPlay) {
+            playOption = /** @type {HTMLElement} */ (existingPlay.cloneNode(true));
+            playOption.classList.remove('selected', 'pcc-slot-active');
+            playOption.style.removeProperty('display');
+          } else {
+            playOption = createPlayOptionElement(
+              playName,
+              playFocus,
+              playObj?.play_id || resolvedPlayId || assignment?.playId || '',
+              playObj
+            );
+          }
 
           orderedPlays.push(playOption);
           usedPlayNames.add(playName);
@@ -3772,9 +3813,8 @@
           scroller.appendChild(play);
         });
 
-        // Collapse to one visible slot immediately (do not wait for headshot fetches — avoids all-flex + hover "all active")
-        if (orderedPlays.length > 0 && typeof window.syncOffensePlaySlotVisibility === 'function') {
-          window.syncOffensePlaySlotVisibility(0);
+        if (orderedPlays.length > 0) {
+          applyOffensePccSlotSync(0);
         }
         
         // Populate headshots for the new play elements
@@ -4584,24 +4624,11 @@
 
     /** One visible row + single .selected; no network (safe to call right after DOM build). */
     function syncOffensePlaySlotVisibility(index) {
-      updatePlayOptions();
-      const list = playOptions;
-      const scrollerEl = document.getElementById('offense-play-scroller');
-      if (!list.length) {
-        scrollerEl?.removeAttribute('data-pcc-slots-ready');
-        return;
+      if (typeof window.applyOffensePccSlotSync === 'function') {
+        window.applyOffensePccSlotSync(index);
       }
-      scrollerEl?.setAttribute('data-pcc-slots-ready', '1');
-      const safeIndex = ((index % list.length) + list.length) % list.length;
-      list.forEach((play, i) => {
-        play.classList.toggle('pcc-slot-active', i === safeIndex);
-        play.style.removeProperty('display');
-      });
-      currentPlayIndex = safeIndex;
-      const el = list[currentPlayIndex];
-      if (!el) return;
-      document.querySelectorAll('#offense-play-scroller .play-option').forEach((opt) => opt.classList.remove('selected'));
-      el.classList.add('selected');
+      updatePlayOptions();
+      currentPlayIndex = typeof window.__pccSlotSyncIndex === 'number' ? window.__pccSlotSyncIndex : 0;
     }
     window.syncOffensePlaySlotVisibility = syncOffensePlaySlotVisibility;
 
