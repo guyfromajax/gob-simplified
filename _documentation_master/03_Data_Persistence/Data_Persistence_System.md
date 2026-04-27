@@ -367,7 +367,7 @@ This system documents data persistence across all three game modes when users ar
 **Current Model (April 2026):**
 1. FCC / TCC / pregame save to the master store
 2. Game init snapshots those settings into the game document
-3. Active gameplay reads and writes the game document only
+3. Active gameplay **writes** go to the game document; **GET /api/gameplan** and **GET /api/playbooks** **read** the game snapshot first and may **merge** from the master store for the HTTP response when strategy/playbook data on the snapshot is empty or not meaningful for the UI (merge does not write back to master)
 4. Master settings remain unchanged by gameplay-only edits
 
 **Files Changed:** `BackEnd/api/gameplan_routes.py` (get_save_location_for_franchise_tournament, get_gameplan, get_playbooks); `BackEnd/utils/team_settings_manager.py` (tournament master save uses authoritative user_team_object_id)
