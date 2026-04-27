@@ -15,6 +15,7 @@ In-game tactical hub at the bottom of the court. User overrides apply only to th
   - Single **play card** (`.pcc-play-card`) showing one play at a time: player headshot (`.play-headshot`), play name (`.play-name`), play focus (`.play-focus`) inside `#offense-play-scroller` with multiple `.play-option` items (one visible).
   - **Nav column** (`.pcc-nav-col`): ▲ (`#play-nav-up`), ▼ (`#play-nav-down`), ✕ (`#clear-offense-override-x`).
   - **Behavior**: ▲/▼ scroll through slots (browse only). **Click** the visible play option to **select** it (highlight + send override). ✕ clears offense override.
+  - **Implementation note**: Slot browsing must not send `/api/set-playcall-override`; only an explicit visible-play click commits the override.
   - **Load state**: the static fallback no longer hardcodes named offensive plays. The card starts with a neutral loading placeholder until live playbook data populates the slots.
 
 - **Stacks Zone (34%)** — `#pcc-stacks-zone`
