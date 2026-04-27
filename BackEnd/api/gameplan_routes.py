@@ -86,6 +86,15 @@ def _franchise_playbook_has_pc_order(pb: dict | None) -> bool:
         return True
     return len(pb.get("slot_assignments") or {}) > 0
 
+
+def _franchise_offense_pc_nonempty(pb: dict | None) -> bool:
+    """True when offensive Playcall Center order has at least one slot."""
+    if not pb or not isinstance(pb, dict):
+        return False
+    pc = pb.get("pc_order") or {}
+    off = pc.get("offense") if isinstance(pc, dict) else None
+    return isinstance(off, list) and len(off) > 0
+
 # Stable play identity for seeded defaults and legacy position filters.
 # These must use play_id, not name, so play renames do not break initialization.
 SEEDED_OFFENSE_PLAY_IDS = {
@@ -2056,9 +2065,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 _need_ftd_pb = not _franchise_playbook_snapshot_meaningful(
                     _pb_snap if isinstance(_pb_snap, dict) else None
                 )
-                _need_ftd_pc_order = not _franchise_playbook_has_pc_order(
+                # Need FTD PC merge when snapshot has no PC identity OR defense/slots exist but offense list is empty
+                # (otherwise set-lineup shows FTD book but GET with game_id returns empty offense PC — user sees wrong Playcall).
+                _need_ftd_pc_order = (not _franchise_playbook_has_pc_order(
                     _pb_snap if isinstance(_pb_snap, dict) else None
-                )
+                )) or (not _franchise_offense_pc_nonempty(
+                    _pb_snap if isinstance(_pb_snap, dict) else None
+                ))
                 _pl_snap = team_obj.get("plays") or {}
                 _need_ftd_plays = (not isinstance(_pl_snap, dict)) or len(_pl_snap) == 0
                 if _need_ftd_pb or _need_ftd_pc_order or _need_ftd_plays:
@@ -2127,18 +2140,40 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                         )
                                 elif _need_ftd_pc_order and _franchise_playbook_has_pc_order(_fb_pb):
                                     _merged_pb = dict(_pb_snap or {})
-                                    for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
-                                        if _fb_pb.get(_pc_key):
-                                            _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
+                                    _fb_pc = (_fb_pb.get("pc_order") or {}) if isinstance(_fb_pb.get("pc_order"), dict) else {}
+                                    _snap_pc = dict((_merged_pb.get("pc_order") or {})) if isinstance(_merged_pb.get("pc_order"), dict) else {}
+                                    _fb_off = _fb_pc.get("offense") if isinstance(_fb_pc.get("offense"), list) else []
+                                    _snap_off = _snap_pc.get("offense") if isinstance(_snap_pc.get("offense"), list) else []
+                                    if (
+                                        _franchise_playbook_has_pc_order(_pb_snap if isinstance(_pb_snap, dict) else None)
+                                        and len(_snap_off) == 0
+                                        and len(_fb_off) > 0
+                                    ):
+                                        _snap_pc["offense"] = list(_fb_off)
+                                        _merged_pb["pc_order"] = _snap_pc
+                                        for _pc_key in ("slot_assignments", "motion_dropdowns"):
+                                            if _fb_pb.get(_pc_key):
+                                                _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
+                                        logger.warning(
+                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD offense PC only "
+                                            "(game snapshot had defense/slots but empty offense) franchise=%s game_id=%s team=%s",
+                                            doc_id,
+                                            game_id,
+                                            authoritative_team_id,
+                                        )
+                                    else:
+                                        for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
+                                            if _fb_pb.get(_pc_key):
+                                                _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
+                                        logger.warning(
+                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD Playcall Center order "
+                                            "(game snapshot missing PC order) franchise=%s game_id=%s team=%s",
+                                            doc_id,
+                                            game_id,
+                                            authoritative_team_id,
+                                        )
                                     ftd_merged_playbook_settings = _merged_pb
                                     team_obj["playbook_settings"] = ftd_merged_playbook_settings
-                                    logger.warning(
-                                        "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD Playcall Center order "
-                                        "(game snapshot missing PC order) franchise=%s game_id=%s team=%s",
-                                        doc_id,
-                                        game_id,
-                                        authoritative_team_id,
-                                    )
                                 if _need_ftd_plays:
                                     _fb_pl = _ftd_row.get("plays") or {}
                                     if isinstance(_fb_pl, dict) and len(_fb_pl) > 0:
@@ -2481,23 +2516,51 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
 
         if mode == "franchise" and load_from_game_doc and ftd_merged_playbook_settings:
             current_pb = (team_obj or {}).get("playbook_settings") or {}
-            if (
-                _franchise_playbook_has_pc_order(ftd_merged_playbook_settings)
-                and not _franchise_playbook_has_pc_order(current_pb)
-            ):
+            ftd_pb = ftd_merged_playbook_settings
+            ftd_pc = (ftd_pb.get("pc_order") or {}) if isinstance(ftd_pb, dict) else {}
+            cur_pc = (current_pb.get("pc_order") or {}) if isinstance(current_pb, dict) else {}
+            ftd_off = ftd_pc.get("offense") if isinstance(ftd_pc.get("offense"), list) else []
+            cur_off = cur_pc.get("offense") if isinstance(cur_pc.get("offense"), list) else []
+            # Full restore when game snapshot has no Playcall identity at all.
+            missing_pc_identity = _franchise_playbook_has_pc_order(ftd_pb) and not _franchise_playbook_has_pc_order(
+                current_pb
+            )
+            # Game doc can have defense pc_order and/or slot_assignments so has_pc_order is True,
+            # but offense list empty — FTD still has the user's offensive PC order; merge it in.
+            missing_offense_pc_only = (
+                _franchise_playbook_has_pc_order(ftd_pb)
+                and len(ftd_off) > 0
+                and len(cur_off) == 0
+            )
+            if missing_pc_identity or missing_offense_pc_only:
                 restored_pb = dict(current_pb)
-                for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
-                    if ftd_merged_playbook_settings.get(_pc_key):
-                        restored_pb[_pc_key] = ftd_merged_playbook_settings.get(_pc_key)
+                if missing_offense_pc_only and not missing_pc_identity:
+                    merged_pc = dict(cur_pc)
+                    merged_pc["offense"] = list(ftd_off)
+                    restored_pb["pc_order"] = merged_pc
+                    for _pc_key in ("slot_assignments", "motion_dropdowns"):
+                        if ftd_pb.get(_pc_key):
+                            restored_pb[_pc_key] = ftd_pb.get(_pc_key)
+                    logger.warning(
+                        "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD offense PC (game doc had empty offense; "
+                        "defense/slots satisfied has_pc_order) franchise=%s game_id=%s team=%s",
+                        doc_id,
+                        game_id,
+                        actual_team_id,
+                    )
+                else:
+                    for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
+                        if ftd_pb.get(_pc_key):
+                            restored_pb[_pc_key] = ftd_pb.get(_pc_key)
+                    logger.warning(
+                        "⚠️ [GET PLAYBOOKS] franchise+game_doc: restored FTD Playcall Center order after doc reload "
+                        "franchise=%s game_id=%s team=%s",
+                        doc_id,
+                        game_id,
+                        actual_team_id,
+                    )
                 team_obj = dict(team_obj or {})
                 team_obj["playbook_settings"] = restored_pb
-                logger.warning(
-                    "⚠️ [GET PLAYBOOKS] franchise+game_doc: restored FTD Playcall Center order after doc reload "
-                    "franchise=%s game_id=%s team=%s",
-                    doc_id,
-                    game_id,
-                    actual_team_id,
-                )
         
         # Get playbook settings.
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
