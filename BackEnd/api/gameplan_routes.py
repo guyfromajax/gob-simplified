@@ -1781,6 +1781,49 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                     doc = game_doc
                                     load_from_game_doc = True
                                     break
+                            # If franchise/tournament name drifted vs game snapshot, resolve ObjectId → canonical team_id key.
+                            if not load_from_game_doc:
+                                _candidates: list[str] = []
+                                try:
+                                    if mode == "franchise":
+                                        _, _uto = get_user_team_from_franchise(master_doc)
+                                        if _uto:
+                                            _candidates.append(str(_uto))
+                                    elif mode == "tournament":
+                                        _, _uto = get_user_team_from_tournament(master_doc)
+                                        if _uto:
+                                            _candidates.append(str(_uto))
+                                except Exception:
+                                    pass
+                                if team_id:
+                                    _ts = str(team_id).strip()
+                                    if _ts and _ts not in _candidates:
+                                        _candidates.append(_ts)
+                                for _cand in _candidates:
+                                    if not _cand:
+                                        continue
+                                    _canon = None
+                                    try:
+                                        _canon = unified_resolve_team_id_to_canonical(
+                                            _cand, mode="single", doc=game_doc
+                                        )
+                                    except (ValueError, Exception):
+                                        try:
+                                            _canon = unified_resolve_team_id_to_canonical(
+                                                _cand, mode="single", doc=None
+                                            )
+                                        except (ValueError, Exception):
+                                            _canon = None
+                                    if _canon and _canon in game_teams:
+                                        game_doc_team_id = _canon
+                                        doc = game_doc
+                                        load_from_game_doc = True
+                                        logger.warning(
+                                            "🔍 [GET PLAYBOOKS] Matched game doc team by canonical key=%s (name match failed; user_team_name=%r)",
+                                            _canon,
+                                            user_team_name,
+                                        )
+                                        break
             except Exception as e:
                 logger.warning(f"🔍 [GET PLAYBOOKS] Game doc path failed: {e!r}")
         

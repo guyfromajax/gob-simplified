@@ -1474,6 +1474,40 @@ def deserialize_computer_timeouts(data):
     return out
 
 
+def _gm_playbook_non_empty_for_summarize(pb: dict) -> bool:
+    """
+    Whether GameManager playbook_settings should be treated as populated when persisting.
+    Includes modern keys (set_plays, pc_order, simplified percentages) — not only legacy motion/slot keys.
+    """
+    if not pb or not isinstance(pb, dict):
+        return False
+    if len(pb.get("slot_assignments") or {}) > 0:
+        return True
+    for k in ("set_play_inside", "set_play_attack", "set_play_outside"):
+        v = pb.get(k)
+        if isinstance(v, dict) and v:
+            return True
+    motion = pb.get("motion")
+    if isinstance(motion, list) and len(motion) > 0:
+        return True
+    if isinstance(motion, dict) and motion:
+        return True
+    pc = pb.get("pc_order") or {}
+    if isinstance(pc, dict) and (pc.get("offense") or pc.get("defense")):
+        return True
+    if isinstance(pb.get("simple_playbook_percentages"), dict) and pb.get("simple_playbook_percentages"):
+        return True
+    if isinstance(pb.get("playbook_percentages"), dict) and pb.get("playbook_percentages"):
+        return True
+    for section in ("set_plays", "man_defense", "zone_defense", "fast_breaks"):
+        v = pb.get(section)
+        if isinstance(v, dict) and v:
+            return True
+        if isinstance(v, list) and len(v) > 0:
+            return True
+    return False
+
+
 def summarize_game_state(game, exclude_animations=True):
     """
     Summarize game state for persistence/API responses.
@@ -1757,9 +1791,7 @@ def summarize_game_state(game, exclude_animations=True):
                 
                 # Home team: Check GameManager first (active gameplay source of truth)
                 if hasattr(game.home_team, 'playbook_settings') and game.home_team.playbook_settings:
-                    # Check if GameManager has non-empty playbook_settings
-                    gm_slots = len(game.home_team.playbook_settings.get("slot_assignments", {}))
-                    if gm_slots > 0 or any(game.home_team.playbook_settings.get(key, {}) for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside"]):
+                    if _gm_playbook_non_empty_for_summarize(game.home_team.playbook_settings):
                         home_playbook_settings = game.home_team.playbook_settings
                         # logging.warning(f"✅ [SUMMARIZE] Using GameManager home playbook_settings (active gameplay): slot_assignments={gm_slots}")
                     else:
@@ -1794,9 +1826,7 @@ def summarize_game_state(game, exclude_animations=True):
                 
                 # Away team: Check GameManager first (active gameplay source of truth)
                 if hasattr(game.away_team, 'playbook_settings') and game.away_team.playbook_settings:
-                    # Check if GameManager has non-empty playbook_settings
-                    gm_slots = len(game.away_team.playbook_settings.get("slot_assignments", {}))
-                    if gm_slots > 0 or any(game.away_team.playbook_settings.get(key, {}) for key in ["motion", "set_play_inside", "set_play_attack", "set_play_outside"]):
+                    if _gm_playbook_non_empty_for_summarize(game.away_team.playbook_settings):
                         away_playbook_settings = game.away_team.playbook_settings
                         # logging.warning(f"✅ [SUMMARIZE] Using GameManager away playbook_settings (active gameplay): slot_assignments={gm_slots}")
                     else:
