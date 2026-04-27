@@ -104,7 +104,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function getFccSessionCacheKey() {
-  return `${FCC_SESSION_CACHE_PREFIX}:${franchiseId || ''}`;
+  return `${FCC_SESSION_CACHE_PREFIX}:${franchiseId || ''}:${userTeamId || 'unknown'}`;
 }
 
 function readFccSessionCache() {
@@ -122,6 +122,7 @@ function persistFccSessionCache() {
   if (!franchiseId || typeof sessionStorage === 'undefined') return;
   try {
     const payload = {
+      teamId: userTeamId || null,
       topData: commandCenterTopDataCache || null,
       standingsData: standingsDataCache || null,
       rosterPlayers: Array.isArray(userRosterPlayersCache) ? userRosterPlayersCache : [],
@@ -139,6 +140,9 @@ function persistFccSessionCache() {
 function restoreFccSessionCache() {
   const cached = readFccSessionCache();
   if (!cached) return false;
+  if (cached.teamId && userTeamId && String(cached.teamId) !== String(userTeamId)) {
+    return false;
+  }
   commandCenterTopDataCache = cached.topData || null;
   standingsDataCache = cached.standingsData || null;
   userRosterPlayersCache = Array.isArray(cached.rosterPlayers) ? cached.rosterPlayers : [];
@@ -150,6 +154,38 @@ function restoreFccSessionCache() {
     if (teamId) homeOpponentRosterCache.set(String(teamId), players || []);
   });
   return !!(commandCenterTopDataCache || standingsDataCache || userRosterPlayersCache.length || teamData || userScheduleDataCache);
+}
+
+function invalidateFccTeamScopedCaches() {
+  standingsDataCache = null;
+  teamData = null;
+  fccPlaybooksSummaryCache = null;
+  userRosterPlayersCache = [];
+  homeOpponentRosterCache.clear();
+  invalidateHomeWeekSensitiveCaches();
+}
+
+function adoptAuthoritativeFccTeamId(topData) {
+  const authoritativeTeamId = topData?.team_id ? String(topData.team_id) : '';
+  if (!authoritativeTeamId) return false;
+
+  const previousTeamId = userTeamId ? String(userTeamId) : '';
+  if (previousTeamId && previousTeamId !== authoritativeTeamId) {
+    console.warn('[FCC] Replacing stale team_id with authoritative command-center team_id', {
+      previousTeamId,
+      authoritativeTeamId
+    });
+    invalidateFccTeamScopedCaches();
+  }
+
+  if (previousTeamId !== authoritativeTeamId) {
+    userTeamId = authoritativeTeamId;
+    localStorage.setItem('franchise_user_team_id', userTeamId);
+    emitDisplayContextUpdate();
+    return true;
+  }
+
+  return false;
 }
 
 function invalidateHomeWeekSensitiveCaches() {
@@ -2595,11 +2631,7 @@ async function init() {
   if (restoredFromSession && commandCenterTopDataCache) {
     persistFranchiseDisplayColorContext(commandCenterTopDataCache);
     emitDisplayContextUpdate();
-    if (commandCenterTopDataCache && commandCenterTopDataCache.team_id && !userTeamId) {
-      userTeamId = commandCenterTopDataCache.team_id;
-      localStorage.setItem('franchise_user_team_id', userTeamId);
-      emitDisplayContextUpdate();
-    }
+    adoptAuthoritativeFccTeamId(commandCenterTopDataCache);
     populateTop(commandCenterTopDataCache);
     void hydrateFccDisplayColorPreference();
     initFccRecruits(commandCenterTopDataCache);
@@ -2641,15 +2673,10 @@ async function init() {
   }
   commandCenterTopDataCache = topData;
   persistFranchiseDisplayColorContext(topData);
+  // Command-center data is the source of truth; URL/localStorage can be stale after team changes.
+  adoptAuthoritativeFccTeamId(topData);
   persistFccSessionCache();
   emitDisplayContextUpdate();
-
-  // ✅ SS&S: Resolve team_id from command center data if not already set
-  if (topData && topData.team_id && !userTeamId) {
-    userTeamId = topData.team_id;
-    localStorage.setItem('franchise_user_team_id', userTeamId);
-    emitDisplayContextUpdate();
-  }
   
   // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /franchise/team-data
   // This ensures 100% consistency between header and Team tab
@@ -3217,7 +3244,7 @@ playNowBtn.addEventListener('click', async () => {
     }
     let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
     // ✅ SS&S: Use ObjectId for consistent navigation
-    if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}`;
+    if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
     if (resolvedSide) url += `&my_team=${resolvedSide}`;
     console.log('Navigating to', url);
     window.location.href = url;

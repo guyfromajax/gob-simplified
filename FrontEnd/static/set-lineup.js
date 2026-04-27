@@ -22,6 +22,7 @@ const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('user_team_id', urlParams.get('user_team_id')) : urlParams.get('user_team_id');
+const teamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('team_id', urlParams.get('team_id')) : urlParams.get('team_id');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
 const weekParam = urlParams.get('week');
 const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
@@ -344,13 +345,14 @@ function getLineupPlaybookEffClass(value) {
 function getLineupPlaybookUrl() {
   const params = new URLSearchParams();
   const resolvedTeamId = userTeamIdParam
+    || teamIdParam
     || (myTeamSide === 'home' ? (homeId || homeTeam) : null)
     || (myTeamSide === 'away' ? (awayId || awayTeam) : null);
   params.set('mode', modeParam || 'single');
   if (resolvedTeamId) params.set('team_id', resolvedTeamId);
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (tournamentId) params.set('tournament_id', tournamentId);
-  const currentGameId = new URLSearchParams(window.location.search).get('game_id');
+  const currentGameId = gameId ? new URLSearchParams(window.location.search).get('game_id') : null;
   if (currentGameId) params.set('game_id', currentGameId);
   return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
 }
@@ -1535,7 +1537,7 @@ function resolveTeam() {
   // ✅ PHASE 2.4: Removed localStorage fallback - user_team_id must come from URL
   // For franchise/tournament mode, user_team_id should be in URL
   // For single game mode, my_team ('home' or 'away') should be in URL
-  const storedId = userTeamIdParam;
+  const storedId = userTeamIdParam || teamIdParam;
   if (storedId) {
     if (storedId === homeId || storedId === homeTeam) {
       myTeamSide = 'home';
