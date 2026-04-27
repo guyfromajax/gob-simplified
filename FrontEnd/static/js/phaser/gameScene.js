@@ -34,6 +34,16 @@ const DEBUG_SKIP =
   (typeof process !== 'undefined' && process.env.DEBUG_SKIP) ||
   false;
 
+/** URL flag: ?debug_pc=1 — Playcall / playbook tracing (pairs with server DEBUG_PC=1). */
+function isDebugPlaycall() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URLSearchParams(window.location.search).get('debug_pc') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 function resolveCourtImagePath(teamNameOrSlug) {
   const fallbackPath = '/images/teams/general/general_court.jpg';
   const preferredPath = typeof getTeamAssetPath === 'function'
@@ -552,6 +562,17 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
+      if (isDebugPlaycall()) {
+        const po = payload.playbook_settings && payload.playbook_settings.pc_order;
+        console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', {
+          gameId: this.gameId,
+          quarter: this.quarter,
+          user_team_side: payload.user_team_side,
+          has_playbook_settings: !!payload.playbook_settings,
+          pc_offense_len: po && Array.isArray(po.offense) ? po.offense.length : null,
+          pc_defense_len: po && Array.isArray(po.defense) ? po.defense.length : null,
+        });
+      }
       const baseUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
       const url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
       const res = await fetch(url, {

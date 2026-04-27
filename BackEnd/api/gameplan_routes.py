@@ -30,9 +30,15 @@ from BackEnd.utils.playbook_weights_utils import (
     weights_cache_is_stale,
 )
 from datetime import datetime
+import os
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _debug_pc_enabled() -> bool:
+    """Gate verbose Playcall/playbook tracing: set env DEBUG_PC=1 (or true/yes)."""
+    return os.getenv("DEBUG_PC", "").strip().lower() in ("1", "true", "yes")
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
@@ -1794,6 +1800,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         return result
     endpoint_start = time.time()
     try:
+        use_gamemanager_settings = False  # set True in single-mode cache branch; franchise/tournament stay False here
         logger.warning(f"🔍 [GET PLAYBOOKS] query: mode={mode!r}, team_id={team_id!r}, franchise_id={franchise_id!r}, tournament_id={tournament_id!r}, game_id={game_id!r}")
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
         collection, doc_id = get_collection_and_doc_id(mode, franchise_id, tournament_id, game_id)
@@ -2649,6 +2656,38 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         even_distribution_all = playbook_settings.get("even_distribution_all", False) if playbook_settings else False
         playbook_meta = simplified_playbook_settings.get("_meta", {})
         
+        if _debug_pc_enabled():
+            _off = (pc_order or {}).get("offense") or []
+            _def = (pc_order or {}).get("defense") or []
+            _slots = (playbook_settings or {}).get("slot_assignments") if isinstance(playbook_settings, dict) else {}
+            _slot_n = len(_slots) if isinstance(_slots, dict) else 0
+            try:
+                from BackEnd.api.api import ongoing_games
+
+                _gm_hit = bool(game_id and ongoing_games.get(str(game_id)))
+            except Exception:
+                _gm_hit = False
+            logger.warning(
+                "[DEBUG_PC] GET /api/playbooks OUT mode=%r request_team_id=%r game_id=%r franchise_id=%r "
+                "tournament_id=%r load_from_game_doc=%s authoritative_team_id=%r game_doc_team_id=%r "
+                "actual_team_id=%r pc_offense_len=%s pc_defense_len=%s slot_assignments_count=%s "
+                "use_gamemanager_settings=%s ongoing_games_hit=%s",
+                mode,
+                team_id,
+                game_id,
+                franchise_id,
+                tournament_id,
+                load_from_game_doc,
+                authoritative_team_id,
+                game_doc_team_id,
+                actual_team_id if "actual_team_id" in locals() else None,
+                len(_off) if isinstance(_off, list) else None,
+                len(_def) if isinstance(_def, list) else None,
+                _slot_n,
+                use_gamemanager_settings,
+                _gm_hit,
+            )
+
         return {
             "motion": motion_plays,
             "set_plays": set_plays,

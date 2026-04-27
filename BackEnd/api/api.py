@@ -2280,6 +2280,17 @@ try:
                 # bootGame (fresh GET /api/playbooks). New-GM path uses load_and_apply_team_settings_to_gamemanager
                 # to merge request over DB — cached path must do the same or DB stays stale until unrelated saves
                 # (e.g. defense matchups → summarize). End-of-request summarize_game_state then persists correctly.
+                _debug_pc = os.getenv("DEBUG_PC", "").strip().lower() in ("1", "true", "yes")
+                if _debug_pc:
+                    logging.warning(
+                        "[DEBUG_PC] simulate-quarter CACHED pre-merge game_id=%r quarter=%s "
+                        "has_request_playbook=%s has_user_team_side=%s uts=%r",
+                        game_id,
+                        body.quarter,
+                        bool(body.playbook_settings),
+                        bool(body.user_team_side),
+                        body.user_team_side,
+                    )
                 if body.playbook_settings and body.user_team_side:
                     try:
                         from BackEnd.utils.team_settings_manager import (
@@ -2322,12 +2333,30 @@ try:
                                 "(user_team_side=%s) before sim — DB save will match client boot",
                                 body.user_team_side,
                             )
+                            if _debug_pc:
+                                _po = transformed.get("pc_order") or {}
+                                logging.warning(
+                                    "[DEBUG_PC] simulate-quarter merged pc_order offense_len=%s defense_len=%s",
+                                    len((_po.get("offense") or []) if isinstance(_po.get("offense"), list) else []),
+                                    len((_po.get("defense") or []) if isinstance(_po.get("defense"), list) else []),
+                                )
+                        elif _debug_pc:
+                            logging.warning(
+                                "[DEBUG_PC] simulate-quarter SKIP merge: invalid playbook shape "
+                                "(has_playbook_keys=%s has_nonempty_values=%s)",
+                                has_playbook_keys,
+                                has_nonempty_values,
+                            )
                     except Exception as e:
                         logging.error(
                             "❌ [simulate-quarter] Cached GM request playbook_settings merge failed: %s",
                             e,
                             exc_info=True,
                         )
+                elif _debug_pc:
+                    logging.warning(
+                        "[DEBUG_PC] simulate-quarter SKIP merge: missing playbook_settings or user_team_side",
+                    )
 
             # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
             # Only check database for timeout state if we have a game_id (existing game, not new game start)

@@ -3528,6 +3528,7 @@
     // Load slot assignments from playbooks and dynamically build Playcall Center DOM
     async function loadAndApplySlotAssignments() {
       const urlParams = new URLSearchParams(window.location.search);
+      const __debugPc = urlParams.get('debug_pc') === '1';
       // ✅ FIX: Mode detection with fallback logic (matches Franchise pattern)
       // Priority: 1) URL param, 2) tournament_id present → 'tournament', 3) franchise_id present → 'franchise', 4) default 'single'
       // This ensures mode is correctly detected even if mode param is missing from URL
@@ -3609,18 +3610,25 @@
         const offensePcOrder = (((data || {}).pc_order || {}).offense || []);
         const motionDropdowns = data.motion_dropdowns || {};
         
-        // ✅ DIAGNOSTIC: Log slot assignments structure
-        console.log('🔍 [PLAYCALL CENTER] Slot assignments from API:', slotAssignments);
-        console.log('🔍 [PLAYCALL CENTER] Slot assignment keys:', Object.keys(slotAssignments));
+        if (__debugPc) {
+          console.warn('[DEBUG_PC] court GET /api/playbooks response', {
+            apiUrl,
+            teamId,
+            mode,
+            gameId,
+            franchiseId,
+            tournamentId,
+            offensePcOrderLen: Array.isArray(offensePcOrder) ? offensePcOrder.length : 0,
+            slotAssignmentKeyCount: Object.keys(slotAssignments).length,
+            motionPlays: (data.motion || []).length,
+          });
+        }
         
         // Get play data to map playId to play name
         const motionPlays = data.motion || [];
         const setPlayInside = data.set_play_inside || [];
         const setPlayAttack = data.set_play_attack || [];
         const setPlayOutside = data.set_play_outside || [];
-        
-        // ✅ DIAGNOSTIC: Log play arrays
-        console.log('🔍 [PLAYCALL CENTER] Play arrays - motion:', motionPlays.length, 'inside:', setPlayInside.length, 'attack:', setPlayAttack.length, 'outside:', setPlayOutside.length);
         
         // Build map of play IDs to play names
         // Slot assignments may use:
