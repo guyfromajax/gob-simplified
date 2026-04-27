@@ -190,10 +190,11 @@ body.homepage-v3.has-auth-bar {
 .hero {
   position: relative;
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   align-items: center;
   overflow: hidden;
-  padding: 100px 40px 80px;
+  padding: 72px 40px 0;  /* 72px = nav height so content clears nav */
 }
 
 /* Background atmosphere */
@@ -335,7 +336,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .pillar-card {
-  background: var(--hp-bg-card);
+  background: #1a1a2e;
   border: 1px solid var(--hp-border);
   border-radius: var(--hp-radius-lg);
   overflow: hidden;
@@ -353,16 +354,41 @@ body.homepage-v3.has-auth-bar {
   width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  background: var(--hp-bg);
+  background: #0d0d1a;
+  position: relative;
 }
+
+/* Screenshot separation — lifts dark screenshots off dark card */
+.pillar-screenshot-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .pillar-screenshot {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top left;
   display: block;
   transition: transform 0.4s ease;
+  box-shadow: 0 4px 24px rgba(39,64,142,0.20);
 }
+
+/* Per-image object-position tuning */
+.pillar-card[data-pillar="1"] .pillar-screenshot {
+  object-position: center 30%;   /* show the four archetype color cards */
+}
+.pillar-card[data-pillar="2"] .pillar-screenshot {
+  object-position: top center;   /* game plan sliders — top is correct */
+}
+.pillar-card[data-pillar="3"] .pillar-screenshot {
+  object-position: center 20%;   /* press conference question text */
+}
+
 .pillar-card:hover .pillar-screenshot {
   transform: scale(1.02);
 }
@@ -463,13 +489,25 @@ body.homepage-v3.has-auth-bar {
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: var(--hp-bg);
+  background: #0d0d1a;
+  position: relative;
 }
+
+/* Screenshot separation on narrow feature cards */
+.feature-card:not(.feature-card--wide) .feature-screenshot-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .feature-card:not(.feature-card--wide) .feature-screenshot {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top left;
+  object-position: top center;
   display: block;
   transition: transform 0.4s ease;
 }
@@ -510,7 +548,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .community-header {
-  margin-bottom: 48px;
+  margin-bottom: 36px;
 }
 
 .community-screenshot-wrap {
@@ -519,12 +557,17 @@ body.homepage-v3.has-auth-bar {
   overflow: hidden;
   border: 1px solid var(--hp-border);
   box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  width: 100%;
+  max-width: 100%;
 }
 
 .community-screenshot {
   width: 100%;
   height: auto;
   display: block;
+  max-height: 560px;
+  object-fit: cover;
+  object-position: top center;
 }
 
 /* Proof bar overlay at bottom of screenshot */
@@ -749,8 +792,10 @@ summary:focus-visible {
     gap: 48px;
   }
   .hero {
-    padding-top: 120px;
-    min-height: auto;
+    height: auto;
+    min-height: 100vh;
+    padding-top: 100px;
+    padding-bottom: 60px;
   }
   .hero-subhead { max-width: 100%; }
   .hero-headline { font-size: clamp(3rem, 8vw, 4.5rem); }
