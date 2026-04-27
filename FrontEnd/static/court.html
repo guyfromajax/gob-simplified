@@ -3053,6 +3053,126 @@
     
     let currentPlaycallSnapshotByName = {};
 
+    /** Max offensive Playcall Center slots; must match backend / playbooks expectations. */
+    const MAX_OFFENSE_PC_ITEMS = 8;
+    /** Snapshot for POST /api/playbooks (game doc + GM apply). Single binding for entire court script. */
+    let lastPlaybookDataForSave = null;
+
+    /** Promise gate so persist never runs before GET /api/playbooks finishes populating context. */
+    let _playcallBookCtxWait = null;
+    function beginPlaycallPlaybookLoad() {
+      _playcallBookCtxWait = {};
+      _playcallBookCtxWait.promise = new Promise((resolve) => {
+        _playcallBookCtxWait.resolve = resolve;
+      });
+    }
+    function endPlaycallPlaybookLoad(ok) {
+      if (_playcallBookCtxWait && typeof _playcallBookCtxWait.resolve === 'function') {
+        _playcallBookCtxWait.resolve(!!ok);
+        _playcallBookCtxWait = null;
+      }
+    }
+    async function whenPlaycallPlaybookLoadDone() {
+      if (_playcallBookCtxWait) await _playcallBookCtxWait.promise;
+    }
+
+    function getCourtGameContext() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return {
+        gameId: urlParams.get('game_id'),
+        userTeamSide: urlParams.get('my_team')
+      };
+    }
+
+    async function courtSetPlaycallOverride(type, value) {
+      if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl) {
+        console.warn('⚠️ [PLAYCALL OVERRIDE] API_CONFIG not ready');
+        return;
+      }
+      const { gameId, userTeamSide } = getCourtGameContext();
+      if (!gameId || !userTeamSide) {
+        console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or my_team, cannot set override', { gameId, userTeamSide });
+        return;
+      }
+      const payload = { game_id: gameId, user_team_side: userTeamSide };
+      if (type === 'offense') payload.offense_override = value;
+      else if (type === 'defense') payload.defense_override = value;
+      else if (type === 'aggression') payload.aggression_override = value;
+      else if (type === 'tempo') payload.tempo_override = value;
+      else if (type === 'press_trap') payload.press_trap_override = value;
+      const headers = { 'Content-Type': 'application/json' };
+      if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getAuthHeaders === 'function') {
+        Object.assign(headers, API_CONFIG.getAuthHeaders());
+      }
+      const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error('❌ [PLAYCALL OVERRIDE] Failed:', err);
+      }
+    }
+
+    function buildOffensePcOrderIdsFromDom() {
+      const nodes = document.querySelectorAll('#offense-play-scroller .play-option');
+      const map = (lastPlaybookDataForSave && lastPlaybookDataForSave.playNameToPlayId) || {};
+      const ids = [];
+      nodes.forEach((el) => {
+        const name = el.dataset.play;
+        const rawId = el.dataset.playId && String(el.dataset.playId).trim();
+        const id = rawId || (name && map[name]) || name;
+        if (id) ids.push(String(id));
+      });
+      return ids.slice(0, MAX_OFFENSE_PC_ITEMS);
+    }
+
+    /**
+     * Single persistence path: rebuild pc_order.offense from current DOM order (stable indices, no .filter collapse),
+     * POST playbooks so game doc + GameManager stay aligned with Set Lineup / simulate-quarter.
+     */
+    async function persistPlaycallPlaybooksFromDom() {
+      await whenPlaycallPlaybookLoadDone();
+      if (!lastPlaybookDataForSave || !lastPlaybookDataForSave.requestContext) {
+        console.warn('⚠️ [PLAYCALL CENTER] persist skipped: playbook context not ready');
+        return false;
+      }
+      const payload = lastPlaybookDataForSave.playbookPayload;
+      if (!payload.pc_order) payload.pc_order = { offense: [], defense: [] };
+      if (!Array.isArray(payload.pc_order.defense)) payload.pc_order.defense = [];
+      payload.pc_order.offense = buildOffensePcOrderIdsFromDom();
+      const ctx = lastPlaybookDataForSave.requestContext;
+      const body = {
+        mode: ctx.mode,
+        team_id: ctx.teamId,
+        playbook_settings: payload
+      };
+      if (ctx.gameId) body.game_id = ctx.gameId;
+      if (ctx.franchiseId) body.franchise_id = ctx.franchiseId;
+      if (ctx.tournamentId) body.tournament_id = ctx.tournamentId;
+      const headers = { 'Content-Type': 'application/json' };
+      if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getAuthHeaders === 'function') {
+        Object.assign(headers, API_CONFIG.getAuthHeaders());
+      }
+      try {
+        const res = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn('⚠️ [PLAYCALL CENTER] Failed to persist playbooks:', res.status, errText);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.warn('⚠️ [PLAYCALL CENTER] Error persisting playbooks:', err);
+        return false;
+      }
+    }
+
     // ✅ SS&S: Populate shooter headshots for the 6-play list using intended shooter from play skeletons
     // This runs on all game entry/re-entry instances (game start, quarter breaks, timeouts, foul outs, overtime)
     // Lineups are locked at timeout navigation points, so we can safely assign images here
@@ -3387,6 +3507,7 @@
         return;
       }
       
+      beginPlaycallPlaybookLoad();
       try {
         const params = new URLSearchParams();
         params.set('mode', mode);
@@ -3402,10 +3523,13 @@
         }
         
         const apiUrl = API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`);
-        
-        const response = await fetch(apiUrl);
+        const getHeaders = (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getAuthHeaders === 'function')
+          ? API_CONFIG.getAuthHeaders()
+          : {};
+        const response = await fetch(apiUrl, { headers: getHeaders });
         if (!response.ok) {
           console.warn('⚠️ [PLAYCALL CENTER] Failed to load slot assignments:', response.status);
+          endPlaycallPlaybookLoad(false);
           return;
         }
         
@@ -3509,6 +3633,7 @@
         const scroller = document.getElementById('offense-play-scroller');
         if (!scroller) {
           console.error('❌ [PLAYCALL CENTER] Could not find #offense-play-scroller element');
+          endPlaycallPlaybookLoad(false);
           return;
         }
         
@@ -3621,8 +3746,10 @@
         window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
           detail: { orderedPlays: orderedPlays.length }
         }));
+        endPlaycallPlaybookLoad(true);
       } catch (error) {
         console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
+        endPlaycallPlaybookLoad(false);
       }
     }
     
@@ -3644,149 +3771,23 @@
     });
     
     (function initPlaycallCenter() {
-      const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
       const DEFENSE_SCHEMES = ['Man Normal', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
       let currentDefenseIndex = 0;
       let selectedDefenseScheme = null; // Explicit user-selected defense scheme, if any
       
-      // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
-      function getGameContext() {
-        const urlParams = new URLSearchParams(window.location.search);
-        
-        // ✅ PHASE 2.4: Removed localStorage fallback - game_id must come from URL
-        // URL params are the source of truth during active gameplay
-        let gameId = urlParams.get('game_id');
-        
-        const userTeamSide = urlParams.get('my_team'); // "home" or "away"
-        
-        return { gameId, userTeamSide };
-      }
-      
-      // ✅ SS&S: Helper function to set playcall override via API
-      async function setPlaycallOverride(type, value) {
-        const { gameId, userTeamSide } = getGameContext();
-        
-        // Debug: Log all sources
-        const debugInfo = {
-          gameId,
-          userTeamSide,
-          url_gameId: new URLSearchParams(window.location.search).get('game_id'),
-          url: window.location.search
-        };
-        if (!gameId || !userTeamSide) {
-          console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or user_team_side, cannot set override', debugInfo);
-          if (!userTeamSide) {
-            console.error('❌ [PLAYCALL OVERRIDE] Cannot proceed without user_team_side');
-            return;
-          }
-          if (!gameId) {
-            console.error('❌ [PLAYCALL OVERRIDE] Cannot proceed without game_id - game may not have started yet');
-            return;
-          }
-        }
-        
-        try {
-          // ✅ SS&S: Only send the field being changed, not all fields
-          // This allows the backend to distinguish between "set this" and "clear that"
-          const payload = {
-            game_id: gameId,
-            user_team_side: userTeamSide
-          };
-          
-          // Only include the field being set/cleared
-          if (type === 'offense') {
-            payload.offense_override = value;
-          } else if (type === 'defense') {
-            payload.defense_override = value;
-          } else if (type === 'aggression') {
-            payload.aggression_override = value;
-          } else if (type === 'tempo') {
-            payload.tempo_override = value;
-          } else if (type === 'press_trap') {
-            payload.press_trap_override = value;
-          }
-          
-          const response = await fetch(API_CONFIG.buildUrl('/api/set-playcall-override'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error('❌ [PLAYCALL OVERRIDE] Failed to set override:', errorData);
-            return;
-          }
-          
-          const result = await response.json();
-        } catch (error) {
-          console.error('❌ [PLAYCALL OVERRIDE] Error setting override:', error);
-        }
-      }
-      
       // Handle play selection - use event delegation for dynamically created elements
       const playScroller = document.getElementById('offense-play-scroller');
       if (playScroller) {
         playScroller.addEventListener('click', async (e) => {
-          // Find the clicked play option (may be nested inside)
           const option = e.target.closest('.play-option');
           if (!option) return;
-          
-          // Get all play options (query dynamically each time)
           const allPlayOptions = document.querySelectorAll('#offense-play-scroller .play-option');
-          
-          // Deselect all other plays
-          allPlayOptions.forEach(opt => opt.classList.remove('selected'));
-          
-          // Select this play
-          option.classList.add('selected');
+          const idx = Array.prototype.indexOf.call(allPlayOptions, option);
+          if (idx < 0) return;
           playSound('confirm-2.mp3');
-          
-          const playName = option.dataset.play;
-          // ✅ SS&S: Store override via API (next play uses this)
-          await setPlaycallOverride('offense', playName);
-          
-          // Persist the updated Playcall Center order to the game doc so it survives timeout/reopen.
-          if (lastPlaybookDataForSave && playName && lastPlaybookDataForSave.requestContext) {
-            const slotNum = Array.prototype.indexOf.call(allPlayOptions, option) + 1;
-            if (slotNum >= 1 && slotNum <= MAX_OFFENSE_PC_ITEMS) {
-              const persistedPlayId = lastPlaybookDataForSave.playNameToPlayId[playName] || option.dataset.playId || playName;
-              if (!lastPlaybookDataForSave.playbookPayload.pc_order) {
-                lastPlaybookDataForSave.playbookPayload.pc_order = { offense: [], defense: [] };
-              }
-              if (!Array.isArray(lastPlaybookDataForSave.playbookPayload.pc_order.offense)) {
-                lastPlaybookDataForSave.playbookPayload.pc_order.offense = [];
-              }
-              lastPlaybookDataForSave.playbookPayload.pc_order.offense[slotNum - 1] = persistedPlayId;
-              lastPlaybookDataForSave.playbookPayload.pc_order.offense =
-                lastPlaybookDataForSave.playbookPayload.pc_order.offense
-                  .slice(0, MAX_OFFENSE_PC_ITEMS)
-                  .filter((value) => !!value);
-              const ctx = lastPlaybookDataForSave.requestContext;
-              const body = {
-                mode: ctx.mode,
-                team_id: ctx.teamId,
-                playbook_settings: lastPlaybookDataForSave.playbookPayload
-              };
-              if (ctx.gameId) body.game_id = ctx.gameId;
-              if (ctx.franchiseId) body.franchise_id = ctx.franchiseId;
-              if (ctx.tournamentId) body.tournament_id = ctx.tournamentId;
-              try {
-                const res = await fetch(API_CONFIG.buildUrl('/api/playbooks'), {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body)
-                });
-                if (!res.ok) {
-                  const errText = await res.text();
-                  console.warn('⚠️ [PLAYCALL CENTER] Failed to persist slot to game doc:', res.status, errText);
-                }
-              } catch (err) {
-                console.warn('⚠️ [PLAYCALL CENTER] Error persisting slot to game doc:', err);
-              }
-            }
-          }
+          await showPlayAsync(idx);
+          await persistPlaycallPlaybooksFromDom();
         });
       }
       
@@ -3810,14 +3811,14 @@
             playSound('confirm-2.mp3');
             document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            await setPlaycallOverride('tempo', values[i]);
+            await courtSetPlaycallOverride('tempo', values[i]);
           });
         }
       });
       document.getElementById('clear-tempo-x')?.addEventListener('click', async () => {
         playSound('x-back.mp3');
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
-        await setPlaycallOverride('tempo', null);
+        await courtSetPlaycallOverride('tempo', null);
       });
 
       // Aggression stack (same API pattern as before)
@@ -3833,14 +3834,14 @@
             playSound('confirm-2.mp3');
             document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            await setPlaycallOverride('aggression', value);
+            await courtSetPlaycallOverride('aggression', value);
           });
         }
       });
       document.getElementById('clear-aggression-override-x')?.addEventListener('click', async () => {
         playSound('x-back.mp3');
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
-        await setPlaycallOverride('aggression', null);
+        await courtSetPlaycallOverride('aggression', null);
       });
 
       // Press/Trap stack
@@ -3856,14 +3857,14 @@
             playSound('confirm-2.mp3');
             document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            await setPlaycallOverride('press_trap', value);
+            await courtSetPlaycallOverride('press_trap', value);
           });
         }
       });
       document.getElementById('clear-press-trap-x')?.addEventListener('click', async () => {
         playSound('x-back.mp3');
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
-        await setPlaycallOverride('press_trap', null);
+        await courtSetPlaycallOverride('press_trap', null);
       });
 
       // Defense card navigation (circular)
@@ -3886,7 +3887,7 @@
           playSound('confirm-2.mp3');
           selectedDefenseScheme = DEFENSE_SCHEMES[currentDefenseIndex];
           updateDefenseCardDisplay();
-          await setPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
+          await courtSetPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));
         });
       }
       document.getElementById('clear-defense-card-x')?.addEventListener('click', async () => {
@@ -3894,8 +3895,8 @@
         selectedDefenseScheme = null;
         currentDefenseIndex = 0;
         updateDefenseCardDisplay();
-        await setPlaycallOverride('defense', null);
-        await setPlaycallOverride('aggression', null);
+        await courtSetPlaycallOverride('defense', null);
+        await courtSetPlaycallOverride('aggression', null);
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
       });
 
@@ -3904,13 +3905,13 @@
         clearOffenseBtn.addEventListener('click', async () => {
           playSound('x-back.mp3');
           document.querySelectorAll('#offense-play-scroller .play-option').forEach(opt => opt.classList.remove('selected'));
-          await setPlaycallOverride('offense', null); // null clears the override
+          await courtSetPlaycallOverride('offense', null); // null clears the override
         });
       }
       
       // Global function to clear all visual selections (called after override is consumed)
       window.clearPlaycallOverrides = function() {
-        playOptions.forEach(opt => opt.classList.remove('selected'));
+        document.querySelectorAll('#offense-play-scroller .play-option').forEach(opt => opt.classList.remove('selected'));
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
         selectedDefenseScheme = null;
         currentDefenseIndex = 0;
@@ -4505,51 +4506,57 @@
     }
 
     // ==================== SLOT-BASED PLAY NAVIGATION ====================
-    const MAX_OFFENSE_PC_ITEMS = 8;
     let currentPlayIndex = 0;
     let playOptions = []; // Will be populated after slot assignments are loaded
-    // Persist Playcall Center changes to game doc (Data Persistence: in-game changes saved to game document)
-    let lastPlaybookDataForSave = null; // { playNameToPlayId, playbookPayload, requestContext }
-    
+    // lastPlaybookDataForSave + MAX_OFFENSE_PC_ITEMS: defined once in PLAYCALL CENTER OVERRIDE section (no shadowing).
+
     function updatePlayOptions() {
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
     }
-    
-    function showPlay(index) {
+
+    /** Visible slot + selection + offense override (GameManager). POST playbooks only when order must sync (e.g. tile click). */
+    async function showPlayAsync(index) {
       if (playOptions.length === 0) updatePlayOptions();
       playOptions.forEach((play, i) => {
         play.style.display = (i === index) ? 'flex' : 'none';
       });
       currentPlayIndex = index;
+      updatePlayOptions();
+      const el = playOptions[currentPlayIndex];
+      if (!el) return;
+      const playName = el.dataset.play;
+      playOptions.forEach(opt => opt.classList.remove('selected'));
+      el.classList.add('selected');
+      await courtSetPlaycallOverride('offense', playName);
     }
-    
+
     // Initialize - show first play (will be updated after slot assignments load)
     updatePlayOptions();
     if (playOptions.length > 0) {
-    showPlay(0);
+      void showPlayAsync(0).catch((e) => console.warn('[PLAYCALL CENTER] initial slot sync', e));
     }
-    
+
     // Up button - goes to previous slot (1→2→3→4→5→6, wraps to 6)
-    document.getElementById('play-nav-up')?.addEventListener('click', () => {
+    document.getElementById('play-nav-up')?.addEventListener('click', async () => {
       playSound('click-tiny.wav');
       if (playOptions.length === 0) updatePlayOptions();
       const newIndex = (currentPlayIndex - 1 + playOptions.length) % playOptions.length;
-      showPlay(newIndex);
+      await showPlayAsync(newIndex);
     });
-    
+
     // Down button - goes to next slot (6→5→4→3→2→1, wraps to 1)
-    document.getElementById('play-nav-down')?.addEventListener('click', () => {
+    document.getElementById('play-nav-down')?.addEventListener('click', async () => {
       playSound('click-tiny.wav');
       if (playOptions.length === 0) updatePlayOptions();
       const newIndex = (currentPlayIndex + 1) % playOptions.length;
-      showPlay(newIndex);
+      await showPlayAsync(newIndex);
     });
 
     // Wait for slot assignments to be applied, then update play options and show first play
     window.addEventListener('playcall-center-reordered', () => {
       updatePlayOptions();
       if (playOptions.length > 0) {
-        showPlay(0); // Reset to first play (Slot 1) after reordering
+        void showPlayAsync(0).catch((e) => console.warn('[PLAYCALL CENTER] reorder slot sync', e));
       }
     }, { once: false }); // Allow multiple events in case of errors/retries
 
