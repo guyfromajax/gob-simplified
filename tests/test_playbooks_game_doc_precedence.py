@@ -119,9 +119,11 @@ def test_get_playbooks_prefers_game_doc_for_franchise_when_game_id_present(monke
     )
 
     motion_percentages = response["playbook_percentages"]["motion"]
-    assert motion_percentages.get("4-1 Motion") == 77
-    assert response["slot_assignments"].get("1", {}).get("playId") == "4-1 Motion"
-    assert response["playbook_meta"] == {"seed_version": "alpha_v1", "user_saved": False}
+    # build_simplified_playbook_settings keys motion by universal play_id when plays map includes play_id
+    assert motion_percentages.get("p1") == 77
+    assert response["slot_assignments"].get("1", {}).get("playId") == "p1"
+    assert response["playbook_meta"].get("user_saved") is False
+    assert response["playbook_meta"].get("schema_version") == 2
 
 
 def test_get_playbooks_franchise_with_objectid_game_id_returns_game_doc(monkeypatch):
@@ -193,6 +195,11 @@ def test_save_playbooks_marks_meta_user_saved(monkeypatch):
         return True, "MORRISTOWN", "franchises"
 
     monkeypatch.setattr("BackEnd.utils.team_settings_manager.save_team_settings", _fake_save_team_settings)
+    monkeypatch.setattr(
+        gameplan_routes,
+        "_load_current_team_plays_for_save",
+        lambda mode, team_id, franchise_id=None, tournament_id=None, game_id=None: ({}, team_id),
+    )
 
     request = gameplan_routes.PlaybookSettingsRequest(
         mode="franchise",
@@ -207,8 +214,8 @@ def test_save_playbooks_marks_meta_user_saved(monkeypatch):
     response = gameplan_routes.save_playbooks(request)
 
     assert response["success"] is True
-    assert captured["settings_data"]["_meta"]["seed_version"] == "alpha_v1"
     assert captured["settings_data"]["_meta"]["user_saved"] is True
+    assert captured["settings_data"]["_meta"].get("schema_version") == 2
 
 
 @pytest.mark.integration

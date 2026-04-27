@@ -421,9 +421,14 @@ function buildLineupPlaybookItems(data, key) {
     }));
   }
 
-  return items
-    .filter((item) => Number(item.percentage || 0) > 0)
-    .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
+  // Read-only playbook modal: show all assigned plays (including 0%) so timeouts never look "empty"
+  // when the API returns full rows but flat percentages.
+  return items.sort(function (a, b) {
+    return (
+      Number(b.percentage || 0) - Number(a.percentage || 0) ||
+      String(a.name).localeCompare(String(b.name))
+    );
+  });
 }
 
 function renderLineupPlaybooksModal(data) {

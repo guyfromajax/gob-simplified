@@ -36,6 +36,40 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
+
+def _franchise_playbook_snapshot_meaningful(pb: dict | None) -> bool:
+    """True if game-doc playbook_settings is worth treating as the gameplay snapshot (non-trivial)."""
+    if not pb or not isinstance(pb, dict):
+        return False
+    pc = pb.get("pc_order") or {}
+    if isinstance(pc, dict) and (pc.get("offense") or pc.get("defense")):
+        return True
+    if len(pb.get("slot_assignments") or {}) > 0:
+        return True
+    pf = pb.get("position_filters") or {}
+    if isinstance(pf, dict):
+        for arr in pf.values():
+            if isinstance(arr, list) and len(arr) > 0:
+                return True
+    simp = pb.get("simple_playbook_percentages")
+    if isinstance(simp, dict):
+        for section in simp.values():
+            if not isinstance(section, dict):
+                continue
+            if any(isinstance(x, (int, float)) and x for x in section.values()):
+                return True
+    for sec in ("motion", "set_plays", "man_defense", "zone_defense", "fast_breaks"):
+        m = pb.get(sec)
+        if isinstance(m, dict) and any(isinstance(v, (int, float)) and v for v in m.values()):
+            return True
+        if isinstance(m, list) and len(m) > 0:
+            return True
+    for k in ("set_play_inside", "set_play_attack", "set_play_outside"):
+        v = pb.get(k)
+        if isinstance(v, dict) and v:
+            return True
+    return False
+
 # Stable play identity for seeded defaults and legacy position filters.
 # These must use play_id, not name, so play renames do not break initialization.
 SEEDED_OFFENSE_PLAY_IDS = {
@@ -1398,17 +1432,57 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                             elif mode == "tournament":
                                 user_team_name, _ = get_user_team_from_tournament(master_doc)
                             
-                            # Find matching team_id in game doc (case-insensitive; franchise/tournament use single source: FTD or tournament doc)
+                            # Find matching team_id in the game doc (active gameplay snapshot)
                             for tid, team_obj in game_teams.items():
                                 doc_name = (team_obj.get("name") or "").strip()
                                 master_name = (user_team_name or "").strip()
                                 if doc_name.lower() == master_name.lower():
                                     game_doc_team_id = tid
-                                    # Single source of truth: franchise/tournament never use game doc for game plan
-                                    if mode not in ["franchise", "tournament"]:
+                                    doc = game_doc
+                                    load_from_game_doc = True
+                                    break
+                            if not load_from_game_doc:
+                                _candidates_gp: list[str] = []
+                                try:
+                                    if mode == "franchise":
+                                        _, _uto_gp = get_user_team_from_franchise(master_doc)
+                                        if _uto_gp:
+                                            _candidates_gp.append(str(_uto_gp))
+                                    elif mode == "tournament":
+                                        _, _uto_gp = get_user_team_from_tournament(master_doc)
+                                        if _uto_gp:
+                                            _candidates_gp.append(str(_uto_gp))
+                                except Exception:
+                                    pass
+                                if team_id:
+                                    _ts_gp = str(team_id).strip()
+                                    if _ts_gp and _ts_gp not in _candidates_gp:
+                                        _candidates_gp.append(_ts_gp)
+                                for _cand_gp in _candidates_gp:
+                                    if not _cand_gp:
+                                        continue
+                                    _canon_gp = None
+                                    try:
+                                        _canon_gp = unified_resolve_team_id_to_canonical(
+                                            _cand_gp, mode="single", doc=game_doc
+                                        )
+                                    except (ValueError, Exception):
+                                        try:
+                                            _canon_gp = unified_resolve_team_id_to_canonical(
+                                                _cand_gp, mode="single", doc=None
+                                            )
+                                        except (ValueError, Exception):
+                                            _canon_gp = None
+                                    if _canon_gp and _canon_gp in game_teams:
+                                        game_doc_team_id = _canon_gp
                                         doc = game_doc
                                         load_from_game_doc = True
-                                    break
+                                        logger.warning(
+                                            "🔍 [GET GAMEPLAN] Matched game doc team by canonical key=%s (name match failed; user_team_name=%r)",
+                                            _canon_gp,
+                                            user_team_name,
+                                        )
+                                        break
             except Exception as e:
                 logger.warning(f"🔍 [GET GAMEPLAN] Game doc path failed: {e!r}")
         
@@ -1450,6 +1524,40 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             # Loading from game doc - use game doc team_id
             authoritative_team_id = game_doc_team_id
             team_obj = doc.get("teams", {}).get(authoritative_team_id, {})
+            if mode == "franchise":
+                _ss_gp = team_obj.get("strategy_settings")
+                if not _ss_gp or not isinstance(_ss_gp, dict) or len(_ss_gp) == 0:
+                    try:
+                        _fr_gp = collection.find_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"user_team_object_id": 1},
+                        )
+                        if _fr_gp:
+                            _, _uto_gp = get_user_team_from_franchise(_fr_gp)
+                            if _uto_gp:
+                                _ftd_gp = franchise_team_data_collection.find_one(
+                                    {
+                                        "franchise_id": ObjectId(doc_id),
+                                        "team_id": ObjectId(str(_uto_gp)),
+                                    },
+                                    {"strategy_settings": 1},
+                                )
+                                if _ftd_gp and _ftd_gp.get("strategy_settings"):
+                                    team_obj = dict(team_obj)
+                                    team_obj["strategy_settings"] = dict(
+                                        _ftd_gp["strategy_settings"]
+                                    )
+                                    logger.warning(
+                                        "⚠️ [GET GAMEPLAN] franchise+game_doc: merged FTD strategy_settings "
+                                        "(game snapshot missing) franchise=%s game_id=%s",
+                                        doc_id,
+                                        game_id,
+                                    )
+                    except Exception as _gp_merge_exc:
+                        logger.warning(
+                            "⚠️ [GET GAMEPLAN] FTD strategy merge failed: %s",
+                            _gp_merge_exc,
+                        )
         elif mode == "franchise":
             # ✅ SS&S: Always use franchise document's user_team_object_id as source of truth
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(doc)
@@ -1924,6 +2032,59 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         authoritative_team_id,
                         game_id,
                     )
+                # Game doc snapshot can lose playbook_settings / plays while FTD still has the user's book.
+                # Game plan reads FTD; playbooks must not show empty UI when master data exists.
+                _pb_snap = team_obj.get("playbook_settings")
+                _need_ftd_pb = not _franchise_playbook_snapshot_meaningful(
+                    _pb_snap if isinstance(_pb_snap, dict) else None
+                )
+                _pl_snap = team_obj.get("plays") or {}
+                _need_ftd_plays = (not isinstance(_pl_snap, dict)) or len(_pl_snap) == 0
+                if _need_ftd_pb or _need_ftd_plays:
+                    try:
+                        _fr_doc = collection.find_one(
+                            {"_id": ObjectId(doc_id)},
+                            {"user_team_id": 1, "user_team_object_id": 1},
+                        )
+                        if _fr_doc:
+                            _, _uto = get_user_team_from_franchise(_fr_doc)
+                            if _uto:
+                                _ftd_row = franchise_team_data_collection.find_one(
+                                    {
+                                        "franchise_id": ObjectId(doc_id),
+                                        "team_id": ObjectId(str(_uto)),
+                                    },
+                                    {"playbook_settings": 1, "plays": 1},
+                                )
+                                if _ftd_row:
+                                    team_obj = dict(team_obj)
+                                    if _need_ftd_pb:
+                                        _fb_pb = _ftd_row.get("playbook_settings") or {}
+                                        if _franchise_playbook_snapshot_meaningful(_fb_pb):
+                                            team_obj["playbook_settings"] = dict(_fb_pb)
+                                            logger.warning(
+                                                "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD playbook_settings "
+                                                "(game snapshot empty or non-meaningful) franchise=%s game_id=%s team=%s",
+                                                doc_id,
+                                                game_id,
+                                                authoritative_team_id,
+                                            )
+                                    if _need_ftd_plays:
+                                        _fb_pl = _ftd_row.get("plays") or {}
+                                        if isinstance(_fb_pl, dict) and len(_fb_pl) > 0:
+                                            team_obj["plays"] = dict(_fb_pl)
+                                            logger.warning(
+                                                "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD plays "
+                                                "(game snapshot missing) franchise=%s game_id=%s team=%s",
+                                                doc_id,
+                                                game_id,
+                                                authoritative_team_id,
+                                            )
+                    except Exception as _merge_exc:
+                        logger.warning(
+                            "⚠️ [GET PLAYBOOKS] franchise+game_doc FTD fallback failed: %s",
+                            _merge_exc,
+                        )
         elif mode == "franchise":
             # Franchise FCC / pregame reads use FTD as the authoritative master source.
             # Gameplay with game_id should use the game doc snapshot instead of mixing sources.

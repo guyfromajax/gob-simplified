@@ -598,7 +598,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
   - Path: `teams.{canonical_team_id}.{settings_type}`
   - Triggered when `game_id` is present and the request is in active-game context
 - **Team ID Format:** ObjectId string in master docs; canonical team ID in game docs.
-- **Read path:** GET gameplan and GET playbooks load from the master store for FCC / TCC / pregame, and from the game document for active gameplay.
+- **Read path:** GET gameplan and GET playbooks load from the master store for FCC / TCC / pregame, and from the game document for active gameplay. If the game snapshot lacks meaningful strategy or playbook data, GET may **merge** from FTD / tournament for the response (see Key Implementation Details).
 
 **Single Game Mode:**
 - Always saves to and loads from the game document (no master doc).
@@ -705,6 +705,8 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 
 **Playcall Center (court):**  
 When the user changes Playcall Center ordering during gameplay, the court must also call **POST /api/playbooks** with the updated canonical `pc_order` payload (plus `game_id`, `franchise_id` / `tournament_id`, etc.). `/api/set-playcall-override` only changes the next-play override in memory; it does not persist Playcall Center ordering. During active gameplay, POST `/api/playbooks` writes to the game document so GET `/api/playbooks` returns the updated order on reopen.
+
+**Active-game GET resolution (`BackEnd/api/gameplan_routes.py`):** When `game_id` is present, franchise and tournament **GET /api/gameplan** and **GET /api/playbooks** resolve the user team from the **game document** first (with canonical team-key fallback if name / id alignment differs). If the snapshot’s `strategy_settings` is empty, **GET /api/gameplan** merges from FTD or the tournament document for display. If the game doc playbook snapshot is empty or not meaningful for the UI, **GET /api/playbooks** can merge from the master store for the response. **Set Lineup** loads playbook state through **GET /api/playbooks** with `game_id`, so it follows this read path. POST during active play still targets the game document per Phase 5.7 above.
 
 ### Key Implementation Details
 
@@ -925,7 +927,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 
 ### Playbook Settings Persistence ✅ **FIXED** (February 2025; franchise/tournament simplified February 2026)
 
-**Note (February 2026):** In franchise and tournament mode, playbook (and game plan) settings are no longer stored in the game document. They are always read from and written to the master store (FTD or tournament doc). The fix below applies to **single game mode** and to the historical behavior when franchise/tournament used the game doc.
+**Note (April 2026):** Franchise and tournament use a **two-stage** model: master store (FTD / tournament doc) for FCC / TCC / pregame, and the **active game document** during gameplay for reads and writes when `game_id` is in context. **GET /api/playbooks** prefers the game snapshot during active play and may merge from the master store when the snapshot is empty or not meaningful for display. The fix narrative below is about **timeout restore and key consistency**; it is not claiming that franchise/tournament never use the game document.
 
 **Problem:** Playbook settings were not persisting through timeouts. When users navigated to the Playbooks page during timeout, settings were missing or incorrect, even though they were saved correctly during the timeout.
 
@@ -933,7 +935,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - `summarize_game_state()` correctly preserved `playbook_settings` from the game document when saving timeout state
 - However, when loading the game from the database after timeout, `playbook_settings` were extracted from the saved document but never explicitly restored back to the game document
 - Additionally, team_id key resolution was inconsistent between save and restore, causing settings to be restored to wrong keys
-- The Playbooks page loads settings from the game document (single mode) or from FTD/tournament doc (franchise/tournament), so missing/incorrectly-keyed settings caused the bug in single mode
+- The Playbooks UI loads from the game document in single mode and, during active franchise/tournament play, from the game snapshot (with master merge when needed); missing or wrongly keyed data in the game doc caused visible bugs after timeout
 
 **Solution:**
 - Added explicit restoration of `playbook_settings` to the game document after GameManager creation
@@ -942,7 +944,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Added detailed logging to trace playbook_settings save/restore for debugging
 
 **Key Points:**
-- **Single game:** `playbook_settings` are stored in the game document (`teams.{team_id}.playbook_settings`). Settings must be explicitly restored to the game document after loading when using the game doc. **Franchise/tournament:** Settings are in FTD or tournament doc only; GET playbooks loads from there, so no game-doc restore is needed.
+- **Single game:** `playbook_settings` are stored in the game document (`teams.{team_id}.playbook_settings`). Settings must be explicitly restored to the game document after loading when using the game doc. **Franchise/tournament (active play):** `playbook_settings` on the game document are the gameplay source of truth; **GET /api/playbooks** is game-doc-first with master merge/fallback when the snapshot is weak. **FCC/TCC (no active game context):** master store only.
 - Team_id key resolution uses: name match → direct team_id lookup → saved document home_team_id/away_team_id → GameManager team_id
 - `strategy_settings` (Game Plan settings) are validated before use - only uses request if valid, otherwise preserves DB settings
 
@@ -952,7 +954,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 
 ### Game Plan Settings Persistence ✅ **FIXED** (February 2025; franchise/tournament simplified February 2026)
 
-**Note (February 2026):** In franchise and tournament mode, game plan (and playbook) settings are always loaded from the master store (FTD or tournament doc), not from the game document. The fix below applies to **single game mode** and to request-vs-DB prioritization when loading from the game doc.
+**Note (April 2026):** For franchise and tournament, **GET /api/gameplan** during active play (`game_id` present) loads from the **game document** first; if `strategy_settings` on that snapshot is empty, the handler **merges** from FTD or the tournament document so the UI is not blank. FCC / TCC without active game context still load from the master store. The fix below applies to **request-vs-DB prioritization** in simulate-quarter / restore paths, not to denying the game doc as a read source during gameplay.
 
 **Problem:** Game plan settings (strategy_settings) were not persisting through timeouts when users didn't visit the Game Plan page during timeout navigation.
 
@@ -968,7 +970,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - This ensures settings persist through timeout even if user doesn't visit Game Plan page
 
 **Key Points:**
-- **Single game:** `strategy_settings` are stored in the game document (`teams.{team_id}.strategy_settings`) and on GameManager objects. **Franchise/tournament:** Settings are in FTD or tournament doc only; GET gameplan loads from there.
+- **Single game:** `strategy_settings` are stored in the game document (`teams.{team_id}.strategy_settings`) and on GameManager objects. **Franchise/tournament (active play):** gameplay reads/writes use the game document; **GET /api/gameplan** may merge from the master store when the snapshot’s strategy block is empty. **FCC/TCC (no active game):** master store.
 - Settings are preserved from GameManager objects when timeout is called via `summarize_game_state()` (single mode / game doc path)
 - Request settings are only used if valid (has all required keys), otherwise DB settings are preserved
 - Added logging to trace strategy_settings extraction and validation
