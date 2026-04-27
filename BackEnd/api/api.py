@@ -2275,7 +2275,60 @@ try:
                         gm.away_team.playbook_settings = away_settings.get("playbook_settings") or {}
                     elif not hasattr(gm.away_team, 'playbook_settings'):
                         gm.away_team.playbook_settings = {}
-            
+
+                # ✅ FIX: Cached GM was hydrated from game doc only; client always sends playbook_settings from
+                # bootGame (fresh GET /api/playbooks). New-GM path uses load_and_apply_team_settings_to_gamemanager
+                # to merge request over DB — cached path must do the same or DB stays stale until unrelated saves
+                # (e.g. defense matchups → summarize). End-of-request summarize_game_state then persists correctly.
+                if body.playbook_settings and body.user_team_side:
+                    try:
+                        from BackEnd.utils.team_settings_manager import (
+                            _transform_playbook_api_response_to_db_structure,
+                        )
+
+                        transformed = _transform_playbook_api_response_to_db_structure(
+                            body.playbook_settings
+                        )
+                        has_playbook_keys = any(
+                            key in transformed
+                            for key in (
+                                "motion",
+                                "set_plays",
+                                "fast_breaks",
+                                "zone_defense",
+                                "man_defense",
+                                "pc_order",
+                            )
+                        )
+                        has_nonempty_values = any(
+                            bool(transformed.get(key))
+                            for key in (
+                                "motion",
+                                "set_plays",
+                                "fast_breaks",
+                                "zone_defense",
+                                "man_defense",
+                            )
+                        ) or bool((transformed.get("pc_order") or {}).get("offense")) or bool(
+                            (transformed.get("pc_order") or {}).get("defense")
+                        )
+                        if has_playbook_keys and has_nonempty_values:
+                            if body.user_team_side == "home":
+                                gm.home_team.playbook_settings = dict(transformed)
+                            elif body.user_team_side == "away":
+                                gm.away_team.playbook_settings = dict(transformed)
+                            logging.warning(
+                                "✅ [simulate-quarter] Cached GM: merged request playbook_settings "
+                                "(user_team_side=%s) before sim — DB save will match client boot",
+                                body.user_team_side,
+                            )
+                    except Exception as e:
+                        logging.error(
+                            "❌ [simulate-quarter] Cached GM request playbook_settings merge failed: %s",
+                            e,
+                            exc_info=True,
+                        )
+
             # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
             # Only check database for timeout state if we have a game_id (existing game, not new game start)
             # Always check database for timeout state if we have a game_id

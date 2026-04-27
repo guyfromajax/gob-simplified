@@ -532,6 +532,8 @@ export function createGameScene(Phaser) {
       
       // ✅ UNIFIED: Send playbook settings (same pattern as strategy_settings)
       if (this.playbookSettings && this.userTeamSide) {
+        // Backend cached-GM playbook merge requires user_team_side on the same payload
+        payload.user_team_side = this.userTeamSide;
         payload.playbook_settings = this.playbookSettings;
         const pcOrder = this.playbookSettings.pc_order || {};
         console.log('🎮 [gameScene] Sending playbook settings to backend:', {
