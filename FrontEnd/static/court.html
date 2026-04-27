@@ -4478,12 +4478,14 @@
     }
   </script>
   <script>
-    // Load timeoutNavigationHelper with environment-aware path
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const staticPrefix = isLocalhost ? '/static' : '';
-    const timeoutHelperScript = document.createElement('script');
-    timeoutHelperScript.src = `${staticPrefix}/js/shared/timeoutNavigationHelper.js`;
-    document.head.appendChild(timeoutHelperScript);
+    (function () {
+      // Load timeoutNavigationHelper with environment-aware path
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const staticPrefix = isLocalhost ? '/static' : '';
+      const timeoutHelperScript = document.createElement('script');
+      timeoutHelperScript.src = `${staticPrefix}/js/shared/timeoutNavigationHelper.js`;
+      document.head.appendChild(timeoutHelperScript);
+    })();
   </script>
   <script>
     (function() {
