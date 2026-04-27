@@ -1253,6 +1253,23 @@
       gap: 0;
     }
 
+    /*
+     * Collapse to one row only after JS marks slots ready (avoids blank card if sync runs late).
+     * Attribute set in syncOffensePlaySlotVisibility; cleared when scroller is rebuilt.
+     */
+    #offense-play-scroller[data-pcc-slots-ready="1"] .play-option:not(.pcc-slot-active) {
+      display: none !important;
+      pointer-events: none;
+    }
+    #offense-play-scroller[data-pcc-slots-ready="1"] .play-option.pcc-slot-active {
+      display: flex !important;
+      align-items: center;
+      pointer-events: auto;
+    }
+    #offense-play-scroller[data-pcc-slots-ready="1"] .play-option.pcc-slot-active:hover {
+      background: rgba(255, 215, 0, 0.1);
+    }
+
     .defense-play-name {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 14px;
@@ -1392,6 +1409,10 @@
 
     .play-option:hover {
       background: rgba(255, 215, 0, 0.1);
+    }
+    /* Beat generic .play-option:hover inside carousel; non-active rows are display:none anyway. */
+    #offense-play-scroller[data-pcc-slots-ready="1"] .play-option:not(.pcc-slot-active):hover {
+      background: transparent !important;
     }
 
     .play-option.selected {
@@ -3650,6 +3671,7 @@
         }
         
         // Clear existing play options
+        scroller.removeAttribute('data-pcc-slots-ready');
         scroller.innerHTML = '';
         
         // Build ordered list based on canonical pc_order first, with legacy slot assignments as fallback.
@@ -4564,10 +4586,16 @@
     function syncOffensePlaySlotVisibility(index) {
       updatePlayOptions();
       const list = playOptions;
-      if (!list.length) return;
+      const scrollerEl = document.getElementById('offense-play-scroller');
+      if (!list.length) {
+        scrollerEl?.removeAttribute('data-pcc-slots-ready');
+        return;
+      }
+      scrollerEl?.setAttribute('data-pcc-slots-ready', '1');
       const safeIndex = ((index % list.length) + list.length) % list.length;
       list.forEach((play, i) => {
-        play.style.display = i === safeIndex ? 'flex' : 'none';
+        play.classList.toggle('pcc-slot-active', i === safeIndex);
+        play.style.removeProperty('display');
       });
       currentPlayIndex = safeIndex;
       const el = list[currentPlayIndex];

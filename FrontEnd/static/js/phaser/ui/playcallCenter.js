@@ -10,8 +10,7 @@
  * Called when a play is used or override is cleared
  */
 export function clearPlaycallHighlights() {
-  const playOptions = document.querySelectorAll('.play-option');
-  playOptions.forEach(opt => opt.classList.remove('selected'));
+  document.querySelectorAll('#offense-play-scroller .play-option').forEach((opt) => opt.classList.remove('selected'));
   const stackZone = document.getElementById('pcc-stacks-zone');
   if (stackZone) {
     stackZone.querySelectorAll('.pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
@@ -39,12 +38,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Backend sets offense_override_cleared: true when user team's override was used and cleared
   // This is simpler and more reliable than matching playcall names or checking team sides
   if (turnData.offense_override_cleared === true) {
-    const allSelectedButtons = document.querySelectorAll('.play-option.selected');
-    if (allSelectedButtons.length > 0) {
-      // Un-highlight the selected button (there should only be one selected at a time)
-      const selectedButton = allSelectedButtons[0];
-      selectedButton.classList.remove('selected');
-    }
+    document.querySelectorAll('#offense-play-scroller .play-option.selected').forEach((btn) => btn.classList.remove('selected'));
   }
   
   // ✅ Defense and aggression buttons remain highlighted until manually cleared by user
