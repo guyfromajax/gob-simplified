@@ -2854,15 +2854,8 @@
       <!-- Offense Card Zone (left 33%) -->
       <div class="pcc-card-zone">
         <div class="pcc-play-card">
-          <div id="offense-play-scroller" class="play-scroller">
-            <div class="play-option">
-              <img class="play-headshot" src="" alt="Shooter">
-              <div class="play-info">
-                <div class="play-name">Loading playbook...</div>
-                <div class="play-focus"></div>
-              </div>
-            </div>
-          </div>
+          <!-- Empty until loadAndApplySlotAssignments(); placeholder .play-option caused stale nodes + all-visible flex bug -->
+          <div id="offense-play-scroller" class="play-scroller"></div>
         </div>
         <div class="pcc-nav-col">
           <button class="pcc-nav-btn" id="play-nav-up">▲</button>
@@ -3057,6 +3050,8 @@
     const MAX_OFFENSE_PC_ITEMS = 8;
     /** Snapshot for POST /api/playbooks (game doc + GM apply). Single binding for entire court script. */
     let lastPlaybookDataForSave = null;
+    /** Last successful playbooks URL signature (avoid redundant refetch on rapid re-schedules). */
+    let _playcallAppliedSignature = '';
 
     /** Promise gate so persist never runs before GET /api/playbooks finishes populating context. */
     let _playcallBookCtxWait = null;
@@ -3185,7 +3180,7 @@
         return;
       }
       
-      const playOptions = document.querySelectorAll('.play-option');
+      const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
       const urlParams = new URLSearchParams(window.location.search);
       
       // Get user team side and lineup from URL params
@@ -3506,7 +3501,22 @@
         console.warn('⚠️ [PLAYCALL CENTER] No team_id found, using default play order');
         return;
       }
-      
+
+      const needsActiveGameDoc =
+        (mode === 'franchise' && !!franchiseId) || (mode === 'tournament' && !!tournamentId);
+      if (needsActiveGameDoc && !gameId) {
+        console.warn('⚠️ [PLAYCALL CENTER] Waiting for game_id in URL before GET /api/playbooks (franchise/tournament game doc)');
+        return;
+      }
+
+      const loadSig = `${mode}|${teamId}|${gameId || ''}|${franchiseId || ''}|${tournamentId || ''}`;
+      if (
+        loadSig === _playcallAppliedSignature &&
+        document.querySelectorAll('#offense-play-scroller .play-option').length > 0
+      ) {
+        return;
+      }
+
       beginPlaycallPlaybookLoad();
       try {
         const params = new URLSearchParams();
@@ -3746,12 +3756,46 @@
         window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
           detail: { orderedPlays: orderedPlays.length }
         }));
+        _playcallAppliedSignature = loadSig;
         endPlaycallPlaybookLoad(true);
       } catch (error) {
         console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
         endPlaycallPlaybookLoad(false);
       }
     }
+
+    let _playcallBookLoadTimer = null;
+    function schedulePlaycallPlaybookLoad() {
+      if (_playcallBookLoadTimer) clearTimeout(_playcallBookLoadTimer);
+      _playcallBookLoadTimer = setTimeout(() => {
+        _playcallBookLoadTimer = null;
+        loadAndApplySlotAssignments().catch((error) => {
+          console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
+          window.dispatchEvent(
+            new CustomEvent('playcall-center-reordered', { detail: { orderedPlays: 0, error: true } })
+          );
+        });
+      }, 80);
+    }
+
+    (function hookHistoryForPlaycallPlaybookLoad() {
+      if (window.__playcallHistoryHooked) return;
+      window.__playcallHistoryHooked = true;
+      ['pushState', 'replaceState'].forEach((methodName) => {
+        const orig = history[methodName];
+        if (typeof orig !== 'function') return;
+        history[methodName] = function patchedHistoryState() {
+          const ret = orig.apply(this, arguments);
+          try {
+            schedulePlaycallPlaybookLoad();
+          } catch (e) {
+            /* ignore */
+          }
+          return ret;
+        };
+      });
+      window.addEventListener('popstate', schedulePlaycallPlaybookLoad);
+    })();
     
     // ✅ SS&S: Call on page load (runs on all game entry/re-entry instances)
     // This ensures images are set whenever we return to court.html from lineup/game plan screens
@@ -3760,15 +3804,10 @@
       console.error('❌ [PLAYCALL HEADSHOTS] Error populating headshots:', error);
     });
     
-    // Load and apply Playcall Center ordering from playbooks
-    // This is async, so navigation code should wait for the 'playcall-center-reordered' event
-    loadAndApplySlotAssignments().catch(error => {
-      console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
-      // Still dispatch event even on error so navigation can initialize
-      window.dispatchEvent(new CustomEvent('playcall-center-reordered', {
-        detail: { orderedPlays: 0, error: true }
-      }));
-    });
+    // Load and apply Playcall Center ordering from playbooks (debounced; retries after replaceState/game_id)
+    schedulePlaycallPlaybookLoad();
+    setTimeout(schedulePlaycallPlaybookLoad, 400);
+    setTimeout(schedulePlaycallPlaybookLoad, 1200);
     
     (function initPlaycallCenter() {
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
@@ -4514,27 +4553,25 @@
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
     }
 
-    /** Visible slot + selection + offense override (GameManager). POST playbooks only when order must sync (e.g. tile click). */
+    /** Visible slot + selection + offense override. Always sync playOptions from DOM first so every row gets an explicit display (avoids default flex on all). */
     async function showPlayAsync(index) {
-      if (playOptions.length === 0) updatePlayOptions();
-      playOptions.forEach((play, i) => {
-        play.style.display = (i === index) ? 'flex' : 'none';
-      });
-      currentPlayIndex = index;
       updatePlayOptions();
-      const el = playOptions[currentPlayIndex];
+      const list = playOptions;
+      if (!list.length) return;
+      const safeIndex = ((index % list.length) + list.length) % list.length;
+      list.forEach((play, i) => {
+        play.style.display = i === safeIndex ? 'flex' : 'none';
+      });
+      currentPlayIndex = safeIndex;
+      const el = list[currentPlayIndex];
       if (!el) return;
       const playName = el.dataset.play;
-      playOptions.forEach(opt => opt.classList.remove('selected'));
+      document.querySelectorAll('#offense-play-scroller .play-option').forEach((opt) => opt.classList.remove('selected'));
       el.classList.add('selected');
       await courtSetPlaycallOverride('offense', playName);
     }
 
-    // Initialize - show first play (will be updated after slot assignments load)
     updatePlayOptions();
-    if (playOptions.length > 0) {
-      void showPlayAsync(0).catch((e) => console.warn('[PLAYCALL CENTER] initial slot sync', e));
-    }
 
     // Up button - goes to previous slot (1→2→3→4→5→6, wraps to 6)
     document.getElementById('play-nav-up')?.addEventListener('click', async () => {
