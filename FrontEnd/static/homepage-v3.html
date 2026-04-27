@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager (production only) -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Basketball Sim | Basketball Simulation Game — Geeked Out Basketball</title>
+  <meta name="description" content="A basketball sim and basketball simulation game where you build an elite high school program. Strategy, not button mashing. Play the alpha free.">
+
+  <!-- FAQ structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Geeked Out Basketball?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Geeked Out Basketball is a basketball simulation game where you build and coach an elite high school program from the ground up. It's a strategy-focused basketball sim — you develop players, set game plans, build playbooks, and make decisions during live gameplay."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is this a basketball sim or an arcade game?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "It's a basketball sim, not an arcade game. You don't control players in real time — you coach. Set your system, manage your roster, call plays, make halftime adjustments, and answer to the press after every game."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What makes this basketball simulation different from other basketball games?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Most basketball games are either arcade action or basic GM sims. Geeked Out Basketball sits in a different category entirely — deep tactical coaching, real player development, a full 26-week season, and a post-game press conference system that makes every decision feel meaningful."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is Geeked Out Basketball free to play?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The alpha is free to play in your browser — no download, no install. Sign up and you're coaching."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Who is this basketball simulation game for?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Coaches and sim fans who want depth and strategy. If you've ever wanted a basketball game that respects your basketball IQ, this is it."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need to download anything?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Geeked Out Basketball is entirely browser-based. Desktop recommended for the best experience."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="./homepage-v3.css">
+</head>
+<body class="homepage-v3 has-auth-bar has-footer">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <!-- ═══════════════════════════════════════════════
+       NAV
+  ═══════════════════════════════════════════════ -->
+  <div id="auth-bar" class="auth-bar homepage-v3-nav">
+    <div class="auth-bar-left">
+      <a href="/" class="logo-link"><img src="./images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>
+      <a href="/tutorial.html" class="tutorials-nav-btn">Tutorials</a>
+    </div>
+    <img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">
+    <div class="auth-bar-right">
+      <a href="./mode-select.html" class="nav-cta" id="nav-cta" aria-label="Play The Alpha">Play The Alpha</a>
+      <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube">
+        <img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24">
+      </a>
+      <a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>
+      </a>
+      <div id="auth-logged-out" class="auth-status">
+        <a href="/login.html" class="auth-link">Log In</a>
+        <span class="auth-divider">|</span>
+        <a href="/signup.html" class="auth-link">Sign Up</a>
+      </div>
+      <div id="auth-logged-in" class="auth-status" style="display: none;">
+        <span id="auth-user-email" class="auth-email"></span>
+        <button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SECTION 1 — HERO
+  ═══════════════════════════════════════════════ -->
+  <section class="hero" aria-label="Hero">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="hero-orb hero-orb-1"></div>
+      <div class="hero-orb hero-orb-2"></div>
+      <div class="hero-texture"></div>
+    </div>
+    <div class="hero-content">
+      <div class="hero-text">
+        <h1 class="hero-headline">
+          <span class="hero-headline-line">Build A Program.</span>
+          <span class="hero-headline-line hero-headline-line--accent">Forge A Legacy.</span>
+        </h1>
+        <p class="hero-subhead">The deepest basketball sim ever built. Develop your roster, set your system, and coach every game — all in your browser.</p>
+        <div class="hero-cta-group">
+          <a href="./mode-select.html" class="hero-cta" id="hero-cta">Play The Alpha →</a>
+          <span class="hero-microcopy">No download required.</span>
+        </div>
+      </div>
+      <div class="hero-screenshot-frame" aria-hidden="true">
+        <div class="hero-screenshot-glow"></div>
+        <img
+          src="./images/homepage/hero-court-gameplay.png"
+          alt="Live gameplay screenshot showing a basketball game in progress with real-time stats and playcall controls"
+          class="hero-screenshot"
+          width="900"
+          height="562"
+          loading="eager"
+        >
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       SECTION 2 — THREE PILLARS
+  ═══════════════════════════════════════════════ -->
+  <section class="pillars" aria-labelledby="pillars-heading">
+    <div class="section-container">
+      <p class="section-eyebrow" id="pillars-heading">How It Works</p>
+      <div class="pillars-grid">
+
+        <article class="pillar-card" data-pillar="1">
+          <div class="pillar-screenshot-wrap">
+            <img
+              src="./images/homepage/pillar-coaching-style.png"
+              alt="Coaching Style selection screen showing four archetypes: Authoritarian, Systems Coach, Player Maximizer, and Culture Builder"
+              class="pillar-screenshot"
+              loading="lazy"
+            >
+          </div>
+          <div class="pillar-body">
+            <span class="pillar-number">01</span>
+            <h2 class="pillar-headline">Choose Your Coaching Identity</h2>
+            <p class="pillar-copy">Before you run a single play, you decide who you are as a coach. Authoritarian. Systems Coach. Player Maximizer. Culture Builder. Your philosophy shapes how your players develop and how your program grows.</p>
+          </div>
+        </article>
+
+        <article class="pillar-card" data-pillar="2">
+          <div class="pillar-screenshot-wrap">
+            <img
+              src="./images/homepage/pillar-game-plan.png"
+              alt="Edit Game Plan screen with ten tactical sliders controlling offense, defense, fast breaks, aggression and more"
+              class="pillar-screenshot"
+              loading="lazy"
+            >
+          </div>
+          <div class="pillar-body">
+            <span class="pillar-number">02</span>
+            <h2 class="pillar-headline">Dial In Every Detail</h2>
+            <p class="pillar-copy">Set your offensive and defensive system across ten tactical dimensions. Then build a playbook of real plays — motion sets, set plays, zone schemes, fast breaks — and tune each one to your roster's strengths.</p>
+          </div>
+        </article>
+
+        <article class="pillar-card" data-pillar="3">
+          <div class="pillar-screenshot-wrap">
+            <img
+              src="./images/homepage/pillar-press-conference.png"
+              alt="Post-game press conference screen showing multiple-choice coaching philosophy questions after a game"
+              class="pillar-screenshot"
+              loading="lazy"
+            >
+          </div>
+          <div class="pillar-body">
+            <span class="pillar-number">03</span>
+            <h2 class="pillar-headline">Answer For Every Decision</h2>
+            <p class="pillar-copy">After every game, the press wants answers. How you respond shapes your program's culture and your players' confidence. In this basketball simulation, coaching doesn't stop when the final buzzer sounds.</p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       SECTION 3 — DEEP DIVE
+  ═══════════════════════════════════════════════ -->
+  <section class="deepdive" aria-labelledby="deepdive-heading">
+    <div class="section-container">
+      <div class="deepdive-header">
+        <h2 class="section-headline" id="deepdive-heading">A Basketball Simulation Built For Coaches Who Love The Game</h2>
+        <p class="section-subhead">Everything a serious basketball sim should have — and a few things you won't find anywhere else.</p>
+      </div>
+
+      <div class="features-grid">
+
+        <article class="feature-card feature-card--wide">
+          <div class="feature-text">
+            <h3 class="feature-headline">Your Franchise Command Center</h3>
+            <p class="feature-copy">Standings. Rankings. Scouting intel. Locker room chemistry. Recruiting pipeline. Player scoring leaders. All of it on one screen, updated every week. This is what running a program actually feels like.</p>
+          </div>
+          <div class="feature-screenshot-wrap">
+            <img
+              src="./images/homepage/deepdive-franchise-command-center.png"
+              alt="Franchise Command Center showing standings, national rankings, next opponent, team chemistry, recruiting, and player stats in one dashboard"
+              class="feature-screenshot"
+              loading="lazy"
+            >
+          </div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-screenshot-wrap">
+            <img
+              src="./images/homepage/deepdive-team-measures.png"
+              alt="Team Measures radar chart showing eight team performance dimensions including Offense, Defense, Fast Breaks, Discipline and Fight"
+              class="feature-screenshot"
+              loading="lazy"
+            >
+          </div>
+          <div class="feature-text">
+            <h3 class="feature-headline">Know Exactly What Your Team Is</h3>
+            <p class="feature-copy">Eight team dimensions — Offense, Defense, Fast Breaks, Press/Traps, Discipline, Fight, and more — visualized as a radar profile. Watch it shift week over week as your training takes hold.</p>
+          </div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-screenshot-wrap">
+            <img
+              src="./images/homepage/deepdive-training-report.png"
+              alt="Training Report showing weekly team performance changes with positive and negative delta indicators across all team measures"
+              class="feature-screenshot"
+              loading="lazy"
+            >
+          </div>
+          <div class="feature-text">
+            <h3 class="feature-headline">Every Week Moves The Needle</h3>
+            <p class="feature-copy">Run training, set your coaching focus, and watch the results. Shooting up. Press/Trap improving. Team Chemistry holding at 25/25. Player development isn't a black box — you see exactly what changed and why.</p>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card--wide feature-card--flipped">
+          <div class="feature-text">
+            <h3 class="feature-headline">Build A Playbook That Fits Your Players</h3>
+            <p class="feature-copy">Assign usage percentages, set scoring targets by position, and track efficiency for every play in your system. The game tells you what's working. What you do with that information is up to you.</p>
+          </div>
+          <div class="feature-screenshot-wrap">
+            <img
+              src="./images/homepage/deepdive-playbook-settings.png"
+              alt="Playbook Settings screen showing motion plays, set plays, zone defense configurations with efficiency ratings and top scorer assignments"
+              class="feature-screenshot"
+              loading="lazy"
+            >
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       SECTION 4 — COMMUNITY
+  ═══════════════════════════════════════════════ -->
+  <section class="community" aria-labelledby="community-heading">
+    <div class="section-container">
+      <div class="community-header">
+        <h2 class="section-headline" id="community-heading">Real Coaches. Real Games. Right Now.</h2>
+        <p class="section-subhead">Geeked-Out Basketball is a living world. While you're reading this, coaches are playing games, climbing the leaderboard, and building programs.</p>
+      </div>
+      <div class="community-screenshot-wrap">
+        <img
+          src="./images/homepage/community-mode-select.png"
+          alt="Mode Select screen showing the Community Highlights live feed and Alpha Leaderboard with real user game results"
+          class="community-screenshot"
+          loading="lazy"
+        >
+        <div class="community-proof-bar">
+          <div class="community-proof-item">
+            <span class="community-proof-label">Live game results from every coach, every week</span>
+          </div>
+          <div class="community-proof-divider" aria-hidden="true"></div>
+          <div class="community-proof-item">
+            <span class="community-proof-label">National rankings updated in real time</span>
+          </div>
+          <div class="community-proof-divider" aria-hidden="true"></div>
+          <div class="community-proof-item">
+            <span class="community-proof-label">Alpha Leaderboard tracking the best coaches in the game</span>
+          </div>
+        </div>
+      </div>
+      <div class="community-cta-wrap">
+        <a href="./mode-select.html" class="community-cta">See Where You Rank →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       SECTION 5 — FAQ
+  ═══════════════════════════════════════════════ -->
+  <section class="faq" aria-labelledby="faq-heading">
+    <div class="section-container">
+      <h2 class="section-headline" id="faq-heading">Frequently Asked Questions</h2>
+      <div class="faq-grid">
+
+        <div class="faq-col">
+          <details class="faq-item">
+            <summary class="faq-question">What is Geeked Out Basketball?</summary>
+            <div class="faq-answer">
+              <p>Geeked Out Basketball is a basketball simulation game where you build and coach an elite high school program from the ground up. It's a strategy-focused basketball sim — you develop players, set game plans, build playbooks, and make decisions during live gameplay.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Is this a basketball sim or an arcade game?</summary>
+            <div class="faq-answer">
+              <p>It's a basketball sim, not an arcade game. You don't control players in real time — you coach. Set your system, manage your roster, call plays, make halftime adjustments, and answer to the press after every game.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">What makes this basketball simulation different?</summary>
+            <div class="faq-answer">
+              <p>Most basketball games are either arcade action or basic GM sims. Geeked Out Basketball sits in a different category entirely — deep tactical coaching, real player development, a full 26-week season, and a post-game press conference system that makes every decision feel meaningful.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="faq-col">
+          <details class="faq-item">
+            <summary class="faq-question">Is Geeked Out Basketball free to play?</summary>
+            <div class="faq-answer">
+              <p>The alpha is free to play in your browser — no download, no install. Sign up and you're coaching.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Who is this basketball simulation game for?</summary>
+            <div class="faq-answer">
+              <p>Coaches and sim fans who want depth and strategy. If you've ever wanted a basketball game that respects your basketball IQ, this is it.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Do I need to download anything?</summary>
+            <div class="faq-answer">
+              <p>No. Geeked Out Basketball is entirely browser-based. Desktop recommended for the best experience.</p>
+            </div>
+          </details>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       SECTION 6 — FOOTER CTA
+  ═══════════════════════════════════════════════ -->
+  <section class="footer-cta" aria-label="Call to action">
+    <div class="section-container">
+      <div class="footer-cta-inner">
+        <h2 class="footer-cta-headline">Ready To Build Your Program?</h2>
+        <p class="footer-cta-sub">No download. No installs. Just basketball.</p>
+        <a href="./mode-select.html" class="hero-cta">Play The Alpha →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer id="site-footer" class="site-footer">
+    <a href="/faqs.html">FAQs</a>
+  </footer>
+
+  <script src="./homepage-v3.js"></script>
+</body>
+</html>

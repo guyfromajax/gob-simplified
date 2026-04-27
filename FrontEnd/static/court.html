@@ -1238,8 +1238,10 @@
 
     .pcc-play-card .play-name { font-size: 13px; }
     .pcc-play-card .play-focus { font-size: 10px; }
-    .pcc-play-card.selected .play-name { color: #FFD700; }
-    .pcc-play-card.selected .play-focus { color: rgba(255,215,0,0.6); }
+    /* Defense card only — never descendant-select all offense .play-name / .play-focus rows */
+    .pcc-card-zone.defense-zone .pcc-play-card.selected .defense-play-name {
+      color: #FFD700;
+    }
 
     /* Offense play scroller inside card — one play visible at a time */
     .pcc-play-card .play-scroller {
@@ -3747,6 +3749,11 @@
         orderedPlays.forEach((play, index) => {
           scroller.appendChild(play);
         });
+
+        // Collapse to one visible slot immediately (do not wait for headshot fetches — avoids all-flex + hover "all active")
+        if (orderedPlays.length > 0 && typeof window.syncOffensePlaySlotVisibility === 'function') {
+          window.syncOffensePlaySlotVisibility(0);
+        }
         
         // Populate headshots for the new play elements
         await populatePlayHeadshots();
@@ -4553,8 +4560,8 @@
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
     }
 
-    /** Visible slot + selection + offense override. Always sync playOptions from DOM first so every row gets an explicit display (avoids default flex on all). */
-    async function showPlayAsync(index) {
+    /** One visible row + single .selected; no network (safe to call right after DOM build). */
+    function syncOffensePlaySlotVisibility(index) {
       updatePlayOptions();
       const list = playOptions;
       if (!list.length) return;
@@ -4565,9 +4572,19 @@
       currentPlayIndex = safeIndex;
       const el = list[currentPlayIndex];
       if (!el) return;
-      const playName = el.dataset.play;
       document.querySelectorAll('#offense-play-scroller .play-option').forEach((opt) => opt.classList.remove('selected'));
       el.classList.add('selected');
+    }
+    window.syncOffensePlaySlotVisibility = syncOffensePlaySlotVisibility;
+
+    /** Sync UI then POST offense override (used after nav and after playbook reorder completes). */
+    async function showPlayAsync(index) {
+      syncOffensePlaySlotVisibility(index);
+      if (!playOptions.length) return;
+      const el = playOptions[currentPlayIndex];
+      if (!el) return;
+      const playName = el.dataset.play;
+      if (!playName) return;
       await courtSetPlaycallOverride('offense', playName);
     }
 
@@ -4577,6 +4594,7 @@
     document.getElementById('play-nav-up')?.addEventListener('click', async () => {
       playSound('click-tiny.wav');
       if (playOptions.length === 0) updatePlayOptions();
+      if (playOptions.length === 0) return;
       const newIndex = (currentPlayIndex - 1 + playOptions.length) % playOptions.length;
       await showPlayAsync(newIndex);
     });
@@ -4585,11 +4603,12 @@
     document.getElementById('play-nav-down')?.addEventListener('click', async () => {
       playSound('click-tiny.wav');
       if (playOptions.length === 0) updatePlayOptions();
+      if (playOptions.length === 0) return;
       const newIndex = (currentPlayIndex + 1) % playOptions.length;
       await showPlayAsync(newIndex);
     });
 
-    // Wait for slot assignments to be applied, then update play options and show first play
+    // After load/headshots: POST override for slot 0 (UI already synced before headshots when plays exist)
     window.addEventListener('playcall-center-reordered', () => {
       updatePlayOptions();
       if (playOptions.length > 0) {
