@@ -218,11 +218,18 @@ async function loadGamePlanSettings() {
     return;
   }
   
-  // Try multiple parameter names (different pages use different names)
-  const teamId = urlParams.get('team_id') || 
-                 urlParams.get('user_team_id') ||
-                 (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
-  
+  const teamId =
+    typeof window !== 'undefined' && typeof window.resolvePlaybookTeamIdFromSearch === 'function'
+      ? window.resolvePlaybookTeamIdFromSearch(urlParams)
+      : urlParams.get('team_id') ||
+        urlParams.get('user_team_id') ||
+        (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
+
+  if (!teamId) {
+    console.warn('⚠️ Could not resolve team_id for game plan request');
+    return;
+  }
+
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
     const params = new URLSearchParams();
@@ -256,11 +263,18 @@ async function loadPlaybookSettings() {
     return;
   }
   
-  // Try multiple parameter names (different pages use different names)
-  const teamId = urlParams.get('team_id') || 
-                 urlParams.get('user_team_id') ||
-                 (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
-  
+  const teamId =
+    typeof window !== 'undefined' && typeof window.resolvePlaybookTeamIdFromSearch === 'function'
+      ? window.resolvePlaybookTeamIdFromSearch(urlParams)
+      : urlParams.get('team_id') ||
+        urlParams.get('user_team_id') ||
+        (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
+
+  if (!teamId) {
+    console.warn('⚠️ Could not resolve team_id for playbook request');
+    return;
+  }
+
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
     const params = new URLSearchParams();

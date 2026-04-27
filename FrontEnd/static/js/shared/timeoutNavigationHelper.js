@@ -71,13 +71,22 @@
     if (homeId) params.set('home_id', homeId);
     if (awayId) params.set('away_id', awayId);
     if (myTeam) params.set('my_team', myTeam);
-    // ✅ SS&S: Preserve team_id (standardized parameter name)
-    if (teamId) params.set('team_id', teamId);
-    // ✅ PHASE 1: Only include user_team_id for franchise/tournament mode (not redundant in single mode)
-    // In single mode, user_team_id can be derived from my_team + home/away, so it's redundant
-    // In franchise/tournament mode, user_team_id is persistent user team identity (required)
+
     const isFranchiseOrTournament = mode === 'franchise' || mode === 'tournament';
-    if (isFranchiseOrTournament && userTeamId && userTeamId !== teamId) {
+
+    let resolvedNavTeamId = teamId;
+    if (!resolvedNavTeamId) {
+      const qpNav = new URLSearchParams();
+      if (myTeam) qpNav.set('my_team', myTeam);
+      if (homeId) qpNav.set('home_id', homeId);
+      if (awayId) qpNav.set('away_id', awayId);
+      if (typeof global.resolvePlaybookTeamIdFromSearch === 'function') {
+        resolvedNavTeamId = global.resolvePlaybookTeamIdFromSearch(qpNav);
+      }
+    }
+    if (resolvedNavTeamId) params.set('team_id', resolvedNavTeamId);
+    // ✅ PHASE 1: Only include user_team_id for franchise/tournament mode (not redundant in single mode)
+    if (isFranchiseOrTournament && userTeamId && userTeamId !== resolvedNavTeamId) {
       params.set('user_team_id', userTeamId);
     }
     

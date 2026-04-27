@@ -13,6 +13,7 @@
   <script src="/common.js"></script>
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
+  <script src="/js/shared/playbookTeamId.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
@@ -3544,11 +3545,14 @@
         }
       }
       
-      // Check multiple possible team_id parameter names (different pages use different names)
-      let teamId = urlParams.get('team_id') || 
-                   urlParams.get('user_team_id') || 
-                   urlParams.get('home_id') || 
-                   urlParams.get('away_id');
+      // SS&S: Same team_id resolution as set-lineup / bootGame (my_team + home/away; no blind home-first)
+      let teamId =
+        typeof window.resolvePlaybookTeamIdFromSearch === 'function'
+          ? window.resolvePlaybookTeamIdFromSearch(urlParams)
+          : urlParams.get('team_id') ||
+            urlParams.get('user_team_id') ||
+            urlParams.get('home_id') ||
+            urlParams.get('away_id');
       // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
       let gameId = urlParams.get('game_id') || null;
       
