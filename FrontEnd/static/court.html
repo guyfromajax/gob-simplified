@@ -3136,10 +3136,11 @@
     }
 
     /**
-     * Offense Playcall Center: exactly one visible row + one .selected.
+     * Offense Playcall Center: exactly one visible row.
      * Lives in THIS script (not the later slot-nav block) so the first GET /api/playbooks
      * can collapse slots even if the later script has not executed yet — avoids every row
-     * staying display:flex and looking “all selected” when #playcall-center scrolls.
+     * staying display:flex when #playcall-center scrolls. Selection is user-commit state,
+     * so slot browsing must not add .selected.
      */
     window.__pccSlotSyncIndex = 0;
     function applyOffensePccSlotSync(activeIndex) {
@@ -3160,8 +3161,6 @@
         el.classList.toggle('pcc-slot-active', i === safeIndex);
         el.style.removeProperty('display');
       });
-      nodes.forEach((el) => el.classList.remove('selected'));
-      nodes[safeIndex].classList.add('selected');
       window.__pccSlotSyncIndex = safeIndex;
     }
     window.applyOffensePccSlotSync = applyOffensePccSlotSync;
@@ -3895,7 +3894,6 @@
           if (idx < 0) return;
           playSound('confirm-2.mp3');
           await showPlayAsync(idx);
-          await persistPlaycallPlaybooksFromDom();
         });
       }
       
@@ -4622,7 +4620,7 @@
       playOptions = Array.from(document.querySelectorAll('#offense-play-scroller .play-option'));
     }
 
-    /** One visible row + single .selected; no network (safe to call right after DOM build). */
+    /** One visible row; no selection and no network (safe to call right after DOM build). */
     function syncOffensePlaySlotVisibility(index) {
       if (typeof window.applyOffensePccSlotSync === 'function') {
         window.applyOffensePccSlotSync(index);
@@ -4632,7 +4630,7 @@
     }
     window.syncOffensePlaySlotVisibility = syncOffensePlaySlotVisibility;
 
-    /** Sync UI then POST offense override (used after nav and after playbook reorder completes). */
+    /** Commit the visible offense slot: select it and POST the override. */
     async function showPlayAsync(index) {
       syncOffensePlaySlotVisibility(index);
       if (!playOptions.length) return;
@@ -4640,6 +4638,8 @@
       if (!el) return;
       const playName = el.dataset.play;
       if (!playName) return;
+      playOptions.forEach((option) => option.classList.remove('selected'));
+      el.classList.add('selected');
       await courtSetPlaycallOverride('offense', playName);
     }
 
@@ -4651,7 +4651,7 @@
       if (playOptions.length === 0) updatePlayOptions();
       if (playOptions.length === 0) return;
       const newIndex = (currentPlayIndex - 1 + playOptions.length) % playOptions.length;
-      await showPlayAsync(newIndex);
+      syncOffensePlaySlotVisibility(newIndex);
     });
 
     // Down button - goes to next slot (6→5→4→3→2→1, wraps to 1)
@@ -4660,14 +4660,14 @@
       if (playOptions.length === 0) updatePlayOptions();
       if (playOptions.length === 0) return;
       const newIndex = (currentPlayIndex + 1) % playOptions.length;
-      await showPlayAsync(newIndex);
+      syncOffensePlaySlotVisibility(newIndex);
     });
 
-    // After load/headshots: POST override for slot 0 (UI already synced before headshots when plays exist)
+    // After load/headshots: browse to slot 0 without committing an offense override.
     window.addEventListener('playcall-center-reordered', () => {
       updatePlayOptions();
       if (playOptions.length > 0) {
-        void showPlayAsync(0).catch((e) => console.warn('[PLAYCALL CENTER] reorder slot sync', e));
+        syncOffensePlaySlotVisibility(0);
       }
     }, { once: false }); // Allow multiple events in case of errors/retries
 

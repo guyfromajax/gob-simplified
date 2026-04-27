@@ -5410,6 +5410,17 @@ try:
             # ✅ FIX: Always set playbook_settings on GameManager (even if empty) to prevent DB fallbacks during gameplay
             gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
             gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
+        elif mode == "franchise" and franchise_id:
+            # Franchise init already loaded FTD into GameManager; persist the same
+            # baseline into the game doc before the first court load.
+            if home_playbook_for_gm:
+                summary["teams"][home_team_id]["playbook_settings"] = dict(home_playbook_for_gm)
+            if away_playbook_for_gm:
+                summary["teams"][away_team_id]["playbook_settings"] = dict(away_playbook_for_gm)
+            if home_strategy_settings:
+                summary["teams"][home_team_id]["strategy_settings"] = dict(home_strategy_settings)
+            if away_strategy_settings:
+                summary["teams"][away_team_id]["strategy_settings"] = dict(away_strategy_settings)
         elif mode == "tournament" and tournament_id:
             # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
             from BackEnd.api.tournament_routes import get_user_team_from_tournament

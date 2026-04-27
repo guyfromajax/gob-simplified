@@ -70,6 +70,16 @@ def _franchise_playbook_snapshot_meaningful(pb: dict | None) -> bool:
             return True
     return False
 
+
+def _franchise_playbook_has_pc_order(pb: dict | None) -> bool:
+    """True when a playbook snapshot has Playcall Center slot identity."""
+    if not pb or not isinstance(pb, dict):
+        return False
+    pc = pb.get("pc_order") or {}
+    if isinstance(pc, dict) and (pc.get("offense") or pc.get("defense")):
+        return True
+    return len(pb.get("slot_assignments") or {}) > 0
+
 # Stable play identity for seeded defaults and legacy position filters.
 # These must use play_id, not name, so play renames do not break initialization.
 SEEDED_OFFENSE_PLAY_IDS = {
@@ -2038,9 +2048,12 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 _need_ftd_pb = not _franchise_playbook_snapshot_meaningful(
                     _pb_snap if isinstance(_pb_snap, dict) else None
                 )
+                _need_ftd_pc_order = not _franchise_playbook_has_pc_order(
+                    _pb_snap if isinstance(_pb_snap, dict) else None
+                )
                 _pl_snap = team_obj.get("plays") or {}
                 _need_ftd_plays = (not isinstance(_pl_snap, dict)) or len(_pl_snap) == 0
-                if _need_ftd_pb or _need_ftd_plays:
+                if _need_ftd_pb or _need_ftd_pc_order or _need_ftd_plays:
                     try:
                         _fr_doc = collection.find_one(
                             {"_id": ObjectId(doc_id)},
@@ -2058,8 +2071,8 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                 )
                                 if _ftd_row:
                                     team_obj = dict(team_obj)
+                                    _fb_pb = _ftd_row.get("playbook_settings") or {}
                                     if _need_ftd_pb:
-                                        _fb_pb = _ftd_row.get("playbook_settings") or {}
                                         if _franchise_playbook_snapshot_meaningful(_fb_pb):
                                             team_obj["playbook_settings"] = dict(_fb_pb)
                                             logger.warning(
@@ -2069,6 +2082,19 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                                 game_id,
                                                 authoritative_team_id,
                                             )
+                                    elif _need_ftd_pc_order and _franchise_playbook_has_pc_order(_fb_pb):
+                                        _merged_pb = dict(_pb_snap or {})
+                                        for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
+                                            if _fb_pb.get(_pc_key):
+                                                _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
+                                        team_obj["playbook_settings"] = _merged_pb
+                                        logger.warning(
+                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD Playcall Center order "
+                                            "(game snapshot missing PC order) franchise=%s game_id=%s team=%s",
+                                            doc_id,
+                                            game_id,
+                                            authoritative_team_id,
+                                        )
                                     if _need_ftd_plays:
                                         _fb_pl = _ftd_row.get("plays") or {}
                                         if isinstance(_fb_pl, dict) and len(_fb_pl) > 0:
