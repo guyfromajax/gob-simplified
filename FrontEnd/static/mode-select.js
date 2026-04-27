@@ -309,6 +309,85 @@ function formatHighlightGpLabel(gpDelta) {
   return String(n) + ' GP';
 }
 
+function chGpBlock(entry) {
+  var gpLabel = formatHighlightGpLabel(entry.gp_delta);
+  var gpNum = parseInt(entry.gp_delta, 10);
+  var gpClass = 'community-highlight-gp' + ((Number.isFinite(gpNum) && gpNum < 0) ? ' is-neg' : ' is-pos');
+  return (
+    '<div class="' +
+    gpClass +
+    '">' +
+    escapeHtmlMs(gpLabel) +
+    '</div>'
+  );
+}
+
+function chRowChromeStyle(entry) {
+  var primary = escapeHtmlMs(entry.primary_color || '#27408E');
+  var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
+  return '--ch-primary:' + primary + ';--ch-secondary:' + secondary;
+}
+
+function chStandardCopyHtml(entry) {
+  var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
+  var ut = escapeHtmlMs(entry.user_team_name || '?');
+  var opp = escapeHtmlMs(entry.opponent_name || '?');
+  var beatLost = entry.user_won ? 'beat' : 'lost to';
+  var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
+  var userStrong = '<strong class="ch-username">' + uname + '</strong>';
+  var usc = entry.user_score;
+  var osc = entry.opponent_score;
+  var hasScores =
+    usc != null &&
+    osc != null &&
+    !Number.isNaN(Number(usc)) &&
+    !Number.isNaN(Number(osc));
+  if (hasScores) {
+    return (
+      userStrong +
+      ', coaching ' +
+      ut +
+      ' ' +
+      beatLost +
+      ' ' +
+      opp +
+      ' ' +
+      Number(usc) +
+      '-' +
+      Number(osc) +
+      '. ' +
+      ut +
+      ' is now ranked ' +
+      rankLabel +
+      ' in the nation.'
+    );
+  }
+  return (
+    userStrong +
+    ', coaching ' +
+    ut +
+    ' ' +
+    beatLost +
+    ' ' +
+    opp +
+    '. ' +
+    ut +
+    ' is now ranked ' +
+    rankLabel +
+    ' in the nation.'
+  );
+}
+
+function chAnnouncementHtml(entry) {
+  var u = String(entry.username || entry.user_name || 'Coach');
+  var raw = String(entry.announcement_line || '');
+  if (raw.indexOf(u + ',') === 0) {
+    var rest = raw.slice(u.length);
+    return '<strong class="ch-username">' + escapeHtmlMs(u) + '</strong>' + escapeHtmlMs(rest);
+  }
+  return escapeHtmlMs(raw);
+}
+
 function renderCommunityHighlights(data) {
   if (!communityHighlightsBody) return;
   var entries = data && Array.isArray(data.entries) ? data.entries : [];
@@ -318,44 +397,44 @@ function renderCommunityHighlights(data) {
     return;
   }
   communityHighlightsBody.innerHTML = entries.map(function (entry) {
-    var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
-    var ut = escapeHtmlMs(entry.user_team_name || '?');
-    var opp = escapeHtmlMs(entry.opponent_name || '?');
-    var beatLost = entry.user_won ? 'beat' : 'lost to';
-    var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
-    var primary = escapeHtmlMs(entry.primary_color || '#27408E');
-    var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
-    var gpLabel = formatHighlightGpLabel(entry.gp_delta);
-    var gpNum = parseInt(entry.gp_delta, 10);
-    var gpClass = 'community-highlight-gp' + ((Number.isFinite(gpNum) && gpNum < 0) ? ' is-neg' : ' is-pos');
-    var copy =
-      uname +
-      ', coaching ' +
-      ut +
-      ' ' +
-      beatLost +
-      ' ' +
-      opp +
-      '. ' +
-      ut +
-      ' is now ranked ' +
-      rankLabel +
-      ' in the nation.';
+    var type = entry.entry_type || 'standard';
+    var variant = entry.variant || 'standard_row';
+    var rowExtra = variant === 'national_gold' ? ' community-highlight-row--national-gold' : '';
+
+    if (type === 'conference_rs_title' || type === 'championship') {
+      var ann = chAnnouncementHtml(entry);
+      var details = escapeHtmlMs(entry.details_line || '');
+      return (
+        '<div class="community-highlight-row community-highlight-row--stacked' +
+        rowExtra +
+        '" style="' +
+        chRowChromeStyle(entry) +
+        '">' +
+        '<div class="community-highlight-row-inner community-highlight-row-inner--stacked">' +
+        '<div class="community-highlight-copy-wrap">' +
+        '<div class="community-highlight-announcement">' +
+        ann +
+        '</div>' +
+        '<div class="community-highlight-details">' +
+        details +
+        '</div>' +
+        '</div>' +
+        chGpBlock(entry) +
+        '</div>' +
+        '</div>'
+      );
+    }
+
+    var copy = chStandardCopyHtml(entry);
     return (
-      '<div class="community-highlight-row" style="--ch-primary:' +
-      primary +
-      ';--ch-secondary:' +
-      secondary +
+      '<div class="community-highlight-row" style="' +
+      chRowChromeStyle(entry) +
       '">' +
       '<div class="community-highlight-row-inner">' +
       '<div class="community-highlight-copy">' +
       copy +
       '</div>' +
-      '<div class="' +
-      gpClass +
-      '">' +
-      escapeHtmlMs(gpLabel) +
-      '</div>' +
+      chGpBlock(entry) +
       '</div>' +
       '</div>'
     );

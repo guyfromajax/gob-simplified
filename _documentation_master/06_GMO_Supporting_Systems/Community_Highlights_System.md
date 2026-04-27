@@ -11,10 +11,10 @@ Feed for the **Community Highlights** panel on **Mode Select** (`FrontEnd/static
 | **Audience** | **Universal** — every signed-in user sees the same feed (everyone’s entries). |
 | **Retention** | **20 rows maximum.** New rows insert at the top; when a 21st is added, **delete** the overflow from persistence so data does not grow beyond the visible list. |
 | **When to create an entry** | **Only after franchise `POST /franchise/complete-week/phase-b` completes successfully** — not after phase A. |
-| **Display name** | `username` from the user’s MongoDB `users` document (email local-part when unset), same idea as the alpha leaderboard. |
+| **Display name** | `username` from the user’s MongoDB `users` document (email local-part when unset), same idea as the alpha leaderboard. **Render the username in bold** everywhere it appears in highlight copy. |
 | **National rank** | User team’s **`natl_rank` from FTD** (`franchise_team_data`) **after** phase B persistence, with caveats below. |
 | **Geek Points (display)** | **Net GP earned from that completed user game only** — not season total, not lifetime account total. |
-| **V1 copy** | Single summary line per row (no box-score “highlights” stats in v1). |
+| **Standard game copy** | One summary line: beat / lost, **scores**, and national rank (`#--` when rank is missing or skipped). |
 
 ---
 
@@ -35,29 +35,49 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
 ## Display rules
 
 - **Order:** Every new entry is a **new row at the top**; existing rows shift down.
-- **Row layout (horizontal):**
-  - **Left (main copy):** `{user_name}`, coaching `{user_team_name}` **beat** (win) / **lost to** (loss) `{opponent_team_name}`. `{user_team_name}` is now ranked **#{natl_rank}** in the nation. Reserve width so the GP column does not collide.
+- **Standard row (horizontal):**
+  - **Left (main copy):** **`{user_name}` (bold)**, coaching `{user_team_name}`, **beat** (win) / **lost to** (loss) `{opponent_team_name}` **`{user_score}`-`{opponent_score}`**. `{user_team_name}` is now ranked **`{rank_label}`** (e.g. `#7` or `#--`) in the nation. Reserve width so the GP column does not collide.
   - **Right:** `+/- {net GP for that game}` — **positive: bold gold**; **negative: bold red**. If the left block wraps to two lines, **vertically center** the GP block in the row.
 
 ---
 
-## Row chrome / design (v1)
+## Special display rules
+
+- These **instances** occupy **two text rows** that read as **one card**: shared border and background (no “split” border between announcement and details).
+- **Row 1:** Announcement (`announcement_line`).
+- **Row 2:** Details (`details_line`).
+- **Row chrome:** Conference **regular-season title**, **conference tournament win**, and **regional tournament win** use the **same team-gradient treatment** as normal highlights (`variant: standard_row`). **National tournament win** uses **`variant: national_gold`** (premium gold styling on Mode Select).
+
+- If the user finishes the regular season as **#1 seed in their conference** (conference regular-season champion):
+  - **Announcement:** "`{user_name}`, coaching {user team name}, wins the Conference `{n}` regular season title."
+  - **Details:** "Record: {user record} -- Top Scorer: {name}: {PPG} -- Top Rebounder: {name}: {RPG} -- Top Defender: {name}: {DEF%} or — if no qualifier."
+  - **Top Defender:** qualifies only with **≥ 156 DEFA** for the season (26 games × 6 DEFA per game).
+
+- If the user wins a **conference**, **regional**, or **national** tournament final:
+  - **Announcement:** e.g. wins the Conference `{n}` Tournament; wins the `{region}` Regional Tournament; wins the National Tournament (see `BackEnd/utils/community_highlights.py`).
+  - **Details:** "Championship Game: {user team}: {score} - {opponent}: {score} -- POTG: …" when box score is available.
+
+---
+
+## Row chrome / design
 
 - **Goal:** Premium feel similar to the **Franchise** card on Mode Select (gradient, **semi-opaque overlay** so background does not overpower text, **inner content area** for type).
-- **V1 fill:** Prefer **user team primary color** (and subtle secondary if needed) as the row background — **not** tiled `banner_primary` — for simpler layout and consistent branding. Optional later: light watermark or texture.
+- **Fill:** **User team primary / secondary** as the row background — **not** tiled `banner_primary` — for simpler layout and consistent branding. **National champion** row adds the gold variant above. Optional later: light watermark or texture.
 
 ---
 
 ## New entry criteria (detail)
 
 - **Trigger:** User finishes their **franchise** week for the human-played game: **phase B** has run and DB state (including rank/GP side effects for that flow) is committed.
-- **Content:** Template line above; **no extra stat lines in v1**.
+- **Content:** Templates above; standard rows include **scores**; special rows add **announcement + details** and optional POTG on championship details.
 
 ---
 
 ## References (implementation)
 
-- Mode Select shell: `FrontEnd/static/mode-select.html` (`community-highlights-section`).
+- Mode Select shell: `FrontEnd/static/mode-select.html` (`community-highlights-section`); rendering: `FrontEnd/static/mode-select.js` (`renderCommunityHighlights`), styles: `FrontEnd/static/mode-select.css`.
+- Pending + flush: `BackEnd/utils/community_highlights.py` (`build_community_highlight_pending`, `flush_community_highlight_pending_after_week`).
+- Phase A wiring: `BackEnd/api/franchise_routes.py` — `_complete_week_process_user_game_block` (passes `game_id`, `eos_game_meta` into pending), `complete_week_phase_a`, monolithic `complete_week`.
 - Phase B / rank: `BackEnd/api/franchise_routes.py` — `_complete_week_finish_cpu_and_persist`, `_apply_regular_season_rank_prestige_updates`.
 - FTD: `franchise_team_data_collection` — `natl_rank`.
-- Geek Points for franchise games: existing win/loss (and related) helpers invoked during complete-week / phase B — **net delta for that game** must be computed or read for the highlight line (exact hook TBD in code).
+- Geek Points for franchise games: win/loss helpers during complete-week; **net delta for that game** is stored on the pending payload and on each feed entry.

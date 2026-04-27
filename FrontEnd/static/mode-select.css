@@ -175,6 +175,54 @@ body.mode-select-page .community-highlight-row-inner {
   background: rgba(15, 17, 22, 0.55);
 }
 
+body.mode-select-page .community-highlight-row-inner--stacked {
+  align-items: center;
+}
+
+body.mode-select-page .community-highlight-copy-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body.mode-select-page .community-highlight-announcement {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.94);
+  font-family: 'Inter', sans-serif;
+}
+
+body.mode-select-page .community-highlight-details {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: 'Inter', sans-serif;
+}
+
+body.mode-select-page .community-highlight-row--stacked .community-highlight-announcement .ch-username,
+body.mode-select-page .community-highlight-copy .ch-username {
+  font-weight: 700;
+}
+
+body.mode-select-page .community-highlight-row--national-gold {
+  border: 1px solid rgba(212, 175, 55, 0.42);
+  background: linear-gradient(
+    128deg,
+    rgba(90, 72, 28, 0.95) 0%,
+    rgba(42, 34, 14, 0.98) 45%,
+    rgba(28, 24, 12, 1) 100%
+  );
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 220, 150, 0.14);
+}
+
+body.mode-select-page .community-highlight-row--national-gold .community-highlight-row-inner {
+  background: rgba(18, 15, 8, 0.62);
+}
+
 body.mode-select-page .community-highlight-copy {
   flex: 1;
   min-width: 0;
