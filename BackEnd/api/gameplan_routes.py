@@ -2061,51 +2061,85 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         )
                         if _fr_doc:
                             _, _uto = get_user_team_from_franchise(_fr_doc)
-                            if _uto:
-                                _ftd_row = franchise_team_data_collection.find_one(
-                                    {
-                                        "franchise_id": ObjectId(doc_id),
-                                        "team_id": ObjectId(str(_uto)),
-                                    },
-                                    {"playbook_settings": 1, "plays": 1},
-                                )
-                                if _ftd_row:
-                                    team_obj = dict(team_obj)
-                                    _fb_pb = _ftd_row.get("playbook_settings") or {}
-                                    if _need_ftd_pb:
-                                        if _franchise_playbook_snapshot_meaningful(_fb_pb):
-                                            team_obj["playbook_settings"] = dict(_fb_pb)
-                                            logger.warning(
-                                                "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD playbook_settings "
-                                                "(game snapshot empty or non-meaningful) franchise=%s game_id=%s team=%s",
-                                                doc_id,
-                                                game_id,
-                                                authoritative_team_id,
-                                            )
-                                    elif _need_ftd_pc_order and _franchise_playbook_has_pc_order(_fb_pb):
-                                        _merged_pb = dict(_pb_snap or {})
-                                        for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
-                                            if _fb_pb.get(_pc_key):
-                                                _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
-                                        team_obj["playbook_settings"] = _merged_pb
+                            _ftd_team_candidates: list[str] = []
+                            if team_id:
+                                _ftd_team_candidates.append(str(team_id))
+                            if _uto and str(_uto) not in _ftd_team_candidates:
+                                _ftd_team_candidates.append(str(_uto))
+
+                            _ftd_row = None
+                            _fallback_ftd_row = None
+                            for _ftd_team_id in _ftd_team_candidates:
+                                try:
+                                    _candidate_row = franchise_team_data_collection.find_one(
+                                        {
+                                            "franchise_id": ObjectId(doc_id),
+                                            "team_id": ObjectId(str(_ftd_team_id)),
+                                        },
+                                        {"playbook_settings": 1, "plays": 1},
+                                    )
+                                except Exception:
+                                    continue
+                                if not _candidate_row:
+                                    continue
+                                if _fallback_ftd_row is None:
+                                    _fallback_ftd_row = _candidate_row
+                                _candidate_pb = _candidate_row.get("playbook_settings") or {}
+                                _candidate_plays = _candidate_row.get("plays") or {}
+                                if (
+                                    (_need_ftd_pc_order and _franchise_playbook_has_pc_order(_candidate_pb))
+                                    or (_need_ftd_pb and _franchise_playbook_snapshot_meaningful(_candidate_pb))
+                                    or (_need_ftd_plays and isinstance(_candidate_plays, dict) and len(_candidate_plays) > 0)
+                                ):
+                                    _ftd_row = _candidate_row
+                                    logger.warning(
+                                        "⚠️ [GET PLAYBOOKS] franchise+game_doc: selected FTD fallback row "
+                                        "team_id=%s (request team_id=%s, franchise user_team_object_id=%s)",
+                                        _ftd_team_id,
+                                        team_id,
+                                        _uto,
+                                    )
+                                    break
+                            if _ftd_row is None:
+                                _ftd_row = _fallback_ftd_row
+
+                            if _ftd_row:
+                                team_obj = dict(team_obj)
+                                _fb_pb = _ftd_row.get("playbook_settings") or {}
+                                if _need_ftd_pb:
+                                    if _franchise_playbook_snapshot_meaningful(_fb_pb):
+                                        team_obj["playbook_settings"] = dict(_fb_pb)
                                         logger.warning(
-                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD Playcall Center order "
-                                            "(game snapshot missing PC order) franchise=%s game_id=%s team=%s",
+                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD playbook_settings "
+                                            "(game snapshot empty or non-meaningful) franchise=%s game_id=%s team=%s",
                                             doc_id,
                                             game_id,
                                             authoritative_team_id,
                                         )
-                                    if _need_ftd_plays:
-                                        _fb_pl = _ftd_row.get("plays") or {}
-                                        if isinstance(_fb_pl, dict) and len(_fb_pl) > 0:
-                                            team_obj["plays"] = dict(_fb_pl)
-                                            logger.warning(
-                                                "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD plays "
-                                                "(game snapshot missing) franchise=%s game_id=%s team=%s",
-                                                doc_id,
-                                                game_id,
-                                                authoritative_team_id,
-                                            )
+                                elif _need_ftd_pc_order and _franchise_playbook_has_pc_order(_fb_pb):
+                                    _merged_pb = dict(_pb_snap or {})
+                                    for _pc_key in ("pc_order", "slot_assignments", "motion_dropdowns"):
+                                        if _fb_pb.get(_pc_key):
+                                            _merged_pb[_pc_key] = _fb_pb.get(_pc_key)
+                                    team_obj["playbook_settings"] = _merged_pb
+                                    logger.warning(
+                                        "⚠️ [GET PLAYBOOKS] franchise+game_doc: merged FTD Playcall Center order "
+                                        "(game snapshot missing PC order) franchise=%s game_id=%s team=%s",
+                                        doc_id,
+                                        game_id,
+                                        authoritative_team_id,
+                                    )
+                                if _need_ftd_plays:
+                                    _fb_pl = _ftd_row.get("plays") or {}
+                                    if isinstance(_fb_pl, dict) and len(_fb_pl) > 0:
+                                        team_obj["plays"] = dict(_fb_pl)
+                                        logger.warning(
+                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD plays "
+                                            "(game snapshot missing) franchise=%s game_id=%s team=%s",
+                                            doc_id,
+                                            game_id,
+                                            authoritative_team_id,
+                                        )
                     except Exception as _merge_exc:
                         logger.warning(
                             "⚠️ [GET PLAYBOOKS] franchise+game_doc FTD fallback failed: %s",
