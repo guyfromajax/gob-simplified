@@ -356,20 +356,12 @@ body.homepage-v3.has-auth-bar {
   width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  background: #0d0d1a;
+  background: #f0ede6;
   position: relative;
+  padding: 16px 16px 0;
 }
 
-/* Screenshot separation — lifts dark screenshots off dark card */
-.pillar-screenshot-wrap::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 0;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
-  pointer-events: none;
-  z-index: 2;
-}
+/* Light backdrop provides separation — no inset border needed */
 
 .pillar-screenshot {
   width: 100%;
@@ -377,7 +369,8 @@ body.homepage-v3.has-auth-bar {
   object-fit: cover;
   display: block;
   transition: transform 0.4s ease;
-  box-shadow: 0 4px 24px rgba(39,64,142,0.20);
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -2px 20px rgba(0,0,0,0.35);
 }
 
 /* Per-image object-position tuning */
