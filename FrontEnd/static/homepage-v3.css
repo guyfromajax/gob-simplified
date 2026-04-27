@@ -338,6 +338,7 @@ body.homepage-v3.has-auth-bar {
 .pillar-card {
   background: #1a1a2e;
   border: 1px solid var(--hp-border);
+  border-top: 3px solid var(--hp-orange);
   border-radius: var(--hp-radius-lg);
   overflow: hidden;
   display: flex;
@@ -346,6 +347,7 @@ body.homepage-v3.has-auth-bar {
 }
 .pillar-card:hover {
   border-color: var(--hp-border-hover);
+  border-top-color: var(--hp-orange);
   transform: translateY(-4px);
   box-shadow: 0 12px 40px rgba(0,0,0,0.4);
 }
@@ -445,6 +447,7 @@ body.homepage-v3.has-auth-bar {
 .feature-card {
   background: var(--hp-bg-card);
   border: 1px solid var(--hp-border);
+  border-top: 3px solid var(--hp-orange);
   border-radius: var(--hp-radius-lg);
   overflow: hidden;
   display: flex;
@@ -453,6 +456,7 @@ body.homepage-v3.has-auth-bar {
 }
 .feature-card:hover {
   border-color: var(--hp-border-hover);
+  border-top-color: var(--hp-orange);
   box-shadow: 0 8px 32px rgba(0,0,0,0.35);
 }
 
