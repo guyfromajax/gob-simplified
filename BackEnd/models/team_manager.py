@@ -329,7 +329,7 @@ class TeamManager:
             # Initialize fresh (new game or no saved calls)
             self.strategy_calls = {
                 "offense_call": None,          # Play name string or None (user override persists until used)
-                "defense_call": None,          # "Man Normal", "2-3 Zone", etc., or None
+                "defense_call": None,          # Canonical slug (man, 2-3-zone) or legacy display; coerced in turn_manager
                 "aggression_override": None,   # "normal", "aggressive", "passive", or None (temporary override)
                 "tempo_override": None,        # "slow", "normal", "fast", or None (temporary override)
                 "press_override": None,        # Future: FCP override

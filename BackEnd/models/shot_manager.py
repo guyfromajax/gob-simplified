@@ -1651,9 +1651,9 @@ class ShotManager:
                             d_weight += (new_prob - 0.5)
                             d_weight = min(0.95, max(0.05, d_weight))
                         
-                            # Zone defense penalty
-                            defense_call = game_state.get("defense_call", "Man")
-                            if defense_call == "Zone":
+                            # Zone defense penalty (canonical `defense_playcall` slug, e.g. 2-3-zone)
+                            defense_playcall = game_state.get("defense_playcall", "man")
+                            if is_zone_defense(defense_playcall):
                                 d_weight *= 0.9
                         
                             # Step 9: Weighted random selection
@@ -2124,8 +2124,8 @@ class ShotManager:
         else:
             d_foul, foul_player = False, None
 
-        # Defense scheme multiplier: Only Zone vs 3pt gets 1.1x (makes shot more likely to be successful)
-        if defense_call == "Zone" and is_three:
+        # Defense scheme multiplier: Only zone vs 3pt gets 1.1x (makes shot more likely to be successful)
+        if is_zone_defense(defense_call) and is_three:
             shot_score *= 1.1
 
         # Help defense removed (will be replaced with location-based check in future)

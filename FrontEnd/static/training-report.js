@@ -1402,16 +1402,18 @@ function renderPlaybookSummary() {
   motion_plays.sort((a, b) => a.name.localeCompare(b.name));
   set_plays.sort((a, b) => a.name.localeCompare(b.name));
   
-  // Organize defenses
-  const man_defenses = [];
-  const zone_defenses = [];
-  
-  if (scouting_data.defense) {
+  let man_defenses = [];
+  let zone_defenses = [];
+  if (scouting_data.defense && typeof window !== 'undefined' && window.GOBDefenseDisplay) {
+    const split = window.GOBDefenseDisplay.buildPlaybookStyleDefenseRows(scouting_data.defense);
+    man_defenses = split.man_defenses;
+    zone_defenses = split.zone_defenses;
+  } else if (scouting_data.defense) {
     for (const [defense_name, defense_data] of Object.entries(scouting_data.defense)) {
       if (typeof defense_data === 'object' && defense_data !== null) {
-        if (defense_name === 'Man') {
-          man_defenses.push({ name: defense_name, ...defense_data });
-        } else if (defense_name.includes('Zone')) {
+        if (defense_name === 'Man' || defense_name === 'man') {
+          man_defenses.push({ name: defense_name === 'man' ? 'Man' : defense_name, ...defense_data });
+        } else if (defense_name.includes('Zone') || defense_name.includes('zone')) {
           zone_defenses.push({ name: defense_name, ...defense_data });
         }
       }

@@ -1270,15 +1270,32 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   defensePlayCallsSection.className = 'scouting-section';
   defensePlayCallsSection.innerHTML = '<div class="scouting-section-header">Defense Play Calls</div>';
 
-  // Man
-  const manDefense = defense.Man || {};
+  const gb =
+    typeof window !== 'undefined' && window.GOBDefenseDisplay
+      ? window.GOBDefenseDisplay
+      : null;
+  const block = (slug) =>
+    gb && typeof gb.getDefenseBlock === 'function'
+      ? gb.getDefenseBlock(defense, slug)
+      : {};
+
+  // Man (canonical slug `man` or legacy `Man`)
+  const manDefense =
+    Object.keys(block('man')).length > 0
+      ? block('man')
+      : defense.Man || defense.man || {};
   const manDefenseSection = createDefensePlaycallSubsection('Man', manDefense);
   defensePlayCallsSection.appendChild(manDefenseSection);
 
   // Zone (aggregate all zone types: 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
-  const zone23 = defense['2-3 Zone'] || {};
-  const zone32 = defense['3-2 Zone'] || {};
-  const zone131 = defense['1-3-1 Zone'] || {};
+  const zone23 =
+    Object.keys(block('2-3-zone')).length > 0 ? block('2-3-zone') : defense['2-3 Zone'] || {};
+  const zone32 =
+    Object.keys(block('3-2-zone')).length > 0 ? block('3-2-zone') : defense['3-2 Zone'] || {};
+  const zone131 =
+    Object.keys(block('1-3-1-zone')).length > 0
+      ? block('1-3-1-zone')
+      : defense['1-3-1 Zone'] || {};
   
   // Aggregate stats from all zone types
   const aggregateZoneStats = (statKey) => {
@@ -1335,17 +1352,22 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   defensePlayCallsSection.appendChild(zoneDefenseSection);
 
   // 2-3 Zone
-  const zone23Defense = defense['2-3 Zone'] || {};
+  const zone23Defense =
+    Object.keys(block('2-3-zone')).length > 0 ? block('2-3-zone') : defense['2-3 Zone'] || {};
   const zone23DefenseSection = createDefensePlaycallSubsection('2-3 Zone', zone23Defense);
   defensePlayCallsSection.appendChild(zone23DefenseSection);
 
   // 3-2 Zone
-  const zone32Defense = defense['3-2 Zone'] || {};
+  const zone32Defense =
+    Object.keys(block('3-2-zone')).length > 0 ? block('3-2-zone') : defense['3-2 Zone'] || {};
   const zone32DefenseSection = createDefensePlaycallSubsection('3-2 Zone', zone32Defense);
   defensePlayCallsSection.appendChild(zone32DefenseSection);
 
   // 1-3-1 Zone
-  const zone131Defense = defense['1-3-1 Zone'] || {};
+  const zone131Defense =
+    Object.keys(block('1-3-1-zone')).length > 0
+      ? block('1-3-1-zone')
+      : defense['1-3-1 Zone'] || {};
   const zone131DefenseSection = createDefensePlaycallSubsection('1-3-1 Zone', zone131Defense);
   defensePlayCallsSection.appendChild(zone131DefenseSection);
 

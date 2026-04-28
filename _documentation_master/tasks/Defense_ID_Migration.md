@@ -4,10 +4,23 @@
 
 **Design decision (locked):** **Canonical defense identity = universal `defenses.defense_id`** (slug string, e.g. `2-3-zone`, `base-man`). This matches existing seed scripts and is **stable across reseeds** when documents are upserted by `defense_id`. **Offense** remains **`play_id` = `str(plays._id)`** — the two domains intentionally differ; do not force Mongo `_id` hex for defense as “parity.”
 
-**Current split (important):**
-- **`playbook_settings.man_defense` / `zone_defense`** already use **logical IDs** (`man_normal`, `man_pressure`, `zone_23`, …) in many paths; see `BackEnd/utils/playbook_settings_utils.py` (`MAN_DEFENSE_ID_TO_NAME`, `ZONE_DEFENSE_ID_TO_NAME`, `DEFENSE_NAME_TO_ID`).
-- **`game_state["defense_playcall"]`**, **`strategy_calls.defense_call`**, **`scouting_data["defense"]` keys**, **`populate_scouting_data()`**, **`team_manager` templates**, and much of **sim / phase_resolution / turn_manager** still use **display names** (`"Man"`, `"2-3 Zone"`, …).
-- **`pc_order.defense`** is **partially** id-oriented: `normalize_pc_order_settings` resolves `defenseId` / `id` where present (`playbook_settings_utils.py`).
+### Implementation status (snapshot)
+
+| Phase | Status | Notes |
+|-------|--------|--------|
+| **0** | Done | Locks as documented below. |
+| **1** | Done | `defense_identity.py` + `test_defense_identity.py`. `defense_utils.is_zone_defense` delegates to `resolve_to_defense_id` / `is_zone_defense_id` (legacy string fallback remains for tests / empty DB). Optional cleanup: refresh docstrings on `map_defense_playcall_to_tracking_name`. |
+| **2** | Done (backend) | Canonical **slug keys** in `populate_scouting_data`, `team_manager` template, and `normalize_scouting_data_for_gameplay` (`canonical_scouting_defense_key` / `_remap_defense_scouting_keys_for_merge`). Training, `stat_updater`, `phase_resolution`, and `turn_manager` scouting increments use **canonical row keys** via `defense_scouting_row_key` / id-shaped `game_state`. **No standalone DB backfill script** in repo yet — **lazy migration on read** is the current approach; add an explicit script if prod needs a one-shot rewrite. |
+| **3** | In progress | **`shot_manager`:** HCO rebound zone penalty and zone-vs-3pt multiplier now use `defense_playcall` + `is_zone_defense` (no bogus `game_state["defense_call"]` / `"Zone"` string). **`shared`:** OREB putback uses `defense_playcall` with legacy `defense_call` fallback. **`rim_runner_fast_break`:** only touches synthetic `vs_Fast_Break` — already id-shaped. **Tests:** `BackEnd/tests/test_defense_phase3_contracts.py` (row keys + zone detection). **Remaining:** optional API persist of canonical slug for `strategy_calls["defense_call"]` (must not collapse **Zone sentinel**); GP client contract; fuller override → turn → scouting test. |
+| **4** | In progress | **`defense-display.js`** (global) + **`js/phaser/utils/defenseUi.js`** (ES module): canonical slug → label, `getDefenseBlock`, ordered playbook rows. Wired: **FCC / tournament / training-report** playbook summary, **box-score** defense sections, **Phaser** `playcallDisplay` / `playcallCenter`. HTML loads `/defense-display.js` before page scripts on those four pages. **Remaining:** other static surfaces if any; prefer backend `defensive_playcall_display` on turns where useful; playbooks API audit. |
+| **5** | Partial | Extend round-trip / E2E tests; staging checklist; eventual removal of dual-read / legacy writes. |
+
+**Repo / git:** Latest defense work is on **`develop`** (commit message references phases 1–2); branch **tracks `origin/develop`** when clean — confirm after each local session with `git status` / `git push`.
+
+**Current split (post–Phase 2 backend):**
+- **`playbook_settings`** + **`defense_identity`** maps still bridge **playbook percentage keys** ↔ **`defense_id`** / scouting row keys.
+- **Runtime / sim (backend):** `game_state["defense_playcall"]`, scouting defense rows, and major sim increment paths use **canonical ids** with **dual-read** at normalize / resolve boundaries.
+- **Still open:** **Frontend** surfaces and some **contracts** (turn payloads, box score, scouting report copy) may still treat defense map keys as display names; **Phase 4** closes that gap.
 
 This migration is about **closing the gap**: one canonical **`defense_id`** everywhere runtime/persistence care, plus **reserved synthetic ids** for non-catalog rows (`vs_Fast_Break`, `FCP`, `HCT`, etc.). Use **`str(_id)`** only when issuing Mongo queries by primary key, not as the app-wide defense playcall string.
 
@@ -15,7 +28,7 @@ This migration is about **closing the gap**: one canonical **`defense_id`** ever
 
 ## 1. Code sweep — places to inspect or change
 
-Below: **primary** files (high confidence) and **secondary** (verify during implementation). Line numbers drift; search by symbol.
+Below: **primary** files (high confidence) and **secondary** (verify during implementation). Line numbers drift; search by symbol. **Many backend rows are already migrated** — use **§ Implementation status** for phase truth; use these tables for **residual verification** (especially **frontend** in §1.5–1.6).
 
 ### 1.1 Backend — simulation & game state
 
@@ -105,33 +118,33 @@ Use these as **templates** for dual-read / normalization:
 4. **Dual-read period:** All readers accept **legacy display name OR `defense_id`** (and optionally `str(_id)` if ever stored), normalizing to **`defense_id`** at the `TeamManager` / `GameManager` boundary.
 5. **Playbook percentage keys** (`zone_23`, `man_normal`, …): keep mapping to / from **`defense_id`** explicit in one module (extends today’s `MAN_DEFENSE_ID_TO_NAME` / `ZONE_DEFENSE_ID_TO_NAME` pattern).
 
-### Phase 1 — Central resolution module ✅ (initial drop)
+### Phase 1 — Central resolution module ✅
 
-1. **`BackEnd/utils/defense_identity.py`** (implemented):  
+1. **`BackEnd/utils/defense_identity.py`:**  
    `resolve_to_defense_id`, `get_defense_doc`, `defense_display_name`, `is_zone_defense_id`, `refresh_defense_identity_cache`, `clear_defense_identity_cache`; synthetics `SYNTHETIC_DEFENSE_IDS`; playbook key maps; legacy Man / `Zone` dual-read.  
    **Tests:** `BackEnd/tests/test_defense_identity.py`.
-2. **Next:** Refactor `defense_utils.py` to delegate zone/man checks to **`defense_id`** via `is_zone_defense_id` where callers have migrated; keep legacy `is_zone_defense(name)` until sim uses ids.
+2. **`defense_utils.py`:** `is_zone_defense` delegates through `defense_identity` (legacy display-string fallback retained). Optional: align `map_defense_playcall_to_tracking_name` docs with id-first behavior.
 
-### Phase 2 — Scouting & template
+### Phase 2 — Scouting & template ✅ (backend)
 
-1. Change `populate_scouting_data`, `team_manager` template, and `normalize_scouting_data_for_gameplay` to use **id keys** (with migration helper reading legacy name keys).
-2. Update `training_execution_v2`, `stat_updater`, `phase_resolution`, `turn_manager` increment paths to use **id** keys.
-3. Data migration script: rewrite `franchise_team_data`, `games.teams.*.scouting`, tournament docs — **or** lazy migration on read (prefer explicit script for prod clarity).
+1. ✅ `populate_scouting_data`, `team_manager` template, and `normalize_scouting_data_for_gameplay` use **canonical slug keys** (`man`, `2-3-zone`, …) with **legacy key remap** before template merge.
+2. ✅ `training_execution_v2`, `stat_updater`, `phase_resolution`, and `turn_manager` paths that read/write scouting defense rows operate on **canonical keys** (variable names like `defense_name` may still appear — they are often **ids** now).
+3. **Persistence backfill:** **Lazy on read** via `normalize_scouting_data_for_gameplay` / remap — **done**. **Explicit bulk migration script** for existing Mongo docs — **not added**; schedule if ops wants documents rewritten at rest.
 
-### Phase 3 — Game state & sim
+### Phase 3 — Game state & sim (in progress)
 
-1. Replace `defense_playcall` string literals in selection with ids; keep **display** resolution at API/UI edge.
-2. Update `shot_manager`, `phase_resolution`, `rim_runner_fast_break`, `animator` branches to key off **id** or `is_zone` from DB metadata.
-3. Update `strategy_calls.defense_call` contract (frontend + backend) to store id.
+1. ✅ HCO selection / `game_state["defense_playcall"]` largely uses canonical ids; display remains a separate concern for Phase 4 APIs/UI.
+2. ✅ **`shot_manager`:** rebound D-weight zone penalty reads **`defense_playcall`**; **`calculate_shot_score`** zone 3pt multiplier uses **`is_zone_defense(defense_call)`** instead of `== "Zone"`. **`rim_runner_fast_break`:** no change needed (synthetic **`vs_Fast_Break`** key only).
+3. 🔄 **`strategy_calls.defense_call`**: still stores client payload as-is; **`turn_manager._coerce_hco_defense_id`** normalizes at sim time. Optional: normalize on **API write** for slugs/display names **without** breaking **Zone sentinel** → weighted zone (`_select_zone_defense_with_playbook_weights`). **Contract tests:** `BackEnd/tests/test_defense_phase3_contracts.py` (slug + legacy + playbook keys → `defense_scouting_row_key` / `is_zone_defense`). **Still to add:** override → possession → scouting row (integration).
 
-### Phase 4 — APIs & frontend surfaces
+### Phase 4 — APIs & frontend surfaces (in progress)
 
-1. **GET /api/playbooks** / gameplan: ensure `man_defense_rows` / `zone_defense_rows` and turn payloads expose **id** as authority; names for labels only.
-2. Update **FCC / tournament / training-report** scouting sections to iterate **template order** or **rows from API**, not raw `Object.entries(scouting_data.defense)` name keys.
-3. **box-score.js:** resolve defense sections via id map or server-provided labels in EOG snapshot.
-4. **Phaser** playcall UI: map id → label using cached defense list or turn payload `defense_display_name` if provided.
+1. 🔄 **GET /api/playbooks** / gameplan: confirm `man_defense_rows` / `zone_defense_rows` and turn payloads expose **id** as authority; names for labels only (spot-check clients).
+2. ✅ **FCC / tournament / training-report** playbook summary: **`GOBDefenseDisplay.buildPlaybookStyleDefenseRows`** — canonical order (`man`, then zone slugs), dual-read keys via **`getDefenseBlock`**; legacy `Object.entries` fallback if script missing.
+3. ✅ **box-score.js:** defense blocks resolved via **`getDefenseBlock`** + legacy key fallback for EOG stats.
+4. ✅ **Phaser** `playcallDisplay.js` / `playcallCenter.js`: import **`defenseUi.js`** — scoreboard Man/Zone bucket + status line labels for slug / legacy display strings.
 
-### Phase 5 — Tests, rollout, cleanup
+### Phase 5 — Tests, rollout, cleanup (partial)
 
 1. Extend `test_training_system` and add defense id round-trip tests (init → sim turn → summarize → scouting keys).
 2. Staging: verify franchise + tournament + single; box score; training report; playbooks save/load.
@@ -147,6 +160,6 @@ Use these as **templates** for dual-read / normalization:
 
 ---
 
-**Document status:** Task plan / sweep only — no implementation in this file.  
+**Document status:** Task plan + **implementation progress** (updated as migration proceeds; no code in this file).  
 **Created:** April 2026.  
-**Updated:** April 2026 — **canonical = `defense_id`** (user decision).
+**Updated:** April 2026 — **canonical = `defense_id`** (user decision); status table reflects **post–Phase 2 backend**, **Phase 3** (`shot_manager` / putback fixes landed), **Phase 4 outstanding**.

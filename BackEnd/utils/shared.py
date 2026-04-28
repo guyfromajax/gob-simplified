@@ -693,13 +693,18 @@ def resolve_offensive_rebound(game, rebounder):
             from BackEnd.models.shot_manager import ShotManager
 
             shot_manager = ShotManager(game)
+            defense_playcall = (
+                game_state.get("defense_playcall")
+                or game_state.get("defense_call")
+                or "man"
+            )
             shot_score, _, d_foul, foul_player = shot_manager.calculate_shot_score(
                 rebounder,
                 None,
                 None,
                 defender,
                 "inside",
-                game_state.get("defense_call", "man"),
+                defense_playcall,
                 False,
                 True,
                 None,
@@ -2140,7 +2145,7 @@ def calculate_defender_pressure_score(defender, defense_call):
     
     Args:
         defender: Defender player object with attributes
-        defense_call: Defense playcall string (e.g., "Man", "2-3 Zone")
+        defense_call: Defense playcall / canonical slug (e.g., "man", "2-3-zone"; legacy display names still accepted)
     
     Returns:
         int: Defender pressure score

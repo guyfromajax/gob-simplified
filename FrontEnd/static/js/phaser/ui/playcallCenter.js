@@ -5,6 +5,8 @@
  * Shows play calls and defense type.
  */
 
+import { statusLineDefenseLabel } from "../utils/defenseUi.js";
+
 /**
  * Clear playcall center highlights (selected buttons)
  * Called when a play is used or override is cleared
@@ -67,13 +69,11 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   }
   
   if (defenseStatusText) {
-    // Use defensive_playcall if available (contains full name like "Man Normal", "2-3 Zone", etc.)
-    // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
     const defPlaycall =
       turnData.defensive_playcall_display || turnData.defensive_playcall || turnData.defense_playcall;
     const defType = defPlaycall || turnData.defensive_play_type;
     if (defType) {
-      const formattedDefType = defType.charAt(0).toUpperCase() + defType.slice(1);
+      const formattedDefType = statusLineDefenseLabel(defType) || defType.charAt(0).toUpperCase() + defType.slice(1);
       // ✅ SS&S: Use defense_aggression_call from backend (set by set_strategy_calls)
       const aggrRaw = turnData.defense_aggression_call || turnData.aggression || 'normal';
       const aggr = aggrRaw.charAt(0).toUpperCase() + aggrRaw.slice(1); // Capitalize first letter

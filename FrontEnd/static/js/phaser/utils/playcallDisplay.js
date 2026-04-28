@@ -1,3 +1,5 @@
+import { scoreboardDefenseBucket } from "./defenseUi.js";
+
 /**
  * Updates the playcall display in the scoreboard
  * @param {Object} turnData - The current turn data
@@ -34,7 +36,11 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   // Get play type and focus directly from turn data if available, otherwise extract from playcall name
   const offensivePlayType = turnData.offensive_play_type || getPlayType(offensivePlaycall);
   const offensivePlayFocus = turnData.offensive_play_focus || getPlayFocus(offensivePlaycall);
-  const defensivePlayType = turnData.defensive_play_type || getPlayType(defensivePlaycall);
+  const defenseBucket = scoreboardDefenseBucket(defensivePlaycall);
+  const defensivePlayType =
+    defenseBucket !== "-"
+      ? defenseBucket
+      : turnData.defensive_play_type || getPlayType(defensivePlaycall);
   const defensivePlayFocus = turnData.defensive_play_focus || getPlayFocus(defensivePlaycall);
   
   // Determine which team is on offense
