@@ -24,6 +24,24 @@ from BackEnd.utils.team_play_utils import iter_team_plays
 logger = logging.getLogger(__name__)
 
 
+def _normalize_scouting_defense_keys_for_training(scouting_data: Optional[Dict]) -> Dict:
+    """
+    Fold legacy `scouting_data['defense']` keys (e.g. Man, 2-3 Zone) onto canonical slugs before
+    install training. `_apply_defense_training` only writes to `man` / `*-zone` keys; without this,
+    FTD rows keyed by display names receive no effectiveness gains.
+    """
+    if not scouting_data or not isinstance(scouting_data, dict):
+        return scouting_data or {}
+    defense_block = scouting_data.get("defense")
+    if not isinstance(defense_block, dict) or not defense_block:
+        return dict(scouting_data)
+    from BackEnd.models.team_manager import _remap_defense_scouting_keys_for_merge
+
+    out = dict(scouting_data)
+    out["defense"] = _remap_defense_scouting_keys_for_merge(defense_block)
+    return out
+
+
 def execute_training(
     players: List[dict],
     team: dict,
@@ -69,6 +87,7 @@ def execute_training(
         plays_data = {}
     if scouting_data is None:
         scouting_data = {}
+    scouting_data = _normalize_scouting_defense_keys_for_training(scouting_data)
     
     logger.warning(f"📚 [TRAINING] Initial plays_data keys: {list(plays_data.keys())}")
     logger.warning(f"📚 [TRAINING] Initial scouting_data keys: {list(scouting_data.keys()) if scouting_data else 'None'}")
