@@ -2141,18 +2141,19 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                             if _ftd_row:
                                 team_obj = dict(team_obj)
                                 _fb_pb = _ftd_row.get("playbook_settings") or {}
-                                if _need_ftd_pb:
-                                    if _franchise_playbook_snapshot_meaningful(_fb_pb):
-                                        ftd_merged_playbook_settings = dict(_fb_pb)
-                                        team_obj["playbook_settings"] = ftd_merged_playbook_settings
-                                        logger.warning(
-                                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD playbook_settings "
-                                            "(game snapshot empty or non-meaningful) franchise=%s game_id=%s team=%s",
-                                            doc_id,
-                                            game_id,
-                                            authoritative_team_id,
-                                        )
-                                elif _need_ftd_pc_order and (
+                                # Do not chain with elif: _need_ftd_pb can be True while FTD is not
+                                # "meaningful" by snapshot rules — we must still run PC-order merge.
+                                if _need_ftd_pb and _franchise_playbook_snapshot_meaningful(_fb_pb):
+                                    ftd_merged_playbook_settings = dict(_fb_pb)
+                                    team_obj["playbook_settings"] = ftd_merged_playbook_settings
+                                    logger.warning(
+                                        "⚠️ [GET PLAYBOOKS] franchise+game_doc: using FTD playbook_settings "
+                                        "(game snapshot empty or non-meaningful) franchise=%s game_id=%s team=%s",
+                                        doc_id,
+                                        game_id,
+                                        authoritative_team_id,
+                                    )
+                                if (not ftd_merged_playbook_settings) and _need_ftd_pc_order and (
                                     _franchise_playbook_has_pc_order(_fb_pb)
                                     or _franchise_offense_pc_nonempty(_fb_pb)
                                 ):
@@ -2662,6 +2663,21 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 playbook_settings = team_obj.get("playbook_settings", {})
         
         plays_by_id, plays_by_name = build_play_lookups_from_team_plays(plays)
+        # Team play snapshots can omit catalog entries still referenced in pc_order /
+        # slot_assignments; merge universal plays so normalize_pc_order does not drop every slot.
+        if load_from_game_doc:
+            try:
+                from BackEnd.db import plays_collection
+
+                _univ_plays = list(
+                    plays_collection.find({}, {"_id": 1, "name": 1, "play_id": 1})
+                )
+                u_by_id, u_by_name = build_play_lookups_from_universal_plays(_univ_plays)
+                plays_by_id = {**u_by_id, **plays_by_id}
+                plays_by_name = {**u_by_name, **plays_by_name}
+            except Exception:
+                pass
+
         fresh_position_shot_weights = compute_position_shot_weights(
             playbook_settings,
             plays,

@@ -399,6 +399,20 @@ def build_simplified_playbook_settings(
             plays_by_name,
         )
 
+    # Game / franchise snapshots often store defense in pc_order but offense only in
+    # slot_assignments (or offense list empty after a partial write). If we only run
+    # normalize_pc_order because pc_order is a dict, offense would stay empty forever.
+    if not (pc_order.get("offense") or []):
+        from_slots = slot_assignments_to_pc_order(
+            playbook_settings.get("slot_assignments", {}),
+            plays_by_id,
+            plays_by_name,
+        )
+        slot_off = from_slots.get("offense") or []
+        if slot_off:
+            pc_order = dict(pc_order)
+            pc_order["offense"] = list(slot_off)
+
     raw_meta = playbook_settings.get("_meta", {})
     meta = raw_meta.copy() if isinstance(raw_meta, dict) else {}
     meta = {
