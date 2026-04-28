@@ -3528,8 +3528,19 @@
     // Load slot assignments from playbooks and dynamically build Playcall Center DOM
     async function loadAndApplySlotAssignments() {
       const urlParams = new URLSearchParams(window.location.search);
+      const __debugPcRaw = (urlParams.get('debug_pc') || '').trim().toLowerCase();
       const __debugPc =
-        typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(urlParams);
+        __debugPcRaw === '1' ||
+        __debugPcRaw === 'true' ||
+        __debugPcRaw === 'yes' ||
+        (typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(urlParams));
+      if (__debugPc) {
+        console.info('[DEBUG_PC] court loadAndApplySlotAssignments', {
+          href: window.location.href,
+          hasHelper: typeof window.isDebugPlaycallSearch === 'function',
+          raw: urlParams.get('debug_pc'),
+        });
+      }
       // ✅ FIX: Mode detection with fallback logic (matches Franchise pattern)
       // Priority: 1) URL param, 2) tournament_id present → 'tournament', 3) franchise_id present → 'franchise', 4) default 'single'
       // This ensures mode is correctly detected even if mode param is missing from URL
@@ -3559,6 +3570,7 @@
       let gameId = urlParams.get('game_id') || null;
       
       if (!teamId) {
+        if (__debugPc) console.info('[DEBUG_PC] court skipped: no team_id');
         console.warn('⚠️ [PLAYCALL CENTER] No team_id found, using default play order');
         return;
       }
@@ -3566,12 +3578,15 @@
       const needsActiveGameDoc =
         (mode === 'franchise' && !!franchiseId) || (mode === 'tournament' && !!tournamentId);
       if (needsActiveGameDoc && !gameId) {
+        if (__debugPc) console.info('[DEBUG_PC] court skipped: waiting for game_id');
         console.warn('⚠️ [PLAYCALL CENTER] Waiting for game_id in URL before GET /api/playbooks (franchise/tournament game doc)');
         return;
       }
 
       const loadSig = `${mode}|${teamId}|${gameId || ''}|${franchiseId || ''}|${tournamentId || ''}`;
+      // With debug_pc=1, always refetch so backend tracing runs (signature skip would prevent GET entirely).
       if (
+        !__debugPc &&
         loadSig === _playcallAppliedSignature &&
         document.querySelectorAll('#offense-play-scroller .play-option').length > 0
       ) {
@@ -3596,6 +3611,7 @@
         if (__debugPc) params.set('debug_pc', '1');
         
         const apiUrl = API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`);
+        if (__debugPc) console.info('[DEBUG_PC] court GET', apiUrl);
         const getHeaders = (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getAuthHeaders === 'function')
           ? API_CONFIG.getAuthHeaders()
           : {};
@@ -3623,7 +3639,7 @@
         const motionDropdowns = data.motion_dropdowns || {};
         
         if (__debugPc) {
-          console.warn('[DEBUG_PC] court GET /api/playbooks response', {
+          const _row = {
             apiUrl,
             teamId,
             mode,
@@ -3633,7 +3649,9 @@
             offensePcOrderLen: Array.isArray(offensePcOrder) ? offensePcOrder.length : 0,
             slotAssignmentKeyCount: Object.keys(slotAssignments).length,
             motionPlays: (data.motion || []).length,
-          });
+          };
+          console.info('[DEBUG_PC] court GET /api/playbooks response', _row);
+          console.warn('[DEBUG_PC] court GET /api/playbooks response', _row);
         }
         
         // Get play data to map playId to play name

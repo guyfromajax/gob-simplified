@@ -1823,7 +1823,22 @@ def get_playbooks(
     endpoint_start = time.time()
     try:
         use_gamemanager_settings = False  # set True in single-mode cache branch; franchise/tournament stay False here
-        logger.warning(f"🔍 [GET PLAYBOOKS] query: mode={mode!r}, team_id={team_id!r}, franchise_id={franchise_id!r}, tournament_id={tournament_id!r}, game_id={game_id!r}")
+        _dpc_log = debug_pc if isinstance(debug_pc, str) else None
+        logger.warning(
+            "🔍 [GET PLAYBOOKS] query: mode=%r, team_id=%r, franchise_id=%r, tournament_id=%r, game_id=%r, debug_pc=%r",
+            mode,
+            team_id,
+            franchise_id,
+            tournament_id,
+            game_id,
+            _dpc_log,
+        )
+        if _dpc_log and _dpc_log.strip():
+            logger.warning(
+                "🔍 [DEBUG_PC] GET /api/playbooks client trace flag debug_pc=%r resolved_on=%s",
+                _dpc_log.strip(),
+                _debug_pc_on(debug_pc),
+            )
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
         collection, doc_id = get_collection_and_doc_id(mode, franchise_id, tournament_id, game_id)
         

@@ -670,20 +670,17 @@ try:
         from bson import ObjectId
         
         try:
-            # Convert team_id to ObjectId if needed
-            try:
-                team_object_id = ObjectId(team_id) if team_id else None
-            except:
-                # If team_id is not a valid ObjectId, resolve from team_name
-                if team_name:
-                    team_doc = teams_collection.find_one({"name": team_name})
-                    if team_doc:
-                        team_object_id = team_doc.get("_id")
-                    else:
-                        return None
-                else:
-                    return None
-            
+            # Resolve Mongo team _id: explicit team_id (init-game often passes None), invalid ObjectId, or name-only.
+            team_object_id = None
+            if team_id:
+                try:
+                    team_object_id = ObjectId(team_id)
+                except Exception:
+                    team_object_id = None
+            if not team_object_id and team_name:
+                team_doc = teams_collection.find_one({"name": team_name})
+                if team_doc:
+                    team_object_id = team_doc.get("_id")
             if not team_object_id:
                 return None
             
@@ -2088,7 +2085,15 @@ try:
     ):
         """Rate limited: 30/minute per IP. quiet_sim=True sets log level to ERROR during sim (sanity check for logging cost)."""
         import time
+        from BackEnd.utils.debug_flags import debug_pc_enabled as _debug_pc_flag
+
         start_time = time.time()
+        if isinstance(debug_pc, str) and debug_pc.strip():
+            logging.warning(
+                "🔍 [DEBUG_PC] POST /api/simulate-quarter entry debug_pc=%r trace_enabled=%s",
+                debug_pc.strip(),
+                _debug_pc_flag(debug_pc),
+            )
         raw_game_id = body.game_id
         game_id = raw_game_id
         entry_trace_id = body.timeout_trace_id
@@ -5366,6 +5371,18 @@ try:
                     away_team,
                     franchise_id,
                 )
+            if home_ftd_row:
+                logging.warning(
+                    "✅ [INIT-GAME] FTD loaded for home team=%s franchise_id=%s",
+                    home_team,
+                    franchise_id,
+                )
+            if away_ftd_row:
+                logging.warning(
+                    "✅ [INIT-GAME] FTD loaded for away team=%s franchise_id=%s",
+                    away_team,
+                    franchise_id,
+                )
             hp = prepare_ftd_for_new_game(home_ftd_row)
             ap = prepare_ftd_for_new_game(away_ftd_row)
             home_team_attributes = hp["team_attributes"]
@@ -5506,6 +5523,16 @@ try:
                 summary["teams"][home_team_id]["strategy_settings"] = dict(home_strategy_settings)
             if away_strategy_settings:
                 summary["teams"][away_team_id]["strategy_settings"] = dict(away_strategy_settings)
+            logging.warning(
+                "✅ [INIT-GAME] Game doc FTD baseline: home_id=%s playbook_keys=%s strategy_keys=%s | "
+                "away_id=%s playbook_keys=%s strategy_keys=%s",
+                home_team_id,
+                list(home_playbook_for_gm.keys())[:24] if home_playbook_for_gm else [],
+                list(home_strategy_settings.keys())[:24] if home_strategy_settings else [],
+                away_team_id,
+                list(away_playbook_for_gm.keys())[:24] if away_playbook_for_gm else [],
+                list(away_strategy_settings.keys())[:24] if away_strategy_settings else [],
+            )
         elif mode == "tournament" and tournament_id:
             # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
             from BackEnd.api.tournament_routes import get_user_team_from_tournament

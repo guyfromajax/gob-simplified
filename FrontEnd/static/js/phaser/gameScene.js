@@ -570,21 +570,22 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
+      const baseUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
+      let url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
       if (isDebugPlaycall()) {
+        url += '&debug_pc=1';
         const po = payload.playbook_settings && payload.playbook_settings.pc_order;
-        console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', {
+        const _row = {
+          url,
           gameId: this.gameId,
           quarter: this.quarter,
           user_team_side: payload.user_team_side,
           has_playbook_settings: !!payload.playbook_settings,
           pc_offense_len: po && Array.isArray(po.offense) ? po.offense.length : null,
           pc_defense_len: po && Array.isArray(po.defense) ? po.defense.length : null,
-        });
-      }
-      const baseUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
-      let url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
-      if (isDebugPlaycall()) {
-        url += '&debug_pc=1';
+        };
+        console.info('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
+        console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
       }
       const res = await fetch(url, {
       method: 'POST',
