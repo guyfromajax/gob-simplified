@@ -272,6 +272,10 @@ export function createGameScene(Phaser) {
         }
         this.gamePlanSettings = data.gamePlanSettings;
         this.playbookSettings = data.playbookSettings; // ✅ UNIFIED: Store playbook settings (same pattern as gamePlanSettings)
+        // Court / bootGame may have a fresher GET /api/playbooks (live URL after replaceState).
+        if (typeof window !== 'undefined' && window.__courtPlaybookApiData) {
+          this.playbookSettings = window.__courtPlaybookApiData;
+        }
         this.userTeamSide = data.userTeamSide;
         // ✅ SS&S: Store team_id (ObjectId) for navigation anchor preservation
         this.teamId = data.teamId;

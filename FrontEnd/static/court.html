@@ -3605,6 +3605,16 @@
         }
         
         const data = await response.json();
+
+        // Court GET /api/playbooks can reflect a newer URL than bootGame's first parse; keep Phaser payload in sync.
+        try {
+          window.__courtPlaybookApiData = data;
+          if (window.currentGameScene && typeof window.currentGameScene === 'object') {
+            window.currentGameScene.playbookSettings = data;
+          }
+        } catch (_e) {
+          /* ignore */
+        }
         
         const slotAssignments = data.slot_assignments || {};
         const offensePcOrder = (((data || {}).pc_order || {}).offense || []);

@@ -72,6 +72,11 @@ function buildQuery(params = {}) {
 
 const urlParams = new URLSearchParams(window.location.search);
 
+/** Read current query string — this module stays loaded; history.replaceState may add game_id after first parse. */
+function readLiveSearchParams() {
+  return new URLSearchParams(window.location.search);
+}
+
 // ✅ DEBUG: Log URL params when court.html loads (to see what game-plan passed)
 const bootGameParams = {
   fullUrl: window.location.href,
@@ -213,17 +218,24 @@ let gamePlanSettings = null;
 let playbookSettings = null;
 
 async function loadGamePlanSettings() {
-  if (!userTeamSide) {
+  const p = readLiveSearchParams();
+  const liveUserTeamSide = p.get('my_team');
+  if (!liveUserTeamSide) {
     console.log('⚠️ No user team side specified, skipping game plan load');
     return;
   }
-  
+
+  const liveMode = p.get('mode') || getMode({ tournamentId: p.get('tournament_id'), franchiseId: p.get('franchise_id') });
+  const liveFranchiseId = p.get('franchise_id');
+  const liveTournamentId = p.get('tournament_id');
+  const liveGameId = p.get('game_id');
+
   const teamId =
     typeof window !== 'undefined' && typeof window.resolvePlaybookTeamIdFromSearch === 'function'
-      ? window.resolvePlaybookTeamIdFromSearch(urlParams)
-      : urlParams.get('team_id') ||
-        urlParams.get('user_team_id') ||
-        (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
+      ? window.resolvePlaybookTeamIdFromSearch(p)
+      : p.get('team_id') ||
+        p.get('user_team_id') ||
+        (liveUserTeamSide === 'home' ? p.get('home_id') : p.get('away_id'));
 
   if (!teamId) {
     console.warn('⚠️ Could not resolve team_id for game plan request');
@@ -233,42 +245,49 @@ async function loadGamePlanSettings() {
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
     const params = new URLSearchParams();
-    params.set('mode', mode);
+    params.set('mode', liveMode);
     params.set('team_id', teamId);
 
     // Always include game_id when available so franchise/tournament gameplay reads from game doc.
-    if (gameId) {
-      params.set('game_id', gameId);
+    if (liveGameId) {
+      params.set('game_id', liveGameId);
     }
-    if (mode === 'franchise' && franchiseId) {
-      params.set('franchise_id', franchiseId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.set('tournament_id', tournamentId);
+    if (liveMode === 'franchise' && liveFranchiseId) {
+      params.set('franchise_id', liveFranchiseId);
+    } else if (liveMode === 'tournament' && liveTournamentId) {
+      params.set('tournament_id', liveTournamentId);
     }
     
     const res = await fetch(API_CONFIG.buildUrl(`/api/gameplan?${params.toString()}`));
     if (res.ok) {
       gamePlanSettings = await res.json();
     } else {
-      console.error(`❌ Failed to load game plan settings (${mode} mode), status:`, res.status);
+      console.error(`❌ Failed to load game plan settings (${liveMode} mode), status:`, res.status);
     }
   } catch (e) {
-    console.error(`❌ Error loading game plan settings (${mode} mode):`, e);
+    console.error(`❌ Error loading game plan settings (${liveMode} mode):`, e);
   }
 }
 
 async function loadPlaybookSettings() {
-  if (!userTeamSide) {
+  const p = readLiveSearchParams();
+  const liveUserTeamSide = p.get('my_team');
+  if (!liveUserTeamSide) {
     console.log('⚠️ No user team side specified, skipping playbook load');
     return;
   }
-  
+
+  const liveMode = p.get('mode') || getMode({ tournamentId: p.get('tournament_id'), franchiseId: p.get('franchise_id') });
+  const liveFranchiseId = p.get('franchise_id');
+  const liveTournamentId = p.get('tournament_id');
+  const liveGameId = p.get('game_id');
+
   const teamId =
     typeof window !== 'undefined' && typeof window.resolvePlaybookTeamIdFromSearch === 'function'
-      ? window.resolvePlaybookTeamIdFromSearch(urlParams)
-      : urlParams.get('team_id') ||
-        urlParams.get('user_team_id') ||
-        (userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id'));
+      ? window.resolvePlaybookTeamIdFromSearch(p)
+      : p.get('team_id') ||
+        p.get('user_team_id') ||
+        (liveUserTeamSide === 'home' ? p.get('home_id') : p.get('away_id'));
 
   if (!teamId) {
     console.warn('⚠️ Could not resolve team_id for playbook request');
@@ -278,27 +297,32 @@ async function loadPlaybookSettings() {
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
     const params = new URLSearchParams();
-    params.set('mode', mode);
+    params.set('mode', liveMode);
     params.set('team_id', teamId);
 
     // Always include game_id when available so franchise/tournament gameplay reads from game doc.
-    if (gameId) {
-      params.set('game_id', gameId);
+    if (liveGameId) {
+      params.set('game_id', liveGameId);
     }
-    if (mode === 'franchise' && franchiseId) {
-      params.set('franchise_id', franchiseId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.set('tournament_id', tournamentId);
+    if (liveMode === 'franchise' && liveFranchiseId) {
+      params.set('franchise_id', liveFranchiseId);
+    } else if (liveMode === 'tournament' && liveTournamentId) {
+      params.set('tournament_id', liveTournamentId);
     }
     params.set('profile', '1');
     const res = await fetch(API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`));
     if (res.ok) {
       playbookSettings = await res.json();
+      try {
+        window.__courtPlaybookApiData = playbookSettings;
+      } catch (_e) {
+        /* non-browser */
+      }
     } else {
-      console.error(`❌ Failed to load playbook settings (${mode} mode), status:`, res.status);
+      console.error(`❌ Failed to load playbook settings (${liveMode} mode), status:`, res.status);
     }
   } catch (e) {
-    console.error(`❌ Error loading playbook settings (${mode} mode):`, e);
+    console.error(`❌ Error loading playbook settings (${liveMode} mode):`, e);
   }
 }
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
@@ -1801,6 +1825,13 @@ async function fetchTeamRoster(teamName) {
 
 async function startGame({ homeRoster, awayRoster, animate = true }) {
   DEBUG && console.log('[bootGame] startGame', { quarter, animate });
+
+  const live = readLiveSearchParams();
+  const liveGid = live.get('game_id');
+  if (liveGid) {
+    gameId = liveGid;
+    gameStore.setGameId(liveGid);
+  }
   
   // Load game plan and playbook settings before starting the game
   await loadGamePlanSettings();
