@@ -2,6 +2,30 @@
 Utility functions for defensive playcall tracking and mapping.
 """
 
+import random
+from typing import Any, Dict, Optional
+
+_LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+
+def random_defender_fallback_position() -> str:
+    """Random lineup slot when man/zone cannot assign a defender position (replaces fixed PG)."""
+    return random.choice(_LINEUP_POSITIONS)
+
+
+def defender_player_from_random_slot_fallback(def_lineup: Optional[Dict[str, Any]]) -> Optional[Any]:
+    """
+    Pick the player at a random PG/SG/SF/PF/C slot; if that slot is empty, first non-None in lineup.
+    """
+    if not def_lineup:
+        return None
+    pos = random_defender_fallback_position()
+    player = def_lineup.get(pos)
+    if player is not None:
+        return player
+    return next((p for p in def_lineup.values() if p is not None), None)
+
+
 def map_defense_playcall_to_tracking_name(playcall: str) -> str:
     """
     Map defensive playcall identifier to tracking name for stats.

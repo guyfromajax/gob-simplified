@@ -54,6 +54,10 @@ from BackEnd.utils.defense_identity import (
     defense_zone_shell_variant,
     offense_vs_key_from_defense_input,
 )
+from BackEnd.utils.defense_utils import (
+    defender_player_from_random_slot_fallback,
+    random_defender_fallback_position,
+)
 
 # TEMPORARY (Mar 2026): When False, missed FT → DREB always continues as HCO (no fast-break roll).
 # Set True to restore `fast_break_probability_from_slider` after FT miss rebounds.
@@ -4483,15 +4487,23 @@ def resolve_half_court_offense_logic(game):
                     # Fallback: use position match
                     defender_pos = ball_handler_pos
                 
-                defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+                defender = (
+                    def_lineup.get(defender_pos)
+                    if defender_pos
+                    else defender_player_from_random_slot_fallback(def_lineup)
+                )
             else:
                 # Man-to-man: use matchups for the defending team (user vs computer)
                 from BackEnd.utils.man_defense_matchups import get_defender_position_for_man_defense
                 defending_team_is_user = getattr(game.defense_team, "is_user_team", False)
                 defender_pos = get_defender_position_for_man_defense(
                     ball_handler_pos, game.game_state, defending_team_is_user=defending_team_is_user
-                ) if ball_handler_pos else "PG"
-                defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+                ) if ball_handler_pos else random_defender_fallback_position()
+                defender = (
+                    def_lineup.get(defender_pos)
+                    if defender_pos
+                    else defender_player_from_random_slot_fallback(def_lineup)
+                )
             
             if defender:
                 roles["defender"] = defender
@@ -4787,7 +4799,8 @@ def resolve_half_court_offense_logic(game):
         # the correct defender based on ball handler position and zone/man defense
         if "defender" not in roles or not roles["defender"]:
             # Determine defender based on ball handler position (same as FCP/HCT)
-            defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
+            _fb = defender_player_from_random_slot_fallback(def_lineup)
+            defender = def_lineup.get(ball_handler_pos) or _fb
             roles["defender"] = defender
         else:
             # Use the defender that was already set by override logic
@@ -5633,9 +5646,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 closest_distance = distance
                 defender = def_player
         
-        # Fallback: use defensive PG if no defender found
+        # Fallback: random defensive lineup slot if no defender found
         if not defender:
-            defender = def_lineup.get("PG", list(def_lineup.values())[0])
+            defender = defender_player_from_random_slot_fallback(def_lineup)
         
         shot_roles = {
             "ball_handler": passer,
@@ -5768,7 +5781,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
     
     # ✅ Determine defender based on ball handler position (position matching for now)
-    defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
+    _fb = defender_player_from_random_slot_fallback(def_lineup)
+    defender = def_lineup.get(ball_handler_pos) or _fb
     
     # Build roles dict for animation generation
     roles = {
@@ -6934,9 +6948,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 closest_distance = distance
                 defender = def_player
         
-        # Fallback: use defensive PG if no defender found
+        # Fallback: random defensive lineup slot if no defender found
         if not defender:
-            defender = def_lineup.get("PG", list(def_lineup.values())[0])
+            defender = defender_player_from_random_slot_fallback(def_lineup)
         
         shot_roles = {
             "ball_handler": passer,
@@ -7057,7 +7071,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
     
     # ✅ Determine defender based on ball handler position (position matching for now)
-    defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
+    _fb = defender_player_from_random_slot_fallback(def_lineup)
+    defender = def_lineup.get(ball_handler_pos) or _fb
     
     # Build roles dict for animation generation
     roles = {

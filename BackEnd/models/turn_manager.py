@@ -38,6 +38,7 @@ from BackEnd.utils.shared import (
     calc_pass_segment_seconds,
 )
 from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
+from BackEnd.utils.defense_utils import defender_player_from_random_slot_fallback
 from BackEnd.utils.defense_identity import (
     DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
@@ -4386,7 +4387,11 @@ class TurnManager:
         shooter = off_lineup.get(shooter_pos) if shooter_pos else off_lineup["PG"]  # Fallback to PG
         screener = off_lineup.get(screener_pos) if screener_pos else off_lineup["PF"]  # Fallback to PF
         passer = off_lineup.get(passer_pos) if passer_pos else None
-        defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
+        defender = (
+            def_lineup.get(defender_pos)
+            if defender_pos
+            else defender_player_from_random_slot_fallback(def_lineup)
+        )
         second_defender = def_lineup.get(second_defender_pos) if second_defender_pos and second_defender_pos in def_lineup else None
         
         # Debug logging for passer assignment

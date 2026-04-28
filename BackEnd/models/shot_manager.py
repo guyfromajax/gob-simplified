@@ -44,7 +44,11 @@ from BackEnd.utils.shared import (
     resolve_over_the_back_foul,
     increment_no_defender_shot_breakdown,
 )
-from BackEnd.utils.defense_utils import is_zone_defense
+from BackEnd.utils.defense_utils import (
+    defender_player_from_random_slot_fallback,
+    is_zone_defense,
+    random_defender_fallback_position,
+)
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
     COVERT_RELEASE,
@@ -125,8 +129,6 @@ def _resolve_hco_shot_defenders(game, def_lineup, shooter, shooter_pos, shot_ste
 
     defense_call = game.game_state.get("defense_playcall", "man")
 
-    from BackEnd.utils.defense_utils import is_zone_defense
-
     if is_zone_defense(defense_call):
         assignments_by_step = getattr(game, "zone_defender_assignments_by_step", {}) or {}
         shot_step_assignments = assignments_by_step.get(shot_step_index, {}) if shot_step_index is not None else {}
@@ -146,8 +148,12 @@ def _resolve_hco_shot_defenders(game, def_lineup, shooter, shooter_pos, shot_ste
         shooter_pos,
         game.game_state,
         defending_team_is_user=defending_team_is_user,
-    ) if shooter_pos else "PG"
-    primary = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+    ) if shooter_pos else random_defender_fallback_position()
+    primary = (
+        def_lineup.get(defender_pos)
+        if defender_pos
+        else defender_player_from_random_slot_fallback(def_lineup)
+    )
     return primary, None
 
 

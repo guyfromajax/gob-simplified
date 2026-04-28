@@ -10,6 +10,8 @@ Matchups reset to defaults at the start of each break (timeout, quarter break, f
 
 from typing import Dict, Tuple, Optional
 
+from BackEnd.utils.defense_utils import random_defender_fallback_position
+
 # Default matchups: position-on-position
 DEFAULT_MATCHUPS = {
     "PG": "PG",
@@ -136,7 +138,7 @@ def get_defender_position_for_man_defense(
         - get_defender_position_for_man_defense("SG", game_state, defending_team_is_user=True) returns "PG"
     """
     if not offensive_pos or offensive_pos not in POSITIONS:
-        return offensive_pos if offensive_pos in POSITIONS else "PG"
+        return offensive_pos if offensive_pos in POSITIONS else random_defender_fallback_position()
     
     if defending_team_is_user is None:
         matchups = game_state.get(USER_MATCHUPS_KEY, {})
