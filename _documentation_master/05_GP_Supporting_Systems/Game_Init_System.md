@@ -86,11 +86,13 @@ Takes the FTD payload (or `None`) and returns pieces for `GameManager`:
 - **`team_attributes` / `strategy_settings`:** copied when non-empty; else `None` (downstream defaults apply).
 - **`playbook_settings`:** dict copy (may be empty).
 - **`plays`:** per-play **`game_stats` reset** to zeros; effectiveness / cloaking / momentum preserved from FTD.
-- **`scouting_data`:** deep copy with defense **`game_stats` reset** to the greenfield structure.
+- **`scouting_data`:** merged onto the **canonical scouting template** (`normalize_scouting_data_for_gameplay` in `team_manager.py`) so every defense row has the full shape (top-level **`used` / `success`**, **`game_stats`**, **`season_stats`**, etc.). Then defense **`game_stats`** (and top-level **`used` / `success`**) are **zeroed** for the new game while training-carried effectiveness / momentum / cloaking and **`season_stats`** remain.
 
 This matches the franchise **greenfield Q1** path in `simulate-quarter` when a new `GameManager` is created without an existing cached game.
 
 ### 3. Construct `GameManager`
+
+Whenever **`TeamManager`** is constructed with **`scouting_data`** (franchise, tournament, or **DB reload**), it runs the same **template merge** so partial or legacy FTD/game-doc rows cannot omit keys that **`run_micro_turn`** and stat tracking expect.
 
 `GameManager` receives prepared attributes, strategy, plays, and scouting for both sides. **Playbook settings** are applied in a follow-up step:
 
@@ -166,6 +168,7 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 |------|---------|
 | HTTP init | `BackEnd/api/api.py` — `init_game()`, `load_ftd_data_for_team()` |
 | FTD normalization | `BackEnd/utils/franchise_ftd_game_seed.py` — `prepare_ftd_for_new_game()` |
+| Scouting shape (gameplay) | `BackEnd/models/team_manager.py` — `normalize_scouting_data_for_gameplay()` |
 | In-memory game | `BackEnd/models/game_manager.py` — `GameManager` |
 | Per-team state | `BackEnd/models/team_manager.py` — `TeamManager` |
 | Summary → DB shape | `BackEnd/utils/shared.py` — `summarize_game_state()` |
@@ -174,4 +177,4 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 
 ---
 
-**Last updated:** April 2026 (FTD name-resolution fix at `init-game` documented alongside full flow.)
+**Last updated:** April 2026 (FTD name-resolution at `init-game`; scouting template merge for defense `used` / full row shape.)

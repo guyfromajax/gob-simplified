@@ -201,7 +201,7 @@ class GameManager:
             "uess_ownership_contract_mode": "warn",
             "turns": self.turns,
             "current_playcall": "Outside",
-            "defense_playcall": "Zone",
+            "defense_playcall": "man",
             "offensive_state": "HCO",
             "team_fouls": {
                 self.home_team.name: 0,

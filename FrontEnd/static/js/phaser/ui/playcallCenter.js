@@ -69,7 +69,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   if (defenseStatusText) {
     // Use defensive_playcall if available (contains full name like "Man Normal", "2-3 Zone", etc.)
     // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
-    const defPlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+    const defPlaycall =
+      turnData.defensive_playcall_display || turnData.defensive_playcall || turnData.defense_playcall;
     const defType = defPlaycall || turnData.defensive_play_type;
     if (defType) {
       const formattedDefType = defType.charAt(0).toUpperCase() + defType.slice(1);
@@ -112,7 +113,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   const playName = turnData.offensive_playcall || turnData.current_playcall;
   // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
   // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
-  const defensePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+  const defensePlaycall =
+    turnData.defensive_playcall_display || turnData.defensive_playcall || turnData.defense_playcall;
   const defenseType = defensePlaycall || turnData.defensive_play_type;
   // ✅ SS&S: Use defense_aggression_call from backend (set by set_strategy_calls)
   const aggression = turnData.defense_aggression_call || turnData.aggression || 'normal';

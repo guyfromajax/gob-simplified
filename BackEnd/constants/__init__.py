@@ -92,13 +92,17 @@ MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
 PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
 
+# Token in STRATEGY_CALL_DICTS["defense"] lists → expand via weighted zone picker (`defense_id` slugs).
+STRATEGY_DEFENSE_ZONE_SENTINEL = "__strategy_zone__"
+
 STRATEGY_CALL_DICTS = {
     "defense": {
-        0: ["Man"],
-        1: ["Man", "Man", "Zone"],  # Zone will be randomly selected as 2-3 or 3-2
-        2: ["Man", "Zone"],
-        3: ["Man", "Zone", "Zone"],
-        4: ["Zone"]},  # Zone will be randomly selected as 2-3 or 3-2
+        0: ["man"],
+        1: ["man", "man", STRATEGY_DEFENSE_ZONE_SENTINEL],
+        2: ["man", STRATEGY_DEFENSE_ZONE_SENTINEL],
+        3: ["man", STRATEGY_DEFENSE_ZONE_SENTINEL, STRATEGY_DEFENSE_ZONE_SENTINEL],
+        4: [STRATEGY_DEFENSE_ZONE_SENTINEL],
+    },
     "tempo": {
         0: ["slow"],
         1: ["slow", "normal"],

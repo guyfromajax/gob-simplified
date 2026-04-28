@@ -156,7 +156,7 @@ The Statistics System tracks comprehensive player-level and team-level statistic
     - This means Motion Plays can have EV stored under one focus (chosen) and execution score stored under a different focus (actual)
 
 **Defensive Success Tracking:**
-- **`def_scouting["defense"][tracking_name]["used"]`**: Incremented each time defense is used (by defensive playcall: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+- **`def_scouting["defense"][tracking_name]["used"]`**: Incremented each time defense is used (by defensive playcall: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone). The same turn logic increments **`["game_stats"]["used"]`**. Rows must expose **top-level** `used` / `success`; partial docs are merged onto the template at `TeamManager` init via **`normalize_scouting_data_for_gameplay`** (`BackEnd/models/team_manager.py`).
 - **`def_scouting["defense"][tracking_name]["success"]`**: Incremented when:
   - Shot is missed (`MISS` without defensive foul), or
   - Turnover occurs (`TURNOVER`), or

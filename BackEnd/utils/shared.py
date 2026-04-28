@@ -699,7 +699,7 @@ def resolve_offensive_rebound(game, rebounder):
                 None,
                 defender,
                 "inside",
-                game_state.get("defense_call", "Man"),
+                game_state.get("defense_call", "man"),
                 False,
                 True,
                 None,

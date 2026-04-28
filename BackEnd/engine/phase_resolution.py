@@ -49,6 +49,11 @@ from BackEnd.utils.position_snapshot_ledger import (
 )
 from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
+from BackEnd.utils.defense_identity import (
+    defense_scouting_row_key,
+    defense_zone_shell_variant,
+    offense_vs_key_from_defense_input,
+)
 
 # TEMPORARY (Mar 2026): When False, missed FT → DREB always continues as HCO (no fast-break roll).
 # Set True to restore `fast_break_probability_from_slider` after FT miss rebounds.
@@ -2371,7 +2376,7 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                 ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=selected_step_index)
                 if ball_handler:
                     ball_handler_pos = get_player_position(off_lineup, ball_handler)
-                    defense_call = game_state.get("defense_playcall", "Man")
+                    defense_call = game_state.get("defense_playcall", "man")
                     
                     # Get defender (zone or man defense logic)
                     if is_zone_defense(defense_call):
@@ -2403,9 +2408,10 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                             ball_handler_coords = get_away_player_coords(ball_handler_coords)
                         
                         # Get zone boundaries based on ball location (applies shifts)
-                        if defense_call == "3-2 Zone":
+                        zv = defense_zone_shell_variant(defense_call) or "23"
+                        if zv == "32":
                             zone_boundaries = _get_32_zone_boundaries(ball_handler_spot, is_away_offense)
-                        elif defense_call == "1-3-1 Zone":
+                        elif zv == "131":
                             zone_boundaries = _get_131_zone_boundaries(ball_handler_spot, is_away_offense)
                         else:
                             zone_boundaries = _get_23_zone_boundaries(ball_handler_spot, is_away_offense)
@@ -2551,7 +2557,7 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                 ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=selected_step_index)
                 if ball_handler:
                     ball_handler_pos = get_player_position(off_lineup, ball_handler)
-                    defense_call = game_state.get("defense_playcall", "Man")
+                    defense_call = game_state.get("defense_playcall", "man")
                     
                     # Get defender
                     if is_zone_defense(defense_call):
@@ -2583,9 +2589,10 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                             ball_handler_coords = get_away_player_coords(ball_handler_coords)
                         
                         # Get zone boundaries based on ball location (applies shifts)
-                        if defense_call == "3-2 Zone":
+                        zv = defense_zone_shell_variant(defense_call) or "23"
+                        if zv == "32":
                             zone_boundaries = _get_32_zone_boundaries(ball_handler_spot, is_away_offense)
-                        elif defense_call == "1-3-1 Zone":
+                        elif zv == "131":
                             zone_boundaries = _get_131_zone_boundaries(ball_handler_spot, is_away_offense)
                         else:
                             zone_boundaries = _get_23_zone_boundaries(ball_handler_spot, is_away_offense)
@@ -2996,17 +3003,7 @@ def _store_lean_score_internal(lean_score, game, offense_team, defense_team):
             play_type_label = "Motion" if offense_play_type == "motion" else "Set"
             pc = offense_team.scouting_data["offense"]["Playcalls"]
             
-            # Determine defense tracking key
-            if defense_playcall == "Man":
-                vs_key = "vs_man"
-            elif defense_playcall == "2-3 Zone":
-                vs_key = "vs_2-3_zone"
-            elif defense_playcall == "3-2 Zone":
-                vs_key = "vs_3-2_zone"
-            elif defense_playcall == "1-3-1 Zone":
-                vs_key = "vs_1-3-1_zone"
-            else:
-                vs_key = None
+            vs_key = offense_vs_key_from_defense_input(defense_playcall)
             
             # Store lean_score in overall and focus buckets
             if "lean_scores" not in pc[play_type_label]["overall"]:
@@ -3044,8 +3041,9 @@ def _store_lean_score_internal(lean_score, game, offense_team, defense_team):
             pc["Cumulative"][offense_focus]["lean_scores"].append(lean_score)
         
         # Store lean_score in defense scouting data
-        if defense_playcall in defense_team.scouting_data["defense"]:
-            def_data = defense_team.scouting_data["defense"][defense_playcall]
+        def_row = defense_scouting_row_key(defense_playcall)
+        if def_row in defense_team.scouting_data["defense"]:
+            def_data = defense_team.scouting_data["defense"][def_row]
             game_stats = def_data.get("game_stats", {})
             
             # Store lean_score in top-level game_stats
@@ -4159,7 +4157,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
         skeleton = {"steps": [step0, step1, step2]}
     roles = game.turn_manager.assign_roles(
-        off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3 Zone"), skeleton=skeleton
+        off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3-zone"), skeleton=skeleton
     )
     # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
     game_state["final_turn"] = True
@@ -4191,7 +4189,7 @@ def resolve_half_court_offense_logic(game):
 
     # 1. Tactical Setup
     off_call = game_state.get("current_playcall", "Inside")
-    def_call = game_state.get("defense_playcall", "Man")
+    def_call = game_state.get("defense_playcall", "man")
     
     # 🔍 DEBUG: Log playcall being used
     logging.debug(f"🔍 [HCO RESOLVE] Using playcall: '{off_call}' (from game_state['current_playcall'])")
@@ -5213,19 +5211,8 @@ def resolve_half_court_offense_logic(game):
                 
                 # Track granular attempts against defensive playcall
                 from BackEnd.utils.defense_utils import is_zone_defense
-                defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
-                
-                # Determine defense tracking key based on specific defense name
-                if defense_playcall == "Man":
-                    vs_key = "vs_man"
-                elif defense_playcall == "2-3 Zone":
-                    vs_key = "vs_2-3_zone"
-                elif defense_playcall == "3-2 Zone":
-                    vs_key = "vs_3-2_zone"
-                elif defense_playcall == "1-3-1 Zone":
-                    vs_key = "vs_1-3-1_zone"
-                else:
-                    vs_key = None
+                defense_playcall = game.game_state.get("defense_playcall", "man")
+                vs_key = offense_vs_key_from_defense_input(defense_playcall)
                 
                 if vs_key:
                     # Overall attempts vs defense
@@ -5261,19 +5248,8 @@ def resolve_half_court_offense_logic(game):
                 
                 # Track granular success against defensive playcall
                 from BackEnd.utils.defense_utils import is_zone_defense
-                defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
-                
-                # Determine defense tracking key based on specific defense name
-                if defense_playcall == "Man":
-                    vs_key = "vs_man"
-                elif defense_playcall == "2-3 Zone":
-                    vs_key = "vs_2-3_zone"
-                elif defense_playcall == "3-2 Zone":
-                    vs_key = "vs_3-2_zone"
-                elif defense_playcall == "1-3-1 Zone":
-                    vs_key = "vs_1-3-1_zone"
-                else:
-                    vs_key = None
+                defense_playcall = game.game_state.get("defense_playcall", "man")
+                vs_key = offense_vs_key_from_defense_input(defense_playcall)
                 
                 if vs_key:
                     # Overall success vs defense
@@ -5330,9 +5306,8 @@ def resolve_half_court_offense_logic(game):
                                     player_points[shooter_id] = old_points + points
             
             # Track defensive playcall success with granular tracking
-            defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
-            # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
-            tracking_name = defense_playcall  # Use specific name directly
+            defense_playcall = game.game_state.get("defense_playcall", "man")
+            tracking_name = defense_scouting_row_key(defense_playcall)
             if tracking_name in def_team.scouting_data["defense"]:
                 # Defense success = MISS (without defensive foul) OR TURNOVER OR O_FOUL
                 # Defense failure = MAKE OR DEFENSIVE FOUL

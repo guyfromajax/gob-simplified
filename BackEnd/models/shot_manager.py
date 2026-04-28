@@ -44,6 +44,7 @@ from BackEnd.utils.shared import (
     resolve_over_the_back_foul,
     increment_no_defender_shot_breakdown,
 )
+from BackEnd.utils.defense_utils import is_zone_defense
 from BackEnd.constants.fast_break_constants import DEFENSIVE_STOP_Y_RANGE
 from BackEnd.constants.fast_break_play_types import (
     COVERT_RELEASE,
@@ -68,9 +69,12 @@ def _hco_zone_shot_threshold_delta(defense_playcall, shot_type):
     """
     if shot_type not in ("inside", "attack", "outside"):
         return 0
-    if defense_playcall == "2-3 Zone":
+    from BackEnd.utils.defense_identity import defense_zone_shell_variant
+
+    zv = defense_zone_shell_variant(defense_playcall)
+    if zv == "23":
         return {"inside": 25, "attack": 10, "outside": -25}[shot_type]
-    if defense_playcall == "3-2 Zone":
+    if zv == "32":
         return {"inside": -30, "attack": -30, "outside": 50}[shot_type]
     return 0
 
@@ -119,7 +123,7 @@ def _resolve_hco_shot_defenders(game, def_lineup, shooter, shooter_pos, shot_ste
     if game.game_state.get("offensive_state") != "HCO":
         return None, None
 
-    defense_call = game.game_state.get("defense_playcall", "Man")
+    defense_call = game.game_state.get("defense_playcall", "man")
 
     from BackEnd.utils.defense_utils import is_zone_defense
 
@@ -1489,7 +1493,7 @@ class ShotManager:
                             d_weight = (d_score / total_score) if total_score > 0 else 0.5
                             d_weight += (new_prob - 0.5)
                             d_weight = min(0.95, max(0.05, d_weight))
-                            if game_state.get("defense_playcall") == "Zone":
+                            if is_zone_defense(game_state.get("defense_playcall", "")):
                                 d_weight *= 0.9
                             rebound_team = def_team if random.random() < d_weight else off_team
                             rebounder = d_rebounder if rebound_team == def_team else o_rebounder
@@ -2262,7 +2266,7 @@ class ShotManager:
         # Filter defenders to only those ahead of ball handler (via x-coords check)
         # Also check for defensive stop challenges (±6 y-coords and ahead)
         valid_defenders = []
-        defense_call = self.game_state.get("defense_playcall", "Man")
+        defense_call = self.game_state.get("defense_playcall", "man")
         
         if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
             for defender in fb_roles.get("defense", []):

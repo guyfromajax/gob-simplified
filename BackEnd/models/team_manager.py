@@ -151,10 +151,10 @@ def _create_scouting_data_template_base():
         },
         "defense": {
             # Create fresh defense structures (will be customized per team/mode)
-            "Man": create_fresh_defense(),
-            "2-3 Zone": create_fresh_defense(),
-            "3-2 Zone": create_fresh_defense(),
-            "1-3-1 Zone": create_fresh_defense(),
+            "man": create_fresh_defense(),
+            "2-3-zone": create_fresh_defense(),
+            "3-2-zone": create_fresh_defense(),
+            "1-3-1-zone": create_fresh_defense(),
             "vs_Fast_Break": {"used": 0, "success": 0},
             "FCP": {"used": 0, "success": 0},
             "HCT": {"used": 0, "success": 0}
@@ -173,6 +173,32 @@ def _deep_merge_scouting_dict(dst: dict, src: dict) -> None:
             _deep_merge_scouting_dict(dst[k], v)
         else:
             dst[k] = v
+
+
+def _remap_defense_scouting_keys_for_merge(defense_block: dict) -> dict:
+    """Fold legacy display / variant keys onto canonical `defense_id` row keys before template merge."""
+    from BackEnd.utils.defense_identity import SYNTHETIC_DEFENSE_IDS, canonical_scouting_defense_key
+
+    if not isinstance(defense_block, dict):
+        return {}
+    out: dict = {}
+    for k, v in defense_block.items():
+        if not isinstance(k, str):
+            continue
+        if k in SYNTHETIC_DEFENSE_IDS:
+            out[k] = deepcopy(v) if isinstance(v, dict) else v
+            continue
+        ck = canonical_scouting_defense_key(k)
+        if not ck:
+            out[k] = deepcopy(v) if isinstance(v, dict) else v
+            continue
+        if ck not in out:
+            out[ck] = deepcopy(v) if isinstance(v, dict) else v
+        elif isinstance(out[ck], dict) and isinstance(v, dict):
+            _deep_merge_scouting_dict(out[ck], v)
+        else:
+            out[ck] = v
+    return out
 
 
 def _sync_defense_top_level_from_game_stats(defense: dict) -> None:
@@ -201,7 +227,8 @@ def normalize_scouting_data_for_gameplay(raw: dict | None) -> dict:
     if isinstance(raw.get("offense"), dict):
         _deep_merge_scouting_dict(base["offense"], raw["offense"])
     if isinstance(raw.get("defense"), dict):
-        _deep_merge_scouting_dict(base["defense"], raw["defense"])
+        remapped_def = _remap_defense_scouting_keys_for_merge(raw["defense"])
+        _deep_merge_scouting_dict(base["defense"], remapped_def)
     _sync_defense_top_level_from_game_stats(base["defense"])
     return base
 
@@ -310,7 +337,7 @@ class TeamManager:
                 "press_trap_override": None,   # "press", "trap", "none", or None (playcall center)
             }
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
-        self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
+        self.defense_playcall_tracker = {"man": 0, "zone": 0}
         
         # Use provided plays_data (from saved game) or initialize fresh from universal collection
         # MALLEABLE: Each game instance has its own copy with tracking stats
@@ -571,7 +598,7 @@ class TeamManager:
         
         # Customize defense structures for tournament mode
         if self.mode == "tournament":
-            for defense_name in ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]:
+            for defense_name in ("man", "2-3-zone", "3-2-zone", "1-3-1-zone"):
                 if defense_name in scouting_data["defense"]:
                     scouting_data["defense"][defense_name]["effectiveness"] = random.randint(0, 80)
                     scouting_data["defense"][defense_name]["momentum"] = random.randint(0, 10)

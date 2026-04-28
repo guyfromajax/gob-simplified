@@ -115,7 +115,7 @@ This system documents data persistence across all three game modes when users ar
 - `plays`: Object with play data including `effectiveness`, `momentum`, `cloaking` (0-100, 0-10, 0-10), `game_stats`, `season_stats`
 
 **Scouting Data** (updated by training):
-- `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking`, `game_stats`, `season_stats`
+- `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking`, `game_stats`, `season_stats`. **Live gameplay** always merges stored data onto the canonical template via **`normalize_scouting_data_for_gameplay`** in `team_manager.py` so each row includes top-level **`used` / `success`** and full nested stats (avoids partial FTD-shaped rows breaking `run_micro_turn`).
 
 **Legacy playcall_settings** (still present for backward compatibility)
 
@@ -228,7 +228,7 @@ This system documents data persistence across all three game modes when users ar
 - `plays`: Object with play data including `effectiveness`, `momentum`, `cloaking` (0-80 randomized on init, 0-10, 0-10), `game_stats`, `season_stats`
 
 **Scouting Data** (updated by training):
-- `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking` (0-80 randomized on init, 0-10, 0-10), `game_stats`, `season_stats`
+- `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking` (0-80 randomized on init, 0-10, 0-10), `game_stats`, `season_stats`. At **`TeamManager`** construction, stored scouting is merged via **`normalize_scouting_data_for_gameplay`** (same as franchise; see FTD scouting bullet above).
 
 **Initialization:** Team objects are created for all 8 teams when tournament is created via `TournamentManager.create_tournament()` or lazily via `ensure_team_objects_exist()` when accessing Game Plan/Playbooks.
 
@@ -347,7 +347,8 @@ This system documents data persistence across all three game modes when users ar
 
 **Common:**
 - `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 152-299)
-- `BackEnd/models/team_manager.py` - `init_team_attributes()` (lines 185-226)
+- `BackEnd/models/team_manager.py` - `init_team_attributes()` (lines 185-226); **`normalize_scouting_data_for_gameplay()`** (scouting template merge at `TeamManager` init)
+- `BackEnd/utils/franchise_ftd_game_seed.py` - `prepare_ftd_for_new_game()` (franchise scouting: merge + per-game defense counter reset)
 - `docs/franchise_mode_architecture.md` - Complete franchise mode architecture
 - `docs/COMMON_DATA_SET.md` - Common data structure across all modes
 

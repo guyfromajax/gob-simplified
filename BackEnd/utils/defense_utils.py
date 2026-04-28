@@ -15,10 +15,10 @@ def map_defense_playcall_to_tracking_name(playcall: str) -> str:
     Returns:
         Tracking name for stats (same as input, or mapped for backward compatibility)
     """
-    # Backward compatibility: map generic "Zone" to "2-3 Zone" if it still exists
-    if playcall == "Zone":
+    # Backward compatibility: map generic "Zone" to catalog name path for resolver
+    if playcall in ("Zone", "zone"):
         return "2-3 Zone"
-    # For specific zone names, return as-is
+    # For specific zone names / slugs, return as-is
     return playcall
 
 def is_zone_defense(defense_playcall: str) -> bool:
@@ -31,7 +31,14 @@ def is_zone_defense(defense_playcall: str) -> bool:
     Returns:
         True if zone defense, False if man defense
     """
-    # List of known zone defense types (will expand as more are added)
+    from BackEnd.utils.defense_identity import is_zone_defense_id, resolve_to_defense_id
+
+    if not defense_playcall or not isinstance(defense_playcall, str):
+        return False
+    did = resolve_to_defense_id(defense_playcall.strip())
+    if did and is_zone_defense_id(did):
+        return True
+    # Legacy display strings / partial reads (empty DB in tests)
     zone_types = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
     return defense_playcall in zone_types or defense_playcall.endswith(" Zone")
 

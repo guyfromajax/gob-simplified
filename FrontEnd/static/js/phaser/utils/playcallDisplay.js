@@ -28,7 +28,8 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   
   // Get playcalls from turn data
   const offensivePlaycall = turnData.offensive_playcall || turnData.current_playcall;
-  const defensivePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+  const defensivePlaycall =
+    turnData.defensive_playcall_display || turnData.defensive_playcall || turnData.defense_playcall;
   
   // Get play type and focus directly from turn data if available, otherwise extract from playcall name
   const offensivePlayType = turnData.offensive_play_type || getPlayType(offensivePlaycall);

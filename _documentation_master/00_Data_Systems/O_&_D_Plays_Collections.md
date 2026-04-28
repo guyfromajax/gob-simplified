@@ -77,6 +77,8 @@ Team docs still store defense effectiveness/momentum/cloaking and stats under `s
 
 Those entries remain defense-name keyed.
 
+**Gameplay contract:** Persisted rows may omit duplicate or legacy fields. When a live `TeamManager` is built, **`normalize_scouting_data_for_gameplay`** (`BackEnd/models/team_manager.py`) merges stored `scouting_data` onto the **cached template** so each standard defense row (Man, zones, etc.) always has top-level **`used` / `success`** plus nested **`game_stats`** and **`season_stats`**, matching what `run_micro_turn` and stat tracking increment. Franchise new-game seeding uses the same merge in **`prepare_ftd_for_new_game`** before zeroing per-game defense counters.
+
 ## Runtime Access Pattern
 
 Current offensive flow:

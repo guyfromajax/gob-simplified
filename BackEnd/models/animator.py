@@ -1349,7 +1349,7 @@ class Animator:
             else:
                 # Check if defense is a zone type (e.g., "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
                 from BackEnd.utils.defense_utils import is_zone_defense
-                defense_playcall = self.game.game_state.get("defense_playcall", "Man")
+                defense_playcall = self.game.game_state.get("defense_playcall", "man")
                 if is_zone_defense(defense_playcall):
                     # Use zone defense positioning (currently supports 2-3 zone, will expand for other types)
                     defensive_anims = self._position_zone_defenders(
@@ -1734,10 +1734,13 @@ class Animator:
         # ✅ Zone boundaries should be in SAME orientation as offensive coords
         # When away team has ball, offensive coords are in away orientation (flipped)
         # So zone boundaries should also be in away orientation (flipped) to match
-        defense_playcall = self.game.game_state.get("defense_playcall", "Man")
-        if defense_playcall == "3-2 Zone":
+        from BackEnd.utils.defense_identity import defense_zone_shell_variant
+
+        defense_playcall = self.game.game_state.get("defense_playcall", "man")
+        zv = defense_zone_shell_variant(defense_playcall) or "23"
+        if zv == "32":
             zone_boundaries = _get_32_zone_boundaries(ball_spot, is_away_offense)
-        elif defense_playcall == "1-3-1 Zone":
+        elif zv == "131":
             zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
         else:
             zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
@@ -1791,10 +1794,11 @@ class Animator:
                 
                 # Update zone boundaries if ball spot changed (shift logic)
                 # ✅ Zone boundaries should be in SAME orientation as offensive coords
-                defense_playcall = self.game.game_state.get("defense_playcall", "Man")
-                if defense_playcall == "3-2 Zone":
+                defense_playcall = self.game.game_state.get("defense_playcall", "man")
+                zv = defense_zone_shell_variant(defense_playcall) or "23"
+                if zv == "32":
                     zone_boundaries = _get_32_zone_boundaries(current_ball_spot, is_away_offense)
-                elif defense_playcall == "1-3-1 Zone":
+                elif zv == "131":
                     zone_boundaries = _get_131_zone_boundaries(current_ball_spot, is_away_offense)
                 else:
                     zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)

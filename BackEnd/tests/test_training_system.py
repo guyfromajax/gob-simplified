@@ -105,25 +105,25 @@ def test_training_system():
     # Create sample scouting data
     scouting_data = {
         "defense": {
-            "Man": {
+            "man": {
                 "effectiveness": 100,
                 "momentum": 0,
                 "used": 0,
                 "success": 0
             },
-            "2-3 Zone": {
+            "2-3-zone": {
                 "effectiveness": 80,
                 "momentum": 0,
                 "used": 0,
                 "success": 0
             },
-            "3-2 Zone": {
+            "3-2-zone": {
                 "effectiveness": 85,
                 "momentum": 0,
                 "used": 0,
                 "success": 0
             },
-            "1-3-1 Zone": {
+            "1-3-1-zone": {
                 "effectiveness": 70,
                 "momentum": 0,
                 "used": 0,
@@ -188,9 +188,9 @@ def test_training_system():
             "Inside Play 1": 100
         },
         "zone_defense": {
-            "2-3 Zone": 50,
-            "3-2 Zone": 30,
-            "1-3-1 Zone": 20
+            "zone_23": 50,
+            "zone_32": 30,
+            "zone_131": 20
         }
     }
     

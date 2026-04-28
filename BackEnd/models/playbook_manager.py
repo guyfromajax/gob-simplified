@@ -13,7 +13,7 @@ class PlaybookManager:
         return self.playcalls.get("offense", "Base")
 
     def get_defensive_playcall(self):
-        return self.playcalls.get("defense", "Man")
+        return self.playcalls.get("defense", "man")
 
     def get_fast_break_tendency(self):
         return self.fast_break_tendency

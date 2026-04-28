@@ -13,9 +13,11 @@ import random
 import logging
 from typing import List, Dict, Tuple, Optional, Any
 from BackEnd.constants import ALL_ATTRS
-from BackEnd.utils.playbook_settings_utils import (
-    ZONE_DEFENSE_ID_TO_NAME,
-    resolve_playbook_percentage,
+from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
+from BackEnd.utils.defense_identity import (
+    DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
+    PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
+    defense_display_name,
 )
 from BackEnd.utils.team_play_utils import iter_team_plays
 
@@ -349,7 +351,7 @@ def parse_coaching_focus(coaching_focus: Optional[str]) -> Tuple[Optional[str], 
 
 
 # Zone defenses that share install training points in _apply_defense_training
-TRAINING_ZONE_DEFENSE_NAMES = frozenset({"2-3 Zone", "3-2 Zone", "1-3-1 Zone"})
+TRAINING_ZONE_DEFENSE_NAMES = frozenset({"2-3-zone", "3-2-zone", "1-3-1-zone"})
 
 
 def _scale_install_training_effectiveness_points(
@@ -2258,7 +2260,7 @@ def _apply_defense_training(
     
     if not use_playbooks or playbook_training_mode == "all-plays-even":
         # Even distribution across all defensive plays (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
-        defense_types = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        defense_types = ["man", "2-3-zone", "3-2-zone", "1-3-1-zone"]
         valid_defenses = [d for d in defense_types if d in defense_data]
         
         if valid_defenses:
@@ -2268,7 +2270,7 @@ def _apply_defense_training(
             for i, defense_name in enumerate(valid_defenses):
                 points = points_per_defense + (1 if i < remainder else 0)
                 if defense_name in defense_data:
-                    is_man = defense_name == "Man"
+                    is_man = defense_name == "man"
                     is_zone = defense_name in TRAINING_ZONE_DEFENSE_NAMES
                     points = _scale_install_training_effectiveness_points(
                         points, authoritarian_execution_eff_mult, is_man
@@ -2305,48 +2307,56 @@ def _apply_defense_training(
         
         # Distribute man defense points
         if man_points > 0:
-            # For now, we only have one man defense ("Man")
+            # For now, we only have one man defense row (`man`)
             # When more man defenses are added, we can use playbook_settings.get("man_defense", {})
-            if "Man" in defense_data:
+            if "man" in defense_data:
                 scaled_man = _scale_install_training_effectiveness_points(
                     man_points, authoritarian_execution_eff_mult, True
                 )
-                old_eff = defense_data["Man"].get("effectiveness", 0)
-                defense_data["Man"]["effectiveness"] = old_eff + scaled_man
-                logger.warning(f"📚 [TRAINING] Defense 'Man': effectiveness {old_eff} → {old_eff + scaled_man} (+{scaled_man} points)")
+                old_eff = defense_data["man"].get("effectiveness", 0)
+                defense_data["man"]["effectiveness"] = old_eff + scaled_man
+                logger.warning(f"📚 [TRAINING] Defense 'man': effectiveness {old_eff} → {old_eff + scaled_man} (+{scaled_man} points)")
         
         # Distribute zone defense points
         if zone_points > 0:
             zone_playbook = playbook_settings.get("zone_defense", {})
-            zone_defenses = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+            zone_defenses = list(PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID.values())
             valid_zone_defenses = [d for d in zone_defenses if d in defense_data]
             
             # Calculate total percentage for zone defenses in playbook
             total_zone_pct = sum(zone_playbook.values())
             
             if total_zone_pct > 0:
-                for defense_name in valid_zone_defenses:
-                    defense_id = next((key for key, value in ZONE_DEFENSE_ID_TO_NAME.items() if value == defense_name), defense_name)
-                    defense_pct = zone_playbook.get(defense_id, zone_playbook.get(defense_name, 0)) / total_zone_pct
+                for defense_id in valid_zone_defenses:
+                    pb_key = DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY.get(defense_id)
+                    raw_pct = 0
+                    if pb_key:
+                        raw_pct = zone_playbook.get(pb_key, 0)
+                    if not raw_pct:
+                        raw_pct = zone_playbook.get(defense_id, 0)
+                    if not raw_pct:
+                        legacy = defense_display_name(defense_id)
+                        raw_pct = zone_playbook.get(legacy, 0)
+                    defense_pct = raw_pct / total_zone_pct
                     points = math.floor(zone_points * defense_pct)
                     if points > 0:
                         points = _scale_install_training_effectiveness_points(
                             points, authoritarian_teamwork_eff_mult, True
                         )
-                        old_eff = defense_data[defense_name].get("effectiveness", 0)
-                        defense_data[defense_name]["effectiveness"] = old_eff + points
-                        logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, {defense_pct*100:.1f}% of {zone_points})")
+                        old_eff = defense_data[defense_id].get("effectiveness", 0)
+                        defense_data[defense_id]["effectiveness"] = old_eff + points
+                        logger.warning(f"📚 [TRAINING] Zone defense '{defense_id}': effectiveness {old_eff} → {old_eff + points} (+{points} points, {defense_pct*100:.1f}% of {zone_points})")
             else:
                 # No playbook percentages, distribute evenly
                 points_per_defense = math.floor(zone_points / len(valid_zone_defenses)) if valid_zone_defenses else 0
                 remainder = zone_points - (points_per_defense * len(valid_zone_defenses)) if valid_zone_defenses else 0
-                for i, defense_name in enumerate(valid_zone_defenses):
+                for i, defense_id in enumerate(valid_zone_defenses):
                     points = points_per_defense + (1 if i < remainder else 0)
                     points = _scale_install_training_effectiveness_points(
                         points, authoritarian_teamwork_eff_mult, True
                     )
-                    old_eff = defense_data[defense_name].get("effectiveness", 0)
-                    defense_data[defense_name]["effectiveness"] = old_eff + points
-                    logger.warning(f"📚 [TRAINING] Zone defense '{defense_name}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")
+                    old_eff = defense_data[defense_id].get("effectiveness", 0)
+                    defense_data[defense_id]["effectiveness"] = old_eff + points
+                    logger.warning(f"📚 [TRAINING] Zone defense '{defense_id}': effectiveness {old_eff} → {old_eff + points} (+{points} points, even distribution)")
     
     return updated_scouting_data

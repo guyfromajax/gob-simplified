@@ -20,6 +20,7 @@ from BackEnd.constants import (
     PLAYCALL_ATTRIBUTE_WEIGHTS,
     POSITION_LIST,
     STRATEGY_CALL_DICTS,
+    STRATEGY_DEFENSE_ZONE_SENTINEL,
     TEMPO_PASS_DICT,
     MALLEABLE_ATTRS,
     HOME_RIM_COORDS,
@@ -36,9 +37,14 @@ from BackEnd.utils.shared import (
     getAwayTeamCoords,
     calc_pass_segment_seconds,
 )
-from BackEnd.utils.playbook_settings_utils import (
-    ZONE_DEFENSE_ID_TO_NAME,
-    resolve_playbook_percentage,
+from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
+from BackEnd.utils.defense_identity import (
+    DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
+    PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
+    defense_display_name,
+    defense_scouting_row_key,
+    defense_zone_shell_variant,
+    offense_vs_key_from_defense_input,
 )
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
@@ -1057,11 +1063,9 @@ class TurnManager:
                 self.game.game_state["defense_playcall"] = calls["defense"]
             
                 # Track defensive playcall usage
-                from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
                 def_team = self.game.defense_team
-                defense_playcall = calls["defense"]  # "Man", "2-3 Zone", "3-2 Zone", etc.
-                # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
-                tracking_name = defense_playcall  # Use specific name directly
+                defense_playcall = calls["defense"]  # canonical row key, e.g. man, 2-3-zone
+                tracking_name = defense_scouting_row_key(defense_playcall)
                 if tracking_name in def_team.scouting_data["defense"]:
                     # Get offensive play type and focus for granular tracking
                     # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
@@ -1115,6 +1119,7 @@ class TurnManager:
                 # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
                 result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
                 result["defensive_playcall"] = calls["defense"]
+                result["defensive_playcall_display"] = defense_display_name(calls["defense"])
                 # ✅ PERFORMANCE: Skip playcall logging during full simulations
                 if not is_full_simulation:
                     offense_name = calls["offense"]
@@ -1616,6 +1621,26 @@ class TurnManager:
         result["forced_shot_reason"] = "SHOT_CLOCK"
         return result
 
+    def _coerce_hco_defense_id(self, raw: str | None) -> str | None:
+        """Normalize picks to `scouting_data['defense']` row keys (man, 2-3-zone, ...)."""
+        from BackEnd.utils.defense_identity import canonical_scouting_defense_key, resolve_to_defense_id
+
+        if not raw or not isinstance(raw, str):
+            return None
+        s = raw.strip()
+        if not s:
+            return None
+        if s in ("Zone", "zone", STRATEGY_DEFENSE_ZONE_SENTINEL):
+            return self._select_zone_defense_with_playbook_weights()
+        ck = canonical_scouting_defense_key(s)
+        if ck:
+            return ck
+        rid = resolve_to_defense_id(s)
+        if rid:
+            ck2 = canonical_scouting_defense_key(rid)
+            if ck2:
+                return ck2
+        return s
 
     def set_playcalls(self):
         """
@@ -1739,25 +1764,19 @@ class TurnManager:
             
             # Still need to choose defense normally
             if user_defense:
-                chosen_defense = user_defense
+                chosen_defense = self._coerce_hco_defense_id(user_defense)
                 # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
                 self.game.game_state["user_defense_override"] = None  # Legacy clear
                 logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, persistent until manually cleared)")
-                
-                # ✅ FIX: If user selected "Zone", convert to a random specific zone type
-                # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
-                if chosen_defense == "Zone":
-                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
-                    logging.info(f"🎮 [PLAYCALL OVERRIDE] Converted 'Zone' to specific zone type: {chosen_defense}")
             else:
                 logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override found (user_defense={user_defense}), will use normal selection or check strategy_calls")
                 # No user defense override - choose defense normally
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
-                chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
-                
-                # Convert "Zone" to specific zone types for normal selection
-                if chosen_defense == "Zone":
-                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+                if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
+                    chosen_defense = self._select_zone_defense_with_playbook_weights()
+                else:
+                    chosen_defense = pick
             
             # ✅ FIX: Record offensive playcall attempt tracking (same as normal path)
             # This was being skipped due to early return, causing override stats not to be tracked
@@ -1770,16 +1789,8 @@ class TurnManager:
                     # Use chosen_defense for granular tracking
                     defense_playcall = chosen_defense  # Use the defense we just determined
                     from BackEnd.utils.defense_utils import is_zone_defense
-                    
-                    # Determine defense tracking key based on specific defense name
-                    if defense_playcall == "Man":
-                        vs_key = "vs_man"
-                    elif defense_playcall == "2-3 Zone":
-                        vs_key = "vs_2-3_zone"
-                    elif defense_playcall == "3-2 Zone":
-                        vs_key = "vs_3-2_zone"
-                    elif defense_playcall == "1-3-1 Zone":
-                        vs_key = "vs_1-3-1_zone"
+
+                    vs_key = offense_vs_key_from_defense_input(defense_playcall)
                 else:
                     vs_key = None
                 
@@ -1831,23 +1842,17 @@ class TurnManager:
                 "defense": chosen_defense,
                 "offense_play_type": chosen_play_type,  # ✅ SS&S: Single source of truth for play type ("motion" or "set_play")
                 "offense_focus": user_focus,
-                "defense_type": chosen_defense.title() if chosen_defense else "-",
+                "defense_type": defense_display_name(chosen_defense) if chosen_defense else "-",
                 "defense_focus": None,
                 "offense_override_cleared": offense_override_cleared  # ✅ SS&S: Flag for frontend button un-highlighting
             }
         
         # If only defense call (user on offense, setting defense for next possession)
         if user_defense:
-            chosen_defense = user_defense
+            chosen_defense = self._coerce_hco_defense_id(user_defense)
             # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
             self.game.game_state["user_defense_override"] = None  # Legacy
             logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
-            
-            # ✅ FIX: If user selected "Zone", convert to a random specific zone type
-            # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
-            if chosen_defense == "Zone":
-                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
-                logging.info(f"🎮 [PLAYCALL] Converted 'Zone' to specific zone type: {chosen_defense}")
         else:
             # No override, choose defense normally (will be set below)
             chosen_defense = None
@@ -1927,16 +1932,9 @@ class TurnManager:
                 defense_call = user_team.strategy_calls.get("defense_call")
                 logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from user_team ({user_team.name}) strategy_calls: {defense_call}")
                 if defense_call:
-                    chosen_defense = defense_call
+                    chosen_defense = self._coerce_hco_defense_id(defense_call)
                     # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
                     logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
-                    
-                    # ✅ FIX: If user selected "Zone", convert to a random specific zone type
-                    # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
-                    if chosen_defense == "Zone":
-                        # ✅ PLAYBOOK SYSTEM: Use weighted selection based on playbook settings
-                        chosen_defense = self._select_zone_defense_with_playbook_weights()
-                        logging.info(f"🎮 [PLAYCALL] Converted 'Zone' to specific zone type: {chosen_defense}")
                 else:
                     logging.info(f"🎮 [PLAYCALL DEBUG] defense_call is None or empty, will use normal selection")
             else:
@@ -1946,14 +1944,13 @@ class TurnManager:
             if chosen_defense is None:
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 logging.info(f"🎮 [PLAYCALL DEBUG] Using normal defense selection (defense_setting={defense_setting})")
-                chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
-                logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {chosen_defense}")
-                
-                # Convert "Zone" to specific zone types for normal selection
-                if chosen_defense == "Zone":
-                    # ✅ PLAYBOOK SYSTEM: Use weighted selection based on playbook settings
+                pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+                logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {pick}")
+                if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
                     chosen_defense = self._select_zone_defense_with_playbook_weights()
-                    logging.info(f"🎮 [PLAYCALL DEBUG] Converted normal 'Zone' to specific zone type: {chosen_defense}")
+                    logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
+                else:
+                    chosen_defense = pick
         
         # Record playcall attempt under new buckets
         try:
@@ -1965,18 +1962,8 @@ class TurnManager:
                 # Use chosen_defense for granular tracking (not from game_state, which isn't set yet)
                 defense_playcall = chosen_defense  # Use the defense we just determined
                 from BackEnd.utils.defense_utils import is_zone_defense
-                
-                # Determine defense tracking key based on specific defense name
-                if defense_playcall == "Man":
-                    vs_key = "vs_man"
-                elif defense_playcall == "2-3 Zone":
-                    vs_key = "vs_2-3_zone"
-                elif defense_playcall == "3-2 Zone":
-                    vs_key = "vs_3-2_zone"
-                elif defense_playcall == "1-3-1 Zone":
-                    vs_key = "vs_1-3-1_zone"
-                else:
-                    vs_key = None
+
+                vs_key = offense_vs_key_from_defense_input(defense_playcall)
                 
                 # ✅ MOTION OFFENSE: Attempt tracking moved to phase_resolution.py (after shot resolution)
                 # For Motion plays, we need to track attempts using the actual shot type, not the intended focus
@@ -2025,7 +2012,7 @@ class TurnManager:
             "defense": chosen_defense,
             "offense_play_type": chosen_play_type if chosen_play_type else None,  # ✅ SS&S: Single source of truth for play type ("motion" or "set_play")
             "offense_focus": chosen_focus if chosen_focus else None,
-            "defense_type": chosen_defense.title() if chosen_defense else "-",  # Man or Zone
+            "defense_type": defense_display_name(chosen_defense) if chosen_defense else "-",
             "defense_focus": None,
             "offense_override_cleared": False  # ✅ SS&S: Normal path - no override cleared
         }
@@ -2263,29 +2250,37 @@ class TurnManager:
         """
         Select a zone defense type using weighted random based on playbook settings.
         Falls back to equal weights if no settings exist or for CPU teams.
+        Returns canonical `defense_id` row keys: 2-3-zone, 3-2-zone, 1-3-1-zone.
         """
-        zone_types = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
-        
-        # Load playbook settings
+        zone_ids = list(PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID.values())
+
         defense_team = self.game.defense_team
         team_id = defense_team.team_id
         playbook_settings = self._load_playbook_settings(team_id)
-        
+
         if playbook_settings and defense_team.is_user_team:
-            # Get zone defense percentages
             zone_settings = playbook_settings.get("zone_defense", {})
             weights = {}
-            for zone_type in zone_types:
-                zone_id = next((key for key, value in ZONE_DEFENSE_ID_TO_NAME.items() if value == zone_type), zone_type)
-                percentage = zone_settings.get(zone_id, zone_settings.get(zone_type, 0))
+            for zid in zone_ids:
+                pb_key = DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY.get(zid)
+                percentage = 0
+                if pb_key:
+                    percentage = zone_settings.get(pb_key, 0)
+                if not percentage:
+                    percentage = zone_settings.get(zid, 0)
+                if not percentage and pb_key:
+                    from BackEnd.utils.playbook_settings_utils import ZONE_DEFENSE_ID_TO_NAME
+
+                    legacy_name = ZONE_DEFENSE_ID_TO_NAME.get(pb_key)
+                    if legacy_name:
+                        percentage = zone_settings.get(legacy_name, 0)
                 if percentage > 0:
-                    weights[zone_type] = percentage
-            
+                    weights[zid] = percentage
+
             if weights:
                 return weighted_random_from_dict(weights)
-        
-        # Fallback to equal weights (CPU team or no settings)
-        return random.choice(zone_types)
+
+        return random.choice(zone_ids)
 
     def set_strategy_calls(self):
         # Ensure strategy_settings are initialized for both teams (but don't overwrite existing settings)
@@ -2518,9 +2513,12 @@ class TurnManager:
                     offense_score = shooter_sh * 1.5
         
         # Step 4: Calculate defense score
+        from BackEnd.utils.defense_utils import is_zone_defense
+
         defense_score = 0.0
-        
-        if defensive_playcall == "Man":
+        def_row = defense_scouting_row_key(defensive_playcall)
+
+        if def_row == "man":
             if play_type == "motion":
                 total_id = sum(player.attributes.get("ID", 50) for player in defensive_lineup.values() if player)
                 total_st = sum(player.attributes.get("ST", 50) for player in defensive_lineup.values() if player)
@@ -2541,14 +2539,14 @@ class TurnManager:
                         defense_score = def_id + def_ag * 0.25
                     elif play_focus == "outside":
                         defense_score = def_od * 1.25
-        else:
+        elif is_zone_defense(defensive_playcall):
             # Zone defense: team_d + 0.5 * player_d
             zone_team_d_values = {
-                "2-3 Zone": {"inside": 80, "attack": 40, "outside": 5},
-                "3-2 Zone": {"inside": 10, "attack": 30, "outside": 80},
-                "1-3-1 Zone": {"inside": 20, "attack": 60, "outside": 20}
+                "2-3-zone": {"inside": 80, "attack": 40, "outside": 5},
+                "3-2-zone": {"inside": 10, "attack": 30, "outside": 80},
+                "1-3-1-zone": {"inside": 20, "attack": 60, "outside": 20}
             }
-            team_d = zone_team_d_values.get(defensive_playcall, {}).get(play_focus, 0)
+            team_d = zone_team_d_values.get(def_row, {}).get(play_focus, 0)
             
             shooter_spot = "key"
             if steps and projected_shooter_pos:
@@ -2561,9 +2559,10 @@ class TurnManager:
             if is_away_offense:
                 shooter_coords = get_away_player_coords(shooter_coords)
             
-            if defensive_playcall == "3-2 Zone":
+            zv = defense_zone_shell_variant(defensive_playcall) or "23"
+            if zv == "32":
                 zone_boundaries = _get_32_zone_boundaries(shooter_spot, is_away_offense)
-            elif defensive_playcall == "1-3-1 Zone":
+            elif zv == "131":
                 zone_boundaries = _get_131_zone_boundaries(shooter_spot, is_away_offense)
             else:
                 zone_boundaries = _get_23_zone_boundaries(shooter_spot, is_away_offense)
@@ -2614,7 +2613,7 @@ class TurnManager:
                     # Default fallback if play_focus is unexpected (shouldn't happen, but safe)
                     player_d = def_id + def_st * 0.25
             
-            if defensive_playcall == "1-3-1 Zone":
+            if zv == "131":
                 player_d *= 1.15
             
             defense_score = team_d + 0.5 * player_d
@@ -2656,17 +2655,7 @@ class TurnManager:
                 play_type_label = "Motion" if offense_play_type == "motion" else "Set"
                 pc = offense_team.scouting_data["offense"]["Playcalls"]
                 
-                # Determine defense tracking key
-                if defense_playcall == "Man":
-                    vs_key = "vs_man"
-                elif defense_playcall == "2-3 Zone":
-                    vs_key = "vs_2-3_zone"
-                elif defense_playcall == "3-2 Zone":
-                    vs_key = "vs_3-2_zone"
-                elif defense_playcall == "1-3-1 Zone":
-                    vs_key = "vs_1-3-1_zone"
-                else:
-                    vs_key = None
+                vs_key = offense_vs_key_from_defense_input(defense_playcall)
                 
                 # Store EV in overall and focus buckets
                 if "ev_scores" not in pc[play_type_label]["overall"]:
@@ -2704,8 +2693,9 @@ class TurnManager:
                 pc["Cumulative"][offense_focus]["ev_scores"].append(ev)
             
             # Store in defense scouting data
-            if defense_playcall in defense_team.scouting_data["defense"]:
-                def_data = defense_team.scouting_data["defense"][defense_playcall]
+            def_row = defense_scouting_row_key(defense_playcall)
+            if def_row in defense_team.scouting_data["defense"]:
+                def_data = defense_team.scouting_data["defense"][def_row]
                 game_stats = def_data.get("game_stats", {})
                 
                 # Store EV in top-level game_stats
@@ -2807,8 +2797,8 @@ class TurnManager:
         from BackEnd.utils.shared_defense import ZONE_23_NORMAL, ZONE_32_NORMAL
         game = self.game
         def_team = game.defense_team
-        zone_playcall = random.choice(["2-3 Zone", "3-2 Zone"])
-        zone_map = ZONE_23_NORMAL if zone_playcall == "2-3 Zone" else ZONE_32_NORMAL
+        zone_playcall = random.choice(["2-3-zone", "3-2-zone"])
+        zone_map = ZONE_23_NORMAL if zone_playcall == "2-3-zone" else ZONE_32_NORMAL
         d_destinations = {}
         for pos, spots in zone_map.items():
             spot = spots[0] if spots else "key"
@@ -4295,7 +4285,7 @@ class TurnManager:
         # Determine shot defender based on defense type
         from BackEnd.utils.defense_utils import is_zone_defense
         second_defender_pos = None  # Initialize second defender position
-        if is_zone_defense(game_state.get("defense_playcall", "Man")):
+        if is_zone_defense(game_state.get("defense_playcall", "man")):
             # For zone defense: find defender whose zone contains the shooter
             from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries, _point_in_zone
             from BackEnd.constants import HCO_STRING_SPOTS
@@ -4333,10 +4323,11 @@ class TurnManager:
             
             # Get zone boundaries based on ball location (applies shifts)
             # Check if it's 2-3 or 3-2 zone and use appropriate function
-            defense_playcall = game_state.get("defense_playcall", "Man")
-            if defense_playcall == "3-2 Zone":
+            defense_playcall = game_state.get("defense_playcall", "man")
+            zv = defense_zone_shell_variant(defense_playcall) or "23"
+            if zv == "32":
                 zone_boundaries = _get_32_zone_boundaries(ball_spot, is_away_offense)
-            elif defense_playcall == "1-3-1 Zone":
+            elif zv == "131":
                 zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
             else:
                 zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)

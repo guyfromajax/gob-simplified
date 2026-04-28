@@ -1088,9 +1088,11 @@ def update_team_attributes_after_game(
 
     def _defensive_play_max_share(team_obj: dict) -> float:
         defense = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
+        from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
+
         counts = [
             int((_stat_bucket(defense.get(key, {}))).get("used", 0) or 0)
-            for key in ("Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+            for key in CANONICAL_HCO_DEFENSE_ROW_KEYS
         ]
         return _max_share_from_counts(counts)
 
@@ -6742,14 +6744,14 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     scouting_data = ftd_doc.get("scouting_data", {})
     if not scouting_data.get("defense"):
         scouting_data["defense"] = {
-            "Man": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "2-3 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "3-2 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "1-3-1 Zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0}
+            "man": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
+            "2-3-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
+            "3-2-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
+            "1-3-1-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0}
         }
     else:
         # Ensure each defense has effectiveness value
-        defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        defenses = ["man", "2-3-zone", "3-2-zone", "1-3-1-zone"]
         for def_name in defenses:
             if def_name not in scouting_data["defense"]:
                 scouting_data["defense"][def_name] = {"effectiveness": 0, "momentum": 0, "cloaking": 0}

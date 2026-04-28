@@ -792,7 +792,7 @@ def get_tournament_team_data(tournament_id: str, team_id: str = None, team_name:
         )
     else:
         # Ensure each defense has effectiveness value (fallback to 0 if missing)
-        defenses = ["Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        defenses = ["man", "2-3-zone", "3-2-zone", "1-3-1-zone"]
         for def_name in defenses:
             if def_name not in scouting_data["defense"]:
                 scouting_data["defense"][def_name] = {"effectiveness": 0, "momentum": 0, "cloaking": 0}
