@@ -2083,8 +2083,16 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         if _fr_doc:
                             _, _uto = get_user_team_from_franchise(_fr_doc)
                             _ftd_team_candidates: list[str] = []
+                            # Prefer game-doc canonical team key first — request team_id can differ
+                            # from franchise_team_data.team_id while still matching teams{} in the game.
+                            if authoritative_team_id:
+                                _aid = str(authoritative_team_id)
+                                if _aid:
+                                    _ftd_team_candidates.append(_aid)
                             if team_id:
-                                _ftd_team_candidates.append(str(team_id))
+                                _ts = str(team_id)
+                                if _ts and _ts not in _ftd_team_candidates:
+                                    _ftd_team_candidates.append(_ts)
                             if _uto and str(_uto) not in _ftd_team_candidates:
                                 _ftd_team_candidates.append(str(_uto))
 
@@ -2108,7 +2116,13 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                 _candidate_pb = _candidate_row.get("playbook_settings") or {}
                                 _candidate_plays = _candidate_row.get("plays") or {}
                                 if (
-                                    (_need_ftd_pc_order and _franchise_playbook_has_pc_order(_candidate_pb))
+                                    (
+                                        _need_ftd_pc_order
+                                        and (
+                                            _franchise_playbook_has_pc_order(_candidate_pb)
+                                            or _franchise_offense_pc_nonempty(_candidate_pb)
+                                        )
+                                    )
                                     or (_need_ftd_pb and _franchise_playbook_snapshot_meaningful(_candidate_pb))
                                     or (_need_ftd_plays and isinstance(_candidate_plays, dict) and len(_candidate_plays) > 0)
                                 ):
@@ -2138,7 +2152,10 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                                             game_id,
                                             authoritative_team_id,
                                         )
-                                elif _need_ftd_pc_order and _franchise_playbook_has_pc_order(_fb_pb):
+                                elif _need_ftd_pc_order and (
+                                    _franchise_playbook_has_pc_order(_fb_pb)
+                                    or _franchise_offense_pc_nonempty(_fb_pb)
+                                ):
                                     _merged_pb = dict(_pb_snap or {})
                                     _fb_pc = (_fb_pb.get("pc_order") or {}) if isinstance(_fb_pb.get("pc_order"), dict) else {}
                                     _snap_pc = dict((_merged_pb.get("pc_order") or {})) if isinstance(_merged_pb.get("pc_order"), dict) else {}
@@ -2189,6 +2206,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         logger.warning(
                             "⚠️ [GET PLAYBOOKS] franchise+game_doc FTD fallback failed: %s",
                             _merge_exc,
+                        )
+                    if _need_ftd_pc_order and not ftd_merged_playbook_settings:
+                        logger.warning(
+                            "⚠️ [GET PLAYBOOKS] franchise+game_doc: FTD Playcall merge was needed but "
+                            "playbook_settings was not updated (no FTD row, FTD has no pc_order/slots, or "
+                            "only _need_ftd_plays ran). game_id=%s authoritative_team_id=%s request_team_id=%s",
+                            game_id,
+                            authoritative_team_id,
+                            team_id,
                         )
         elif mode == "franchise":
             # Franchise FCC / pregame reads use FTD as the authoritative master source.
@@ -2425,6 +2451,11 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                 # Reload team_obj (game/tournament doc both have "teams")
                 if mode == "franchise":
                     team_obj = doc.get("teams", {}).get(actual_team_id, {}) if (actual_team_id and doc) else {}
+                    # Plays write + reload can restore stale game-doc playbook_settings (FTD merge is in-memory only).
+                    if load_from_game_doc and ftd_merged_playbook_settings:
+                        _tm = dict(team_obj or {})
+                        _tm["playbook_settings"] = dict(ftd_merged_playbook_settings)
+                        team_obj = _tm
                 elif mode == "tournament":
                     teams = doc.get("teams", {})
                     team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
