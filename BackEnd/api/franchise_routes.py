@@ -6750,13 +6750,22 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
             "1-3-1-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0}
         }
     else:
-        # Ensure each defense has effectiveness value
+        # Ensure each HCO defense row exists for FCC; dual-read legacy keys (e.g. Man) into canonical slug.
+        from BackEnd.utils.defense_identity import read_scouting_defense_row
+
         defenses = ["man", "2-3-zone", "3-2-zone", "1-3-1-zone"]
+        def_block = scouting_data.get("defense")
+        if not isinstance(def_block, dict):
+            def_block = {}
+            scouting_data["defense"] = def_block
         for def_name in defenses:
-            if def_name not in scouting_data["defense"]:
-                scouting_data["defense"][def_name] = {"effectiveness": 0, "momentum": 0, "cloaking": 0}
-            elif "effectiveness" not in scouting_data["defense"][def_name]:
-                scouting_data["defense"][def_name]["effectiveness"] = 0
+            if def_name not in def_block:
+                row = read_scouting_defense_row(def_block, def_name)
+                def_block[def_name] = dict(row) if row else {"effectiveness": 0, "momentum": 0, "cloaking": 0}
+            elif "effectiveness" not in def_block[def_name]:
+                def_block[def_name]["effectiveness"] = read_scouting_defense_row(def_block, def_name).get(
+                    "effectiveness", 0
+                ) or 0
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-data COMPLETE: {total_time:.3f}s")

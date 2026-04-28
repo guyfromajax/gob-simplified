@@ -446,6 +446,8 @@ Data source:
 
 - `/api/playbooks?mode=franchise&franchise_id=...&team_id=...`
 
+**Effectiveness wiring (Playbooks tab):** Motion and set rows take **`effectiveness` from each entry in `team_obj["plays"]`** (same object the API lists). Man and zone defense rows are **synthetic rows** keyed by playbook ids (`man_normal`, `zone_23`, …); their **`effectiveness` is read from `scouting_data["defense"]`** using the **canonical defense row key** (`man`, `2-3-zone`, …), with **legacy scouting keys** (`Man`, `2-3 Zone`, …) still accepted during migration (`read_scouting_defense_row` in `BackEnd/utils/defense_identity.py`, used when building `GET /api/playbooks`).
+
 ---
 
 ## Scouting Report Tab

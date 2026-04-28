@@ -14,6 +14,7 @@
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
+  <script src="/defense-display.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
   <style>
@@ -4222,12 +4223,25 @@
         setCell('motion_total_attempts', motionTotalAtt);
         setCell('motion_total_rate', rate(motionTotalSuc, motionTotalAtt));
         
-        // S2 Tab: Section 2 - Defense (3 columns)
+        // S2 Tab: Section 2 - Defense (3 columns) — canonical slug keys + legacy display keys
         const defense = data.defense || {};
-        const man = defense.Man || { used: 0, success: 0 };
-        const zone23 = defense['2-3 Zone'] || { used: 0, success: 0 };
-        const zone32 = defense['3-2 Zone'] || { used: 0, success: 0 }; // Hardcoded 0s for now
-        const zone131 = defense['1-3-1 Zone'] || { used: 0, success: 0 }; // Hardcoded 0s for now
+        const gb = typeof window !== 'undefined' && window.GOBDefenseDisplay;
+        const defenseRow = (slug, legacyKeys) => {
+          if (gb && typeof gb.getDefenseBlock === 'function') {
+            const b = gb.getDefenseBlock(defense, slug);
+            if (b && typeof b === 'object' && Object.keys(b).length) return b;
+          }
+          for (let i = 0; i < (legacyKeys || []).length; i++) {
+            const k = legacyKeys[i];
+            const v = defense[k];
+            if (v && typeof v === 'object') return v;
+          }
+          return { used: 0, success: 0 };
+        };
+        const man = defenseRow('man', ['Man', 'man']);
+        const zone23 = defenseRow('2-3-zone', ['2-3 Zone']);
+        const zone32 = defenseRow('3-2-zone', ['3-2 Zone']);
+        const zone131 = defenseRow('1-3-1-zone', ['1-3-1 Zone']);
         
         // Man
         const manAtt = man.used || 0;
