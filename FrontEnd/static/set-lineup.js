@@ -415,6 +415,13 @@ function renderLineupShotWeights(playbookData) {
   }
 }
 
+function getLineupPlaybookPercentage(percentages, key, id) {
+  const category = percentages?.[key] || {};
+  const legacyFastBreakCategory = key === 'fast_breaks' ? percentages?.fast_break || {} : {};
+  const value = category?.[id] ?? legacyFastBreakCategory?.[id] ?? 0;
+  return Number(value || 0);
+}
+
 function buildLineupPlaybookItems(data, key) {
   const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
   let items = [];
@@ -422,7 +429,7 @@ function buildLineupPlaybookItems(data, key) {
     items = (data?.motion || []).map((play) => ({
       id: String(play?.play_id || ''),
       name: play?.name || 'Unknown',
-      percentage: Number(percentages.motion?.[play?.play_id] || 0),
+      percentage: getLineupPlaybookPercentage(percentages, 'motion', play?.play_id),
       effectiveness: Number(play?.effectiveness || 0),
       top_scorer: play?.top_scorer || '',
     }));
@@ -430,7 +437,7 @@ function buildLineupPlaybookItems(data, key) {
     items = (data?.set_plays || []).map((play) => ({
       id: String(play?.play_id || ''),
       name: play?.name || 'Unknown',
-      percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
+      percentage: getLineupPlaybookPercentage(percentages, 'set_plays', play?.play_id),
       effectiveness: Number(play?.effectiveness || 0),
       top_scorer: play?.top_scorer || '',
     }));
@@ -440,7 +447,7 @@ function buildLineupPlaybookItems(data, key) {
       .map((row) => ({
         id: String(row?.id || ''),
         name: row?.name || 'Unknown',
-        percentage: Number(percentages.man_defense?.[row?.id] || 0),
+        percentage: getLineupPlaybookPercentage(percentages, 'man_defense', row?.id),
         effectiveness: Number(row?.effectiveness || 0),
         top_scorer: row?.top_scorer || '',
       }));
@@ -448,7 +455,7 @@ function buildLineupPlaybookItems(data, key) {
     items = (data?.zone_defense_rows || []).map((row) => ({
       id: String(row?.id || ''),
       name: row?.name || 'Unknown',
-      percentage: Number(percentages.zone_defense?.[row?.id] || 0),
+      percentage: getLineupPlaybookPercentage(percentages, 'zone_defense', row?.id),
       effectiveness: Number(row?.effectiveness || 0),
       top_scorer: row?.top_scorer || '',
     }));
@@ -456,20 +463,20 @@ function buildLineupPlaybookItems(data, key) {
     items = (data?.fast_breaks || []).map((row) => ({
       id: String(row?.id || ''),
       name: row?.name || 'Unknown',
-      percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
+      percentage: getLineupPlaybookPercentage(percentages, 'fast_breaks', row?.id),
       effectiveness: Number(row?.effectiveness || 0),
       top_scorer: row?.top_scorer || '',
     }));
   }
 
-  // Read-only playbook modal: show all assigned plays (including 0%) so timeouts never look "empty"
-  // when the API returns full rows but flat percentages.
-  return items.sort(function (a, b) {
-    return (
-      Number(b.percentage || 0) - Number(a.percentage || 0) ||
-      String(a.name).localeCompare(String(b.name))
-    );
-  });
+  return items
+    .filter((item) => Number(item.percentage || 0) > 0)
+    .sort(function (a, b) {
+      return (
+        Number(b.percentage || 0) - Number(a.percentage || 0) ||
+        String(a.name).localeCompare(String(b.name))
+      );
+    });
 }
 
 function renderLineupPlaybooksModal(data) {

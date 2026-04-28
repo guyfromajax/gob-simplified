@@ -13,6 +13,7 @@ from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unifi
 from BackEnd.utils.defense_identity import (
     PLAYBOOK_MAN_KEY_TO_DEFENSE_ID,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
+    read_scouting_defense_row,
 )
 from BackEnd.utils.playbook_settings_utils import (
     PLAYBOOK_PERCENTAGE_KEYS,
@@ -2842,14 +2843,13 @@ def get_playbooks(
                 {
                     "id": defense_id,
                     "name": defense_name,
-                    "effectiveness": (
-                        defense_scouting.get(PLAYBOOK_MAN_KEY_TO_DEFENSE_ID.get(defense_id, "man"), {})
-                        if isinstance(
-                            defense_scouting.get(PLAYBOOK_MAN_KEY_TO_DEFENSE_ID.get(defense_id, "man"), {}),
-                            dict,
-                        )
-                        else {}
-                    ).get("effectiveness", 0),
+                    "effectiveness": float(
+                        read_scouting_defense_row(
+                            defense_scouting,
+                            PLAYBOOK_MAN_KEY_TO_DEFENSE_ID.get(defense_id, "man"),
+                        ).get("effectiveness", 0)
+                        or 0
+                    ),
                     "is_active": defense_id == "man_normal",
                 }
                 for defense_id, defense_name in MAN_DEFENSE_ID_TO_NAME.items()
@@ -2858,14 +2858,13 @@ def get_playbooks(
                 {
                     "id": defense_id,
                     "name": defense_name,
-                    "effectiveness": (
-                        defense_scouting.get(PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID.get(defense_id, ""), {})
-                        if isinstance(
-                            defense_scouting.get(PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID.get(defense_id, ""), {}),
-                            dict,
-                        )
-                        else {}
-                    ).get("effectiveness", 0),
+                    "effectiveness": float(
+                        read_scouting_defense_row(
+                            defense_scouting,
+                            PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID.get(defense_id) or "",
+                        ).get("effectiveness", 0)
+                        or 0
+                    ),
                     "is_active": True,
                 }
                 for defense_id, defense_name in ZONE_DEFENSE_ID_TO_NAME.items()

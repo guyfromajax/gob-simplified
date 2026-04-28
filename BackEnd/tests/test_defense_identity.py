@@ -9,6 +9,7 @@ from BackEnd.utils.defense_identity import (
     defense_display_name,
     is_zone_defense_id,
     offense_vs_key_from_defense_input,
+    read_scouting_defense_row,
     refresh_defense_identity_cache,
     resolve_to_defense_id,
 )
@@ -137,3 +138,14 @@ def test_canonical_scouting_row_key_and_vs_bucket():
     assert canonical_scouting_defense_key("2-3-zone") == "2-3-zone"
     assert offense_vs_key_from_defense_input("Man") == "vs_man"
     assert offense_vs_key_from_defense_input("2-3 Zone") == "vs_2-3_zone"
+
+
+def test_read_scouting_defense_row_canonical_then_legacy():
+    row_slug = {"effectiveness": 55, "momentum": 1}
+    row_legacy = {"effectiveness": 66, "momentum": 2}
+    assert read_scouting_defense_row({"man": row_slug}, "man") == row_slug
+    assert read_scouting_defense_row({"Man": row_legacy}, "man") == row_legacy
+    assert read_scouting_defense_row({"2-3-zone": row_slug}, "2-3-zone") == row_slug
+    assert read_scouting_defense_row({"2-3 Zone": row_legacy}, "2-3-zone") == row_legacy
+    assert read_scouting_defense_row({}, "man") == {}
+    assert read_scouting_defense_row(None, "man") == {}

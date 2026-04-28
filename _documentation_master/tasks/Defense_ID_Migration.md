@@ -139,7 +139,7 @@ Use these as **templates** for dual-read / normalization:
 
 ### Phase 4 — APIs & frontend surfaces (in progress)
 
-1. 🔄 **GET /api/playbooks** / gameplan: confirm `man_defense_rows` / `zone_defense_rows` and turn payloads expose **id** as authority; names for labels only (spot-check clients).
+1. 🔄 **GET /api/playbooks** / gameplan: defense row **effectiveness** uses `read_scouting_defense_row` (canonical + legacy scouting keys). Spot-check other response fields and turn payloads as needed.
 2. ✅ **FCC / tournament / training-report** playbook summary: **`GOBDefenseDisplay.buildPlaybookStyleDefenseRows`** — canonical order (`man`, then zone slugs), dual-read keys via **`getDefenseBlock`**; legacy `Object.entries` fallback if script missing.
 3. ✅ **box-score.js:** defense blocks resolved via **`getDefenseBlock`** + legacy key fallback for EOG stats.
 4. ✅ **Phaser** `playcallDisplay.js` / `playcallCenter.js`: import **`defenseUi.js`** — scoreboard Man/Zone bucket + status line labels for slug / legacy display strings.

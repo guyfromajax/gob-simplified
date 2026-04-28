@@ -48,6 +48,36 @@ CANONICAL_HCO_DEFENSE_ROW_KEYS: Tuple[str, ...] = (
     "1-3-1-zone",
 )
 
+# When scouting was keyed by display names, these alternate keys may hold the same row dict.
+_SCOUTING_DEFENSE_LEGACY_KEYS_BY_CANONICAL: Dict[str, Tuple[str, ...]] = {
+    "man": ("Man", "man"),
+    "2-3-zone": ("2-3 Zone", "2-3-zone"),
+    "3-2-zone": ("3-2 Zone", "3-2-zone"),
+    "1-3-1-zone": ("1-3-1 Zone", "1-3-1-zone"),
+}
+
+
+def read_scouting_defense_row(defense_scouting: Any, canonical_row_key: str) -> Dict[str, Any]:
+    """
+    Return `scouting_data['defense'][*]` row dict for a canonical slug (`man`, `2-3-zone`, …).
+
+    Dual-read: try canonical key first, then legacy display / casing variants so APIs (e.g.
+    GET /api/playbooks) still surface effectiveness when persisted data uses pre-migration keys.
+    """
+    if not isinstance(defense_scouting, dict) or not canonical_row_key:
+        return {}
+    ck = canonical_row_key.strip()
+    if not ck:
+        return {}
+    row = defense_scouting.get(ck)
+    if isinstance(row, dict):
+        return row
+    for alt in _SCOUTING_DEFENSE_LEGACY_KEYS_BY_CANONICAL.get(ck, ()):
+        row = defense_scouting.get(alt)
+        if isinstance(row, dict):
+            return row
+    return {}
+
 # Offense Playcalls buckets vs_* keys from canonical defense row key
 _OFFENSE_VS_KEY_BY_ROW_KEY: Dict[str, str] = {
     "man": "vs_man",
