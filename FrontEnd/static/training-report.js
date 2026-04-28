@@ -1411,10 +1411,19 @@ function renderPlaybookSummary() {
   } else if (scouting_data.defense) {
     for (const [defense_name, defense_data] of Object.entries(scouting_data.defense)) {
       if (typeof defense_data === 'object' && defense_data !== null) {
+        const rowKey = trainingReportCanonicalDefenseRowKey(defense_name) || defense_name;
         if (defense_name === 'Man' || defense_name === 'man') {
-          man_defenses.push({ name: defense_name === 'man' ? 'Man' : defense_name, ...defense_data });
+          man_defenses.push({
+            ...defense_data,
+            name: defense_name === 'man' ? 'Man' : defense_name,
+            defense_row_key: rowKey,
+          });
         } else if (defense_name.includes('Zone') || defense_name.includes('zone')) {
-          zone_defenses.push({ name: defense_name, ...defense_data });
+          zone_defenses.push({
+            ...defense_data,
+            name: defense_name,
+            defense_row_key: rowKey,
+          });
         }
       }
     }
@@ -1579,6 +1588,36 @@ function getTrainingReportPlayChange(playsChanges, play) {
   return 0;
 }
 
+function trainingReportCanonicalDefenseRowKey(scoutingKey) {
+  if (scoutingKey == null || scoutingKey === '') return null;
+  const k = String(scoutingKey).trim();
+  if (k === 'man' || k === 'Man' || k.toLowerCase() === 'base-man') return 'man';
+  if (k === '2-3-zone' || k === '2-3 Zone') return '2-3-zone';
+  if (k === '3-2-zone' || k === '3-2 Zone') return '3-2-zone';
+  if (k === '1-3-1-zone' || k === '1-3-1 Zone') return '1-3-1-zone';
+  return k;
+}
+
+/** Backend `defenses_effectiveness_changes` uses canonical row keys (`man`, `2-3-zone`); rows use display `name`. */
+function getTrainingReportDefenseChange(defensesChanges, defenseItem) {
+  if (!defensesChanges || !defenseItem) return 0;
+
+  const candidates = [
+    defenseItem.defense_row_key,
+    trainingReportCanonicalDefenseRowKey(defenseItem.name),
+    defenseItem.name,
+    defenseItem.display_name
+  ].filter(Boolean);
+
+  for (const key of candidates) {
+    if (Object.prototype.hasOwnProperty.call(defensesChanges, key)) {
+      return normalizeTrainingReportChangeValue(defensesChanges[key]);
+    }
+  }
+
+  return 0;
+}
+
 function createPlaybookCategorySection(title, items, changesLookup) {
   const section = document.createElement('div');
   section.className = 'playbook-category';
@@ -1602,7 +1641,7 @@ function createPlaybookCategorySection(title, items, changesLookup) {
     items.forEach((item) => {
       const change = title === 'Offense'
         ? getTrainingReportPlayChange(changesLookup, item)
-        : normalizeTrainingReportChangeValue(changesLookup[item.name] || 0);
+        : getTrainingReportDefenseChange(changesLookup, item);
       grid.appendChild(createPlayCard(item.display_name || item.name, item, change));
     });
   }

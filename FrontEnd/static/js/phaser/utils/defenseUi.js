@@ -54,12 +54,20 @@ export function buildPlaybookStyleDefenseRows(scoutingDefense) {
   }
   const manRow = getDefenseBlock(scoutingDefense, HCO_MAN_SLUG);
   if (Object.keys(manRow).length > 0) {
-    man_defenses.push({ name: displayLabelForDefenseSlug(HCO_MAN_SLUG), ...manRow });
+    man_defenses.push({
+      ...manRow,
+      name: displayLabelForDefenseSlug(HCO_MAN_SLUG),
+      defense_row_key: HCO_MAN_SLUG,
+    });
   }
   for (const slug of HCO_ZONE_SLUGS) {
     const row = getDefenseBlock(scoutingDefense, slug);
     if (Object.keys(row).length > 0) {
-      zone_defenses.push({ name: displayLabelForDefenseSlug(slug), ...row });
+      zone_defenses.push({
+        ...row,
+        name: displayLabelForDefenseSlug(slug),
+        defense_row_key: slug,
+      });
     }
   }
   return { man_defenses, zone_defenses };

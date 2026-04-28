@@ -30,7 +30,7 @@ This document should reflect the current franchise training implementation in co
 5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/distant-cpu` (see **Training loading feed** below). Tournament/single-game modes still use their existing endpoints.
 6. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
-7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing
+7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` then merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines and decay (same remap as gameplay).
 8. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
 9. **Pre-Training Conditions**: Random decreases applied to player attributes (excluding EM, MO, NG); team attributes are no longer decayed here (skipped for training camp: week 1 before first games)
 10. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
@@ -214,11 +214,13 @@ The training execution system applies pre-training conditions, allocates trainin
 
 #### Training Execution Flow
 
+**Defense scouting keys (before decay and baselines):** At the start of `execute_training`, `scouting_data["defense"]` is passed through `_remap_defense_scouting_keys_for_merge` (`BackEnd/models/team_manager.py`) so legacy row keys (display names such as `Man`, `2-3 Zone`, etc.) fold onto canonical half-court keys (`man`, `2-3-zone`, …), matching gameplay normalization. Defense install training only writes effectiveness to those canonical rows; baselines for `defenses_effectiveness_changes` and pre-training defense decay both use this normalized map.
+
 0. **Pre-Training Effectiveness Decay** (`_apply_pre_training_effectiveness_decay`, `_apply_pre_training_defense_decay`)
    - All plays and defenses with effectiveness > 0 are reduced by `random.randint(5, 15)`
    - Minimum effectiveness is clamped to 0 (cannot be negative)
    - This represents natural skill degradation between training sessions
-   - Original effectiveness values are tracked for change calculation
+   - Original effectiveness values are tracked for change calculation (after the defense-key remap above for defense rows)
    - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
@@ -745,7 +747,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 ### Current Play / Report Identity Notes
 
 - Training report play deltas use `play_id` as the canonical key when available
-- `training_report["plays_effectiveness_changes"]` is keyed by `play_id` for offense and by defense name for defensive sets
+- `training_report["plays_effectiveness_changes"]` is keyed by `play_id` for offense and by **canonical defense row keys** (`man`, `2-3-zone`, … — same as `scouting_data["defense"]` after `execute_training`) for defensive sets; the report UI may still show human-readable names via defense display helpers
 - The Training Report frontend resolves offensive deltas by `play_id` first, while still displaying the play `name`
 - **Training loading feed** (`build_training_loading_highlights`) does **not** surface play/defense effectiveness deltas; it uses archetyped copy from `training_feed_lines.py` (see `Training_System_Live_Feed.md`).
 - Offensive `playbook_settings` are now expected to be `play_id`-keyed, though runtime compatibility still tolerates older name-keyed maps
