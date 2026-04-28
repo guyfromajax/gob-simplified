@@ -3,30 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Basketball Sim | Basketball Simulation Game — Geeked Out Basketball</title>
-  <meta name="description" content="A basketball sim and basketball simulation game where you build an elite high school program. Strategy, not button mashing. Play the alpha free.">
-  <!-- Google Tag Manager -->
-  <script src="/js/shared/gtm-loader.js"></script>
-  <!-- End Google Tag Manager -->
-  <script src="/js/shared/authGuard.js"></script>
-  <script src="/js/shared/sentryInit.js"></script>
-  <link rel="stylesheet" href="/css/auth-bar.css">
+  <title>GOB Homepage v2</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- auth-bar.css and authGuard.js load from server in production -->
+  <style>
+    /* Minimal auth-bar base layout (normally from /css/auth-bar.css) */
+    .auth-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 64px; width: 100%;
+    }
+    .auth-bar-left  { display: flex; align-items: center; gap: 20px; }
+    .auth-bar-right { display: flex; align-items: center; gap: 16px; }
+    .auth-status    { display: flex; align-items: center; gap: 8px; }
+    .alpha-badge    { height: 32px; width: auto; }
+    .logo-link      { display: flex; align-items: center; }
+    .auth-logout-btn {
+      padding: 5px 12px; font-size: 12px; font-weight: 600;
+      background: transparent; border: 1px solid; border-radius: 6px;
+      cursor: pointer; transition: background 0.2s, color 0.2s;
+    }
+  </style>
   <style>
     @font-face {
       font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Bold.otf') format('opentype');
+      src: url('./fonts/BebasNeuePro-Bold.otf') format('opentype');
       font-weight: 700; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Regular.otf') format('opentype');
+      src: url('./fonts/BebasNeuePro-Regular.otf') format('opentype');
       font-weight: 400; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Book.otf') format('opentype');
+      src: url('./fonts/BebasNeuePro-Book.otf') format('opentype');
       font-weight: 300; font-style: normal; font-display: swap;
     }
 
@@ -497,23 +507,19 @@
 </head>
 <body class="has-auth-bar">
 
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager -->
-
   <!-- NAV -->
   <div id="auth-bar" class="auth-bar gob-hp-nav">
     <div class="auth-bar-left">
       <a href="/" class="logo-link">
-        <img src="./images/geekedout_logo.png" alt="Geeked-Out Basketball" class="logo">
+        <img src="./FrontEnd/static/images/geekedout_logo.png" alt="Geeked-Out Basketball" class="logo">
       </a>
       <a href="/tutorial.html" class="tutorials-nav-btn">Tutorials</a>
     </div>
-    <img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">
+    <img id="alpha-badge" class="alpha-badge visible" src="./FrontEnd/static/images/alpha_badge_gold.png" alt="Alpha">
     <div class="auth-bar-right">
       <a href="./mode-select.html" class="nav-cta" id="nav-cta" aria-label="Play The Alpha">Play The Alpha</a>
       <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube">
-        <img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24">
+        <img src="./FrontEnd/static/images/yt_icon_red_digital.png" alt="" width="24" height="24">
       </a>
       <a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X">
         <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>
@@ -534,7 +540,7 @@
   <section class="hero">
     <div class="hero-bg">
       <img
-        src="./images/homepage/hero-court-gameplay.png"
+        src="./FrontEnd/static/images/homepage/hero-court-gameplay.png"
         alt="Live GOB gameplay" loading="eager"
       >
     </div>
@@ -592,7 +598,7 @@
         <article class="pillar-card pillar-main anim">
           <div class="pillar-img-wrap">
             <img
-              src="./images/homepage/pillar-coaching-style.png"
+              src="./FrontEnd/static/images/homepage/pillar-coaching-style.png"
               alt="Coaching Style selection — four archetypes" loading="lazy"
             >
           </div>
@@ -608,7 +614,7 @@
           <article class="pillar-card anim">
             <div class="pillar-img-wrap">
               <img
-                src="./images/homepage/pillar-game-plan.png"
+                src="./FrontEnd/static/images/homepage/pillar-game-plan.png"
                 alt="Game Plan sliders — ten tactical dimensions" loading="lazy"
               >
             </div>
@@ -622,7 +628,7 @@
           <article class="pillar-card anim">
             <div class="pillar-img-wrap">
               <img
-                src="./images/homepage/pillar-press-conference.png"
+                src="./FrontEnd/static/images/homepage/pillar-press-conference.png"
                 alt="Post-game press conference" loading="lazy"
               >
             </div>
@@ -655,7 +661,7 @@
           <p class="feature-copy">Standings. Rankings. Scouting intel. Locker room chemistry. Recruiting pipeline. Player scoring leaders. All of it on one screen, updated every week. This is what running a program actually feels like.</p>
         </div>
         <div class="feature-img">
-          <img src="./images/homepage/deepdive-franchise-command-center.png" alt="Franchise Command Center" loading="lazy">
+          <img src="./FrontEnd/static/images/homepage/deepdive-franchise-command-center.png" alt="Franchise Command Center" loading="lazy">
         </div>
       </div>
 
@@ -666,7 +672,7 @@
           <p class="feature-copy">Eight team dimensions — Offense, Defense, Fast Breaks, Press/Traps, Discipline, Fight, and more — visualized as a radar profile. Watch it shift week over week as your training takes hold.</p>
         </div>
         <div class="feature-img">
-          <img src="./images/homepage/deepdive-team-measures.png" alt="Team Measures radar chart" loading="lazy">
+          <img src="./FrontEnd/static/images/homepage/deepdive-team-measures.png" alt="Team Measures radar chart" loading="lazy">
         </div>
       </div>
 
@@ -682,7 +688,7 @@
           <p class="feature-copy">Run training, set your coaching focus, and watch the results. Shooting up. Chemistry holding. Player development isn't a black box — you see exactly what changed and why.</p>
         </div>
         <div class="feature-img">
-          <img src="./images/homepage/deepdive-training-report.png" alt="Training Report" loading="lazy">
+          <img src="./FrontEnd/static/images/homepage/deepdive-training-report.png" alt="Training Report" loading="lazy">
         </div>
       </div>
 
@@ -693,7 +699,7 @@
           <p class="feature-copy">Assign usage percentages, set scoring targets by position, and track efficiency for every play in your system. The game tells you what's working. What you do with that is up to you.</p>
         </div>
         <div class="feature-img">
-          <img src="./images/homepage/deepdive-playbook-settings.png" alt="Playbook Settings" loading="lazy">
+          <img src="./FrontEnd/static/images/homepage/deepdive-playbook-settings.png" alt="Playbook Settings" loading="lazy">
         </div>
       </div>
 
@@ -707,7 +713,7 @@
       <h2 class="community-hed anim">Real Coaches.<br>Real Games.<br>Right Now.</h2>
       <p class="community-sub anim">While you're reading this, coaches are playing games, climbing the leaderboard, and building programs.</p>
       <div class="community-shot anim">
-        <img src="./images/homepage/community-mode-select.png" alt="Community mode select with live leaderboard" loading="lazy">
+        <img src="./FrontEnd/static/images/homepage/community-mode-select.png" alt="Community mode select with live leaderboard" loading="lazy">
       </div>
       <div class="community-cta anim">
         <a href="./mode-select.html" class="btn-white">See Where You Rank →</a>
@@ -785,7 +791,7 @@
   <script>
     /* ─── Tweaks ─── */
     const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-      "heroOverlay": "heavy",
+      "heroOverlay": "cinematic",
       "statsStrip": "show",
       "pullquote": "show",
       "pillarLayout": "asymmetric"
