@@ -161,6 +161,51 @@ def _create_scouting_data_template_base():
         }
     }
 
+
+def _deep_merge_scouting_dict(dst: dict, src: dict) -> None:
+    """Merge src into dst in place. Preserves dst keys/skeleton when src omits them."""
+    if not isinstance(src, dict):
+        return
+    for k, v in src.items():
+        if k not in dst:
+            dst[k] = deepcopy(v) if isinstance(v, dict) else v
+        elif isinstance(dst[k], dict) and isinstance(v, dict):
+            _deep_merge_scouting_dict(dst[k], v)
+        else:
+            dst[k] = v
+
+
+def _sync_defense_top_level_from_game_stats(defense: dict) -> None:
+    """Keep legacy mirror fields aligned with game_stats when both exist (turn_manager updates both)."""
+    for row in defense.values():
+        if not isinstance(row, dict):
+            continue
+        gs = row.get("game_stats")
+        if isinstance(gs, dict):
+            if "used" in gs:
+                row["used"] = gs["used"]
+            if "success" in gs:
+                row["success"] = gs["success"]
+
+
+def normalize_scouting_data_for_gameplay(raw: dict | None) -> dict:
+    """
+    Merge persisted or partial scouting_data onto the canonical template.
+
+    Ensures defense rows include top-level used/success, game_stats, season_stats, etc.,
+    so turn resolution (e.g. run_micro_turn) does not KeyError on legacy/FTD-shaped rows.
+    """
+    base = _get_cached_scouting_data_template()
+    if not raw:
+        return base
+    if isinstance(raw.get("offense"), dict):
+        _deep_merge_scouting_dict(base["offense"], raw["offense"])
+    if isinstance(raw.get("defense"), dict):
+        _deep_merge_scouting_dict(base["defense"], raw["defense"])
+    _sync_defense_top_level_from_game_stats(base["defense"])
+    return base
+
+
 def _get_cached_plays():
     """Get all plays from database, using cache if available."""
     global _plays_cache
@@ -216,7 +261,7 @@ class TeamManager:
         # Use provided scouting_data or initialize fresh
         scouting_start = time.time()
         if scouting_data:
-            self.scouting_data = scouting_data
+            self.scouting_data = normalize_scouting_data_for_gameplay(scouting_data)
         else:
             self.scouting_data = self._init_scouting_data()
         scouting_time = (time.time() - scouting_start) * 1000

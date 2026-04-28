@@ -70,35 +70,20 @@ def prepare_ftd_for_new_game(ftd: dict | None) -> dict[str, Any]:
     scouting_raw = ftd.get("scouting_data")
     scouting_data: dict[str, Any] | None = None
     if scouting_raw and isinstance(scouting_raw, dict):
-        scouting_data = copy.deepcopy(scouting_raw)
-        defense = scouting_data.get("defense")
-        if defense:
-            for defense_name, defense_data in list(defense.items()):
-                if defense_name is None:
-                    continue
-                if isinstance(defense_data, dict):
-                    defense[defense_name] = {
-                        "effectiveness": defense_data.get("effectiveness", 0),
-                        "momentum": defense_data.get("momentum", 0),
-                        "cloaking": defense_data.get("cloaking", 0),
-                        "game_stats": {
-                            "used": 0,
-                            "success": 0,
-                            "ev_scores": [],
-                            "lean_scores": [],
-                            "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                            "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        },
-                    }
+        from BackEnd.models.team_manager import TeamManager, normalize_scouting_data_for_gameplay
+
+        scouting_data = normalize_scouting_data_for_gameplay(scouting_raw)
+        defense = scouting_data.get("defense") or {}
+        fresh_gs = copy.deepcopy(TeamManager._create_defense_structure_template()["game_stats"])
+        for defense_name, defense_data in list(defense.items()):
+            if defense_name is None or not isinstance(defense_data, dict):
+                continue
+            if "game_stats" in defense_data:
+                defense_data["game_stats"] = copy.deepcopy(fresh_gs)
+            if "used" in defense_data:
+                defense_data["used"] = 0
+            if "success" in defense_data:
+                defense_data["success"] = 0
     else:
         scouting_data = {}
 

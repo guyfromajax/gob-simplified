@@ -1,5 +1,7 @@
 ## Computer Team Game Init System
 
+**See also:** `Game_Init_System.md` — HTTP **`POST /api/init-game`**, franchise **FTD → game document** seeding, and tournament user-master copy. This document focuses on **in-TeamManager** defaults when persisted settings are absent.
+
 ## Overview
 
 Computer team init has two distinct pieces:

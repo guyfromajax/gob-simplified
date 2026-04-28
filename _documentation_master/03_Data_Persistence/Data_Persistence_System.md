@@ -342,6 +342,7 @@ This system documents data persistence across all three game modes when users ar
 
 **Single Game Mode:**
 - `BackEnd/api/api.py` - `init_game()` (game initialization)
+- `05_GP_Supporting_Systems/Game_Init_System.md` - Full **`POST /api/init-game`** flow, franchise FTD → game doc, tournament/single behavior
 - `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lazy team object creation)
 
 **Common:**
