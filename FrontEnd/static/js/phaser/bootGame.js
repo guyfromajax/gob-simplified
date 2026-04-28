@@ -254,8 +254,11 @@ async function loadGamePlanSettings() {
     }
     if (liveMode === 'franchise' && liveFranchiseId) {
       params.set('franchise_id', liveFranchiseId);
-    } else if (liveMode === 'tournament' && liveTournamentId) {
+    } else     if (liveMode === 'tournament' && liveTournamentId) {
       params.set('tournament_id', liveTournamentId);
+    }
+    if (typeof window !== 'undefined' && typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(p)) {
+      params.set('debug_pc', '1');
     }
     
     const res = await fetch(API_CONFIG.buildUrl(`/api/gameplan?${params.toString()}`));
@@ -308,6 +311,9 @@ async function loadPlaybookSettings() {
       params.set('franchise_id', liveFranchiseId);
     } else if (liveMode === 'tournament' && liveTournamentId) {
       params.set('tournament_id', liveTournamentId);
+    }
+    if (typeof window !== 'undefined' && typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(p)) {
+      params.set('debug_pc', '1');
     }
     params.set('profile', '1');
     const res = await fetch(API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`));

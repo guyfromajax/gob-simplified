@@ -34,11 +34,15 @@ const DEBUG_SKIP =
   (typeof process !== 'undefined' && process.env.DEBUG_SKIP) ||
   false;
 
-/** URL flag: ?debug_pc=1 — Playcall / playbook tracing (pairs with server DEBUG_PC=1). */
+/** URL flag: ?debug_pc=1|true|yes — forwards to API so Railway logs without DEBUG_PC env. */
 function isDebugPlaycall() {
   if (typeof window === 'undefined') return false;
   try {
-    return new URLSearchParams(window.location.search).get('debug_pc') === '1';
+    if (typeof window.isDebugPlaycallSearch === 'function') {
+      return window.isDebugPlaycallSearch(window.location.search);
+    }
+    const v = (new URLSearchParams(window.location.search).get('debug_pc') || '').trim().toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
   } catch (e) {
     return false;
   }
@@ -578,7 +582,10 @@ export function createGameScene(Phaser) {
         });
       }
       const baseUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
-      const url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+      let url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+      if (isDebugPlaycall()) {
+        url += '&debug_pc=1';
+      }
       const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

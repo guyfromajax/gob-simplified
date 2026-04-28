@@ -23,7 +23,7 @@ from BackEnd.api._bootstrap import app
 import traceback
 _startup_error = None
 try:
-    from fastapi import Depends, FastAPI, HTTPException, Response
+    from fastapi import Depends, FastAPI, HTTPException, Query, Response
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
     from fastapi.templating import Jinja2Templates
@@ -2084,6 +2084,7 @@ try:
         debug: bool = False,
         quiet_sim: bool = False,
         profile: bool = False,
+        debug_pc: str | None = Query(None),
     ):
         """Rate limited: 30/minute per IP. quiet_sim=True sets log level to ERROR during sim (sanity check for logging cost)."""
         import time
@@ -2280,7 +2281,9 @@ try:
                 # bootGame (fresh GET /api/playbooks). New-GM path uses load_and_apply_team_settings_to_gamemanager
                 # to merge request over DB — cached path must do the same or DB stays stale until unrelated saves
                 # (e.g. defense matchups → summarize). End-of-request summarize_game_state then persists correctly.
-                _debug_pc = os.getenv("DEBUG_PC", "").strip().lower() in ("1", "true", "yes")
+                from BackEnd.utils.debug_flags import debug_pc_enabled
+
+                _debug_pc = debug_pc_enabled(debug_pc)
                 if _debug_pc:
                     logging.warning(
                         "[DEBUG_PC] simulate-quarter CACHED pre-merge game_id=%r quarter=%s "

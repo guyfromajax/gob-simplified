@@ -3528,7 +3528,8 @@
     // Load slot assignments from playbooks and dynamically build Playcall Center DOM
     async function loadAndApplySlotAssignments() {
       const urlParams = new URLSearchParams(window.location.search);
-      const __debugPc = urlParams.get('debug_pc') === '1';
+      const __debugPc =
+        typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(urlParams);
       // ✅ FIX: Mode detection with fallback logic (matches Franchise pattern)
       // Priority: 1) URL param, 2) tournament_id present → 'tournament', 3) franchise_id present → 'franchise', 4) default 'single'
       // This ensures mode is correctly detected even if mode param is missing from URL
@@ -3592,6 +3593,7 @@
           params.set('franchise_id', franchiseId);
           if (gameId) params.set('game_id', gameId);
         }
+        if (__debugPc) params.set('debug_pc', '1');
         
         const apiUrl = API_CONFIG.buildUrl(`/api/playbooks?${params.toString()}`);
         const getHeaders = (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getAuthHeaders === 'function')

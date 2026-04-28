@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from bson import ObjectId
@@ -29,16 +29,11 @@ from BackEnd.utils.playbook_weights_utils import (
     compute_position_shot_weights,
     weights_cache_is_stale,
 )
+from BackEnd.utils.debug_flags import debug_pc_enabled as _debug_pc_on
 from datetime import datetime
-import os
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def _debug_pc_enabled() -> bool:
-    """Gate verbose Playcall/playbook tracing: set env DEBUG_PC=1 (or true/yes)."""
-    return os.getenv("DEBUG_PC", "").strip().lower() in ("1", "true", "yes")
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
@@ -1792,7 +1787,16 @@ def update_gameplan(request: GamePlanUpdateRequest):
 
 
 @router.get("/api/playbooks")
-def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None, profile: bool = False):
+def get_playbooks(
+    mode: str,
+    team_id: str,
+    franchise_id: str = None,
+    tournament_id: str = None,
+    game_id: str = None,
+    source: str = None,
+    profile: bool = False,
+    debug_pc: Optional[str] = Query(None),
+):
     """
     Get plays for a team from the appropriate mode document.
     Add profile=1 to get profile_summary in the response.
@@ -1802,7 +1806,16 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         from BackEnd.utils.profiling import run_profiled
         _out = [None]
         def _wrapped():
-            _out[0] = get_playbooks(mode, team_id, franchise_id, tournament_id, game_id, source, profile=False)
+            _out[0] = get_playbooks(
+                mode,
+                team_id,
+                franchise_id,
+                tournament_id,
+                game_id,
+                source,
+                profile=False,
+                debug_pc=debug_pc,
+            )
         profile_summary = run_profiled(_wrapped, top_n=60)
         result = _out[0]
         result["profile_summary"] = profile_summary
@@ -2766,7 +2779,7 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         even_distribution_all = playbook_settings.get("even_distribution_all", False) if playbook_settings else False
         playbook_meta = simplified_playbook_settings.get("_meta", {})
         
-        if _debug_pc_enabled():
+        if _debug_pc_on(debug_pc):
             _off = (pc_order or {}).get("offense") or []
             _def = (pc_order or {}).get("defense") or []
             _slots = (playbook_settings or {}).get("slot_assignments") if isinstance(playbook_settings, dict) else {}

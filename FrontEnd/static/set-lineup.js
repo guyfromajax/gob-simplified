@@ -362,12 +362,16 @@ function getLineupPlaybookUrl() {
   if (tournamentId) params.set('tournament_id', tournamentId);
   const currentGameId = gameId ? new URLSearchParams(window.location.search).get('game_id') : null;
   if (currentGameId) params.set('game_id', currentGameId);
+  if (typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(qp)) {
+    params.set('debug_pc', '1');
+  }
   return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
 }
 
 async function fetchLineupPlaybooksData() {
   const apiUrl = getLineupPlaybookUrl();
-  const __debugPc = urlParams.get('debug_pc') === '1';
+  const __debugPc =
+    typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(urlParams);
   const response = await fetch(apiUrl, { headers: API_CONFIG.getAuthHeaders() });
   if (abortIfAccessDenied(response)) return null;
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);

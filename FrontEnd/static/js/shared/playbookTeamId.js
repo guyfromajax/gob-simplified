@@ -36,5 +36,20 @@
     return null;
   }
 
+  /** Match server debug_pc_enabled: 1 / true / yes (case-insensitive). */
+  function isDebugPlaycallSearch(source) {
+    var params =
+      source instanceof URLSearchParams
+        ? source
+        : new URLSearchParams(
+            typeof source === 'string' && source.charAt(0) === '?'
+              ? source.slice(1)
+              : source || ''
+          );
+    var v = (params.get('debug_pc') || '').trim().toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  }
+
   g.resolvePlaybookTeamIdFromSearch = resolvePlaybookTeamIdFromSearch;
+  g.isDebugPlaycallSearch = isDebugPlaycallSearch;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
