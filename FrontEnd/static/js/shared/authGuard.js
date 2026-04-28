@@ -50,6 +50,8 @@
     "/",
     "/homepage.html",
     "/homepage",
+    "/homepage-v3.html",
+    "/homepage-v3",
     "/login.html",
     "/login",
     "/signup.html",
