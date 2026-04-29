@@ -4,7 +4,7 @@ body.mode-select-page {
   padding: 88px 22px 54px;
   font-family: 'Inter', sans-serif;
   color: #f7f9ff;
-  background: #0d1124;
+  background: #0b0d14;
 }
 
 body.mode-select-page button,
@@ -94,10 +94,13 @@ body.mode-select-page .alpha-disclaimer-dismiss:hover {
 }
 
 body.mode-select-page .community-panel,
-body.mode-select-page .franchise-home-card {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(42, 48, 58, 0.92);
+body.mode-select-page .franchise-home-card,
+body.mode-select-page .community-highlights-panel {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 14%),
+    rgba(22, 26, 36, 0.97);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
 }
 
@@ -120,10 +123,6 @@ body.mode-select-page .franchise-delete-section {
 }
 
 body.mode-select-page .community-highlights-panel {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(42, 48, 58, 0.92);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
   min-height: 240px;
   padding: 16px 20px 10px;
 }
@@ -522,9 +521,9 @@ body.mode-select-page .franchise-home-card-active {
   min-height: 220px;
   border-radius: 14px;
   overflow: hidden;
-  background-color: #0d1124;
+  background-color: #0b0d14;
   background-size: cover;
-  background-position: center;
+  background-position: center center;
 }
 
 body.mode-select-page .franchise-home-card-active::before {
@@ -534,17 +533,17 @@ body.mode-select-page .franchise-home-card-active::before {
   background:
     linear-gradient(
       to bottom,
-      rgba(13, 17, 36, 0.15) 0%,
-      rgba(13, 17, 36, 0.5) 50%,
-      rgba(13, 17, 36, 0.92) 75%,
-      rgba(13, 17, 36, 0.98) 100%
+      rgba(11, 13, 20, 0.15) 0%,
+      rgba(11, 13, 20, 0.55) 50%,
+      rgba(11, 13, 20, 0.95) 80%,
+      rgba(11, 13, 20, 0.99) 100%
     ),
     linear-gradient(
       to right,
-      rgba(13, 17, 36, 0.0) 0%,
-      rgba(13, 17, 36, 0.0) 30%,
-      rgba(13, 17, 36, 0.7) 60%,
-      rgba(13, 17, 36, 0.85) 100%
+      rgba(11, 13, 20, 0) 0%,
+      rgba(11, 13, 20, 0) 30%,
+      rgba(11, 13, 20, 0.7) 60%,
+      rgba(11, 13, 20, 0.85) 100%
     );
   z-index: 1;
 }

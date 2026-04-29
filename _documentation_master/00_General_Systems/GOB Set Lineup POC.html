@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GOB — Set Lineup Shell POC</title>
+  <style>
+    @font-face {
+      font-family: 'Bebas Neue Pro';
+      src: url('./fonts/BebasNeuePro-Bold.otf') format('opentype');
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Bebas Neue Pro';
+      src: url('./fonts/BebasNeuePro-Regular.otf') format('opentype');
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+
+    :root {
+      --bg:        #0b0d14;
+      --orange:    #F79420;
+      --green:     #34EC27;
+      --white:     #ffffff;
+      --w90:       rgba(255,255,255,0.90);
+      --w70:       rgba(255,255,255,0.70);
+      --w50:       rgba(255,255,255,0.50);
+      --w35:       rgba(255,255,255,0.35);
+      --w20:       rgba(255,255,255,0.20);
+      --w12:       rgba(255,255,255,0.12);
+      --w08:       rgba(255,255,255,0.08);
+      --w05:       rgba(255,255,255,0.05);
+      --bebas:     'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      --inter:     'Inter', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: var(--inter);
+      background: var(--bg);
+      color: var(--w90);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Shell (same as FCC) ── */
+    #lineup-shell {
+      position: relative;
+      width: min(1400px, calc(100vw - 24px));
+      margin: 12px auto 18px;
+      height: calc(100vh - 36px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Shell glass layer */
+    #lineup-shell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.09);
+      background:
+        linear-gradient(160deg, rgba(255,255,255,0.028) 0%, rgba(255,255,255,0.014) 18%, transparent 40%),
+        rgba(14,16,24,0.96);
+      box-shadow: 0 20px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07);
+      pointer-events: none;
+    }
+
+    /* Diagonal banding */
+    #lineup-shell::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      background: repeating-linear-gradient(
+        132deg,
+        transparent 0 102px,
+        rgba(255,255,255,0.012) 102px 103px,
+        transparent 103px 208px
+      );
+      pointer-events: none;
+    }
+
+    #lineup-shell > * { position: relative; z-index: 1; }
+
+    /* ── Banner strip ── */
+    .banner-strip {
+      flex: 0 0 76px;
+      overflow: hidden;
+      border-radius: 24px 24px 0 0;
+      position: relative;
+    }
+    .banner-img {
+      width: 100%; height: 76px;
+      object-fit: cover; object-position: center 35%;
+      display: block;
+    }
+    /* Gradient over banner so context bar reads cleanly */
+    .banner-strip::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(11,13,20,0.20) 0%, rgba(11,13,20,0.65) 100%);
+    }
+
+    /* ── Context bar ── */
+    .context-bar {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 9px 20px;
+      background: rgba(14,17,28,0.98);
+      border-bottom: 1px solid rgba(255,255,255,0.09);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .scoreboard-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 999px;
+    }
+
+    .sb-team { font-size: 13px; color: var(--w50); white-space: nowrap; }
+    .sb-score {
+      font-family: var(--bebas);
+      font-size: 24px;
+      line-height: 1;
+      color: var(--white);
+    }
+    .sb-sep { font-family: var(--bebas); font-size: 24px; color: rgba(255,255,255,0.3); }
+    .sb-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.10); }
+    .sb-info {
+      font-family: var(--bebas);
+      font-size: 17px;
+      color: var(--orange);
+      white-space: nowrap;
+    }
+    .sb-info-neutral {
+      font-family: var(--bebas);
+      font-size: 17px;
+      color: var(--white);
+      white-space: nowrap;
+    }
+
+    .context-actions { display: flex; align-items: center; gap: 10px; }
+
+    .ctx-btn {
+      appearance: none;
+      height: 36px;
+      min-width: 120px;
+      padding: 0 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-family: var(--bebas);
+      font-size: 16px;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: filter 0.14s, transform 0.14s, opacity 0.14s;
+    }
+    .ctx-btn:hover:not(.disabled) { transform: translateY(-1px); filter: brightness(1.05); }
+    .ctx-btn-green {
+      background: var(--green);
+      color: #07101f;
+      border-color: rgba(52,236,39,0.5);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .ctx-btn-ghost {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.14);
+      color: var(--w90);
+    }
+    .ctx-btn.disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Main split ── */
+    .lineup-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+    }
+
+    /* ── Left: Roster ── */
+    .roster-panel {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 18px 12px;
+      background: rgba(13,16,24,0.97);
+    }
+
+    .roster-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    .roster-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--w35);
+    }
+
+    .toggle-wrap {
+      display: flex;
+      gap: 0;
+      padding: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 10px;
+    }
+    .toggle-btn {
+      padding: 5px 14px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--w35);
+      font-family: var(--bebas);
+      font-size: 14px;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .toggle-btn.active {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(255,255,255,0.18);
+      color: var(--white);
+    }
+
+    /* Roster table */
+    .roster-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.02);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.15) transparent;
+    }
+
+    .roster-table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .roster-table thead th {
+      position: sticky; top: 0; z-index: 2;
+      padding: 8px 8px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.40);
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      text-align: center; white-space: nowrap;
+    }
+    .roster-table thead th:first-child { text-align: left; padding-left: 14px; }
+
+    .roster-table tbody td {
+      padding: 9px 8px;
+      font-size: 12px;
+      color: var(--w70);
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .roster-table tbody td:first-child {
+      text-align: left; padding-left: 14px;
+      font-weight: 700; color: var(--white);
+    }
+    .roster-table tbody tr:nth-child(odd) td { background: rgba(255,255,255,0.02); }
+    .roster-table tbody tr:hover td { background: rgba(255,255,255,0.05); }
+
+    /* Assigned row — dimmed with orange left border */
+    .roster-table tbody tr.assigned td {
+      opacity: 0.45; cursor: not-allowed;
+    }
+    .roster-table tbody tr.assigned td:first-child {
+      box-shadow: inset 3px 0 0 rgba(247,148,32,0.7);
+    }
+
+    /* Attribute color pills */
+    .attr { font-weight: 700; }
+    .attr-red    { color: #ff6d6d; }
+    .attr-yellow { color: #FFD700; }
+    .attr-green  { color: #34EC27; }
+    .attr-blue   { color: #4A90D9; }
+    .attr-orange { color: var(--orange); }
+
+    /* Panel actions */
+    .panel-actions {
+      display: flex;
+      gap: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+    .panel-btn {
+      appearance: none; min-width: 140px; height: 34px; padding: 0 14px;
+      border-radius: 8px; font-family: var(--bebas); font-size: 15px; letter-spacing: 0.03em;
+      cursor: pointer; transition: filter 0.14s, transform 0.14s;
+    }
+    .panel-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    .panel-btn-orange { background: var(--orange); color: #15181f; border: 1px solid rgba(247,148,32,0.45); }
+    .panel-btn-ghost {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+      color: var(--w90);
+    }
+
+    /* ── Right: Lineup slots ── */
+    .slots-panel {
+      width: 38%;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 18px 12px;
+      background: rgba(16,19,30,0.98);
+      border-left: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .slots-label {
+      font-family: var(--bebas);
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      color: var(--w35);
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    .slots-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    /* Slot — empty */
+    .slot {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 62px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px dashed rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.02);
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    /* Slot — filled */
+    .slot.filled {
+      border-style: solid;
+      border-color: rgba(247,148,32,0.22);
+      background: rgba(247,148,32,0.04);
+    }
+
+    .slot-pos {
+      font-family: var(--bebas);
+      font-size: 15px;
+      color: var(--w35);
+      width: 26px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .slot.filled .slot-pos { color: var(--w70); }
+
+    .slot-empty-text {
+      font-size: 12px;
+      font-style: italic;
+      color: rgba(255,255,255,0.22);
+    }
+
+    .slot-info {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .slot-row1 {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .slot-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--white);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .slot-rating {
+      font-family: var(--bebas);
+      font-size: 15px;
+      color: var(--orange);
+      flex-shrink: 0;
+    }
+    .slot-row2 {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--w50);
+    }
+    .slot-row2 span { font-weight: 600; }
+
+    .slot-remove {
+      appearance: none;
+      background: transparent; border: none;
+      color: rgba(255,255,255,0.25);
+      font-size: 14px; cursor: pointer;
+      flex-shrink: 0; transition: color 0.14s;
+    }
+    .slot-remove:hover { color: var(--white); }
+
+    /* Shot weights strip */
+    .shot-weights {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+    .shot-weights-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      color: var(--w35); margin-bottom: 7px;
+    }
+    .shot-weights-strip {
+      display: flex;
+      gap: 5px;
+    }
+    .sw-pill {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8px 4px 6px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.04);
+      gap: 3px;
+    }
+    .sw-pos { font-family: var(--bebas); font-size: 11px; color: var(--w35); letter-spacing: 0.05em; }
+    .sw-val { font-size: 18px; font-weight: 700; color: var(--white); line-height: 1; }
+    .sw-bar {
+      width: 80%; height: 2px; border-radius: 2px;
+      background: var(--orange); opacity: 0.6;
+    }
+
+    /* Autoset */
+    .autoset-wrap {
+      padding-top: 10px;
+      margin-top: 2px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .autoset-btn {
+      width: 100%; height: 34px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      font-family: var(--bebas); font-size: 15px; letter-spacing: 0.03em;
+      color: var(--w70); cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .autoset-btn:hover { background: rgba(255,255,255,0.10); color: var(--white); }
+
+    /* ── Tweaks ── */
+    .tweaks-panel {
+      display: none; position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: rgba(10,12,20,0.97); border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px; padding: 18px; width: 240px;
+      box-shadow: 0 20px 48px rgba(0,0,0,0.6);
+    }
+    .tweaks-panel.open { display: block; }
+    .tweaks-title {
+      font-family: var(--bebas); font-size: 13px; letter-spacing: 0.12em;
+      color: var(--white); margin-bottom: 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .tweaks-close { background: none; border: none; color: var(--w35); cursor: pointer; font-size: 16px; }
+    .tweaks-close:hover { color: var(--white); }
+    .tweak-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .tweak-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--w35); }
+    .tweak-options { display: flex; gap: 5px; }
+    .tweak-btn {
+      flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 6px; color: var(--w50); cursor: pointer; text-align: center; transition: all 0.15s;
+    }
+    .tweak-btn.active, .tweak-btn:hover { background: rgba(247,148,32,0.10); border-color: rgba(247,148,32,0.35); color: var(--orange); }
+  </style>
+</head>
+<body>
+
+  <div id="lineup-shell">
+
+    <!-- Banner strip -->
+    <div class="banner-strip">
+      <img
+        class="banner-img"
+        src="./FrontEnd/static/images/teams/four_corners/four_corners_banner_primary.jpg"
+        alt="Four Corners Harvest"
+      >
+    </div>
+
+    <!-- Context bar -->
+    <div class="context-bar">
+      <div class="scoreboard-pill">
+        <span class="sb-team">FOUR CORNERS</span>
+        <span class="sb-score">0</span>
+        <span class="sb-sep">—</span>
+        <span class="sb-score">0</span>
+        <span class="sb-team">MORRISTOWN</span>
+        <span class="sb-divider"></span>
+        <span class="sb-info">Pre-Game</span>
+        <span class="sb-divider"></span>
+        <span class="sb-info-neutral">--:--</span>
+      </div>
+      <div class="context-actions">
+        <button class="ctx-btn ctx-btn-green disabled" type="button" id="play-btn">Play Game</button>
+      </div>
+    </div>
+
+    <!-- Main split -->
+    <div class="lineup-main">
+
+      <!-- Left: Roster -->
+      <div class="roster-panel">
+        <div class="roster-header">
+          <span class="roster-label">Roster — click or drag to assign</span>
+          <div class="toggle-wrap">
+            <button class="toggle-btn active" type="button">Attributes</button>
+            <button class="toggle-btn" type="button">Stats</button>
+          </div>
+        </div>
+
+        <div class="roster-scroll">
+          <table class="roster-table">
+            <thead>
+              <tr>
+                <th>Player Name &nbsp; RT</th>
+                <th>Pos</th>
+                <th>HT</th>
+                <th>WT</th>
+                <th>SC</th>
+                <th>SH</th>
+                <th>ID</th>
+                <th>OD</th>
+                <th>PS</th>
+                <th>BH</th>
+                <th>RB</th>
+                <th>ST</th>
+                <th>AG</th>
+                <th>ND</th>
+                <th>IQ</th>
+                <th>FT</th>
+                <th>NG</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="assigned">
+                <td>Kevin Nelson &nbsp; <span class="attr-orange">82</span></td>
+                <td>PG</td><td>6'2"</td><td>185</td>
+                <td class="attr attr-blue">88</td>
+                <td class="attr attr-blue">84</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-blue">81</td>
+                <td class="attr attr-blue">86</td>
+                <td class="attr attr-yellow">55</td>
+                <td class="attr attr-green">74</td>
+                <td class="attr attr-blue">82</td>
+                <td class="attr attr-green">66</td>
+                <td class="attr attr-blue">80</td>
+                <td class="attr attr-green">78</td>
+                <td class="attr attr-green">High</td>
+              </tr>
+              <tr class="assigned">
+                <td>Carlton Bonner &nbsp; <span class="attr-orange">78</span></td>
+                <td>SG</td><td>6'4"</td><td>200</td>
+                <td class="attr attr-blue">82</td>
+                <td class="attr attr-blue">85</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-green">71</td>
+                <td class="attr attr-green">74</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-yellow">60</td>
+                <td class="attr attr-green">65</td>
+                <td class="attr attr-green">76</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-green">75</td>
+                <td class="attr attr-green">High</td>
+              </tr>
+              <tr>
+                <td>Mose Hawkins &nbsp; <span class="attr-orange">76</span></td>
+                <td>SF</td><td>6'6"</td><td>215</td>
+                <td class="attr attr-blue">80</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-green">75</td>
+                <td class="attr attr-blue">82</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-green">65</td>
+                <td class="attr attr-blue">84</td>
+                <td class="attr attr-yellow">62</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-green">74</td>
+                <td class="attr attr-yellow">60</td>
+                <td class="attr attr-green">High</td>
+              </tr>
+              <tr>
+                <td>Kwame Castor &nbsp; <span class="attr-orange">74</span></td>
+                <td>PF</td><td>6'8"</td><td>230</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-yellow">55</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-blue">85</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-yellow">52</td>
+                <td class="attr attr-blue">86</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-green">66</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-yellow">55</td>
+                <td class="attr attr-green">High</td>
+              </tr>
+              <tr>
+                <td>DeShawn Morris &nbsp; <span class="attr-orange">70</span></td>
+                <td>C</td><td>6'10"</td><td>245</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-red">42</td>
+                <td class="attr attr-yellow">62</td>
+                <td class="attr attr-blue">88</td>
+                <td class="attr attr-yellow">50</td>
+                <td class="attr attr-yellow">45</td>
+                <td class="attr attr-blue">90</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-yellow">55</td>
+                <td class="attr attr-green">65</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-red">44</td>
+                <td class="attr attr-green">High</td>
+              </tr>
+              <tr>
+                <td>Terrence Webb &nbsp; <span class="attr-orange">66</span></td>
+                <td>PG</td><td>6'0"</td><td>175</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-yellow">60</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-green">76</td>
+                <td class="attr attr-blue">82</td>
+                <td class="attr attr-yellow">50</td>
+                <td class="attr attr-blue">80</td>
+                <td class="attr attr-green">74</td>
+                <td class="attr attr-green">62</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-yellow">Med</td>
+              </tr>
+              <tr>
+                <td>Isaiah Pruitt &nbsp; <span class="attr-orange">62</span></td>
+                <td>SG</td><td>6'3"</td><td>195</td>
+                <td class="attr attr-green">66</td>
+                <td class="attr attr-green">74</td>
+                <td class="attr attr-yellow">55</td>
+                <td class="attr attr-yellow">60</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-yellow">52</td>
+                <td class="attr attr-green">64</td>
+                <td class="attr attr-green">70</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-yellow">62</td>
+                <td class="attr attr-green">72</td>
+                <td class="attr attr-green">High</td>
+              </tr>
+              <tr>
+                <td>Marcus Teel &nbsp; <span class="attr-orange">58</span></td>
+                <td>SF</td><td>6'5"</td><td>208</td>
+                <td class="attr attr-green">62</td>
+                <td class="attr attr-yellow">60</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-green">65</td>
+                <td class="attr attr-yellow">55</td>
+                <td class="attr attr-yellow">52</td>
+                <td class="attr attr-green">68</td>
+                <td class="attr attr-yellow">56</td>
+                <td class="attr attr-green">64</td>
+                <td class="attr attr-yellow">54</td>
+                <td class="attr attr-yellow">60</td>
+                <td class="attr attr-yellow">58</td>
+                <td class="attr attr-yellow">Med</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel-actions">
+          <button class="panel-btn panel-btn-orange" type="button">Game Plan</button>
+          <button class="panel-btn panel-btn-ghost" type="button">Playbooks</button>
+        </div>
+      </div>
+
+      <!-- Right: Lineup slots -->
+      <div class="slots-panel">
+        <div class="slots-label">Starting Five</div>
+
+        <ul class="slots-list">
+          <!-- PG — filled -->
+          <li class="slot filled">
+            <span class="slot-pos">PG</span>
+            <div class="slot-info">
+              <div class="slot-row1">
+                <span class="slot-name">Kevin Nelson</span>
+                <span class="slot-rating">82</span>
+              </div>
+              <div class="slot-row2">
+                <span>SC <strong class="attr-blue">88</strong></span>
+                <span>BH <strong class="attr-blue">86</strong></span>
+                <span>IQ <strong class="attr-blue">80</strong></span>
+                <span>NG <strong style="color:#34EC27">High</strong></span>
+              </div>
+            </div>
+            <button class="slot-remove" type="button">✕</button>
+          </li>
+
+          <!-- SG — filled -->
+          <li class="slot filled">
+            <span class="slot-pos">SG</span>
+            <div class="slot-info">
+              <div class="slot-row1">
+                <span class="slot-name">Carlton Bonner</span>
+                <span class="slot-rating">78</span>
+              </div>
+              <div class="slot-row2">
+                <span>SC <strong class="attr-blue">82</strong></span>
+                <span>SH <strong class="attr-blue">85</strong></span>
+                <span>IQ <strong class="attr-green">72</strong></span>
+                <span>NG <strong style="color:#34EC27">High</strong></span>
+              </div>
+            </div>
+            <button class="slot-remove" type="button">✕</button>
+          </li>
+
+          <!-- SF — empty -->
+          <li class="slot">
+            <span class="slot-pos">SF</span>
+            <span class="slot-empty-text">Drag a player here</span>
+          </li>
+
+          <!-- PF — empty -->
+          <li class="slot">
+            <span class="slot-pos">PF</span>
+            <span class="slot-empty-text">Drag a player here</span>
+          </li>
+
+          <!-- C — empty -->
+          <li class="slot">
+            <span class="slot-pos">C</span>
+            <span class="slot-empty-text">Drag a player here</span>
+          </li>
+        </ul>
+
+        <!-- Shot weights -->
+        <div class="shot-weights">
+          <div class="shot-weights-label">Shot Weight by Position</div>
+          <div class="shot-weights-strip">
+            <div class="sw-pill">
+              <span class="sw-pos">PG</span>
+              <span class="sw-val">28</span>
+              <div class="sw-bar"></div>
+            </div>
+            <div class="sw-pill">
+              <span class="sw-pos">SG</span>
+              <span class="sw-val">24</span>
+              <div class="sw-bar"></div>
+            </div>
+            <div class="sw-pill">
+              <span class="sw-pos">SF</span>
+              <span class="sw-val">20</span>
+              <div class="sw-bar"></div>
+            </div>
+            <div class="sw-pill">
+              <span class="sw-pos">PF</span>
+              <span class="sw-val">16</span>
+              <div class="sw-bar"></div>
+            </div>
+            <div class="sw-pill">
+              <span class="sw-pos">C</span>
+              <span class="sw-val">12</span>
+              <div class="sw-bar"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="autoset-wrap">
+          <button class="autoset-btn" type="button">Autoset Lineup</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Tweaks -->
+  <div class="tweaks-panel" id="tweaks-panel">
+    <div class="tweaks-title">
+      Tweaks
+      <button class="tweaks-close" id="tweaks-close" type="button">✕</button>
+    </div>
+
+    <div class="tweak-row">
+      <span class="tweak-label">Left Panel Bg</span>
+      <div class="tweak-options">
+        <button class="tweak-btn active" data-tweak="leftBg" data-val="darker" type="button">Darker</button>
+        <button class="tweak-btn" data-tweak="leftBg" data-val="lighter" type="button">Mid</button>
+      </div>
+    </div>
+
+    <div class="tweak-row">
+      <span class="tweak-label">Filled Slot Style</span>
+      <div class="tweak-options">
+        <button class="tweak-btn active" data-tweak="slotStyle" data-val="orange" type="button">Orange</button>
+        <button class="tweak-btn" data-tweak="slotStyle" data-val="neutral" type="button">Neutral</button>
+      </div>
+    </div>
+
+    <div class="tweak-row">
+      <span class="tweak-label">Banner</span>
+      <div class="tweak-options">
+        <button class="tweak-btn active" data-tweak="banner" data-val="show" type="button">Show</button>
+        <button class="tweak-btn" data-tweak="banner" data-val="hide" type="button">Hide</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "leftBg": "darker",
+      "slotStyle": "orange",
+      "banner": "show"
+    }/*EDITMODE-END*/;
+
+    let tweaks = { ...TWEAK_DEFAULTS };
+
+    function applyTweaks() {
+      // Left panel bg
+      document.querySelector('.roster-panel').style.background =
+        tweaks.leftBg === 'lighter'
+          ? 'rgba(18,22,32,0.97)'
+          : 'rgba(13,16,24,0.97)';
+
+      // Filled slot style
+      document.querySelectorAll('.slot.filled').forEach(s => {
+        if (tweaks.slotStyle === 'neutral') {
+          s.style.borderColor = 'rgba(255,255,255,0.14)';
+          s.style.background = 'rgba(255,255,255,0.04)';
+        } else {
+          s.style.borderColor = '';
+          s.style.background = '';
+        }
+      });
+
+      // Banner
+      document.querySelector('.banner-strip').style.display =
+        tweaks.banner === 'hide' ? 'none' : '';
+    }
+
+    window.addEventListener('message', e => {
+      if (e.data?.type === '__activate_edit_mode') document.getElementById('tweaks-panel').classList.add('open');
+      if (e.data?.type === '__deactivate_edit_mode') document.getElementById('tweaks-panel').classList.remove('open');
+    });
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+    document.getElementById('tweaks-close').addEventListener('click', () => {
+      document.getElementById('tweaks-panel').classList.remove('open');
+      window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+    });
+
+    document.querySelectorAll('[data-tweak]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.tweak, val = btn.dataset.val;
+        tweaks[key] = val;
+        document.querySelectorAll(`[data-tweak="${key}"]`).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyTweaks();
+        window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: val } }, '*');
+      });
+    });
+
+    applyTweaks();
+  </script>
+</body>
+</html>

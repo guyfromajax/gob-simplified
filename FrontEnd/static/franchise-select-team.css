@@ -4,7 +4,7 @@ body {
   padding: 90px 24px 50px;
   font-family: 'Inter', sans-serif;
   color: #f7f9ff;
-  background: #0d1124;
+  background: #0b0d14;
 }
 
 button,
@@ -99,7 +99,7 @@ input[type="reset"] {
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #0d1124;
+  background: #0b0d14;
 }
 
 .team-card-banner img {
@@ -180,7 +180,7 @@ input[type="reset"] {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #0d1124;
+  background: #0b0d14;
   z-index: 9999;
 }
 
