@@ -97,7 +97,7 @@
       /* Canvas fills grid-allocated container; Phaser must match container dimensions */
     }
     #app-grid .player-stats-panel.home { grid-area: right-stats; min-height: 0; min-width: 0; }
-    /* Game controls strip lives inside #phaser-container; styled below under PAUSE/SKIP CONTROLS */
+    /* Game controls strip lives inside #playcall-center; styled under PAUSE/SKIP CONTROLS */
     #app-grid #playcall-center {
       grid-area: playcall;
       grid-column: 2; /* Force center column only so container does not cover side panels */
@@ -2400,12 +2400,13 @@
     }
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
-    /* Controls strip lives inside #phaser-container; positioned at bottom (out-of-bounds area) */
+    /* Controls strip is a child of #playcall-center (in-flow, below #playcall-main-row) */
     #game-controls-strip {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      position: relative;
+      flex: 0 0 auto;
+      align-self: stretch;
+      width: 100%;
+      box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -2413,7 +2414,7 @@
       padding: 7px 20px;
       background: rgba(7, 8, 14, 0.88);
       border-top: 1px solid rgba(255, 255, 255, 0.08);
-      z-index: 40;
+      z-index: 1;
     }
     .game-controls {
       position: absolute;
@@ -3368,13 +3369,6 @@
         </div>
       </div>
 
-      <!-- Game controls: inside court container, bottom out-of-bounds -->
-      <div id="game-controls-strip">
-        <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
-        <button id="pause-btn">Pause</button>
-        <button id="timeout-btn" type="button">Timeout<span class="timeout-pips" id="timeout-pips" aria-hidden="true"><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span></span></button>
-      </div>
-      
     </div>
 
     <!-- HOME PLAYER STATS PANEL (RIGHT) - grid-area: right-stats -->
@@ -3576,6 +3570,12 @@
           </div>
         </div>
       </div>
+    </div>
+    <!-- Game controls: inside Playcall Center (DOM child of #playcall-center) -->
+    <div id="game-controls-strip">
+      <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
+      <button id="pause-btn">Pause</button>
+      <button id="timeout-btn" type="button">Timeout<span class="timeout-pips" id="timeout-pips" aria-hidden="true"><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span></span></button>
     </div>
   </div>  <!-- Close #playcall-center -->
   </div>  <!-- Close #app-grid -->
