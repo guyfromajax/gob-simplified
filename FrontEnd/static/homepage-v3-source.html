@@ -133,10 +133,12 @@
     }
     .hero-hed {
       font-family: var(--bebas);
-      font-size: clamp(5.5rem, 11vw, 10.5rem);
+      /* Tuned so “Build A Program.” fits one line above the fold on typical laptop widths */
+      font-size: clamp(2.5rem, 4.2vw + 1.25rem, 6rem);
       line-height: 0.94; letter-spacing: 0.01em; color: var(--w);
     }
     .hero-hed span { display: block; }
+    .hero-hed span:first-child { white-space: nowrap; }
     .hero-sub {
       font-size: clamp(1rem, 1.6vw, 1.125rem); color: var(--w70);
       max-width: 520px; line-height: 1.7;
@@ -484,7 +486,7 @@
     }
     @media (max-width: 640px) {
       .wrap, .site-footer { padding-left: 20px; padding-right: 20px; }
-      .hero-hed { font-size: 4.5rem; }
+      .hero-hed { font-size: clamp(2rem, 9.5vw, 3.25rem); }
       .footer-hed { font-size: 4rem; }
       .deepdive-hed { font-size: 3.5rem; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
