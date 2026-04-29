@@ -13,24 +13,8 @@
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <link rel="stylesheet" href="/css/auth-bar.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @font-face {
-      font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Bold.otf') format('opentype');
-      font-weight: 700; font-style: normal; font-display: swap;
-    }
-    @font-face {
-      font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Regular.otf') format('opentype');
-      font-weight: 400; font-style: normal; font-display: swap;
-    }
-    @font-face {
-      font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Book.otf') format('opentype');
-      font-weight: 300; font-style: normal; font-display: swap;
-    }
-
     /* ── Tokens ── */
     :root {
       --bg:         #08080f;
@@ -49,7 +33,7 @@
       --w06:        rgba(255,255,255,0.06);
       --border:     rgba(255,255,255,0.10);
       --border-lt:  rgba(255,255,255,0.20);
-      --bebas:      'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      --bebas:      'Bebas Neue', sans-serif;
       --inter:      'Inter', sans-serif;
       --max:        1240px;
     }
@@ -326,16 +310,28 @@
 
     /* Pullquote: typographic section break */
     .pullquote {
+      container-type: inline-size;
       padding: 72px 0;
       border-bottom: 1px solid var(--border);
       text-align: center;
+      overflow-x: auto;
     }
     .pullquote-text {
+      max-width: 900px; margin: 0 auto; padding: 0 48px;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    .pullquote-quote {
       font-family: var(--bebas);
-      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      white-space: nowrap;
+      font-size: min(4.5rem, max(1rem, calc(100cqi / 30)));
       line-height: 1.05; letter-spacing: 0.015em;
       color: rgba(255,255,255,0.18);
-      max-width: 900px; margin: 0 auto; padding: 0 48px;
+    }
+    .pullquote-attrib {
+      font-family: var(--inter);
+      font-size: 0.95rem; font-weight: 500; font-style: italic;
+      letter-spacing: 0.02em;
+      color: rgba(255,255,255,0.28);
     }
 
     /* ══════════════════════════════════
@@ -673,7 +669,10 @@
 
       <!-- Pullquote breaker -->
       <div class="pullquote anim">
-        <p class="pullquote-text">“Failing to prepare is preparing to fail.” — John Wooden</p>
+        <p class="pullquote-text">
+          <span class="pullquote-quote">“Failing to prepare is preparing to fail.”</span>
+          <span class="pullquote-attrib">— John Wooden</span>
+        </p>
       </div>
 
       <!-- Feature 03 -->
