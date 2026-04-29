@@ -2908,6 +2908,103 @@
       filter: brightness(1.06);
       transform: translateY(-1px);
     }
+
+/* ===== DESIGN OVERRIDES — appended, do not edit above ===== */
+
+/* 1. Logo containers: cap width so rank/record is visible */
+#away-logo-container,
+#home-logo-container {
+  width: 180px !important;
+  max-width: 180px !important;
+  height: 90px !important;
+  overflow: hidden !important;
+}
+#scoreboard img.team-logo {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+/* 2. Scoreboard rank/record meta blocks — ensure they render */
+.sb-team-meta {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  justify-content: center !important;
+}
+.sb-team-meta--away { grid-column: 3 !important; }
+.sb-team-meta--home { grid-column: 28 !important; }
+.sb-rank {
+  font-family: 'Bebas Neue', sans-serif !important;
+  font-size: 14px !important;
+  color: rgba(255,255,255,0.55) !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+.sb-record {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: rgba(255,255,255,0.35) !important;
+  display: block !important;
+}
+
+/* 3. Playcall main row: stretch children to fill height */
+#playcall-main-row {
+  align-items: stretch !important;
+  min-height: 0 !important;
+}
+
+/* 4. Card zone: fill full height, stack offense+defense equally */
+.pcc-card-zone {
+  align-self: stretch !important;
+}
+.pcc-card-zone .zone-inner {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  height: 100% !important;
+  flex: 1 !important;
+}
+.pcc-scroller-row {
+  flex: 1 1 0 !important;
+  min-height: 44px !important;
+  align-items: stretch !important;
+}
+.pcc-play-card {
+  min-height: 44px !important;
+  align-self: stretch !important;
+}
+
+/* 5. Stacks zone: equal height strips via flex */
+#pcc-stacks-zone {
+  align-self: stretch !important;
+}
+.pcc-stack {
+  flex: 1 1 0 !important;
+  height: auto !important;
+  min-height: 26px !important;
+}
+
+/* 6. Away panel header: show text alongside logo image */
+.player-stats-panel.away .stats-header h3 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 16px !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+}
+.player-stats-panel.away .stats-header h3 img {
+  height: 22px !important;
+  width: auto !important;
+  flex-shrink: 0 !important;
+  object-fit: contain !important;
+}
+
+/* ===== END DESIGN OVERRIDES ===== */
   </style>
 </head>
 <body>
