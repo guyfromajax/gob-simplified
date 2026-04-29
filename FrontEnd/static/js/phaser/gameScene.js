@@ -48,6 +48,139 @@ function isDebugPlaycall() {
   }
 }
 
+function resolvePrimaryHexFromTeamColors(colors) {
+  if (!colors) return null;
+  if (typeof colors === 'string') return colors;
+  return (
+    colors.primary_color ||
+    colors.primary ||
+    colors.Primary ||
+    colors.primaryColor ||
+    null
+  );
+}
+
+function hexToRgbTripletString(hex) {
+  if (!hex || typeof hex !== 'string') return null;
+  let h = hex.trim();
+  if (h.startsWith('#')) h = h.slice(1);
+  if (h.length === 3) {
+    h = h.split('').map((c) => c + c).join('');
+  }
+  if (h.length !== 6) return null;
+  const n = parseInt(h, 16);
+  if (!Number.isFinite(n)) return null;
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+
+function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors) {
+  if (typeof document === 'undefined') return;
+  const hh = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(homeColors));
+  const ah = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(awayColors));
+  if (hh) {
+    document.documentElement.style.setProperty('--home-vibrant-rgb', hh);
+  }
+  if (ah) {
+    document.documentElement.style.setProperty('--away-vibrant-rgb', ah);
+  }
+}
+
+function updateMomentumBar(teamSide, value) {
+  const negEl = document.getElementById(`${teamSide}-momentum-neg`);
+  const posEl = document.getElementById(`${teamSide}-momentum-pos`);
+  if (!negEl || !posEl) return;
+  const v = Math.max(-50, Math.min(50, Number(value) || 0));
+  if (v < 0) {
+    negEl.style.width = `${Math.abs(v)}%`;
+    posEl.style.width = '0%';
+  } else {
+    posEl.style.width = `${v}%`;
+    negEl.style.width = '0%';
+  }
+}
+
+function showPlaycallStrip(offensePlay, offenseTarget, defensePlay) {
+  const strip = document.getElementById('playcall-strip');
+  if (!strip) return;
+  const oPlay = document.getElementById('pcs-offense-play');
+  const oTgt = document.getElementById('pcs-offense-target');
+  const dPlay = document.getElementById('pcs-defense-play');
+  if (oPlay) oPlay.textContent = offensePlay || '--';
+  if (oTgt) oTgt.textContent = offenseTarget != null && String(offenseTarget).length ? String(offenseTarget) : '';
+  if (dPlay) dPlay.textContent = defensePlay || '--';
+  strip.classList.remove('hidden');
+}
+
+function hidePlaycallStrip() {
+  const strip = document.getElementById('playcall-strip');
+  if (strip) strip.classList.add('hidden');
+}
+
+function syncShotClockCriticalClass(shotSeconds) {
+  const el = document.getElementById('shot-clock');
+  if (!el) return;
+  if (shotSeconds == null || !Number.isFinite(Number(shotSeconds))) {
+    el.classList.remove('critical');
+    return;
+  }
+  el.classList.toggle('critical', Number(shotSeconds) < 7);
+}
+
+function updateTimeoutPipsUsedCount(remainingTimeouts, maxTimeouts = 4) {
+  const pipWrap = document.getElementById('timeout-pips');
+  if (!pipWrap) return;
+  const rem = Math.max(0, Math.floor(Number(remainingTimeouts) || 0));
+  const used = Math.max(0, Math.min(maxTimeouts, maxTimeouts - rem));
+  pipWrap.querySelectorAll('.to-pip').forEach((pip, i) => {
+    pip.classList.toggle('used', i < used);
+  });
+}
+
+function formatSbRank(teamObj) {
+  const r = Number(teamObj?.natl_rank);
+  if (Number.isInteger(r) && r >= 1) return `#${r}`;
+  return '#--';
+}
+
+function formatSbRecord(teamObj) {
+  const w = teamObj?.wins ?? teamObj?.team_wins;
+  const l = teamObj?.losses ?? teamObj?.team_losses;
+  if (Number.isFinite(Number(w)) && Number.isFinite(Number(l))) {
+    return `${w}-${l}`;
+  }
+  return '--';
+}
+
+function momentumValueForTeam(teamObj, turn, side) {
+  const fromTurn =
+    side === 'home'
+      ? Number(turn?.home_momentum_bar ?? turn?.home_momentum ?? turn?.home_team_momentum)
+      : Number(turn?.away_momentum_bar ?? turn?.away_momentum ?? turn?.away_team_momentum);
+  if (Number.isFinite(fromTurn)) {
+    return Math.max(-50, Math.min(50, fromTurn));
+  }
+  const attrs = teamObj?.attributes || teamObj?.team_attributes || {};
+  const m = Number(attrs.momentum ?? teamObj?.momentum_score);
+  if (Number.isFinite(m)) {
+    if (m >= 0 && m <= 10) {
+      return Math.round((m - 5) * 10);
+    }
+    return Math.max(-50, Math.min(50, m));
+  }
+  return 0;
+}
+
+function isHcoTurnContext(turn) {
+  if (!turn || typeof turn !== 'object') return false;
+  const keys = ['offensive_state', 'current_turn', 'play_type'];
+  for (let i = 0; i < keys.length; i += 1) {
+    const v = turn[keys[i]];
+    if (v != null && String(v).toUpperCase() === 'HCO') return true;
+  }
+  if (turn.playcall === 'HCO') return true;
+  return false;
+}
+
 function resolveCourtImagePath(teamNameOrSlug) {
   const fallbackPath = '/images/teams/general/general_court.jpg';
   const preferredPath = typeof getTeamAssetPath === 'function'
@@ -702,6 +835,7 @@ export function createGameScene(Phaser) {
         home: homeColors,
         away: awayColors,
       });
+      applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors);
       this.isFinal = simData.is_final;
       
       // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
@@ -811,6 +945,7 @@ export function createGameScene(Phaser) {
         formatter: (seconds) => String(Math.max(0, Math.floor(Number(seconds) || 0))),
       });
       this.shotClock.syncWithBackend(30);
+      syncShotClockCriticalClass(30);
       // Clocks are backend-driven: updated only when turn data is applied (updateScoreboard), not by a countdown interval.
       if (quarterEl && livePeriodLabel) {
         quarterEl.textContent = livePeriodLabel;
@@ -1759,6 +1894,17 @@ export function createGameScene(Phaser) {
           this.shotClock.pause('no_impact_turn');
         }
 
+        let shotSecForCritical = incomingShotSec;
+        if (shotSecForCritical == null && this.shotClock?.getState) {
+          const st = this.shotClock.getState();
+          if (Number.isFinite(st?.timeRemaining)) shotSecForCritical = st.timeRemaining;
+        }
+        if (isNoImpactShotClockTurn(turn)) {
+          syncShotClockCriticalClass(null);
+        } else {
+          syncShotClockCriticalClass(shotSecForCritical);
+        }
+
         if (turn.quarter != null) liveQuarter = turn.quarter;
         if (turn.period_label) {
           livePeriodLabel = turn.period_label;
@@ -1775,6 +1921,39 @@ export function createGameScene(Phaser) {
         if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
         // Clock text is written only by gameClock (single-writer authority).
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
+
+        const awayRankEl = document.getElementById('away-rank');
+        const awayRecEl = document.getElementById('away-record');
+        const homeRankEl = document.getElementById('home-rank');
+        const homeRecEl = document.getElementById('home-record');
+        if (awayRankEl) awayRankEl.textContent = formatSbRank(awayTeamObj);
+        if (awayRecEl) awayRecEl.textContent = formatSbRecord(awayTeamObj);
+        if (homeRankEl) homeRankEl.textContent = formatSbRank(homeTeamObj);
+        if (homeRecEl) homeRecEl.textContent = formatSbRecord(homeTeamObj);
+
+        updateMomentumBar('home', momentumValueForTeam(homeTeamObj, turn, 'home'));
+        updateMomentumBar('away', momentumValueForTeam(awayTeamObj, turn, 'away'));
+
+        const mySide = urlParams.get('my_team');
+        if (mySide === 'home') {
+          updateTimeoutPipsUsedCount(liveHomeTimeouts);
+        } else if (mySide === 'away') {
+          updateTimeoutPipsUsedCount(liveAwayTimeouts);
+        }
+
+        if (isHcoTurnContext(turn)) {
+          const offPlay = turn.offensive_playcall || turn.current_playcall || '';
+          const focusRaw = turn.offensive_play_focus || turn.offensive_focus || '';
+          const focus =
+            typeof focusRaw === 'string' && focusRaw.length
+              ? focusRaw.charAt(0).toUpperCase() + focusRaw.slice(1)
+              : '';
+          const defPlay =
+            turn.defensive_playcall_display || turn.defensive_playcall || turn.defense_playcall || '';
+          showPlaycallStrip(offPlay, focus, defPlay);
+        } else {
+          hidePlaycallStrip();
+        }
 
         applyPlayerStats(turn);
         applyTeamStats(turn);

@@ -34,9 +34,6 @@
       --scoreboard-gap: 20px;
       --home-vibrant-color: #ff6200;
       --away-vibrant-color: #ff6200;
-      /* RGB triplets only (no rgba wrapper) — used with rgba(var(--*-vibrant-rgb), a) */
-      --home-vibrant-rgb: 255, 98, 0;
-      --away-vibrant-rgb: 255, 98, 0;
     }
 
     * {
@@ -128,7 +125,6 @@
       grid-template-columns: 
         var(--side-padding)
         auto
-        auto
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
@@ -152,30 +148,11 @@
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
-        auto
         auto
         var(--side-padding);
       align-items: center;
       z-index: 1000;
-      border-bottom: none;
-    }
-
-    #scoreboard::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(
-        to right,
-        var(--away-vibrant-color) 0%,
-        rgba(255, 255, 255, 0.10) 48%,
-        rgba(255, 255, 255, 0.10) 52%,
-        var(--home-vibrant-color) 100%
-      );
-      pointer-events: none;
-      z-index: 1001;
+      border-bottom: 2px solid var(--home-vibrant-color);
     }
 
     /* Grid layout breakdown:
@@ -216,70 +193,20 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
     }
 
-    #away-logo-container::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to right, rgba(var(--away-vibrant-rgb), 0.25) 0%, transparent 100%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    #away-logo-container .team-logo {
-      position: relative;
-      z-index: 1;
-    }
-
-    .sb-team-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      justify-content: center;
-      min-width: 0;
-    }
-
-    .sb-team-meta--away {
-      grid-column: 3;
-      text-align: left;
-    }
-
-    .sb-rank {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 14px;
-      letter-spacing: 0.06em;
-      color: rgba(255, 255, 255, 0.55);
-      line-height: 1;
-    }
-
-    .sb-record {
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.35);
-      letter-spacing: 0.03em;
-      line-height: 1;
-    }
-
-    .sb-team-meta--home {
-      grid-column: 28;
-      text-align: right;
-    }
-
-    /* Away Score - Grid column 5 */
+    /* Away Score - Grid column 4 */
     #away-score {
-      grid-column: 5;
+      grid-column: 4;
       font-size: 56px;
       line-height: 1;
       text-align: center;
       font-weight: bold;
     }
 
-    /* Away TOL/F - Grid column 7 */
+    /* Away TOL/F - Grid column 6 */
     .tol-fouls.away {
-      grid-column: 7;
+      grid-column: 6;
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -349,9 +276,8 @@
     */
 
     #scoreboard .center .clock {
-      font-size: 80px;
+      font-size: 52px;
       line-height: 1;
-      letter-spacing: 0.01em;
       font-weight: bold;
       white-space: nowrap;
     }
@@ -375,16 +301,6 @@
       line-height: 1;
       color: #FFD700;
       font-weight: 700;
-    }
-
-    #scoreboard .center .shot-clock.critical {
-      color: #ff4444;
-      animation: shotClockCritical 0.5s ease-in-out infinite alternate;
-    }
-
-    @keyframes shotClockCritical {
-      from { opacity: 1; }
-      to { opacity: 0.5; }
     }
 
     /* COMMENTED OUT: Strategy bars now in Playcall Center */
@@ -458,14 +374,14 @@
 
     /* Away side: [Image] 🏀/D AUDIBLE! → (reading left to right from center) */
     .active-player-display.away-side {
-      grid-column: 9;
+      grid-column: 8;
       flex-direction: row;
       justify-content: flex-end; /* Push content toward center */
     }
 
     /* Home side: AUDIBLE! 🏀/D [Image] ← (reading right to left from center) */
     .active-player-display.home-side {
-      grid-column: 21;
+      grid-column: 20;
       flex-direction: row-reverse;
       justify-content: flex-start; /* Push content toward center */
     }
@@ -551,9 +467,9 @@
       to { transform: scale(1.05); }
     }
 
-    /* Home TOL/F - Grid column 23 */
+    /* Home TOL/F - Grid column 22 */
     .tol-fouls.home {
-      grid-column: 23;
+      grid-column: 22;
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -562,38 +478,23 @@
       align-items: flex-end;
     }
 
-    /* Home Score - Grid column 25 */
+    /* Home Score - Grid column 24 */
     #home-score {
-      grid-column: 25;
+      grid-column: 24;
       font-size: 56px;
       line-height: 1;
       text-align: center;
       font-weight: bold;
     }
 
-    /* Home Logo - Grid column 27 */
+    /* Home Logo - Grid column 26 */
     #home-logo-container {
-      grid-column: 27;
+      grid-column: 26;
       height: 90px;
       width: auto;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-    }
-
-    #home-logo-container::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to left, rgba(var(--home-vibrant-rgb), 0.25) 0%, transparent 100%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    #home-logo-container .team-logo {
-      position: relative;
-      z-index: 1;
     }
 
     #scoreboard img.team-logo {
@@ -648,36 +549,11 @@
     }
 
     .player-stats-panel.away {
-      border-right: 2px solid var(--away-vibrant-color);
-      position: relative;
-    }
-
-    .player-stats-panel.away::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to right, rgba(var(--away-vibrant-rgb), 0.10) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 0;
+      border-right: 2px solid var(--home-vibrant-color);
     }
 
     .player-stats-panel.home {
       border-left: 2px solid var(--home-vibrant-color);
-      position: relative;
-    }
-
-    .player-stats-panel.home::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to left, rgba(var(--home-vibrant-rgb), 0.10) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .player-stats-panel > * {
-      position: relative;
-      z-index: 1;
     }
 
     /* Player Box Score Section */
@@ -726,67 +602,14 @@
     }
 
     .toggle-btn.active {
-      background: rgba(var(--home-vibrant-rgb), 0.18);
-      color: #ffffff;
+      background: var(--home-vibrant-color);
+      color: #fff;
       border-color: var(--home-vibrant-color);
     }
 
     .player-stats-panel.away .toggle-btn.active {
-      background: rgba(var(--away-vibrant-rgb), 0.18);
+      background: var(--away-vibrant-color);
       border-color: var(--away-vibrant-color);
-    }
-
-    .momentum-bar-wrap {
-      padding: 5px 12px 4px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      flex-shrink: 0;
-    }
-
-    .momentum-bar-label {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 9px;
-      letter-spacing: 0.18em;
-      color: rgba(255, 255, 255, 0.25);
-      margin-bottom: 3px;
-    }
-
-    .momentum-bar {
-      position: relative;
-      height: 8px;
-      background: rgba(255, 255, 255, 0.07);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .momentum-center-tick {
-      position: absolute;
-      left: 50%;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: rgba(255, 255, 255, 0.25);
-      transform: translateX(-50%);
-      z-index: 2;
-    }
-
-    .momentum-fill-neg {
-      position: absolute;
-      right: 50%;
-      top: 0;
-      bottom: 0;
-      background: #ff4444;
-      border-radius: 999px 0 0 999px;
-      transition: width 0.5s ease;
-    }
-
-    .momentum-fill-pos {
-      position: absolute;
-      left: 50%;
-      top: 0;
-      bottom: 0;
-      background: #34EC27;
-      border-radius: 0 999px 999px 0;
-      transition: width 0.5s ease;
     }
     
     .player-stats-panel.home .player-box-score h3 {
@@ -1356,9 +1179,14 @@
       z-index: 900 !important;
     }
 
-    /* ── STATUS ROW (hidden — replaced by #playcall-strip; IDs kept for playcallCenter.js) ── */
+    /* ── STATUS ROW ── */
     #playcall-status-row {
-      display: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(255,215,0,0.18);
+      padding-bottom: 5px;
+      flex-shrink: 0;
     }
 
     .status-display { display: flex; align-items: baseline; gap: 8px; }
@@ -1376,10 +1204,10 @@
 
     /* ── CARD ZONES ── */
     .pcc-card-zone {
-      flex: 0 0 260px;
+      flex: 0 0 33%;
       display: flex;
       flex-direction: row;
-      align-items: stretch;
+      align-items: center;
       gap: 5px;
       min-width: 0;
       padding: 0 8px 0 0;
@@ -1387,82 +1215,6 @@
 
     .pcc-card-zone.defense-zone {
       padding: 0 0 0 8px;
-      flex-direction: row;
-    }
-
-    .pcc-card-zone .zone-inner {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      height: 100%;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .pcc-scroller-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .pcc-offense-block {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-    }
-
-    .pcc-zone-label {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 9px;
-      letter-spacing: 0.18em;
-      color: rgba(255, 255, 255, 0.25);
-      margin-bottom: 0;
-    }
-
-    .pcc-scroller-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.07);
-      flex-shrink: 0;
-    }
-
-    .pcc-readonly-row .pcc-nav-col--spacer {
-      width: 16px;
-      flex-shrink: 0;
-    }
-
-    .defense-under-offense-text,
-    .offense-under-defense-text {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.75);
-      letter-spacing: 0.04em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .pcc-card-zone:not(.defense-zone) .play-name {
-      display: none;
-    }
-
-    .pcc-defense-readonly-card {
-      cursor: default;
-    }
-
-    .pcc-readonly-row .pcc-play-card {
-      cursor: default;
-    }
-
-    .pcc-card-zone.defense-zone > .zone-inner > .pcc-scroller-row:first-of-type {
-      flex-direction: row-reverse;
-    }
-
-    .pcc-card-zone.defense-zone .pcc-readonly-row {
       flex-direction: row-reverse;
     }
 
@@ -1476,8 +1228,7 @@
       border: 2px solid rgba(255,255,255,0.14);
       border-radius: 6px;
       flex: 1;
-      min-height: 0;
-      height: auto;
+      height: 66px;
       min-width: 0;
       cursor: pointer;
       overflow: hidden;
@@ -1535,133 +1286,87 @@
     }
 
     /* ── NAV COLUMN ── */
-    .pcc-nav-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      flex-shrink: 0;
-      align-self: stretch;
-    }
+    .pcc-nav-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 
     .pcc-nav-btn {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.45);
-      font-size: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,215,0,0.3);
+      color: rgba(255,215,0,0.75);
+      font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
     }
 
     .pcc-nav-x {
-      width: 16px;
-      height: 16px;
-      border-radius: 3px;
-      background: rgba(244, 67, 54, 0.07);
-      border: 1px solid rgba(244, 67, 54, 0.22);
-      color: rgba(244, 67, 54, 0.60);
-      font-size: 9px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 24px; height: 24px; border-radius: 4px;
+      background: rgba(244,67,54,0.14);
+      border: 2px solid rgba(244,67,54,0.45);
+      color: #F44336; font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
     }
 
     /* ── STACKS ZONE ── */
     #pcc-stacks-zone {
-      flex: 0 0 400px;
+      flex: 0 0 34%;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
+      align-items: stretch;
       justify-content: center;
-      gap: 5px;
-      padding-left: 12px;
-      border-left: 1px solid rgba(255, 255, 255, 0.07);
-      border-right: none;
+      gap: 6px;
+      padding: 2px 8px;
+      border-left: 1px solid rgba(255,255,255,0.07);
+      border-right: 1px solid rgba(255,255,255,0.07);
       min-width: 0;
     }
 
-    /* ── STACK (horizontal strip) ── */
+    /* ── STACK ── */
     .pcc-stack {
       display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 6px;
-      height: calc((100% - 10px) / 3);
-      min-height: 28px;
-      flex: 0 0 auto;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 3px;
+      flex: 1;
       min-width: 0;
-      padding-top: 0;
+      padding-top: 4px;
       position: relative;
     }
 
     .pcc-stack::before {
       content: '';
-      width: 3px;
-      align-self: stretch;
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
       border-radius: 2px;
-      flex-shrink: 0;
-      position: static;
-      top: auto;
-      left: auto;
-      right: auto;
     }
 
-    .pcc-stack.tempo::before {
-      background: #4a90d9;
-    }
-
-    .pcc-stack.aggression::before {
-      background: #FFD700;
-    }
-
-    .pcc-stack.press-trap::before {
-      background: #cc3333;
-    }
+    .pcc-stack.tempo::before      { background: #4a90d9; }
+    .pcc-stack.aggression::before  { background: #FFD700; }
+    .pcc-stack.press-trap::before  { background: #cc3333; }
 
     .pcc-stack-label {
-      flex: 0 0 72px;
-      font-size: 11px;
-      letter-spacing: 0.13em;
-      text-align: left;
-      margin: 0;
+      font-size: 9px;
+      letter-spacing: 1.2px;
+      text-align: center;
+      margin-bottom: 1px;
       flex-shrink: 0;
       white-space: nowrap;
+      margin-top: 2px;
     }
 
-    .pcc-stack.tempo .pcc-stack-label {
-      color: #4a90d9;
-    }
-
-    .pcc-stack.aggression .pcc-stack-label {
-      color: #FFD700;
-    }
-
-    .pcc-stack.press-trap .pcc-stack-label {
-      color: #cc3333;
-    }
+    .pcc-stack.tempo .pcc-stack-label      { color: #4a90d9; }
+    .pcc-stack.aggression .pcc-stack-label  { color: #FFD700; }
+    .pcc-stack.press-trap .pcc-stack-label  { color: #cc3333; }
 
     .pcc-stack-btn {
-      flex: 1;
-      height: 100%;
-      min-height: 26px;
-      padding: 4px 6px;
-      border-radius: 6px;
-      font-size: 12px;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.55);
+      padding: 5px 4px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      color: rgba(255,255,255,0.55);
       font-family: 'Bebas Neue', sans-serif;
-      cursor: pointer;
-      text-align: center;
-      line-height: 1.2;
+      font-size: 12px; letter-spacing: 0.6px;
+      cursor: pointer; text-align: center;
+      white-space: nowrap; line-height: 1.2;
     }
 
     .pcc-stack.tempo .pcc-stack-btn.selected {
@@ -1683,27 +1388,13 @@
     }
 
     .pcc-stack-x {
-      width: 16px;
-      height: 100%;
-      min-height: 26px;
-      border-radius: 4px;
-      background: transparent;
-      border: 1px solid rgba(244, 67, 54, 0.18);
-      color: rgba(244, 67, 54, 0.45);
-      font-size: 9px;
-      flex-shrink: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      padding: 4px 4px;
+      background: rgba(244,67,54,0.12);
+      border: 2px solid rgba(244,67,54,0.42);
+      border-radius: 5px; color: #F44336;
       font-family: 'Bebas Neue', sans-serif;
-      cursor: pointer;
-    }
-
-    .pcc-stack-x:hover {
-      background: rgba(244, 67, 54, 0.12);
-      color: #F44336;
-      border-color: rgba(244, 67, 54, 0.40);
+      font-size: 12px; cursor: pointer;
+      text-align: center; line-height: 1.2;
     }
 
     /* Reused play-option/headshot/info/name/focus (offense card) — dimensions updated for card height */
@@ -1711,13 +1402,13 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 6px 8px;
+      padding: 8px 10px;
       background: transparent;
       border: none;
       border-radius: 0;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-height: 48px;
+      min-height: 62px;
     }
 
     .play-option:hover {
@@ -1735,13 +1426,12 @@
     }
 
     .play-headshot {
-      width: 44px;
-      height: 44px;
+      width: auto;
+      height: 58px;
+      max-height: 58px;
       border-radius: 4px;
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
-      object-position: top center;
-      flex-shrink: 0;
       background: rgba(0, 0, 0, 0.5);
     }
 
@@ -2050,84 +1740,6 @@
     @keyframes announcement-pop { ... }
     */
 
-    /* ==================== LOWER-THIRD PLAYCALL STRIP ==================== */
-    #playcall-strip {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      z-index: 60;
-      pointer-events: none;
-    }
-
-    #playcall-strip.hidden {
-      display: none;
-    }
-
-    .playcall-strip-inner {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 9px 20px;
-      background: rgba(7, 8, 14, 0.92);
-      border-top: 2px solid #F79420;
-    }
-
-    .pcs-eyebrow {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 10px;
-      letter-spacing: 0.20em;
-      color: #F79420;
-      flex-shrink: 0;
-    }
-
-    .pcs-divider {
-      width: 1px;
-      height: 18px;
-      background: rgba(255, 255, 255, 0.16);
-      flex-shrink: 0;
-    }
-
-    .pcs-text {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 20px;
-      letter-spacing: 0.04em;
-      color: #ffffff;
-    }
-
-    .pcs-text--muted {
-      color: rgba(255, 255, 255, 0.60);
-    }
-
-    .pcs-target {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 20px;
-      letter-spacing: 0.04em;
-      color: #FFD700;
-    }
-
-    .pcs-spacer {
-      flex: 1;
-    }
-
-    .timeout-pips {
-      display: inline-flex;
-      gap: 3px;
-      align-items: center;
-      margin-left: 8px;
-    }
-
-    .to-pip {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #34EC27;
-    }
-
-    .to-pip.used {
-      background: rgba(52, 236, 39, 0.20);
-    }
-
     /* ==================== ANNOUNCEMENT OVERLAY ==================== */
     #announcement-overlay {
       position: absolute;
@@ -2145,8 +1757,8 @@
       display: flex;
       flex-direction: row;
       align-items: stretch;
-      background: rgba(7, 8, 14, 0.90);
-      box-shadow: 0 16px 64px rgba(0, 0, 0, 0.80), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      background: rgba(10,10,10,0.82);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
       overflow: visible;
       animation: annCardIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
@@ -2162,26 +1774,6 @@
       background: #F79420;
       z-index: 2;
     }
-
-    .ann-card.ann-accent--made::before {
-      background: #34EC27;
-    }
-
-    .ann-card.ann-accent--foul::before {
-      background: #ff4444;
-    }
-
-    .ann-card.ann-accent--defense::before {
-      background: #4a90d9;
-    }
-
-    .ann-card.ann-accent--turnover::before {
-      background: #F79420;
-    }
-
-    .ann-card.ann-accent--neutral::before {
-      background: #F79420;
-    }
     .ann-card.standard-card.no-player .ann-portrait-zone {
       display: none;
     }
@@ -2191,8 +1783,8 @@
     }
     .ann-portrait-zone {
       position: relative;
-      width: 110px;
-      height: 144px;
+      width: 100px;
+      height: 130px;
       flex-shrink: 0;
       overflow: hidden;
       background: #111;
@@ -2239,14 +1831,13 @@
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.45);
+      color: #fff;
       text-transform: uppercase;
-      letter-spacing: 0.09em;
+      letter-spacing: 0.5px;
       line-height: 1;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-bottom: 4px;
     }
     .ann-pos-label {
       font-family: 'Barlow Condensed', sans-serif;
@@ -2268,15 +1859,14 @@
       position: relative;
       padding: 18px 32px 42px 24px;
     }
-    .ann-event-zone .ann-text,
     .ann-event-text {
       font-family: 'Barlow Condensed', sans-serif;
       font-weight: 900;
       font-style: italic;
-      font-size: 64px;
+      font-size: 48px;
       color: #fff;
       text-transform: uppercase;
-      letter-spacing: 0.02em;
+      letter-spacing: 1px;
       line-height: 1;
       white-space: nowrap;
       text-shadow: 0 2px 8px rgba(0,0,0,0.5);
@@ -2493,46 +2083,14 @@
       font-weight: 900; /* Extra bold text */
     }
 
-    /* Playcall / pause control hierarchy (court redesign) */
     #game-controls-strip #pause-btn {
       position: static;
       left: auto;
       transform: none;
-      height: 46px;
-      font-size: 22px;
-      background: #F79420;
-      border: 1px solid rgba(247, 148, 32, 0.45);
-      color: #0a0b10;
-      box-shadow: 0 4px 18px rgba(247, 148, 32, 0.25);
-      border-radius: 8px;
-      width: 100%;
-      max-width: 200px;
     }
 
     #game-controls-strip #timeout-btn {
       margin-left: 0;
-      height: 34px;
-      font-size: 16px;
-      background: rgba(52, 236, 39, 0.09);
-      border: 1px solid rgba(52, 236, 39, 0.30);
-      color: #34EC27;
-      border-radius: 8px;
-      width: 100%;
-      max-width: 200px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #game-controls-strip #game-speed-btn {
-      height: 26px;
-      font-size: 12px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.10);
-      color: rgba(255, 255, 255, 0.45);
-      border-radius: 8px;
-      width: 100%;
-      max-width: 200px;
     }
     
     @keyframes timeoutPulse {
@@ -2924,15 +2482,11 @@
     <div id="away-logo-container">
       <img id="away-logo" class="team-logo" alt="away logo" />
     </div>
-    <div class="sb-team-meta sb-team-meta--away">
-      <span class="sb-rank" id="away-rank">#--</span>
-      <span class="sb-record" id="away-record">--</span>
-    </div>
     
-    <!-- Away Score -->
+    <!-- Away Score - Grid column 4 -->
     <div id="away-score">0</div>
     
-    <!-- Away TOL/F -->
+    <!-- Away TOL/F - Grid column 6 -->
     <div class="tol-fouls away">
       <div id="away-tol">TOL: 5</div>
       <div id="away-fouls">F: 0</div>
@@ -3046,13 +2600,9 @@
     <!-- Home Score - Grid column 12 -->
     <div id="home-score">0</div>
     
-    <!-- Home Logo -->
+    <!-- Home Logo - Grid column 14 -->
     <div id="home-logo-container">
       <img id="home-logo" class="team-logo" alt="home logo" />
-    </div>
-    <div class="sb-team-meta sb-team-meta--home">
-      <span class="sb-rank" id="home-rank">#--</span>
-      <span class="sb-record" id="home-record">--</span>
     </div>
   </div>
 
@@ -3065,14 +2615,6 @@
             <button class="toggle-btn active" data-stat="S1">S1</button>
             <button class="toggle-btn" data-stat="S2">S2</button>
             <button class="toggle-btn" data-stat="S3">S3</button>
-          </div>
-        </div>
-        <div class="momentum-bar-wrap">
-          <div class="momentum-bar-label">MOMENTUM</div>
-          <div class="momentum-bar" id="away-momentum-bar">
-            <div class="momentum-center-tick"></div>
-            <div class="momentum-fill-neg" id="away-momentum-neg" style="width:0%"></div>
-            <div class="momentum-fill-pos" id="away-momentum-pos" style="width:0%"></div>
           </div>
         </div>
         <table>
@@ -3217,25 +2759,11 @@
         </div>
       </div>
 
-      <div id="playcall-strip" class="playcall-strip hidden">
-        <div class="playcall-strip-inner">
-          <span class="pcs-eyebrow" id="pcs-offense-label">OFFENSE</span>
-          <div class="pcs-divider"></div>
-          <span class="pcs-text" id="pcs-offense-play">--</span>
-          <div class="pcs-divider"></div>
-          <span class="pcs-target" id="pcs-offense-target">--</span>
-          <div class="pcs-spacer"></div>
-          <span class="pcs-eyebrow" id="pcs-defense-label">DEFENSE</span>
-          <div class="pcs-divider"></div>
-          <span class="pcs-text pcs-text--muted" id="pcs-defense-play">--</span>
-        </div>
-      </div>
-
       <!-- Game controls: inside court container, bottom out-of-bounds -->
       <div id="game-controls-strip">
         <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
         <button id="pause-btn">Pause</button>
-        <button id="timeout-btn" type="button">Timeout<span class="timeout-pips" id="timeout-pips" aria-hidden="true"><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span></span></button>
+        <button id="timeout-btn">Timeout</button>
       </div>
       
     </div>
@@ -3249,14 +2777,6 @@
             <button class="toggle-btn active" data-stat="S1">S1</button>
             <button class="toggle-btn" data-stat="S2">S2</button>
             <button class="toggle-btn" data-stat="S3">S3</button>
-          </div>
-        </div>
-        <div class="momentum-bar-wrap">
-          <div class="momentum-bar-label">MOMENTUM</div>
-          <div class="momentum-bar" id="home-momentum-bar">
-            <div class="momentum-center-tick"></div>
-            <div class="momentum-fill-neg" id="home-momentum-neg" style="width:0%"></div>
-            <div class="momentum-fill-pos" id="home-momentum-pos" style="width:0%"></div>
           </div>
         </div>
         <table>
@@ -3358,33 +2878,16 @@
     </div>
     <!-- Main row: Offense Card (33%) | Stacks (34%) | Defense Card (33%) -->
     <div id="playcall-main-row">
-      <!-- Offense Card Zone (left) -->
+      <!-- Offense Card Zone (left 33%) -->
       <div class="pcc-card-zone">
-        <div class="zone-inner">
-          <div class="pcc-scroller-row">
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Offense</div>
-              <div class="pcc-play-card">
-                <!-- Empty until loadAndApplySlotAssignments(); placeholder .play-option caused stale nodes + all-visible flex bug -->
-                <div id="offense-play-scroller" class="play-scroller"></div>
-              </div>
-            </div>
-            <div class="pcc-nav-col">
-              <button class="pcc-nav-btn" id="play-nav-up">▲</button>
-              <button class="pcc-nav-btn" id="play-nav-down">▼</button>
-              <button class="pcc-nav-x" id="clear-offense-override-x">✕</button>
-            </div>
-          </div>
-          <div class="pcc-scroller-divider"></div>
-          <div class="pcc-scroller-row pcc-readonly-row">
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Defense</div>
-              <div class="pcc-play-card pcc-defense-readonly-card">
-                <div id="defense-under-offense-label" class="defense-under-offense-text">--</div>
-              </div>
-            </div>
-            <div class="pcc-nav-col pcc-nav-col--spacer" aria-hidden="true"></div>
-          </div>
+        <div class="pcc-play-card">
+          <!-- Empty until loadAndApplySlotAssignments(); placeholder .play-option caused stale nodes + all-visible flex bug -->
+          <div id="offense-play-scroller" class="play-scroller"></div>
+        </div>
+        <div class="pcc-nav-col">
+          <button class="pcc-nav-btn" id="play-nav-up">▲</button>
+          <button class="pcc-nav-btn" id="play-nav-down">▼</button>
+          <button class="pcc-nav-x" id="clear-offense-override-x">✕</button>
         </div>
       </div>
       <!-- Stacks Zone (center 34%): Tempo | Aggression | Press/Trap -->
@@ -3411,32 +2914,15 @@
           <button type="button" class="pcc-stack-x" id="clear-press-trap-x">✕</button>
         </div>
       </div>
-      <!-- Defense Card Zone (right) -->
+      <!-- Defense Card Zone (right 33%) -->
       <div class="pcc-card-zone defense-zone">
-        <div class="zone-inner">
-          <div class="pcc-scroller-row">
-            <div class="pcc-nav-col">
-              <button class="pcc-nav-btn" id="defense-nav-up">▲</button>
-              <button class="pcc-nav-btn" id="defense-nav-down">▼</button>
-              <button class="pcc-nav-x" id="clear-defense-card-x">✕</button>
-            </div>
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Defense</div>
-              <div class="pcc-play-card">
-                <div class="defense-play-name">Man Normal</div>
-              </div>
-            </div>
-          </div>
-          <div class="pcc-scroller-divider"></div>
-          <div class="pcc-scroller-row pcc-readonly-row">
-            <div class="pcc-nav-col pcc-nav-col--spacer" aria-hidden="true"></div>
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Offense</div>
-              <div class="pcc-play-card pcc-defense-readonly-card">
-                <div id="offense-under-defense-label" class="offense-under-defense-text">--</div>
-              </div>
-            </div>
-          </div>
+        <div class="pcc-nav-col">
+          <button class="pcc-nav-btn" id="defense-nav-up">▲</button>
+          <button class="pcc-nav-btn" id="defense-nav-down">▼</button>
+          <button class="pcc-nav-x" id="clear-defense-card-x">✕</button>
+        </div>
+        <div class="pcc-play-card">
+          <div class="defense-play-name">Man Normal</div>
         </div>
       </div>
     </div>
@@ -4456,10 +3942,7 @@
       
       function updateDefenseCardDisplay() {
         const el = document.querySelector('.defense-play-name');
-        const preview = document.getElementById('defense-under-offense-label');
-        const scheme = DEFENSE_SCHEMES[currentDefenseIndex];
-        if (el) el.textContent = scheme;
-        if (preview) preview.textContent = scheme;
+        if (el) el.textContent = DEFENSE_SCHEMES[currentDefenseIndex];
         const defenseCard = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
         if (defenseCard) {
           const shownScheme = DEFENSE_SCHEMES[currentDefenseIndex];
@@ -4943,28 +4426,8 @@
     const staticPath = API_CONFIG.getStaticPath();
     const vibrantColorsModule = await import(`${staticPath}/js/phaser/utils/vibrantColors.js`);
     const loadGameStatsModule = await import(`${staticPath}/js/phaser/utils/loadGameStats.js`);
-    const { applyVibrantColors, getVibrantColor } = vibrantColorsModule;
+    const { applyVibrantColors } = vibrantColorsModule;
     const { initializeGameStats } = loadGameStatsModule;
-
-    function hexToVibrantRgbTriplet(hex) {
-      if (!hex || typeof hex !== 'string') return null;
-      var h = hex.trim();
-      if (h.startsWith('#')) h = h.slice(1);
-      if (h.length === 3) {
-        h = h.split('').map(function(c) { return c + c; }).join('');
-      }
-      if (h.length !== 6) return null;
-      var n = parseInt(h, 16);
-      if (!Number.isFinite(n)) return null;
-      return ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255);
-    }
-
-    function applyVibrantRgbCssVarsFromHex(homeHex, awayHex) {
-      var rh = hexToVibrantRgbTriplet(homeHex);
-      var ra = hexToVibrantRgbTriplet(awayHex);
-      if (rh) document.documentElement.style.setProperty('--home-vibrant-rgb', rh);
-      if (ra) document.documentElement.style.setProperty('--away-vibrant-rgb', ra);
-    }
 
     async function hydrateCourtColorsFromRoster(homeTeamName, awayTeamName) {
       if (!homeTeamName || !awayTeamName) return false;
@@ -4992,7 +4455,6 @@
 
         document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
         document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
-        applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
         return true;
       } catch (err) {
         console.warn('⚠️ Failed to hydrate real team colors for pre-game court UI:', err);
@@ -5049,9 +4511,6 @@
         const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
         if (!appliedRealColors) {
           applyVibrantColors(homeTeam, awayTeam);
-          try {
-            applyVibrantRgbCssVarsFromHex(getVibrantColor(homeTeam), getVibrantColor(awayTeam));
-          } catch (e) { /* ignore */ }
         }
       } else {
         console.warn('⚠️ No teams found in URL, using default vibrant colors');
@@ -5083,24 +4542,6 @@
   <script>
     (function() {
       var _annTimer = null;
-      var ANN_ACCENTS = ['ann-accent--made', 'ann-accent--foul', 'ann-accent--defense', 'ann-accent--turnover', 'ann-accent--neutral'];
-      function clearAnnAccent(el) {
-        if (!el) return;
-        ANN_ACCENTS.forEach(function(a) { el.classList.remove(a); });
-      }
-      function resolveAnnAccentTone(data) {
-        if (data && data.annAccentTone) {
-          var map = { made: 'ann-accent--made', foul: 'ann-accent--foul', defense: 'ann-accent--defense', turnover: 'ann-accent--turnover', neutral: 'ann-accent--neutral' };
-          return map[data.annAccentTone] || 'ann-accent--neutral';
-        }
-        if (data && data.type === 'foul') return 'ann-accent--foul';
-        var raw = (data && data.eventText) ? String(data.eventText) : '';
-        var t = raw.toUpperCase();
-        if (t.indexOf("IT'S GOOD") >= 0 || t.indexOf('THREE') >= 0 || t.indexOf('FREE THROW') >= 0 || t.indexOf('FREE THROWS') >= 0) return 'ann-accent--made';
-        if (t.indexOf('BLOCK') >= 0 || t.indexOf('STEAL') >= 0) return 'ann-accent--defense';
-        if (t.indexOf('TURNOVER') >= 0 || t.indexOf('TRAVEL') >= 0 || t.indexOf('DOUBLE DRIBBLE') >= 0) return 'ann-accent--turnover';
-        return 'ann-accent--neutral';
-      }
       window.showAnnouncementOverlay = function(data) {
         var overlay = document.getElementById('announcement-overlay');
         if (!overlay) return;
@@ -5116,12 +4557,9 @@
         if (_annTimer) { clearTimeout(_annTimer); _annTimer = null; }
         var standardCard = overlay.querySelector('.standard-card');
         var foulCard = overlay.querySelector('.foul-card');
-        clearAnnAccent(standardCard);
-        clearAnnAccent(foulCard);
         if (data.type === 'foul') {
           standardCard.style.display = 'none';
           foulCard.style.display = 'flex';
-          foulCard.classList.add('ann-accent--foul');
           applyHeadshotFallback(foulCard.querySelector('.shooter-img'), data.shooterPhotoUrl);
           foulCard.querySelector('.shooter-name').textContent = ((data.shooterJersey || '') + ' ' + (data.shooterLastName || '')).trim();
           applyHeadshotFallback(foulCard.querySelector('.fouler-img'), data.foulerPhotoUrl);
@@ -5134,7 +4572,6 @@
         } else {
           foulCard.style.display = 'none';
           standardCard.style.display = 'flex';
-          standardCard.classList.add(resolveAnnAccentTone(data));
           var decisionPill = standardCard.querySelector('.ann-decision-pill');
           var hasPlayer = (data.photoUrl && data.photoUrl.length) || (data.lastName && data.lastName.length);
           if (hasPlayer) {
@@ -5248,13 +4685,6 @@
       }
       updatePlayOptions();
       currentPlayIndex = typeof window.__pccSlotSyncIndex === 'number' ? window.__pccSlotSyncIndex : 0;
-      const underDefense = document.getElementById('offense-under-defense-label');
-      const el = playOptions[currentPlayIndex];
-      if (underDefense && el) {
-        const pn = el.dataset.play;
-        const labelEl = el.querySelector('.play-name');
-        underDefense.textContent = (labelEl && labelEl.textContent.trim()) || pn || '--';
-      }
     }
     window.syncOffensePlaySlotVisibility = syncOffensePlaySlotVisibility;
 
@@ -5268,11 +4698,6 @@
       if (!playName) return;
       playOptions.forEach((option) => option.classList.remove('selected'));
       el.classList.add('selected');
-      const underDefense = document.getElementById('offense-under-defense-label');
-      if (underDefense) {
-        const labelEl = el.querySelector('.play-name');
-        underDefense.textContent = (labelEl && labelEl.textContent.trim()) || playName || '--';
-      }
       await courtSetPlaycallOverride('offense', playName);
     }
 
