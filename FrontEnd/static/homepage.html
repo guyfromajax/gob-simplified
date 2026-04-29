@@ -985,6 +985,6 @@
       document.querySelectorAll('.anim').forEach(el => el.classList.add('in'));
     }
   </script>
-  <button id="tweaks-toggle" style="position:fixed;bottom:24px;left:24px;z-index:998;background:rgba(13,13,26,0.9);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.6);font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:8px 14px;border-radius:8px;cursor:pointer;" onclick="document.getElementById('tweaks-panel').classList.toggle('open')">Tweaks</button>
+  <button id="tweaks-toggle" type="button" style="display:none;position:fixed;bottom:24px;left:24px;z-index:998;background:rgba(13,13,26,0.9);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.6);font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:8px 14px;border-radius:8px;cursor:pointer;" onclick="document.getElementById('tweaks-panel').classList.toggle('open')" aria-hidden="true">Tweaks</button>
 </body>
 </html>
