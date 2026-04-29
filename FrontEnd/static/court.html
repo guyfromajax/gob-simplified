@@ -4182,11 +4182,18 @@
         __debugPcRaw === 'true' ||
         __debugPcRaw === 'yes' ||
         (typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(urlParams));
-      if (__debugPc) {
+      const __debugPlaycallRaw = (urlParams.get('debug_playcall') || '').trim().toLowerCase();
+      const __debugPlaycall =
+        __debugPc ||
+        __debugPlaycallRaw === '1' ||
+        __debugPlaycallRaw === 'true' ||
+        __debugPlaycallRaw === 'yes';
+      if (__debugPlaycall) {
         console.info('[DEBUG_PC] court loadAndApplySlotAssignments', {
           href: window.location.href,
           hasHelper: typeof window.isDebugPlaycallSearch === 'function',
-          raw: urlParams.get('debug_pc'),
+          debug_pc: urlParams.get('debug_pc'),
+          debug_playcall: urlParams.get('debug_playcall'),
         });
       }
       // ✅ FIX: Mode detection with fallback logic (matches Franchise pattern)
@@ -4226,16 +4233,34 @@
       let gameId = urlParams.get('game_id') || null;
       
       if (!teamId) {
-        if (__debugPc) console.info('[DEBUG_PC] court skipped: no team_id');
-        console.warn('⚠️ [PLAYCALL CENTER] No team_id found, using default play order');
+        console.warn('⚠️ [PLAYCALL CENTER] No team_id — cannot GET /api/playbooks (offense slots empty). URL hints:', {
+          my_team: urlParams.get('my_team'),
+          team_id: urlParams.get('team_id'),
+          user_team_id: urlParams.get('user_team_id'),
+          home_id: urlParams.get('home_id'),
+          away_id: urlParams.get('away_id'),
+          game_id: urlParams.get('game_id'),
+          mode,
+        });
+        if (__debugPlaycall) {
+          console.info('[DEBUG_PC] resolver returned:', typeof window.resolvePlaybookTeamIdFromSearch === 'function'
+            ? window.resolvePlaybookTeamIdFromSearch(urlParams)
+            : '(no resolvePlaybookTeamIdFromSearch)');
+        }
         return;
       }
 
       const needsActiveGameDoc =
         (mode === 'franchise' && !!franchiseId) || (mode === 'tournament' && !!tournamentId);
       if (needsActiveGameDoc && !gameId) {
-        if (__debugPc) console.info('[DEBUG_PC] court skipped: waiting for game_id');
-        console.warn('⚠️ [PLAYCALL CENTER] Waiting for game_id in URL before GET /api/playbooks (franchise/tournament game doc)');
+        console.warn('⚠️ [PLAYCALL CENTER] Waiting for game_id before GET /api/playbooks', {
+          mode,
+          franchiseId,
+          tournamentId,
+          game_id: gameId,
+          teamId,
+        });
+        if (__debugPlaycall) console.info('[DEBUG_PC] court skipped: waiting for game_id');
         return;
       }
 
@@ -4243,15 +4268,28 @@
       // With debug_pc=1, always refetch so backend tracing runs (signature skip would prevent GET entirely).
       if (
         !__debugPc &&
+        !__debugPlaycall &&
         loadSig === _playcallAppliedSignature &&
         document.querySelectorAll('#offense-play-scroller .play-option').length > 0
       ) {
+        if (__debugPlaycall) {
+          console.info('[DEBUG_PC] skip refetch (same loadSig, slots already in DOM)', { loadSig });
+        }
         applyOffensePccSlotSync(typeof window.__pccSlotSyncIndex === 'number' ? window.__pccSlotSyncIndex : 0);
         return;
       }
 
+      if (__debugPlaycall) {
+        console.info('[DEBUG_PC] proceeding GET /api/playbooks', { loadSig, teamId, gameId, mode });
+      }
+
       beginPlaycallPlaybookLoad();
       try {
+        if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl) {
+          console.error('❌ [PLAYCALL CENTER] API_CONFIG not ready; cannot GET /api/playbooks. Load api-config before court inline script or retry.');
+          endPlaycallPlaybookLoad(false);
+          return;
+        }
         const params = new URLSearchParams();
         params.set('mode', mode);
         params.set('team_id', teamId);
@@ -4273,12 +4311,25 @@
           : {};
         const response = await fetch(apiUrl, { headers: getHeaders });
         if (!response.ok) {
-          console.warn('⚠️ [PLAYCALL CENTER] Failed to load slot assignments:', response.status);
+          let errBody = '';
+          try {
+            errBody = (await response.text()).slice(0, 500);
+          } catch (_e) { /* ignore */ }
+          console.warn('⚠️ [PLAYCALL CENTER] Failed to load slot assignments:', response.status, errBody || '');
+          if (__debugPlaycall) console.info('[DEBUG_PC] GET failed', { apiUrl, status: response.status, errBody });
           endPlaycallPlaybookLoad(false);
           return;
         }
         
         const data = await response.json();
+        if (__debugPlaycall) {
+          const po = ((data || {}).pc_order || {}).offense;
+          console.info('[DEBUG_PC] GET /api/playbooks ok', {
+            motionLen: (data.motion || []).length,
+            offensePcOrderLen: Array.isArray(po) ? po.length : 0,
+            slotAssignmentKeys: Object.keys(data.slot_assignments || {}).length,
+          });
+        }
 
         // Court GET /api/playbooks can reflect a newer URL than bootGame's first parse; keep Phaser payload in sync.
         try {
@@ -4509,6 +4560,17 @@
         orderedPlays.forEach((play, index) => {
           scroller.appendChild(play);
         });
+
+        if (orderedPlays.length === 0) {
+          console.warn('⚠️ [PLAYCALL CENTER] Built 0 offense slots after successful GET (check pc_order.offense, slot_assignments, motion/set arrays)', {
+            offensePcOrderLen: Array.isArray(offensePcOrder) ? offensePcOrder.length : 0,
+            slotAssignmentKeyCount: Object.keys(slotAssignments).length,
+            motionPlays: motionPlays.length,
+            setPlaysTotal: setPlayInside.length + setPlayAttack.length + setPlayOutside.length,
+            teamId,
+            gameId,
+          });
+        }
 
         if (orderedPlays.length > 0) {
           applyOffensePccSlotSync(0);
