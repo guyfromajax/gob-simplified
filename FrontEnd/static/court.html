@@ -4272,6 +4272,13 @@
         loadSig === _playcallAppliedSignature &&
         document.querySelectorAll('#offense-play-scroller .play-option').length > 0
       ) {
+        const _skipEl = document.getElementById('offense-play-scroller');
+        const _skipN = _skipEl ? _skipEl.querySelectorAll('.play-option').length : 0;
+        console.info('[PLAYCALL CENTER] skip playbook refetch (same loadSig, slots already in DOM)', {
+          loadSig,
+          slotCount: _skipN,
+          scrollerOffsetH: _skipEl ? _skipEl.offsetHeight : null,
+        });
         if (__debugPlaycall) {
           console.info('[DEBUG_PC] skip refetch (same loadSig, slots already in DOM)', { loadSig });
         }
@@ -4584,6 +4591,15 @@
           requestAnimationFrame(() => {
             const idx = typeof window.__pccSlotSyncIndex === 'number' ? window.__pccSlotSyncIndex : 0;
             applyOffensePccSlotSync(idx);
+            const el = document.getElementById('offense-play-scroller');
+            const n = el ? el.querySelectorAll('.play-option').length : 0;
+            console.info('[PLAYCALL CENTER] offense slots wired', {
+              built: orderedPlays.length,
+              domOptionCount: n,
+              scrollerOffsetH: el ? el.offsetHeight : null,
+              scrollerClientH: el ? el.clientHeight : null,
+              dataPccSlotsReady: el ? el.getAttribute('data-pcc-slots-ready') : null,
+            });
           });
         }
         
