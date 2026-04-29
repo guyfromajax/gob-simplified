@@ -212,7 +212,10 @@
     #away-logo-container {
       grid-column: 2;
       height: 90px;
-      width: auto;
+      width: 200px;
+      max-width: 200px;
+      overflow: hidden;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -271,7 +274,7 @@
     /* Away Score - Grid column 5 */
     #away-score {
       grid-column: 5;
-      font-size: 56px;
+      font-size: 68px;
       line-height: 1;
       text-align: center;
       font-weight: bold;
@@ -565,7 +568,7 @@
     /* Home Score - Grid column 25 */
     #home-score {
       grid-column: 25;
-      font-size: 56px;
+      font-size: 68px;
       line-height: 1;
       text-align: center;
       font-weight: bold;
@@ -575,7 +578,10 @@
     #home-logo-container {
       grid-column: 27;
       height: 90px;
-      width: auto;
+      width: 200px;
+      max-width: 200px;
+      overflow: hidden;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -598,8 +604,9 @@
 
     #scoreboard img.team-logo {
       height: 100%;
-      width: auto;
-      object-fit: contain;
+      width: 100%;
+      object-fit: cover;
+      object-position: center center;
     }
 
     /* ==================== MAIN CONTAINER ==================== */
@@ -703,11 +710,20 @@
       margin: 0;
     }
 
+    .player-stats-panel.away .stats-header h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
     .player-stats-panel.away .stats-header h3 img {
-      height: 28px;
+      height: 24px;
       width: auto;
+      flex-shrink: 0;
       object-fit: contain;
-      vertical-align: middle;
     }
 
     .stats-toggle {
@@ -1395,8 +1411,8 @@
     #playcall-main-row {
       display: flex;
       flex-direction: row;
-      align-items: center;
-      flex: 1;
+      align-items: stretch;
+      flex: 1 1 auto;
       min-height: 0;
     }
 
@@ -1409,6 +1425,7 @@
       gap: 5px;
       min-width: 0;
       padding: 0 8px 0 0;
+      align-self: stretch;
     }
 
     .pcc-card-zone.defense-zone {
@@ -1422,14 +1439,15 @@
       height: 100%;
       flex: 1;
       min-width: 0;
+      align-self: stretch;
     }
 
     .pcc-scroller-row {
       display: flex;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
-      flex: 1;
-      min-height: 0;
+      flex: 1 1 0;
+      min-height: 44px;
     }
 
     .pcc-offense-block {
@@ -1501,8 +1519,8 @@
       border: 2px solid rgba(255,255,255,0.14);
       border-radius: 6px;
       flex: 1;
-      min-height: 0;
-      height: auto;
+      min-height: 44px;
+      width: 0;
       min-width: 0;
       cursor: pointer;
       overflow: hidden;
@@ -1564,7 +1582,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: space-evenly;
       gap: 4px;
       flex-shrink: 0;
       align-self: stretch;
@@ -1603,11 +1621,12 @@
       flex: 0 0 400px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: stretch;
       gap: 5px;
       padding-left: 12px;
       border-left: 1px solid rgba(255, 255, 255, 0.07);
       border-right: none;
+      align-self: stretch;
       min-width: 0;
     }
 
@@ -1617,9 +1636,8 @@
       flex-direction: row;
       align-items: center;
       gap: 6px;
-      height: calc((100% - 10px) / 3);
-      min-height: 28px;
-      flex: 0 0 auto;
+      flex: 1 1 0;
+      min-height: 26px;
       min-width: 0;
       padding-top: 0;
       position: relative;
@@ -1674,14 +1692,14 @@
     .pcc-stack-btn {
       flex: 1;
       height: 100%;
-      min-height: 26px;
-      padding: 4px 6px;
+      min-height: 24px;
+      padding: 3px 4px;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11px;
       letter-spacing: 0.05em;
       white-space: nowrap;
       background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       color: rgba(255, 255, 255, 0.55);
       font-family: 'Bebas Neue', sans-serif;
       cursor: pointer;
@@ -2383,23 +2401,19 @@
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
     /* Controls strip lives inside #phaser-container; positioned at bottom (out-of-bounds area) */
-    #phaser-container #game-controls-strip {
+    #game-controls-strip {
       position: absolute;
-      bottom: 12px;
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: 0;
+      left: 0;
+      right: 0;
       display: flex;
-      flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 24px;
-      width: 500px;
-      padding: 0 40px;
-      box-sizing: border-box;
-      background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.6));
-      border-top: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px 8px 0 0;
-      z-index: 925;
+      gap: 10px;
+      padding: 7px 20px;
+      background: rgba(7, 8, 14, 0.88);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 40;
     }
     .game-controls {
       position: absolute;
@@ -2525,43 +2539,40 @@
       position: static;
       left: auto;
       transform: none;
-      height: 46px;
-      font-size: 22px;
+      height: 42px;
+      min-width: 120px;
+      font-size: 20px;
       background: #F79420;
       border: 1px solid rgba(247, 148, 32, 0.45);
-      color: #0a0b10;
-      box-shadow: 0 4px 18px rgba(247, 148, 32, 0.25);
       border-radius: 8px;
-      width: 100%;
-      max-width: 200px;
+      color: #0a0b10;
+      box-shadow: 0 4px 16px rgba(247, 148, 32, 0.28);
     }
 
     #game-controls-strip #timeout-btn {
       margin-left: 0;
       height: 34px;
+      min-width: 120px;
       font-size: 16px;
       background: rgba(52, 236, 39, 0.09);
       border: 1px solid rgba(52, 236, 39, 0.30);
-      color: #34EC27;
       border-radius: 8px;
-      width: 100%;
-      max-width: 200px;
+      color: #34EC27;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
 
     #game-controls-strip #game-speed-btn {
-      height: 26px;
-      font-size: 12px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.10);
-      color: rgba(255, 255, 255, 0.45);
-      border-radius: 8px;
-      width: 100%;
-      max-width: 200px;
       white-space: nowrap;
       min-width: fit-content;
+      height: 28px;
+      padding: 0 14px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 7px;
+      color: rgba(255, 255, 255, 0.50);
     }
     
     @keyframes timeoutPulse {
