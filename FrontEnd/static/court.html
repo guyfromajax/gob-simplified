@@ -4578,6 +4578,14 @@
         
         // Populate headshots for the new play elements
         await populatePlayHeadshots();
+
+        // After layout + images, re-apply slot visibility (develop flex can paint 0-height until this frame)
+        if (orderedPlays.length > 0) {
+          requestAnimationFrame(() => {
+            const idx = typeof window.__pccSlotSyncIndex === 'number' ? window.__pccSlotSyncIndex : 0;
+            applyOffensePccSlotSync(idx);
+          });
+        }
         
         // Trigger re-initialization of navigation after building
         // Dispatch event to notify navigation code that reordering is complete
@@ -4593,16 +4601,20 @@
     }
 
     let _playcallBookLoadTimer = null;
+    /** Serializes playbook loads so overlapping debounced/history fires cannot interleave innerHTML clears. */
+    let _playcallScheduleChain = Promise.resolve();
     function schedulePlaycallPlaybookLoad() {
       if (_playcallBookLoadTimer) clearTimeout(_playcallBookLoadTimer);
       _playcallBookLoadTimer = setTimeout(() => {
         _playcallBookLoadTimer = null;
-        loadAndApplySlotAssignments().catch((error) => {
-          console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
-          window.dispatchEvent(
-            new CustomEvent('playcall-center-reordered', { detail: { orderedPlays: 0, error: true } })
-          );
-        });
+        _playcallScheduleChain = _playcallScheduleChain
+          .then(() => loadAndApplySlotAssignments())
+          .catch((error) => {
+            console.error('❌ [PLAYCALL CENTER] Error loading slot assignments:', error);
+            window.dispatchEvent(
+              new CustomEvent('playcall-center-reordered', { detail: { orderedPlays: 0, error: true } })
+            );
+          });
       }, 80);
     }
 
