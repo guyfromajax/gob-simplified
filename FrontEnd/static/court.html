@@ -1489,10 +1489,6 @@
       text-overflow: ellipsis;
     }
 
-    .pcc-card-zone:not(.defense-zone) .play-name {
-      display: none;
-    }
-
     .pcc-defense-readonly-card {
       cursor: default;
     }
@@ -4210,14 +4206,22 @@
         }
       }
       
-      // SS&S: Same team_id resolution as set-lineup / bootGame (my_team + home/away; no blind home-first)
+      // SS&S: Same team_id resolution as set-lineup / playbookTeamId, then bootGame-aligned fallback.
+      // bootGame.js uses: team_id || (my_team === 'home' ? home_id : away_id) — so when my_team is
+      // missing, away_id is used. resolvePlaybookTeamIdFromSearch returns null if both home+away exist
+      // without my_team; without this fallback GET /api/playbooks never runs and offense slots stay empty.
       let teamId =
         typeof window.resolvePlaybookTeamIdFromSearch === 'function'
           ? window.resolvePlaybookTeamIdFromSearch(urlParams)
-          : urlParams.get('team_id') ||
-            urlParams.get('user_team_id') ||
-            urlParams.get('home_id') ||
-            urlParams.get('away_id');
+          : null;
+      if (!teamId) {
+        teamId =
+          urlParams.get('team_id') ||
+          urlParams.get('user_team_id') ||
+          (urlParams.get('my_team') === 'home' ? urlParams.get('home_id') : urlParams.get('away_id')) ||
+          urlParams.get('home_id') ||
+          urlParams.get('away_id');
+      }
       // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
       let gameId = urlParams.get('game_id') || null;
       
