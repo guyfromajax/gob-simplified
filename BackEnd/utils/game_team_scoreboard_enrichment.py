@@ -17,6 +17,39 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def resolve_mongo_team_id_string(raw: Any) -> str | None:
+    """
+    Normalize a game/slot team identifier to the canonical ``teams._id`` hex string
+    used as ``franchise_team_data.team_id`` (FTD). Accepts ObjectId, 24-char hex, team name, or ``team_id`` slug.
+    """
+    if raw is None or raw == "":
+        return None
+    from bson import ObjectId
+    from bson.errors import InvalidId
+
+    if isinstance(raw, ObjectId):
+        return str(raw)
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        return str(ObjectId(s))
+    except (InvalidId, TypeError):
+        pass
+    try:
+        from BackEnd.db import teams_collection
+
+        doc = teams_collection.find_one(
+            {"$or": [{"name": s}, {"team_id": s}, {"code": s}]},
+            {"_id": 1},
+        )
+        if doc and doc.get("_id") is not None:
+            return str(doc["_id"])
+    except Exception as e:
+        logger.warning("resolve_mongo_team_id_string: teams lookup failed for %r: %s", raw, e)
+    return None
+
+
 def natl_rank_from_ftd_document(ftd: dict[str, Any] | None) -> int | None:
     """Return national rank from an FTD document, or None if missing/invalid."""
     if not isinstance(ftd, dict):
@@ -60,24 +93,29 @@ def enrich_franchise_teams_scoreboard_meta(
     from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
     try:
-        fid = ObjectId(franchise_id)
+        fid = ObjectId(str(franchise_id).strip())
     except (InvalidId, TypeError):
         logger.warning("enrich_franchise_teams_scoreboard_meta: invalid franchise_id=%r", franchise_id)
         return
 
     oids: list[ObjectId] = []
     id_strs: list[str] = []
+    slot_to_canonical: list[tuple[Any, str]] = []
     for raw in (home_team_id, away_team_id):
         if not raw:
             continue
-        s = str(raw)
-        if s in id_strs:
+        canon = resolve_mongo_team_id_string(raw)
+        if not canon:
+            logger.warning("enrich_franchise_teams_scoreboard_meta: could not resolve team_id=%r", raw)
+            continue
+        slot_to_canonical.append((raw, canon))
+        if canon in id_strs:
             continue
         try:
-            oids.append(ObjectId(s))
-            id_strs.append(s)
+            oids.append(ObjectId(canon))
+            id_strs.append(canon)
         except (InvalidId, TypeError):
-            logger.warning("enrich_franchise_teams_scoreboard_meta: invalid team_id=%r", raw)
+            logger.warning("enrich_franchise_teams_scoreboard_meta: invalid resolved id=%r", canon)
 
     if not oids:
         return
@@ -106,20 +144,18 @@ def enrich_franchise_teams_scoreboard_meta(
     except Exception as e:
         logger.warning("enrich_franchise_teams_scoreboard_meta: standings failed: %s", e)
 
-    def _apply(team_id_str: str) -> None:
-        if team_id_str not in teams_obj:
-            return
-        entry = teams_obj[team_id_str]
+    def _apply_slot(slot_id: Any, canonical_oid_str: str) -> None:
+        entry = teams_row_for_team_id(teams_obj, slot_id)
         if not isinstance(entry, dict):
             return
 
-        ftd = ftd_by_tid.get(team_id_str)
+        ftd = ftd_by_tid.get(canonical_oid_str)
         if ftd:
             nr = natl_rank_from_ftd_document(ftd)
             if nr is not None:
                 entry["natl_rank"] = nr
 
-        st = standings.get(team_id_str) or {}
+        st = standings.get(canonical_oid_str) or {}
         try:
             w = int(st.get("W", 0) or 0)
             ell = int(st.get("L", 0) or 0)
@@ -130,8 +166,8 @@ def enrich_franchise_teams_scoreboard_meta(
         entry["team_wins"] = w
         entry["team_losses"] = ell
 
-    _apply(str(home_team_id))
-    _apply(str(away_team_id))
+    for slot_id, canon in slot_to_canonical:
+        _apply_slot(slot_id, canon)
 
 
 def teams_row_for_team_id(teams: Any, tid: Any) -> dict[str, Any] | None:

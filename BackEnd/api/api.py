@@ -711,11 +711,17 @@ try:
         if not franchise_id or not team_id:
             return None
         try:
-            team_object_id = ObjectId(team_id) if not isinstance(team_id, ObjectId) else team_id
-            from BackEnd.utils.game_team_scoreboard_enrichment import natl_rank_from_ftd_document
+            from BackEnd.utils.game_team_scoreboard_enrichment import (
+                natl_rank_from_ftd_document,
+                resolve_mongo_team_id_string,
+            )
 
+            resolved = resolve_mongo_team_id_string(team_id)
+            if not resolved:
+                return None
+            team_object_id = ObjectId(resolved)
             ftd_doc = franchise_team_data_collection.find_one(
-                {"franchise_id": ObjectId(franchise_id), "team_id": team_object_id},
+                {"franchise_id": ObjectId(str(franchise_id).strip()), "team_id": team_object_id},
                 {"natl_rank": 1, "Recruits": 1},
             )
             if not ftd_doc:
@@ -1709,12 +1715,12 @@ try:
                         _rk_home, _rk_away = resolve_home_away_teams_slot_keys(saved)
                         home_team_rank = (
                             load_franchise_team_rank(saved_franchise_id, str(_rk_home) if _rk_home is not None else None)
-                            if saved_mode == "franchise" and saved_franchise_id
+                            if saved_franchise_id
                             else None
                         )
                         away_team_rank = (
                             load_franchise_team_rank(saved_franchise_id, str(_rk_away) if _rk_away is not None else None)
-                            if saved_mode == "franchise" and saved_franchise_id
+                            if saved_franchise_id
                             else None
                         )
 
@@ -1730,7 +1736,7 @@ try:
                             _sb_new[str(_rk_home)] = dict(home_team_data)
                         if _rk_away:
                             _sb_new[str(_rk_away)] = dict(away_team_data)
-                        if saved_mode == "franchise" and saved_franchise_id and _rk_home and _rk_away:
+                        if saved_franchise_id and _rk_home and _rk_away:
                             try:
                                 enrich_franchise_teams_scoreboard_meta(
                                     _sb_new,
@@ -1875,9 +1881,9 @@ try:
                     for _tid in (home_team_id, away_team_id):
                         if _tid:
                             _sb_merge[str(_tid)] = dict(teams_row_for_team_id(_teams_raw, _tid) or {})
-                    _sb_mode = saved.get("mode", "single")
                     _sb_fid = saved.get("franchise_id")
-                    if _sb_mode == "franchise" and _sb_fid and home_team_id and away_team_id:
+                    # Enrich whenever franchise_id exists; ``mode`` is often missing or inconsistent on saved games.
+                    if _sb_fid and home_team_id and away_team_id:
                         try:
                             enrich_franchise_teams_scoreboard_meta(
                                 _sb_merge,
@@ -1967,12 +1973,12 @@ try:
                     saved_franchise_id = saved.get("franchise_id")
                     home_team_rank = (
                         load_franchise_team_rank(saved_franchise_id, home_team_id)
-                        if saved_mode == "franchise" and saved_franchise_id
+                        if saved_franchise_id
                         else None
                     )
                     away_team_rank = (
                         load_franchise_team_rank(saved_franchise_id, away_team_id)
-                        if saved_mode == "franchise" and saved_franchise_id
+                        if saved_franchise_id
                         else None
                     )
                     from BackEnd.utils.game_team_scoreboard_enrichment import (
