@@ -17,17 +17,17 @@
   <style>
     @font-face {
       font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Bold.otf') format('opentype');
+      src: url('./fonts/BebasNeuePro-Bold.otf') format('opentype');
       font-weight: 700; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Regular.otf') format('opentype');
+      src: url('./fonts/BebasNeuePro-Regular.otf') format('opentype');
       font-weight: 400; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: 'Bebas Neue Pro';
-      src: url('./GOB Homepage Redesign/fonts/BebasNeuePro-Book.otf') format('opentype');
+      src: url('./fonts/BebasNeuePro-Book.otf') format('opentype');
       font-weight: 300; font-style: normal; font-display: swap;
     }
 
@@ -87,6 +87,10 @@
       box-shadow: 0 2px 24px rgba(0,0,0,0.5);
     }
     .auth-bar.gob-hp-nav .logo { height: 36px; width: auto; display: block; }
+    .auth-bar.gob-hp-nav .tutorials-nav-btn {
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.70); transition: color 0.2s;
+    }
+    .auth-bar.gob-hp-nav .tutorials-nav-btn:hover { color: var(--w); }
     .auth-bar.gob-hp-nav .nav-icon { color: rgba(255,255,255,0.65); transition: color 0.2s; }
     .auth-bar.gob-hp-nav .nav-icon:hover { color: var(--w); }
     .auth-bar.gob-hp-nav .auth-link {
@@ -156,18 +160,18 @@
       max-width: 520px; line-height: 1.7;
     }
     .hero-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-    /* Primary CTA — GOB orange */
+    /* Green = THE one primary action on this page */
     .btn-green {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 16px 48px; font-family: var(--bebas); font-size: 1.25rem; letter-spacing: 0.07em;
-      color: var(--bg); background: #F79420;
+      color: var(--bg); background: var(--green);
       border: none; border-radius: 8px; cursor: pointer;
-      box-shadow: 0 4px 28px rgba(247,148,32,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+      box-shadow: 0 4px 28px rgba(52,236,39,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
       transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
     .btn-green:hover {
-      background: #e08318; transform: translateY(-2px);
-      box-shadow: 0 10px 40px rgba(247,148,32,0.5);
+      background: var(--green-dk); transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(52,236,39,0.5);
     }
     .hero-microcopy { font-size: 0.8rem; color: var(--w45); font-style: italic; }
     /* Scroll indicator */
@@ -403,7 +407,7 @@
       content: ''; position: absolute;
       bottom: -100px; left: 50%; transform: translateX(-50%);
       width: 900px; height: 500px;
-      background: radial-gradient(ellipse, rgba(247,148,32,0.05) 0%, transparent 65%);
+      background: radial-gradient(ellipse, rgba(52,236,39,0.05) 0%, transparent 65%);
       pointer-events: none;
     }
     .footer-cta-inner {
@@ -429,31 +433,6 @@
     .objection-dot {
       width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.20);
       flex-shrink: 0;
-    }
-
-    /* ══════════════════════════════════
-       FAQ (details)
-    ══════════════════════════════════ */
-    .faq-section {
-      background: var(--bg); padding: 80px 0 96px;
-      border-top: 1px solid var(--border);
-    }
-    .faq-section-inner { max-width: 720px; margin: 0 auto; }
-    .faq-section-hed {
-      font-family: var(--bebas); font-size: clamp(2rem, 4vw, 2.75rem);
-      color: var(--w); letter-spacing: 0.01em; margin-bottom: 28px;
-    }
-    .faq-item { border-bottom: 1px solid var(--border); }
-    .faq-item:last-of-type { border-bottom: none; }
-    .faq-question {
-      font-family: var(--inter); font-size: 1rem; font-weight: 600;
-      color: var(--w90); cursor: pointer; padding: 18px 0;
-      list-style: none;
-    }
-    .faq-question::-webkit-details-marker { display: none; }
-    .faq-answer p {
-      font-family: var(--inter); font-size: 0.925rem; color: var(--w70);
-      line-height: 1.75; margin: 0 0 20px;
     }
 
     /* ══════════════════════════════════
@@ -530,20 +509,6 @@
       .objection-strip { flex-direction: column; gap: 8px; }
     }
   </style>
-  <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {"@type":"Question","name":"What is Geeked Out Basketball?","acceptedAnswer":{"@type":"Answer","text":"Geeked Out Basketball is a basketball simulation game where you build and coach an elite high school program from the ground up. It's a strategy-focused basketball sim — you develop players, set game plans, build playbooks, and make decisions during live gameplay."}},
-    {"@type":"Question","name":"Is this a basketball sim or an arcade game?","acceptedAnswer":{"@type":"Answer","text":"It's a basketball sim, not an arcade game. You don't control players in real time — you coach. Set your system, manage your roster, call plays, make halftime adjustments, and answer to the press after every game."}},
-    {"@type":"Question","name":"What makes this basketball simulation different?","acceptedAnswer":{"@type":"Answer","text":"Most basketball games are either arcade action or basic GM sims. Geeked Out Basketball sits in a different category entirely — deep tactical coaching, real player development, a full 26-week season, and a post-game press conference system that makes every decision feel meaningful."}},
-    {"@type":"Question","name":"Do I need to know basketball to play?","acceptedAnswer":{"@type":"Answer","text":"You don't need to know plays by name, but you'll get more out of it if you think like a coach. The game rewards basketball IQ — understanding matchups, managing player minutes, adjusting at halftime. The deeper your knowledge, the deeper the game gets."}},
-    {"@type":"Question","name":"Who is this basketball simulation game for?","acceptedAnswer":{"@type":"Answer","text":"Coaches and sim fans who want depth and strategy. If you've ever wanted a basketball game that respects your basketball IQ, this is it."}},
-    {"@type":"Question","name":"Do I need to download anything?","acceptedAnswer":{"@type":"Answer","text":"No. Geeked Out Basketball is entirely browser-based. Desktop recommended for the best experience."}}
-  ]
-}
-</script>
 </head>
 <body class="has-auth-bar">
 
@@ -557,6 +522,7 @@
       <a href="/" class="logo-link">
         <img src="./images/geekedout_logo.png" alt="Geeked-Out Basketball" class="logo">
       </a>
+      <a href="/tutorial.html" class="tutorials-nav-btn">Tutorials</a>
     </div>
     <img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">
     <div class="auth-bar-right">
@@ -767,55 +733,6 @@
     </div>
   </section>
 
-  <!-- ═══════════ FAQ ═══════════ -->
-  <section class="faq-section" aria-labelledby="faq-heading">
-    <div class="wrap faq-section-inner">
-      <h2 id="faq-heading" class="faq-section-hed anim">Frequently Asked Questions</h2>
-
-      <details class="faq-item anim">
-        <summary class="faq-question">What is Geeked Out Basketball?</summary>
-        <div class="faq-answer">
-          <p>Geeked Out Basketball is a basketball simulation game where you build and coach an elite high school program from the ground up. It's a strategy-focused basketball sim — you develop players, set game plans, build playbooks, and make decisions during live gameplay.</p>
-        </div>
-      </details>
-
-      <details class="faq-item anim">
-        <summary class="faq-question">Is this a basketball sim or an arcade game?</summary>
-        <div class="faq-answer">
-          <p>It's a basketball sim, not an arcade game. You don't control players in real time — you coach. Set your system, manage your roster, call plays, make halftime adjustments, and answer to the press after every game.</p>
-        </div>
-      </details>
-
-      <details class="faq-item anim">
-        <summary class="faq-question">What makes this basketball simulation different?</summary>
-        <div class="faq-answer">
-          <p>Most basketball games are either arcade action or basic GM sims. Geeked Out Basketball sits in a different category entirely — deep tactical coaching, real player development, a full 26-week season, and a post-game press conference system that makes every decision feel meaningful.</p>
-        </div>
-      </details>
-
-      <details class="faq-item anim">
-        <summary class="faq-question">Do I need to know basketball to play?</summary>
-        <div class="faq-answer">
-          <p>You don't need to know plays by name, but you'll get more out of it if you think like a coach. The game rewards basketball IQ — understanding matchups, managing player minutes, adjusting at halftime. The deeper your knowledge, the deeper the game gets.</p>
-        </div>
-      </details>
-
-      <details class="faq-item anim">
-        <summary class="faq-question">Who is this basketball simulation game for?</summary>
-        <div class="faq-answer">
-          <p>Coaches and sim fans who want depth and strategy. If you've ever wanted a basketball game that respects your basketball IQ, this is it.</p>
-        </div>
-      </details>
-
-      <details class="faq-item anim">
-        <summary class="faq-question">Do I need to download anything?</summary>
-        <div class="faq-answer">
-          <p>No. Geeked Out Basketball is entirely browser-based. Desktop recommended for the best experience.</p>
-        </div>
-      </details>
-    </div>
-  </section>
-
   <!-- ═══════════ FOOTER CTA ═══════════ -->
   <section class="footer-cta">
     <div class="wrap">
@@ -980,6 +897,5 @@
       document.querySelectorAll('.anim').forEach(el => el.classList.add('in'));
     }
   </script>
-  <button id="tweaks-toggle" type="button" style="display:none;position:fixed;bottom:24px;left:24px;z-index:998;background:rgba(13,13,26,0.9);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.6);font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:8px 14px;border-radius:8px;cursor:pointer;" onclick="document.getElementById('tweaks-panel').classList.toggle('open')" aria-hidden="true">Tweaks</button>
 </body>
 </html>

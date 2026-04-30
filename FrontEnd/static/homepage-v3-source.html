@@ -15,6 +15,22 @@
   <link rel="stylesheet" href="/css/auth-bar.css">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family: 'Bebas Neue Pro';
+      src: url('./fonts/BebasNeuePro-Bold.otf') format('opentype');
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Bebas Neue Pro';
+      src: url('./fonts/BebasNeuePro-Regular.otf') format('opentype');
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Bebas Neue Pro';
+      src: url('./fonts/BebasNeuePro-Book.otf') format('opentype');
+      font-weight: 300; font-style: normal; font-display: swap;
+    }
+
     /* ── Tokens ── */
     :root {
       --bg:         #08080f;
@@ -33,7 +49,7 @@
       --w06:        rgba(255,255,255,0.06);
       --border:     rgba(255,255,255,0.10);
       --border-lt:  rgba(255,255,255,0.20);
-      --bebas:      'Bebas Neue', sans-serif;
+      --bebas:      'Bebas Neue Pro', 'Bebas Neue', sans-serif;
       --inter:      'Inter', sans-serif;
       --max:        1240px;
     }
