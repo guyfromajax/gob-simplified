@@ -133,7 +133,6 @@
       grid-template-columns: 
         var(--side-padding)
         auto
-        auto
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
@@ -157,7 +156,6 @@
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
-        auto
         auto
         var(--side-padding);
       align-items: center;
@@ -185,35 +183,16 @@
 
     /* Grid layout breakdown:
        1. Left padding
-       2. Away logo (auto width, fills height)
-       3. Gap (20px)
+       2. Away logo stack (logo + rank/record under, auto width)
+       3. Gap
        4. Away score (70px)
-       5. Gap (20px)
+       5. Gap
        6. Away TOL/F (60px)
-       7. Gap (20px)
-       8. Away/Defensive Playcall (auto width)
-       9. Gap (10px)
-       10. Away Tempo Bar (25px)
-       11. Gap (10px)
-       12. Away Aggression Bar (25px)
-       13. Flex space
-       14. Center (clock/quarter)
-       15. Flex space
-       16. Home Tempo Bar (25px)
-       17. Gap (10px)
-       18. Home Aggression Bar (25px)
-       19. Gap (10px)
-       20. Home/Offensive Playcall (auto width)
-       21. Gap (20px)
-       22. Home TOL/F (60px)
-       23. Gap (20px)
-       24. Home score (70px)
-       25. Gap (20px)
-       26. Home logo (auto width, fills height)
-       27. Right padding
+       7. Gap → flex toward center … clock (absolute) …
+       Home: TOL/F, score, logo stack (rank/record under logo); right padding.
     */
 
-    /* Away Logo - Grid column 2 */
+    /* Away Logo + under-logo rank/record — grid column 2 */
     #away-logo-container {
       grid-column: 2;
       height: var(--scoreboard-height);
@@ -222,8 +201,9 @@
       overflow: hidden;
       flex-shrink: 0;
       display: flex;
+      flex-direction: column;
       align-items: stretch;
-      justify-content: center;
+      justify-content: flex-start;
       position: relative;
     }
 
@@ -250,7 +230,6 @@
     }
 
     .sb-team-meta--away {
-      grid-column: 3;
       text-align: left;
     }
 
@@ -272,22 +251,21 @@
     }
 
     .sb-team-meta--home {
-      grid-column: 28;
       text-align: right;
     }
 
-    /* Away Score - Grid column 5 */
+    /* Away Score */
     #away-score {
-      grid-column: 5;
-      font-size: 68px;
+      grid-column: 4;
+      font-size: 80px;
       line-height: 1;
       text-align: center;
       font-weight: bold;
     }
 
-    /* Away TOL/F - Grid column 7 */
+    /* Away TOL/F */
     .tol-fouls.away {
-      grid-column: 7;
+      grid-column: 6;
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -466,14 +444,14 @@
 
     /* Away side: [Image] 🏀/D AUDIBLE! → (reading left to right from center) */
     .active-player-display.away-side {
-      grid-column: 9;
+      grid-column: 8;
       flex-direction: row;
       justify-content: flex-end; /* Push content toward center */
     }
 
     /* Home side: AUDIBLE! 🏀/D [Image] ← (reading right to left from center) */
     .active-player-display.home-side {
-      grid-column: 21;
+      grid-column: 20;
       flex-direction: row-reverse;
       justify-content: flex-start; /* Push content toward center */
     }
@@ -559,9 +537,9 @@
       to { transform: scale(1.05); }
     }
 
-    /* Home TOL/F - Grid column 23 */
+    /* Home TOL/F */
     .tol-fouls.home {
-      grid-column: 23;
+      grid-column: 22;
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -570,26 +548,27 @@
       align-items: flex-end;
     }
 
-    /* Home Score - Grid column 25 */
+    /* Home Score */
     #home-score {
-      grid-column: 25;
-      font-size: 68px;
+      grid-column: 24;
+      font-size: 80px;
       line-height: 1;
       text-align: center;
       font-weight: bold;
     }
 
-    /* Home Logo - Grid column 27 */
+    /* Home Logo stack */
     #home-logo-container {
-      grid-column: 27;
+      grid-column: 26;
       height: var(--scoreboard-height);
       width: 200px;
       max-width: 200px;
       overflow: hidden;
       flex-shrink: 0;
       display: flex;
+      flex-direction: column;
       align-items: stretch;
-      justify-content: center;
+      justify-content: flex-start;
       position: relative;
     }
 
@@ -3139,39 +3118,29 @@
    • Away panel header (logo + text) clipped                   → fixed
 
    Design intent:
-   • Scoreboard reads outside→inside symmetrically:
-        [LOGO] [#RANK / RECORD] [SCORE] [TOL/F]   ...   [TOL/F] [SCORE] [#RANK / RECORD] [LOGO]
+   • Scoreboard: away L→R [logo w/ rank+record under][score][TOL/F] · home [TOL/F][score][logo w/ rank+record under].
+   • Team points use the same font size as the game clock (--sb-clock-font-size).
    • --scoreboard-height 120px; logo cells flush to viewport (grid edge columns 0);
-     object-fit: contain + L/R object-position shows full logo width (symmetric gutters
-     push rank/record, score, TOL/F toward center).
+     object-fit: contain + L/R object-position; meta strip sits under logo, above bottom hairline.
    • overflow:hidden clips the center HUD so Q1/shot cannot paint onto the court.
    • Playcall: card zone is 240px wide, plays card fills it; stacks zone
      stretches to fill remaining width with three equal-height strips.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ───────────────────────────────────────────────────────────────────
-   1. SCOREBOARD — LOGO + RANK/RECORD ZONE
+   1. SCOREBOARD — LOGO STACK + SCORE + TOL/F
    ───────────────────────────────────────────────────────────────────
-   Grid columns from existing template:
-     ... 2 (away logo) | 3 (away meta) | 4 gap | 5 (away score) | … | 7 (away TOL/F)
-     … | 23 (home TOL/F) | 25 (home score) | 26 gap | 27 (home meta) | 28 (home logo) | 29 (pad)
-
-   PROBLEM (historical): home meta and logo could share placement / row.
-   Symmetry: same outside→in strip as away — [LOGO][META][SCORE][TOL/F] mirrored.
-
-   FIX: Home meta column 27, home logo column 28; DOM order meta→logo
-   (mirrors away logo→meta); explicit grid-row: 1 on all placed children
-   prevents implicit row-2 collisions.
+   Away (L→R): [logo + rank/record under][score][TOL/F] … center …
+   Home (R→L outside→in): [TOL/F][score][logo + rank/record under]
+   Rank/record sit in a slim row under each logo (no separate grid column).
    ─────────────────────────────────────────────────────────────────── */
 
-/* Pin scoreboard grid children to row 1 (avoids meta/logo sharing a row with stacked placement). */
+/* Pin scoreboard grid children to row 1 */
 #scoreboard #away-logo-container,
-#scoreboard .sb-team-meta--away,
 #scoreboard #away-score,
 #scoreboard .tol-fouls.away,
 #scoreboard .tol-fouls.home,
 #scoreboard #home-score,
-#scoreboard .sb-team-meta--home,
 #scoreboard #home-logo-container {
   grid-row: 1 !important;
 }
@@ -3179,6 +3148,7 @@
 /* Clip center HUD to bar — prevents Q1/shot from painting on the court below when cluster was taller than the bar */
 /* Edge columns 0px: logos flush to viewport; global --side-padding unchanged elsewhere */
 #scoreboard {
+  --sb-clock-font-size: 54px !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
   align-items: stretch !important;
@@ -3186,7 +3156,6 @@
   grid-template-columns:
     0px
     auto
-    auto
     var(--scoreboard-gap)
     70px
     var(--scoreboard-gap)
@@ -3210,15 +3179,13 @@
     var(--scoreboard-gap)
     70px
     var(--scoreboard-gap)
-    auto
     auto
     0px !important;
 }
 #scoreboard #away-score,
 #scoreboard #home-score,
 #scoreboard .tol-fouls.away,
-#scoreboard .tol-fouls.home,
-#scoreboard .sb-team-meta {
+#scoreboard .tol-fouls.home {
   align-self: center !important;
 }
 
@@ -3233,7 +3200,7 @@
   justify-content: center !important;
 }
 #scoreboard .center .clock {
-  font-size: 54px !important;
+  font-size: var(--sb-clock-font-size) !important;
   line-height: 0.92 !important;
 }
 #scoreboard .center .quarter,
@@ -3247,14 +3214,28 @@
 }
 #scoreboard #away-score,
 #scoreboard #home-score {
-  font-size: 48px !important;
-  line-height: 0.95 !important;
+  font-size: var(--sb-clock-font-size) !important;
+  line-height: 0.92 !important;
+}
+#scoreboard #away-logo-container {
+  grid-column: 2 !important;
 }
 #scoreboard #away-score {
+  grid-column: 4 !important;
   margin-left: 16px !important;
 }
 #scoreboard #home-score {
+  grid-column: 24 !important;
   margin-right: 16px !important;
+}
+#scoreboard .tol-fouls.away {
+  grid-column: 6 !important;
+}
+#scoreboard .tol-fouls.home {
+  grid-column: 22 !important;
+}
+#scoreboard #home-logo-container {
+  grid-column: 26 !important;
 }
 
 #away-logo-container,
@@ -3273,10 +3254,12 @@
   /* Drop the colored gradient overlay — it muddies team logos */
 }
 #away-logo-container {
+  flex-direction: column !important;
   justify-content: flex-start !important;
 }
 #home-logo-container {
-  justify-content: flex-end !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
 }
 #away-logo-container::before,
 #home-logo-container::before {
@@ -3288,9 +3271,9 @@
 #scoreboard #away-logo-container .team-logo,
 #scoreboard #home-logo-container .team-logo {
   width: 100% !important;
-  height: 100% !important;
+  height: auto !important;
   max-width: 100% !important;
-  max-height: 100% !important;
+  max-height: none !important;
   object-fit: contain !important;
   object-position: center center !important;
   display: block !important;
@@ -3312,38 +3295,36 @@
   margin-right: 16px !important;
 }
 
-/* Meta: vertically centered in bar; height tracks scoreboard (logos stretch full height) */
-.sb-team-meta {
+/* Rank + record under logo: one row, rank then record (L→R); padding clears bottom hairline */
+#scoreboard #away-logo-container .sb-team-meta,
+#scoreboard #home-logo-container .sb-team-meta {
   display: flex !important;
-  flex-direction: column !important;
-  gap: 3px !important;
-  justify-content: center !important;
-  align-self: center !important;
-  align-items: stretch !important;
-  min-width: 0 !important;
-  min-height: calc(var(--scoreboard-height) - 16px) !important;
-  max-height: var(--scoreboard-height) !important;
-  padding: 0 4px !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+  align-items: baseline !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  flex: 0 0 auto !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  min-width: 72px !important;
+  min-height: 0 !important;
+  max-height: none !important;
   margin: 0 !important;
+  padding: 2px 6px 5px !important;
   box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+#scoreboard #home-logo-container .sb-team-meta {
+  justify-content: flex-end !important;
 }
 .sb-team-meta--away {
-  grid-column: 3 !important;
   text-align: left !important;
-  align-self: center !important;
-  margin-left: 32px !important;
-}
-/* SWAP: home logo moves from col 27 → col 28; home meta stays at col 28 → moves to col 27.
-   Result reads outer→inner: ...[score 25][meta 27][logo 28][edge 29]
-   matching the away side: [edge 0][logo 2][meta 3][score 5]... */
-#home-logo-container {
-  grid-column: 28 !important;
 }
 .sb-team-meta--home {
-  grid-column: 27 !important;
   text-align: right !important;
-  align-self: center !important;
-  margin-right: 32px !important;
 }
 
 .sb-rank {
@@ -3353,7 +3334,7 @@
   color: rgba(255, 255, 255, 0.75) !important;
   letter-spacing: 0.06em !important;
   line-height: 1 !important;
-  display: block !important;
+  display: inline !important;
 }
 .sb-record {
   font-family: 'Inter', sans-serif !important;
@@ -3362,22 +3343,7 @@
   color: rgba(255, 255, 255, 0.45) !important;
   letter-spacing: 0.04em !important;
   line-height: 1 !important;
-  display: block !important;
-}
-
-/* ───────────────────────────────────────────────────────────────────
-   1b. SCOREBOARD GRID — meta column min-widths
-   ───────────────────────────────────────────────────────────────────
-   Both meta tracks (away col 3, home col 27) are `auto`-sized in the
-   existing grid template. Force a min-width so the rank/record block
-   always has room to render without being squeezed to 0 by the score
-   tracks competing for space.
-   ─────────────────────────────────────────────────────────────────── */
-.sb-team-meta--home {
-  min-width: 68px !important;
-}
-.sb-team-meta--away {
-  min-width: 68px !important;
+  display: inline !important;
 }
 
 /* ───────────────────────────────────────────────────────────────────
@@ -3458,12 +3424,12 @@
     <!-- Away Logo - Grid column 2 -->
     <div id="away-logo-container">
       <img id="away-logo" class="team-logo" alt="away logo" />
+      <div class="sb-team-meta sb-team-meta--away">
+        <span class="sb-rank" id="away-rank">#--</span>
+        <span class="sb-record" id="away-record">--</span>
+      </div>
     </div>
-    <div class="sb-team-meta sb-team-meta--away">
-      <span class="sb-rank" id="away-rank">#--</span>
-      <span class="sb-record" id="away-record">--</span>
-    </div>
-    
+
     <!-- Away Score -->
     <div id="away-score">0</div>
     
@@ -3578,17 +3544,16 @@
       <div id="home-fouls">F: 0</div>
     </div>
     
-    <!-- Home Score - Grid column 12 -->
+    <!-- Home Score -->
     <div id="home-score">0</div>
-    
-    <!-- Home meta before logo: mirrors away [logo][meta][score] reading outside→in on the right -->
-    <div class="sb-team-meta sb-team-meta--home">
-      <span class="sb-rank" id="home-rank">#--</span>
-      <span class="sb-record" id="home-record">--</span>
-    </div>
-    <!-- Home Logo -->
+
+    <!-- Home Logo + under-logo rank/record (outside→in on the right: … score, logo) -->
     <div id="home-logo-container">
       <img id="home-logo" class="team-logo" alt="home logo" />
+      <div class="sb-team-meta sb-team-meta--home">
+        <span class="sb-rank" id="home-rank">#--</span>
+        <span class="sb-record" id="home-record">--</span>
+      </div>
     </div>
   </div>
 
