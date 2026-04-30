@@ -17,10 +17,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def resolve_mongo_team_id_string(raw: Any) -> str | None:
+def resolve_mongo_team_id_string(raw: Any, teams_obj: dict[str, Any] | None = None) -> str | None:
     """
     Normalize a game/slot team identifier to the canonical ``teams._id`` hex string
-    used as ``franchise_team_data.team_id`` (FTD). Accepts ObjectId, 24-char hex, team name, or ``team_id`` slug.
+    used as ``franchise_team_data.team_id`` (FTD).
+
+    Accepts: BSON ObjectId, 24-char hex, universal ``teams`` row field ``name`` / ``team_id`` / ``code``,
+    or any slot key that maps to a ``teams`` row via ``teams_obj`` (same keys as ``game["teams"]``).
     """
     if raw is None or raw == "":
         return None
@@ -36,17 +39,35 @@ def resolve_mongo_team_id_string(raw: Any) -> str | None:
         return str(ObjectId(s))
     except (InvalidId, TypeError):
         pass
-    try:
-        from BackEnd.db import teams_collection
 
-        doc = teams_collection.find_one(
-            {"$or": [{"name": s}, {"team_id": s}, {"code": s}]},
-            {"_id": 1},
-        )
-        if doc and doc.get("_id") is not None:
-            return str(doc["_id"])
-    except Exception as e:
-        logger.warning("resolve_mongo_team_id_string: teams lookup failed for %r: %s", raw, e)
+    def _lookup_by_string(q: str) -> str | None:
+        if not q or not str(q).strip():
+            return None
+        t = str(q).strip()
+        try:
+            from BackEnd.db import teams_collection
+
+            doc = teams_collection.find_one(
+                {"$or": [{"name": t}, {"team_id": t}, {"code": t}]},
+                {"_id": 1},
+            )
+            if doc and doc.get("_id") is not None:
+                return str(doc["_id"])
+        except Exception as e:
+            logger.warning("resolve_mongo_team_id_string: teams lookup failed for %r: %s", q, e)
+        return None
+
+    hit = _lookup_by_string(s)
+    if hit:
+        return hit
+
+    if isinstance(teams_obj, dict) and teams_obj:
+        row = teams_row_for_team_id(teams_obj, raw)
+        if isinstance(row, dict):
+            for hint in (row.get("name"), row.get("team_id"), row.get("code")):
+                hit = _lookup_by_string(hint) if hint else None
+                if hit:
+                    return hit
     return None
 
 
@@ -76,15 +97,22 @@ def enrich_franchise_teams_scoreboard_meta(
     franchise_id: str,
     home_team_id: str,
     away_team_id: str,
+    *,
+    resolve_teams: dict[str, Any] | None = None,
 ) -> None:
     """
     Mutate teams_obj[home_team_id] and teams_obj[away_team_id] in place.
 
     Sets when data is available: natl_rank, wins, losses, team_wins, team_losses
     (team_wins / team_losses mirror wins / losses for older frontend keys).
+
+    ``resolve_teams``: optional superset dict (e.g. merge of DB ``game["teams"]`` + sidecar) used only to
+    resolve slot ids → Mongo ``teams._id`` via row ``name`` / ``team_id`` / ``code``. Defaults to ``teams_obj``.
     """
     if not franchise_id or not isinstance(teams_obj, dict):
         return
+
+    res_hint = resolve_teams if isinstance(resolve_teams, dict) and resolve_teams else teams_obj
 
     from bson import ObjectId
     from bson.errors import InvalidId
@@ -104,7 +132,7 @@ def enrich_franchise_teams_scoreboard_meta(
     for raw in (home_team_id, away_team_id):
         if not raw:
             continue
-        canon = resolve_mongo_team_id_string(raw)
+        canon = resolve_mongo_team_id_string(raw, res_hint)
         if not canon:
             logger.warning("enrich_franchise_teams_scoreboard_meta: could not resolve team_id=%r", raw)
             continue
@@ -118,6 +146,14 @@ def enrich_franchise_teams_scoreboard_meta(
             logger.warning("enrich_franchise_teams_scoreboard_meta: invalid resolved id=%r", canon)
 
     if not oids:
+        logger.warning(
+            "enrich_franchise_teams_scoreboard_meta: abort_no_valid_team_oids franchise_id=%r raw_home=%r raw_away=%r "
+            "teams_obj_key_sample=%s",
+            franchise_id,
+            home_team_id,
+            away_team_id,
+            list(teams_obj.keys())[:16] if isinstance(teams_obj, dict) else None,
+        )
         return
 
     ftd_by_tid: dict[str, dict[str, Any]] = {}
@@ -168,6 +204,32 @@ def enrich_franchise_teams_scoreboard_meta(
 
     for slot_id, canon in slot_to_canonical:
         _apply_slot(slot_id, canon)
+
+    dbg_slots: list[dict[str, Any]] = []
+    for slot_id, canon in slot_to_canonical:
+        ent = teams_row_for_team_id(teams_obj, slot_id)
+        dbg_slots.append(
+            {
+                "slot_raw_repr": repr(slot_id)[:160],
+                "slot_type": type(slot_id).__name__,
+                "canonical_mongo_team_id": canon,
+                "row_found": isinstance(ent, dict),
+                "row_team_name": (ent or {}).get("name"),
+                "ftd_doc_hit": canon in ftd_by_tid,
+                "natl_rank_after": (ent or {}).get("natl_rank") if isinstance(ent, dict) else None,
+                "wins_after": (ent or {}).get("wins"),
+                "losses_after": (ent or {}).get("losses"),
+            }
+        )
+    logger.warning(
+        "enrich_franchise_teams_scoreboard_meta OK franchise_id=%r franchise_oid=%s ftd_team_ids=%s "
+        "standings_for_slots=%s debug_slots=%s",
+        franchise_id,
+        str(fid),
+        list(ftd_by_tid.keys()),
+        {k: standings.get(k) for k in id_strs},
+        dbg_slots,
+    )
 
 
 def teams_row_for_team_id(teams: Any, tid: Any) -> dict[str, Any] | None:

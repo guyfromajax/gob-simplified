@@ -1736,6 +1736,10 @@ try:
                             _sb_new[str(_rk_home)] = dict(home_team_data)
                         if _rk_away:
                             _sb_new[str(_rk_away)] = dict(away_team_data)
+                        _new_resolve_hint = {}
+                        if isinstance(saved.get("teams"), dict):
+                            _new_resolve_hint.update(saved["teams"])
+                        _new_resolve_hint.update(_sb_new)
                         if saved_franchise_id and _rk_home and _rk_away:
                             try:
                                 enrich_franchise_teams_scoreboard_meta(
@@ -1743,6 +1747,7 @@ try:
                                     str(saved_franchise_id),
                                     str(_rk_home),
                                     str(_rk_away),
+                                    resolve_teams=_new_resolve_hint,
                                 )
                             except Exception:
                                 pass
@@ -1882,6 +1887,10 @@ try:
                         if _tid:
                             _sb_merge[str(_tid)] = dict(teams_row_for_team_id(_teams_raw, _tid) or {})
                     _sb_fid = saved.get("franchise_id")
+                    _resolve_hint = {}
+                    if isinstance(_teams_raw, dict):
+                        _resolve_hint.update(_teams_raw)
+                    _resolve_hint.update(_sb_merge)
                     # Enrich whenever franchise_id exists; ``mode`` is often missing or inconsistent on saved games.
                     if _sb_fid and home_team_id and away_team_id:
                         try:
@@ -1890,6 +1899,7 @@ try:
                                 str(_sb_fid),
                                 str(home_team_id),
                                 str(away_team_id),
+                                resolve_teams=_resolve_hint,
                             )
                         except Exception as _sb_ex:
                             logging.warning("GET /api/game: franchise scoreboard enrich failed: %s", _sb_ex)
@@ -5584,6 +5594,36 @@ try:
         summary_start = time.time()
         gm.score = {home_team: 0, away_team: 0}
         summary = summarize_game_state(gm, exclude_animations=True)
+        try:
+            _ts = summary.get("teams") or {}
+            _sw = {}
+            for _k in list(_ts.keys())[:6]:
+                _r = _ts.get(_k)
+                if isinstance(_r, dict):
+                    _sw[str(_k)] = {
+                        "name": _r.get("name"),
+                        "natl_rank": _r.get("natl_rank"),
+                        "wins": _r.get("wins"),
+                        "losses": _r.get("losses"),
+                    }
+            logging.warning(
+                "🔍 [INIT-GAME SCOREBOARD POST-SUMMARIZE] game_id=%s mode=%s franchise_id_param=%s "
+                "summary_franchise_id=%s gm_home_team_id=%s gm_away_team_id=%s gm_home_franchise_id=%s gm_away_franchise_id=%s "
+                "summary_home_team_id=%s summary_away_team_id=%s teams_snapshot=%s",
+                game_id,
+                mode,
+                franchise_id,
+                summary.get("franchise_id"),
+                getattr(gm.home_team, "team_id", None),
+                getattr(gm.away_team, "team_id", None),
+                getattr(gm.home_team, "franchise_id", None),
+                getattr(gm.away_team, "franchise_id", None),
+                summary.get("home_team_id"),
+                summary.get("away_team_id"),
+                _sw,
+            )
+        except Exception as _init_sb_log_ex:
+            logging.warning("🔍 [INIT-GAME SCOREBOARD POST-SUMMARIZE] log failed: %s", _init_sb_log_ex)
         summary["_id"] = game_id
         summary["game_stats_initialized"] = True
         summary["quarter"] = 1  # Pre-game, but set to 1 so simulate-quarter works correctly
@@ -5599,7 +5639,9 @@ try:
         summary["mode"] = mode
         if mode == "tournament" and tournament_id:
             summary["tournament_id"] = str(tournament_id)
-        elif mode == "franchise" and franchise_id:
+        # Always persist franchise_id when the client sent it — GET /api/game enrichment keys off this field;
+        # ``mode`` alone is not reliable on older or partially-written game docs.
+        if franchise_id:
             summary["franchise_id"] = str(franchise_id)
         
         # ✅ CRITICAL: Store user_team_side in game document for persistence
