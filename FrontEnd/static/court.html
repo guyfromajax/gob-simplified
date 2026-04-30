@@ -136,7 +136,7 @@
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
-        60px
+        max-content
         var(--scoreboard-gap)
         auto
         10px
@@ -152,7 +152,7 @@
         10px
         auto
         var(--scoreboard-gap)
-        60px
+        max-content
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
@@ -187,7 +187,7 @@
        3. Gap
        4. Away score (70px)
        5. Gap
-       6. Away TOL/F (60px)
+       6. Away TOL/F (max-content — one line per stat)
        7. Gap → flex toward center … clock (absolute) …
        Home: TOL/F, score, logo stack (rank/record under logo); right padding.
     */
@@ -556,6 +556,11 @@
       text-transform: uppercase;
       color: rgba(255, 255, 255, 0.55);
       align-items: flex-end;
+    }
+
+    .tol-fouls.away > div,
+    .tol-fouls.home > div {
+      white-space: nowrap;
     }
 
     /* Home Score */
@@ -3169,7 +3174,7 @@
     var(--scoreboard-gap)
     70px
     var(--scoreboard-gap)
-    60px
+    max-content
     var(--scoreboard-gap)
     auto
     10px
@@ -3185,7 +3190,7 @@
     10px
     auto
     var(--scoreboard-gap)
-    60px
+    max-content
     var(--scoreboard-gap)
     70px
     var(--scoreboard-gap)
