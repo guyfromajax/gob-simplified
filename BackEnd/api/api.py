@@ -712,14 +712,15 @@ try:
             return None
         try:
             team_object_id = ObjectId(team_id) if not isinstance(team_id, ObjectId) else team_id
+            from BackEnd.utils.game_team_scoreboard_enrichment import natl_rank_from_ftd_document
+
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": ObjectId(franchise_id), "team_id": team_object_id},
-                {"natl_rank": 1},
+                {"natl_rank": 1, "Recruits": 1},
             )
             if not ftd_doc:
                 return None
-            rank = ftd_doc.get("natl_rank")
-            return int(rank) if rank is not None else None
+            return natl_rank_from_ftd_document(ftd_doc)
         except Exception:
             return None
     
@@ -1716,6 +1717,35 @@ try:
                             if saved_mode == "franchise" and saved_franchise_id
                             else None
                         )
+
+                        from BackEnd.utils.game_team_scoreboard_enrichment import (
+                            coalesce_natl_rank_from_team_row,
+                            enrich_franchise_teams_scoreboard_meta,
+                            team_scoreboard_meta_for_pair,
+                            teams_row_for_team_id,
+                        )
+
+                        _sb_new: dict[str, dict] = {}
+                        if _rk_home:
+                            _sb_new[str(_rk_home)] = dict(home_team_data)
+                        if _rk_away:
+                            _sb_new[str(_rk_away)] = dict(away_team_data)
+                        if saved_mode == "franchise" and saved_franchise_id and _rk_home and _rk_away:
+                            try:
+                                enrich_franchise_teams_scoreboard_meta(
+                                    _sb_new,
+                                    str(saved_franchise_id),
+                                    str(_rk_home),
+                                    str(_rk_away),
+                                )
+                            except Exception:
+                                pass
+                        _hn_row = teams_row_for_team_id(_sb_new, _rk_home) if _rk_home else {}
+                        _an_row = teams_row_for_team_id(_sb_new, _rk_away) if _rk_away else {}
+                        _hn_merged = {**home_team_data, **_hn_row}
+                        _an_merged = {**away_team_data, **_an_row}
+                        _hn_natl = coalesce_natl_rank_from_team_row(_hn_merged, home_team_rank)
+                        _an_natl = coalesce_natl_rank_from_team_row(_an_merged, away_team_rank)
                         
                         # Extract players with energy but no stats
                         players = saved.get("players", [])
@@ -1736,8 +1766,6 @@ try:
                             players_with_energy.append(player_data)
                         
                         # Return empty stats structure
-                        from BackEnd.utils.game_team_scoreboard_enrichment import team_scoreboard_meta_for_pair
-
                         _hn = home_team_data.get("name", "") or ""
                         _an = away_team_data.get("name", "") or ""
                         response_data = {
@@ -1763,16 +1791,24 @@ try:
                                 "name": _hn,
                                 "team_fouls": 0,
                                 "attributes": home_team_data.get("attributes", {}),
-                                "natl_rank": home_team_rank,
+                                "natl_rank": _hn_natl,
+                                "wins": _hn_merged.get("wins"),
+                                "losses": _hn_merged.get("losses"),
+                                "team_wins": _hn_merged.get("team_wins", _hn_merged.get("wins")),
+                                "team_losses": _hn_merged.get("team_losses", _hn_merged.get("losses")),
                             },
                             "away_team": {
                                 "name": _an,
                                 "team_fouls": 0,
                                 "attributes": away_team_data.get("attributes", {}),
-                                "natl_rank": away_team_rank,
+                                "natl_rank": _an_natl,
+                                "wins": _an_merged.get("wins"),
+                                "losses": _an_merged.get("losses"),
+                                "team_wins": _an_merged.get("team_wins", _an_merged.get("wins")),
+                                "team_losses": _an_merged.get("team_losses", _an_merged.get("losses")),
                             },
                             "team_scoreboard_meta": team_scoreboard_meta_for_pair(
-                                _hn, _an, home_team_data, away_team_data, home_team_rank, away_team_rank
+                                _hn, _an, _hn_merged, _an_merged, _hn_natl, _an_natl
                             ),
                         }
                         response_size = len(json.dumps(response_data))
@@ -1826,6 +1862,41 @@ try:
                     if not away_team_data and saved.get("away_team"):
                         away_team_data = saved.get("away_team", {})
                         logging.warning(f"⚠️ Using legacy away_team structure (teams object not found)")
+
+                    # Franchise: merge live natl_rank (FTD) + W-L (franchise.results) into team blobs.
+                    # Persisted game.teams rows may predate enrichment or be missing copies of standings.
+                    from BackEnd.utils.game_team_scoreboard_enrichment import (
+                        enrich_franchise_teams_scoreboard_meta,
+                        teams_row_for_team_id,
+                    )
+
+                    _sb_merge: dict[str, dict] = {}
+                    _teams_raw = teams_obj if isinstance(teams_obj, dict) else {}
+                    for _tid in (home_team_id, away_team_id):
+                        if _tid:
+                            _sb_merge[str(_tid)] = dict(teams_row_for_team_id(_teams_raw, _tid) or {})
+                    _sb_mode = saved.get("mode", "single")
+                    _sb_fid = saved.get("franchise_id")
+                    if _sb_mode == "franchise" and _sb_fid and home_team_id and away_team_id:
+                        try:
+                            enrich_franchise_teams_scoreboard_meta(
+                                _sb_merge,
+                                str(_sb_fid),
+                                str(home_team_id),
+                                str(away_team_id),
+                            )
+                        except Exception as _sb_ex:
+                            logging.warning("GET /api/game: franchise scoreboard enrich failed: %s", _sb_ex)
+                    _row_h = teams_row_for_team_id(_sb_merge, home_team_id) or {}
+                    _row_a = teams_row_for_team_id(_sb_merge, away_team_id) or {}
+                    if isinstance(home_team_data, dict):
+                        for _k in ("natl_rank", "wins", "losses", "team_wins", "team_losses"):
+                            if _k in _row_h:
+                                home_team_data[_k] = _row_h[_k]
+                    if isinstance(away_team_data, dict):
+                        for _k in ("natl_rank", "wins", "losses", "team_wins", "team_losses"):
+                            if _k in _row_a:
+                                away_team_data[_k] = _row_a[_k]
                     
                     # ✅ FIX: Extract team names with fallbacks to ensure we always have strings (never None)
                     # This prevents TypeError when using None as dictionary keys

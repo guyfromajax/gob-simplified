@@ -1,9 +1,12 @@
 """
 Scoreboard metadata on unified game `teams` objects (franchise mode).
 
-- natl_rank: read from franchise_team_data (FTD) for each team_id.
-- wins / losses: derived from franchise.results via calculate_franchise_standings
-  (FTD rows do not persist W-L; franchise results are the SS&S source).
+- natl_rank: read from franchise_team_data (FTD) for each team_id (top-level
+  ``natl_rank`` is canonical; optional fallbacks for legacy/nested shapes).
+- wins / losses: derived from ``franchise.results`` via calculate_franchise_standings
+  (authoritative W-L for the season). The weekly rank job also denormalizes
+  ``season_wins`` / ``season_losses`` onto each FTD row for convenience in
+  tooling and reporting (enrichment uses ``franchise.results`` only).
 """
 
 from __future__ import annotations
@@ -12,6 +15,27 @@ import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def natl_rank_from_ftd_document(ftd: dict[str, Any] | None) -> int | None:
+    """Return national rank from an FTD document, or None if missing/invalid."""
+    if not isinstance(ftd, dict):
+        return None
+    nr = ftd.get("natl_rank")
+    if nr is not None:
+        try:
+            return int(nr)
+        except (TypeError, ValueError):
+            pass
+    recruits = ftd.get("Recruits")
+    if isinstance(recruits, dict):
+        nr2 = recruits.get("natl_rank")
+        if nr2 is not None:
+            try:
+                return int(nr2)
+            except (TypeError, ValueError):
+                pass
+    return None
 
 
 def enrich_franchise_teams_scoreboard_meta(
@@ -62,7 +86,7 @@ def enrich_franchise_teams_scoreboard_meta(
     try:
         for doc in franchise_team_data_collection.find(
             {"franchise_id": fid, "team_id": {"$in": oids}},
-            {"team_id": 1, "natl_rank": 1},
+            {"team_id": 1, "natl_rank": 1, "Recruits": 1},
         ):
             tid = doc.get("team_id")
             if tid is not None:
@@ -91,12 +115,9 @@ def enrich_franchise_teams_scoreboard_meta(
 
         ftd = ftd_by_tid.get(team_id_str)
         if ftd:
-            nr = ftd.get("natl_rank")
+            nr = natl_rank_from_ftd_document(ftd)
             if nr is not None:
-                try:
-                    entry["natl_rank"] = int(nr)
-                except (TypeError, ValueError):
-                    pass
+                entry["natl_rank"] = nr
 
         st = standings.get(team_id_str) or {}
         try:

@@ -270,6 +270,7 @@ def _apply_regular_season_rank_prestige_updates(
             continue
         state = team_state_by_id[team_id]
         ranked_entry = ranked_by_team[team_id]
+        team_standings = standings_data.get(team_id, {"W": 0, "L": 0})
         franchise_team_data_collection.update_one(
             {"franchise_id": franchise_id, "team_id": doc["team_id"]},
             {"$set": {
@@ -278,6 +279,8 @@ def _apply_regular_season_rank_prestige_updates(
                 "sos_avg": float(state["sos_avg"]),
                 "sos_rank_sum": float(state["sos_rank_sum"]),
                 "sos_games_played": int(state["sos_games_played"]),
+                "season_wins": int(team_standings.get("W", 0) or 0),
+                "season_losses": int(team_standings.get("L", 0) or 0),
                 "updated_at": datetime.utcnow(),
             }},
         )
