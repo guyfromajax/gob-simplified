@@ -928,20 +928,13 @@ export function createGameScene(Phaser) {
       // Extract team colors (unified structure preferred)
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
       const awayColors = awayTeamObj?.colors || simData.away_team_colors;
-      const formatRankedTeamName = (teamName, teamObj) => {
-        const rank = Number(teamObj?.natl_rank);
-        if (teamName && Number.isInteger(rank) && rank >= 1) {
-          return `#${rank} ${teamName}`;
-        }
-        return teamName || '';
-      };
       const homePlayersHeaderEl = document.getElementById('home-players-header');
       const awayPlayersHeaderEl = document.getElementById('away-players-header');
       if (homePlayersHeaderEl) {
-        homePlayersHeaderEl.textContent = formatRankedTeamName(logHome, homeTeamObj);
+        homePlayersHeaderEl.textContent = logHome || '';
       }
       if (awayPlayersHeaderEl) {
-        awayPlayersHeaderEl.textContent = formatRankedTeamName(logAway, awayTeamObj);
+        awayPlayersHeaderEl.textContent = logAway || '';
       }
       
       if (DEBUG_TEAMS) {
