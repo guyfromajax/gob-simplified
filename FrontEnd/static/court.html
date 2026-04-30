@@ -2973,6 +2973,8 @@
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
   padding: 2px 4px !important;
+  /* Same vertical band as rank/meta: #scoreboard centers items; meta was start-only and sat in a different band than logos */
+  align-self: center !important;
   /* Drop the colored gradient overlay — it muddies team logos */
 }
 #away-logo-container {
@@ -2997,26 +2999,25 @@
   display: block !important;
 }
 
-/* Meta block: rank above record, both sides.
-   Grid align-items:center on #scoreboard centers each meta by its own height,
-   so L/R tops drifted. Pin both to block-start + flex-start inside so rank lines align. */
+/* Meta: match logo column height (80px) and center stack in row — avoids logo centered vs meta top-aligned mismatch */
 .sb-team-meta {
   display: flex !important;
   flex-direction: column !important;
   gap: 3px !important;
-  justify-content: flex-start !important;
-  align-self: start !important;
+  justify-content: center !important;
+  align-self: center !important;
   align-items: stretch !important;
   min-width: 0 !important;
-  min-height: 44px !important;
-  padding: 10px 2px 2px !important;
+  min-height: 80px !important;
+  max-height: 80px !important;
+  padding: 0 2px !important;
   margin: 0 !important;
   box-sizing: border-box !important;
 }
 .sb-team-meta--away {
   grid-column: 3 !important;
   text-align: left !important;
-  align-self: start !important;
+  align-self: center !important;
   margin-left: 10px !important;
 }
 /* SWAP: home logo moves from col 27 → col 28; home meta stays at col 28 → moves to col 27.
@@ -3028,7 +3029,7 @@
 .sb-team-meta--home {
   grid-column: 27 !important;
   text-align: right !important;
-  align-self: start !important;
+  align-self: center !important;
   margin-right: 10px !important;
 }
 

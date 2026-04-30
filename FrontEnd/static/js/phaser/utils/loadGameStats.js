@@ -115,6 +115,36 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   if (homeRecEl && hMeta) homeRecEl.textContent = fmtRec(hMeta);
   if (awayRankEl && aMeta) awayRankEl.textContent = fmtRank(aMeta);
   if (awayRecEl && aMeta) awayRecEl.textContent = fmtRec(aMeta);
+
+  try {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug_scoreboard') === '1') {
+      console.info('[court scoreboard] GET /api/game → displayAccumulatedHeaderState', {
+        home_team_id: hid,
+        away_team_id: aid,
+        teams_keys: Object.keys(teamsObj).slice(0, 12),
+        hMeta: hMeta
+          ? {
+              natl_rank: hMeta.natl_rank,
+              wins: hMeta.wins ?? hMeta.team_wins,
+              losses: hMeta.losses ?? hMeta.team_losses,
+            }
+          : null,
+        aMeta: aMeta
+          ? {
+              natl_rank: aMeta.natl_rank,
+              wins: aMeta.wins ?? aMeta.team_wins,
+              losses: aMeta.losses ?? aMeta.team_losses,
+            }
+          : null,
+        painted_home_rank: hMeta ? fmtRank(hMeta) : '(skip, no hMeta)',
+        painted_home_rec: hMeta ? fmtRec(hMeta) : '(skip)',
+        painted_away_rank: aMeta ? fmtRank(aMeta) : '(skip, no aMeta)',
+        painted_away_rec: aMeta ? fmtRec(aMeta) : '(skip)',
+      });
+    }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 /**

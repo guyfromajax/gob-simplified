@@ -192,6 +192,15 @@ function resolveTeamRowForScoreboard(simData, side) {
   return legacyObj;
 }
 
+/** Append `&debug_scoreboard=1` to the court URL to log rank/record resolution and DOM-bound strings. */
+function isCourtDebugScoreboard() {
+  try {
+    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug_scoreboard') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 function momentumValueForTeam(teamObj, turn, side) {
   const fromTurn =
     side === 'home'
@@ -811,6 +820,34 @@ export function createGameScene(Phaser) {
       // Get team data (unified teams + legacy); tolerate teams{} key != home_team_id string
       let homeTeamObj = resolveTeamRowForScoreboard(simData, 'home');
       let awayTeamObj = resolveTeamRowForScoreboard(simData, 'away');
+
+      if (isCourtDebugScoreboard()) {
+        const tk = Object.keys(teamsObj);
+        console.info('[court scoreboard] simulate response → team rows', {
+          home_team_id: homeTeamId,
+          away_team_id: awayTeamId,
+          teams_key_count: tk.length,
+          teams_keys: tk.slice(0, 12),
+          home_resolved: homeTeamObj
+            ? {
+                natl_rank: homeTeamObj.natl_rank,
+                wins: homeTeamObj.wins ?? homeTeamObj.team_wins,
+                losses: homeTeamObj.losses ?? homeTeamObj.team_losses,
+              }
+            : null,
+          away_resolved: awayTeamObj
+            ? {
+                natl_rank: awayTeamObj.natl_rank,
+                wins: awayTeamObj.wins ?? awayTeamObj.team_wins,
+                losses: awayTeamObj.losses ?? awayTeamObj.team_losses,
+              }
+            : null,
+          dom_rank_home: formatSbRank(homeTeamObj),
+          dom_rec_home: formatSbRecord(homeTeamObj),
+          dom_rank_away: formatSbRank(awayTeamObj),
+          dom_rec_away: formatSbRecord(awayTeamObj),
+        });
+      }
       
       // Extract team names (unified structure preferred, fallback to old structure)
       const logHome = homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
@@ -1966,6 +2003,20 @@ export function createGameScene(Phaser) {
         if (awayRecEl) awayRecEl.textContent = formatSbRecord(rowAway);
         if (homeRankEl) homeRankEl.textContent = formatSbRank(rowHome);
         if (homeRecEl) homeRecEl.textContent = formatSbRecord(rowHome);
+
+        if (isCourtDebugScoreboard()) {
+          const sig = `${formatSbRank(rowAway)}|${formatSbRecord(rowAway)}|${formatSbRank(rowHome)}|${formatSbRecord(rowHome)}`;
+          if (typeof window !== 'undefined' && window.__courtSbDbgSig !== sig) {
+            window.__courtSbDbgSig = sig;
+            console.info('[court scoreboard] updateScoreboard → #away-rank/#home-rank text', {
+              away_rank_text: formatSbRank(rowAway),
+              away_rec_text: formatSbRecord(rowAway),
+              home_rank_text: formatSbRank(rowHome),
+              home_rec_text: formatSbRecord(rowHome),
+              turn_index: turn?.index,
+            });
+          }
+        }
 
         updateMomentumBar('home', momentumValueForTeam(rowHome, turn, 'home'));
         updateMomentumBar('away', momentumValueForTeam(rowAway, turn, 'away'));
