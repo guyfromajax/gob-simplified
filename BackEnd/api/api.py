@@ -1736,37 +1736,44 @@ try:
                             players_with_energy.append(player_data)
                         
                         # Return empty stats structure
+                        from BackEnd.utils.game_team_scoreboard_enrichment import team_scoreboard_meta_for_pair
+
+                        _hn = home_team_data.get("name", "") or ""
+                        _an = away_team_data.get("name", "") or ""
                         response_data = {
                             "game_id": game_id,
-                            "score": {home_team_data.get("name", ""): 0, away_team_data.get("name", ""): 0},
+                            "score": {_hn: 0, _an: 0},
                             "box_score": {},
                             "quarter": 1,
                             "clock": "12:00",
                             "players": players_with_energy,
                             "team_totals": {
-                                home_team_data.get("name", ""): {},
-                                away_team_data.get("name", ""): {}
+                                _hn: {},
+                                _an: {}
                             },
                             "team_stats": {
-                                home_team_data.get("name", ""): {"offense": {}, "defense": {}},
-                                away_team_data.get("name", ""): {"offense": {}, "defense": {}}
+                                _hn: {"offense": {}, "defense": {}},
+                                _an: {"offense": {}, "defense": {}}
                             },
                             "points_by_quarter": {
-                                home_team_data.get("name", ""): [0, 0, 0, 0],
-                                away_team_data.get("name", ""): [0, 0, 0, 0]
+                                _hn: [0, 0, 0, 0],
+                                _an: [0, 0, 0, 0]
                             },
                             "home_team": {
-                                "name": home_team_data.get("name", ""),
+                                "name": _hn,
                                 "team_fouls": 0,
                                 "attributes": home_team_data.get("attributes", {}),
                                 "natl_rank": home_team_rank,
                             },
                             "away_team": {
-                                "name": away_team_data.get("name", ""),
+                                "name": _an,
                                 "team_fouls": 0,
                                 "attributes": away_team_data.get("attributes", {}),
                                 "natl_rank": away_team_rank,
-                            }
+                            },
+                            "team_scoreboard_meta": team_scoreboard_meta_for_pair(
+                                _hn, _an, home_team_data, away_team_data, home_team_rank, away_team_rank
+                            ),
                         }
                         response_size = len(json.dumps(response_data))
                         total_time = (time.time() - endpoint_start) * 1000
@@ -1897,7 +1904,10 @@ try:
                         if saved_mode == "franchise" and saved_franchise_id
                         else None
                     )
-                    from BackEnd.utils.game_team_scoreboard_enrichment import coalesce_natl_rank_from_team_row
+                    from BackEnd.utils.game_team_scoreboard_enrichment import (
+                        coalesce_natl_rank_from_team_row,
+                        team_scoreboard_meta_for_pair,
+                    )
 
                     home_natl = coalesce_natl_rank_from_team_row(home_team_data, home_team_rank)
                     away_natl = coalesce_natl_rank_from_team_row(away_team_data, away_team_rank)
@@ -1958,7 +1968,16 @@ try:
                             "box_score": away_team_data.get("box_score", {}),
                             "totals": away_team_data.get("totals", {})
                         },
-                        "team_attribute_changes": saved.get("team_attribute_changes") or {}
+                        "team_attribute_changes": saved.get("team_attribute_changes") or {},
+                        # Court scoreboard: same string keys as score / box_score (URL ?home=&away=)
+                        "team_scoreboard_meta": team_scoreboard_meta_for_pair(
+                            home_team_name,
+                            away_team_name,
+                            home_team_data,
+                            away_team_data,
+                            home_natl,
+                            away_natl,
+                        ),
                     }
                     tac = response_data.get("team_attribute_changes") or {}
                     logging.warning(
@@ -3767,9 +3786,13 @@ try:
         # 2. WITHOUT animations for database save (exclude_animations=True)
         summary_start = time.time()
         frontend_summary = summarize_game_state(gm, exclude_animations=False)
-        from BackEnd.utils.game_team_scoreboard_enrichment import attach_home_away_team_scoreboard_shards
+        from BackEnd.utils.game_team_scoreboard_enrichment import (
+            attach_home_away_team_scoreboard_shards,
+            attach_team_scoreboard_meta_by_name_for_simulate,
+        )
 
         attach_home_away_team_scoreboard_shards(frontend_summary)
+        attach_team_scoreboard_meta_by_name_for_simulate(frontend_summary, gm)
 
         # Add start_box_score (only needed for Q2-Q4 frontend, not critical for saves)
         frontend_summary["start_box_score"] = gm.game_state.get("start_box_score")

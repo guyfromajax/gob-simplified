@@ -205,9 +205,34 @@ function resolveTeamRowForScoreboard(simData, side) {
     }
   }
 
-  if (row && legacyObj) return { ...legacyObj, ...row };
-  if (row) return row;
-  return legacyObj;
+  let out = null;
+  if (row && legacyObj) out = { ...legacyObj, ...row };
+  else if (row) out = row;
+  else out = legacyObj;
+
+  let nameKey = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      nameKey = side === 'home' ? sp.get('home') : sp.get('away');
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  const tsm = simData.team_scoreboard_meta;
+  let snap = null;
+  if (nameKey && tsm && typeof tsm === 'object') {
+    snap = tsm[nameKey] || null;
+    if (!snap) {
+      const nk = String(nameKey).trim();
+      let found = Object.keys(tsm).find((x) => String(x).trim() === nk);
+      if (!found) found = Object.keys(tsm).find((x) => String(x).trim().toLowerCase() === nk.toLowerCase());
+      if (found) snap = tsm[found];
+    }
+  }
+  if (out && snap) return { ...out, ...snap };
+  if (snap) return { ...(typeof out === 'object' && out ? out : {}), ...snap };
+  return out;
 }
 
 /** Append `&debug_scoreboard=1` to the court URL to log rank/record resolution and DOM-bound strings. */

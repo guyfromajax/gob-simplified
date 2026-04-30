@@ -134,6 +134,23 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   // SS&S: same merge order as S3 attributes (teams row overwrites legacy home_team for overlapping keys).
   const hMeta = { ...(legH || {}), ...(homeTeamObj || {}) };
   const aMeta = { ...(legA || {}), ...(awayTeamObj || {}) };
+  // Name-keyed meta: same keys as gameData.score / box_score (?home= & ?away=).
+  const metaByName = gameData.team_scoreboard_meta && typeof gameData.team_scoreboard_meta === 'object'
+    ? gameData.team_scoreboard_meta
+    : {};
+  const pickNameMeta = (nm) => {
+    if (!nm || !metaByName) return null;
+    if (metaByName[nm]) return metaByName[nm];
+    const keys = Object.keys(metaByName);
+    const t = String(nm).trim();
+    let k = keys.find((x) => String(x).trim() === t);
+    if (!k) k = keys.find((x) => String(x).trim().toLowerCase() === t.toLowerCase());
+    return k ? metaByName[k] : null;
+  };
+  const hByName = pickNameMeta(homeTeam);
+  const aByName = pickNameMeta(awayTeam);
+  const hRankRec = { ...hMeta, ...(hByName || {}) };
+  const aRankRec = { ...aMeta, ...(aByName || {}) };
   const fmtRank = (t) => {
     const r = Number(t?.natl_rank);
     if (Number.isInteger(r) && r >= 1) return `#${r}`;
@@ -148,10 +165,10 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
     if (Number.isFinite(wn) && Number.isFinite(ln)) return `${wn}-${ln}`;
     return '--';
   };
-  if (homeRankEl) homeRankEl.textContent = fmtRank(hMeta);
-  if (homeRecEl) homeRecEl.textContent = fmtRec(hMeta);
-  if (awayRankEl) awayRankEl.textContent = fmtRank(aMeta);
-  if (awayRecEl) awayRecEl.textContent = fmtRec(aMeta);
+  if (homeRankEl) homeRankEl.textContent = fmtRank(hRankRec);
+  if (homeRecEl) homeRecEl.textContent = fmtRec(hRankRec);
+  if (awayRankEl) awayRankEl.textContent = fmtRank(aRankRec);
+  if (awayRecEl) awayRecEl.textContent = fmtRec(aRankRec);
 
   try {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug_scoreboard') === '1') {
@@ -159,24 +176,27 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
         home_team_id: hid,
         away_team_id: aid,
         teams_keys: Object.keys(teamsObj).slice(0, 12),
-        hMeta: hMeta
+        team_scoreboard_meta_keys: Object.keys(metaByName),
+        hByName,
+        aByName,
+        hRankRec: hRankRec
           ? {
-              natl_rank: hMeta.natl_rank,
-              wins: hMeta.wins ?? hMeta.team_wins,
-              losses: hMeta.losses ?? hMeta.team_losses,
+              natl_rank: hRankRec.natl_rank,
+              wins: hRankRec.wins ?? hRankRec.team_wins,
+              losses: hRankRec.losses ?? hRankRec.team_losses,
             }
           : null,
-        aMeta: aMeta
+        aRankRec: aRankRec
           ? {
-              natl_rank: aMeta.natl_rank,
-              wins: aMeta.wins ?? aMeta.team_wins,
-              losses: aMeta.losses ?? aMeta.team_losses,
+              natl_rank: aRankRec.natl_rank,
+              wins: aRankRec.wins ?? aRankRec.team_wins,
+              losses: aRankRec.losses ?? aRankRec.team_losses,
             }
           : null,
-        painted_home_rank: hMeta ? fmtRank(hMeta) : '(skip, no hMeta)',
-        painted_home_rec: hMeta ? fmtRec(hMeta) : '(skip)',
-        painted_away_rank: aMeta ? fmtRank(aMeta) : '(skip, no aMeta)',
-        painted_away_rec: aMeta ? fmtRec(aMeta) : '(skip)',
+        painted_home_rank: fmtRank(hRankRec),
+        painted_home_rec: fmtRec(hRankRec),
+        painted_away_rank: fmtRank(aRankRec),
+        painted_away_rec: fmtRec(aRankRec),
       });
     }
   } catch (e) {

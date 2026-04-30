@@ -113,6 +113,48 @@ def enrich_franchise_teams_scoreboard_meta(
     _apply(str(away_team_id))
 
 
+def teams_row_for_team_id(teams: Any, tid: Any) -> dict[str, Any] | None:
+    """Return ``teams[tid]`` with tolerant key match (ObjectId vs str)."""
+    if not isinstance(teams, dict) or tid is None or tid == "":
+        return None
+    row = teams.get(tid)
+    if row is None:
+        sid = str(tid)
+        for k, v in teams.items():
+            if str(k) == sid and isinstance(v, dict):
+                return v
+    return row if isinstance(row, dict) else None
+
+
+def team_scoreboard_meta_for_pair(
+    home_display_name: str,
+    away_display_name: str,
+    home_row: Any,
+    away_row: Any,
+    home_natl: Any,
+    away_natl: Any,
+) -> dict[str, dict[str, Any]]:
+    """
+    Court scoreboard: same keys as ``score`` / box score (display team names).
+    Each value: natl_rank, wins, losses (optional team_wins / team_losses mirrors).
+    """
+
+    def one(row: Any, natl: Any) -> dict[str, Any]:
+        rd = row if isinstance(row, dict) else {}
+        return {
+            "natl_rank": natl,
+            "wins": rd.get("wins"),
+            "losses": rd.get("losses"),
+            "team_wins": rd.get("team_wins", rd.get("wins")),
+            "team_losses": rd.get("team_losses", rd.get("losses")),
+        }
+
+    return {
+        str(home_display_name): one(home_row, home_natl),
+        str(away_display_name): one(away_row, away_natl),
+    }
+
+
 def coalesce_natl_rank_from_team_row(team_data: dict[str, Any], rank_from_ftd_loader: Any) -> Any:
     """Prefer persisted ``teams`` natl_rank; else use value from FTD loader (e.g. GET /api/game)."""
     if isinstance(team_data, dict):
@@ -138,19 +180,8 @@ def attach_home_away_team_scoreboard_shards(summary: dict[str, Any]) -> None:
     hid = summary.get("home_team_id")
     aid = summary.get("away_team_id")
 
-    def _row(tid: Any) -> dict[str, Any] | None:
-        if tid is None or tid == "":
-            return None
-        row = teams.get(tid)
-        if row is None:
-            sid = str(tid)
-            for k, v in teams.items():
-                if str(k) == sid and isinstance(v, dict):
-                    return v
-        return row if isinstance(row, dict) else None
-
     def _shard(tid: Any) -> dict[str, Any] | None:
-        row = _row(tid)
+        row = teams_row_for_team_id(teams, tid)
         if not row:
             return None
         return {
@@ -170,3 +201,21 @@ def attach_home_away_team_scoreboard_shards(summary: dict[str, Any]) -> None:
     aws = _shard(aid)
     if aws:
         summary["away_team"] = aws
+
+
+def attach_team_scoreboard_meta_by_name_for_simulate(summary: dict[str, Any], gm: Any) -> None:
+    """Set ``team_scoreboard_meta`` on simulate response; keys match ``summary[\"score\"]`` (display names)."""
+    if not isinstance(summary, dict) or gm is None:
+        return
+    teams = summary.get("teams") or {}
+    hid = summary.get("home_team_id")
+    aid = summary.get("away_team_id")
+    rh = teams_row_for_team_id(teams, hid)
+    ra = teams_row_for_team_id(teams, aid)
+    hn = getattr(gm.home_team, "name", None) or (rh or {}).get("name")
+    an = getattr(gm.away_team, "name", None) or (ra or {}).get("name")
+    if not hn or not an:
+        return
+    nh = coalesce_natl_rank_from_team_row(rh or {}, None)
+    na = coalesce_natl_rank_from_team_row(ra or {}, None)
+    summary["team_scoreboard_meta"] = team_scoreboard_meta_for_pair(hn, an, rh, ra, nh, na)
