@@ -1467,8 +1467,8 @@
     .pcc-overrides {
       display: flex;
       flex-direction: column;
-      padding: 10px 12px;
-      gap: 8px;
+      padding: 8px 12px;
+      gap: 6px;
       min-width: 0;
     }
 
@@ -1482,7 +1482,7 @@
       background: rgba(0, 0, 0, 0.25);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 6px;
-      padding: 6px 8px;
+      padding: 4px 8px;
       box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.3);
       transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
     }
@@ -1503,7 +1503,7 @@
 
     .pcc-row-label {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 11px;
+      font-size: 14px;
       letter-spacing: 0.14em;
       color: rgba(255, 255, 255, 0.42);
       flex-shrink: 0;
@@ -1543,7 +1543,7 @@
       display: flex;
       align-items: center;
       width: 100%;
-      min-height: 38px;
+      min-height: 42px;
       padding: 4px 8px;
       box-sizing: border-box;
       background: rgba(255, 255, 255, 0.04);
@@ -1561,7 +1561,7 @@
 
     .defense-play-name {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 14px;
+      font-size: 20px;
       letter-spacing: 0.04em;
       color: #fff;
       line-height: 1.05;
@@ -1641,8 +1641,8 @@
     #pcc-stacks-zone.pcc-strategy {
       display: flex;
       flex-direction: column;
-      padding: 10px 14px 12px;
-      gap: 12px;
+      padding: 6px 12px 8px;
+      gap: 9px;
       justify-content: space-between;
       min-width: 0;
       border: none;
@@ -1663,14 +1663,23 @@
     }
 
     .pcc-dial-label.pcc-stack-label {
-      width: 88px;
-      flex: 0 0 88px;
+      width: 96px;
+      flex: 0 0 96px;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 10px;
+      font-size: 13px;
       letter-spacing: 0.18em;
       color: rgba(255, 255, 255, 0.42);
       text-align: left;
       margin: 0;
+    }
+
+    /* "AGGRESSION" at 13px: tighter tracking so it stays one line in the label column */
+    .pcc-dial-row.pcc-stack.aggression .pcc-dial-label.pcc-stack-label {
+      letter-spacing: 0.10em;
+    }
+
+    .pcc-dial-row.pcc-stack.press-trap .pcc-dial-label.pcc-stack-label {
+      letter-spacing: 0.11em;
     }
 
     .pcc-dial-row:has(.pcc-stack-btn.selected) .pcc-dial-label {
@@ -1679,7 +1688,8 @@
 
     .pcc-dial {
       flex: 1;
-      height: 24px;
+      min-height: 40px;
+      height: auto;
       position: relative;
       display: flex;
       align-items: center;
@@ -1719,12 +1729,12 @@
     .pcc-notch.pcc-stack-btn::after {
       content: attr(data-label);
       position: absolute;
-      top: 22px;
+      top: 24px;
       left: 50%;
       transform: translateX(-50%);
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 9px;
-      letter-spacing: 0.1em;
+      font-size: 11px;
+      letter-spacing: 0.10em;
       color: rgba(255, 255, 255, 0.3);
       white-space: nowrap;
       pointer-events: none;
@@ -1985,7 +1995,7 @@
 
     .play-name {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 14px;
+      font-size: 20px;
       font-weight: 700;
       letter-spacing: 0.04em;
       color: rgba(255, 255, 255, 0.85);
