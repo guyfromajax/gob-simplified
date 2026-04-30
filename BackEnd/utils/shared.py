@@ -2018,9 +2018,10 @@ def summarize_game_state(game, exclude_animations=True):
         }
     }
 
-    # Franchise: scoreboard rank (FTD natl_rank) + W-L (franchise.results via standings)
+    # Franchise: scoreboard rank (FTD natl_rank) + W-L (franchise.results via standings).
+    # Trigger on franchise_id only — mode string can be omitted or inconsistent on some GM paths.
     franchise_id = getattr(game.home_team, "franchise_id", None) or getattr(game.away_team, "franchise_id", None)
-    if franchise_id and getattr(game.home_team, "mode", None) == "franchise":
+    if franchise_id:
         try:
             from BackEnd.utils.game_team_scoreboard_enrichment import enrich_franchise_teams_scoreboard_meta
 

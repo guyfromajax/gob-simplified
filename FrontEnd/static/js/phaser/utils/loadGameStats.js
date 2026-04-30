@@ -72,6 +72,49 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   if (awayFoulsEl) awayFoulsEl.textContent = `F: ${awayFouls}`;
   if (homeTolEl) homeTolEl.textContent = `TOL: ${homeTimeouts}`;
   if (awayTolEl) awayTolEl.textContent = `TOL: ${awayTimeouts}`;
+
+  // Scoreboard rank / record (game doc teams[id] and/or legacy home_team / away_team)
+  const homeRankEl = document.getElementById('home-rank');
+  const homeRecEl = document.getElementById('home-record');
+  const awayRankEl = document.getElementById('away-rank');
+  const awayRecEl = document.getElementById('away-record');
+  const hid = gameData.home_team_id;
+  const aid = gameData.away_team_id;
+  const pickTeamMeta = (tid) => {
+    if (tid == null || tid === '') return null;
+    const s = String(tid);
+    if (teamsObj[s]) return teamsObj[s];
+    if (teamsObj[tid]) return teamsObj[tid];
+    for (const k of Object.keys(teamsObj)) {
+      if (String(k) === s) return teamsObj[k];
+    }
+    for (const k of Object.keys(teamsObj)) {
+      const row = teamsObj[k];
+      if (row && String(row.team_id) === s) return row;
+    }
+    return null;
+  };
+  const legH = typeof gameData.home_team === 'object' && gameData.home_team ? gameData.home_team : null;
+  const legA = typeof gameData.away_team === 'object' && gameData.away_team ? gameData.away_team : null;
+  const rowH = pickTeamMeta(hid);
+  const rowA = pickTeamMeta(aid);
+  const hMeta = rowH && legH ? { ...legH, ...rowH } : rowH || legH;
+  const aMeta = rowA && legA ? { ...legA, ...rowA } : rowA || legA;
+  const fmtRank = (t) => {
+    const r = Number(t?.natl_rank);
+    if (Number.isInteger(r) && r >= 1) return `#${r}`;
+    return '#--';
+  };
+  const fmtRec = (t) => {
+    const w = t?.wins ?? t?.team_wins;
+    const l = t?.losses ?? t?.team_losses;
+    if (Number.isFinite(Number(w)) && Number.isFinite(Number(l))) return `${w}-${l}`;
+    return '--';
+  };
+  if (homeRankEl && hMeta) homeRankEl.textContent = fmtRank(hMeta);
+  if (homeRecEl && hMeta) homeRecEl.textContent = fmtRec(hMeta);
+  if (awayRankEl && aMeta) awayRankEl.textContent = fmtRank(aMeta);
+  if (awayRecEl && aMeta) awayRecEl.textContent = fmtRec(aMeta);
 }
 
 /**

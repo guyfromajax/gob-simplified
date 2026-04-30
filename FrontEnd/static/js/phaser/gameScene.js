@@ -151,6 +151,47 @@ function formatSbRecord(teamObj) {
   return '--';
 }
 
+/**
+ * Resolve unified `teams[id]` row for scoreboard rank/record. Keys on `teams` may not
+ * strictly equal `home_team_id` (string/ObjectId); legacy `home_team` / `away_team`
+ * may carry natl_rank without a matching teams row.
+ */
+function resolveTeamRowForScoreboard(simData, side) {
+  if (!simData || typeof simData !== 'object') return null;
+  const teamsObj = simData.teams || {};
+  const id = side === 'home' ? simData.home_team_id : simData.away_team_id;
+  const legacy = side === 'home' ? simData.home_team : simData.away_team;
+  const legacyObj = typeof legacy === 'object' && legacy != null ? legacy : null;
+
+  let row = null;
+  if (id != null && id !== '') {
+    const idStr = String(id);
+    if (teamsObj[idStr]) row = teamsObj[idStr];
+    if (!row && teamsObj[id]) row = teamsObj[id];
+    if (!row) {
+      for (const k of Object.keys(teamsObj)) {
+        if (String(k) === idStr) {
+          row = teamsObj[k];
+          break;
+        }
+      }
+    }
+    if (!row) {
+      for (const k of Object.keys(teamsObj)) {
+        const t = teamsObj[k];
+        if (t && String(t.team_id) === idStr) {
+          row = t;
+          break;
+        }
+      }
+    }
+  }
+
+  if (row && legacyObj) return { ...legacyObj, ...row };
+  if (row) return row;
+  return legacyObj;
+}
+
 function momentumValueForTeam(teamObj, turn, side) {
   const fromTurn =
     side === 'home'
@@ -766,18 +807,10 @@ export function createGameScene(Phaser) {
       const homeTeamId = simData.home_team_id;
       const awayTeamId = simData.away_team_id;
       const teamsObj = simData.teams || {};
-      
-      // Get team data from unified structure first
-      let homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
-      let awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;
-      
-      // ✅ BACKWARD COMPATIBILITY: Fallback to old structure if unified structure not available
-      if (!homeTeamObj) {
-        homeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
-      }
-      if (!awayTeamObj) {
-        awayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
-      }
+
+      // Get team data (unified teams + legacy); tolerate teams{} key != home_team_id string
+      let homeTeamObj = resolveTeamRowForScoreboard(simData, 'home');
+      let awayTeamObj = resolveTeamRowForScoreboard(simData, 'away');
       
       // Extract team names (unified structure preferred, fallback to old structure)
       const logHome = homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
@@ -1926,13 +1959,16 @@ export function createGameScene(Phaser) {
         const awayRecEl = document.getElementById('away-record');
         const homeRankEl = document.getElementById('home-rank');
         const homeRecEl = document.getElementById('home-record');
-        if (awayRankEl) awayRankEl.textContent = formatSbRank(awayTeamObj);
-        if (awayRecEl) awayRecEl.textContent = formatSbRecord(awayTeamObj);
-        if (homeRankEl) homeRankEl.textContent = formatSbRank(homeTeamObj);
-        if (homeRecEl) homeRecEl.textContent = formatSbRecord(homeTeamObj);
+        const sd = this.simData || simData;
+        const rowHome = resolveTeamRowForScoreboard(sd, 'home');
+        const rowAway = resolveTeamRowForScoreboard(sd, 'away');
+        if (awayRankEl) awayRankEl.textContent = formatSbRank(rowAway);
+        if (awayRecEl) awayRecEl.textContent = formatSbRecord(rowAway);
+        if (homeRankEl) homeRankEl.textContent = formatSbRank(rowHome);
+        if (homeRecEl) homeRecEl.textContent = formatSbRecord(rowHome);
 
-        updateMomentumBar('home', momentumValueForTeam(homeTeamObj, turn, 'home'));
-        updateMomentumBar('away', momentumValueForTeam(awayTeamObj, turn, 'away'));
+        updateMomentumBar('home', momentumValueForTeam(rowHome, turn, 'home'));
+        updateMomentumBar('away', momentumValueForTeam(rowAway, turn, 'away'));
 
         const mySide = urlParams.get('my_team');
         if (mySide === 'home') {
