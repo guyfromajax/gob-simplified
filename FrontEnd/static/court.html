@@ -1423,7 +1423,7 @@
       flex-direction: row;
       align-items: stretch;
       gap: 5px;
-      min-width: 0;
+      min-width: 220px;
       padding: 0 8px 0 0;
       align-self: stretch;
     }
@@ -1522,6 +1522,16 @@
       overflow: hidden;
     }
 
+    /*
+     * Offense / readonly rows: .pcc-play-card lives inside .pcc-offense-block (flex-direction: column).
+     * width:0 is for flex-row siblings; in a column it zeroes cross-axis width → compressed “black bar”.
+     */
+    .pcc-offense-block > .pcc-play-card {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
     .pcc-play-card.selected {
       background: rgba(255,215,0,0.2);
       border-color: #FFD700;
@@ -1614,7 +1624,9 @@
 
     /* ── STACKS ZONE ── */
     #pcc-stacks-zone {
-      flex: 0 0 400px;
+      flex: 1 1 280px;
+      min-width: 200px;
+      max-width: 400px;
       display: flex;
       flex-direction: column;
       justify-content: stretch;
