@@ -32,31 +32,53 @@
   #playcall-center {
     width:100%;
     height:160px;
-    background:linear-gradient(180deg, #0d0f15 0%, #07080c 100%);
-    border:1px solid rgba(255,255,255,0.06);
+    background:linear-gradient(180deg, #2a2f3a 0%, #20242e 50%, #262a35 100%);
+    border:1px solid rgba(255,255,255,0.16);
     border-radius:8px;
     position:relative;
     overflow:hidden;
     display:grid;
     grid-template-columns: 38% 1px 32% 1px auto;
     align-items:stretch;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      inset 0 -1px 0 rgba(0,0,0,0.5),
+      0 -2px 16px -4px rgba(0,0,0,0.7),
+      0 4px 12px -4px rgba(0,0,0,0.5);
   }
+  /* Subtle vertical brushed-steel striations */
   #playcall-center::before {
-    /* Subtle team-color tint at top edge — ownership signal */
-    content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,0.012) 0px,
+      rgba(255,255,255,0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events:none;
+    z-index:1;
+  }
+  /* Team-color top edge bleed (ownership signal) */
+  #playcall-center::after {
+    content:''; position:absolute; top:0; left:0; right:0; height:24px;
+    background:linear-gradient(180deg, rgba(var(--team-rgb), 0.05) 0%, transparent 100%);
+    pointer-events:none;
+    z-index:2;
+  }
+  /* Hairline element (replaces former ::before role) */
+  .pcc-hairline {
+    position:absolute; top:0; left:0; right:0; height:1px;
     background:linear-gradient(to right,
       transparent 0%,
       rgba(var(--team-rgb), 0.5) 30%,
       rgba(var(--team-rgb), 0.5) 70%,
       transparent 100%);
     pointer-events:none;
+    z-index:3;
   }
-  #playcall-center::after {
-    content:''; position:absolute; top:0; left:0; right:0; height:24px;
-    background:linear-gradient(180deg, rgba(var(--team-rgb), 0.05) 0%, transparent 100%);
-    pointer-events:none;
-  }
-  .pcc-divider { background:rgba(255,255,255,0.05); width:1px; }
+  #playcall-center > * { position:relative; z-index:2; }
+  .pcc-divider { background:rgba(255,255,255,0.08); width:1px; }
 
   /* ── ZONE 1: OFFENSE / DEFENSE OVERRIDES ── */
   .pcc-overrides {
@@ -68,10 +90,11 @@
   .pcc-row {
     display:flex; align-items:center; gap:8px;
     flex:1; min-height:0;
-    background:rgba(255,255,255,0.02);
-    border:1px solid rgba(255,255,255,0.04);
+    background:rgba(0,0,0,0.25);
+    border:1px solid rgba(255,255,255,0.08);
     border-radius:6px;
     padding:8px 10px;
+    box-shadow:inset 0 1px 0 rgba(0,0,0,0.3);
     transition:background 0.18s, border-color 0.18s;
   }
   .pcc-row.active {
@@ -121,7 +144,7 @@
     word-break:break-word;
   }
   .pcc-row:not(.active):not(.armed) .pcc-call-name {
-    color:rgba(255,255,255,0.35);
+    color:rgba(255,255,255,0.55);
   }
   .pcc-call-meta {
     font-family:var(--inter); font-size:9px; font-weight:600;
@@ -139,9 +162,9 @@
   .pcc-arrow {
     width:20px; height:14px;
     background:transparent;
-    border:1px solid rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.14);
     border-radius:3px;
-    color:rgba(255,255,255,0.5);
+    color:rgba(255,255,255,0.65);
     font-size:8px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     transition:background 0.14s, color 0.14s, border-color 0.14s;
@@ -186,7 +209,7 @@
     position:absolute; left:8px; right:8px; top:50%;
     transform:translateY(-50%);
     height:2px;
-    background:rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.14);
     border-radius:2px;
   }
   .pcc-dial-track::before {
@@ -195,8 +218,8 @@
   .pcc-notch {
     position:relative;
     width:18px; height:18px; border-radius:50%;
-    background:#0a0c12;
-    border:2px solid rgba(255,255,255,0.18);
+    background:#1a1d25;
+    border:2px solid rgba(255,255,255,0.32);
     cursor:pointer;
     transition:border-color 0.16s, background 0.16s, transform 0.16s;
     z-index:2;
@@ -256,11 +279,11 @@
   .pcc-speed-btn.on { background:var(--orange); color:#0a0c12; }
   .pcc-speed-glyph { font-family:var(--bebas); letter-spacing:-0.05em; font-size:11px; }
 
-  /* Pause/Resume — neutral steel (per styleguide: green reserved for gating, orange overused if used here) */
+  /* Pause/Resume — darker recessed treatment so it anchors against the lifted steel surface */
   .pcc-pause {
     width:120px; height:64px;
-    background:linear-gradient(180deg, #2a2f3a 0%, #1a1d27 100%);
-    border:1px solid rgba(255,255,255,0.18);
+    background:linear-gradient(180deg, #14171e 0%, #0c0e13 100%);
+    border:1px solid rgba(255,255,255,0.28);
     border-radius:6px;
     color:#fff;
     font-family:var(--bebas); font-size:24px;
@@ -268,12 +291,12 @@
     cursor:pointer;
     display:flex; align-items:center; justify-content:center; gap:8px;
     transition:filter 0.14s, transform 0.14s, background 0.18s, border-color 0.18s;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px -6px rgba(0,0,0,0.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 16px -6px rgba(0,0,0,0.8);
   }
-  .pcc-pause:hover { filter:brightness(1.12); border-color:rgba(255,255,255,0.32); }
+  .pcc-pause:hover { filter:brightness(1.18); border-color:rgba(255,255,255,0.42); }
   .pcc-pause.paused {
-    background:linear-gradient(180deg, #3a4252 0%, #232732 100%);
-    border-color:rgba(255,255,255,0.32);
+    background:linear-gradient(180deg, #1c2028 0%, #14171e 100%);
+    border-color:rgba(255,255,255,0.42);
   }
   .pcc-pause-icon { font-size:14px; color:rgba(255,255,255,0.85); }
 
@@ -285,7 +308,7 @@
   .pcc-timeout {
     width:120px; height:38px;
     background:transparent;
-    border:1px solid rgba(255,255,255,0.18);
+    border:1px solid rgba(255,255,255,0.28);
     border-radius:5px;
     color:#fff;
     font-family:var(--bebas); font-size:16px;
@@ -294,7 +317,7 @@
     display:flex; align-items:center; justify-content:center;
     transition:background 0.14s, border-color 0.14s;
   }
-  .pcc-timeout:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.32); }
+  .pcc-timeout:hover { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.42); }
   .pcc-timeout-pills {
     display:flex; gap:3px; justify-content:center;
   }
@@ -304,7 +327,7 @@
     transition:background 0.18s;
   }
   .pcc-pill.used {
-    background:rgba(255,255,255,0.1);
+    background:rgba(255,255,255,0.18);
   }
 </style>
 </head>
@@ -312,6 +335,7 @@
   <div class="frame">
     <div class="label">Playcall Center — Cockpit redesign POC (1000×160 — actual court container size)</div>
     <div id="playcall-center">
+      <span class="pcc-hairline"></span>
       <!-- ZONE 1: Overrides -->
       <div class="pcc-overrides">
         <div class="pcc-row armed" id="row-offense">
