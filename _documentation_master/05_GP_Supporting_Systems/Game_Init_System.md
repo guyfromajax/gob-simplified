@@ -24,7 +24,7 @@ The handler creates a new `game_id`, constructs `GameManager`, runs first-pass g
 | `home_team`, `away_team` | Display names matching `teams.name` (required). Used for roster load and, in franchise mode, to resolve Mongo `teams._id` for FTD lookup. |
 | `mode` | `"single"` \| `"tournament"` \| `"franchise"` (default `"single"`). |
 | `tournament_id` | Tournament mode: master doc id. |
-| `franchise_id` | Franchise mode: franchise doc id (string/ObjectId-compatible). |
+| `franchise_id` | Franchise doc id (string/ObjectId-compatible). When present, **always** written on the game summary (not gated on `mode`) so **`GET /api/game`** can enrich rank/W–L. |
 | `user_team_side` | `"home"` \| `"away"` — drives `is_user_team`, persisted `user_team_side`, and franchise community-engagement crowd shift. |
 
 ---
@@ -105,7 +105,23 @@ So both **user and CPU** franchise teams enter the first summarize with full FTD
 
 ### 4. First `summarize_game_state` and game doc baseline
 
-After `_initialize_game_stats`, the handler sets scores to zero and calls `summarize_game_state(gm, exclude_animations=True)`, attaches `game_id`, `mode`, `franchise_id`, `user_team_side`, etc.
+After `_initialize_game_stats`, the handler sets scores to zero and calls `summarize_game_state(gm, exclude_animations=True)`, then attaches `game_id`, `mode`, `user_team_side`, etc.
+
+**`franchise_id`:** written to **`summary["franchise_id"]` whenever the request includes `franchise_id`** (not gated on `mode`). The court’s **`GET /api/game`** path uses this field to re-merge **FTD rank + franchise `results` W–L** onto team rows; omitting it on older saves broke scoreboard metadata until re-init.
+
+**Scoreboard metadata (franchise):**
+
+| Field | Where it lives |
+|--------|------------------|
+| **`natl_rank`** | **`franchise_team_data`** (FTD), same keying as settings: `(franchise_id, team_id)` with `team_id` = **`teams._id`**. |
+| **Season W–L** | **`franchises.results`** (via `calculate_franchise_standings`), not on FTD as the ledger. |
+| **Display `name` on the game** | **`teams`** / `GameManager` → `game.teams[…].name` — **not** copied from FTD for labeling. |
+
+- **`summarize_game_state`** (`BackEnd/utils/shared.py`): if GM teams expose **`franchise_id`**, calls **`enrich_franchise_teams_scoreboard_meta`** so the first `teams` snapshot can include rank/W–L before upsert.
+- **`GET /api/game`**: resolves slot keys (`resolve_home_away_teams_slot_keys`), runs **`enrich_franchise_teams_scoreboard_meta`** when **`franchise_id`** is on the doc, builds **`team_scoreboard_meta`** keyed like **`score`** (display names). Resolver: **`resolve_mongo_team_id_string`** (hex `ObjectId` or `teams` lookup by name / `team_id` / `code`).
+- **Ops logs:** `🔍 [INIT-GAME SCOREBOARD POST-SUMMARIZE]` after summarize; **`enrich_franchise_teams_scoreboard_meta OK`** / **`abort_no_valid_team_oids`** on enrich.
+
+**Court frontend:** `initializeGameStats` (`FrontEnd/static/js/phaser/utils/loadGameStats.js`) loads **`GET /api/game`**. Simulate payloads often omit **`team_scoreboard_meta`**; **`gameScene.js`** keeps a merged copy so per-turn scoreboard updates do not reset rank/record to placeholders.
 
 Then, for franchise mode, it **persists the FTD baseline** under canonical team keys from `gm.home_team.team_id` / `gm.away_team.team_id`:
 
@@ -118,6 +134,8 @@ That makes the **game document** a usable snapshot for `GET /api/playbooks?game_
 
 Watch for:
 
+- `🔍 [INIT-GAME SCOREBOARD POST-SUMMARIZE]` — franchise id on summary vs param, GM `team_id`s, `teams` snapshot (`natl_rank` / wins / losses).
+- **`enrich_franchise_teams_scoreboard_meta`** `OK` vs **`abort_no_valid_team_oids`** — FTD + standings merge (see `BackEnd/utils/game_team_scoreboard_enrichment.py`).
 - `⚠️ [INIT-GAME] No FTD row for home/away team=…` — name mismatch, missing FTD doc, or wrong `franchise_id`.
 - `✅ [INIT-GAME] FTD loaded for …` — FTD document found.
 - `✅ [INIT-GAME] Game doc FTD baseline: … playbook_keys=… strategy_keys=…` — what was written onto `summary["teams"]` before upsert.
@@ -166,15 +184,19 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 
 | Area | File(s) |
 |------|---------|
-| HTTP init | `BackEnd/api/api.py` — `init_game()`, `load_ftd_data_for_team()` |
+| HTTP init | `BackEnd/api/api.py` — `init_game()`, `load_ftd_data_for_team()`, `GET /api/game/{id}` scoreboard merge |
 | FTD normalization | `BackEnd/utils/franchise_ftd_game_seed.py` — `prepare_ftd_for_new_game()` |
+| Franchise scoreboard enrich | `BackEnd/utils/game_team_scoreboard_enrichment.py` — `enrich_franchise_teams_scoreboard_meta`, `resolve_mongo_team_id_string` |
+| Game doc team slot keys | `BackEnd/utils/resolve_game_teams_slot_keys.py` — `resolve_home_away_teams_slot_keys` |
 | Scouting shape (gameplay) | `BackEnd/models/team_manager.py` — `normalize_scouting_data_for_gameplay()` |
 | In-memory game | `BackEnd/models/game_manager.py` — `GameManager` |
 | Per-team state | `BackEnd/models/team_manager.py` — `TeamManager` |
 | Summary → DB shape | `BackEnd/utils/shared.py` — `summarize_game_state()` |
 | Greenfield Q1 (franchise) | `BackEnd/api/api.py` — franchise branch using `prepare_ftd_for_new_game` |
-| Collections | `franchise_team_data`, `teams`, `games` |
+| Court load + header | `FrontEnd/static/js/phaser/utils/loadGameStats.js` — `initializeGameStats`, `displayAccumulatedHeaderState` |
+| Sim vs scoreboard meta | `FrontEnd/static/js/phaser/gameScene.js` — merged `team_scoreboard_meta` across turns |
+| Collections | `franchise_team_data`, `franchises`, `teams`, `games` |
 
 ---
 
-**Last updated:** April 2026 (FTD name-resolution at `init-game`; scouting template merge for defense `used` / full row shape.)
+**Last updated:** April 2026 — `franchise_id` always on game doc when provided; GET + enrich scoreboard pipeline; `team_scoreboard_meta` + frontend merge; prior: FTD name-resolution at `init-game`; scouting template merge for defense `used` / full row shape.
