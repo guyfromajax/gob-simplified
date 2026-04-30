@@ -12,6 +12,7 @@ import { animateCountdownTransition } from './animation/countdownAnimation.js';
 import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
 import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
 import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAttributes.js';
+import { resolveTeamsSlotLookupKey } from './utils/loadGameStats.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -159,9 +160,23 @@ function formatSbRecord(teamObj) {
 function resolveTeamRowForScoreboard(simData, side) {
   if (!simData || typeof simData !== 'object') return null;
   const teamsObj = simData.teams || {};
-  const id = side === 'home' ? simData.home_team_id : simData.away_team_id;
+  const storedId = side === 'home' ? simData.home_team_id : simData.away_team_id;
   const legacy = side === 'home' ? simData.home_team : simData.away_team;
   const legacyObj = typeof legacy === 'object' && legacy != null ? legacy : null;
+  let urlHome = null;
+  let urlAway = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      urlHome = sp.get('home_id');
+      urlAway = sp.get('away_id');
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  const urlId = side === 'home' ? urlHome : urlAway;
+  const resolvedKey = resolveTeamsSlotLookupKey(teamsObj, storedId, urlId, legacyObj);
+  const id = resolvedKey != null && resolvedKey !== '' ? resolvedKey : storedId;
 
   let row = null;
   if (id != null && id !== '') {

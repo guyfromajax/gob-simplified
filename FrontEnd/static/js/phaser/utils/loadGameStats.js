@@ -26,6 +26,40 @@ export async function fetchGameState(gameId) {
   }
 }
 
+function normTeamsSlot(s) {
+  if (s == null || s === '') return '';
+  return String(s).toUpperCase().replace(/\s+/g, '_').replace(/-/g, '_');
+}
+
+/**
+ * Key for `gameData.teams[key]`: prefer `home_id`/`away_id` from the court URL when the API
+ * still emits legacy `home_team_id` values that do not match `teams` keys.
+ */
+export function resolveTeamsSlotLookupKey(teamsObj, storedId, urlId, legacyTeam) {
+  const teams = teamsObj && typeof teamsObj === 'object' ? teamsObj : {};
+
+  const tryCandidate = (candidate) => {
+    if (candidate == null || candidate === '') return null;
+    const s = String(candidate);
+    if (teams[s]) return s;
+    if (teams[candidate]) return String(candidate);
+    for (const k of Object.keys(teams)) {
+      if (String(k) === s) return k;
+    }
+    for (const k of Object.keys(teams)) {
+      const row = teams[k];
+      if (!row || typeof row !== 'object') continue;
+      const tid = row.team_id;
+      if (tid != null && String(tid) === s) return k;
+      const nm = row.name;
+      if (nm && (String(nm) === s || normTeamsSlot(nm) === normTeamsSlot(s))) return k;
+    }
+    return null;
+  };
+
+  return tryCandidate(urlId) || tryCandidate(storedId) || tryCandidate(legacyTeam?.name) || null;
+}
+
 function setScoreboardHeaderDefaults(homeTeam, awayTeam) {
   const homeLogoEl = document.getElementById('home-logo');
   const awayLogoEl = document.getElementById('away-logo');
@@ -60,8 +94,25 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   const homeFoulsEl = document.getElementById('home-fouls');
   const awayFoulsEl = document.getElementById('away-fouls');
   const teamsObj = gameData.teams || {};
-  const homeTeamObj = gameData.home_team_id && teamsObj[gameData.home_team_id] ? teamsObj[gameData.home_team_id] : null;
-  const awayTeamObj = gameData.away_team_id && teamsObj[gameData.away_team_id] ? teamsObj[gameData.away_team_id] : null;
+  let urlHomeId = null;
+  let urlAwayId = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      urlHomeId = p.get('home_id');
+      urlAwayId = p.get('away_id');
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  const legH = typeof gameData.home_team === 'object' && gameData.home_team ? gameData.home_team : null;
+  const legA = typeof gameData.away_team === 'object' && gameData.away_team ? gameData.away_team : null;
+  const homeSlotKey =
+    resolveTeamsSlotLookupKey(teamsObj, gameData.home_team_id, urlHomeId, legH) ?? gameData.home_team_id;
+  const awaySlotKey =
+    resolveTeamsSlotLookupKey(teamsObj, gameData.away_team_id, urlAwayId, legA) ?? gameData.away_team_id;
+  const homeTeamObj = homeSlotKey && teamsObj[homeSlotKey] ? teamsObj[homeSlotKey] : null;
+  const awayTeamObj = awaySlotKey && teamsObj[awaySlotKey] ? teamsObj[awaySlotKey] : null;
 
   const homeFouls = homeTeamObj?.team_fouls ?? gameData.fouls?.home ?? 0;
   const awayFouls = awayTeamObj?.team_fouls ?? gameData.fouls?.away ?? 0;
@@ -78,8 +129,8 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   const homeRecEl = document.getElementById('home-record');
   const awayRankEl = document.getElementById('away-rank');
   const awayRecEl = document.getElementById('away-record');
-  const hid = gameData.home_team_id;
-  const aid = gameData.away_team_id;
+  const hid = homeSlotKey;
+  const aid = awaySlotKey;
   const pickTeamMeta = (tid) => {
     if (tid == null || tid === '') return null;
     const s = String(tid);
@@ -94,8 +145,6 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
     }
     return null;
   };
-  const legH = typeof gameData.home_team === 'object' && gameData.home_team ? gameData.home_team : null;
-  const legA = typeof gameData.away_team === 'object' && gameData.away_team ? gameData.away_team : null;
   const rowH = pickTeamMeta(hid);
   const rowA = pickTeamMeta(aid);
   const hMeta = rowH && legH ? { ...legH, ...rowH } : rowH || legH;
@@ -276,10 +325,25 @@ export function displayTeamBoxScore(gameData, homeTeam, awayTeam) {
   const awayTotals = gameData.team_totals?.[awayTeam] || {};
   
   // ✅ UNIFIED STRUCTURE: Get team attributes from unified teams object
-  const homeTeamId = gameData.home_team_id;
-  const awayTeamId = gameData.away_team_id;
   const teamsObj = gameData.teams || {};
-  
+  let urlHomeId = null;
+  let urlAwayId = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      urlHomeId = p.get('home_id');
+      urlAwayId = p.get('away_id');
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  const legH = typeof gameData.home_team === 'object' ? gameData.home_team : null;
+  const legA = typeof gameData.away_team === 'object' ? gameData.away_team : null;
+  const homeTeamId =
+    resolveTeamsSlotLookupKey(teamsObj, gameData.home_team_id, urlHomeId, legH) ?? gameData.home_team_id;
+  const awayTeamId =
+    resolveTeamsSlotLookupKey(teamsObj, gameData.away_team_id, urlAwayId, legA) ?? gameData.away_team_id;
+
   // Get team data from unified structure first
   const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : null;
   const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : null;

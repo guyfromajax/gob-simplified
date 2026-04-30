@@ -1656,6 +1656,8 @@ try:
                     "clock": 1,                # Game clock
                     "home_team_id": 1,         # For unified teams structure
                     "away_team_id": 1,         # For unified teams structure
+                    "home_team": 1,           # Legacy name blob for teams[] key resolution
+                    "away_team": 1,
                     "teams": 1,                # Teams object (will project nested fields if needed)
                     "points_by_quarter": 1,    # Points by quarter (may be in teams object, but include for backward compatibility)
                     "team_attribute_changes": 1,  # Franchise post-game attribute deltas (box score)
@@ -1684,6 +1686,8 @@ try:
                     # logging.warning(f"⚠️ [PERF] Slow DB query: /api/game/{game_id} - {query_time:.2f}ms, doc_size: {doc_size} bytes")
                     pass
                 if saved:
+                    from BackEnd.utils.resolve_game_teams_slot_keys import resolve_home_away_teams_slot_keys
+
                     # ✅ REMOVED: Verbose debug logs
                     
                     saved_quarter = saved.get("quarter", 1)
@@ -1700,13 +1704,15 @@ try:
                         away_team_data = saved.get("away_team", {})
                         saved_mode = saved.get("mode", "single")
                         saved_franchise_id = saved.get("franchise_id")
+
+                        _rk_home, _rk_away = resolve_home_away_teams_slot_keys(saved)
                         home_team_rank = (
-                            load_franchise_team_rank(saved_franchise_id, saved.get("home_team_id"))
+                            load_franchise_team_rank(saved_franchise_id, str(_rk_home) if _rk_home is not None else None)
                             if saved_mode == "franchise" and saved_franchise_id
                             else None
                         )
                         away_team_rank = (
-                            load_franchise_team_rank(saved_franchise_id, saved.get("away_team_id"))
+                            load_franchise_team_rank(saved_franchise_id, str(_rk_away) if _rk_away is not None else None)
                             if saved_mode == "franchise" and saved_franchise_id
                             else None
                         )
@@ -1800,8 +1806,7 @@ try:
                     
                     # ✅ UNIFIED STRUCTURE: Extract team data from teams object using home_team_id/away_team_id
                     teams_obj = saved.get("teams", {})
-                    home_team_id = saved.get("home_team_id")
-                    away_team_id = saved.get("away_team_id")
+                    home_team_id, away_team_id = resolve_home_away_teams_slot_keys(saved)
                     
                     # Get team data from unified teams object
                     home_team_data = teams_obj.get(home_team_id, {}) if home_team_id else {}
@@ -1849,9 +1854,7 @@ try:
                     # ✅ SS&S: Build box_score from nested structure using team_id keys (not team names)
                     box_score = saved.get("box_score", {})
                     if not box_score:
-                        # Build from unified teams structure (use team_id keys)
-                        home_team_id = saved.get("home_team_id")
-                        away_team_id = saved.get("away_team_id")
+                        # Build from unified teams structure (keys aligned with resolve_home_away_teams_slot_keys)
                         if home_team_id and "box_score" in home_team_data:
                             home_box = home_team_data.get("box_score", {})
                             box_score[home_team_id] = home_box
