@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Playcall Center — POC</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --orange: #F79420;
+    --orange-glow: rgba(247,148,32,0.35);
+    --team-rgb: 220, 38, 38;
+    --bebas: 'Bebas Neue', sans-serif;
+    --inter: 'Inter', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0a0c12; color:#fff;
+    font-family:var(--inter);
+    padding:32px 22px 60px;
+    min-height:100vh;
+  }
+  .label {
+    font-family:var(--bebas); font-size:14px;
+    letter-spacing:0.16em; color:rgba(255,255,255,0.45);
+    margin-bottom:10px;
+  }
+  .frame { width:100%; max-width:1000px; margin:0 auto 32px; }
+
+  /* ============================================================
+     PLAYCALL CENTER — cockpit panel
+     ============================================================ */
+  #playcall-center {
+    width:100%;
+    height:160px;
+    background:linear-gradient(180deg, #0d0f15 0%, #07080c 100%);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:8px;
+    position:relative;
+    overflow:hidden;
+    display:grid;
+    grid-template-columns: 38% 1px 32% 1px auto;
+    align-items:stretch;
+  }
+  #playcall-center::before {
+    /* Subtle team-color tint at top edge — ownership signal */
+    content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    background:linear-gradient(to right,
+      transparent 0%,
+      rgba(var(--team-rgb), 0.5) 30%,
+      rgba(var(--team-rgb), 0.5) 70%,
+      transparent 100%);
+    pointer-events:none;
+  }
+  #playcall-center::after {
+    content:''; position:absolute; top:0; left:0; right:0; height:24px;
+    background:linear-gradient(180deg, rgba(var(--team-rgb), 0.05) 0%, transparent 100%);
+    pointer-events:none;
+  }
+  .pcc-divider { background:rgba(255,255,255,0.05); width:1px; }
+
+  /* ── ZONE 1: OFFENSE / DEFENSE OVERRIDES ── */
+  .pcc-overrides {
+    display:flex; flex-direction:column;
+    padding:12px 16px;
+    gap:10px;
+    min-width:0;
+  }
+  .pcc-row {
+    display:flex; align-items:center; gap:8px;
+    flex:1; min-height:0;
+    background:rgba(255,255,255,0.02);
+    border:1px solid rgba(255,255,255,0.04);
+    border-radius:6px;
+    padding:8px 10px;
+    transition:background 0.18s, border-color 0.18s;
+  }
+  .pcc-row.active {
+    background:rgba(247,148,32,0.08);
+    border-color:rgba(247,148,32,0.35);
+  }
+  .pcc-row.armed {
+    background:rgba(247,148,32,0.10);
+    border-color:rgba(247,148,32,0.5);
+    box-shadow:inset 0 0 0 1px rgba(247,148,32,0.15), 0 0 16px -4px var(--orange-glow);
+  }
+  .pcc-row-label {
+    font-family:var(--bebas); font-size:11px;
+    letter-spacing:0.14em; color:rgba(255,255,255,0.42);
+    flex-shrink:0;
+  }
+  .pcc-row.active .pcc-row-label,
+  .pcc-row.armed .pcc-row-label { color:rgba(247,148,32,0.85); }
+
+  .pcc-headshot {
+    width:38px; height:38px; border-radius:4px;
+    background:#1a1d27;
+    background-image:linear-gradient(135deg, #2a2d37 25%, transparent 25%, transparent 75%, #2a2d37 75%), linear-gradient(135deg, #2a2d37 25%, transparent 25%, transparent 75%, #2a2d37 75%);
+    background-size:8px 8px;
+    background-position:0 0, 4px 4px;
+    flex-shrink:0;
+    position:relative;
+    overflow:hidden;
+  }
+  .pcc-headshot::after {
+    content:'WAL'; position:absolute; bottom:2px; left:50%; transform:translateX(-50%);
+    font-family:var(--bebas); font-size:9px;
+    color:rgba(255,255,255,0.6); letter-spacing:0.06em;
+  }
+
+  .pcc-call {
+    flex:1; min-width:0;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .pcc-call-name {
+    font-family:var(--bebas); font-size:15px;
+    letter-spacing:0.04em; color:#fff; line-height:1.05;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+    word-break:break-word;
+  }
+  .pcc-row:not(.active):not(.armed) .pcc-call-name {
+    color:rgba(255,255,255,0.35);
+  }
+  .pcc-call-meta {
+    font-family:var(--inter); font-size:9px; font-weight:600;
+    color:rgba(255,255,255,0.4); letter-spacing:0.06em;
+    text-transform:uppercase; line-height:1;
+  }
+  .pcc-row.armed .pcc-call-meta {
+    color:rgba(247,148,32,0.75);
+  }
+
+  .pcc-arrows {
+    display:flex; flex-direction:column; gap:2px;
+    flex-shrink:0;
+  }
+  .pcc-arrow {
+    width:20px; height:14px;
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:3px;
+    color:rgba(255,255,255,0.5);
+    font-size:8px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.14s, color 0.14s, border-color 0.14s;
+  }
+  .pcc-arrow:hover { background:rgba(255,255,255,0.05); color:#fff; border-color:rgba(255,255,255,0.18); }
+  .pcc-clear {
+    width:16px; height:16px;
+    background:transparent; border:none; padding:0;
+    color:rgba(255,90,90,0.55);
+    cursor:pointer; font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; opacity:0;
+    transition:opacity 0.14s, color 0.14s;
+  }
+  .pcc-row.active .pcc-clear,
+  .pcc-row.armed .pcc-clear { opacity:1; }
+  .pcc-clear:hover { color:#ff5a5a; }
+
+  /* ── ZONE 2: STRATEGY DIALS ── */
+  .pcc-strategy {
+    display:flex; flex-direction:column;
+    padding:10px 18px 14px; gap:14px;
+    justify-content:space-between;
+  }
+  .pcc-dial-row {
+    display:flex; align-items:center; gap:12px;
+    flex:1;
+  }
+  .pcc-dial-label {
+    font-family:var(--bebas); font-size:10px;
+    letter-spacing:0.18em; color:rgba(255,255,255,0.42);
+    width:88px; flex-shrink:0;
+  }
+  .pcc-dial-row.active .pcc-dial-label { color:rgba(247,148,32,0.85); }
+
+  .pcc-dial {
+    flex:1; height:24px; position:relative;
+    display:flex; align-items:center;
+    cursor:pointer;
+  }
+  .pcc-dial-track {
+    position:absolute; left:8px; right:8px; top:50%;
+    transform:translateY(-50%);
+    height:2px;
+    background:rgba(255,255,255,0.08);
+    border-radius:2px;
+  }
+  .pcc-dial-track::before {
+    display:none;
+  }
+  .pcc-notch {
+    position:relative;
+    width:18px; height:18px; border-radius:50%;
+    background:#0a0c12;
+    border:2px solid rgba(255,255,255,0.18);
+    cursor:pointer;
+    transition:border-color 0.16s, background 0.16s, transform 0.16s;
+    z-index:2;
+  }
+  .pcc-notch::after {
+    content:attr(data-label);
+    position:absolute; top:22px; left:50%; transform:translateX(-50%);
+    font-family:var(--bebas); font-size:9px;
+    letter-spacing:0.1em; color:rgba(255,255,255,0.3);
+    white-space:nowrap; pointer-events:none;
+  }
+  .pcc-notch:hover { border-color:rgba(255,255,255,0.4); }
+  .pcc-notch.on {
+    background:var(--orange);
+    border-color:var(--orange);
+    box-shadow:0 0 12px -2px var(--orange-glow);
+  }
+  .pcc-notch.on::after { color:rgba(247,148,32,0.85); }
+  .pcc-dial-spacer { flex:1; }
+
+  .pcc-clear-strategy {
+    width:14px; height:14px; flex-shrink:0;
+    color:rgba(255,90,90,0.55);
+    cursor:pointer; font-size:12px;
+    background:transparent; border:none; padding:0;
+    opacity:0; transition:opacity 0.14s;
+  }
+  .pcc-dial-row.active .pcc-clear-strategy { opacity:1; }
+
+  /* ── ZONE 3: GAME CONTROLS ── */
+  .pcc-game {
+    display:flex; align-items:center;
+    padding:12px 16px; gap:12px;
+    justify-content:flex-end;
+  }
+
+  /* Speed segmented (vertical) */
+  .pcc-speed {
+    display:flex; flex-direction:column;
+    background:rgba(255,255,255,0.02);
+    border:1px solid rgba(255,255,255,0.05);
+    border-radius:5px;
+    overflow:hidden;
+    opacity:0.35; /* disabled state */
+    pointer-events:none;
+  }
+  .pcc-speed-btn {
+    width:32px; height:30px;
+    background:transparent; border:none; padding:0;
+    color:rgba(255,255,255,0.6);
+    font-size:10px; letter-spacing:0.04em;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    border-bottom:1px solid rgba(255,255,255,0.04);
+  }
+  .pcc-speed-btn:last-child { border-bottom:none; }
+  .pcc-speed-btn.on { background:var(--orange); color:#0a0c12; }
+  .pcc-speed-glyph { font-family:var(--bebas); letter-spacing:-0.05em; font-size:11px; }
+
+  /* Pause/Resume — neutral steel (per styleguide: green reserved for gating, orange overused if used here) */
+  .pcc-pause {
+    width:120px; height:64px;
+    background:linear-gradient(180deg, #2a2f3a 0%, #1a1d27 100%);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:6px;
+    color:#fff;
+    font-family:var(--bebas); font-size:24px;
+    letter-spacing:0.06em;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    transition:filter 0.14s, transform 0.14s, background 0.18s, border-color 0.18s;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 12px -6px rgba(0,0,0,0.6);
+  }
+  .pcc-pause:hover { filter:brightness(1.12); border-color:rgba(255,255,255,0.32); }
+  .pcc-pause.paused {
+    background:linear-gradient(180deg, #3a4252 0%, #232732 100%);
+    border-color:rgba(255,255,255,0.32);
+  }
+  .pcc-pause-icon { font-size:14px; color:rgba(255,255,255,0.85); }
+
+  /* Timeout */
+  .pcc-timeout-wrap {
+    display:flex; flex-direction:column; gap:6px;
+    align-items:stretch;
+  }
+  .pcc-timeout {
+    width:120px; height:38px;
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:5px;
+    color:#fff;
+    font-family:var(--bebas); font-size:16px;
+    letter-spacing:0.08em;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.14s, border-color 0.14s;
+  }
+  .pcc-timeout:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.32); }
+  .pcc-timeout-pills {
+    display:flex; gap:3px; justify-content:center;
+  }
+  .pcc-pill {
+    flex:1; height:5px; border-radius:1px;
+    background:var(--orange);
+    transition:background 0.18s;
+  }
+  .pcc-pill.used {
+    background:rgba(255,255,255,0.1);
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="label">Playcall Center — Cockpit redesign POC (1000×160 — actual court container size)</div>
+    <div id="playcall-center">
+      <!-- ZONE 1: Overrides -->
+      <div class="pcc-overrides">
+        <div class="pcc-row armed" id="row-offense">
+          <div class="pcc-row-label">OFF</div>
+          <div class="pcc-headshot"></div>
+          <div class="pcc-call">
+            <div class="pcc-call-name">Double Screen Three - Wing (SG)</div>
+          </div>
+          <div class="pcc-arrows">
+            <button class="pcc-arrow">▲</button>
+            <button class="pcc-arrow">▼</button>
+          </div>
+          <button class="pcc-clear">✕</button>
+        </div>
+        <div class="pcc-row active" id="row-defense">
+          <div class="pcc-row-label">DEF</div>
+          <div class="pcc-call">
+            <div class="pcc-call-name">Man Normal</div>
+          </div>
+          <div class="pcc-arrows">
+            <button class="pcc-arrow">▲</button>
+            <button class="pcc-arrow">▼</button>
+          </div>
+          <button class="pcc-clear">✕</button>
+        </div>
+      </div>
+
+      <div class="pcc-divider"></div>
+
+      <!-- ZONE 2: Strategy dials -->
+      <div class="pcc-strategy">
+        <div class="pcc-dial-row active">
+          <div class="pcc-dial-label">TEMPO</div>
+          <div class="pcc-dial" style="--fill:50%">
+            <div class="pcc-dial-track"></div>
+            <div class="pcc-notch" data-label="FAST"></div>
+            <div class="pcc-dial-spacer"></div>
+            <div class="pcc-notch on" data-label="NORMAL"></div>
+            <div class="pcc-dial-spacer"></div>
+            <div class="pcc-notch" data-label="SLOW"></div>
+          </div>
+          <button class="pcc-clear-strategy">✕</button>
+        </div>
+        <div class="pcc-dial-row active">
+          <div class="pcc-dial-label">AGGRESSION</div>
+          <div class="pcc-dial" style="--fill:0%">
+            <div class="pcc-dial-track"></div>
+            <div class="pcc-notch" data-label="AGGR"></div>
+            <div class="pcc-dial-spacer"></div>
+            <div class="pcc-notch" data-label="NORMAL"></div>
+            <div class="pcc-dial-spacer"></div>
+            <div class="pcc-notch" data-label="PASSIVE"></div>
+          </div>
+          <button class="pcc-clear-strategy">✕</button>
+        </div>
+        <div class="pcc-dial-row active">
+          <div class="pcc-dial-label">PRESS/TRAP</div>
+          <div class="pcc-dial pcc-dial--discrete" style="--fill:0%">
+            <div class="pcc-dial-track"></div>
+            <div class="pcc-notch" data-label="PRESS"></div>
+            <div class="pcc-dial-spacer"></div>
+            <div class="pcc-notch on" data-label="TRAP"></div>
+            <div class="pcc-dial-spacer"></div>
+            <div class="pcc-notch" data-label="NONE"></div>
+          </div>
+          <button class="pcc-clear-strategy">✕</button>
+        </div>
+      </div>
+
+      <div class="pcc-divider"></div>
+
+      <!-- ZONE 3: Game controls -->
+      <div class="pcc-game">
+        <div class="pcc-speed">
+          <button class="pcc-speed-btn"><span class="pcc-speed-glyph">▶▶▶</span></button>
+          <button class="pcc-speed-btn"><span class="pcc-speed-glyph">▶▶</span></button>
+          <button class="pcc-speed-btn on"><span class="pcc-speed-glyph">▶</span></button>
+        </div>
+        <button class="pcc-pause">
+          <span class="pcc-pause-icon">▮▮</span>
+          PAUSE
+        </button>
+        <div class="pcc-timeout-wrap">
+          <button class="pcc-timeout">TIMEOUT</button>
+          <div class="pcc-timeout-pills">
+            <div class="pcc-pill"></div>
+            <div class="pcc-pill"></div>
+            <div class="pcc-pill"></div>
+            <div class="pcc-pill used"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="label" style="color:rgba(255,255,255,0.3); margin-top:24px;">Notes — what you're seeing:</div>
+    <ul style="font-family:var(--inter); font-size:13px; color:rgba(255,255,255,0.55); line-height:1.7; padding-left:20px;">
+      <li><strong>OFF row "armed"</strong> — orange glow on the row signals an upcoming-possession call. Auto-clears after the possession runs.</li>
+      <li><strong>DEF row "active"</strong> — softer orange. Persistent until cleared / quarter end / timeout.</li>
+      <li><strong>Up/down arrows</strong> stacked vertically, tight against the right edge — reads as a paging/cycle control.</li>
+      <li><strong>Strategy dials</strong> — each notch labeled below (Fast/Normal/Slow, Aggr/Normal/Passive, Press/Trap/None). Active value glows orange.</li>
+      <li><strong>Press/Trap</strong> spelled out in label — wider label column accommodates the full word.</li>
+      <li><strong>Pause</strong> — neutral steel, not green or orange. Per styleguide: green reserved for gating actions, orange already heavily used. Steel keeps the action tier clear.</li>
+      <li><strong>Speed</strong> — disabled (35% opacity), 3 stacked icons.</li>
+      <li><strong>Timeout</strong> — pill row replaces dots. 4th pill used = grey.</li>
+      <li><strong>Top edge</strong> — barely-visible team-color hairline + 5% gradient bleed.</li>
+    </ul>
+  </div>
+</body>
+</html>

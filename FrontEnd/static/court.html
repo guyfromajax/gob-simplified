@@ -25,6 +25,10 @@
      * - No JS for layout: do not set top/left/width/height on layout-critical elements.
      */
     :root {
+      /* Playcall Center cockpit (POC tokens; --team-rgb set by hydrateCourtColors + my_team) */
+      --orange: #F79420;
+      --orange-glow: rgba(247, 148, 32, 0.35);
+      --team-rgb: 255, 98, 0;
       /* Taller bar: center cluster (clock + Q/shot) must fit inside; overflow hidden clips bleed onto court */
       --scoreboard-height: 120px;
       --player-stats-width: 280px;
@@ -1350,20 +1354,25 @@
       background: #666;
     }
 
-    /* ==================== PLAYCALL CENTER - UNIFIED TACTICAL HUB ==================== */
+    /* ==================== PLAYCALL CENTER — cockpit (POC port) ==================== */
     #playcall-center {
-      position: relative;
-      width: 100%;
-      /* height removed - controlled by fixed positioning rule below */
-      overflow-y: auto;  /* Scroll if content exceeds available space */
-      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
-      border-top: none;
-      padding: 6px 24px 8px 24px;
-      box-sizing: border-box;
-      z-index: 900;
+      position: fixed !important;
+      bottom: 0 !important;
+      left: calc(var(--player-stats-width) + var(--side-padding)) !important;
+      right: calc(var(--player-stats-width) + var(--side-padding)) !important;
+      width: auto !important;
+      max-height: clamp(160px, 22vh, 260px) !important;
+      min-height: 160px !important;
+      overflow: hidden !important;
+      z-index: 900 !important;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
+      padding: 0 12px 6px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, #0d0f15 0%, #07080c 100%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px 8px 0 0;
     }
 
     #playcall-center::before {
@@ -1372,34 +1381,30 @@
       top: 0;
       left: 0;
       right: 0;
-      height: 2px;
+      height: 1px;
       background: linear-gradient(
         to right,
-        var(--away-vibrant-color) 0%,
-        rgba(255, 255, 255, 0.10) 48%,
-        rgba(255, 255, 255, 0.10) 52%,
-        var(--home-vibrant-color) 100%
+        transparent 0%,
+        rgba(var(--team-rgb), 0.5) 30%,
+        rgba(var(--team-rgb), 0.5) 70%,
+        transparent 100%
       );
       z-index: 10;
       pointer-events: none;
     }
 
-    /* FIXED POSITIONING - Dynamically positioned below canvas, constrained height */
-    #playcall-center {
-      position: fixed !important;
-      /* top set dynamically via JS based on canvas bottom */
-      bottom: 0 !important;
-      left: calc(var(--player-stats-width) + var(--side-padding)) !important;  /* After left panel */
-      right: calc(var(--player-stats-width) + var(--side-padding)) !important;  /* Before right panel */
-      width: auto !important;
-      /* Height constrained: min 160px, preferred 22vh, max 260px */
-      max-height: clamp(160px, 22vh, 260px) !important;
-      min-height: 160px !important;
-      overflow-y: auto !important;
-      z-index: 900 !important;
+    #playcall-center::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: linear-gradient(180deg, rgba(var(--team-rgb), 0.05) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 1;
     }
 
-    /* ── STATUS ROW (hidden — replaced by #playcall-strip; IDs kept for playcallCenter.js) ── */
     #playcall-status-row {
       display: none;
     }
@@ -1408,158 +1413,472 @@
     .status-label { font-size: 11px; color: rgba(255,215,0,0.5); letter-spacing: 1.5px; }
     #offense-status-text, #defense-status-text { font-size: 17px; color: #FFD700; letter-spacing: 0.5px; }
 
-    /* ── MAIN ROW ── */
-    #playcall-main-row {
-      display: flex;
-      flex-direction: row;
-      align-items: stretch;
+    .pcc-cockpit {
+      position: relative;
+      z-index: 2;
       flex: 1 1 auto;
       min-height: 0;
-    }
-
-    /* ── CARD ZONES ── */
-    .pcc-card-zone {
-      flex: 0 0 260px;
-      display: flex;
-      flex-direction: row;
+      width: 100%;
+      max-width: 1000px;
+      margin: 0 auto;
+      height: 160px;
+      max-height: 100%;
+      display: grid;
+      grid-template-columns: 38% 1px 32% 1px minmax(0, 1fr);
       align-items: stretch;
-      gap: 5px;
-      min-width: 220px;
-      padding: 0 8px 0 0;
-      align-self: stretch;
+      box-sizing: border-box;
     }
 
-    .pcc-card-zone.defense-zone {
-      display: none !important;
+    .pcc-divider {
+      background: rgba(255, 255, 255, 0.05);
+      width: 1px;
     }
 
-    .pcc-card-zone .zone-inner {
+    /* ── ZONE 1 overrides ── */
+    .pcc-overrides {
       display: flex;
       flex-direction: column;
-      gap: 5px;
-      height: 100%;
-      flex: 1;
+      padding: 10px 12px;
+      gap: 8px;
       min-width: 0;
-      align-self: stretch;
     }
 
-    .pcc-scroller-row {
-      display: flex;
-      align-items: stretch;
-      gap: 6px;
-      flex: 1 1 0;
-      min-height: 44px;
-    }
-
-    .pcc-offense-block {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-    }
-
-    .pcc-zone-label {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 9px;
-      letter-spacing: 0.18em;
-      color: rgba(255, 255, 255, 0.25);
-      margin-bottom: 0;
-    }
-
-    .pcc-scroller-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.07);
-      flex-shrink: 0;
-    }
-
-    .pcc-readonly-row .pcc-nav-col--spacer {
-      width: 16px;
-      flex-shrink: 0;
-    }
-
-    .defense-under-offense-text,
-    .offense-under-defense-text {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.75);
-      letter-spacing: 0.04em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .pcc-defense-readonly-card {
-      cursor: default;
-    }
-
-    .pcc-readonly-row .pcc-play-card {
-      cursor: default;
-    }
-
-    .pcc-card-zone.defense-zone > .zone-inner > .pcc-scroller-row:first-of-type {
-      flex-direction: row-reverse;
-    }
-
-    .pcc-card-zone.defense-zone .pcc-readonly-row {
-      flex-direction: row-reverse;
-    }
-
-    /* ── PLAY CARD (offense and defense) ── */
-    .pcc-play-card {
+    .pcc-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 0 10px;
-      background: rgba(255,255,255,0.05);
-      border: 2px solid rgba(255,255,255,0.14);
-      border-radius: 6px;
       flex: 1;
-      min-height: 44px;
-      width: 0;
+      min-height: 0;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 6px;
+      padding: 6px 8px;
+      transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+    }
+
+    .pcc-row.active {
+      background: rgba(247, 148, 32, 0.08);
+      border-color: rgba(247, 148, 32, 0.35);
+    }
+
+    .pcc-row.armed {
+      background: rgba(247, 148, 32, 0.10);
+      border-color: rgba(247, 148, 32, 0.5);
+      box-shadow: inset 0 0 0 1px rgba(247, 148, 32, 0.15), 0 0 16px -4px var(--orange-glow);
+    }
+
+    .pcc-row-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      color: rgba(255, 255, 255, 0.42);
+      flex-shrink: 0;
+    }
+
+    .pcc-row.active .pcc-row-label,
+    .pcc-row.armed .pcc-row-label {
+      color: rgba(247, 148, 32, 0.85);
+    }
+
+    .pcc-offense-call {
+      flex: 1;
       min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .pcc-offense-call .play-scroller {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pcc-call {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    #defense-scheme-card.pcc-play-card {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 38px;
+      padding: 4px 8px;
+      box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
       cursor: pointer;
       overflow: hidden;
     }
 
-    /*
-     * Offense / readonly rows: .pcc-play-card lives inside .pcc-offense-block (flex-direction: column).
-     * width:0 is for flex-row siblings; in a column it zeroes cross-axis width → compressed “black bar”.
-     */
-    .pcc-offense-block > .pcc-play-card {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
+    #defense-scheme-card.pcc-play-card.selected {
+      background: rgba(247, 148, 32, 0.12);
+      border-color: rgba(247, 148, 32, 0.45);
+      box-shadow: 0 0 12px -2px var(--orange-glow);
     }
 
-    .pcc-play-card.selected {
-      background: rgba(255,215,0,0.2);
-      border-color: #FFD700;
-      box-shadow: 0 0 14px rgba(255,215,0,0.3);
-    }
-
-    .pcc-play-card .play-name { font-size: 13px; }
-    .pcc-play-card .play-focus { font-size: 10px; }
-    /* Defense card only — never descendant-select all offense .play-name / .play-focus rows */
-    .pcc-card-zone.defense-zone .pcc-play-card.selected .defense-play-name {
-      color: #FFD700;
-    }
-
-    /* Offense play scroller inside card — one play visible at a time */
-    .pcc-play-card .play-scroller {
-      flex: 1;
-      min-height: 0;
+    .defense-play-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      color: #fff;
+      line-height: 1.05;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
+      word-break: break-word;
+    }
+
+    .pcc-row:not(.active) .defense-play-name {
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    .pcc-row.active .defense-play-name {
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .pcc-arrows {
       display: flex;
       flex-direction: column;
-      gap: 0;
+      gap: 2px;
+      flex-shrink: 0;
     }
 
-    /*
-     * Collapse to one row only after JS marks slots ready (avoids blank card if sync runs late).
-     * Attribute set in syncOffensePlaySlotVisibility; cleared when scroller is rebuilt.
-     */
+    .pcc-arrow {
+      width: 20px;
+      height: 14px;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.14s, color 0.14s, border-color 0.14s;
+      padding: 0;
+    }
+
+    .pcc-arrow:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .pcc-clear {
+      width: 16px;
+      height: 16px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: rgba(255, 90, 90, 0.55);
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.14s, color 0.14s;
+    }
+
+    .pcc-row.active .pcc-clear,
+    .pcc-row.armed .pcc-clear {
+      opacity: 1;
+    }
+
+    .pcc-clear:hover {
+      color: #ff5a5a;
+    }
+
+    /* ── ZONE 2 strategy dials ── */
+    #pcc-stacks-zone.pcc-strategy {
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px 12px;
+      gap: 12px;
+      justify-content: space-between;
+      min-width: 0;
+      border: none;
+    }
+
+    .pcc-dial-row.pcc-stack {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    .pcc-dial-row.pcc-stack::before {
+      display: none;
+    }
+
+    .pcc-dial-label.pcc-stack-label {
+      width: 88px;
+      flex: 0 0 88px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: rgba(255, 255, 255, 0.42);
+      text-align: left;
+      margin: 0;
+    }
+
+    .pcc-dial-row:has(.pcc-stack-btn.selected) .pcc-dial-label {
+      color: rgba(247, 148, 32, 0.85);
+    }
+
+    .pcc-dial {
+      flex: 1;
+      height: 24px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .pcc-dial-track {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+    }
+
+    .pcc-notch.pcc-stack-btn {
+      position: relative;
+      flex: 0 0 18px;
+      width: 18px;
+      height: 18px;
+      min-height: 18px;
+      padding: 0;
+      border-radius: 50%;
+      background: #0a0c12;
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      color: transparent;
+      font-size: 0;
+      cursor: pointer;
+      transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
+      z-index: 2;
+    }
+
+    .pcc-notch.pcc-stack-btn::after {
+      content: attr(data-label);
+      position: absolute;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: rgba(255, 255, 255, 0.3);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .pcc-notch.pcc-stack-btn:hover {
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .pcc-notch.pcc-stack-btn.selected {
+      background: var(--orange);
+      border-color: var(--orange);
+      box-shadow: 0 0 12px -2px var(--orange-glow);
+    }
+
+    .pcc-notch.pcc-stack-btn.selected::after {
+      color: rgba(247, 148, 32, 0.85);
+    }
+
+    .pcc-dial-spacer {
+      flex: 1;
+    }
+
+    .pcc-clear-strategy.pcc-stack-x {
+      width: 14px;
+      height: 14px;
+      min-height: 14px;
+      flex-shrink: 0;
+      color: rgba(255, 90, 90, 0.55);
+      cursor: pointer;
+      font-size: 12px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      opacity: 0;
+      transition: opacity 0.14s;
+    }
+
+    .pcc-dial-row:has(.pcc-stack-btn.selected) .pcc-clear-strategy {
+      opacity: 1;
+    }
+
+    .pcc-clear-strategy:hover {
+      color: #ff5a5a;
+    }
+
+    /* ── ZONE 3 game controls ── */
+    .pcc-game {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      gap: 12px;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .pcc-speed {
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 5px;
+      overflow: hidden;
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .pcc-speed-btn {
+      width: 32px;
+      height: 30px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .pcc-speed-btn:last-child {
+      border-bottom: none;
+    }
+
+    .pcc-speed-btn.on {
+      background: var(--orange);
+      color: #0a0c12;
+    }
+
+    .pcc-speed-glyph {
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: -0.05em;
+      font-size: 11px;
+    }
+
+    #playcall-center .pcc-game #pause-btn.pcc-pause {
+      position: static;
+      transform: none;
+      width: 120px;
+      height: 64px;
+      min-width: 120px;
+      padding: 0 12px;
+      background: linear-gradient(180deg, #2a2f3a 0%, #1a1d27 100%);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: filter 0.14s, transform 0.14s, background 0.18s, border-color 0.18s;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 12px -6px rgba(0, 0, 0, 0.6);
+    }
+
+    #playcall-center .pcc-game #pause-btn.pcc-pause:hover {
+      filter: brightness(1.12);
+      border-color: rgba(255, 255, 255, 0.32);
+      background: linear-gradient(180deg, #323742 0%, #1e222c 100%);
+    }
+
+    #playcall-center .pcc-game #pause-btn.pcc-pause.paused {
+      background: linear-gradient(180deg, #3a4252 0%, #232732 100%);
+      border-color: rgba(255, 255, 255, 0.32);
+    }
+
+    .pcc-pause-icon {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .pcc-timeout-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+    }
+
+    #playcall-center .pcc-game #timeout-btn.pcc-timeout {
+      position: static;
+      margin: 0;
+      width: 120px;
+      height: auto;
+      min-height: 38px;
+      padding: 6px 8px;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 5px;
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background 0.14s, border-color 0.14s;
+    }
+
+    #playcall-center .pcc-game #timeout-btn.pcc-timeout:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.32);
+    }
+
+    .pcc-timeout-pills {
+      display: flex;
+      gap: 3px;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .pcc-pill.to-pip {
+      flex: 1;
+      height: 5px;
+      border-radius: 1px;
+      background: var(--orange);
+      transition: background 0.18s;
+    }
+
+    .pcc-pill.to-pip.used {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Offense slot carousel */
     #offense-play-scroller[data-pcc-slots-ready="1"] .play-option:not(.pcc-slot-active) {
       display: none !important;
       pointer-events: none;
@@ -1570,227 +1889,41 @@
       pointer-events: auto;
     }
     #offense-play-scroller[data-pcc-slots-ready="1"] .play-option.pcc-slot-active:hover {
-      background: rgba(255, 215, 0, 0.1);
+      background: transparent !important;
     }
 
-    .defense-play-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 14px;
-      color: rgba(255,255,255,0.85);
-      letter-spacing: 0.3px;
-      line-height: 1.1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ── NAV COLUMN ── */
-    .pcc-nav-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-evenly;
-      gap: 4px;
-      flex-shrink: 0;
-      align-self: stretch;
-    }
-
-    .pcc-nav-btn {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.45);
-      font-size: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .pcc-nav-x {
-      width: 16px;
-      height: 16px;
-      border-radius: 3px;
-      background: rgba(244, 67, 54, 0.07);
-      border: 1px solid rgba(244, 67, 54, 0.22);
-      color: rgba(244, 67, 54, 0.60);
-      font-size: 9px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* ── STACKS ZONE ── */
-    #pcc-stacks-zone {
-      flex: 1 1 280px;
-      min-width: 200px;
-      max-width: 400px;
-      display: flex;
-      flex-direction: column;
-      justify-content: stretch;
-      gap: 5px;
-      padding-left: 12px;
-      border-left: 1px solid rgba(255, 255, 255, 0.07);
-      border-right: none;
-      align-self: stretch;
-      min-width: 0;
-    }
-
-    /* ── STACK (horizontal strip) ── */
-    .pcc-stack {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 6px;
-      flex: 1 1 0;
-      min-height: 26px;
-      min-width: 0;
-      padding-top: 0;
-      position: relative;
-    }
-
-    .pcc-stack::before {
-      content: '';
-      width: 3px;
-      align-self: stretch;
-      border-radius: 2px;
-      flex-shrink: 0;
-      position: static;
-      top: auto;
-      left: auto;
-      right: auto;
-    }
-
-    .pcc-stack.tempo::before {
-      background: #4a90d9;
-    }
-
-    .pcc-stack.aggression::before {
-      background: #FFD700;
-    }
-
-    .pcc-stack.press-trap::before {
-      background: #cc3333;
-    }
-
-    .pcc-stack-label {
-      flex: 0 0 72px;
-      font-size: 11px;
-      letter-spacing: 0.13em;
-      text-align: left;
-      margin: 0;
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
-
-    .pcc-stack.tempo .pcc-stack-label {
-      color: #4a90d9;
-    }
-
-    .pcc-stack.aggression .pcc-stack-label {
-      color: #FFD700;
-    }
-
-    .pcc-stack.press-trap .pcc-stack-label {
-      color: #cc3333;
-    }
-
-    .pcc-stack-btn {
-      flex: 1;
-      height: 100%;
-      min-height: 24px;
-      padding: 3px 4px;
-      border-radius: 6px;
-      font-size: 11px;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.55);
-      font-family: 'Bebas Neue', sans-serif;
-      cursor: pointer;
-      text-align: center;
-      line-height: 1.2;
-    }
-
-    .pcc-stack.tempo .pcc-stack-btn.selected {
-      background: rgba(74,144,217,0.2);
-      border-color: #4a90d9; color: #4a90d9;
-      box-shadow: 0 0 8px rgba(74,144,217,0.3);
-    }
-
-    .pcc-stack.aggression .pcc-stack-btn.selected {
-      background: rgba(255,215,0,0.2);
-      border-color: #FFD700; color: #FFD700;
-      box-shadow: 0 0 8px rgba(255,215,0,0.28);
-    }
-
-    .pcc-stack.press-trap .pcc-stack-btn.selected {
-      background: rgba(204,51,51,0.2);
-      border-color: #cc3333; color: #cc3333;
-      box-shadow: 0 0 8px rgba(204,51,51,0.3);
-    }
-
-    .pcc-stack-x {
-      width: 16px;
-      height: 100%;
-      min-height: 26px;
-      border-radius: 4px;
-      background: transparent;
-      border: 1px solid rgba(244, 67, 54, 0.18);
-      color: rgba(244, 67, 54, 0.45);
-      font-size: 9px;
-      flex-shrink: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Bebas Neue', sans-serif;
-      cursor: pointer;
-    }
-
-    .pcc-stack-x:hover {
-      background: rgba(244, 67, 54, 0.12);
-      color: #F44336;
-      border-color: rgba(244, 67, 54, 0.40);
-    }
-
-    /* Reused play-option/headshot/info/name/focus (offense card) — dimensions updated for card height */
     .play-option {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 6px 8px;
+      gap: 8px;
+      padding: 2px 0;
       background: transparent;
       border: none;
       border-radius: 0;
       cursor: pointer;
-      transition: all 0.2s ease;
-      min-height: 48px;
+      transition: background 0.2s ease;
+      min-height: 0;
     }
 
     .play-option:hover {
-      background: rgba(255, 215, 0, 0.1);
+      background: rgba(255, 215, 0, 0.08);
     }
-    /* Beat generic .play-option:hover inside carousel; non-active rows are display:none anyway. */
+
     #offense-play-scroller[data-pcc-slots-ready="1"] .play-option:not(.pcc-slot-active):hover {
       background: transparent !important;
     }
 
     .play-option.selected {
-      background: rgba(255, 215, 0, 0.25);
-      border-color: #FFD700;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+      background: transparent;
+      border: none;
+      box-shadow: none;
     }
 
     .play-headshot {
-      width: 44px;
-      height: 44px;
+      width: 38px;
+      height: 38px;
       border-radius: 4px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       object-fit: cover;
       object-position: top center;
       flex-shrink: 0;
@@ -1798,8 +1931,8 @@
     }
 
     .play-option.selected .play-headshot {
-      border-color: #FFD700;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+      border-color: rgba(247, 148, 32, 0.85);
+      box-shadow: 0 0 8px -1px var(--orange-glow);
     }
 
     .play-info {
@@ -1811,26 +1944,46 @@
     }
 
     .play-name {
-      font-size: 16px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 14px;
       font-weight: 700;
-      color: rgba(255, 255, 255, 0.8);
-      letter-spacing: 0.5px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.05;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
     }
 
+    #row-offense:not(.armed) .play-name {
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    #row-offense.armed .play-name,
     .play-option.selected .play-name {
-      color: #FFD700;
+      color: #fff;
     }
 
     .play-focus {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.35);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.06em;
     }
 
     .play-option.selected .play-focus {
-      color: rgba(255, 215, 0, 0.8);
+      color: rgba(247, 148, 32, 0.75);
+    }
+
+    .defense-under-offense-text,
+    .offense-under-defense-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 0.04em;
     }
 
     /* ==================== PLAYCALL REVEAL HUD ==================== */
@@ -3177,124 +3330,9 @@
 }
 
 /* ───────────────────────────────────────────────────────────────────
-   2. PLAYCALL CENTER — MAIN ROW LAYOUT
-   ───────────────────────────────────────────────────────────────────
-   PROBLEM: .pcc-play-card has width:0 (a flex-row hack) but lives
-   inside .pcc-offense-block which is flex-direction:column.
-   In a column context, width:0 zeroes the cross axis → black bar.
-
-   FIX: Force play cards inside offense blocks to width:100% and
-   stretch align-self.
+   2–3. PLAYCALL CENTER (legacy main-row / stacks overrides)
+   Superseded by cockpit `.pcc-cockpit` + dial markup in base styles.
    ─────────────────────────────────────────────────────────────────── */
-
-#playcall-main-row {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: stretch !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  gap: 0 !important;
-}
-
-/* Card zone (offense + defense column) — left side */
-.pcc-card-zone {
-  flex: 0 0 240px !important;
-  min-width: 240px !important;
-  max-width: 240px !important;
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: stretch !important;
-  align-self: stretch !important;
-  gap: 5px !important;
-  padding: 0 8px 0 0 !important;
-}
-
-.pcc-card-zone .zone-inner {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 5px !important;
-  height: 100% !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  align-self: stretch !important;
-}
-
-.pcc-scroller-row {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: stretch !important;
-  gap: 6px !important;
-  flex: 1 1 0 !important;
-  min-height: 44px !important;
-}
-
-.pcc-offense-block {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 4px !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-}
-
-/* THE CRITICAL FIX — play card inside column-flex must have width:100% */
-.pcc-offense-block > .pcc-play-card,
-.pcc-card-zone .pcc-play-card {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  min-height: 44px !important;
-  align-self: stretch !important;
-  box-sizing: border-box !important;
-  flex: 1 1 auto !important;
-}
-
-/* ───────────────────────────────────────────────────────────────────
-   3. PLAYCALL — STACKS ZONE (TEMPO / AGGRESSION / PRESS)
-   ───────────────────────────────────────────────────────────────────
-   PROBLEM: Three stacks didn't fill height equally; right edge had
-   extra padding.
-
-   FIX: Force flex:1 on each stack with shared min-height so they
-   distribute the parent height evenly.
-   ─────────────────────────────────────────────────────────────────── */
-
-#pcc-stacks-zone {
-  flex: 1 1 auto !important;
-  min-width: 240px !important;
-  max-width: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: stretch !important;
-  align-self: stretch !important;
-  gap: 6px !important;
-  padding-left: 14px !important;
-  padding-right: 0 !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.07) !important;
-}
-
-.pcc-stack {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  gap: 8px !important;
-  flex: 1 1 0 !important;
-  height: auto !important;
-  min-height: 28px !important;
-  min-width: 0 !important;
-}
-
-.pcc-stack-label {
-  flex: 0 0 78px !important;
-  min-width: 78px !important;
-}
-
-.pcc-stack-btn {
-  flex: 1 1 0 !important;
-  min-width: 0 !important;
-  height: 100% !important;
-  min-height: 26px !important;
-}
 
 /* ───────────────────────────────────────────────────────────────────
    4. AWAY PANEL HEADER — logo + team name on one line
@@ -3783,9 +3821,9 @@
       <button class="speed-option speed-option-superfast" data-speed="1000">Super Fast</button>
     </div>
 
-  <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB - grid-area: playcall ==================== -->
+  <!-- ==================== PLAYCALL CENTER (BOTTOM) — cockpit POC port, grid-area: playcall ==================== -->
   <div id="playcall-center" style="grid-area: playcall;">
-    <!-- Status row (unchanged IDs — JS depends on these) -->
+    <!-- Status row (unchanged IDs — playcallCenter.js) -->
     <div id="playcall-status-row">
       <div id="offense-status" class="status-display">
         <span class="status-label">OFFENSE</span>
@@ -3796,95 +3834,107 @@
         <span class="status-label">DEFENSE</span>
       </div>
     </div>
-    <!-- Main row: Offense Card (33%) | Stacks (34%) | Defense Card (33%) -->
-    <div id="playcall-main-row">
-      <!-- Offense Card Zone (left) -->
-      <div class="pcc-card-zone">
-        <div class="zone-inner">
-          <div class="pcc-scroller-row">
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Offense</div>
-              <div class="pcc-play-card">
-                <!-- Empty until loadAndApplySlotAssignments(); placeholder .play-option caused stale nodes + all-visible flex bug -->
-                <div id="offense-play-scroller" class="play-scroller"></div>
-              </div>
-            </div>
-            <div class="pcc-nav-col">
-              <button class="pcc-nav-btn" id="play-nav-up">▲</button>
-              <button class="pcc-nav-btn" id="play-nav-down">▼</button>
-              <button class="pcc-nav-x" id="clear-offense-override-x">✕</button>
+
+    <div class="pcc-cockpit">
+      <!-- ZONE 1: Overrides -->
+      <div class="pcc-overrides">
+        <div class="pcc-row" id="row-offense">
+          <div class="pcc-row-label">OFF</div>
+          <div class="pcc-offense-call">
+            <div id="offense-play-scroller" class="play-scroller"></div>
+          </div>
+          <div class="pcc-arrows">
+            <button type="button" class="pcc-arrow" id="play-nav-up">▲</button>
+            <button type="button" class="pcc-arrow" id="play-nav-down">▼</button>
+          </div>
+          <button type="button" class="pcc-clear" id="clear-offense-override-x" aria-label="Clear offense override">✕</button>
+        </div>
+        <div class="pcc-row" id="row-defense">
+          <div class="pcc-row-label">DEF</div>
+          <div class="pcc-call">
+            <div class="pcc-play-card" id="defense-scheme-card">
+              <div class="defense-play-name">Man Normal</div>
             </div>
           </div>
-          <div class="pcc-scroller-divider"></div>
-          <div class="pcc-scroller-row pcc-readonly-row">
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Defense</div>
-              <div class="pcc-play-card pcc-defense-readonly-card">
-                <div id="defense-under-offense-label" class="defense-under-offense-text">--</div>
-              </div>
-            </div>
-            <div class="pcc-nav-col pcc-nav-col--spacer" aria-hidden="true"></div>
+          <div class="pcc-arrows">
+            <button type="button" class="pcc-arrow" id="defense-nav-up">▲</button>
+            <button type="button" class="pcc-arrow" id="defense-nav-down">▼</button>
           </div>
+          <button type="button" class="pcc-clear" id="clear-defense-card-x" aria-label="Clear defense override">✕</button>
         </div>
       </div>
-      <!-- Stacks Zone (center 34%): Tempo | Aggression | Press/Trap -->
-      <div id="pcc-stacks-zone">
-        <div class="pcc-stack tempo">
-          <span class="pcc-stack-label">Tempo</span>
-          <button type="button" class="pcc-stack-btn" id="tempo-fast">Fast</button>
-          <button type="button" class="pcc-stack-btn" id="tempo-normal">Normal</button>
-          <button type="button" class="pcc-stack-btn" id="tempo-slow">Slow</button>
-          <button type="button" class="pcc-stack-x" id="clear-tempo-x">✕</button>
+
+      <div class="pcc-divider" aria-hidden="true"></div>
+
+      <!-- ZONE 2: Strategy dials (keep #pcc-stacks-zone + .pcc-stack.* for playcallCenter.js selectors) -->
+      <div id="pcc-stacks-zone" class="pcc-strategy">
+        <div class="pcc-dial-row pcc-stack tempo">
+          <div class="pcc-dial-label pcc-stack-label">TEMPO</div>
+          <div class="pcc-dial">
+            <div class="pcc-dial-track"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="tempo-fast" data-label="FAST"></button>
+            <div class="pcc-dial-spacer"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="tempo-normal" data-label="NORMAL"></button>
+            <div class="pcc-dial-spacer"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="tempo-slow" data-label="SLOW"></button>
+          </div>
+          <button type="button" class="pcc-clear-strategy pcc-stack-x" id="clear-tempo-x" aria-label="Clear tempo">✕</button>
         </div>
-        <div class="pcc-stack aggression">
-          <span class="pcc-stack-label">Aggression</span>
-          <button type="button" class="pcc-stack-btn" id="aggr-passive">Passive</button>
-          <button type="button" class="pcc-stack-btn" id="aggr-normal">Normal</button>
-          <button type="button" class="pcc-stack-btn" id="aggr-aggressive">Aggr</button>
-          <button type="button" class="pcc-stack-x" id="clear-aggression-override-x">✕</button>
+        <div class="pcc-dial-row pcc-stack aggression">
+          <div class="pcc-dial-label pcc-stack-label">AGGRESSION</div>
+          <div class="pcc-dial">
+            <div class="pcc-dial-track"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="aggr-aggressive" data-label="AGGR"></button>
+            <div class="pcc-dial-spacer"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="aggr-normal" data-label="NORMAL"></button>
+            <div class="pcc-dial-spacer"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="aggr-passive" data-label="PASSIVE"></button>
+          </div>
+          <button type="button" class="pcc-clear-strategy pcc-stack-x" id="clear-aggression-override-x" aria-label="Clear aggression">✕</button>
         </div>
-        <div class="pcc-stack press-trap">
-          <span class="pcc-stack-label">Press/Trap</span>
-          <button type="button" class="pcc-stack-btn" id="press-btn">Press</button>
-          <button type="button" class="pcc-stack-btn" id="trap-btn">Trap</button>
-          <button type="button" class="pcc-stack-btn" id="press-trap-none-btn">None</button>
-          <button type="button" class="pcc-stack-x" id="clear-press-trap-x">✕</button>
+        <div class="pcc-dial-row pcc-stack press-trap">
+          <div class="pcc-dial-label pcc-stack-label">PRESS/TRAP</div>
+          <div class="pcc-dial pcc-dial--discrete">
+            <div class="pcc-dial-track"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="press-btn" data-label="PRESS"></button>
+            <div class="pcc-dial-spacer"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="trap-btn" data-label="TRAP"></button>
+            <div class="pcc-dial-spacer"></div>
+            <button type="button" class="pcc-notch pcc-stack-btn" id="press-trap-none-btn" data-label="NONE"></button>
+          </div>
+          <button type="button" class="pcc-clear-strategy pcc-stack-x" id="clear-press-trap-x" aria-label="Clear press/trap">✕</button>
         </div>
       </div>
-      <!-- Defense Card Zone (right) -->
-      <div class="pcc-card-zone defense-zone">
-        <div class="zone-inner">
-          <div class="pcc-scroller-row">
-            <div class="pcc-nav-col">
-              <button class="pcc-nav-btn" id="defense-nav-up">▲</button>
-              <button class="pcc-nav-btn" id="defense-nav-down">▼</button>
-              <button class="pcc-nav-x" id="clear-defense-card-x">✕</button>
-            </div>
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Defense</div>
-              <div class="pcc-play-card">
-                <div class="defense-play-name">Man Normal</div>
-              </div>
-            </div>
-          </div>
-          <div class="pcc-scroller-divider"></div>
-          <div class="pcc-scroller-row pcc-readonly-row">
-            <div class="pcc-nav-col pcc-nav-col--spacer" aria-hidden="true"></div>
-            <div class="pcc-offense-block">
-              <div class="pcc-zone-label">Offense</div>
-              <div class="pcc-play-card pcc-defense-readonly-card">
-                <div id="offense-under-defense-label" class="offense-under-defense-text">--</div>
-              </div>
-            </div>
+
+      <div class="pcc-divider" aria-hidden="true"></div>
+
+      <!-- ZONE 3: Game controls -->
+      <div class="pcc-game">
+        <div class="pcc-speed" aria-hidden="false">
+          <button type="button" class="pcc-speed-btn" disabled tabindex="-1" title="Coming in a future update"><span class="pcc-speed-glyph">▶▶▶</span></button>
+          <button type="button" class="pcc-speed-btn" disabled tabindex="-1" title="Coming in a future update"><span class="pcc-speed-glyph">▶▶</span></button>
+          <button type="button" class="pcc-speed-btn on" id="game-speed-btn" disabled title="Coming in a future update"><span class="pcc-speed-glyph">▶</span></button>
+        </div>
+        <button type="button" id="pause-btn" class="pcc-pause">
+          <span class="pcc-pause-icon">▮▮</span>
+          <span class="pcc-pause-text">PAUSE</span>
+        </button>
+        <div class="pcc-timeout-wrap">
+          <button type="button" id="timeout-btn" class="pcc-timeout">TIMEOUT</button>
+          <div class="pcc-timeout-pills timeout-pips" id="timeout-pips" aria-hidden="true">
+            <span class="pcc-pill to-pip"></span>
+            <span class="pcc-pill to-pip"></span>
+            <span class="pcc-pill to-pip"></span>
+            <span class="pcc-pill to-pip"></span>
           </div>
         </div>
       </div>
     </div>
-    <!-- Game controls: inside Playcall Center (DOM child of #playcall-center) -->
-    <div id="game-controls-strip">
-      <button id="game-speed-btn" class="dead-control" disabled title="Coming in a future update">Game Speed</button>
-      <button id="pause-btn">Pause</button>
-      <button id="timeout-btn" type="button">Timeout<span class="timeout-pips" id="timeout-pips" aria-hidden="true"><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span><span class="to-pip"></span></span></button>
+
+    <!-- Legacy cross-row preview hooks (hidden; syncOffensePlaySlotVisibility / updateDefenseCardDisplay still write text) -->
+    <div class="pcc-legacy-preview-hooks" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;">
+      <span id="defense-under-offense-label" class="defense-under-offense-text"></span>
+      <span id="offense-under-defense-label" class="offense-under-defense-text"></span>
     </div>
   </div>  <!-- Close #playcall-center -->
   </div>  <!-- Close #app-grid -->
@@ -4069,12 +4119,12 @@
     async function courtSetPlaycallOverride(type, value) {
       if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl) {
         console.warn('⚠️ [PLAYCALL OVERRIDE] API_CONFIG not ready');
-        return;
+        return false;
       }
       const { gameId, userTeamSide } = getCourtGameContext();
       if (!gameId || !userTeamSide) {
         console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or my_team, cannot set override', { gameId, userTeamSide });
-        return;
+        return false;
       }
       const payload = { game_id: gameId, user_team_side: userTeamSide };
       if (type === 'offense') payload.offense_override = value;
@@ -4094,7 +4144,9 @@
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         console.error('❌ [PLAYCALL OVERRIDE] Failed:', err);
+        return false;
       }
+      return true;
     }
 
     /**
@@ -4999,16 +5051,20 @@
       }
       
       function updateDefenseCardDisplay() {
-        const el = document.querySelector('.defense-play-name');
+        const el = document.querySelector('#defense-scheme-card .defense-play-name');
         const preview = document.getElementById('defense-under-offense-label');
         const scheme = DEFENSE_SCHEMES[currentDefenseIndex];
         if (el) el.textContent = scheme;
         if (preview) preview.textContent = scheme;
-        const defenseCard = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
+        const defenseCard = document.getElementById('defense-scheme-card');
         if (defenseCard) {
           const shownScheme = DEFENSE_SCHEMES[currentDefenseIndex];
           const shouldHighlight = selectedDefenseScheme != null && shownScheme === selectedDefenseScheme;
           defenseCard.classList.toggle('selected', shouldHighlight);
+        }
+        const rowDefense = document.getElementById('row-defense');
+        if (rowDefense) {
+          rowDefense.classList.toggle('active', selectedDefenseScheme != null);
         }
       }
 
@@ -5091,7 +5147,7 @@
         currentDefenseIndex = (currentDefenseIndex + 1) % DEFENSE_SCHEMES.length;
         updateDefenseCardDisplay();
       });
-      const defenseCardEl = document.querySelector('.pcc-card-zone.defense-zone .pcc-play-card');
+      const defenseCardEl = document.getElementById('defense-scheme-card');
       if (defenseCardEl) {
         defenseCardEl.addEventListener('click', async () => {
           playSound('confirm-2.mp3');
@@ -5115,7 +5171,8 @@
         clearOffenseBtn.addEventListener('click', async () => {
           playSound('x-back.mp3');
           document.querySelectorAll('#offense-play-scroller .play-option').forEach(opt => opt.classList.remove('selected'));
-          await courtSetPlaycallOverride('offense', null); // null clears the override
+          const ok = await courtSetPlaycallOverride('offense', null); // null clears the override
+          if (ok) document.getElementById('row-offense')?.classList.remove('armed');
         });
       }
       
@@ -5125,6 +5182,7 @@
         document.querySelectorAll('#pcc-stacks-zone .pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
         selectedDefenseScheme = null;
         currentDefenseIndex = 0;
+        document.getElementById('row-offense')?.classList.remove('armed');
         updateDefenseCardDisplay();
         console.log('📋 Override selections cleared');
       };
@@ -5537,6 +5595,16 @@
         document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
         document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
         applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
+        try {
+          const mt = new URLSearchParams(window.location.search).get('my_team');
+          const tri =
+            mt === 'away'
+              ? hexToVibrantRgbTriplet(awayColor)
+              : mt === 'home'
+                ? hexToVibrantRgbTriplet(homeColor)
+                : null;
+          if (tri) document.documentElement.style.setProperty('--team-rgb', tri);
+        } catch (e) { /* ignore */ }
         return true;
       } catch (err) {
         console.warn('⚠️ Failed to hydrate real team colors for pre-game court UI:', err);
@@ -5595,6 +5663,10 @@
           applyVibrantColors(homeTeam, awayTeam);
           try {
             applyVibrantRgbCssVarsFromHex(getVibrantColor(homeTeam), getVibrantColor(awayTeam));
+            const mt = urlParams.get('my_team');
+            const hex = mt === 'away' ? getVibrantColor(awayTeam) : getVibrantColor(homeTeam);
+            const tri = hexToVibrantRgbTriplet(hex);
+            if (tri) document.documentElement.style.setProperty('--team-rgb', tri);
           } catch (e) { /* ignore */ }
         }
       } else {
@@ -5817,7 +5889,12 @@
         const labelEl = el.querySelector('.play-name');
         underDefense.textContent = (labelEl && labelEl.textContent.trim()) || playName || '--';
       }
-      await courtSetPlaycallOverride('offense', playName);
+      const ok = await courtSetPlaycallOverride('offense', playName);
+      const rowOff = document.getElementById('row-offense');
+      if (rowOff) {
+        if (ok) rowOff.classList.add('armed');
+        else rowOff.classList.remove('armed');
+      }
     }
 
     updatePlayOptions();

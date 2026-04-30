@@ -13,6 +13,7 @@ import { statusLineDefenseLabel } from "../utils/defenseUi.js";
  */
 export function clearPlaycallHighlights() {
   document.querySelectorAll('#offense-play-scroller .play-option').forEach((opt) => opt.classList.remove('selected'));
+  document.getElementById('row-offense')?.classList.remove('armed');
   const stackZone = document.getElementById('pcc-stacks-zone');
   if (stackZone) {
     stackZone.querySelectorAll('.pcc-stack-btn').forEach(btn => btn.classList.remove('selected'));
@@ -41,6 +42,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // This is simpler and more reliable than matching playcall names or checking team sides
   if (turnData.offense_override_cleared === true) {
     document.querySelectorAll('#offense-play-scroller .play-option.selected').forEach((btn) => btn.classList.remove('selected'));
+    document.getElementById('row-offense')?.classList.remove('armed');
   }
   
   // ✅ Defense and aggression buttons remain highlighted until manually cleared by user

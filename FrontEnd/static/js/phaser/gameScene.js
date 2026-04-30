@@ -86,6 +86,20 @@ function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors) {
   }
 }
 
+/** Playcall cockpit uses `.pcc-pause-text`; legacy controls used `textContent` only. */
+function syncPauseButtonDom(isPaused) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('pause-btn');
+  if (!el) return;
+  const label = el.querySelector('.pcc-pause-text');
+  if (label) {
+    label.textContent = isPaused ? 'RESUME' : 'PAUSE';
+    el.classList.toggle('paused', !!isPaused);
+  } else {
+    el.textContent = isPaused ? 'Resume' : 'Pause';
+  }
+}
+
 function updateMomentumBar(teamSide, value) {
   const negEl = document.getElementById(`${teamSide}-momentum-neg`);
   const posEl = document.getElementById(`${teamSide}-momentum-pos`);
@@ -565,10 +579,7 @@ export function createGameScene(Phaser) {
       }
       
       // Update pause button text if it exists (element may not exist during shutdown)
-      const pauseBtnEl = document.getElementById('pause-btn');
-      if (pauseBtnEl) {
-        pauseBtnEl.textContent = 'Pause';
-      }
+      syncPauseButtonDom(false);
       
       // Destroy all player sprites
       if (this.playerSprites) {
@@ -2300,7 +2311,7 @@ export function createGameScene(Phaser) {
             }
             if (this.gameClock) this.gameClock.pause('user_pause');
             if (this.shotClock) this.shotClock.pause('user_pause');
-            pauseBtn.textContent = 'Resume';
+            syncPauseButtonDom(true);
           } else {
             // Resume all tweens
             if (this.tweens) {
@@ -2346,7 +2357,7 @@ export function createGameScene(Phaser) {
             if (this.gameClock) this.gameClock.resume('user_pause');
             if (this.shotClock) this.shotClock.resume('user_pause');
             
-            pauseBtn.textContent = 'Pause';
+            syncPauseButtonDom(false);
           }
         });
       }
@@ -2357,7 +2368,7 @@ export function createGameScene(Phaser) {
           this.isSkipping = true;
           this.isPaused = false;
           skipBtn.disabled = true;
-          if (pauseBtn) pauseBtn.textContent = 'Pause';
+          syncPauseButtonDom(false);
           this.tweens.resumeAll();
           this.tweens.getAllTweens().forEach(t => t.stop());
           await finalize();
