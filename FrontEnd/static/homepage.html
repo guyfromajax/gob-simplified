@@ -38,6 +38,7 @@
       --navy-lt:    #3551A5;
       --navy-dk:    #1A2E71;
       --orange:     #F79420;
+      --orange-dk:  #e08318;
       --green:      #34EC27;
       --green-dk:   #28c91e;
       --w:          #fff;
@@ -112,7 +113,7 @@
       transition: opacity 0.25s, transform 0.25s, background 0.2s;
     }
     #nav-cta.nav-cta-visible { opacity: 1; pointer-events: auto; transform: none; }
-    #nav-cta:hover { background: #e08318; }
+    #nav-cta:hover { background: var(--orange-dk); }
 
     /* ══════════════════════════════════
        HERO — cinematic full-bleed
@@ -160,18 +161,18 @@
       max-width: 520px; line-height: 1.7;
     }
     .hero-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-    /* Green = THE one primary action on this page */
+    /* Primary CTA — brand orange (matches nav Play The Alpha) */
     .btn-green {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 16px 48px; font-family: var(--bebas); font-size: 1.25rem; letter-spacing: 0.07em;
-      color: var(--bg); background: var(--green);
+      color: var(--bg); background: var(--orange);
       border: none; border-radius: 8px; cursor: pointer;
-      box-shadow: 0 4px 28px rgba(52,236,39,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+      box-shadow: 0 4px 28px rgba(247, 148, 32, 0.45), inset 0 1px 0 rgba(255,255,255,0.25);
       transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
     .btn-green:hover {
-      background: var(--green-dk); transform: translateY(-2px);
-      box-shadow: 0 10px 40px rgba(52,236,39,0.5);
+      background: var(--orange-dk); transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(247, 148, 32, 0.55);
     }
     .hero-microcopy { font-size: 0.8rem; color: var(--w45); font-style: italic; }
     /* Scroll indicator */
