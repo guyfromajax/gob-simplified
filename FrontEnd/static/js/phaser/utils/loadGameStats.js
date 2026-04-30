@@ -3,6 +3,11 @@
  * Used when loading Q4 after simming Q1-Q3
  */
 
+/** Throttle rank/record diagnostic: log when payload changes or every ~3.5s. */
+let _gobScoreboardHeaderLogAt = 0;
+let _gobScoreboardHeaderLastSig = '';
+const GO_SCOREBOARD_HEADER_LOG_MS = 3500;
+
 /**
  * Fetch game state from backend
  * @param {string} gameId - Game ID
@@ -151,6 +156,9 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   const aByName = pickNameMeta(awayTeam);
   const hRankRec = { ...hMeta, ...(hByName || {}) };
   const aRankRec = { ...aMeta, ...(aByName || {}) };
+  if (typeof window !== 'undefined' && metaByName && typeof metaByName === 'object' && Object.keys(metaByName).length) {
+    window.__gobCourtScoreboardMetaByName = { ...(window.__gobCourtScoreboardMetaByName || {}), ...metaByName };
+  }
   const fmtRank = (t) => {
     const r = Number(t?.natl_rank);
     if (Number.isInteger(r) && r >= 1) return `#${r}`;
@@ -171,33 +179,39 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   if (awayRecEl) awayRecEl.textContent = fmtRec(aRankRec);
 
   try {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug_scoreboard') === '1') {
-      console.info('[court scoreboard] GET /api/game → displayAccumulatedHeaderState', {
-        home_team_id: hid,
-        away_team_id: aid,
-        teams_keys: Object.keys(teamsObj).slice(0, 12),
-        team_scoreboard_meta_keys: Object.keys(metaByName),
-        hByName,
-        aByName,
-        hRankRec: hRankRec
-          ? {
-              natl_rank: hRankRec.natl_rank,
-              wins: hRankRec.wins ?? hRankRec.team_wins,
-              losses: hRankRec.losses ?? hRankRec.team_losses,
-            }
-          : null,
-        aRankRec: aRankRec
-          ? {
-              natl_rank: aRankRec.natl_rank,
-              wins: aRankRec.wins ?? aRankRec.team_wins,
-              losses: aRankRec.losses ?? aRankRec.team_losses,
-            }
-          : null,
-        painted_home_rank: fmtRank(hRankRec),
-        painted_home_rec: fmtRec(hRankRec),
-        painted_away_rank: fmtRank(aRankRec),
-        painted_away_rec: fmtRec(aRankRec),
-      });
+    const hdrBlob = {
+      homeName: homeTeam,
+      awayName: awayTeam,
+      home_team_id: hid,
+      away_team_id: aid,
+      home_team_legacy: legH,
+      away_team_legacy: legA,
+      home_team_row: homeTeamObj,
+      away_team_row: awayTeamObj,
+      team_scoreboard_meta: metaByName,
+      merged_home_rank_record: hRankRec,
+      merged_away_rank_record: aRankRec,
+      painted: {
+        home: { rank: fmtRank(hRankRec), record: fmtRec(hRankRec) },
+        away: { rank: fmtRank(aRankRec), record: fmtRec(aRankRec) },
+      },
+    };
+    const sig = JSON.stringify({
+      hid,
+      aid,
+      hr: hRankRec?.natl_rank,
+      ar: aRankRec?.natl_rank,
+      hw: hRankRec?.wins ?? hRankRec?.team_wins,
+      hl: hRankRec?.losses ?? hRankRec?.team_losses,
+      aw: aRankRec?.wins ?? aRankRec?.team_wins,
+      al: aRankRec?.losses ?? aRankRec?.team_losses,
+      mkeys: Object.keys(metaByName),
+    });
+    const t = Date.now();
+    if (typeof window !== 'undefined' && (sig !== _gobScoreboardHeaderLastSig || t - _gobScoreboardHeaderLogAt >= GO_SCOREBOARD_HEADER_LOG_MS)) {
+      _gobScoreboardHeaderLastSig = sig;
+      _gobScoreboardHeaderLogAt = t;
+      console.log('[GOB scoreboard rank/record] full merge sources (auto; throttled unless data changed)', hdrBlob);
     }
   } catch (e) {
     /* ignore */

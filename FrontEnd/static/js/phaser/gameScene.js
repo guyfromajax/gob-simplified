@@ -478,6 +478,8 @@ export function createGameScene(Phaser) {
       this.possessionManager = null; // Will be initialized in create()
       this.gameClock = null;
       this.shotClock = null;
+      /** Merged team_scoreboard_meta from simulate responses (turns often omit it). */
+      this._courtScoreboardMetaByName = null;
       installOwnershipContractGlobalHelpers();
       installPressureReworkGlobalHelpers();
     }
@@ -512,6 +514,10 @@ export function createGameScene(Phaser) {
         
         // Reset pause state for new game
         this.isPaused = false;
+        this._courtScoreboardMetaByName = null;
+        if (typeof window !== 'undefined') {
+          window.__gobCourtScoreboardMetaByName = null;
+        }
 
         if (DEBUG_FLOW) {
           const teams = gameStore.getTeams();
@@ -847,6 +853,10 @@ export function createGameScene(Phaser) {
       const simData = await res.json();
       // ✅ TIMEOUT: Store simData in scene for timeout button manager access
       this.simData = simData;
+      const _tsm0 = simData.team_scoreboard_meta;
+      if (_tsm0 && typeof _tsm0 === 'object' && Object.keys(_tsm0).length) {
+        this._courtScoreboardMetaByName = { ...(this._courtScoreboardMetaByName || {}), ..._tsm0 };
+      }
       DEBUG && console.log('[gameScene] simData.turns', simData.turns.length, simData.turns[0]);
       if (DEBUG_FLOW) {
         console.log("📦 simData received:", simData);
@@ -2040,8 +2050,23 @@ export function createGameScene(Phaser) {
         const homeRankEl = document.getElementById('home-rank');
         const homeRecEl = document.getElementById('home-record');
         const sd = this.simData || simData;
-        const rowHome = resolveTeamRowForScoreboard(sd, 'home');
-        const rowAway = resolveTeamRowForScoreboard(sd, 'away');
+        const fromWin =
+          typeof window !== 'undefined' && window.__gobCourtScoreboardMetaByName &&
+          typeof window.__gobCourtScoreboardMetaByName === 'object'
+            ? window.__gobCourtScoreboardMetaByName
+            : {};
+        const fromTurn = sd?.team_scoreboard_meta && typeof sd.team_scoreboard_meta === 'object' ? sd.team_scoreboard_meta : {};
+        if (Object.keys(fromTurn).length) {
+          this._courtScoreboardMetaByName = { ...(this._courtScoreboardMetaByName || {}), ...fromTurn };
+        }
+        const mergedTsm = {
+          ...fromWin,
+          ...(this._courtScoreboardMetaByName || {}),
+          ...fromTurn,
+        };
+        const sdSb = sd && Object.keys(mergedTsm).length ? { ...sd, team_scoreboard_meta: mergedTsm } : sd;
+        const rowHome = resolveTeamRowForScoreboard(sdSb, 'home');
+        const rowAway = resolveTeamRowForScoreboard(sdSb, 'away');
         if (awayRankEl) awayRankEl.textContent = formatSbRank(rowAway);
         if (awayRecEl) awayRecEl.textContent = formatSbRecord(rowAway);
         if (homeRankEl) homeRankEl.textContent = formatSbRank(rowHome);

@@ -96,16 +96,17 @@
 
 #away-logo-container,
 #home-logo-container {
-  width: 200px !important;
-  max-width: 220px !important;
+  width: 240px !important;
+  max-width: 280px !important;
   height: 100% !important;
   max-height: var(--scoreboard-height) !important;
   min-height: calc(var(--scoreboard-height) - 8px) !important;
   overflow: hidden !important;
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
-  padding: 2px 6px !important;
+  padding: 0 4px !important;
   align-self: stretch !important;
+  align-items: stretch !important;
   /* Drop the colored gradient overlay — it muddies team logos */
 }
 #away-logo-container {
@@ -119,14 +120,19 @@
   display: none !important;
 }
 
-/* contain = full logo visible; height fills the stretched logo cell when aspect ratio allows */
-#scoreboard img.team-logo {
-  width: auto !important;
+/* Fill logo cell height (wide banners scale to full bar; contain avoids crop) */
+#scoreboard img.team-logo,
+#scoreboard #away-logo-container .team-logo,
+#scoreboard #home-logo-container .team-logo {
+  width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
+  max-height: 100% !important;
   object-fit: contain !important;
   object-position: center center !important;
   display: block !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
 }
 
 .sb-team-meta {
