@@ -32,17 +32,34 @@
    1. SCOREBOARD — LOGO + RANK/RECORD ZONE
    ───────────────────────────────────────────────────────────────────
    Grid columns from existing template:
-     ... 2 (away logo) | 3 (away meta) | 4 gap | 5 (away score) ...
-     ... 25 (home score) | 26 gap | 27 (home logo) | 28 (home meta) ...
+     ... 2 (away logo) | 3 (away meta) | 4 gap | 5 (away score) | … | 7 (away TOL/F)
+     … | 23 (home TOL/F) | 25 (home score) | 26 gap | 27 (home meta) | 28 (home logo) | 29 (pad)
 
-   PROBLEM: home meta at column 28 is OUTSIDE the home logo (column 27).
-   That breaks symmetry — away has [logo][meta][score], home reads
-   [score][logo][meta] which puts the meta block hanging off the right
-   edge of the logo, often clipped by side padding.
+   Symmetry: same outside→in strip as away — [LOGO][META][SCORE][TOL/F] mirrored.
+   DOM: home meta immediately before home logo. grid-row: 1 pins all placed children.
 
-   FIX: Move home meta to column 26 (between score and logo) so both
-   sides read outer→inner: [LOGO] [META] [...] [META] [LOGO].
    ─────────────────────────────────────────────────────────────────── */
+
+/* Pin scoreboard grid children to row 1 */
+#scoreboard #away-logo-container,
+#scoreboard .sb-team-meta--away,
+#scoreboard #away-score,
+#scoreboard .tol-fouls.away,
+#scoreboard .tol-fouls.home,
+#scoreboard #home-score,
+#scoreboard .sb-team-meta--home,
+#scoreboard #home-logo-container {
+  grid-row: 1 !important;
+}
+
+/* Center cluster: vertical space between game clock and quarter/shot row */
+#scoreboard .center {
+  gap: 10px !important;
+  padding-bottom: 6px !important;
+}
+#scoreboard .center .period-row {
+  margin-top: 4px !important;
+}
 
 #away-logo-container,
 #home-logo-container {

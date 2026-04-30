@@ -2952,17 +2952,37 @@
    1. SCOREBOARD — LOGO + RANK/RECORD ZONE
    ───────────────────────────────────────────────────────────────────
    Grid columns from existing template:
-     ... 2 (away logo) | 3 (away meta) | 4 gap | 5 (away score) ...
-     ... 25 (home score) | 26 gap | 27 (home logo) | 28 (home meta) ...
+     ... 2 (away logo) | 3 (away meta) | 4 gap | 5 (away score) | … | 7 (away TOL/F)
+     … | 23 (home TOL/F) | 25 (home score) | 26 gap | 27 (home meta) | 28 (home logo) | 29 (pad)
 
-   PROBLEM: home meta at column 28 is OUTSIDE the home logo (column 27).
-   That breaks symmetry — away has [logo][meta][score], home reads
-   [score][logo][meta] which puts the meta block hanging off the right
-   edge of the logo, often clipped by side padding.
+   PROBLEM (historical): home meta and logo could share placement / row.
+   Symmetry: same outside→in strip as away — [LOGO][META][SCORE][TOL/F] mirrored.
 
-   FIX: Move home meta to column 26 (between score and logo) so both
-   sides read outer→inner: [LOGO] [META] [...] [META] [LOGO].
+   FIX: Home meta column 27, home logo column 28; DOM order meta→logo
+   (mirrors away logo→meta); explicit grid-row: 1 on all placed children
+   prevents implicit row-2 collisions.
    ─────────────────────────────────────────────────────────────────── */
+
+/* Pin scoreboard grid children to row 1 (avoids meta/logo sharing a row with stacked placement). */
+#scoreboard #away-logo-container,
+#scoreboard .sb-team-meta--away,
+#scoreboard #away-score,
+#scoreboard .tol-fouls.away,
+#scoreboard .tol-fouls.home,
+#scoreboard #home-score,
+#scoreboard .sb-team-meta--home,
+#scoreboard #home-logo-container {
+  grid-row: 1 !important;
+}
+
+/* Center cluster: extra vertical space between game clock and quarter/shot row */
+#scoreboard .center {
+  gap: 10px !important;
+  padding-bottom: 6px !important;
+}
+#scoreboard .center .period-row {
+  margin-top: 4px !important;
+}
 
 #away-logo-container,
 #home-logo-container {
@@ -3383,13 +3403,14 @@
     <!-- Home Score - Grid column 12 -->
     <div id="home-score">0</div>
     
-    <!-- Home Logo -->
-    <div id="home-logo-container">
-      <img id="home-logo" class="team-logo" alt="home logo" />
-    </div>
+    <!-- Home meta before logo: mirrors away [logo][meta][score] reading outside→in on the right -->
     <div class="sb-team-meta sb-team-meta--home">
       <span class="sb-rank" id="home-rank">#--</span>
       <span class="sb-record" id="home-record">--</span>
+    </div>
+    <!-- Home Logo -->
+    <div id="home-logo-container">
+      <img id="home-logo" class="team-logo" alt="home logo" />
     </div>
   </div>
 
