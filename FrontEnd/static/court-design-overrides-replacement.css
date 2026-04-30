@@ -22,8 +22,11 @@
    Design intent:
    • Scoreboard reads outside→inside symmetrically:
         [LOGO] [#RANK / RECORD] [SCORE] [TOL/F]   ...   [TOL/F] [SCORE] [#RANK / RECORD] [LOGO]
-   • --scoreboard-height 120px in court.html :root; logos stretch full bar height;
-     overflow:hidden + bar padding-bottom keep Q1/shot inside the black bar.
+   • --scoreboard-height 120px in court.html :root; logo cells flush to viewport edges
+     (scoreboard grid edge columns 0); images use object-fit: cover + left/right
+     object-position so aspect ratio is preserved while filling bar height (wide
+     banners crop horizontally, not letterboxed).
+   • overflow:hidden + bar padding-bottom keep Q1/shot inside the black bar.
    • Playcall: card zone is 240px wide, plays card fills it; stacks zone
      stretches to fill remaining width with three equal-height strips.
    ═══════════════════════════════════════════════════════════════════ */
@@ -53,11 +56,42 @@
 }
 
 /* Set --scoreboard-height: 120px in court.html :root when pasting this block (center cluster must fit). */
+/* Edge columns 0px: logos flush to viewport; --side-padding unchanged for #main-container etc. */
 #scoreboard {
   overflow: hidden !important;
   box-sizing: border-box !important;
   align-items: stretch !important;
   padding-bottom: 6px !important;
+  grid-template-columns:
+    0px
+    auto
+    auto
+    var(--scoreboard-gap)
+    70px
+    var(--scoreboard-gap)
+    60px
+    var(--scoreboard-gap)
+    auto
+    10px
+    25px
+    10px
+    25px
+    1fr
+    auto
+    1fr
+    25px
+    10px
+    25px
+    10px
+    auto
+    var(--scoreboard-gap)
+    60px
+    var(--scoreboard-gap)
+    70px
+    var(--scoreboard-gap)
+    auto
+    auto
+    0px !important;
 }
 #scoreboard #away-score,
 #scoreboard #home-score,
@@ -99,12 +133,12 @@
   width: 240px !important;
   max-width: 280px !important;
   height: 100% !important;
-  max-height: var(--scoreboard-height) !important;
-  min-height: calc(var(--scoreboard-height) - 8px) !important;
+  max-height: none !important;
+  min-height: 0 !important;
   overflow: hidden !important;
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
-  padding: 0 4px !important;
+  padding: 0 !important;
   align-self: stretch !important;
   align-items: stretch !important;
   /* Drop the colored gradient overlay — it muddies team logos */
@@ -120,7 +154,7 @@
   display: none !important;
 }
 
-/* Fill logo cell height (wide banners scale to full bar; contain avoids crop) */
+/* Fill logo cell: cover preserves aspect ratio; anchor L/R so flush edges crop wide banners */
 #scoreboard img.team-logo,
 #scoreboard #away-logo-container .team-logo,
 #scoreboard #home-logo-container .team-logo {
@@ -128,11 +162,17 @@
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  object-fit: contain !important;
+  object-fit: cover !important;
   object-position: center center !important;
   display: block !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
+}
+#scoreboard #away-logo-container .team-logo {
+  object-position: left center !important;
+}
+#scoreboard #home-logo-container .team-logo {
+  object-position: right center !important;
 }
 
 .sb-team-meta {
@@ -156,8 +196,8 @@
   margin-left: 16px !important;
 }
 /* SWAP: home logo moves from col 27 → col 28; home meta stays at col 28 → moves to col 27.
-   Result reads outer→inner: ...[score 25][meta 27][logo 28][padding 29]
-   matching the away side: [padding 1][logo 2][meta 3][score 5]... */
+   Result reads outer→inner: ...[score 25][meta 27][logo 28][edge 29]
+   matching the away side: [edge 0][logo 2][meta 3][score 5]... */
 #home-logo-container {
   grid-column: 28 !important;
 }

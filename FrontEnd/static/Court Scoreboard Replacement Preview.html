@@ -213,20 +213,97 @@
     .before .sb-team-meta--home { grid-column: 28; text-align: right; }
 
     /* ============================================================
-       AFTER — replacement
-       (logos 160×80, no overlay; home meta moves to col 27, logo to 28)
+       AFTER — replacement (matches court.html overrides)
+       Flush edge columns; logos stretch bar height; object-fit: cover + L/R anchor
        ============================================================ */
+    #scoreboard.after #away-logo-container,
+    #scoreboard.after .sb-team-meta--away,
+    #scoreboard.after #away-score,
+    #scoreboard.after .tol-fouls.away,
+    #scoreboard.after .tol-fouls.home,
+    #scoreboard.after #home-score,
+    #scoreboard.after .sb-team-meta--home,
+    #scoreboard.after #home-logo-container {
+      grid-row: 1;
+    }
+    #scoreboard.after {
+      align-items: stretch;
+      grid-template-columns:
+        0px
+        auto
+        auto
+        var(--scoreboard-gap)
+        70px
+        var(--scoreboard-gap)
+        60px
+        var(--scoreboard-gap)
+        auto
+        10px
+        25px
+        10px
+        25px
+        1fr
+        auto
+        1fr
+        25px
+        10px
+        25px
+        10px
+        auto
+        var(--scoreboard-gap)
+        60px
+        var(--scoreboard-gap)
+        70px
+        var(--scoreboard-gap)
+        auto
+        auto
+        0px;
+    }
     .after #away-logo-container,
     .after #home-logo-container {
-      width: 160px;
-      max-width: 160px;
-      height: 80px;
+      width: 240px;
+      max-width: 280px;
+      height: 100%;
+      max-height: none;
+      min-height: 0;
       overflow: hidden;
       flex-shrink: 0;
+      padding: 0;
+      display: flex;
+      align-items: stretch;
+      box-sizing: border-box;
     }
-    .after #away-logo-container { grid-column: 2; grid-row: 1; align-self: center; }
-    /* SWAP: logo moves to outermost track */
-    .after #home-logo-container { grid-column: 28; grid-row: 1; align-self: center; }
+    .after #away-logo-container {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: stretch;
+      justify-content: flex-start;
+    }
+    .after #home-logo-container {
+      grid-column: 28;
+      grid-row: 1;
+      align-self: stretch;
+      justify-content: flex-end;
+    }
+    .after #away-logo-container::before,
+    .after #home-logo-container::before {
+      display: none;
+    }
+    #scoreboard.after img.team-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center center;
+      display: block;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    #scoreboard.after #away-logo-container .team-logo {
+      object-position: left center;
+    }
+    #scoreboard.after #home-logo-container .team-logo {
+      object-position: right center;
+    }
 
     .after .sb-team-meta {
       gap: 3px;
@@ -264,7 +341,7 @@
 <body>
   <div class="page-title">Scoreboard — Before / After</div>
   <div class="page-sub">
-    Same HTML markup, two different stylesheets. The replacement caps the logo at 160×80 (was 200×90), drops the colored gradient overlay, swaps the home logo and home meta tracks (so both sides read outer→inner: <code>[LOGO] [#RANK / RECORD] [SCORE]</code>), and bumps the rank/record type so it's actually legible.
+    Same HTML markup, two states. <strong>After</strong> matches court overrides: outer grid padding columns are 0 so logos sit flush to the frame; logo cells use <code>object-fit: cover</code> with left/right <code>object-position</code> so aspect ratio is preserved while filling bar height (wide banners crop horizontally); home logo/meta columns swapped so both sides read outer→inner <code>[LOGO] [#RANK / RECORD] [SCORE]</code>.
   </div>
 
   <div class="label before">BEFORE — logos at 200×90 cover the rank/record. Right side reads [SCORE] [LOGO] [META] which puts meta at the far edge. <em style="color:rgba(255,255,255,0.4)">(Rendered at 1600px — scroll horizontally if needed. Production court page is 1920+ so this won't wrap.)</em></div>
@@ -302,7 +379,7 @@
     </div>
   </div></div></div>
 
-  <div class="label after">AFTER — logos 160×80, no gradient. Home logo moves to outermost track; home meta moves between score and logo. Symmetric.</div>
+  <div class="label after">AFTER — flush viewport edges, full bar height, cover + L/R anchor (no letterboxing). Home logo outermost; home meta between score and logo.</div>
   <div class="demo-frame"><div class="demo-inner"><div id="scoreboard" class="after">
     <div id="away-logo-container">
       <img class="team-logo" src="FrontEnd/static/images/teams/bentley_truman/bentley_truman_banner_primary.jpg" alt="Bentley-Truman" />
