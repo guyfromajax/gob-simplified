@@ -23,9 +23,9 @@
    • Scoreboard reads outside→inside symmetrically:
         [LOGO] [#RANK / RECORD] [SCORE] [TOL/F]   ...   [TOL/F] [SCORE] [#RANK / RECORD] [LOGO]
    • --scoreboard-height 120px in court.html :root; logo cells flush to viewport edges
-     (scoreboard grid edge columns 0); images use object-fit: cover + left/right
-     object-position so aspect ratio is preserved while filling bar height (wide
-     banners crop horizontally, not letterboxed).
+     (scoreboard grid edge columns 0); images use object-fit: contain + left/right
+     object-position so full logo art is visible (no inner-edge crop); wide banners
+     may letterbox slightly vertically inside the cell.
    • overflow:hidden + bar padding-bottom keep Q1/shot inside the black bar.
    • Playcall: card zone is 240px wide, plays card fills it; stacks zone
      stretches to fill remaining width with three equal-height strips.
@@ -127,6 +127,12 @@
   font-size: 48px !important;
   line-height: 0.95 !important;
 }
+#scoreboard #away-score {
+  margin-left: 16px !important;
+}
+#scoreboard #home-score {
+  margin-right: 16px !important;
+}
 
 #away-logo-container,
 #home-logo-container {
@@ -154,7 +160,7 @@
   display: none !important;
 }
 
-/* Fill logo cell: cover preserves aspect ratio; anchor L/R so flush edges crop wide banners */
+/* Full logo visible (no horizontal crop); flush outer edge via object-position */
 #scoreboard img.team-logo,
 #scoreboard #away-logo-container .team-logo,
 #scoreboard #home-logo-container .team-logo {
@@ -162,7 +168,7 @@
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   object-position: center center !important;
   display: block !important;
   flex: 1 1 auto !important;
@@ -173,6 +179,14 @@
 }
 #scoreboard #home-logo-container .team-logo {
   object-position: right center !important;
+}
+
+/* Symmetric gutter: TOL/F toward center (scores use rules above) */
+#scoreboard .tol-fouls.away {
+  margin-left: 16px !important;
+}
+#scoreboard .tol-fouls.home {
+  margin-right: 16px !important;
 }
 
 .sb-team-meta {
@@ -193,7 +207,7 @@
   grid-column: 3 !important;
   text-align: left !important;
   align-self: center !important;
-  margin-left: 16px !important;
+  margin-left: 32px !important;
 }
 /* SWAP: home logo moves from col 27 → col 28; home meta stays at col 28 → moves to col 27.
    Result reads outer→inner: ...[score 25][meta 27][logo 28][edge 29]
@@ -205,7 +219,7 @@
   grid-column: 27 !important;
   text-align: right !important;
   align-self: center !important;
-  margin-right: 16px !important;
+  margin-right: 32px !important;
 }
 
 .sb-rank {

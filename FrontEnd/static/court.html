@@ -2944,7 +2944,8 @@
    • Scoreboard reads outside→inside symmetrically:
         [LOGO] [#RANK / RECORD] [SCORE] [TOL/F]   ...   [TOL/F] [SCORE] [#RANK / RECORD] [LOGO]
    • --scoreboard-height 120px; logo cells flush to viewport (grid edge columns 0);
-     object-fit: cover + L/R object-position preserves aspect ratio while filling bar height.
+     object-fit: contain + L/R object-position shows full logo width (symmetric gutters
+     push rank/record, score, TOL/F toward center).
    • overflow:hidden clips the center HUD so Q1/shot cannot paint onto the court.
    • Playcall: card zone is 240px wide, plays card fills it; stacks zone
      stretches to fill remaining width with three equal-height strips.
@@ -3051,6 +3052,12 @@
   font-size: 48px !important;
   line-height: 0.95 !important;
 }
+#scoreboard #away-score {
+  margin-left: 16px !important;
+}
+#scoreboard #home-score {
+  margin-right: 16px !important;
+}
 
 #away-logo-container,
 #home-logo-container {
@@ -3078,7 +3085,7 @@
   display: none !important;
 }
 
-/* Fill logo cell: cover preserves aspect ratio; anchor L/R for flush-edge crop on wide banners */
+/* Full logo visible (no inner horizontal crop); outer flush via object-position */
 #scoreboard img.team-logo,
 #scoreboard #away-logo-container .team-logo,
 #scoreboard #home-logo-container .team-logo {
@@ -3086,7 +3093,7 @@
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   object-position: center center !important;
   display: block !important;
   flex: 1 1 auto !important;
@@ -3097,6 +3104,14 @@
 }
 #scoreboard #home-logo-container .team-logo {
   object-position: right center !important;
+}
+
+/* Symmetric gutter: TOL/F toward center */
+#scoreboard .tol-fouls.away {
+  margin-left: 16px !important;
+}
+#scoreboard .tol-fouls.home {
+  margin-right: 16px !important;
 }
 
 /* Meta: vertically centered in bar; height tracks scoreboard (logos stretch full height) */
@@ -3118,7 +3133,7 @@
   grid-column: 3 !important;
   text-align: left !important;
   align-self: center !important;
-  margin-left: 16px !important;
+  margin-left: 32px !important;
 }
 /* SWAP: home logo moves from col 27 → col 28; home meta stays at col 28 → moves to col 27.
    Result reads outer→inner: ...[score 25][meta 27][logo 28][edge 29]
@@ -3130,7 +3145,7 @@
   grid-column: 27 !important;
   text-align: right !important;
   align-self: center !important;
-  margin-right: 16px !important;
+  margin-right: 32px !important;
 }
 
 .sb-rank {

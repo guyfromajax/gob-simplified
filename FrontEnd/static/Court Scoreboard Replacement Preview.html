@@ -214,7 +214,7 @@
 
     /* ============================================================
        AFTER — replacement (matches court.html overrides)
-       Flush edge columns; logos stretch bar height; object-fit: cover + L/R anchor
+       Flush edge columns; contain + L/R anchor (full logo width); symmetric gutters
        ============================================================ */
     #scoreboard.after #away-logo-container,
     #scoreboard.after .sb-team-meta--away,
@@ -292,7 +292,7 @@
     #scoreboard.after img.team-logo {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       object-position: center center;
       display: block;
       flex: 1 1 auto;
@@ -303,6 +303,18 @@
     }
     #scoreboard.after #home-logo-container .team-logo {
       object-position: right center;
+    }
+    #scoreboard.after #away-score {
+      margin-left: 16px;
+    }
+    #scoreboard.after #home-score {
+      margin-right: 16px;
+    }
+    #scoreboard.after .tol-fouls.away {
+      margin-left: 16px;
+    }
+    #scoreboard.after .tol-fouls.home {
+      margin-right: 16px;
     }
 
     .after .sb-team-meta {
@@ -318,6 +330,7 @@
       text-align: left;
       align-items: flex-start;
       min-width: 56px;
+      margin-left: 32px;
     }
     /* SWAP: meta moves to inner track (between score and logo) */
     .after .sb-team-meta--home {
@@ -326,6 +339,7 @@
       text-align: right;
       align-items: flex-end;
       min-width: 56px;
+      margin-right: 32px;
     }
     .after .sb-rank {
       font-size: 16px;
@@ -341,7 +355,7 @@
 <body>
   <div class="page-title">Scoreboard — Before / After</div>
   <div class="page-sub">
-    Same HTML markup, two states. <strong>After</strong> matches court overrides: outer grid padding columns are 0 so logos sit flush to the frame; logo cells use <code>object-fit: cover</code> with left/right <code>object-position</code> so aspect ratio is preserved while filling bar height (wide banners crop horizontally); home logo/meta columns swapped so both sides read outer→inner <code>[LOGO] [#RANK / RECORD] [SCORE]</code>.
+    Same HTML markup, two states. <strong>After</strong> matches court overrides: outer grid columns 0 for flush frame edges; <code>object-fit: contain</code> + left/right <code>object-position</code> keeps the whole logo visible; symmetric margins push rank/record, score, and TOL/F toward the center; home logo/meta columns swapped so both sides read outer→inner <code>[LOGO] [#RANK / RECORD] [SCORE]</code>.
   </div>
 
   <div class="label before">BEFORE — logos at 200×90 cover the rank/record. Right side reads [SCORE] [LOGO] [META] which puts meta at the far edge. <em style="color:rgba(255,255,255,0.4)">(Rendered at 1600px — scroll horizontally if needed. Production court page is 1920+ so this won't wrap.)</em></div>
@@ -379,7 +393,7 @@
     </div>
   </div></div></div>
 
-  <div class="label after">AFTER — flush viewport edges, full bar height, cover + L/R anchor (no letterboxing). Home logo outermost; home meta between score and logo.</div>
+  <div class="label after">AFTER — flush edges, full logo width (contain + L/R), gutters on meta/score/TOL. Home logo outermost; home meta between score and logo.</div>
   <div class="demo-frame"><div class="demo-inner"><div id="scoreboard" class="after">
     <div id="away-logo-container">
       <img class="team-logo" src="FrontEnd/static/images/teams/bentley_truman/bentley_truman_banner_primary.jpg" alt="Bentley-Truman" />
