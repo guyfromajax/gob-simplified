@@ -111,3 +111,62 @@ def enrich_franchise_teams_scoreboard_meta(
 
     _apply(str(home_team_id))
     _apply(str(away_team_id))
+
+
+def coalesce_natl_rank_from_team_row(team_data: dict[str, Any], rank_from_ftd_loader: Any) -> Any:
+    """Prefer persisted ``teams`` natl_rank; else use value from FTD loader (e.g. GET /api/game)."""
+    if isinstance(team_data, dict):
+        tnr = team_data.get("natl_rank")
+        if tnr is not None:
+            try:
+                return int(tnr)
+            except (TypeError, ValueError):
+                pass
+    return rank_from_ftd_loader
+
+
+def attach_home_away_team_scoreboard_shards(summary: dict[str, Any]) -> None:
+    """
+    Set ``home_team`` / ``away_team`` on a simulate (or other) summary so the court can read
+    rank/record from the same blobs as S3 ``attributes`` — sourced from ``teams`` rows.
+    """
+    if not isinstance(summary, dict):
+        return
+    teams = summary.get("teams") or {}
+    if not isinstance(teams, dict) or not teams:
+        return
+    hid = summary.get("home_team_id")
+    aid = summary.get("away_team_id")
+
+    def _row(tid: Any) -> dict[str, Any] | None:
+        if tid is None or tid == "":
+            return None
+        row = teams.get(tid)
+        if row is None:
+            sid = str(tid)
+            for k, v in teams.items():
+                if str(k) == sid and isinstance(v, dict):
+                    return v
+        return row if isinstance(row, dict) else None
+
+    def _shard(tid: Any) -> dict[str, Any] | None:
+        row = _row(tid)
+        if not row:
+            return None
+        return {
+            "name": row.get("name"),
+            "team_id": row.get("team_id"),
+            "attributes": row.get("attributes") or {},
+            "natl_rank": row.get("natl_rank"),
+            "wins": row.get("wins"),
+            "losses": row.get("losses"),
+            "team_wins": row.get("team_wins"),
+            "team_losses": row.get("team_losses"),
+        }
+
+    hs = _shard(hid)
+    if hs:
+        summary["home_team"] = hs
+    aws = _shard(aid)
+    if aws:
+        summary["away_team"] = aws

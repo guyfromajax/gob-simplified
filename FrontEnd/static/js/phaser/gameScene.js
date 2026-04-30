@@ -146,8 +146,11 @@ function formatSbRank(teamObj) {
 function formatSbRecord(teamObj) {
   const w = teamObj?.wins ?? teamObj?.team_wins;
   const l = teamObj?.losses ?? teamObj?.team_losses;
-  if (Number.isFinite(Number(w)) && Number.isFinite(Number(l))) {
-    return `${w}-${l}`;
+  if (w == null || l == null) return '--';
+  const wn = Number(w);
+  const ln = Number(l);
+  if (Number.isFinite(wn) && Number.isFinite(ln)) {
+    return `${wn}-${ln}`;
   }
   return '--';
 }

@@ -1897,7 +1897,11 @@ try:
                         if saved_mode == "franchise" and saved_franchise_id
                         else None
                     )
-                    
+                    from BackEnd.utils.game_team_scoreboard_enrichment import coalesce_natl_rank_from_team_row
+
+                    home_natl = coalesce_natl_rank_from_team_row(home_team_data, home_team_rank)
+                    away_natl = coalesce_natl_rank_from_team_row(away_team_data, away_team_rank)
+
                     response_data = {
                         "game_id": game_id,
                         "score": saved_score,  # ✅ Team scores: {"teamName1": score1, "teamName2": score2}
@@ -1926,7 +1930,11 @@ try:
                             "name": home_team_name,
                             "team_fouls": home_team_data.get("team_fouls", 0),
                             "attributes": home_team_data.get("attributes", {}),  # Team attributes for S3 tab
-                            "natl_rank": home_team_rank,
+                            "natl_rank": home_natl,
+                            "wins": home_team_data.get("wins"),
+                            "losses": home_team_data.get("losses"),
+                            "team_wins": home_team_data.get("team_wins", home_team_data.get("wins")),
+                            "team_losses": home_team_data.get("team_losses", home_team_data.get("losses")),
                             "colors": home_team_data.get("colors", {}),
                             "score": home_team_data.get("score", 0),
                             "timeouts": home_team_data.get("timeouts", 4),
@@ -1938,7 +1946,11 @@ try:
                             "name": away_team_name,
                             "team_fouls": away_team_data.get("team_fouls", 0),
                             "attributes": away_team_data.get("attributes", {}),  # Team attributes for S3 tab
-                            "natl_rank": away_team_rank,
+                            "natl_rank": away_natl,
+                            "wins": away_team_data.get("wins"),
+                            "losses": away_team_data.get("losses"),
+                            "team_wins": away_team_data.get("team_wins", away_team_data.get("wins")),
+                            "team_losses": away_team_data.get("team_losses", away_team_data.get("losses")),
                             "colors": away_team_data.get("colors", {}),
                             "score": away_team_data.get("score", 0),
                             "timeouts": away_team_data.get("timeouts", 4),
@@ -3755,7 +3767,10 @@ try:
         # 2. WITHOUT animations for database save (exclude_animations=True)
         summary_start = time.time()
         frontend_summary = summarize_game_state(gm, exclude_animations=False)
-        
+        from BackEnd.utils.game_team_scoreboard_enrichment import attach_home_away_team_scoreboard_shards
+
+        attach_home_away_team_scoreboard_shards(frontend_summary)
+
         # Add start_box_score (only needed for Q2-Q4 frontend, not critical for saves)
         frontend_summary["start_box_score"] = gm.game_state.get("start_box_score")
         

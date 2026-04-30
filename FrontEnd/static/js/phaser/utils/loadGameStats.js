@@ -131,24 +131,9 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   const awayRecEl = document.getElementById('away-record');
   const hid = homeSlotKey;
   const aid = awaySlotKey;
-  const pickTeamMeta = (tid) => {
-    if (tid == null || tid === '') return null;
-    const s = String(tid);
-    if (teamsObj[s]) return teamsObj[s];
-    if (teamsObj[tid]) return teamsObj[tid];
-    for (const k of Object.keys(teamsObj)) {
-      if (String(k) === s) return teamsObj[k];
-    }
-    for (const k of Object.keys(teamsObj)) {
-      const row = teamsObj[k];
-      if (row && String(row.team_id) === s) return row;
-    }
-    return null;
-  };
-  const rowH = pickTeamMeta(hid);
-  const rowA = pickTeamMeta(aid);
-  const hMeta = rowH && legH ? { ...legH, ...rowH } : rowH || legH;
-  const aMeta = rowA && legA ? { ...legA, ...rowA } : rowA || legA;
+  // SS&S: same merge order as S3 attributes (teams row overwrites legacy home_team for overlapping keys).
+  const hMeta = { ...(legH || {}), ...(homeTeamObj || {}) };
+  const aMeta = { ...(legA || {}), ...(awayTeamObj || {}) };
   const fmtRank = (t) => {
     const r = Number(t?.natl_rank);
     if (Number.isInteger(r) && r >= 1) return `#${r}`;
@@ -157,13 +142,16 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   const fmtRec = (t) => {
     const w = t?.wins ?? t?.team_wins;
     const l = t?.losses ?? t?.team_losses;
-    if (Number.isFinite(Number(w)) && Number.isFinite(Number(l))) return `${w}-${l}`;
+    if (w == null || l == null) return '--';
+    const wn = Number(w);
+    const ln = Number(l);
+    if (Number.isFinite(wn) && Number.isFinite(ln)) return `${wn}-${ln}`;
     return '--';
   };
-  if (homeRankEl && hMeta) homeRankEl.textContent = fmtRank(hMeta);
-  if (homeRecEl && hMeta) homeRecEl.textContent = fmtRec(hMeta);
-  if (awayRankEl && aMeta) awayRankEl.textContent = fmtRank(aMeta);
-  if (awayRecEl && aMeta) awayRecEl.textContent = fmtRec(aMeta);
+  if (homeRankEl) homeRankEl.textContent = fmtRank(hMeta);
+  if (homeRecEl) homeRecEl.textContent = fmtRec(hMeta);
+  if (awayRankEl) awayRankEl.textContent = fmtRank(aMeta);
+  if (awayRecEl) awayRecEl.textContent = fmtRec(aMeta);
 
   try {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug_scoreboard') === '1') {
