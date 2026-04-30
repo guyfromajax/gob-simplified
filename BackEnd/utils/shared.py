@@ -2018,6 +2018,23 @@ def summarize_game_state(game, exclude_animations=True):
         }
     }
 
+    # Franchise: scoreboard rank (FTD natl_rank) + W-L (franchise.results via standings)
+    franchise_id = getattr(game.home_team, "franchise_id", None) or getattr(game.away_team, "franchise_id", None)
+    if franchise_id and getattr(game.home_team, "mode", None) == "franchise":
+        try:
+            from BackEnd.utils.game_team_scoreboard_enrichment import enrich_franchise_teams_scoreboard_meta
+
+            enrich_franchise_teams_scoreboard_meta(
+                teams_obj,
+                str(franchise_id),
+                str(home_key),
+                str(away_key),
+            )
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "summarize_game_state: franchise scoreboard enrichment failed: %s", e
+            )
+
     # ✅ UNIFIED STRUCTURE: All team data in teams object, referenced by home_team_id/away_team_id
     # ✅ Eliminated home_team/away_team duplication - single source of truth in teams object
     return {
