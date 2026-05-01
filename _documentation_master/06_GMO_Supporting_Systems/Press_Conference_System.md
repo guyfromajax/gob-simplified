@@ -12,7 +12,7 @@ Franchise-only flow that runs **after the user’s game is saved** (`POST /franc
    - **Franchise with phase B pending:** **Box Score** is hidden on this popup; primary CTA is **Post-Game Press Conference** (replaces “Sim Computer Games” on this surface only). Other modes keep Box Score + Go To Locker Room.
    - **Background scoreboard:** When the EOG popup opens, the court scoreboard DOM is synced to **final** home/away scores and a **FINAL / 0:00** clock readout so the dimmed court behind the modal is not stuck at Q1 / 0–0.
 3. **PGPC CTA:** Optional **Sammy reminder** modal (`pgpcSammyReminderModal.js`) unless suppressed; then `launchPostGamePressConference` opens the PGPC overlay.
-4. **Phase B gating:** `POST /franchise/complete-week/phase-b` is started **only after** `POST /franchise/press-conference/session` succeeds, so the franchise week is not advanced if PGPC cannot start.
+4. **Phase B timing:** `POST /franchise/complete-week/phase-b` starts **as soon as the franchise EOG popup appears** (`getOrStartFranchisePhaseB` in `FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js`, invoked from `gameCompletionPopup.js`). It is **not** gated on Sammy or the PGPC button. When the user opens PGPC, `launchPostGamePressConference` **reuses the same in-flight Promise** (single-flight per `franchise_id` + `week` in a tab) so phase B is not requested twice. Outcome handlers (e.g. clearing `franchise_complete_week_pending` on success) still run from PGPC after handlers attach. If the user finishes all press answers before phase B returns, the existing **“Simming Computer Games”** waiting UI (team logo + pulse) still applies.
 
 ---
 
@@ -56,8 +56,9 @@ If **`game_id`** is missing or the game is not found, the server builds **dummy*
 
 | File | Role |
 |------|------|
-| `FrontEnd/static/js/phaser/utils/postGamePressConference.js` | Modal UI: waiting state (logo, “Simming Computer Games”, pulse), question loop (**A–D** from API), completion (“Week *n* complete.”, **Go To Locker Room** → FCC), `POST` answer + complete. |
-| `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` | EOG popup, franchise PGPC button, Sammy reminder, scoreboard sync. |
+| `FrontEnd/static/js/phaser/utils/postGamePressConference.js` | Modal UI: waiting state (logo, “Simming Computer Games”, pulse), question loop (**A–D** from API), completion (“Week *n* complete.”, **Go To Locker Room** → FCC), `POST` answer + complete; attaches phase-b handlers to shared Promise. |
+| `FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js` | Single-flight `POST …/complete-week/phase-b` per franchise week; EOG starts it, PGPC reuses it. |
+| `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` | EOG popup, franchise PGPC button, Sammy reminder, scoreboard sync, **background phase-b** when pending. |
 | `FrontEnd/static/js/phaser/finalizeGame.js` | Phase A, `finalScore` / localStorage snapshot for PGPC. |
 | `FrontEnd/static/js/phaser/gameScene.js` | Calls `showGameCompletionPopup` with `finalScore` after `finalizeGame`. |
 

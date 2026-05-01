@@ -8485,12 +8485,30 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         rec_header = None
         rec_meta = None
         if mode == "franchise" and isinstance(report_data, dict):
-            if "recruiting_header" in report_data or "recruiting_meta_line" in report_data:
-                rec_header = report_data.get("recruiting_header")
-                rec_meta = report_data.get("recruiting_meta_line")
+            try:
+                report_week_int = int(week)
+            except (TypeError, ValueError):
+                report_week_int = 0
+            visit_window = 20 <= report_week_int <= 26
+            rec_header_snap = report_data.get("recruiting_header")
+            rec_meta_snap = report_data.get("recruiting_meta_line")
+            meta_empty = (
+                "recruiting_meta_line" not in report_data
+                or rec_meta_snap is None
+                or (isinstance(rec_meta_snap, str) and not str(rec_meta_snap).strip())
+            )
+            keys_present = (
+                "recruiting_header" in report_data or "recruiting_meta_line" in report_data
+            )
+            # Snapshots that saved "Recruiting Visit" with null/empty meta never refreshed; recompute
+            # from current franchise + FRD when visit-week meta is missing (Training_System.md).
+            stale_visit_strip = visit_window and meta_empty
+            if keys_present and not stale_visit_strip:
+                rec_header = rec_header_snap
+                rec_meta = rec_meta_snap
             else:
                 rec_snap = _training_report_recruiting_display(
-                    doc, int(week), str(authoritative_team_id)
+                    doc, report_week_int, str(authoritative_team_id)
                 )
                 if rec_snap is not None:
                     rec_header = rec_snap.get("header")

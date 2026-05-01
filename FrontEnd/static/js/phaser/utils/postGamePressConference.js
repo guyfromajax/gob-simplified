@@ -1,9 +1,12 @@
 /**
  * Post-game press conference (franchise): runs in a modal on court.html while
- * phase-b (CPU games) runs in parallel. Dummy copy (Question 1–10 / Answer A–E).
+ * phase-b (CPU games) completes. Phase-b may already be in flight from the EOG popup
+ * (`getOrStartFranchisePhaseB`); this module attaches to the same Promise.
  *
  * Persists answers via POST /franchise/press-conference/session (+ /answer, /complete).
  */
+
+import { getOrStartFranchisePhaseB } from './franchisePhaseBClient.js';
 
 const PGPC_STYLE_ID = 'post-game-press-conference-styles';
 /** Dummy / placeholder UI only; live sessions use four choices (A–D) from the API. */
@@ -218,16 +221,6 @@ export async function launchPostGamePressConference(opts) {
     panel.innerHTML = html;
   };
 
-  const startPhaseBFetch = () =>
-    fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-b'), {
-      method: 'POST',
-      headers: jsonHeaders(),
-      body: JSON.stringify(franchisePhaseBPending),
-    });
-
-  /** Set once session exists — avoids advancing week if PGPC cannot start. */
-  let phaseBPromise = null;
-
   function attachPhaseBHandlers(promise) {
     promise
       .then(async (res) => {
@@ -257,6 +250,9 @@ export async function launchPostGamePressConference(opts) {
         }
       });
   }
+
+  const phaseBPromise = getOrStartFranchisePhaseB(franchisePhaseBPending);
+  attachPhaseBHandlers(phaseBPromise);
 
   function allAnswered() {
     return questionIndex >= questions.length;
@@ -353,10 +349,6 @@ export async function launchPostGamePressConference(opts) {
 
   function tryShowFinal() {
     if (!allAnswered()) return;
-    if (!phaseBPromise) {
-      renderWaitingView();
-      return;
-    }
     if (!phaseBResolved) {
       renderWaitingView();
       return;
@@ -411,8 +403,6 @@ export async function launchPostGamePressConference(opts) {
     if (Array.isArray(created.questions) && created.questions.length > 0) {
       questions = created.questions;
     }
-    phaseBPromise = startPhaseBFetch();
-    attachPhaseBHandlers(phaseBPromise);
   } catch (err) {
     console.error('[PGPC] session create error:', err);
     renderBody(`

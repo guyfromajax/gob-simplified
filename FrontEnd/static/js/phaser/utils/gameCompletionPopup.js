@@ -1,4 +1,5 @@
 import { launchPostGamePressConference } from './postGamePressConference.js';
+import { getOrStartFranchisePhaseB } from './franchisePhaseBClient.js';
 import {
   isPgpcSammyReminderSuppressed,
   showPgpcSammyReminderModal,
@@ -627,6 +628,12 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   }
 
   document.body.appendChild(popup);
+
+  if (franchisePhaseBPending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
+    getOrStartFranchisePhaseB(franchisePhaseBPending).catch((err) => {
+      console.warn('[gameCompletionPopup] background phase-b failed to start:', err);
+    });
+  }
 
   // Single game: delete completed game from DB when user leaves via "Go To Locker Room" (not when viewing Box Score)
   const lockerRoomBtn = popup.querySelector('.locker-room-button');
