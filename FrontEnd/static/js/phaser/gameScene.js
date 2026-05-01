@@ -114,28 +114,108 @@ function updateMomentumBar(teamSide, value) {
   }
 }
 
-function formatPlaycallStripEv(ev) {
+/** Solid left-pointing chevron (offense advantage); currentColor fill */
+function pcsEvSvgChevronLeftSolid() {
+  return '<svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path fill="currentColor" d="M8.6 1.2L8.6 10.8L1.2 6z"/></svg>';
+}
+
+/** Solid right-pointing chevron (defense advantage) */
+function pcsEvSvgChevronRightSolid() {
+  return '<svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path fill="currentColor" d="M1.4 1.2L1.4 10.8L8.8 6z"/></svg>';
+}
+
+/** Hollow chevron, tip points left */
+function pcsEvSvgChevronLeftHollow() {
+  return '<svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="miter" d="M8.4 1.8L8.4 10.2L1.8 6z"/></svg>';
+}
+
+/** Hollow chevron, tip points right */
+function pcsEvSvgChevronRightHollow() {
+  return '<svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="miter" d="M1.6 1.8L1.6 10.2L8.2 6z"/></svg>';
+}
+
+/**
+ * HCO playcall strip: chevron advantage meter + signed EV % (presentation only).
+ * EV is clamped to [-100, 100]; lit slots = round(|EV|/10), 0–10.
+ */
+function renderPlaycallEvMeter(el, ev) {
+  if (!el) return;
   const evNum = parseFloat(ev);
   if (!Number.isFinite(evNum)) {
-    return { text: '--', color: '#FFD700' };
+    el.className = 'pcs-ev-meter pcs-ev-meter--na';
+    el.setAttribute('aria-label', 'Expected value not available');
+    el.innerHTML = '<span class="pcs-ev-num">--</span>';
+    return;
   }
-  let text;
-  if (evNum > 0) {
-    text = `+${Math.round(evNum)}%`;
-  } else if (evNum < 0) {
-    text = `${Math.round(evNum)}%`;
-  } else {
-    text = '0%';
+  const evInt = Math.max(-100, Math.min(100, Math.round(evNum)));
+  const nLit = Math.min(10, Math.max(0, Math.round(Math.abs(evInt) / 10)));
+  let label = 'Even expected value';
+  if (evInt > 0) label = `Offense advantage, ${evInt} percent`;
+  else if (evInt < 0) label = `Defense advantage, ${evInt} percent`;
+  el.setAttribute('aria-label', label);
+
+  const numText =
+    evInt > 0 ? `+${evInt}%` : evInt < 0 ? `${evInt}%` : '0%';
+
+  const gap = '<span class="pcs-ev-gap" aria-hidden="true"></span>';
+
+  const triggerEnter = () => {
+    el.classList.remove('pcs-ev-meter--enter');
+    void el.offsetWidth;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.classList.add('pcs-ev-meter--enter');
+      });
+    });
+  };
+
+  if (evInt === 0) {
+    const leftRow = Array.from({ length: 5 }, () => {
+      return `<span class="pcs-ev-slot pcs-ev-slot--neu" aria-hidden="true">${pcsEvSvgChevronLeftHollow()}</span>`;
+    }).join('');
+    const rightRow = Array.from({ length: 5 }, () => {
+      return `<span class="pcs-ev-slot pcs-ev-slot--neu" aria-hidden="true">${pcsEvSvgChevronRightHollow()}</span>`;
+    }).join('');
+    el.className = 'pcs-ev-meter pcs-ev-meter--zero';
+    el.innerHTML = `<div class="pcs-ev-chevron-row" aria-hidden="true">${leftRow}</div>${gap}<span class="pcs-ev-num">${numText}</span>${gap}<div class="pcs-ev-chevron-row" aria-hidden="true">${rightRow}</div>`;
+    triggerEnter();
+    return;
   }
-  let color;
-  if (evNum < 0) {
-    color = '#FF3B30';
-  } else if (evNum === 0) {
-    color = '#FFD700';
-  } else {
-    color = '#00FF88';
+
+  if (evInt > 0) {
+    const parts = [];
+    for (let i = 0; i < 10; i++) {
+      const lit = i < nLit;
+      const litOrder = lit ? i : -1;
+      const delayMs =
+        lit && nLit > 1 ? Math.round((litOrder / (nLit - 1)) * 200) : 0;
+      const style = lit ? ` style="--pcs-ev-d:${delayMs}ms"` : '';
+      const glyph = lit ? pcsEvSvgChevronLeftSolid() : pcsEvSvgChevronRightHollow();
+      parts.push(
+        `<span class="pcs-ev-slot${lit ? ' is-lit' : ''}"${style} aria-hidden="true">${glyph}</span>`
+      );
+    }
+    el.className = 'pcs-ev-meter pcs-ev-meter--pos';
+    el.innerHTML = `<span class="pcs-ev-num">${numText}</span>${gap}<div class="pcs-ev-chevron-row" aria-hidden="true">${parts.join('')}</div>`;
+    triggerEnter();
+    return;
   }
-  return { text, color };
+
+  const parts = [];
+  for (let i = 0; i < 10; i++) {
+    const lit = i >= 10 - nLit;
+    const litOrder = lit ? 9 - i : -1;
+    const delayMs =
+      lit && nLit > 1 ? Math.round((litOrder / (nLit - 1)) * 200) : 0;
+    const style = lit ? ` style="--pcs-ev-d:${delayMs}ms"` : '';
+    const glyph = lit ? pcsEvSvgChevronRightSolid() : pcsEvSvgChevronLeftHollow();
+    parts.push(
+      `<span class="pcs-ev-slot${lit ? ' is-lit' : ''}"${style} aria-hidden="true">${glyph}</span>`
+    );
+  }
+  el.className = 'pcs-ev-meter pcs-ev-meter--neg';
+  el.innerHTML = `<div class="pcs-ev-chevron-row" aria-hidden="true">${parts.join('')}</div>${gap}<span class="pcs-ev-num">${numText}</span>`;
+  triggerEnter();
 }
 
 function showPlaycallStrip(offensePlay, offenseTarget, defensePlay, ev) {
@@ -148,11 +228,7 @@ function showPlaycallStrip(offensePlay, offenseTarget, defensePlay, ev) {
   if (oPlay) oPlay.textContent = offensePlay || '--';
   if (oTgt) oTgt.textContent = offenseTarget != null && String(offenseTarget).length ? String(offenseTarget) : '';
   if (dPlay) dPlay.textContent = defensePlay || '--';
-  if (evEl) {
-    const evDisplay = formatPlaycallStripEv(ev);
-    evEl.textContent = evDisplay.text;
-    evEl.style.color = evDisplay.color;
-  }
+  if (evEl) renderPlaycallEvMeter(evEl, ev);
   strip.classList.remove('hidden');
 }
 

@@ -2344,14 +2344,119 @@
       color: #FFD700;
     }
 
-    .pcs-ev {
+    /* EV advantage meter (HCO strip): chevrons + signed %; colors match momentum pos/neg */
+    .pcs-ev-meter {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      min-width: 220px;
+      max-height: 24px;
       font-family: 'Bebas Neue', sans-serif;
+    }
+
+    .pcs-ev-meter--na .pcs-ev-num {
       font-size: 24px;
       font-weight: bold;
       letter-spacing: 0.04em;
+      color: #ffd700;
       min-width: 54px;
       text-align: center;
+    }
+
+    .pcs-ev-num {
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      min-width: 72px;
+      text-align: center;
       flex-shrink: 0;
+      transition: opacity 150ms ease, color 150ms ease;
+    }
+
+    .pcs-ev-meter--pos .pcs-ev-num {
+      text-align: right;
+      color: #34ec27;
+    }
+
+    .pcs-ev-meter--neg .pcs-ev-num {
+      text-align: left;
+      color: #ff4444;
+    }
+
+    .pcs-ev-meter--zero .pcs-ev-num {
+      color: #ffd700;
+    }
+
+    .pcs-ev-gap {
+      flex-shrink: 0;
+      width: 8px;
+    }
+
+    .pcs-ev-chevron-row {
+      display: inline-flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 2.5px;
+      flex-shrink: 0;
+    }
+
+    .pcs-ev-slot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 11px;
+      height: 12px;
+      flex-shrink: 0;
+      color: rgba(255, 255, 255, 0.1);
+    }
+
+    .pcs-ev-slot svg {
+      display: block;
+      width: 10px;
+      height: 12px;
+    }
+
+    .pcs-ev-meter--pos .pcs-ev-slot.is-lit {
+      color: #34ec27;
+    }
+
+    .pcs-ev-meter--neg .pcs-ev-slot.is-lit {
+      color: #ff4444;
+    }
+
+    .pcs-ev-meter--enter.pcs-ev-meter--pos .pcs-ev-slot.is-lit,
+    .pcs-ev-meter--enter.pcs-ev-meter--neg .pcs-ev-slot.is-lit {
+      opacity: 0.2;
+      animation: pcsEvLitIn 250ms ease forwards;
+      animation-delay: var(--pcs-ev-d, 0ms);
+    }
+
+    .pcs-ev-meter--enter .pcs-ev-num {
+      opacity: 0.35;
+      animation: pcsEvNumIn 150ms ease forwards;
+    }
+
+    .pcs-ev-meter--zero .pcs-ev-slot--neu {
+      color: rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes pcsEvLitIn {
+      from {
+        opacity: 0.2;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes pcsEvNumIn {
+      to {
+        opacity: 1;
+      }
     }
 
     .pcs-spacer {
@@ -3739,7 +3844,7 @@
           <div class="pcs-divider"></div>
           <span class="pcs-target" id="pcs-offense-target">--</span>
           <div class="pcs-spacer"></div>
-          <span class="pcs-ev" id="pcs-ev">--</span>
+          <div class="pcs-ev-meter" id="pcs-ev" role="img" aria-label="Expected value advantage"></div>
           <div class="pcs-spacer"></div>
           <span class="pcs-eyebrow" id="pcs-defense-label">DEFENSE</span>
           <div class="pcs-divider"></div>
