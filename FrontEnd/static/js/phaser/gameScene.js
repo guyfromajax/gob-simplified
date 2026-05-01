@@ -143,6 +143,30 @@ function pcsEvPivotMarkup(withZeroPercent) {
   return `<div class="pcs-ev-pivot" aria-hidden="true"><div class="pcs-ev-pivot-mark">${ticksAndLabel}</div></div>`;
 }
 
+function pcsEvAxisColor(evInt) {
+  if (evInt > 0) return '#34EC27';
+  if (evInt < 0) return '#ff4444';
+  return '';
+}
+
+function applyPcsEvAxisColor(el, axisColor) {
+  const previousAxisColor = el.dataset.evAxisColor || '';
+  if (previousAxisColor) {
+    el.style.setProperty('--ev-axis-color', previousAxisColor);
+  } else {
+    el.style.removeProperty('--ev-axis-color');
+  }
+  void el.offsetWidth;
+  requestAnimationFrame(() => {
+    if (axisColor) {
+      el.style.setProperty('--ev-axis-color', axisColor);
+    } else {
+      el.style.removeProperty('--ev-axis-color');
+    }
+    el.dataset.evAxisColor = axisColor;
+  });
+}
+
 /**
  * HCO playcall strip: dual chevron rows + fixed "EV" pivot + signed % (presentation only).
  * EV is clamped to [-100, 100]; lit count per side = round(|EV|/10), 0–10.
@@ -155,9 +179,11 @@ function renderPlaycallEvMeter(el, ev) {
     el.className = 'pcs-ev-meter pcs-ev-meter--na';
     el.setAttribute('aria-label', 'Expected value not available');
     el.innerHTML = '<span class="pcs-ev-num">--</span>';
+    applyPcsEvAxisColor(el, '');
     return;
   }
   const evInt = Math.max(-100, Math.min(100, Math.round(evNum)));
+  const axisColor = pcsEvAxisColor(evInt);
   const nLit = Math.min(10, Math.max(0, Math.round(Math.abs(evInt) / 10)));
   let label = 'Even expected value';
   if (evInt > 0) label = `Offense advantage, ${evInt} percent`;
@@ -191,6 +217,7 @@ function renderPlaycallEvMeter(el, ev) {
     }).join('');
     el.className = 'pcs-ev-meter pcs-ev-meter--zero';
     el.innerHTML = `${slotLeft('')}${`<div class="pcs-ev-chevron-row pcs-ev-chevron-row--left" aria-hidden="true">${leftRow}</div>`}${pcsEvPivotMarkup(true)}${`<div class="pcs-ev-chevron-row pcs-ev-chevron-row--right" aria-hidden="true">${rightRow}</div>`}${slotRight('')}`;
+    applyPcsEvAxisColor(el, axisColor);
     triggerEnter();
     return;
   }
@@ -213,6 +240,7 @@ function renderPlaycallEvMeter(el, ev) {
     });
     el.className = 'pcs-ev-meter pcs-ev-meter--pos';
     el.innerHTML = `${slotLeft(`<span class="pcs-ev-num">${numTextPos}</span>`)}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--left" aria-hidden="true">${leftParts.join('')}</div>${pcsEvPivotMarkup(false)}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--right" aria-hidden="true">${rightParts.join('')}</div>${slotRight('')}`;
+    applyPcsEvAxisColor(el, axisColor);
     triggerEnter();
     return;
   }
@@ -232,6 +260,7 @@ function renderPlaycallEvMeter(el, ev) {
   }
   el.className = 'pcs-ev-meter pcs-ev-meter--neg';
   el.innerHTML = `${slotLeft('')}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--left" aria-hidden="true">${leftPartsNeg.join('')}</div>${pcsEvPivotMarkup(false)}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--right" aria-hidden="true">${rightParts.join('')}</div>${slotRight(`<span class="pcs-ev-num">${numTextNeg}</span>`)}`;
+  applyPcsEvAxisColor(el, axisColor);
   triggerEnter();
 }
 
