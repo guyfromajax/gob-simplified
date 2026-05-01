@@ -114,7 +114,7 @@ During **HCO** turns, the lower-third **playcall strip** on the court page (`Fro
 - On each qualifying turn update, `dispatchPlaycallStripShow` fires a window event **`gob:playcall-strip-show`** with `detail`: `offensePlay`, `offenseTarget`, `defensePlay`, and **`ev`** (from `turnData.ev`). Non-HCO turns dispatch **`gob:playcall-strip-hide`** instead.
 - `FrontEnd/static/js/phaser/gameScene.js` listens for those events and updates the strip DOM (offense/defense text and the EV meter). **EV is not recomputed in the client**; it is whatever the turn payload supplies, rounded and displayed.
 
-### EV advantage meter (chevrons)
+### EV advantage meter (chevrons + pivot)
 
 The centered EV control (`#pcs-ev`, class `pcs-ev-meter`) is **presentational only**. It does not change HCO resolution logic.
 
@@ -125,14 +125,14 @@ The centered EV control (`#pcs-ev`, class `pcs-ev-meter`) is **presentational on
 
 **Lit slot count**
 
-- There are always **10** chevron slots in one horizontal row (plus the signed percentage).
-- **Lit slots** = `Math.round(Math.abs(EV) / 10)`, clamped to **0–10** (each lit chevron represents roughly ten percentage points of advantage magnitude).
+- Two rows of **10** chevrons each (**20** total), flanking a fixed **EV** pivot (small label + hairline ticks). **Lit count per advantaged row** = `Math.round(Math.abs(EV) / 10)`, clamped to **0–10** (the opposite row stays fully unlit).
 
 **Direction and layout**
 
-- **Positive EV** (offense advantage): solid **left**-pointing chevrons for lit slots; unlit slots use hollow **right**-pointing marks. Layout: **`[+XX%]`** (eight-pixel gap) **chevron row** (number on the **left** of the row).
-- **Negative EV** (defense advantage): solid **right**-pointing chevrons for lit slots; unlit slots use hollow **left**-pointing marks. Layout: **chevron row** (gap) **`[-XX%]`** (number on the **right**).
-- **EV = 0**: five hollow left-pointing | **`0%`** | five hollow right-pointing (neutral “outward from center” look). The number uses **`0%`** (no plus sign); positive and negative values always include **`+`** or **`-`** on the number.
+- Fixed **five columns**: `[number-left]` · `[left chevrons ×10]` · **`EV` pivot** · `[right chevrons ×10]` · `[number-right]`. Outer number slots keep **stable width** so the strip does not jump when the sign flips.
+- **Positive EV**: **`+XX%`** in the left slot; **left** row uses solid **◀** for lit slots (filled from the slot **nearest the pivot** outward toward the number); **right** row is all hollow **▷** (unlit). **EV** pivot is always visible (muted typography + ticks).
+- **Negative EV**: **`−XX%`** in the right slot; **right** row uses solid **▶** for lit slots (filled from the pivot outward); **left** row is all hollow **◁**. **EV** pivot unchanged.
+- **EV = 0**: both number slots empty; **10** hollow **◁** left of pivot and **10** hollow **▷** right of pivot; **`0%`** sits beside the **EV** label (gold). No plus sign on zero.
 
 **Color (matches momentum strip tokens)**
 
@@ -140,14 +140,14 @@ The centered EV control (`#pcs-ev`, class `pcs-ev-meter`) is **presentational on
 - Lit defense / number on defense side: `#ff4444`
 - Unlit stroke/fill base: `rgba(255, 255, 255, 0.10)`
 
-Direction of chevrons and the sign on the percentage are redundant cues (not color-only).
+Direction of chevrons, the **EV** pivot, and the sign on the percentage are redundant cues (not color-only).
 
 **Animation (on each strip show / EV update)**
 
-- Lit chevrons fade in over ~**250 ms**, staggered **left-to-right** for offense advantage and **right-to-left** for defense advantage. Unlit slots are not animated.
+- Lit chevrons fade in over ~**250 ms**: offense row staggered **right-to-left** from the pivot; defense row **left-to-right** from the pivot. Unlit slots are not animated.
 - The percentage uses a short **~150 ms** opacity intro.
 
-Implementation lives in **`renderPlaycallEvMeter`** in `FrontEnd/static/js/phaser/gameScene.js` and the `.pcs-ev-meter*` rules in `FrontEnd/static/court.html`.
+Implementation lives in **`renderPlaycallEvMeter`** / **`pcsEvPivotMarkup`** in `FrontEnd/static/js/phaser/gameScene.js` and the `.pcs-ev-meter*` rules in `FrontEnd/static/court.html`.
 
 ## Key Files
 

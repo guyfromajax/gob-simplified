@@ -2344,15 +2344,15 @@
       color: #FFD700;
     }
 
-    /* EV advantage meter (HCO strip): chevrons + signed %; colors match momentum pos/neg */
+    /* EV meter: dual chevron rows + fixed EV pivot; colors match momentum pos/neg */
     .pcs-ev-meter {
       display: flex;
       flex-direction: row;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      min-width: 220px;
-      max-height: 24px;
+      gap: 6px;
+      min-width: 400px;
       font-family: 'Bebas Neue', sans-serif;
     }
 
@@ -2365,34 +2365,86 @@
       text-align: center;
     }
 
+    .pcs-ev-num-slot {
+      box-sizing: border-box;
+      flex: 0 0 auto;
+      min-width: 56px;
+      width: 56px;
+      display: flex;
+      align-items: center;
+    }
+
+    .pcs-ev-num-slot--left {
+      justify-content: flex-end;
+    }
+
+    .pcs-ev-num-slot--right {
+      justify-content: flex-start;
+    }
+
     .pcs-ev-num {
       font-size: 24px;
       font-weight: bold;
       letter-spacing: 0.04em;
       line-height: 1;
-      min-width: 72px;
-      text-align: center;
       flex-shrink: 0;
       transition: opacity 150ms ease, color 150ms ease;
     }
 
-    .pcs-ev-meter--pos .pcs-ev-num {
+    .pcs-ev-meter--pos .pcs-ev-num-slot--left .pcs-ev-num {
       text-align: right;
       color: #34ec27;
     }
 
-    .pcs-ev-meter--neg .pcs-ev-num {
+    .pcs-ev-meter--neg .pcs-ev-num-slot--right .pcs-ev-num {
       text-align: left;
       color: #ff4444;
     }
 
-    .pcs-ev-meter--zero .pcs-ev-num {
+    .pcs-ev-num--zero-pivot {
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      line-height: 1;
       color: #ffd700;
     }
 
-    .pcs-ev-gap {
+    .pcs-ev-pivot {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
-      width: 8px;
+      padding: 0 6px;
+    }
+
+    .pcs-ev-pivot-mark {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .pcs-ev-pivot-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: rgba(255, 255, 255, 0.35);
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .pcs-ev-pivot-tick {
+      display: block;
+      width: 1px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.25);
+      flex-shrink: 0;
+    }
+
+    .pcs-ev-pivot--with-zero {
+      gap: 6px;
     }
 
     .pcs-ev-chevron-row {
@@ -2419,22 +2471,23 @@
       height: 12px;
     }
 
-    .pcs-ev-meter--pos .pcs-ev-slot.is-lit {
+    .pcs-ev-meter--pos .pcs-ev-chevron-row--left .pcs-ev-slot.is-lit {
       color: #34ec27;
     }
 
-    .pcs-ev-meter--neg .pcs-ev-slot.is-lit {
+    .pcs-ev-meter--neg .pcs-ev-chevron-row--right .pcs-ev-slot.is-lit {
       color: #ff4444;
     }
 
-    .pcs-ev-meter--enter.pcs-ev-meter--pos .pcs-ev-slot.is-lit,
-    .pcs-ev-meter--enter.pcs-ev-meter--neg .pcs-ev-slot.is-lit {
+    .pcs-ev-meter--enter.pcs-ev-meter--pos .pcs-ev-chevron-row--left .pcs-ev-slot.is-lit,
+    .pcs-ev-meter--enter.pcs-ev-meter--neg .pcs-ev-chevron-row--right .pcs-ev-slot.is-lit {
       opacity: 0.2;
       animation: pcsEvLitIn 250ms ease forwards;
       animation-delay: var(--pcs-ev-d, 0ms);
     }
 
-    .pcs-ev-meter--enter .pcs-ev-num {
+    .pcs-ev-meter--enter .pcs-ev-num-slot .pcs-ev-num,
+    .pcs-ev-meter--enter .pcs-ev-num--zero-pivot {
       opacity: 0.35;
       animation: pcsEvNumIn 150ms ease forwards;
     }

@@ -134,9 +134,19 @@ function pcsEvSvgChevronRightHollow() {
   return '<svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="miter" d="M1.6 1.8L1.6 10.2L8.2 6z"/></svg>';
 }
 
+/** Fixed center pivot label + hairline ticks (meter metaphor). */
+function pcsEvPivotMarkup(withZeroPercent) {
+  const ticksAndLabel = `<span class="pcs-ev-pivot-tick" aria-hidden="true"></span><span class="pcs-ev-pivot-label">EV</span><span class="pcs-ev-pivot-tick" aria-hidden="true"></span>`;
+  if (withZeroPercent) {
+    return `<div class="pcs-ev-pivot pcs-ev-pivot--with-zero"><div class="pcs-ev-pivot-mark" aria-hidden="true">${ticksAndLabel}</div><span class="pcs-ev-num pcs-ev-num--zero-pivot">0%</span></div>`;
+  }
+  return `<div class="pcs-ev-pivot" aria-hidden="true"><div class="pcs-ev-pivot-mark">${ticksAndLabel}</div></div>`;
+}
+
 /**
- * HCO playcall strip: chevron advantage meter + signed EV % (presentation only).
- * EV is clamped to [-100, 100]; lit slots = round(|EV|/10), 0–10.
+ * HCO playcall strip: dual chevron rows + fixed "EV" pivot + signed % (presentation only).
+ * EV is clamped to [-100, 100]; lit count per side = round(|EV|/10), 0–10.
+ * Left row: ◀ lit when offense advantage; right row: ▶ lit when defense advantage.
  */
 function renderPlaycallEvMeter(el, ev) {
   if (!el) return;
@@ -154,10 +164,8 @@ function renderPlaycallEvMeter(el, ev) {
   else if (evInt < 0) label = `Defense advantage, ${evInt} percent`;
   el.setAttribute('aria-label', label);
 
-  const numText =
-    evInt > 0 ? `+${evInt}%` : evInt < 0 ? `${evInt}%` : '0%';
-
-  const gap = '<span class="pcs-ev-gap" aria-hidden="true"></span>';
+  const numTextPos = evInt > 0 ? `+${evInt}%` : '';
+  const numTextNeg = evInt < 0 ? `${evInt}%` : '';
 
   const triggerEnter = () => {
     el.classList.remove('pcs-ev-meter--enter');
@@ -169,52 +177,61 @@ function renderPlaycallEvMeter(el, ev) {
     });
   };
 
+  const slotLeft = (inner) =>
+    `<span class="pcs-ev-num-slot pcs-ev-num-slot--left">${inner}</span>`;
+  const slotRight = (inner) =>
+    `<span class="pcs-ev-num-slot pcs-ev-num-slot--right">${inner}</span>`;
+
   if (evInt === 0) {
-    const leftRow = Array.from({ length: 5 }, () => {
+    const leftRow = Array.from({ length: 10 }, () => {
       return `<span class="pcs-ev-slot pcs-ev-slot--neu" aria-hidden="true">${pcsEvSvgChevronLeftHollow()}</span>`;
     }).join('');
-    const rightRow = Array.from({ length: 5 }, () => {
+    const rightRow = Array.from({ length: 10 }, () => {
       return `<span class="pcs-ev-slot pcs-ev-slot--neu" aria-hidden="true">${pcsEvSvgChevronRightHollow()}</span>`;
     }).join('');
     el.className = 'pcs-ev-meter pcs-ev-meter--zero';
-    el.innerHTML = `<div class="pcs-ev-chevron-row" aria-hidden="true">${leftRow}</div>${gap}<span class="pcs-ev-num">${numText}</span>${gap}<div class="pcs-ev-chevron-row" aria-hidden="true">${rightRow}</div>`;
+    el.innerHTML = `${slotLeft('')}${`<div class="pcs-ev-chevron-row pcs-ev-chevron-row--left" aria-hidden="true">${leftRow}</div>`}${pcsEvPivotMarkup(true)}${`<div class="pcs-ev-chevron-row pcs-ev-chevron-row--right" aria-hidden="true">${rightRow}</div>`}${slotRight('')}`;
     triggerEnter();
     return;
   }
 
   if (evInt > 0) {
-    const parts = [];
+    const leftParts = [];
     for (let i = 0; i < 10; i++) {
-      const lit = i < nLit;
-      const litOrder = lit ? i : -1;
+      const lit = i >= 10 - nLit;
+      const litOrder = lit ? 9 - i : -1;
       const delayMs =
         lit && nLit > 1 ? Math.round((litOrder / (nLit - 1)) * 200) : 0;
       const style = lit ? ` style="--pcs-ev-d:${delayMs}ms"` : '';
       const glyph = lit ? pcsEvSvgChevronLeftSolid() : pcsEvSvgChevronRightHollow();
-      parts.push(
+      leftParts.push(
         `<span class="pcs-ev-slot${lit ? ' is-lit' : ''}"${style} aria-hidden="true">${glyph}</span>`
       );
     }
+    const rightParts = Array.from({ length: 10 }, () => {
+      return `<span class="pcs-ev-slot" aria-hidden="true">${pcsEvSvgChevronRightHollow()}</span>`;
+    });
     el.className = 'pcs-ev-meter pcs-ev-meter--pos';
-    el.innerHTML = `<span class="pcs-ev-num">${numText}</span>${gap}<div class="pcs-ev-chevron-row" aria-hidden="true">${parts.join('')}</div>`;
+    el.innerHTML = `${slotLeft(`<span class="pcs-ev-num">${numTextPos}</span>`)}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--left" aria-hidden="true">${leftParts.join('')}</div>${pcsEvPivotMarkup(false)}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--right" aria-hidden="true">${rightParts.join('')}</div>${slotRight('')}`;
     triggerEnter();
     return;
   }
 
-  const parts = [];
+  const leftPartsNeg = Array.from({ length: 10 }, () => {
+    return `<span class="pcs-ev-slot" aria-hidden="true">${pcsEvSvgChevronLeftHollow()}</span>`;
+  });
+  const rightParts = [];
   for (let i = 0; i < 10; i++) {
-    const lit = i >= 10 - nLit;
-    const litOrder = lit ? 9 - i : -1;
-    const delayMs =
-      lit && nLit > 1 ? Math.round((litOrder / (nLit - 1)) * 200) : 0;
+    const lit = i < nLit;
+    const delayMs = lit && nLit > 1 ? Math.round((i / (nLit - 1)) * 200) : 0;
     const style = lit ? ` style="--pcs-ev-d:${delayMs}ms"` : '';
     const glyph = lit ? pcsEvSvgChevronRightSolid() : pcsEvSvgChevronLeftHollow();
-    parts.push(
+    rightParts.push(
       `<span class="pcs-ev-slot${lit ? ' is-lit' : ''}"${style} aria-hidden="true">${glyph}</span>`
     );
   }
   el.className = 'pcs-ev-meter pcs-ev-meter--neg';
-  el.innerHTML = `<div class="pcs-ev-chevron-row" aria-hidden="true">${parts.join('')}</div>${gap}<span class="pcs-ev-num">${numText}</span>`;
+  el.innerHTML = `${slotLeft('')}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--left" aria-hidden="true">${leftPartsNeg.join('')}</div>${pcsEvPivotMarkup(false)}<div class="pcs-ev-chevron-row pcs-ev-chevron-row--right" aria-hidden="true">${rightParts.join('')}</div>${slotRight(`<span class="pcs-ev-num">${numTextNeg}</span>`)}`;
   triggerEnter();
 }
 
