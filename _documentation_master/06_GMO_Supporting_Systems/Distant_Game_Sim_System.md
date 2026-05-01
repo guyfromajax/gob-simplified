@@ -29,7 +29,7 @@ Resolution of “who is the user’s next-week opponent” is **`_user_next_regu
 
 ### Win Probability Calculation (implement now)
 1. Calculate each team's **combined score**: prestige + int(0.1 * total_player_attrs)
-2. Home team gets a +100 bonus added to their combined score
+2. Home team gets a +(2 * home team chemistry attribute value) bonus added to their combined score
 3. Roll `randint(1, combined_total)`- If roll <= home_team_score: home team wins
    - If roll > home_team_score: away team wins
 
