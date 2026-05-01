@@ -147,14 +147,14 @@ def _team_chemistry_pool_sizes(team_chemistry: float) -> List[int]:
     if tc > 25:
         tc = 25.0
     if tc > 20:
-        return [1, 1, 1, 2, 2]
+        return [1, 1, 1, 1, 2]
     if tc >= 16:
-        return [1, 1, 2, 2, 2]
+        return [1, 1, 1, 1, 3]
     if tc >= 11:
-        return [1, 2, 2, 2, 2]
+        return [1, 1, 1, 2, 3]
     if tc >= 7:
-        return [2, 2, 2, 2, 3]
-    return [2, 2, 2, 2, 3]
+        return [1, 1, 1, 3, 3]
+    return [1, 1, 1, 3, 3]
 
 
 def _player_slot_rating(player: Player, pos: str) -> float:
@@ -384,4 +384,3 @@ def autoset_strategy_settings(team: TeamManager):
     # logging.warning(f"🔍 [AUTOSET STRATEGY] New inside: {new_inside}")
     
     return new_strategy_settings
-

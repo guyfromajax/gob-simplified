@@ -47,17 +47,17 @@ def _five_distinct_payload() -> list[dict]:
 @pytest.mark.parametrize(
     "tc,expected",
     [
-        (26, [1, 1, 1, 2, 2]),  # >25 clamped
-        (21, [1, 1, 1, 2, 2]),
-        (20.5, [1, 1, 1, 2, 2]),
-        (20, [1, 1, 2, 2, 2]),
-        (16, [1, 1, 2, 2, 2]),
-        (15, [1, 2, 2, 2, 2]),
-        (11, [1, 2, 2, 2, 2]),
-        (10, [2, 2, 2, 2, 3]),
-        (7, [2, 2, 2, 2, 3]),
-        (6, [2, 2, 2, 2, 3]),
-        (0, [2, 2, 2, 2, 3]),
+        (26, [1, 1, 1, 1, 2]),  # >25 clamped
+        (21, [1, 1, 1, 1, 2]),
+        (20.5, [1, 1, 1, 1, 2]),
+        (20, [1, 1, 1, 1, 3]),
+        (16, [1, 1, 1, 1, 3]),
+        (15, [1, 1, 1, 2, 3]),
+        (11, [1, 1, 1, 2, 3]),
+        (10, [1, 1, 1, 3, 3]),
+        (7, [1, 1, 1, 3, 3]),
+        (6, [1, 1, 1, 3, 3]),
+        (0, [1, 1, 1, 3, 3]),
     ],
 )
 def test_team_chemistry_pool_sizes_bands(tc, expected):
@@ -65,7 +65,7 @@ def test_team_chemistry_pool_sizes_bands(tc, expected):
 
 
 def test_team_chemistry_pool_sizes_invalid_uses_default_mid_band():
-    assert _team_chemistry_pool_sizes("bogus") == [1, 2, 2, 2, 2]
+    assert _team_chemistry_pool_sizes("bogus") == [1, 1, 1, 2, 3]
 
 
 def test_autoset_payload_assigns_five_deterministic_with_patched_random():

@@ -103,10 +103,10 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
    | Chemistry | Pos 1 | Pos 2 | Pos 3 | Pos 4 | Pos 5 |
    |-----------|-------|-------|-------|-------|-------|
-   | > 20      | 1     | 1     | 1     | 2     | 2     |
-   | 16–20     | 1     | 1     | 2     | 2     | 2     |
-   | 11–15     | 1     | 2     | 2     | 2     | 2     |
-   | 7–10      | 2     | 2     | 2     | 2     | 3     |
+   | > 20      | 1     | 1     | 1     | 1     | 2     |
+   | 16–20     | 1     | 1     | 1     | 1     | 3     |
+   | 11–15     | 1     | 1     | 1     | 2     | 3     |
+   | 7–10      | 1     | 1     | 1     | 3     | 3     |
 
 4. **User lineup screen:** `set-lineup.js` clears slots → `POST /api/autoset-lineup` (roster rows + `game_state` + `team_chemistry`) → refresh UI + toast. `team_chemistry` comes from `GET /roster/...` when franchise/tournament query params are used; otherwise **15**.
 5. **Phaser sim (Q2–Q4):** `bootGame.js` → `generateBothLineupsFromApi()` (`autosetLineupApi.js`) — same endpoint; rosters via `fetchTeamRoster()`.

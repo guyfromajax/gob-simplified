@@ -475,7 +475,7 @@ After training is submitted, users are automatically redirected to the training 
 
 **Header Section:**
 - Page title: "TRAINING REPORT"
-- **Row 1 (meta):** Week number, Upcoming Opponent (from schedule), Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)"). In **franchise** mode, the **right** side of this row can show an optional **recruiting meta line** (`#training-report-recruit-meta-line`): recruit name(s) and RT, week-gated (see **Recruiting summary (Franchise only)** below).
+- **Row 1 (meta):** Week number, Upcoming Opponent (from schedule), Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)"). Franchise-only recruit **detail** (name / RT line) is **not** in this row; it sits under the recruit strip title in the Notes header (see below).
 - **Top-right header control** (behavior depends on `from` query parameter):
   - **`from=inbox` (franchise):** **Back** → Franchise Command Center, Inbox tab
   - **Otherwise (e.g. `from=training` or absent):** Orange **Go To Locker Room** → Franchise or Tournament Command Center (existing behavior)
@@ -485,8 +485,7 @@ After training is submitted, users are automatically redirected to the training 
 The Notes block no longer shows a static **Internal** label. Instead, **franchise** training reports show week-specific recruiting copy (right-aligned), driven by the API and persisted on the user-team FTD snapshot for that week.
 
 **Placement (UI):**
-- **Same row as the Notes `h2`:** Right column shows the **section title** string (`#training-report-recruit-header`), e.g. `Recruiting Visit` or `Recruits Leaning Your Way`.
-- **Same row as Week / Upcoming Opponent / Training Focus:** Right column shows the **detail line** (`#training-report-recruit-meta-line`), e.g. `{Recruit Name} - RT: {n}` or a comma-separated list (see week rules). Tournament mode hides both slots.
+- **Same row as the Notes `h2` (right column):** **Title** (`#training-report-recruit-header`), e.g. `Recruiting Visit` or `Recruits Leaning Your Way`, with **detail line directly beneath** (`#training-report-recruit-meta-line`): e.g. `{Recruit Name} - RT: {n}` or a comma-separated list (see week rules). Tournament mode hides both slots.
 
 **Week rules:**
 - **Weeks 20–26 (official visit window):** Title **`Recruiting Visit`**. Detail line is the **single recruit assigned to visit the user’s team that week** — `{Name} - RT: {RT}` — resolved from franchise `recruiting_results.{week}[user_team_object_id]` → recruit row in **FRD** (`franchise_recruits_data`). **Do not** show the “recruits leaning” list in these weeks. Weekly visit assignment still runs from training when results for that week are not yet present (see recruiting flow in `franchise_routes`).
