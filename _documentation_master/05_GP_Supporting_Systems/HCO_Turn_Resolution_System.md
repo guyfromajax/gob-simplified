@@ -104,8 +104,56 @@ HCO is now protected from play renames in the critical fetch path because:
 - universal skeleton fetch is by `play_id`
 - team play resolution supports both name-keyed and `play_id`-keyed storage maps
 
+## Playcall strip (court UI)
+
+During **HCO** turns, the lower-third **playcall strip** on the court page (`FrontEnd/static/court.html`, `#playcall-strip`) summarizes the chosen offense play, offensive focus/target, defense call, and **expected value (EV)** for that half-court turn.
+
+### When it appears
+
+- `FrontEnd/static/js/phaser/ui/playcallCenter.js` treats a turn as HCO when turn payload fields such as `offensive_state`, `current_turn`, or `play_type` read as `HCO`, or `playcall === 'HCO'`.
+- On each qualifying turn update, `dispatchPlaycallStripShow` fires a window event **`gob:playcall-strip-show`** with `detail`: `offensePlay`, `offenseTarget`, `defensePlay`, and **`ev`** (from `turnData.ev`). Non-HCO turns dispatch **`gob:playcall-strip-hide`** instead.
+- `FrontEnd/static/js/phaser/gameScene.js` listens for those events and updates the strip DOM (offense/defense text and the EV meter). **EV is not recomputed in the client**; it is whatever the turn payload supplies, rounded and displayed.
+
+### EV advantage meter (chevrons)
+
+The centered EV control (`#pcs-ev`, class `pcs-ev-meter`) is **presentational only**. It does not change HCO resolution logic.
+
+**Inputs**
+
+- `ev` is parsed as a number. Non-finite values show `--` (gold).
+- Otherwise EV is shown as an integer percent in **[-100, +100]** (clamped after `Math.round`).
+
+**Lit slot count**
+
+- There are always **10** chevron slots in one horizontal row (plus the signed percentage).
+- **Lit slots** = `Math.round(Math.abs(EV) / 10)`, clamped to **0–10** (each lit chevron represents roughly ten percentage points of advantage magnitude).
+
+**Direction and layout**
+
+- **Positive EV** (offense advantage): solid **left**-pointing chevrons for lit slots; unlit slots use hollow **right**-pointing marks. Layout: **`[+XX%]`** (eight-pixel gap) **chevron row** (number on the **left** of the row).
+- **Negative EV** (defense advantage): solid **right**-pointing chevrons for lit slots; unlit slots use hollow **left**-pointing marks. Layout: **chevron row** (gap) **`[-XX%]`** (number on the **right**).
+- **EV = 0**: five hollow left-pointing | **`0%`** | five hollow right-pointing (neutral “outward from center” look). The number uses **`0%`** (no plus sign); positive and negative values always include **`+`** or **`-`** on the number.
+
+**Color (matches momentum strip tokens)**
+
+- Lit offense / number on offense side: `#34EC27`
+- Lit defense / number on defense side: `#ff4444`
+- Unlit stroke/fill base: `rgba(255, 255, 255, 0.10)`
+
+Direction of chevrons and the sign on the percentage are redundant cues (not color-only).
+
+**Animation (on each strip show / EV update)**
+
+- Lit chevrons fade in over ~**250 ms**, staggered **left-to-right** for offense advantage and **right-to-left** for defense advantage. Unlit slots are not animated.
+- The percentage uses a short **~150 ms** opacity intro.
+
+Implementation lives in **`renderPlaycallEvMeter`** in `FrontEnd/static/js/phaser/gameScene.js` and the `.pcs-ev-meter*` rules in `FrontEnd/static/court.html`.
+
 ## Key Files
 
 - `BackEnd/engine/phase_resolution.py`
 - `BackEnd/models/turn_manager.py`
 - `BackEnd/utils/team_play_utils.py`
+- `FrontEnd/static/js/phaser/ui/playcallCenter.js` (HCO gating and `gob:playcall-strip-show` / `hide` dispatch)
+- `FrontEnd/static/js/phaser/gameScene.js` (`showPlaycallStrip`, `renderPlaycallEvMeter`)
+- `FrontEnd/static/court.html` (`#playcall-strip`, `#pcs-ev`, meter styles)

@@ -51,6 +51,8 @@
       --border:     rgba(255,255,255,0.10);
       --border-lt:  rgba(255,255,255,0.20);
       --bebas:      'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      /* CTAs: Google Bebas Neue only (all caps), not Pro */
+      --bebas-neue-cta: 'Bebas Neue', sans-serif;
       --inter:      'Inter', sans-serif;
       --max:        1240px;
     }
@@ -107,7 +109,8 @@
       background: var(--orange); border-color: var(--orange); color: #fff;
     }
     #nav-cta {
-      padding: 7px 18px; font-family: var(--bebas); font-size: 14px; letter-spacing: 0.05em;
+      padding: 7px 18px; font-family: var(--bebas-neue-cta); font-size: 14px; letter-spacing: 0.08em;
+      text-transform: uppercase;
       color: var(--bg); background: var(--orange); border-radius: 7px; text-decoration: none;
       opacity: 0; pointer-events: none; transform: translateY(-4px);
       transition: opacity 0.25s, transform 0.25s, background 0.2s;
@@ -164,7 +167,8 @@
     /* Primary CTA — brand orange (matches nav Play The Alpha) */
     .btn-green {
       display: inline-flex; align-items: center; gap: 8px;
-      padding: 16px 48px; font-family: var(--bebas); font-size: 1.25rem; letter-spacing: 0.07em;
+      padding: 16px 48px; font-family: var(--bebas-neue-cta); font-size: 1.25rem; letter-spacing: 0.1em;
+      text-transform: uppercase;
       color: var(--bg); background: var(--orange);
       border: none; border-radius: 8px; cursor: pointer;
       box-shadow: 0 4px 28px rgba(247, 148, 32, 0.45), inset 0 1px 0 rgba(255,255,255,0.25);
