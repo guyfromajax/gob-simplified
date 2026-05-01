@@ -114,21 +114,60 @@ function updateMomentumBar(teamSide, value) {
   }
 }
 
-function showPlaycallStrip(offensePlay, offenseTarget, defensePlay) {
+function formatPlaycallStripEv(ev) {
+  const evNum = parseFloat(ev);
+  if (!Number.isFinite(evNum)) {
+    return { text: '--', color: '#FFD700' };
+  }
+  let text;
+  if (evNum > 0) {
+    text = `+${Math.round(evNum)}%`;
+  } else if (evNum < 0) {
+    text = `${Math.round(evNum)}%`;
+  } else {
+    text = '0%';
+  }
+  let color;
+  if (evNum < 0) {
+    color = '#FF3B30';
+  } else if (evNum === 0) {
+    color = '#FFD700';
+  } else {
+    color = '#00FF88';
+  }
+  return { text, color };
+}
+
+function showPlaycallStrip(offensePlay, offenseTarget, defensePlay, ev) {
   const strip = document.getElementById('playcall-strip');
   if (!strip) return;
   const oPlay = document.getElementById('pcs-offense-play');
   const oTgt = document.getElementById('pcs-offense-target');
   const dPlay = document.getElementById('pcs-defense-play');
+  const evEl = document.getElementById('pcs-ev');
   if (oPlay) oPlay.textContent = offensePlay || '--';
   if (oTgt) oTgt.textContent = offenseTarget != null && String(offenseTarget).length ? String(offenseTarget) : '';
   if (dPlay) dPlay.textContent = defensePlay || '--';
+  if (evEl) {
+    const evDisplay = formatPlaycallStripEv(ev);
+    evEl.textContent = evDisplay.text;
+    evEl.style.color = evDisplay.color;
+  }
   strip.classList.remove('hidden');
 }
 
 function hidePlaycallStrip() {
   const strip = document.getElementById('playcall-strip');
   if (strip) strip.classList.add('hidden');
+}
+
+if (typeof window !== 'undefined' && !window.__gobPlaycallStripListenersInstalled) {
+  window.__gobPlaycallStripListenersInstalled = true;
+  window.addEventListener('gob:playcall-strip-show', (event) => {
+    const detail = event?.detail || {};
+    showPlaycallStrip(detail.offensePlay, detail.offenseTarget, detail.defensePlay, detail.ev);
+  });
+  window.addEventListener('gob:playcall-strip-hide', hidePlaycallStrip);
 }
 
 function syncShotClockCriticalClass(shotSeconds) {
@@ -2100,6 +2139,10 @@ export function createGameScene(Phaser) {
           updateTimeoutPipsUsedCount(liveAwayTimeouts);
         }
 
+        // Playcall strip lifecycle now starts from updatePlaycallCenter() at HCO turn start
+        // and hides from finalizeTurnAfterAnimation() when the instigating event resolves.
+        // Keeping the old scoreboard-driven implementation commented for easy rollback.
+        /*
         if (isHcoTurnContext(turn)) {
           const offPlay = turn.offensive_playcall || turn.current_playcall || '';
           const focusRaw = turn.offensive_play_focus || turn.offensive_focus || '';
@@ -2113,6 +2156,7 @@ export function createGameScene(Phaser) {
         } else {
           hidePlaycallStrip();
         }
+        */
 
         applyPlayerStats(turn);
         applyTeamStats(turn);

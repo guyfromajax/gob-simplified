@@ -23,6 +23,28 @@ import {
 } from "./BallControllerAdapter.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
+function isHcoPlaycallTurn(turn) {
+  if (!turn || typeof turn !== 'object') return false;
+  const keys = ['offensive_state', 'current_turn', 'play_type'];
+  return keys.some((key) => {
+    const value = turn[key];
+    return value != null && String(value).toUpperCase() === 'HCO';
+  }) || turn.playcall === 'HCO';
+}
+
+function hidePlaycallStripAtInstigatingEvent(turn) {
+  if (!isHcoPlaycallTurn(turn)) return;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gob:playcall-strip-hide', {
+      detail: {
+        reason: 'hco_instigating_event',
+        resultType: turn.result_type || null,
+        turnIndex: turn.index ?? null,
+      },
+    }));
+  }
+}
+
 /**
  * Prepare a turn for animation by setting up all required state and UI updates.
  * 
@@ -270,6 +292,7 @@ export async function finalizeTurnAfterAnimation({
   // Scenario A: Executes immediately in handleTimeoutButtonClick when button is pressed during eligible turn
   // Scenario B: Executes immediately in checkAndExecuteQueuedTimeout when eligible turn is reached
   // No need to wait for turn completion - popup appears immediately in both scenarios
+  hidePlaycallStripAtInstigatingEvent(turn);
   
   // ✅ UNIVERSAL TRANSITION HANDLER - Handle possession flips and state transitions
   // This runs FIRST to ensure possession is correct before other finalization steps

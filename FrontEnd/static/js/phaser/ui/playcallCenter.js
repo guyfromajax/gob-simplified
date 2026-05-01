@@ -20,6 +20,38 @@ export function clearPlaycallHighlights() {
   }
 }
 
+function isHcoPlaycallTurn(turnData) {
+  if (!turnData || typeof turnData !== 'object') return false;
+  const keys = ['offensive_state', 'current_turn', 'play_type'];
+  return keys.some((key) => {
+    const value = turnData[key];
+    return value != null && String(value).toUpperCase() === 'HCO';
+  }) || turnData.playcall === 'HCO';
+}
+
+function dispatchPlaycallStripShow(turnData) {
+  if (typeof window === 'undefined') return;
+  if (!isHcoPlaycallTurn(turnData)) {
+    window.dispatchEvent(new CustomEvent('gob:playcall-strip-hide', {
+      detail: { reason: 'non_hco_turn_start' },
+    }));
+    return;
+  }
+  const focusRaw = turnData.offensive_play_focus || turnData.offensive_focus || '';
+  const focus =
+    typeof focusRaw === 'string' && focusRaw.length
+      ? focusRaw.charAt(0).toUpperCase() + focusRaw.slice(1)
+      : '';
+  window.dispatchEvent(new CustomEvent('gob:playcall-strip-show', {
+    detail: {
+      offensePlay: turnData.offensive_playcall || turnData.current_playcall || '',
+      offenseTarget: focus,
+      defensePlay: turnData.defensive_playcall_display || turnData.defensive_playcall || turnData.defense_playcall || '',
+      ev: turnData.ev,
+    },
+  }));
+}
+
 /**
  * Update playcall center at the start of each turn
  * @param {Object} turnData - Turn data from backend containing playcalls
@@ -109,9 +141,14 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Do NOT update headshots dynamically during gameplay - this causes images to change mid-game
   // and can show computer team players. Images remain static based on user's lineup.
 
+  dispatchPlaycallStripShow(turnData);
+
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
   // ✅ FIX: Use play name instead of Play Type => Play Focus
+  /*
+  // Temporarily disabled by Playcall Center surface update.
+  // Keep this block intact so the center-court playcall HUD can be restored quickly.
   const playName = turnData.offensive_playcall || turnData.current_playcall;
   // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
   // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
@@ -143,6 +180,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
       hotPlayer: null
     });
   }
+  */
 }
 
 /**
