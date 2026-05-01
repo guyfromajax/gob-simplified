@@ -334,6 +334,8 @@ function chStandardCopyHtml(entry) {
   var opp = escapeHtmlMs(entry.opponent_name || '?');
   var beatLost = entry.user_won ? 'beat' : 'lost to';
   var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
+  var recRaw = entry.user_team_record != null && String(entry.user_team_record).trim() !== '' ? String(entry.user_team_record).trim() : '';
+  var rec = recRaw ? escapeHtmlMs(recRaw) : '';
   var userStrong = '<strong class="ch-username">' + uname + '</strong>';
   var usc = entry.user_score;
   var osc = entry.opponent_score;
@@ -342,12 +344,15 @@ function chStandardCopyHtml(entry) {
     osc != null &&
     !Number.isNaN(Number(usc)) &&
     !Number.isNaN(Number(osc));
+  var tailRanked = rec
+    ? ut + ' is now ' + rec + ' & ranked ' + rankLabel + ' in the nation.'
+    : ut + ' is now ranked ' + rankLabel + ' in the nation.';
   if (hasScores) {
     return (
       userStrong +
       ', coaching ' +
       ut +
-      ' ' +
+      ', ' +
       beatLost +
       ' ' +
       opp +
@@ -356,26 +361,10 @@ function chStandardCopyHtml(entry) {
       '-' +
       Number(osc) +
       '. ' +
-      ut +
-      ' is now ranked ' +
-      rankLabel +
-      ' in the nation.'
+      tailRanked
     );
   }
-  return (
-    userStrong +
-    ', coaching ' +
-    ut +
-    ' ' +
-    beatLost +
-    ' ' +
-    opp +
-    '. ' +
-    ut +
-    ' is now ranked ' +
-    rankLabel +
-    ' in the nation.'
-  );
+  return userStrong + ', coaching ' + ut + ', ' + beatLost + ' ' + opp + '. ' + tailRanked;
 }
 
 function chAnnouncementHtml(entry) {

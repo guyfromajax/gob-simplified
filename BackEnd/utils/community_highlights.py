@@ -349,6 +349,7 @@ def _build_standard_entry(
     opponent_score: int,
     rank_label: str,
     natl_rank: int,
+    user_team_record: str,
     gp_delta: int,
     primary: str,
     secondary: str,
@@ -366,6 +367,7 @@ def _build_standard_entry(
         "opponent_score": int(opponent_score),
         "natl_rank": natl_rank,
         "rank_label": rank_label,
+        "user_team_record": str(user_team_record or "0-0"),
         "gp_delta": gp_delta,
         "primary_color": primary,
         "secondary_color": secondary,
@@ -530,6 +532,7 @@ def flush_community_highlight_pending_after_week(
             )
         )
     else:
+        user_team_record = _user_regular_season_record(fresh, str(user_team_id_str))
         entries.append(
             _build_standard_entry(
                 display_username=display_username,
@@ -540,6 +543,7 @@ def flush_community_highlight_pending_after_week(
                 opponent_score=opponent_score,
                 rank_label=rank_label,
                 natl_rank=natl_rank,
+                user_team_record=user_team_record,
                 gp_delta=gp_delta,
                 primary=primary,
                 secondary=secondary,
