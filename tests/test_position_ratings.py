@@ -31,3 +31,20 @@ def test_height_clamps():
     assert low_center == 1
     # C rating weights height at 40%; max height rating 100 → 40 when other attrs are 0
     assert high_center == 40
+
+
+def test_power_forward_regular_uses_height():
+    player = {"height": 90, "attributes": {}}
+    assert compute_position_ratings(player)["PF"] == 20
+
+
+def test_recruit_power_forward_weights_reduce_height():
+    player = {"height": 90, "attributes": {"RB": 100, "ST": 100}}
+    ratings = compute_position_ratings(player, profile="recruit")
+    assert ratings["PF"] == 70
+
+
+def test_recruit_center_weights_scoring_and_inside_defense_more_than_height():
+    player = {"height": 90, "attributes": {"SC": 100, "ID": 100}}
+    ratings = compute_position_ratings(player, profile="recruit")
+    assert ratings["C"] == 70

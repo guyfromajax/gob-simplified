@@ -6245,7 +6245,7 @@ def _generate_walk_on_profile() -> dict[str, Any]:
         "attributes": attrs,
         "height": height,
         "name": name,
-    })
+    }, profile="recruit")
     return {
         "recruit_id": None,
         "name": name,

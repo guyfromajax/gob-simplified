@@ -72,11 +72,12 @@ SH, OD, (AG, SC), (IQ, PS)
 ### Power Forward (PF)
 RB, ST, ID, (IQ, SC)
 
-- **RB** (Rebounding): 35%
-- **ST** (Strength): 35%
+- **RB** (Rebounding): 25% (Recruits 30%)
+- **ST** (Strength): 25% (Recruits 30%)
 - **IQ** (Basketball IQ): 5%
 - **SC** (Scoring): 5%
 - **ID** (Inside Defense): 15%
+- **height**: 20% (Recruits 10%)
 - **FT** (Free Throw): 5%
 - **PS** (Passing): 0%
 - **SH** (Shooting): 0%
@@ -84,9 +85,9 @@ RB, ST, ID, (IQ, SC)
 ### Center (C)
 (SC, ID, height), (ST, RB)
 
-- **SC** (Scoring): 15%
-- **ID** (Inside Defense): 15%
-- **height**: 40%
+- **SC** (Scoring): 15% (Recruits: 30%)
+- **ID** (Inside Defense): 15% (Recruits: 30%)
+- **height**: 40% (Recruits: 10%)
 - **ST** (Strength): 15%
 - **RB** (Rebounding): 15%
 - **PS** (Passing): 0%

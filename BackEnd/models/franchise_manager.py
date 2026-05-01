@@ -878,7 +878,7 @@ class RecruitManager:
                 "height": height,
                 "name": name
             }
-            position_ratings = compute_position_ratings(recruit_for_ratings)
+            position_ratings = compute_position_ratings(recruit_for_ratings, profile="recruit")
             
             recruits.append({
                 "name": name, 

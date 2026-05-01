@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Literal
 
 # Weights for each position. Each sub-dict maps attribute -> weight percentage (0-1).
 # All weights must total 1.0 (100%).
@@ -40,11 +40,12 @@ POSITION_WEIGHTS: Dict[str, Dict[str, float]] = {
         "RB": 0.00,
     },
     "PF": {
-        "RB": 0.35,
-        "ST": 0.35,
+        "RB": 0.25,
+        "ST": 0.25,
         "IQ": 0.05,
         "SC": 0.05,
         "ID": 0.15,
+        "height": 0.20,
         "FT": 0.05,
         "PS": 0.00,
         "SH": 0.00,
@@ -61,6 +62,34 @@ POSITION_WEIGHTS: Dict[str, Dict[str, float]] = {
         "AG": 0.00,
     },
 }
+
+RECRUIT_POSITION_WEIGHTS: Dict[str, Dict[str, float]] = {
+    **POSITION_WEIGHTS,
+    "PF": {
+        "RB": 0.30,
+        "ST": 0.30,
+        "IQ": 0.05,
+        "SC": 0.05,
+        "ID": 0.15,
+        "height": 0.10,
+        "FT": 0.05,
+        "PS": 0.00,
+        "SH": 0.00,
+    },
+    "C": {
+        "SC": 0.30,
+        "ID": 0.30,
+        "height": 0.10,
+        "ST": 0.15,
+        "RB": 0.15,
+        "PS": 0.00,
+        "IQ": 0.00,
+        "FT": 0.00,
+        "AG": 0.00,
+    },
+}
+
+PositionRatingProfile = Literal["player", "recruit"]
 
 
 def _get_attr(player: dict, key: str) -> float:
@@ -103,7 +132,7 @@ def _clamp(value: float, lower: int = 1, upper: int | None = 100) -> int:
     return max(lower, min(upper, rounded))
 
 
-def compute_position_ratings(player: dict) -> Dict[str, int]:
+def compute_position_ratings(player: dict, profile: PositionRatingProfile = "player") -> Dict[str, int]:
     """Compute position ratings for each basketball position.
 
     ``player`` is a mapping containing numeric attributes either at the top
@@ -112,8 +141,9 @@ def compute_position_ratings(player: dict) -> Dict[str, int]:
 
     ratings: Dict[str, int] = {}
     height_rating = _height_to_rating(_get_attr(player, "height"))
+    position_weights = RECRUIT_POSITION_WEIGHTS if profile == "recruit" else POSITION_WEIGHTS
 
-    for pos, weights in POSITION_WEIGHTS.items():
+    for pos, weights in position_weights.items():
         total = 0.0
         for attr, weight in weights.items():
             if attr == "height":
