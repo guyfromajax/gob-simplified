@@ -85,7 +85,7 @@
       });
     });
     // Top nav: Tutorials (and Feedback if present) — homepage has static bar, authBarInit may not run
-    document.querySelectorAll('.tutorials-nav-btn').forEach(function (btn) {
+    document.querySelectorAll('.nav-tutorials-link').forEach(function (btn) {
       btn.addEventListener('click', function () { playSound('click-tiny.wav'); });
     });
     var feedbackBtn = document.getElementById('feedback-btn');

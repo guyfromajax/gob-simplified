@@ -92,7 +92,7 @@ body.homepage-v3.has-auth-bar {
   border-color: var(--hp-orange);
   color: #fff;
 }
-.auth-bar.homepage-v3-nav .tutorials-nav-btn {
+.auth-bar.homepage-v3-nav .nav-tutorials-link {
   font-size: 13px;
 }
 

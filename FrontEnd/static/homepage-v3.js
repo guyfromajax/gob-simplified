@@ -114,7 +114,7 @@
     });
 
     /* Tutorials nav */
-    document.querySelectorAll('.tutorials-nav-btn').forEach(function (btn) {
+    document.querySelectorAll('.nav-tutorials-link').forEach(function (btn) {
       btn.addEventListener('click', function () { playSound('click-tiny.wav'); });
     });
   }

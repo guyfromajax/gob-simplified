@@ -349,7 +349,13 @@
     bar.innerHTML = [
       '<div class="auth-bar-left">',
       '  <a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>',
-      '  <a href="/tutorial.html" class="tutorials-nav-btn">Tutorials</a>',
+      '  <a href="/tutorial.html" class="nav-tutorials-link" aria-label="Tutorials">',
+      '    <svg class="nav-tutorials-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">',
+      '      <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.25"/>',
+      '      <path d="M5.6 4.8 L9.4 7 L5.6 9.2 Z" fill="currentColor"/>',
+      '    </svg>',
+      '    <span class="nav-tutorials-label">Tutorials</span>',
+      '  </a>',
       '</div>',
       '<img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">',
       '<div class="auth-bar-right">',
@@ -654,7 +660,7 @@
   function ensureTutorialsNavSound() {
     var bar = document.getElementById('auth-bar');
     if (!bar) return;
-    var tutorialsBtn = bar.querySelector('.tutorials-nav-btn');
+    var tutorialsBtn = bar.querySelector('.nav-tutorials-link');
     if (tutorialsBtn && !tutorialsBtn.dataset.soundBound) {
       tutorialsBtn.dataset.soundBound = '1';
       tutorialsBtn.addEventListener('click', function () { playNavSound('click-tiny.wav'); });
