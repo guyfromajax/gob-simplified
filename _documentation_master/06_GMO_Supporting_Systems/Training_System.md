@@ -475,12 +475,33 @@ After training is submitted, users are automatically redirected to the training 
 
 **Header Section:**
 - Page title: "TRAINING REPORT"
-- Week number
-- Upcoming Opponent (from schedule)
-- Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)")
-- Top-right header control (behavior depends on `from` query parameter):
+- **Row 1 (meta):** Week number, Upcoming Opponent (from schedule), Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)"). In **franchise** mode, the **right** side of this row can show an optional **recruiting meta line** (`#training-report-recruit-meta-line`): recruit name(s) and RT, week-gated (see **Recruiting summary (Franchise only)** below).
+- **Top-right header control** (behavior depends on `from` query parameter):
   - **`from=inbox` (franchise):** **Back** → Franchise Command Center, Inbox tab
   - **Otherwise (e.g. `from=training` or absent):** Orange **Go To Locker Room** → Franchise or Tournament Command Center (existing behavior)
+
+#### Recruiting summary (Franchise only)
+
+The Notes block no longer shows a static **Internal** label. Instead, **franchise** training reports show week-specific recruiting copy (right-aligned), driven by the API and persisted on the user-team FTD snapshot for that week.
+
+**Placement (UI):**
+- **Same row as the Notes `h2`:** Right column shows the **section title** string (`#training-report-recruit-header`), e.g. `Recruiting Visit` or `Recruits Leaning Your Way`.
+- **Same row as Week / Upcoming Opponent / Training Focus:** Right column shows the **detail line** (`#training-report-recruit-meta-line`), e.g. `{Recruit Name} - RT: {n}` or a comma-separated list (see week rules). Tournament mode hides both slots.
+
+**Week rules:**
+- **Weeks 20–26 (official visit window):** Title **`Recruiting Visit`**. Detail line is the **single recruit assigned to visit the user’s team that week** — `{Name} - RT: {RT}` — resolved from franchise `recruiting_results.{week}[user_team_object_id]` → recruit row in **FRD** (`franchise_recruits_data`). **Do not** show the “recruits leaning” list in these weeks. Weekly visit assignment still runs from training when results for that week are not yet present (see recruiting flow in `franchise_routes`).
+- **Weeks 1–19 and 27–34:** Title **`Recruits Leaning Your Way`**. Detail line lists recruits whose **`Lean.1` / `Lean.2` / `Lean.3`** equals the user’s team (same lean semantics as FCC). Sorted by **RT** (max `position_ratings` value) descending. **At most three** recruits are listed, formatted `Name - RT: n`, comma-separated; if **more than three** lean toward the team, append **` ...`** after the third entry.
+- **Other weeks (e.g. 35+):** No recruiting title or meta line (elements stay hidden).
+
+**API (`GET /franchise/training-report`, franchise):**
+- Response includes optional string fields **`recruiting_header`** and **`recruiting_meta_line`** (may be `null` when out of scope or empty).
+
+**Persistence:**
+- On each successful **user** training run, the snapshot written to **FTD** `training_reports.{week}` includes `recruiting_header` and `recruiting_meta_line` when applicable, so reopening a **past** week’s report shows the lean/visit copy from **that** run. Older snapshots without these keys are **recomputed** on read from current franchise + FRD state (visit weeks can still resolve from `recruiting_results`; lean lines may differ from history if leans changed later).
+
+**Implementation:**
+- Backend: `_training_report_recruiting_display` (and helpers) in `BackEnd/api/franchise_routes.py`; wired into `GET /franchise/training-report` and user training report persistence.
+- Frontend: `FrontEnd/static/training-report.html` / `training-report.css` / `training-report.js` (`renderTrainingReportRecruitingBanner`, called from `renderHeader`).
 
 **Player Report Section:**
 - Header: "Player Report"
@@ -646,6 +667,7 @@ Training report links appear next to scheduled games on the Franchise Command Ce
    - Backend retrieves players from franchise-instance `FPD`
    - Franchise player membership comes from `FTD.players` (not universal `teams.player_ids`)
    - Backend retrieves training report from `franchise_teams.{team_id}.training_reports.{week}`
+   - **Franchise:** Response may include **`recruiting_header`** and **`recruiting_meta_line`** for the week-gated recruiting strip (see **Recruiting summary (Franchise only)** under **Training Report Page**).
    - Frontend renders players table and team attributes with visualizations
 
 3. **Schedule Integration:**
@@ -696,7 +718,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 ### Data Storage
 
 **FTD / Franchise Team Data:**
-- `training_reports.{week}` - User-team training report for a specific week
+- `training_reports.{week}` - User-team training report for a specific week (includes standard report fields; **franchise** snapshots also store **`recruiting_header`** and **`recruiting_meta_line`** when the recruiting strip applies so historical weeks match the run that produced them)
 - `team_attributes.*` - Updated user-team and CPU-team team attributes
 - `plays` - User-team plays data after training
 - `scouting_data` - User-team scouting data after training
@@ -739,7 +761,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 **Backend:**
 - `BackEnd/models/training_execution_v2.py` - Core training execution logic
 - `BackEnd/models/training_notes.py` - Structured training-notes generation for report sections
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/distant-cpu`, distant helper + idempotency); also `GET /franchise/training-report`, `GET /franchise/schedule`
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/distant-cpu`, distant helper + idempotency); also `GET /franchise/training-report`, `GET /franchise/schedule`. Training report **recruiting strip**: `_training_report_recruiting_display` (+ `_recruit_display_name_for_training_report`, `_recruit_rt`) and persistence on `training_reports.{week}`.
 - `BackEnd/utils/training_loading_highlights.py` - `training_highlights` for loading feed
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)

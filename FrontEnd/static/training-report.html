@@ -23,14 +23,17 @@
   <div class="training-report-container resource-page-container fcc-brand-page-shell training-report-resource-shell">
     <!-- Header -->
     <header class="report-header">
-      <div class="header-left">
+        <div class="header-left">
         <h1 class="page-title">Training Report</h1>
-        <div class="header-meta-line">
-          <span><span id="week-label">Week:</span> <span id="week-number">--</span></span>
-          <span class="meta-sep">·</span>
-          <span>Upcoming Opponent: <span id="upcoming-opponent">--</span></span>
-          <span class="meta-sep">·</span>
-          <span>Training Focus: <span id="training-focus">--</span></span>
+        <div class="header-meta-row">
+          <div class="header-meta-line">
+            <span><span id="week-label">Week:</span> <span id="week-number">--</span></span>
+            <span class="meta-sep">·</span>
+            <span>Upcoming Opponent: <span id="upcoming-opponent">--</span></span>
+            <span class="meta-sep">·</span>
+            <span>Training Focus: <span id="training-focus">--</span></span>
+          </div>
+          <div id="training-report-recruit-meta-line" class="header-recruit-meta is-hidden" aria-live="polite"></div>
         </div>
       </div>
       <button id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>
@@ -46,7 +49,7 @@
             <div id="training-notes-brief" class="training-notes-brief">Week -- Training Brief · For Coaching Staff Only</div>
           </div>
         </div>
-        <div class="training-notes-classification">Internal</div>
+        <div id="training-report-recruit-header" class="training-notes-recruit-title is-hidden" aria-live="polite"></div>
       </div>
       <div class="training-notes-rule" aria-hidden="true"></div>
       <div class="training-notes-container" id="training-notes-container">

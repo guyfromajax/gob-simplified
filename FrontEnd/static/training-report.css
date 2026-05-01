@@ -759,19 +759,46 @@ body.training-report-page .header-left {
   width: 100%;
 }
 
+body.training-report-page .header-meta-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
 body.training-report-page .header-meta-line {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 6px;
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.54);
   text-align: left;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   align-self: flex-start;
   justify-content: flex-start;
   white-space: nowrap;
+}
+
+body.training-report-page .header-recruit-meta {
+  flex: 0 1 auto;
+  max-width: min(520px, 48%);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+  line-height: 1.35;
+  align-self: center;
+  white-space: normal;
+}
+
+body.training-report-page .header-recruit-meta.is-hidden {
+  display: none;
 }
 
 body.training-report-page .header-meta-line #week-number,
@@ -1077,16 +1104,21 @@ body.training-report-page .training-notes-brief {
   line-height: 1.3;
 }
 
-body.training-report-page .training-notes-classification {
-  color: rgba(255,255,255,0.25);
+body.training-report-page .training-notes-recruit-title {
+  color: rgba(255, 255, 255, 0.72);
   font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 400;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   white-space: nowrap;
   align-self: start;
   padding-top: 6px;
+  text-align: right;
+}
+
+body.training-report-page .training-notes-recruit-title.is-hidden {
+  display: none;
 }
 
 body.training-report-page .training-notes-rule,
@@ -1297,6 +1329,22 @@ body.training-report-page .training-notes-misc-value {
 
   body.training-report-page .training-notes-header {
     grid-template-columns: 1fr;
+  }
+
+  body.training-report-page .header-meta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.training-report-page .header-recruit-meta {
+    max-width: 100%;
+    text-align: right;
+    align-self: flex-end;
+  }
+
+  body.training-report-page .training-notes-recruit-title {
+    text-align: right;
+    width: 100%;
   }
 }
 

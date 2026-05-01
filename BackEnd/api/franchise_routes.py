@@ -4773,6 +4773,85 @@ def _recruit_rt(recruit_doc: dict) -> int:
     return max(values) if values else 0
 
 
+def _recruit_display_name_for_training_report(recruit_doc: dict) -> str:
+    name = str(recruit_doc.get("name") or "").strip()
+    if name:
+        return name
+    first = str(recruit_doc.get("first_name") or "").strip()
+    last = str(recruit_doc.get("last_name") or "").strip()
+    full = f"{first} {last}".strip()
+    return full or "Recruit"
+
+
+def _training_report_recruiting_display(
+    franchise_doc: dict | None,
+    report_week: int,
+    user_team_object_id: str,
+) -> dict[str, str | None] | None:
+    """
+    Copy for training-report.html recruiting column: visit weeks 20–26 vs lean weeks 1–19 / 27–34.
+    Returns dict with keys header, meta_line (strings; meta_line may be empty) or None when out of scope.
+    """
+    if not franchise_doc or not user_team_object_id:
+        return None
+    try:
+        w = int(report_week)
+    except (TypeError, ValueError):
+        return None
+    fid = franchise_doc.get("_id")
+    if fid is None:
+        return None
+    fid_str = str(fid)
+    tid_str = str(user_team_object_id)
+
+    if 20 <= w <= 26:
+        assignments = (franchise_doc.get("recruiting_results") or {}).get(str(w)) or {}
+        rid = assignments.get(tid_str)
+        if not rid and assignments:
+            for k, v in assignments.items():
+                if str(k) == tid_str:
+                    rid = v
+                    break
+        if not rid:
+            return {"header": "Recruiting Visit", "meta_line": None}
+        recruit = franchise_recruits_data_collection.find_one(
+            {"franchise_id": fid_str, "recruit_id": rid},
+            {"name": 1, "first_name": 1, "last_name": 1, "position_ratings": 1, "recruit_id": 1},
+        )
+        if not recruit:
+            return {"header": "Recruiting Visit", "meta_line": None}
+        nm = _recruit_display_name_for_training_report(recruit)
+        rt = _recruit_rt(recruit)
+        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {rt}"}
+
+    if (1 <= w <= 19) or (27 <= w <= 34):
+        lean_or = []
+        for slot in ("1", "2", "3"):
+            lean_or.append({f"Lean.{slot}": tid_str})
+            try:
+                lean_or.append({f"Lean.{slot}": ObjectId(tid_str)})
+            except Exception:
+                pass
+        recruits = list(
+            franchise_recruits_data_collection.find(
+                {"franchise_id": fid_str, "$or": lean_or},
+                {"name": 1, "first_name": 1, "last_name": 1, "position_ratings": 1, "recruit_id": 1},
+            )
+        )
+        recruits.sort(key=lambda r: (-_recruit_rt(r), str(r.get("recruit_id") or "")))
+        header = "Recruits Leaning Your Way"
+        if not recruits:
+            return {"header": header, "meta_line": ""}
+        top = recruits[:3]
+        parts = [f"{_recruit_display_name_for_training_report(r)} - RT: {_recruit_rt(r)}" for r in top]
+        line = ", ".join(parts)
+        if len(recruits) > 3:
+            line += " ..."
+        return {"header": header, "meta_line": line}
+
+    return None
+
+
 def _best_position(position_ratings: dict) -> dict:
     best_pos = "--"
     best_rating = None
@@ -7891,7 +7970,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         ftd_update["pending_community_engagement"] = True
 
     if 20 <= week <= 26 and str(week) not in recruiting_results:
-        _process_weekly_recruiting_invites(franchise_doc)
+        week_assignments = _process_weekly_recruiting_invites(franchise_doc)
+        if isinstance(week_assignments, dict) and week_assignments:
+            franchise_doc.setdefault("recruiting_results", {})[str(week)] = week_assignments
 
     session_type = training_status.get("session_type", "in-season")
     ftd_counts_for_highlights: dict[str, int] = {}
@@ -7917,6 +7998,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "ftd_coaching_focus": ftd_counts_for_highlights,
         "team_drills": training_data.get("team_drills") or {},
     }
+    rec_ui = _training_report_recruiting_display(franchise_doc, int(week), str(team_id))
+    if rec_ui is not None:
+        training_report_data["recruiting_header"] = rec_ui.get("header")
+        training_report_data["recruiting_meta_line"] = rec_ui.get("meta_line")
 
     franchise_update_user = {
         "training_status.user_training_applied_week": week,
@@ -8397,6 +8482,20 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         except Exception as debug_exc:
             logger.warning("⚠️ [TRAINING REPORT][NOTES] debug logging failed: %s", debug_exc)
 
+        rec_header = None
+        rec_meta = None
+        if mode == "franchise" and isinstance(report_data, dict):
+            if "recruiting_header" in report_data or "recruiting_meta_line" in report_data:
+                rec_header = report_data.get("recruiting_header")
+                rec_meta = report_data.get("recruiting_meta_line")
+            else:
+                rec_snap = _training_report_recruiting_display(
+                    doc, int(week), str(authoritative_team_id)
+                )
+                if rec_snap is not None:
+                    rec_header = rec_snap.get("header")
+                    rec_meta = rec_snap.get("meta_line")
+
         return {
             "status": "success",
             "week": week if mode == "franchise" else None,  # Only for franchise mode
@@ -8414,6 +8513,8 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "players": players,
             "team_attributes": team_attrs,
             "projected_starting_five": projected_starting_five,
+            "recruiting_header": rec_header if mode == "franchise" else None,
+            "recruiting_meta_line": rec_meta if mode == "franchise" else None,
         }
         
     except HTTPException:

@@ -559,6 +559,23 @@ function renderHeader() {
   }
   
   document.getElementById('training-focus').textContent = focusText;
+
+  renderTrainingReportRecruitingBanner();
+}
+
+function renderTrainingReportRecruitingBanner() {
+  const titleEl = document.getElementById('training-report-recruit-header');
+  const metaLineEl = document.getElementById('training-report-recruit-meta-line');
+  if (!titleEl || !metaLineEl) return;
+
+  const h = reportData && reportData.recruiting_header != null ? String(reportData.recruiting_header).trim() : '';
+  const mRaw = reportData && reportData.recruiting_meta_line != null ? reportData.recruiting_meta_line : '';
+  const m = mRaw === null || mRaw === undefined ? '' : String(mRaw).trim();
+
+  titleEl.textContent = h;
+  metaLineEl.textContent = m;
+  titleEl.classList.toggle('is-hidden', !h);
+  metaLineEl.classList.toggle('is-hidden', !m);
 }
 
 function getReportWeekNumber() {
