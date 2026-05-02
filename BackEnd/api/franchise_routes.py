@@ -3945,6 +3945,60 @@ def _get_schedule_game_doc_map(franchise_id: str, max_week: int = 26) -> dict[tu
     return game_doc_map
 
 
+def _eos_schedule_score_for_side(score: dict[str, Any], side: str, team_id: str) -> Any:
+    if not isinstance(score, dict):
+        return None
+    if side in score:
+        return score.get(side)
+    return score.get(team_id)
+
+
+def _build_eos_schedule_payload(franchise_doc: dict[str, Any]) -> tuple[dict[int, list[dict[str, Any]]], set[str]]:
+    eos_schedule: dict[int, list[dict[str, Any]]] = {}
+    included_team_ids: set[str] = set()
+
+    for week in ft.EOS_WEEKS:
+        week_games: list[dict[str, Any]] = []
+        for game in ft.get_eos_week_games(franchise_doc, week, include_completed=True):
+            away_str = str(game.get("away_id") or "")
+            home_str = str(game.get("home_id") or "")
+            if not away_str or not home_str:
+                continue
+
+            score = game.get("score") or {}
+            away_score = _eos_schedule_score_for_side(score, "away", away_str)
+            home_score = _eos_schedule_score_for_side(score, "home", home_str)
+            is_complete = bool(game.get("winner")) or (away_score is not None and home_score is not None)
+
+            phase = str(game.get("phase") or "")
+            context = ""
+            if phase == "conference":
+                context = f"Conference {game.get('conference')}"
+            elif phase == "region":
+                context = f"Region {game.get('region')}"
+            elif phase == "national":
+                context = "National"
+
+            week_games.append({
+                "week": week,
+                "away_team_id": away_str,
+                "home_team_id": home_str,
+                "away_score": away_score,
+                "home_score": home_score,
+                "status": "complete" if is_complete else "scheduled",
+                "game_id": str(game.get("game_id")) if game.get("game_id") else None,
+                "phase": phase,
+                "round": game.get("round"),
+                "matchup_index": game.get("matchup_index"),
+                "tournament_context": context,
+            })
+            included_team_ids.add(away_str)
+            included_team_ids.add(home_str)
+        eos_schedule[week] = week_games
+
+    return eos_schedule, included_team_ids
+
+
 def _build_season_schedule_payload(
     franchise_id: str,
     conference: Optional[int] = None,
@@ -4056,6 +4110,9 @@ def _build_season_schedule_payload(
             included_team_ids.add(home_str)
         weeks.append(week_games)
 
+    eos_schedule, eos_team_ids = _build_eos_schedule_payload(franchise_doc)
+    included_team_ids.update(eos_team_ids)
+
     team_name_map = {
         team_id_str: team_name_lookup.get(team_id_str, team_id_str)
         for team_id_str in included_team_ids
@@ -4084,6 +4141,7 @@ def _build_season_schedule_payload(
     )
     return {
         "schedule": weeks,
+        "tournament_schedule": eos_schedule,
         "team_id": team_id,
         "team_name": user_team_name,
         "team_conferences": team_conferences,

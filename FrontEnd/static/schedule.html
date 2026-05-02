@@ -87,6 +87,18 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
     }
 
+    .schedule-week-card--tournament {
+      border-color: rgba(247, 148, 32, 0.32);
+      background:
+        linear-gradient(180deg, rgba(247, 148, 32, 0.10), transparent 22%),
+        linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
+    }
+
+    .schedule-week-card--tournament .schedule-week-title {
+      color: #ffd29b;
+      border-bottom-color: rgba(247, 148, 32, 0.18);
+    }
+
     .schedule-week-body {
       padding: 4px 10px 6px;
     }
@@ -163,6 +175,16 @@
       margin-left: 6px;
       color: #ffffff;
       font-weight: 700;
+    }
+
+    .schedule-game-context {
+      display: inline-block;
+      margin-right: 6px;
+      color: rgba(255, 210, 155, 0.86);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
     .schedule-loading,
@@ -279,6 +301,11 @@
     const homeConf = getConferenceShortLabel(game.home_conference);
     const awayLink = buildTeamLink(game.away_team_id, awayDisplay, awayRaw, returnUrl);
     const homeLink = buildTeamLink(game.home_team_id, homeDisplay, homeRaw, returnUrl);
+    const hasAwayConference = Number.isFinite(Number(game.away_conference));
+    const hasHomeConference = Number.isFinite(Number(game.home_conference));
+    const contextMarkup = game.tournament_context
+      ? `<span class="schedule-game-context">${escapeHtml(game.tournament_context)}</span>`
+      : '';
     const awayScore = game.away_score;
     const homeScore = game.home_score;
     const isComplete = game.status === 'complete' || (
@@ -287,8 +314,8 @@
       (Number(awayScore) > 0 || Number(homeScore) > 0)
     );
 
-    let awayMarkup = `${awayLink} <span class="schedule-game-conf">(${escapeHtml(awayConf)})</span>`;
-    let homeMarkup = `${homeLink} <span class="schedule-game-conf">(${escapeHtml(homeConf)})</span>`;
+    let awayMarkup = `${awayLink}${hasAwayConference ? ` <span class="schedule-game-conf">(${escapeHtml(awayConf)})</span>` : ''}`;
+    let homeMarkup = `${homeLink}${hasHomeConference ? ` <span class="schedule-game-conf">(${escapeHtml(homeConf)})</span>` : ''}`;
 
     if (isComplete) {
       awayMarkup += ` (${escapeHtml(awayScore)})`;
@@ -304,12 +331,12 @@
       ? ` <a class="schedule-box-link" href="/box-score.html?game_id=${encodeURIComponent(game.game_id)}&mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}&return_url=${encodeURIComponent(returnUrl)}">Box Score</a>`
       : '';
 
-    return `<div class="schedule-game-row">${awayMarkup} at ${homeMarkup}${boxScore}</div>`;
+    return `<div class="schedule-game-row">${contextMarkup}${awayMarkup} at ${homeMarkup}${boxScore}</div>`;
   }
 
-  function buildWeekRowsMarkup(weekGames, returnUrl, weekNumber) {
+  function buildWeekRowsMarkup(weekGames, returnUrl, weekNumber, emptyText = 'No games scheduled.') {
     if (!weekGames.length) {
-      return '<div class="schedule-game-row">No games scheduled.</div>';
+      return `<div class="schedule-game-row">${escapeHtml(emptyText)}</div>`;
     }
     const initialRows = weekGames.slice(0, 8).map((game) => buildGameRow(game, returnUrl)).join('');
     if (weekGames.length <= 8) {
@@ -351,6 +378,44 @@
     scheduleContainer.innerHTML = weekCards.join('');
   }
 
+  const tournamentWeekLabels = {
+    27: 'Conference Tourney - R1',
+    28: 'Conference Tourney - R2',
+    29: 'Conference Tourney - Championships',
+    30: 'Region Tourney - R1',
+    31: 'Region Tourney - Championships',
+    32: 'National Tourney - R1',
+    33: 'National Tourney - R2',
+    34: 'National Championship'
+  };
+
+  function renderFullSchedule(allGamesByWeek, tournamentGamesByWeek, userConference) {
+    if (!scheduleContainer) return;
+    const returnUrl = getCurrentRelativeUrl();
+    const weekCards = [];
+    for (let week = 1; week <= 26; week += 1) {
+      const weekGames = sortGamesForWeek(allGamesByWeek[week] || [], userConference);
+      const rows = buildWeekRowsMarkup(weekGames, returnUrl, week);
+      weekCards.push(`
+        <section class="schedule-week-card">
+          <div class="schedule-week-title">Week ${week}</div>
+          <div class="schedule-week-body">${rows}</div>
+        </section>
+      `);
+    }
+    for (let week = 27; week <= 34; week += 1) {
+      const weekGames = tournamentGamesByWeek[week] || [];
+      const rows = buildWeekRowsMarkup(weekGames, returnUrl, week, 'No tournament matchups available yet.');
+      weekCards.push(`
+        <section class="schedule-week-card schedule-week-card--tournament">
+          <div class="schedule-week-title">Week ${week}: ${escapeHtml(tournamentWeekLabels[week])}</div>
+          <div class="schedule-week-body">${rows}</div>
+        </section>
+      `);
+    }
+    scheduleContainer.innerHTML = weekCards.join('');
+  }
+
   if (!franchiseId) {
     if (scheduleContainer) scheduleContainer.innerHTML = '<div class="schedule-error">Missing franchise_id in URL.</div>';
     return;
@@ -375,14 +440,14 @@
     fetchJSON(API_CONFIG.buildUrl('/franchise/schedule/national') + '?franchise_id=' + encodeURIComponent(franchiseId))
   ]).then(([cc, payload]) => {
     const allGamesByWeek = {};
+    const tournamentGamesByWeek = {};
     const schedule = payload?.schedule || [];
+    const tournamentSchedule = payload?.tournament_schedule || {};
     const teamNameMap = payload?.team_name_map || {};
     const teamDisplayMap = payload?.team_display_name_map || {};
 
-    schedule.forEach((weekGames, weekIndex) => {
-      const weekNumber = weekIndex + 1;
-      if (!Array.isArray(weekGames)) return;
-      allGamesByWeek[weekNumber] = weekGames.map((game) => ({
+    function hydrateGame(game) {
+      return {
         ...game,
         away_name: teamNameMap[game.away_team_id] || game.away_team_id,
         home_name: teamNameMap[game.home_team_id] || game.home_team_id,
@@ -390,10 +455,21 @@
         home_display_name: teamDisplayMap[game.home_team_id] || teamNameMap[game.home_team_id] || game.home_team_id,
         away_conference: Number(game.away_conference),
         home_conference: Number(game.home_conference)
-      }));
+      };
+    }
+
+    schedule.forEach((weekGames, weekIndex) => {
+      const weekNumber = weekIndex + 1;
+      if (!Array.isArray(weekGames)) return;
+      allGamesByWeek[weekNumber] = weekGames.map(hydrateGame);
     });
 
-    renderNationalSchedule(allGamesByWeek, Number(cc.user_conference));
+    Object.entries(tournamentSchedule).forEach(([weekNumber, weekGames]) => {
+      if (!Array.isArray(weekGames)) return;
+      tournamentGamesByWeek[Number(weekNumber)] = weekGames.map(hydrateGame);
+    });
+
+    renderFullSchedule(allGamesByWeek, tournamentGamesByWeek, Number(cc.user_conference));
   }).catch((err) => {
     if (scheduleContainer) scheduleContainer.innerHTML = '<div class="schedule-error">Failed to load schedule.</div>';
     console.error(err);
