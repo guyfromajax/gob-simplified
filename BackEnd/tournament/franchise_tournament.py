@@ -352,6 +352,23 @@ def get_eos_week_games(
     return games
 
 
+def _eos_team_id_canonical(tid: Any) -> str:
+    """Normalize franchise / bracket team ids for comparisons (ObjectId, 24-hex str, etc.)."""
+    if tid is None:
+        return ""
+    if isinstance(tid, ObjectId):
+        return str(tid)
+    s = str(tid).strip()
+    if not s:
+        return ""
+    if ObjectId.is_valid(s):
+        try:
+            return str(ObjectId(s))
+        except Exception:
+            return s
+    return s
+
+
 def find_user_game_in_eos_week(
     week_games: List[Dict[str, Any]],
     user_team_id_str: Optional[str],
@@ -359,8 +376,11 @@ def find_user_game_in_eos_week(
     """Return (index, game) if user's team is in one of the games, else None."""
     if not user_team_id_str:
         return None
+    user_key = _eos_team_id_canonical(user_team_id_str)
+    if not user_key:
+        return None
     for idx, g in enumerate(week_games):
-        if str(g["away_id"]) == user_team_id_str or str(g["home_id"]) == user_team_id_str:
+        if _eos_team_id_canonical(g.get("away_id")) == user_key or _eos_team_id_canonical(g.get("home_id")) == user_key:
             return (idx, g)
     return None
 
@@ -377,7 +397,7 @@ def save_conference_game_result(
     """Mutates franchise_doc['conference_tournaments']."""
     conf_tournaments = franchise_doc.setdefault("conference_tournaments", {})
     key = str(conference)
-    ct = conf_tournaments.get(key, {})
+    ct = conf_tournaments.get(key) or conf_tournaments.get(conference) or {}
     bracket = ct.get("bracket", {})
     bracket_engine.save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score)
     ct["bracket"] = bracket
@@ -390,7 +410,8 @@ def advance_conference_bracket(
 ) -> Tuple[bool, Optional[str]]:
     """Advance one conference bracket. Returns (advanced, champion_if_finished)."""
     conf_tournaments = franchise_doc.get("conference_tournaments", {})
-    ct = conf_tournaments.get(str(conference), {})
+    key = str(conference)
+    ct = conf_tournaments.get(key) or conf_tournaments.get(conference) or {}
     bracket = ct.get("bracket", {})
     current_round = ct.get("current_round", 1)
     updated, next_round, completed, champion = bracket_engine.advance_bracket(

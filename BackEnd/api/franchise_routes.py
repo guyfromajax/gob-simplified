@@ -2489,6 +2489,32 @@ def _save_user_eos_bracket_result(
     if not week_games_meta:
         return None
     found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
+    if not found and user_team_id_str:
+        raw = str(user_team_id_str).strip()
+        resolved: str | None = None
+        try:
+            if ObjectId.is_valid(raw):
+                resolved = str(ObjectId(raw))
+        except Exception:
+            resolved = None
+        if not resolved:
+            try:
+                doc = db.teams.find_one(
+                    {"$or": [{"team_id": raw}, {"name": raw}, {"code": raw}]},
+                    {"_id": 1},
+                )
+            except Exception:
+                doc = None
+            if doc and doc.get("_id") is not None:
+                resolved = str(doc["_id"])
+        if resolved:
+            found = ft.find_user_game_in_eos_week(week_games_meta, resolved)
+            if found:
+                logger.warning(
+                    "🧭 [COMPLETE-WEEK] Resolved user_team_id for EOS bracket save: raw=%s resolved=%s",
+                    raw,
+                    resolved,
+                )
     if not found:
         logger.warning(
             "⚠️ [COMPLETE-WEEK] Could not find user EOS matchup for bracket persistence. user_team_id=%s game_id=%s",
@@ -2497,11 +2523,14 @@ def _save_user_eos_bracket_result(
         )
         return None
     _, g = found
-    winner_id = team1_id if team1_score > team2_score else team2_id
+    winner_raw = team1_id if team1_score > team2_score else team2_id
+    winner_id_str = ft._eos_team_id_canonical(winner_raw)
     home_id_g = g["home_id"]
+    hg = ft._eos_team_id_canonical(home_id_g)
+    t1 = ft._eos_team_id_canonical(team1_id)
     score = {
-        "home": team1_score if str(team1_id) == str(home_id_g) else team2_score,
-        "away": team2_score if str(team1_id) == str(home_id_g) else team1_score,
+        "home": team1_score if t1 == hg else team2_score,
+        "away": team2_score if t1 == hg else team1_score,
     }
     bracket_game_id = str(game_id or "")
     if g["phase"] == "conference":
@@ -2511,7 +2540,7 @@ def _save_user_eos_bracket_result(
             g["round"],
             g["matchup_index"],
             bracket_game_id,
-            str(winner_id),
+            winner_id_str or str(winner_raw),
             score,
         )
     elif g["phase"] == "region":
@@ -2521,7 +2550,7 @@ def _save_user_eos_bracket_result(
             g["round"],
             g["matchup_index"],
             bracket_game_id,
-            str(winner_id),
+            winner_id_str or str(winner_raw),
             score,
         )
     elif g["phase"] == "national":
@@ -2530,7 +2559,7 @@ def _save_user_eos_bracket_result(
             g["round"],
             g["matchup_index"],
             bracket_game_id,
-            str(winner_id),
+            winner_id_str or str(winner_raw),
             score,
         )
     return g
