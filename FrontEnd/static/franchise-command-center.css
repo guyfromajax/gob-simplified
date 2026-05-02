@@ -1279,6 +1279,17 @@ input[type="reset"] {
   text-decoration: underline;
 }
 
+/* Tournament tab (week 27+): bracket mount + footer links (inherits .fcc-standings-full-link) */
+.fcc-tournament-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 0 4px;
+}
+
 .fcc-data-card {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;

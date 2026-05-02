@@ -282,6 +282,29 @@ function populateTop(data) {
   const rankEl = document.getElementById('stat-rank');
   if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
   if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
+  applyScheduleTabMode(Number(data.week || 1));
+}
+
+/**
+ * Week 27+: tab label "Tournament", show bracket mount + footer links; else regular-season schedule.
+ * Uses franchise command-center `week` (same source as header season/week label).
+ */
+function applyScheduleTabMode(weekArg) {
+  const w = weekArg !== undefined && weekArg !== null
+    ? Number(weekArg)
+    : Number(commandCenterTopDataCache?.week || 1);
+  const tabBtn = document.querySelector('.tab-buttons button[data-tab="schedule-tab"]');
+  const regularView = document.getElementById('fcc-regular-schedule-view');
+  const regularFooter = document.getElementById('fcc-regular-schedule-footer');
+  const tournamentView = document.getElementById('fcc-tournament-view');
+  const tournamentFooter = document.getElementById('fcc-tournament-footer');
+  const isTournament = Number.isFinite(w) && w >= 27;
+
+  if (tabBtn) tabBtn.textContent = isTournament ? 'Tournament' : 'Schedule';
+  if (regularView) regularView.style.display = isTournament ? 'none' : '';
+  if (regularFooter) regularFooter.style.display = isTournament ? 'none' : '';
+  if (tournamentView) tournamentView.style.display = isTournament ? '' : 'none';
+  if (tournamentFooter) tournamentFooter.style.display = isTournament ? 'flex' : 'none';
 }
 
 function updateTopRecordLabel() {
@@ -829,6 +852,11 @@ function buildScheduleColumnMarkup(title, weeks, extraRows = []) {
 }
 
 async function renderScheduleTab() {
+  applyScheduleTabMode();
+  const weekNum = Number(commandCenterTopDataCache?.week || 0);
+  if (Number.isFinite(weekNum) && weekNum >= 27) {
+    return;
+  }
   const host = document.getElementById('fcc-schedule-grid');
   if (!host) return;
   if (!franchiseId) {
@@ -1121,6 +1149,10 @@ function bindResourcesLinks() {
   if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
   const scheduleFullLink = document.getElementById('schedule-full-link');
   if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
+  const tournamentAllBracketsLink = document.getElementById('tournament-all-brackets-link');
+  if (tournamentAllBracketsLink) tournamentAllBracketsLink.href = `/brackets.html${q()}`;
+  const tournamentScheduleLink = document.getElementById('tournament-schedule-link');
+  if (tournamentScheduleLink) tournamentScheduleLink.href = `/schedule.html${q()}`;
   const statsNavBtn = document.getElementById('stats-nav-btn');
   if (statsNavBtn) statsNavBtn.dataset.route = '';
   const teamStatsFullLink = document.getElementById('team-stats-full-link');

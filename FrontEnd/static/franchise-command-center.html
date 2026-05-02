@@ -330,13 +330,23 @@
         </div>
       </div>
       <div id="schedule-tab" class="tab-content">
-        <section class="fcc-data-card fcc-schedule-card">
+        <section class="fcc-data-card fcc-schedule-card" id="fcc-regular-schedule-view">
           <div class="fcc-data-card-body fcc-schedule-card-body">
             <div id="fcc-schedule-grid" class="fcc-schedule-grid"></div>
           </div>
         </section>
-        <div class="fcc-standings-footer-link-wrap">
+        <div class="fcc-standings-footer-link-wrap" id="fcc-regular-schedule-footer">
           <a id="schedule-full-link" class="fcc-standings-full-link" href="#">Full national schedule here</a>
+        </div>
+
+        <section class="fcc-data-card fcc-tournament-card" id="fcc-tournament-view" style="display: none;">
+          <div class="fcc-data-card-body fcc-tournament-card-body">
+            <div id="fcc-tournament-bracket" class="fcc-tournament-bracket"></div>
+          </div>
+        </section>
+        <div class="fcc-tournament-footer-links" id="fcc-tournament-footer" style="display: none;">
+          <a id="tournament-all-brackets-link" class="fcc-standings-full-link" href="#">View All Brackets</a>
+          <a id="tournament-schedule-link" class="fcc-standings-full-link" href="#">View Season Schedule</a>
         </div>
       </div>
       <div id="fcc-team-stats-summary-tab" class="tab-content">
