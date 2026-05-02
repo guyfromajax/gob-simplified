@@ -1188,6 +1188,26 @@ input[type="reset"] {
   color: inherit;
 }
 
+.fcc-tb-record {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.38);
+  white-space: nowrap;
+}
+
+.fcc-tb-team--winner .fcc-tb-record {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.fcc-tb-team--loser .fcc-tb-record {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.fcc-tb-team--user .fcc-tb-record {
+  color: rgba(43, 214, 106, 0.75);
+}
+
 .fcc-tb-rank-prefix {
   color: rgba(255, 255, 255, 0.38);
   font-weight: 600;

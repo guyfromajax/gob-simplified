@@ -4197,12 +4197,15 @@ async function renderTournamentBracket() {
     teams.forEach(function (t) {
       if (t.team_id != null && t.team != null) {
         teamIdToNameMap[String(t.team_id)] = t.team;
+        const st = t.stats || {};
         teamIdMetaMap[String(t.team_id)] = {
           team: t.team,
           mascot: t.mascot || '',
           conference: t.conference,
           region: t.region != null && t.region !== '' ? String(t.region).toUpperCase() : '',
           natl_rank: t.natl_rank != null && Number.isFinite(Number(t.natl_rank)) ? Number(t.natl_rank) : null,
+          W: Number.isFinite(Number(st.W)) ? Number(st.W) : 0,
+          L: Number.isFinite(Number(st.L)) ? Number(st.L) : 0,
         };
       }
     });

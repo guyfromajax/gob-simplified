@@ -226,15 +226,24 @@ def get_eos_week_games(
     Return list of games for the given EOS week. Each item: {away_id, home_id, phase, meta}.
     meta: conference/region, round, matchup_index for routing results.
     If include_completed True, also return winner, score, game_id on each item.
+
+    include_completed True: bracket round follows the calendar EOS week (e.g. week 28 → conference R2).
+    include_completed False: bracket round follows each tournament's current_round so playable lists
+    stay in sync when franchise week advances before every bracket has finished the prior round.
     """
     games = []
     if week in EOS_CONFERENCE_WEEKS:
-        round_num = week - 26  # 27->1, 28->2, 29->3
+        # Calendar column (schedule / history): round follows franchise week (27→R1, 28→R2, 29→final).
+        # Playable list (complete_week, play-next, FCC): each bracket uses its own current_round so
+        # global week can advance while a conference still has R1 games (avoids empty week lists).
+        round_num_calendar = week - 26  # 27->1, 28->2, 29->3
         conf_tournaments = franchise_doc.get("conference_tournaments", {})
         for c in range(1, 17):
             ct = conf_tournaments.get(str(c), conf_tournaments.get(c)) or {}
-            if not include_completed and ct.get("current_round") != round_num:
-                continue
+            if include_completed:
+                round_num = round_num_calendar
+            else:
+                round_num = int(ct.get("current_round", 1) or 1)
             bracket = ct.get("bracket", {})
             rn = bracket_engine.get_round_name(round_num)
             matchups = bracket.get(rn, [])
@@ -313,10 +322,12 @@ def get_eos_week_games(
                         g["game_id"] = m.get("game_id")
                     games.append(g)
     elif week in EOS_NATIONAL_WEEKS:
-        round_num = week - 31  # 32->1, 33->2, 34->3
-        national = franchise_doc.get("national_tournament", {})
-        if not include_completed and national.get("current_round") != round_num:
-            return games
+        round_num_calendar = week - 31  # 32->1, 33->2, 34->3
+        national = franchise_doc.get("national_tournament", {}) or {}
+        if include_completed:
+            round_num = round_num_calendar
+        else:
+            round_num = int(national.get("current_round", 1) or 1)
         bracket = national.get("bracket", {})
         rn = bracket_engine.get_round_name(round_num)
         matchups = bracket.get(rn, [])

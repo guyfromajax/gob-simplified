@@ -334,15 +334,16 @@
     return `<div class="schedule-game-row">${contextMarkup}${awayMarkup} at ${homeMarkup}${boxScore}</div>`;
   }
 
-  function buildWeekRowsMarkup(weekGames, returnUrl, weekNumber, emptyText = 'No games scheduled.') {
+  function buildWeekRowsMarkup(weekGames, returnUrl, weekNumber, emptyText = 'No games scheduled.', initialVisible = 8) {
     if (!weekGames.length) {
       return `<div class="schedule-game-row">${escapeHtml(emptyText)}</div>`;
     }
-    const initialRows = weekGames.slice(0, 8).map((game) => buildGameRow(game, returnUrl)).join('');
-    if (weekGames.length <= 8) {
+    const cap = Math.max(1, Number(initialVisible) || 8);
+    const initialRows = weekGames.slice(0, cap).map((game) => buildGameRow(game, returnUrl)).join('');
+    if (weekGames.length <= cap) {
       return initialRows;
     }
-    const extraRows = weekGames.slice(8).map((game) => buildGameRow(game, returnUrl)).join('');
+    const extraRows = weekGames.slice(cap).map((game) => buildGameRow(game, returnUrl)).join('');
     return `
       ${initialRows}
       <div class="schedule-expand-row">
@@ -404,8 +405,8 @@
       `);
     }
     for (let week = 27; week <= 34; week += 1) {
-      const weekGames = tournamentGamesByWeek[week] || [];
-      const rows = buildWeekRowsMarkup(weekGames, returnUrl, week, 'No tournament matchups available yet.');
+      const weekGames = sortGamesForWeek(tournamentGamesByWeek[week] || [], userConference);
+      const rows = buildWeekRowsMarkup(weekGames, returnUrl, week, 'No tournament matchups available yet.', 16);
       weekCards.push(`
         <section class="schedule-week-card schedule-week-card--tournament">
           <div class="schedule-week-title">Week ${week}: ${escapeHtml(tournamentWeekLabels[week])}</div>
@@ -447,14 +448,27 @@
     const teamDisplayMap = payload?.team_display_name_map || {};
 
     function hydrateGame(game) {
+      let awayConf = Number(game.away_conference);
+      let homeConf = Number(game.home_conference);
+      if (!Number.isFinite(awayConf) || !Number.isFinite(homeConf)) {
+        const ctx = game.tournament_context;
+        const m = typeof ctx === 'string' ? ctx.match(/Conference\s+(\d+)/i) : null;
+        if (m) {
+          const n = Number(m[1]);
+          if (Number.isFinite(n)) {
+            if (!Number.isFinite(awayConf)) awayConf = n;
+            if (!Number.isFinite(homeConf)) homeConf = n;
+          }
+        }
+      }
       return {
         ...game,
         away_name: teamNameMap[game.away_team_id] || game.away_team_id,
         home_name: teamNameMap[game.home_team_id] || game.home_team_id,
         away_display_name: teamDisplayMap[game.away_team_id] || teamNameMap[game.away_team_id] || game.away_team_id,
         home_display_name: teamDisplayMap[game.home_team_id] || teamNameMap[game.home_team_id] || game.home_team_id,
-        away_conference: Number(game.away_conference),
-        home_conference: Number(game.home_conference)
+        away_conference: awayConf,
+        home_conference: homeConf
       };
     }
 

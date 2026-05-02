@@ -30,6 +30,16 @@
     return null;
   }
 
+  /** Franchise team-stats W/L; shown beside team name in bracket rows. */
+  function recordStrFor(id, teamIdMetaMap) {
+    if (!isRealTeamId(id)) return '';
+    var m = teamIdMetaMap[String(id)] || {};
+    if (!Object.prototype.hasOwnProperty.call(m, 'W') && !Object.prototype.hasOwnProperty.call(m, 'L')) return '';
+    var w = Number.isFinite(Number(m.W)) ? Number(m.W) : 0;
+    var l = Number.isFinite(Number(m.L)) ? Number(m.L) : 0;
+    return w + '-' + l;
+  }
+
   function seedFor(id, seeds) {
     if (!seeds || !isRealTeamId(id)) return null;
     var s = seeds[String(id)];
@@ -141,6 +151,12 @@
     nm.className = 'fcc-tb-name-text';
     nm.textContent = slot.name || '';
     nameCell.appendChild(nm);
+    if (slot.recordStr) {
+      var rec = document.createElement('span');
+      rec.className = 'fcc-tb-record';
+      rec.textContent = '\u00a0' + slot.recordStr;
+      nameCell.appendChild(rec);
+    }
     row.appendChild(nameCell);
 
     row.appendChild(elSpan('fcc-tb-score', slot.score !== '' && slot.score != null ? String(slot.score) : ''));
@@ -162,11 +178,13 @@
     var name = teamName(id, teamIdToNameMap);
     var sc = scoresFor(m, m.home_team, m.away_team, name, teamName(m.away_team, teamIdToNameMap));
     var score = side === 'home' ? sc.hs : sc.as;
+    var recStr = recordStrFor(id, teamIdMetaMap);
     return {
       tbd: false,
       seed: seedFor(id, seeds),
       rank: natRankFor(id, teamIdMetaMap, rankMap),
       name: name,
+      recordStr: recStr,
       score: score,
       isUser: userTeamId != null && String(userTeamId) === String(id),
       outcome: won ? 'winner' : lost ? 'loser' : null,
@@ -482,6 +500,13 @@
         bn.appendChild(rp);
       }
       bn.appendChild(document.createTextNode(teamName(byeId, teamIdToNameMap)));
+      var recS = recordStrFor(byeId, teamIdMetaMap);
+      if (recS) {
+        var recEl = document.createElement('span');
+        recEl.className = 'fcc-tb-record';
+        recEl.textContent = '\u00a0' + recS;
+        bn.appendChild(recEl);
+      }
       var bb = document.createElement('span');
       bb.className = 'fcc-tb-bye-badge';
       bb.textContent = 'BYE →';
