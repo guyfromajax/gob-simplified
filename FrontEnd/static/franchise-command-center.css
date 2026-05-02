@@ -990,16 +990,31 @@ input[type="reset"] {
 }
 
 /* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
-#tournament-bracket-container.bracket {
+#tournament-bracket-container.bracket,
+#fcc-tournament-bracket.fcc-tournament-bracket,
+#all-brackets-root.fcc-tournament-bracket {
   padding-top: 8px;
   padding-bottom: 16px;
   min-height: 500px;
 }
 
-#tournament-bracket-container {
+#tournament-bracket-container,
+#fcc-tournament-bracket.fcc-tournament-bracket,
+#all-brackets-root.fcc-tournament-bracket {
   display: flex;
   flex-direction: column;
   gap: 0;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.fcc-tournament-empty-msg {
+  margin: 0;
+  padding: 16px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(247, 249, 255, 0.78);
 }
 
 .fcc-tournament-section {

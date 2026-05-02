@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Tournament brackets</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tournament.css">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <style>
+    .brackets-page-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .brackets-page-header .brackets-back-link {
+      justify-self: start;
+    }
+
+    .brackets-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 0;
+      box-shadow: none;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    .brackets-back-link:hover {
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .brackets-back-link::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .brackets-page-title {
+      margin: 0 !important;
+      text-align: center;
+    }
+
+    .brackets-page-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 14px;
+      padding: 0 4px;
+    }
+
+    .brackets-page-footer a {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .brackets-page-footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="resource-page-container fcc-brand-page-shell">
+    <div class="brackets-page-header">
+      <a id="brackets-back-btn" class="brackets-back-link" href="#">Back to Locker Room</a>
+      <h1 class="brackets-page-title">All tournament brackets</h1>
+      <div></div>
+    </div>
+    <div id="all-brackets-root" class="fcc-tournament-bracket" aria-live="polite"></div>
+    <div class="brackets-page-footer">
+      <a id="brackets-footer-schedule" href="#">View season schedule</a>
+    </div>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/bracket.js"></script>
+  <script src="/franchise-tournament-brackets-render.js"></script>
+  <script src="/brackets-page.js"></script>
+</body>
+</html>

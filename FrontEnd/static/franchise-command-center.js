@@ -283,6 +283,10 @@ function populateTop(data) {
   if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
   if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
   applyScheduleTabMode(Number(data.week || 1));
+  const wk = Number(data.week || 1);
+  if (Number.isFinite(wk) && wk >= 27 && document.getElementById('schedule-tab')?.classList.contains('active')) {
+    void renderTournamentBracket();
+  }
 }
 
 /**
@@ -855,6 +859,7 @@ async function renderScheduleTab() {
   applyScheduleTabMode();
   const weekNum = Number(commandCenterTopDataCache?.week || 0);
   if (Number.isFinite(weekNum) && weekNum >= 27) {
+    await renderTournamentBracket();
     return;
   }
   const host = document.getElementById('fcc-schedule-grid');
@@ -4166,40 +4171,25 @@ function createMetricBar(title, value, maxValue, color, change) {
 
 // ✅ Phase 4.2: Roster stats rendering delegated to RosterStatsRenderer (rosterStatsRenderer.js)
 
-// ✅ EOS TOURNAMENT: Render tournament bracket (shared with TCC via bracket.js)
+// ✅ EOS TOURNAMENT: Render tournament bracket (shared renderer: franchise-tournament-brackets-render.js)
 async function renderTournamentBracket() {
-  const container = document.getElementById('tournament-bracket-container');
+  const container =
+    document.getElementById('fcc-tournament-bracket') || document.getElementById('tournament-bracket-container');
   const titleEl = document.getElementById('fcc-tournament-title');
-  if (!container) return;
+  if (!container || !franchiseId) return;
 
-  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-  const eosTournament = topData?.eos_tournament;
-  const week = Number(topData?.week || 0);
-  const userConference = topData?.user_conference != null ? String(topData.user_conference) : '';
-  const userRegion = String(topData?.user_region || '').toUpperCase();
-  const conferenceTournament = userConference ? (topData?.conference_tournaments || {})[userConference] : null;
-  const regionTournamentRaw = userRegion ? (topData?.region_tournaments || {})[userRegion] : null;
-  const regionTournament = regionTournamentRaw ? normalizeRegionBracket(regionTournamentRaw) : null;
-  const nationalTournament = topData?.national_tournament || null;
-
-  const hasBracketHistory = Boolean(eosTournament || conferenceTournament || regionTournament || nationalTournament);
-  if (!hasBracketHistory) {
-    if (titleEl) titleEl.textContent = 'End-of-Season Tournament';
-    container.innerHTML = '<p>Tournament bracket not available.</p>';
-    return;
+  let topData = commandCenterTopDataCache;
+  try {
+    topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+    commandCenterTopDataCache = topData;
+  } catch (e) {
+    console.warn('[FCC] Could not refresh command-center data for bracket:', e);
+    if (!topData) {
+      container.innerHTML = '<p class="fcc-tournament-empty-msg">Tournament bracket not available.</p>';
+      return;
+    }
   }
 
-  let tournamentTitle = 'End-of-Season Tournament';
-  if (week >= 27 && week <= 29) {
-    tournamentTitle = 'Conference Tournament';
-  } else if (week >= 30 && week <= 31) {
-    tournamentTitle = 'Region Tournament';
-  } else if (week >= 32 && week <= 36) {
-    tournamentTitle = 'National Tournament';
-  }
-  if (titleEl) titleEl.textContent = tournamentTitle;
-
-  // SS&S: Get team id→name map from franchise/team-stats (same pattern as TCC)
   let teamIdToNameMap = {};
   try {
     const teamStatsRes = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
@@ -4218,90 +4208,17 @@ async function renderTournamentBracket() {
     console.warn('[FCC] Could not load team-stats for bracket names:', e);
   }
 
-  function normalizeRegionBracket(rt) {
-    if (!rt) return null;
-    const finalList = rt.final || [];
-    return {
-      bracket: {
-        round1: rt.round1 || [],
-        round2: [],
-        final: finalList,
-      },
-      seeds: {},
-    };
+  if (typeof FranchiseTournamentBrackets !== 'undefined' && FranchiseTournamentBrackets.appendFranchiseBracketSections) {
+    FranchiseTournamentBrackets.appendFranchiseBracketSections(container, topData, {
+      userTeamId,
+      teamIdToNameMap,
+      teamIdMetaMap,
+      mode: 'fcc',
+      titleEl,
+    });
+  } else {
+    container.innerHTML = '<p class="fcc-tournament-empty-msg">Bracket UI not loaded.</p>';
   }
-
-  function createBracketSection(sectionTitle, bracketPayload, layout, toneClass) {
-    if (!bracketPayload || !bracketPayload.bracket) return null;
-
-    const section = document.createElement('section');
-    section.className = `fcc-tournament-section ${toneClass || ''}`.trim();
-
-    const heading = document.createElement('h4');
-    heading.className = 'fcc-tournament-section-title';
-    heading.textContent = sectionTitle;
-    section.appendChild(heading);
-
-    const bracketRoot = document.createElement('div');
-    bracketRoot.className = 'bracket';
-    section.appendChild(bracketRoot);
-
-    if (typeof renderBracketShared === 'function') {
-      renderBracketShared(bracketRoot, bracketPayload.bracket || {}, teamIdToNameMap, {
-        seeds: bracketPayload.seeds || {},
-        layout: layout || 'full',
-        getLogo: function (name) {
-          return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(name, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
-        },
-        isUserTeam: function (id) {
-          return userTeamId != null && (String(id) === String(userTeamId));
-        },
-        getTooltip: function (id, name) {
-          const meta = teamIdMetaMap[String(id)] || {};
-          const teamName = meta.team || name || '';
-          const mascot = meta.mascot || '';
-          if (!teamName) return '';
-          return mascot ? `${teamName} ${mascot}` : teamName;
-        },
-      });
-    } else {
-      bracketRoot.innerHTML = '<p>Bracket renderer not loaded.</p>';
-    }
-
-    return section;
-  }
-
-  container.innerHTML = '';
-
-  const sections = [];
-  if (week >= 27 && week <= 29 && conferenceTournament) {
-    sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
-  } else if (week >= 30 && week <= 31) {
-    if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
-    if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
-  } else if (week >= 32 && week <= 36) {
-    if (nationalTournament) sections.push(createBracketSection('National Tournament', nationalTournament, 'full', 'fcc-tournament-tone-national'));
-    if (regionTournament) sections.push(createBracketSection('Region Tournament', regionTournament, 'compact4', 'fcc-tournament-tone-region'));
-    if (conferenceTournament) sections.push(createBracketSection('Conference Tournament', conferenceTournament, 'full', 'fcc-tournament-tone-conference'));
-  } else if (eosTournament) {
-    sections.push(createBracketSection(tournamentTitle, eosTournament, week >= 30 && week <= 31 ? 'compact4' : 'full', 'fcc-tournament-tone-conference'));
-  }
-
-  const renderedSections = sections.filter(Boolean);
-  if (!renderedSections.length) {
-    container.innerHTML = '<p>Tournament bracket not available.</p>';
-    return;
-  }
-
-  renderedSections.forEach(function (section, index) {
-    if (index > 0) {
-      const divider = document.createElement('hr');
-      divider.className = 'fcc-tournament-divider';
-      container.appendChild(divider);
-    }
-    container.appendChild(section);
-  });
-
 }
 
 // Scouting Report functionality
