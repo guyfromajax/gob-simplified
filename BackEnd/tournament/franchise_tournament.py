@@ -382,6 +382,17 @@ def find_user_game_in_eos_week(
     for idx, g in enumerate(week_games):
         if _eos_team_id_canonical(g.get("away_id")) == user_key or _eos_team_id_canonical(g.get("home_id")) == user_key:
             return (idx, g)
+    previews: list[str] = []
+    for i, g in enumerate(week_games[:12]):
+        previews.append(
+            f"{i}:a={_eos_team_id_canonical(g.get('away_id'))[:10]} h={_eos_team_id_canonical(g.get('home_id'))[:10]}"
+        )
+    logger.warning(
+        "[EOS-BRACKET-DEBUG] find_user_game_miss user_key=%s n_games=%s preview=[%s]",
+        user_key,
+        len(week_games),
+        " | ".join(previews) if previews else "(empty week_games_meta)",
+    )
     return None
 
 
@@ -399,9 +410,52 @@ def save_conference_game_result(
     key = str(conference)
     ct = conf_tournaments.get(key) or conf_tournaments.get(conference) or {}
     bracket = ct.get("bracket", {})
+    if not bracket or not bracket.get("round1"):
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] save_conference_game_result_empty_bracket franchise_id=%s conf=%s "
+            "key_str=%s had_ct=%s round=%s idx=%s",
+            str(franchise_doc.get("_id")),
+            conference,
+            key,
+            bool(ct),
+            round_num,
+            matchup_index,
+        )
     bracket_engine.save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score)
+    if int(conference) <= 4:
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] save_conference_game_result franchise_id=%s conf=%s round=%s idx=%s "
+            "winner_id=%s game_id=%s",
+            str(franchise_doc.get("_id")),
+            conference,
+            round_num,
+            matchup_index,
+            str(winner_id)[:12] if winner_id else "",
+            str(game_id)[:12] if game_id else "",
+        )
     ct["bracket"] = bracket
     conf_tournaments[key] = ct
+
+
+def log_eos_conference_bracket_snapshot(franchise_doc: Dict[str, Any], label: str) -> None:
+    """Temporary debug: log R1 winner counts and round2 size per conference (grep [EOS-BRACKET-DEBUG])."""
+    franch_id = franchise_doc.get("_id")
+    ct_all = franchise_doc.get("conference_tournaments") or {}
+    for c in range(1, 17):
+        ct = ct_all.get(str(c)) or ct_all.get(c) or {}
+        br = ct.get("bracket") or {}
+        r1 = br.get("round1") or []
+        r2 = br.get("round2") or []
+        nwin = sum(1 for m in r1 if m.get("winner"))
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] %s franchise_id=%s conf=%s current_round=%s r1_winners=%s/4 r2_len=%s",
+            label,
+            str(franch_id),
+            c,
+            ct.get("current_round"),
+            nwin,
+            len(r2),
+        )
 
 
 def advance_conference_bracket(
@@ -414,6 +468,8 @@ def advance_conference_bracket(
     ct = conf_tournaments.get(key) or conf_tournaments.get(conference) or {}
     bracket = ct.get("bracket", {})
     current_round = ct.get("current_round", 1)
+    r1 = bracket.get("round1") or []
+    r1_winners_before = sum(1 for m in r1 if m.get("winner"))
     updated, next_round, completed, champion = bracket_engine.advance_bracket(
         bracket, current_round, winners_from_matchups=True
     )
@@ -421,6 +477,19 @@ def advance_conference_bracket(
     ct["current_round"] = next_round
     if completed and champion:
         ct["champion"] = champion
+    r2_after = len((updated.get("round2") or []))
+    logger.warning(
+        "[EOS-BRACKET-DEBUG] advance_conference franchise_id=%s conf=%s cr_before=%s cr_after=%s "
+        "r1_winners_before=%s/4 advanced=%s r2_len_after=%s champion=%s",
+        str(franchise_doc.get("_id")),
+        conference,
+        current_round,
+        next_round,
+        r1_winners_before,
+        next_round > current_round,
+        r2_after,
+        champion,
+    )
     conf_tournaments[str(conference)] = ct
     franchise_doc["conference_tournaments"] = conf_tournaments
     return (next_round > current_round, champion if completed else None)

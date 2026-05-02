@@ -2525,6 +2525,17 @@ def _save_user_eos_bracket_result(
     _, g = found
     winner_raw = team1_id if team1_score > team2_score else team2_id
     winner_id_str = ft._eos_team_id_canonical(winner_raw)
+    logger.warning(
+        "[EOS-BRACKET-DEBUG] user_eos_bracket_save_start franchise_id=%s phase=%s conf=%s round=%s "
+        "idx=%s user_team_id_str=%s winner=%s",
+        str(franchise_doc.get("_id")),
+        g.get("phase"),
+        g.get("conference") or g.get("region"),
+        g.get("round"),
+        g.get("matchup_index"),
+        user_team_id_str,
+        (winner_id_str or str(winner_raw))[:24],
+    )
     home_id_g = g["home_id"]
     hg = ft._eos_team_id_canonical(home_id_g)
     t1 = ft._eos_team_id_canonical(team1_id)
@@ -2562,6 +2573,11 @@ def _save_user_eos_bracket_result(
             winner_id_str or str(winner_raw),
             score,
         )
+    logger.warning(
+        "[EOS-BRACKET-DEBUG] user_eos_bracket_save_done franchise_id=%s phase=%s",
+        str(franchise_doc.get("_id")),
+        g.get("phase"),
+    )
     return g
 
 
@@ -3246,8 +3262,16 @@ def _complete_week_finish_cpu_and_persist(
         # EOS week: advance brackets and set next week (or init region/national)
         next_week = week + 1
         if week in ft.EOS_CONFERENCE_WEEKS:
+            ft.log_eos_conference_bracket_snapshot(
+                franchise_doc,
+                f"complete_week_pre_advance week={week} fid={franchise_id_str}",
+            )
             for c in range(1, 17):
                 advanced, champ = ft.advance_conference_bracket(franchise_doc, c)
+            ft.log_eos_conference_bracket_snapshot(
+                franchise_doc,
+                f"complete_week_post_advance week={week} fid={franchise_id_str}",
+            )
             if week == ft.EOS_CONFERENCE_WEEKS[-1]:
                 eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
                     {"franchise_id": franchise_id}, {"team_id": 1}
