@@ -450,7 +450,7 @@
     c1.className = 'fcc-tb-region-col';
     c1.appendChild(colHeadDual('WEEK 31 · CHAMPIONSHIP'));
     var champWrap = document.createElement('div');
-    champWrap.className = 'fcc-tb-mu-wrap fcc-tb-mu-wrap--champ';
+    champWrap.className = 'fcc-tb-mu-wrap fcc-tb-mu-wrap--champ fcc-tb-mu-wrap--region4-champ';
     var inner = createMatchupEl(fin, seeds, teamIdToNameMap, teamIdMetaMap, userTeamId, rankMap, null);
     var muEl = inner.querySelector('.fcc-tb-mu');
     if (muEl) muEl.classList.add('fcc-tb-mu--championship');
