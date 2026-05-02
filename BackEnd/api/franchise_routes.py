@@ -2474,6 +2474,68 @@ def _find_user_franchise_week_matchup_normalized_ids(
     raise HTTPException(status_code=400, detail="User team has no game this week")
 
 
+def _save_user_eos_bracket_result(
+    franchise_doc: dict,
+    *,
+    week_games_meta: list | None,
+    user_team_id_str: Any,
+    team1_id: Any,
+    team2_id: Any,
+    team1_score: int,
+    team2_score: int,
+    game_id: str | None,
+) -> dict | None:
+    """Persist the played user EOS game into its tournament bracket."""
+    if not week_games_meta:
+        return None
+    found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
+    if not found:
+        logger.warning(
+            "⚠️ [COMPLETE-WEEK] Could not find user EOS matchup for bracket persistence. user_team_id=%s game_id=%s",
+            user_team_id_str,
+            game_id,
+        )
+        return None
+    _, g = found
+    winner_id = team1_id if team1_score > team2_score else team2_id
+    home_id_g = g["home_id"]
+    score = {
+        "home": team1_score if str(team1_id) == str(home_id_g) else team2_score,
+        "away": team2_score if str(team1_id) == str(home_id_g) else team1_score,
+    }
+    bracket_game_id = str(game_id or "")
+    if g["phase"] == "conference":
+        ft.save_conference_game_result(
+            franchise_doc,
+            g["conference"],
+            g["round"],
+            g["matchup_index"],
+            bracket_game_id,
+            str(winner_id),
+            score,
+        )
+    elif g["phase"] == "region":
+        ft.save_region_game_result(
+            franchise_doc,
+            g["region"],
+            g["round"],
+            g["matchup_index"],
+            bracket_game_id,
+            str(winner_id),
+            score,
+        )
+    elif g["phase"] == "national":
+        ft.save_national_game_result(
+            franchise_doc,
+            g["round"],
+            g["matchup_index"],
+            bracket_game_id,
+            str(winner_id),
+            score,
+        )
+    return g
+
+
 def _complete_week_process_user_game_block(
     franchise_doc: dict,
     req: CompleteWeekRequest,
@@ -2498,31 +2560,18 @@ def _complete_week_process_user_game_block(
     }
     
     # ✅ EOS (weeks 27–34): save user's game result to the correct bracket (conference/region/national)
-    if week_games_meta and user_game_id:
-        found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
-        if found:
-            _, g = found
-            winner_id = team1_id if user.team1_score > user.team2_score else team2_id
-            home_id_g = g["home_id"]
-            score = {
-                "home": user.team1_score if str(team1_id) == str(home_id_g) else user.team2_score,
-                "away": user.team2_score if str(team1_id) == str(home_id_g) else user.team1_score,
-            }
-            if g["phase"] == "conference":
-                ft.save_conference_game_result(
-                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                    str(user_game_id), str(winner_id), score,
-                )
-            elif g["phase"] == "region":
-                ft.save_region_game_result(
-                    franchise_doc, g["region"], g["round"], g["matchup_index"],
-                    str(user_game_id), str(winner_id), score,
-                )
-            elif g["phase"] == "national":
-                ft.save_national_game_result(
-                    franchise_doc, g["round"], g["matchup_index"],
-                    str(user_game_id), str(winner_id), score,
-                )
+    # Do not require req.game_id here. Some gameplay paths omit it, but the bracket still
+    # needs the winner so later tournament rounds can be generated.
+    _save_user_eos_bracket_result(
+        franchise_doc,
+        week_games_meta=week_games_meta,
+        user_team_id_str=user_team_id_str,
+        team1_id=team1_id,
+        team2_id=team2_id,
+        team1_score=user.team1_score,
+        team2_score=user.team2_score,
+        game_id=user_game_id,
+    )
     
     user_winner_id = team1_id if user.team1_score > user.team2_score else team2_id
     eos_matchup_for_user = None
@@ -2756,6 +2805,16 @@ def _complete_week_process_user_game_block(
             user_game_id = str(user_game.get("_id", ""))
             logger.info(f"✅ [COMPLETE_WEEK] Found user's game via legacy lookup: game_id={user_game_id}")
             if user_game_id:
+                _save_user_eos_bracket_result(
+                    franchise_doc,
+                    week_games_meta=week_games_meta,
+                    user_team_id_str=user_team_id_str,
+                    team1_id=team1_id,
+                    team2_id=team2_id,
+                    team1_score=user.team1_score,
+                    team2_score=user.team2_score,
+                    game_id=user_game_id,
+                )
                 logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game: game_id={user_game_id}")
                 stat_updater.finalize_game(
                     user_game_id, mode="franchise", franchise_id=req.franchise_id

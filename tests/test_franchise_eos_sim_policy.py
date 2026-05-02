@@ -1,5 +1,9 @@
 from BackEnd.api import franchise_routes
-from BackEnd.api.franchise_routes import _get_user_eos_phase_status, _should_use_tbt_for_eos_game
+from BackEnd.api.franchise_routes import (
+    _get_user_eos_phase_status,
+    _save_user_eos_bracket_result,
+    _should_use_tbt_for_eos_game,
+)
 
 
 def test_conference_weeks_only_user_conference_uses_tbt():
@@ -62,6 +66,53 @@ def test_all_eos_games_use_csg_when_user_is_not_active():
     assert _should_use_tbt_for_eos_game(28, {"phase": "conference", "conference": 3}, user_scope) is False
     assert _should_use_tbt_for_eos_game(30, {"phase": "region", "region": "B"}, user_scope) is False
     assert _should_use_tbt_for_eos_game(33, {"phase": "national"}, user_scope) is False
+
+
+def test_user_eos_bracket_result_persists_without_game_id():
+    away_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    user_team_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    franchise_doc = {
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {
+                            "away_team": away_id,
+                            "home_team": user_team_id,
+                            "winner": None,
+                        }
+                    ],
+                },
+            }
+        }
+    }
+    week_games_meta = [
+        {
+            "away_id": away_id,
+            "home_id": user_team_id,
+            "phase": "conference",
+            "conference": 1,
+            "round": 1,
+            "matchup_index": 0,
+        }
+    ]
+
+    _save_user_eos_bracket_result(
+        franchise_doc,
+        week_games_meta=week_games_meta,
+        user_team_id_str=user_team_id,
+        team1_id=away_id,
+        team2_id=user_team_id,
+        team1_score=61,
+        team2_score=72,
+        game_id=None,
+    )
+
+    matchup = franchise_doc["conference_tournaments"]["1"]["bracket"]["round1"][0]
+    assert matchup["winner"] == user_team_id
+    assert matchup["score"] == {"home": 72, "away": 61}
+    assert matchup["game_id"] == ""
 
 
 def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
