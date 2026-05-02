@@ -2920,6 +2920,78 @@ def _complete_week_process_user_game_block(
     return user_res, user_row, gp_delta, eos_matchup_for_user, ch_game_id
 
 
+def _sync_eos_bracket_from_existing_game_doc(
+    franchise_doc: dict,
+    *,
+    existing: dict,
+    away_id: Any,
+    home_id: Any,
+    g: dict[str, Any],
+) -> None:
+    """Write EOS bracket winner/scores from an already-saved games row.
+
+    When ``complete_week`` hits ``existing`` it used to ``continue`` without updating the
+    in-memory bracket, so ``advance_bracket`` saw fewer than four R1 winners (e.g. 3/4).
+    """
+    ex_id = existing.get("_id")
+    gid = str(ex_id) if ex_id is not None else ""
+    t1 = existing.get("team1_id")
+    t2 = existing.get("team2_id")
+    s1 = int(existing.get("team1_score", 0) or 0)
+    s2 = int(existing.get("team2_score", 0) or 0)
+    if str(t1) == str(away_id) and str(t2) == str(home_id):
+        away_s, home_s = s1, s2
+    elif str(t1) == str(home_id) and str(t2) == str(away_id):
+        away_s, home_s = s2, s1
+    else:
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] existing_game_team_order_unexpected t1=%s t2=%s away=%s home=%s",
+            t1,
+            t2,
+            away_id,
+            home_id,
+        )
+        away_s, home_s = s1, s2
+    if home_s > away_s:
+        winner_raw = home_id
+    elif away_s > home_s:
+        winner_raw = away_id
+    else:
+        winner_raw = home_id
+    wid = ft._eos_team_id_canonical(winner_raw) or str(winner_raw)
+    score = {"home": home_s, "away": away_s}
+    phase = g.get("phase")
+    if phase == "conference":
+        ft.save_conference_game_result(
+            franchise_doc,
+            g["conference"],
+            g["round"],
+            g["matchup_index"],
+            gid,
+            wid,
+            score,
+        )
+    elif phase == "region":
+        ft.save_region_game_result(
+            franchise_doc,
+            g["region"],
+            g["round"],
+            g["matchup_index"],
+            gid,
+            wid,
+            score,
+        )
+    elif phase == "national":
+        ft.save_national_game_result(
+            franchise_doc,
+            g["round"],
+            g["matchup_index"],
+            gid,
+            wid,
+            score,
+        )
+
+
 def _complete_week_finish_cpu_and_persist(
     franchise_doc: dict,
     franchise_id: ObjectId,
@@ -2997,6 +3069,15 @@ def _complete_week_finish_cpu_and_persist(
                 "away_score": existing["team1_score"],
                 "home_score": existing["team2_score"],
             })
+            if week in ft.EOS_WEEKS and week_games_meta and idx < len(week_games_meta):
+                g_meta = week_games_meta[idx]
+                _sync_eos_bracket_from_existing_game_doc(
+                    franchise_doc,
+                    existing=existing,
+                    away_id=away_id,
+                    home_id=home_id,
+                    g=g_meta,
+                )
             continue
     
         if week_games_meta and idx < len(week_games_meta):
