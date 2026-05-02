@@ -9,11 +9,17 @@
   var recruitMap = {};
   var currentEntries = [];
   var savedEntries = [];
+  var poolFilters = { regions: [], search: '', rtMin: 35, leansOnly: false };
+  var showOnlyMine = false;
+  var lastAddedRecruitId = null;
+  var dragFromIndex = null;
   var allowLeave = false;
   var activeWeek = 1;
   var availableRosterSpots = 0;
   var mode = 'visits';
+  var userTeamId = context.teamId || '';
   var WEEK_35_POINTS_BUDGET = 20;
+  var FILTER_STORAGE_KEY = 'gob-recruiting-orders-v2-filters';
 
   window.addEventListener('pageshow', function (event) {
     if (event.persisted) {
@@ -23,6 +29,93 @@
 
   function isWeek35Mode() {
     return mode === 'week35';
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getVisitStorageKey() {
+    return FILTER_STORAGE_KEY + ':' + (context.franchiseId || 'global') + ':' + (context.teamId || 'team');
+  }
+
+  function loadVisitPreferences() {
+    try {
+      var raw = window.localStorage.getItem(getVisitStorageKey());
+      if (!raw) return;
+      var parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        poolFilters = Object.assign({}, poolFilters, parsed.filters || {});
+        if (!Array.isArray(poolFilters.regions)) poolFilters.regions = [];
+        poolFilters.rtMin = Number(poolFilters.rtMin || 0);
+        showOnlyMine = !!parsed.showOnlyMine;
+        if (parsed.sort && parsed.sort.key) {
+          sortState.key = parsed.sort.key;
+          sortState.direction = parsed.sort.direction === 'asc' ? 'asc' : 'desc';
+        }
+      }
+    } catch (e) {}
+  }
+
+  function saveVisitPreferences() {
+    try {
+      window.localStorage.setItem(getVisitStorageKey(), JSON.stringify({
+        filters: poolFilters,
+        showOnlyMine: showOnlyMine,
+        sort: sortState
+      }));
+    } catch (e) {}
+  }
+
+  function getRecruitRank(recruitId) {
+    var index = currentEntries.findIndex(function (entry) { return entry.id === recruitId; });
+    return index === -1 ? 0 : index + 1;
+  }
+
+  function getLeanRankForUser(recruit) {
+    var lean = recruit && recruit.lean ? recruit.lean : {};
+    var teamId = String(userTeamId || context.teamId || '');
+    if (!teamId) return 0;
+    if (String(lean['1'] || '') === teamId) return 1;
+    if (String(lean['2'] || '') === teamId) return 2;
+    if (String(lean['3'] || '') === teamId) return 3;
+    return 0;
+  }
+
+  function isLeaningToUser(recruit) {
+    return getLeanRankForUser(recruit) === 1;
+  }
+
+  function getLeanCellHtml(recruit) {
+    var rank = getLeanRankForUser(recruit);
+    if (rank === 1) {
+      return '<span class="lean-cell"><span class="lean-dot is-solid"></span>Leaning You</span>';
+    }
+    if (rank === 2 || rank === 3) {
+      return '<span class="lean-cell"><span class="lean-dot"></span>In Top ' + rank + '</span>';
+    }
+    return escapeHtml(recruit.leanDisplay || 'Open');
+  }
+
+  function getPositionCounts() {
+    var counts = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
+    currentEntries.forEach(function (entry) {
+      var recruit = recruitMap[entry.id];
+      var pos = recruit && recruit.pos;
+      if (Object.prototype.hasOwnProperty.call(counts, pos)) counts[pos] += 1;
+    });
+    return counts;
+  }
+
+  function getLeaningPickCount() {
+    return currentEntries.reduce(function (total, entry) {
+      return total + (isLeaningToUser(recruitMap[entry.id]) ? 1 : 0);
+    }, 0);
   }
 
   function cloneEntry(entry) {
@@ -123,15 +216,30 @@
     var help = document.getElementById('orders-help');
     var status = document.getElementById('orders-status');
     var table = document.getElementById('orders-grid-table');
+    var visitsDock = document.getElementById('visits-dock-section');
+    var ordersTableSection = document.getElementById('orders-table-section');
+    var poolTitle = document.getElementById('recruit-pool-title');
+    var poolFiltersEl = document.getElementById('recruit-pool-filters');
+    var picksToggle = document.getElementById('show-only-picks-toggle');
     if (table) table.classList.toggle('orders-grid-table-week36', isWeek35Mode());
     if (isWeek35Mode()) {
       if (title) title.textContent = 'Recruiting Focus List';
-      help.textContent = '';
-      status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Points Remaining: ' + getWeek35PointsRemaining();
+      if (help) help.textContent = '';
+      if (status) status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Points Remaining: ' + getWeek35PointsRemaining();
+      if (visitsDock) visitsDock.hidden = true;
+      if (ordersTableSection) ordersTableSection.hidden = false;
+      if (poolTitle) poolTitle.textContent = 'All Recruits';
+      if (poolFiltersEl) poolFiltersEl.hidden = true;
+      if (picksToggle) picksToggle.hidden = true;
     } else {
       if (title) title.textContent = 'Recruiting Orders';
-      help.textContent = 'Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.';
-      status.textContent = '';
+      if (help) help.textContent = '';
+      if (status) status.textContent = '';
+      if (visitsDock) visitsDock.hidden = false;
+      if (ordersTableSection) ordersTableSection.hidden = true;
+      if (poolTitle) poolTitle.textContent = 'Recruit Pool';
+      if (poolFiltersEl) poolFiltersEl.hidden = false;
+      if (picksToggle) picksToggle.hidden = false;
     }
   }
 
@@ -146,6 +254,10 @@
   }
 
   function renderRecruitList() {
+    if (!isWeek35Mode()) {
+      renderRecruitPool();
+      return;
+    }
     Recruiting.renderRecruitTableRows(
       document.getElementById('recruits-body'),
       Recruiting.sortRecruits(recruits, sortState),
@@ -162,6 +274,94 @@
         }
       }
     );
+  }
+
+  function applyPoolFilters(list) {
+    var selectedIds = getSelectedIds();
+    var search = String(poolFilters.search || '').trim().toLowerCase();
+    var regions = poolFilters.regions || [];
+    var rtMin = Number(poolFilters.rtMin || 0);
+    return list.filter(function (recruit) {
+      if (showOnlyMine && !selectedIds.has(recruit.recruitId)) return false;
+      if (regions.length && regions.indexOf(String(recruit.homeRegion || '').trim().toUpperCase().charAt(0)) === -1) return false;
+      if (search) {
+        var haystack = [
+          recruit.name,
+          recruit.pos,
+          recruit.homeRegion,
+          recruit.archetype,
+          recruit.leanDisplay
+        ].join(' ').toLowerCase();
+        if (haystack.indexOf(search) === -1) return false;
+      }
+      if (recruit.rt != null && recruit.rt < rtMin) return false;
+      if (recruit.rt == null && rtMin > 0) return false;
+      if (poolFilters.leansOnly && !isLeaningToUser(recruit)) return false;
+      return true;
+    });
+  }
+
+  function renderRecruitPool() {
+    var tbody = document.getElementById('recruits-body');
+    if (!tbody) return;
+    var sorted = Recruiting.sortRecruits(applyPoolFilters(recruits), sortState);
+    tbody.innerHTML = '';
+    sorted.forEach(function (recruit) {
+      var rank = getRecruitRank(recruit.recruitId);
+      var tr = document.createElement('tr');
+      tr.dataset.recruitId = recruit.recruitId;
+      if (rank) tr.classList.add('recruit-selected');
+      if (isLeaningToUser(recruit)) tr.classList.add('is-leaning-row');
+      tr.innerHTML = [
+        '<td>' + escapeHtml(recruit.name) + '</td>',
+        '<td>' + escapeHtml(recruit.homeRegion) + '</td>',
+        '<td>' + escapeHtml(recruit.archetype) + '</td>',
+        '<td>' + escapeHtml(recruit.height) + '</td>',
+        '<td>' + (recruit.weight != null ? escapeHtml(recruit.weight) : '--') + '</td>',
+        '<td>' + escapeHtml(recruit.pos) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.SC) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.SH) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.ID) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.OD) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.PS) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.BH) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.RB) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.AG) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.ST) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.ND) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.IQ) + '</td>',
+        '<td>' + escapeHtml(recruit.attrs.FT) + '</td>',
+        '<td>' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
+        '<td>' + getLeanCellHtml(recruit) + '</td>',
+        '<td>' + (rank
+          ? '<button class="picked-rank-badge" type="button" data-action="scroll-to-pick" data-recruit-id="' + escapeHtml(recruit.recruitId) + '">' + rank + '</button>'
+          : '<button class="recruiting-row-action-btn" type="button" data-action="add-recruit" data-recruit-id="' + escapeHtml(recruit.recruitId) + '">+</button>') + '</td>'
+      ].join('');
+      tbody.appendChild(tr);
+    });
+    if (!sorted.length) {
+      tbody.innerHTML = '<tr><td colspan="21">No recruits match the current filters.</td></tr>';
+    }
+    tbody.querySelectorAll('button[data-action="add-recruit"]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleRecruitSelection(btn.dataset.recruitId);
+      });
+    });
+    tbody.querySelectorAll('button[data-action="scroll-to-pick"]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        scrollToPick(btn.dataset.recruitId);
+      });
+    });
+    if (typeof window.initAttributeTooltips === 'function') {
+      window.initAttributeTooltips(tbody, ['td']);
+    }
+    var picksToggle = document.getElementById('show-only-picks-toggle');
+    if (picksToggle) {
+      picksToggle.classList.toggle('is-active', showOnlyMine);
+      picksToggle.setAttribute('aria-pressed', showOnlyMine ? 'true' : 'false');
+    }
   }
 
   function buildTopGridHead() {
@@ -250,6 +450,11 @@
   }
 
   function renderTopGrid() {
+    if (!isWeek35Mode()) {
+      renderInviteDock();
+      updateActionButtons();
+      return;
+    }
     var tbody = document.getElementById('orders-grid-body');
     var rowCount = MAX_RECRUITING_ORDER_SLOTS;
     tbody.innerHTML = '';
@@ -267,6 +472,89 @@
 
     bindTopGridInteractions();
     updateActionButtons();
+  }
+
+  function renderInviteDock() {
+    renderInviteDockHeader();
+    renderInviteSlots();
+  }
+
+  function renderInviteDockHeader() {
+    var counts = getPositionCounts();
+    var breakdown = document.getElementById('position-breakdown');
+    var leaningBadge = document.getElementById('leaning-badge');
+    var leaningDivider = document.getElementById('leaning-divider');
+    var firstDivider = document.getElementById('meta-first-divider');
+    var fillMoreLink = document.getElementById('fill-more-link');
+    var inviteCount = document.getElementById('invite-count');
+    var positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    if (breakdown) {
+      breakdown.innerHTML = positions.map(function (pos) {
+        var count = counts[pos] || 0;
+        return '<div class="position-group' + (count ? '' : ' is-zero') + '"><span class="position-count">' + count + '</span><span class="position-label">' + pos + '</span></div>';
+      }).join('');
+    }
+    var leaningCount = getLeaningPickCount();
+    if (leaningBadge) {
+      leaningBadge.hidden = leaningCount <= 0;
+      leaningBadge.innerHTML = '<span class="leaning-dot"></span><span class="leaning-count">' + leaningCount + '</span><span>leaning to you</span>';
+    }
+    if (leaningDivider) leaningDivider.hidden = leaningCount <= 0 || currentEntries.length >= MAX_RECRUITING_ORDER_SLOTS;
+    if (fillMoreLink) {
+      var remaining = MAX_RECRUITING_ORDER_SLOTS - currentEntries.length;
+      fillMoreLink.hidden = !(currentEntries.length > 0 && remaining > 0);
+      fillMoreLink.textContent = remaining + ' more to fill ↓';
+    }
+    if (firstDivider) firstDivider.hidden = leaningCount <= 0 && !(currentEntries.length > 0 && currentEntries.length < MAX_RECRUITING_ORDER_SLOTS);
+    if (inviteCount) inviteCount.textContent = String(currentEntries.length);
+  }
+
+  function buildGripHtml() {
+    return '<span></span><span></span><span></span><span></span><span></span><span></span>';
+  }
+
+  function buildSlotHtml(index, recruit) {
+    if (!recruit) {
+      return [
+        '<div class="slot-rank">' + (index + 1) + '</div>',
+        '<div class="slot-body"><div class="slot-name">' + (index === currentEntries.length ? 'Add next' : 'Empty') + '</div></div>'
+      ].join('');
+    }
+    return [
+      '<div class="slot-grip" aria-hidden="true">' + buildGripHtml() + '</div>',
+      '<div class="slot-body">',
+      '<div class="slot-name">' + escapeHtml(recruit.name) + '</div>',
+      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
+      '</div>',
+      isLeaningToUser(recruit) ? '<span class="lean-dot is-solid" aria-label="Leaning to you"></span>' : '<span></span>',
+      '<button class="slot-remove" type="button" data-action="remove" data-index="' + index + '" aria-label="Remove ' + escapeHtml(recruit.name) + '">×</button>'
+    ].join('');
+  }
+
+  function renderInviteSlots() {
+    var grid = document.getElementById('invite-slot-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (var i = 0; i < MAX_RECRUITING_ORDER_SLOTS; i += 1) {
+      var entry = currentEntries[i] || null;
+      var recruit = entry ? recruitMap[entry.id] : null;
+      var slot = document.createElement('div');
+      slot.className = 'invite-slot ' + (recruit ? 'is-filled' : 'is-empty');
+      if (!recruit && i === currentEntries.length) slot.classList.add('is-next-empty');
+      if (recruit && isLeaningToUser(recruit)) slot.classList.add('is-leaning');
+      if (recruit && recruit.recruitId === lastAddedRecruitId) slot.classList.add('is-new-add');
+      slot.dataset.index = String(i);
+      slot.dataset.filled = recruit ? 'true' : 'false';
+      slot.draggable = !!recruit;
+      slot.innerHTML = buildSlotHtml(i, recruit);
+      grid.appendChild(slot);
+    }
+    if (lastAddedRecruitId) {
+      window.setTimeout(function () {
+        lastAddedRecruitId = null;
+      }, 750);
+    }
+    bindInviteSlotInteractions();
   }
 
   function rerender() {
@@ -301,6 +589,25 @@
     rerender();
   }
 
+  function requestRemoveRecruitAt(index) {
+    var entry = currentEntries[index];
+    if (!entry) return;
+    var recruit = recruitMap[entry.id];
+    if (recruit && Number(recruit.rt || 0) >= 60 && !isWeek35Mode()) {
+      showModal({
+        title: 'Remove Recruit?',
+        message: 'This recruit is rated ' + recruit.rt + '. Remove ' + recruit.name + ' from your invite list?',
+        accent: 'is-red',
+        actions: [
+          { label: 'Keep', variant: 'secondary' },
+          { label: 'Remove', variant: 'primary', onClick: function () { removeRecruitAt(index); } }
+        ]
+      });
+      return;
+    }
+    removeRecruitAt(index);
+  }
+
   function toggleRecruitSelection(recruitId) {
     var existingIndex = currentEntries.findIndex(function (entry) {
       return entry.id === recruitId;
@@ -318,6 +625,7 @@
       return;
     }
     currentEntries.push(defaultEntryForRecruit(recruitId));
+    lastAddedRecruitId = recruitId;
     Recruiting.playSound('click-tiny.wav');
     rerender();
   }
@@ -330,6 +638,77 @@
     if (!isWeek35Mode() && currentEntries.length > MAX_RECRUITING_ORDER_SLOTS) {
       currentEntries = currentEntries.slice(0, MAX_RECRUITING_ORDER_SLOTS);
     }
+  }
+
+  function scrollToPoolAndFocusSearch() {
+    var pool = document.getElementById('recruit-pool-title');
+    if (pool) pool.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(function () {
+      var search = document.getElementById('recruit-search');
+      if (search) search.focus({ preventScroll: true });
+    }, 300);
+  }
+
+  function scrollToPick(recruitId) {
+    var rank = getRecruitRank(recruitId);
+    var slot = rank ? document.querySelector('.invite-slot[data-index="' + (rank - 1) + '"]') : null;
+    if (slot) {
+      slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      slot.classList.add('is-new-add');
+      window.setTimeout(function () { slot.classList.remove('is-new-add'); }, 750);
+    }
+  }
+
+  function bindInviteSlotInteractions() {
+    var grid = document.getElementById('invite-slot-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.invite-slot').forEach(function (slot) {
+      slot.addEventListener('click', function () {
+        if (slot.dataset.filled === 'false') scrollToPoolAndFocusSearch();
+      });
+      var removeBtn = slot.querySelector('.slot-remove');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          requestRemoveRecruitAt(Number(removeBtn.dataset.index));
+        });
+      }
+      slot.addEventListener('dragstart', function (e) {
+        if (slot.dataset.filled !== 'true') return;
+        dragFromIndex = Number(slot.dataset.index);
+        e.dataTransfer.setData('text/plain', slot.dataset.index);
+        slot.classList.add('is-dragging');
+      });
+      slot.addEventListener('dragend', function () {
+        dragFromIndex = null;
+        grid.querySelectorAll('.invite-slot').forEach(function (item) {
+          item.classList.remove('is-dragging', 'is-drag-over', 'is-shift-preview');
+        });
+      });
+      slot.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        var toIndex = Number(slot.dataset.index);
+        grid.querySelectorAll('.invite-slot').forEach(function (item) {
+          item.classList.remove('is-drag-over', 'is-shift-preview');
+        });
+        slot.classList.add('is-drag-over');
+        if (dragFromIndex != null && toIndex !== dragFromIndex) {
+          slot.classList.add('is-shift-preview');
+        }
+      });
+      slot.addEventListener('dragleave', function () {
+        slot.classList.remove('is-drag-over', 'is-shift-preview');
+      });
+      slot.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var fromIndex = Number(e.dataTransfer.getData('text/plain'));
+        var toIndex = Number(slot.dataset.index);
+        if (Number.isNaN(fromIndex) || Number.isNaN(toIndex) || fromIndex === toIndex || !currentEntries[fromIndex]) return;
+        insertMove(fromIndex, Math.min(toIndex, currentEntries.length - 1));
+        Recruiting.playSound('click-tiny.wav');
+        rerender();
+      });
+    });
   }
 
   function bindTopGridInteractions() {
@@ -429,6 +808,93 @@
   function navigateAway(url) {
     allowLeave = true;
     window.location.href = url;
+  }
+
+  function syncVisitFilterControls() {
+    var search = document.getElementById('recruit-search');
+    var slider = document.getElementById('rt-min-slider');
+    var sliderValue = document.getElementById('rt-min-value');
+    var leansOnly = document.getElementById('leans-only-checkbox');
+    var picksToggle = document.getElementById('show-only-picks-toggle');
+    if (search) search.value = poolFilters.search || '';
+    if (slider) slider.value = String(poolFilters.rtMin || 0);
+    if (sliderValue) sliderValue.textContent = String(poolFilters.rtMin || 0);
+    if (leansOnly) leansOnly.checked = !!poolFilters.leansOnly;
+    if (picksToggle) {
+      picksToggle.classList.toggle('is-active', showOnlyMine);
+      picksToggle.setAttribute('aria-pressed', showOnlyMine ? 'true' : 'false');
+    }
+    document.querySelectorAll('.region-chip').forEach(function (chip) {
+      var region = chip.dataset.region;
+      var active = region === 'all' ? !(poolFilters.regions || []).length : (poolFilters.regions || []).indexOf(region) !== -1;
+      chip.classList.toggle('is-active', active);
+    });
+  }
+
+  function bindVisitFilters() {
+    var search = document.getElementById('recruit-search');
+    var slider = document.getElementById('rt-min-slider');
+    var leansOnly = document.getElementById('leans-only-checkbox');
+    var picksToggle = document.getElementById('show-only-picks-toggle');
+    var fillMoreLink = document.getElementById('fill-more-link');
+    document.querySelectorAll('.region-chip').forEach(function (chip) {
+      if (chip.dataset.bound === '1') return;
+      chip.dataset.bound = '1';
+      chip.addEventListener('click', function () {
+        var region = chip.dataset.region;
+        if (region === 'all') {
+          poolFilters.regions = [];
+        } else {
+          var regions = poolFilters.regions || [];
+          if (regions.indexOf(region) === -1) regions.push(region);
+          else regions = regions.filter(function (item) { return item !== region; });
+          poolFilters.regions = regions;
+        }
+        saveVisitPreferences();
+        syncVisitFilterControls();
+        renderRecruitList();
+      });
+    });
+    if (search && search.dataset.bound !== '1') {
+      search.dataset.bound = '1';
+      search.addEventListener('input', function () {
+        poolFilters.search = search.value;
+        saveVisitPreferences();
+        renderRecruitList();
+      });
+    }
+    if (slider && slider.dataset.bound !== '1') {
+      slider.dataset.bound = '1';
+      slider.addEventListener('input', function () {
+        poolFilters.rtMin = Number(slider.value || 0);
+        var sliderValue = document.getElementById('rt-min-value');
+        if (sliderValue) sliderValue.textContent = String(poolFilters.rtMin);
+        saveVisitPreferences();
+        renderRecruitList();
+      });
+    }
+    if (leansOnly && leansOnly.dataset.bound !== '1') {
+      leansOnly.dataset.bound = '1';
+      leansOnly.addEventListener('change', function () {
+        poolFilters.leansOnly = leansOnly.checked;
+        saveVisitPreferences();
+        renderRecruitList();
+      });
+    }
+    if (picksToggle && picksToggle.dataset.bound !== '1') {
+      picksToggle.dataset.bound = '1';
+      picksToggle.addEventListener('click', function () {
+        showOnlyMine = !showOnlyMine;
+        saveVisitPreferences();
+        syncVisitFilterControls();
+        renderRecruitList();
+      });
+    }
+    if (fillMoreLink && fillMoreLink.dataset.bound !== '1') {
+      fillMoreLink.dataset.bound = '1';
+      fillMoreLink.addEventListener('click', scrollToPoolAndFocusSearch);
+    }
+    syncVisitFilterControls();
   }
 
   function attemptLeave(url) {
@@ -634,8 +1100,10 @@
         }
 
         mode = activeWeek === 35 ? 'week35' : 'visits';
+        userTeamId = data.team_id || context.teamId || '';
         availableRosterSpots = Number(data.available_roster_spots || 0);
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});
+        if (!isWeek35Mode()) loadVisitPreferences();
         recruitMap = {};
         recruits.forEach(function (recruit) {
           recruitMap[recruit.recruitId] = recruit;
@@ -657,8 +1125,12 @@
         Recruiting.bindSortableHeaders(
           document.getElementById('recruits-table'),
           sortState,
-          renderRecruitList
+          function () {
+            if (!isWeek35Mode()) saveVisitPreferences();
+            renderRecruitList();
+          }
         );
+        if (!isWeek35Mode()) bindVisitFilters();
         rerender();
         if (typeof window.initAttributeTooltips === 'function') {
           window.initAttributeTooltips(document.getElementById('recruits-table'), ['th']);

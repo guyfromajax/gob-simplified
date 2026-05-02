@@ -22,7 +22,28 @@
       </div>
     </div>
 
-    <section class="gob-page-panel recruiting-section">
+    <section id="visits-dock-section" class="recruiting-v2-dock-section" hidden>
+      <div id="invite-dock" class="invite-dock">
+        <div class="invite-dock-header">
+          <div class="invite-dock-title-wrap">
+            <h2>Your Invite List</h2>
+            <div class="invite-dock-meta">
+              <div id="position-breakdown" class="position-breakdown" aria-label="Position breakdown"></div>
+              <span id="meta-first-divider" class="invite-dock-divider" aria-hidden="true" hidden></span>
+              <div id="leaning-badge" class="leaning-badge" hidden></div>
+              <span id="leaning-divider" class="invite-dock-divider" aria-hidden="true" hidden></span>
+              <button id="fill-more-link" class="fill-more-link" type="button" hidden></button>
+            </div>
+          </div>
+          <div class="invite-counter" aria-label="Invite list count">
+            <span id="invite-count">0</span><span class="invite-counter-total">/ 20</span>
+          </div>
+        </div>
+        <div id="invite-slot-grid" class="invite-slot-grid" aria-label="Invite list slots"></div>
+      </div>
+    </section>
+
+    <section id="orders-table-section" class="gob-page-panel recruiting-section">
       <p id="orders-help" class="gob-page-help recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
       <p id="orders-status" class="gob-page-status recruiting-status-text"></p>
       <div class="gob-data-grid-shell">
@@ -36,15 +57,41 @@
     </section>
 
     <section class="gob-page-panel recruiting-section">
-      <div class="gob-page-panel-header">
-        <h2>All Recruits</h2>
+      <div class="gob-page-panel-header recruiting-pool-header">
+        <h2 id="recruit-pool-title">All Recruits</h2>
+        <button id="show-only-picks-toggle" class="recruiting-pill-toggle" type="button" aria-pressed="false" hidden>Show only my picks</button>
+      </div>
+      <div id="recruit-pool-filters" class="recruit-pool-filters" hidden>
+        <div class="region-chip-group" aria-label="Region filter">
+          <button class="region-chip is-active" type="button" data-region="all">All</button>
+          <button class="region-chip" type="button" data-region="A">A</button>
+          <button class="region-chip" type="button" data-region="B">B</button>
+          <button class="region-chip" type="button" data-region="C">C</button>
+          <button class="region-chip" type="button" data-region="D">D</button>
+          <button class="region-chip" type="button" data-region="E">E</button>
+          <button class="region-chip" type="button" data-region="F">F</button>
+          <button class="region-chip" type="button" data-region="G">G</button>
+          <button class="region-chip" type="button" data-region="H">H</button>
+        </div>
+        <label class="recruit-search-wrap">
+          <span>Search</span>
+          <input id="recruit-search" type="search" autocomplete="off">
+        </label>
+        <label class="rt-min-wrap">
+          <span>RT Min <strong id="rt-min-value">35</strong></span>
+          <input id="rt-min-slider" type="range" min="0" max="100" step="1" value="35">
+        </label>
+        <label class="leans-only-wrap">
+          <input id="leans-only-checkbox" type="checkbox">
+          <span>Leaning toward you only</span>
+        </label>
       </div>
       <div class="gob-data-grid-shell">
         <div class="gob-data-grid-scroll scroll-x">
         <table id="recruits-table" class="gob-data-grid recruiting-table">
           <thead>
             <tr>
-              <th>Name</th>
+              <th data-sort-key="name">Name</th>
               <th data-sort-key="homeRegion">Home Region</th>
               <th data-sort-key="archetype">Archetype</th>
               <th data-sort-key="height">HT</th>
