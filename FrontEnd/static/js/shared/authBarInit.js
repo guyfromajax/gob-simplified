@@ -359,7 +359,7 @@
       '</div>',
       '<img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">',
       '<div class="auth-bar-right">',
-      '  <button type="button" id="feedback-btn" class="feedback-btn">Feedback</button>',
+      '  <button type="button" id="feedback-btn" class="feedback-btn"><span class="feedback-pulse" aria-hidden="true"></span>Send feedback</button>',
       '  <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube">',
       '    <img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24">',
       '  </a>',
@@ -390,7 +390,11 @@
     btn.type = 'button';
     btn.id = 'feedback-btn';
     btn.className = 'feedback-btn';
-    btn.textContent = 'Feedback';
+    var pulse = document.createElement('span');
+    pulse.className = 'feedback-pulse';
+    pulse.setAttribute('aria-hidden', 'true');
+    btn.appendChild(pulse);
+    btn.appendChild(document.createTextNode('Send feedback'));
     right.insertBefore(btn, right.firstChild);
   }
 
