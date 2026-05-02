@@ -196,3 +196,26 @@ def test_merge_phase_a_user_row_replaces_same_matchup():
     assert ab["away_score"] == 70
     assert ab["home_score"] == 60
 
+
+def test_find_user_matchup_eos_phase_b_fallback_when_week_games_omits_user():
+    """Phase A persists bracket winner; get_eos_week_games skips that row — phase B uses saved results."""
+    uid = ObjectId()
+    peer = ObjectId()
+    saved = [
+        {
+            "away_id": str(uid),
+            "home_id": str(peer),
+            "away_score": 10,
+            "home_score": 8,
+        }
+    ]
+    # No row contains uid (user R1 already has winner in DB / excluded from incomplete list)
+    week_games = [(peer, ObjectId())]
+    t1, t2 = franchise_routes._find_user_franchise_week_matchup_normalized_ids(
+        week_games,
+        str(uid),
+        week=27,
+        saved_week_results=saved,
+    )
+    assert {str(t1), str(t2)} == {str(uid), str(peer)}
+

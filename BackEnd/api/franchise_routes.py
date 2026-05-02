@@ -2463,7 +2463,11 @@ def _user_next_regular_season_opponent_id(
 
 
 def _find_user_franchise_week_matchup_normalized_ids(
-    week_games: list, user_team_id_str: str | None
+    week_games: list,
+    user_team_id_str: str | None,
+    *,
+    week: int | None = None,
+    saved_week_results: list | None = None,
 ) -> tuple[Any, Any]:
     if not user_team_id_str:
         raise HTTPException(status_code=400, detail="Franchise has no user team")
@@ -2471,6 +2475,19 @@ def _find_user_franchise_week_matchup_normalized_ids(
     for away_id, home_id in week_games:
         if str(away_id) == ut or str(home_id) == ut:
             return _normalize_team_id(str(away_id)), _normalize_team_id(str(home_id))
+    # After phase A persists EOS bracket winners, get_eos_week_games(..., include_completed=False)
+    # drops the user's completed matchup. Phase B still needs normalized (away, home) for the skip
+    # in _complete_week_finish_cpu_and_persist and for result keying.
+    if week is not None and week in ft.EOS_WEEKS and saved_week_results:
+        for r in saved_week_results:
+            if not isinstance(r, dict):
+                continue
+            away_id = r.get("away_id")
+            home_id = r.get("home_id")
+            if away_id is None or home_id is None:
+                continue
+            if str(away_id) == ut or str(home_id) == ut:
+                return _normalize_team_id(str(away_id)), _normalize_team_id(str(home_id))
     raise HTTPException(status_code=400, detail="User team has no game this week")
 
 
@@ -3735,7 +3752,10 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
     team1_id, team2_id = _find_user_franchise_week_matchup_normalized_ids(
-        week_games, user_team_id_str
+        week_games,
+        user_team_id_str,
+        week=req.week,
+        saved_week_results=saved,
     )
     results = [dict(r) for r in saved]
 
