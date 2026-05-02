@@ -52,15 +52,17 @@ body.homepage-v3.has-auth-bar {
 
 /* ── Nav overrides for dark homepage ── */
 .auth-bar.homepage-v3-nav {
-  background: rgba(8, 8, 15, 0.92);
+  /* Match global nav surface #12161C */
+  background: rgba(18, 22, 28, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
   transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 .auth-bar.homepage-v3-nav.nav-scrolled {
-  background: rgba(8, 8, 15, 0.98);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+  background: rgba(18, 22, 28, 0.98);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.45);
 }
 .auth-bar.homepage-v3-nav .nav-icon {
   color: rgba(255,255,255,0.75);

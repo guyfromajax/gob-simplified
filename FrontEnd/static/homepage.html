@@ -87,14 +87,16 @@
     body.has-auth-bar { padding-top: 0 !important; }
     .auth-bar.gob-hp-nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      background: rgba(8,8,15,0.80);
+      /* Align with global nav #12161C + glass */
+      background: rgba(18, 22, 28, 0.88);
       backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(255,255,255,0.06);
-      box-shadow: none; transition: background 0.3s, box-shadow 0.3s;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+      transition: background 0.3s, box-shadow 0.3s;
     }
     .auth-bar.gob-hp-nav.nav-scrolled {
-      background: rgba(8,8,15,0.97);
-      box-shadow: 0 2px 24px rgba(0,0,0,0.5);
+      background: rgba(18, 22, 28, 0.97);
+      box-shadow: 0 2px 24px rgba(0,0,0,0.45);
     }
     .auth-bar.gob-hp-nav .logo { height: 36px; width: auto; display: block; }
     .auth-bar.gob-hp-nav .nav-tutorials-link {
