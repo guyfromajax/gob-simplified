@@ -3293,6 +3293,12 @@ def _complete_week_finish_cpu_and_persist(
             sim_eos_g = week_games_meta[idx] if week_games_meta and idx < len(week_games_meta) else None
             _award_gp_sim(winner_oid, sim_eos_g, (away_id, home_id))
         except Exception:
+            logger.exception(
+                "❌ [COMPLETE-WEEK] EOS full-sim path failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
+                franchise_id_str,
+                week,
+                idx,
+            )
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
             sim_res = _save_game_result(away_id, home_id, away_score, home_score, week, franchise_id=franchise_id_str)
@@ -3303,6 +3309,51 @@ def _complete_week_finish_cpu_and_persist(
             )
             ex_g = week_games_meta[idx] if week_games_meta and idx < len(week_games_meta) else None
             _award_gp_sim(ex_winner, ex_g, (away_id, home_id))
+            # Try block wrote bracket; this path previously did not → stuck at 3/4 R1 winners.
+            if week in ft.EOS_WEEKS and week_games_meta and idx < len(week_games_meta):
+                g_fb = week_games_meta[idx]
+                wid_fb = ft._eos_team_id_canonical(ex_winner) or str(ex_winner)
+                score_fb = {
+                    "home": int(sim_res["team2_score"]),
+                    "away": int(sim_res["team1_score"]),
+                }
+                ph = g_fb.get("phase")
+                if ph == "conference":
+                    ft.save_conference_game_result(
+                        franchise_doc,
+                        g_fb["conference"],
+                        g_fb["round"],
+                        g_fb["matchup_index"],
+                        "",
+                        wid_fb,
+                        score_fb,
+                    )
+                elif ph == "region":
+                    ft.save_region_game_result(
+                        franchise_doc,
+                        g_fb["region"],
+                        g_fb["round"],
+                        g_fb["matchup_index"],
+                        "",
+                        wid_fb,
+                        score_fb,
+                    )
+                elif ph == "national":
+                    ft.save_national_game_result(
+                        franchise_doc,
+                        g_fb["round"],
+                        g_fb["matchup_index"],
+                        "",
+                        wid_fb,
+                        score_fb,
+                    )
+                logger.warning(
+                    "[EOS-BRACKET-DEBUG] eos_full_sim_fallback_bracket_sync week=%s idx=%s phase=%s conf=%s",
+                    week,
+                    idx,
+                    ph,
+                    g_fb.get("conference"),
+                )
         results.append({
             "away_id": sim_res["team1_id"],
             "home_id": sim_res["team2_id"],
