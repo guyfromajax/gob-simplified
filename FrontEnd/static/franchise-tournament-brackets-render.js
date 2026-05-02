@@ -1,6 +1,6 @@
 /**
  * Shared franchise tournament bracket DOM (FCC Tournament tab + brackets.html).
- * Depends: bracket.js (renderBracketShared), getTeamAssetPath from common.js (optional).
+ * Depends: fcc-tournament-style-a.js (Style A renderer).
  */
 (function (global) {
   'use strict';
@@ -14,47 +14,50 @@
         round2: [],
         final: finalList,
       },
-      seeds: {},
+      seeds: rt.seeds || {},
     };
   }
 
-  function createBracketSection(sectionTitle, bracketPayload, layout, toneClass, teamIdToNameMap, userTeamId, teamIdMetaMap) {
+  function createBracketSection(
+    sectionTitle,
+    bracketPayload,
+    layout,
+    teamIdToNameMap,
+    userTeamId,
+    teamIdMetaMap,
+    topData,
+    fccMode,
+    tierHint
+  ) {
     if (!bracketPayload || !bracketPayload.bracket) return null;
 
     const section = document.createElement('section');
-    section.className = `fcc-tournament-section ${toneClass || ''}`.trim();
+    section.className = 'fcc-tournament-section fcc-tb-tier';
 
     const heading = document.createElement('h4');
-    heading.className = 'fcc-tournament-section-title';
+    heading.className = 'fcc-tournament-section-title fcc-tb-tier-title';
     heading.textContent = sectionTitle;
     section.appendChild(heading);
 
     const bracketRoot = document.createElement('div');
-    bracketRoot.className = 'bracket';
+    bracketRoot.className = 'fcc-tb-tier-body';
     section.appendChild(bracketRoot);
 
-    if (typeof renderBracketShared === 'function') {
-      renderBracketShared(bracketRoot, bracketPayload.bracket || {}, teamIdToNameMap, {
-        seeds: bracketPayload.seeds || {},
+    if (typeof FccTournamentStyleA !== 'undefined' && FccTournamentStyleA.renderInto) {
+      FccTournamentStyleA.renderInto(bracketRoot, {
+        sectionTitle: sectionTitle,
         layout: layout || 'full',
-        getLogo: function (name) {
-          return typeof getTeamAssetPath === 'function'
-            ? getTeamAssetPath(name, 'banner_primary')
-            : '/images/teams/general/general_banner_primary.jpg';
-        },
-        isUserTeam: function (id) {
-          return userTeamId != null && String(id) === String(userTeamId);
-        },
-        getTooltip: function (id, name) {
-          const meta = teamIdMetaMap[String(id)] || {};
-          const teamName = meta.team || name || '';
-          const mascot = meta.mascot || '';
-          if (!teamName) return '';
-          return mascot ? `${teamName} ${mascot}` : teamName;
-        },
+        bracket: bracketPayload.bracket || {},
+        seeds: bracketPayload.seeds || {},
+        teamIdToNameMap: teamIdToNameMap,
+        userTeamId: userTeamId,
+        teamIdMetaMap: teamIdMetaMap,
+        topData: topData || {},
+        allBrackets: fccMode === 'all',
+        tierHint: tierHint || null,
       });
     } else {
-      bracketRoot.innerHTML = '<p>Bracket renderer not loaded.</p>';
+      bracketRoot.innerHTML = '<p class="fcc-tournament-empty-msg">Tournament bracket UI not loaded.</p>';
     }
 
     return section;
@@ -102,10 +105,12 @@
           'Conference Tournament',
           conferenceTournament,
           'full',
-          'fcc-tournament-tone-conference',
           teamIdToNameMap,
           userTeamId,
-          teamIdMetaMap
+          teamIdMetaMap,
+          topData,
+          'fcc',
+          'conference'
         )
       );
     } else if (week >= 30 && week <= 31) {
@@ -115,10 +120,12 @@
             'Region Tournament',
             regionTournament,
             'compact4',
-            'fcc-tournament-tone-region',
             teamIdToNameMap,
             userTeamId,
-            teamIdMetaMap
+            teamIdMetaMap,
+            topData,
+            'fcc',
+            'region'
           )
         );
       }
@@ -128,10 +135,12 @@
             'Conference Tournament',
             conferenceTournament,
             'full',
-            'fcc-tournament-tone-conference',
             teamIdToNameMap,
             userTeamId,
-            teamIdMetaMap
+            teamIdMetaMap,
+            topData,
+            'fcc',
+            'conference'
           )
         );
       }
@@ -142,10 +151,12 @@
             'National Tournament',
             nationalTournament,
             'full',
-            'fcc-tournament-tone-national',
             teamIdToNameMap,
             userTeamId,
-            teamIdMetaMap
+            teamIdMetaMap,
+            topData,
+            'fcc',
+            'national'
           )
         );
       }
@@ -155,10 +166,12 @@
             'Region Tournament',
             regionTournament,
             'compact4',
-            'fcc-tournament-tone-region',
             teamIdToNameMap,
             userTeamId,
-            teamIdMetaMap
+            teamIdMetaMap,
+            topData,
+            'fcc',
+            'region'
           )
         );
       }
@@ -168,23 +181,28 @@
             'Conference Tournament',
             conferenceTournament,
             'full',
-            'fcc-tournament-tone-conference',
             teamIdToNameMap,
             userTeamId,
-            teamIdMetaMap
+            teamIdMetaMap,
+            topData,
+            'fcc',
+            'conference'
           )
         );
       }
     } else if (eosTournament) {
+      const eosTier = week >= 32 ? 'national' : week >= 30 ? 'region' : 'conference';
       sections.push(
         createBracketSection(
           tournamentTitle,
           eosTournament,
           week >= 30 && week <= 31 ? 'compact4' : 'full',
-          'fcc-tournament-tone-conference',
           teamIdToNameMap,
           userTeamId,
-          teamIdMetaMap
+          teamIdMetaMap,
+          topData,
+          'fcc',
+          eosTier
         )
       );
     }
@@ -201,10 +219,12 @@
           'National Tournament',
           nat,
           'full',
-          'fcc-tournament-tone-national',
           teamIdToNameMap,
           userTeamId,
-          teamIdMetaMap
+          teamIdMetaMap,
+          topData,
+          'all',
+          'national'
         )
       );
     }
@@ -219,10 +239,12 @@
               `Region ${regionKey} Tournament`,
               normalized,
               'compact4',
-              'fcc-tournament-tone-region',
               teamIdToNameMap,
               userTeamId,
-              teamIdMetaMap
+              teamIdMetaMap,
+              topData,
+              'all',
+              'region'
             )
           );
         }
@@ -240,10 +262,12 @@
               `Conference ${ck} Tournament`,
               ct,
               'full',
-              'fcc-tournament-tone-conference',
               teamIdToNameMap,
               userTeamId,
-              teamIdMetaMap
+              teamIdMetaMap,
+              topData,
+              'all',
+              'conference'
             )
           );
         }

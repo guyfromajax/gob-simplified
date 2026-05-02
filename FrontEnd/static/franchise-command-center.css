@@ -1048,6 +1048,315 @@ input[type="reset"] {
   margin: 14px 0;
 }
 
+/* ===== FCC Tournament — Style A (Classic horizontal), .fcc-tb-* ===== */
+.fcc-data-card.fcc-tournament-card .fcc-tournament-divider,
+.resource-page-container .fcc-tournament-divider {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.fcc-data-card.fcc-tournament-card .fcc-tournament-section.fcc-tb-tier {
+  padding: 12px 0 16px;
+  background: transparent;
+  border-radius: 0;
+}
+
+.fcc-tournament-section-title.fcc-tb-tier-title {
+  margin: 0 0 12px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: #f7f9ff;
+}
+
+.fcc-tb-tier-body {
+  width: 100%;
+  min-width: 0;
+}
+
+.fcc-tb-classic {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  gap: 0;
+  align-items: stretch;
+  padding: 8px 2px 12px;
+  position: relative;
+}
+
+.fcc-tb-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 12px;
+  padding: 0 6px;
+  min-width: 0;
+}
+
+.fcc-tb-col--r2l,
+.fcc-tb-col--r2r {
+  padding-top: 28px;
+  padding-bottom: 28px;
+}
+
+.fcc-tb-col--final {
+  justify-content: center;
+  align-items: center;
+}
+
+.fcc-tb-col-head {
+  font: 700 9.5px/1.25 'JetBrains Mono', monospace;
+  letter-spacing: 0.14em;
+  color: rgba(247, 249, 255, 0.42);
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fcc-tb-col-head-primary {
+  display: block;
+}
+
+.fcc-tb-mu-wrap {
+  min-width: 0;
+}
+
+.fcc-tb-mu {
+  background: rgba(35, 42, 51, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.fcc-tb-mu--tbd {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(26, 31, 38, 0.55);
+}
+
+.fcc-tb-mu--user {
+  box-shadow: 0 0 0 1px rgba(43, 214, 106, 0.12);
+}
+
+.fcc-tb-mu--championship {
+  background: linear-gradient(180deg, #2a1f0a, #1a1f26);
+  border-color: rgba(212, 168, 72, 0.4);
+  box-shadow: 0 0 0 1px rgba(212, 168, 72, 0.08), 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.fcc-tb-team {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  line-height: 1.15;
+  min-height: 30px;
+  font-family: 'Inter', sans-serif;
+}
+
+.fcc-tb-team + .fcc-tb-team {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fcc-tb-team--user {
+  border-left: 3px solid #2bd66a;
+  background: rgba(43, 214, 106, 0.07);
+}
+
+.fcc-tb-seed {
+  font: 700 10px/1 'JetBrains Mono', monospace;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  width: 22px;
+}
+
+.fcc-tb-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.fcc-tb-name-text {
+  font-weight: inherit;
+  color: inherit;
+}
+
+.fcc-tb-rank-prefix {
+  color: rgba(255, 255, 255, 0.38);
+  font-weight: 600;
+  font-size: 10.5px;
+}
+
+.fcc-tb-region-chip {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font: 700 9px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.05em;
+  color: #d4a848;
+  background: rgba(212, 168, 72, 0.12);
+  border: 1px solid rgba(212, 168, 72, 0.32);
+  vertical-align: baseline;
+}
+
+.fcc-tb-score {
+  font: 700 12px/1 'JetBrains Mono', monospace;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: right;
+  min-width: 22px;
+}
+
+.fcc-tb-team--winner .fcc-tb-name,
+.fcc-tb-team--winner .fcc-tb-score {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.fcc-tb-team--loser .fcc-tb-name,
+.fcc-tb-team--loser .fcc-tb-score {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.fcc-tb-team--tbd .fcc-tb-name {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.fcc-tb-trophy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.fcc-tb-trophy-badge {
+  font: 800 10px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.15em;
+  color: #d4a848;
+  background: rgba(212, 168, 72, 0.1);
+  border: 1px solid rgba(212, 168, 72, 0.32);
+  padding: 5px 8px;
+  border-radius: 4px;
+}
+
+.fcc-tb-conn {
+  z-index: 0;
+}
+
+.fcc-tb-col,
+.fcc-tb-mu-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.fcc-tb-region {
+  display: grid;
+  gap: 12px;
+  align-items: stretch;
+  padding: 4px 0 8px;
+}
+
+.fcc-tb-region--4 {
+  grid-template-columns: 1fr 1fr minmax(12px, 0.35fr);
+}
+
+.fcc-tb-region--3 {
+  grid-template-columns: 1fr 1fr minmax(12px, 0.35fr);
+}
+
+.fcc-tb-region--2 {
+  grid-template-columns: 1fr;
+}
+
+.fcc-tb-region-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.fcc-tb-region-col--solo {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.fcc-tb-region-col--spacer {
+  min-width: 0;
+}
+
+.fcc-tb-bye-card {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px dashed rgba(212, 168, 72, 0.32);
+  background: rgba(212, 168, 72, 0.06);
+  font-size: 11.5px;
+  font-family: 'Inter', sans-serif;
+  color: rgba(247, 249, 255, 0.85);
+}
+
+.fcc-tb-bye-seed {
+  font: 700 10px/1 'JetBrains Mono', monospace;
+  color: #d4a848;
+  text-align: center;
+}
+
+.fcc-tb-bye-badge {
+  font: 700 9px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  color: #d4a848;
+}
+
+.fcc-tb-both-bye-note {
+  text-align: center;
+  color: rgba(247, 249, 255, 0.62);
+  font: 500 11px/1.45 'Inter', sans-serif;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+  .fcc-tb-classic {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .fcc-tb-col--r2l,
+  .fcc-tb-col--r2r {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .fcc-tb-conn {
+    display: none;
+  }
+
+  .fcc-tb-region--4,
+  .fcc-tb-region--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .fcc-tb-region-col--spacer {
+    display: none;
+  }
+}
+
 /* Reusable FCC modal styling (EOS and confirmation popups) */
 .fcc-modal-overlay,
 .sim-popup {

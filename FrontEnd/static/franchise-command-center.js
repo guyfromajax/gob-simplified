@@ -4201,6 +4201,8 @@ async function renderTournamentBracket() {
           team: t.team,
           mascot: t.mascot || '',
           conference: t.conference,
+          region: t.region != null && t.region !== '' ? String(t.region).toUpperCase() : '',
+          natl_rank: t.natl_rank != null && Number.isFinite(Number(t.natl_rank)) ? Number(t.natl_rank) : null,
         };
       }
     });
