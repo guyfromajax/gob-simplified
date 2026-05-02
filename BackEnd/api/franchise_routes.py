@@ -3657,16 +3657,24 @@ def complete_week_phase_a(req: CompleteWeekRequest):
         eos_game_meta=eos_meta,
     )
 
+    # Split phase B reloads the franchise from Mongo. `_complete_week_process_user_game_block`
+    # mutates bracket blobs in memory only; without persisting them here, phase B skips the
+    # user matchup row and never re-applies that winner → e.g. conference R1 stuck at 3/4.
+    phase_a_fields: dict[str, Any] = {
+        f"results.{str(req.week)}": merged,
+        "season_inbox": franchise_doc.get("season_inbox", []),
+        "post_game_status.phase_a_user_week": req.week,
+        "post_game_status.community_highlight_pending": ch_pending,
+    }
+    if req.week in ft.EOS_WEEKS:
+        for _eos_key in ("conference_tournaments", "region_tournaments", "national_tournament"):
+            _eos_val = franchise_doc.get(_eos_key)
+            if _eos_val is not None:
+                phase_a_fields[_eos_key] = _eos_val
+
     db.franchises.update_one(
         {"_id": franchise_id},
-        {
-            "$set": {
-                f"results.{str(req.week)}": merged,
-                "season_inbox": franchise_doc.get("season_inbox", []),
-                "post_game_status.phase_a_user_week": req.week,
-                "post_game_status.community_highlight_pending": ch_pending,
-            }
-        },
+        {"$set": phase_a_fields},
     )
 
     return {
