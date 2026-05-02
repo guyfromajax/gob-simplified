@@ -2939,17 +2939,23 @@ def _sync_eos_bracket_from_existing_game_doc(
     t2 = existing.get("team2_id")
     s1 = int(existing.get("team1_score", 0) or 0)
     s2 = int(existing.get("team2_score", 0) or 0)
-    if str(t1) == str(away_id) and str(t2) == str(home_id):
+    ca = ft._eos_team_id_canonical(away_id)
+    ch = ft._eos_team_id_canonical(home_id)
+    c1 = ft._eos_team_id_canonical(t1)
+    c2 = ft._eos_team_id_canonical(t2)
+    if c1 == ca and c2 == ch:
         away_s, home_s = s1, s2
-    elif str(t1) == str(home_id) and str(t2) == str(away_id):
+    elif c1 == ch and c2 == ca:
         away_s, home_s = s2, s1
     else:
         logger.warning(
-            "[EOS-BRACKET-DEBUG] existing_game_team_order_unexpected t1=%s t2=%s away=%s home=%s",
+            "[EOS-BRACKET-DEBUG] existing_game_team_order_unexpected c1=%s c2=%s ca=%s ch=%s raw_t1=%s raw_t2=%s",
+            c1,
+            c2,
+            ca,
+            ch,
             t1,
             t2,
-            away_id,
-            home_id,
         )
         away_s, home_s = s1, s2
     if home_s > away_s:
@@ -2960,6 +2966,13 @@ def _sync_eos_bracket_from_existing_game_doc(
         winner_raw = home_id
     wid = ft._eos_team_id_canonical(winner_raw) or str(winner_raw)
     score = {"home": home_s, "away": away_s}
+    logger.warning(
+        "[EOS-BRACKET-DEBUG] sync_from_existing_apply winner=%s home_s=%s away_s=%s phase=%s",
+        wid[:16] if wid else "",
+        home_s,
+        away_s,
+        g.get("phase"),
+    )
     phase = g.get("phase")
     if phase == "conference":
         ft.save_conference_game_result(
@@ -3071,6 +3084,15 @@ def _complete_week_finish_cpu_and_persist(
             })
             if week in ft.EOS_WEEKS and week_games_meta and idx < len(week_games_meta):
                 g_meta = week_games_meta[idx]
+                logger.warning(
+                    "[EOS-BRACKET-DEBUG] sync_from_existing idx=%s phase=%s conf=%s round=%s midx=%s game_id=%s",
+                    idx,
+                    g_meta.get("phase"),
+                    g_meta.get("conference"),
+                    g_meta.get("round"),
+                    g_meta.get("matchup_index"),
+                    str(existing.get("_id")),
+                )
                 _sync_eos_bracket_from_existing_game_doc(
                     franchise_doc,
                     existing=existing,

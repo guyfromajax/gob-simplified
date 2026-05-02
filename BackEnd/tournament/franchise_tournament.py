@@ -396,6 +396,23 @@ def find_user_game_in_eos_week(
     return None
 
 
+def _get_conference_tournament_ct(franchise_doc: Dict[str, Any], conference: int) -> Optional[Dict[str, Any]]:
+    """Resolve conference tournament state; never return a fresh {} (that would wipe keys on writeback)."""
+    conf_tournaments = franchise_doc.get("conference_tournaments") or {}
+    key = str(conference)
+    ct = conf_tournaments.get(key)
+    if ct is None:
+        ct = conf_tournaments.get(conference)
+    if ct is None and key.isdigit():
+        try:
+            ct = conf_tournaments.get(int(key))
+        except (TypeError, ValueError):
+            ct = None
+    if not isinstance(ct, dict) or not ct:
+        return None
+    return ct
+
+
 def save_conference_game_result(
     franchise_doc: Dict[str, Any],
     conference: int,
@@ -408,19 +425,40 @@ def save_conference_game_result(
     """Mutates franchise_doc['conference_tournaments']."""
     conf_tournaments = franchise_doc.setdefault("conference_tournaments", {})
     key = str(conference)
-    ct = conf_tournaments.get(key) or conf_tournaments.get(conference) or {}
-    bracket = ct.get("bracket", {})
-    if not bracket or not bracket.get("round1"):
+    ct = _get_conference_tournament_ct(franchise_doc, conference)
+    if not ct:
         logger.warning(
-            "[EOS-BRACKET-DEBUG] save_conference_game_result_empty_bracket franchise_id=%s conf=%s "
-            "key_str=%s had_ct=%s round=%s idx=%s",
+            "[EOS-BRACKET-DEBUG] save_conference_missing_ct franchise_id=%s conf=%s key=%s",
             str(franchise_doc.get("_id")),
             conference,
             key,
-            bool(ct),
+        )
+        return
+    bracket = ct.get("bracket")
+    if not isinstance(bracket, dict) or not bracket.get("round1"):
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] save_conference_game_result_empty_bracket franchise_id=%s conf=%s "
+            "key_str=%s round=%s idx=%s",
+            str(franchise_doc.get("_id")),
+            conference,
+            key,
             round_num,
             matchup_index,
         )
+        return
+    rn = bracket_engine.get_round_name(round_num)
+    rnd_list = bracket.get(rn) or []
+    if matchup_index < 0 or matchup_index >= len(rnd_list):
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] save_conference_OOB franchise_id=%s conf=%s round=%s rn=%s idx=%s len=%s",
+            str(franchise_doc.get("_id")),
+            conference,
+            round_num,
+            rn,
+            matchup_index,
+            len(rnd_list),
+        )
+        return
     bracket_engine.save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score)
     if int(conference) <= 4:
         logger.warning(
@@ -465,7 +503,14 @@ def advance_conference_bracket(
     """Advance one conference bracket. Returns (advanced, champion_if_finished)."""
     conf_tournaments = franchise_doc.get("conference_tournaments", {})
     key = str(conference)
-    ct = conf_tournaments.get(key) or conf_tournaments.get(conference) or {}
+    ct = _get_conference_tournament_ct(franchise_doc, conference)
+    if not ct:
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] advance_conference_missing_ct franchise_id=%s conf=%s",
+            str(franchise_doc.get("_id")),
+            conference,
+        )
+        return (False, None)
     bracket = ct.get("bracket", {})
     current_round = ct.get("current_round", 1)
     r1 = bracket.get("round1") or []
