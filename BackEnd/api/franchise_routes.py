@@ -3408,76 +3408,110 @@ def _eos_sync_missing_result_rows_from_games_for_week(
     return n_added
 
 
-def _eos_advance_conference_brackets_if_round1_complete(franchise_doc: dict) -> int:
-    """For each conference stuck at R1 with four winners and empty R2, run ``advance_conference_bracket``."""
+def _eos_sync_bracket_slots_from_games_for_week(
+    franchise_id_str: str,
+    franchise_doc: dict,
+    week: int,
+) -> int:
+    """
+    For each EOS ``week`` calendar matchup with no bracket ``winner``, apply
+    ``_sync_eos_bracket_from_existing_game_doc`` when a ``games`` row exists.
+
+    Covers **R1, semis, and finals** (calendar weeks 27–29); fixes the user semi stuck at
+    ``game_id: null`` while the CPU semi completed.
+    """
+    if week not in ft.EOS_WEEKS:
+        return 0
     n = 0
-    for c in range(1, 17):
-        ct = ft._get_conference_tournament_ct(franchise_doc, c)
-        if not ct:
+    meta = ft.get_eos_week_games(franchise_doc, int(week), include_completed=True)
+    for g in meta:
+        if not isinstance(g, dict) or g.get("phase") not in ("conference", "region", "national"):
             continue
-        br = ct.get("bracket") or {}
-        r1 = br.get("round1") or []
-        r2 = br.get("round2") or []
-        cr = int(ct.get("current_round") or 1)
-        r1w = sum(1 for m in r1 if m.get("winner"))
-        if cr == 1 and r1w == 4 and len(r2) == 0:
-            advanced, _ch = ft.advance_conference_bracket(franchise_doc, c)
-            if advanced:
-                n += 1
+        if ft.eos_meta_bracket_slot_has_winner(franchise_doc, g):
+            continue
+        away_id, home_id = g.get("away_id"), g.get("home_id")
+        existing = db.games.find_one(
+            {
+                "week": int(week),
+                "franchise_id": franchise_id_str,
+                "$or": [
+                    {"team1_id": away_id, "team2_id": home_id},
+                    {"team1_id": home_id, "team2_id": away_id},
+                ],
+            }
+        )
+        if not existing:
+            continue
+        _sync_eos_bracket_from_existing_game_doc(
+            franchise_doc,
+            existing=existing,
+            away_id=away_id,
+            home_id=home_id,
+            g=g,
+        )
+        n += 1
     return n
 
 
-def _eos_phase_b_catch_up_when_calendar_ahead(
-    franchise_id: ObjectId,
-    franchise_id_str: str,
-    target_week: int,
-) -> dict[str, Any]:
-    """
-    If ``franchise.week`` moved past ``target_week`` before EOS closure could advance brackets,
-    ``complete_week_phase_b`` used to return idempotent and never build semis.
+def _eos_advance_all_conference_brackets_until_idle(franchise_doc: dict) -> int:
+    """Repeatedly ``advance_conference_bracket`` (R1→R2→final) until no conference moves."""
+    steps = 0
+    for c in range(1, 17):
+        for _ in range(4):
+            advanced, _ch = ft.advance_conference_bracket(franchise_doc, c)
+            if not advanced:
+                break
+            steps += 1
+    return steps
 
-    Re-load the doc, backfill missing ``results.{week}`` from ``games``, then advance any
-    conference bracket that still has four R1 winners and an empty ``round2``.
+
+def _eos_heal_conference_eos_from_games(franchise_id: ObjectId, franchise_id_str: str) -> dict[str, Any]:
     """
-    out: dict[str, Any] = {"did_work": False, "results_rows_added": 0, "conferences_advanced": 0}
-    if target_week not in ft.EOS_WEEKS:
-        return out
+    Backfill ``results`` + bracket from ``games`` for conference EOS weeks **≤ franchise.week**,
+    then advance all conference brackets as far as outcomes allow.
+
+    Runs at the start of ``complete_week_phase_b`` so a stuck **user semi** (week 28 meta) still
+    heals when ``franchise.week`` is already **29** (calendar ahead of bracket).
+    """
+    out: dict[str, Any] = {
+        "did_work": False,
+        "results_rows_added": 0,
+        "bracket_slots_synced": 0,
+        "advance_steps": 0,
+    }
     fresh = db.franchises.find_one({"_id": franchise_id})
     if not fresh:
         return out
-
-    rows_added = _eos_sync_missing_result_rows_from_games_for_week(franchise_id_str, fresh, int(target_week))
-    ft.log_eos_conference_bracket_snapshot(
-        fresh,
-        f"eos_catch_up_pre_advance week={target_week} fid={franchise_id_str}",
-    )
-    adv_count = _eos_advance_conference_brackets_if_round1_complete(fresh)
-    ft.log_eos_conference_bracket_snapshot(
-        fresh,
-        f"eos_catch_up_post_advance week={target_week} fid={franchise_id_str}",
-    )
-
-    if rows_added == 0 and adv_count == 0:
+    cw = int(fresh.get("week") or 1)
+    rows_total = 0
+    slots_total = 0
+    for w in ft.EOS_CONFERENCE_WEEKS:
+        if w > cw:
+            continue
+        rows_total += _eos_sync_missing_result_rows_from_games_for_week(franchise_id_str, fresh, int(w))
+        slots_total += _eos_sync_bracket_slots_from_games_for_week(franchise_id_str, fresh, int(w))
+    ft.log_eos_conference_bracket_snapshot(fresh, f"eos_heal_pre_idle fid={franchise_id_str}")
+    adv_steps = _eos_advance_all_conference_brackets_until_idle(fresh)
+    ft.log_eos_conference_bracket_snapshot(fresh, f"eos_heal_post_idle fid={franchise_id_str}")
+    if rows_total == 0 and slots_total == 0 and adv_steps == 0:
         return out
-
     patch: dict[str, Any] = {}
-    if rows_added:
-        wk = str(int(target_week))
-        patch[f"results.{wk}"] = (fresh.get("results") or {}).get(wk) or []
-    if adv_count:
-        patch["conference_tournaments"] = fresh.get("conference_tournaments", {})
-
+    if rows_total:
+        patch["results"] = fresh.get("results") or {}
+    if slots_total or adv_steps:
+        patch["conference_tournaments"] = fresh.get("conference_tournaments") or {}
     db.franchises.update_one({"_id": franchise_id}, {"$set": patch})
     out["did_work"] = True
-    out["results_rows_added"] = rows_added
-    out["conferences_advanced"] = adv_count
+    out["results_rows_added"] = rows_total
+    out["bracket_slots_synced"] = slots_total
+    out["advance_steps"] = adv_steps
     logger.warning(
-        "🧭 [COMPLETE-WEEK-PHASE-B] outcome=eos_catch_up franchise_id=%s target_week=%s "
-        "results_rows_added=%s conferences_advanced=%s",
+        "🧭 [EOS-HEAL] franchise_id=%s calendar_week=%s results_rows_added=%s bracket_slots_synced=%s advance_steps=%s",
         franchise_id_str,
-        target_week,
-        rows_added,
-        adv_count,
+        cw,
+        rows_total,
+        slots_total,
+        adv_steps,
     )
     return out
 
@@ -4323,34 +4357,31 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
+    eos_heal_summary: dict[str, Any] | None = None
+    heal = _eos_heal_conference_eos_from_games(franchise_id, req.franchise_id)
+    if heal.get("did_work"):
+        franchise_doc = db.franchises.find_one({"_id": franchise_id}) or franchise_doc
+        eos_heal_summary = heal
+
     current_week = int(franchise_doc.get("week", 1))
     if current_week > req.week:
-        # Calendar week can move (e.g. week 28) while conference R1 stayed stuck (no round2). A plain
-        # idempotent return would never run ``advance_conference_bracket`` for the prior EOS week.
-        if req.week in ft.EOS_WEEKS:
-            catch = _eos_phase_b_catch_up_when_calendar_ahead(franchise_id, req.franchise_id, int(req.week))
-            if catch.get("did_work"):
-                return {
-                    "status": "ok",
-                    "phase": "b",
-                    "idempotent": False,
-                    "week": req.week,
-                    "results": [],
-                    "eos_catch_up": catch,
-                }
         logger.info(
             "[COMPLETE-WEEK-PHASE-B] outcome=already_finalized franchise_id=%s req_week=%s franchise_week=%s",
             req.franchise_id,
             req.week,
             current_week,
         )
-        return {
+        payload: dict[str, Any] = {
             "status": "ok",
             "phase": "b",
             "idempotent": True,
             "week": req.week,
             "results": [],
         }
+        if eos_heal_summary:
+            payload["eos_heal"] = eos_heal_summary
+            payload["idempotent"] = False
+        return payload
     if current_week < req.week:
         raise HTTPException(status_code=400, detail="Franchise week is behind requested week")
 
@@ -4400,6 +4431,8 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     out["status"] = "ok"
     out["phase"] = "b"
     out["idempotent"] = False
+    if eos_heal_summary:
+        out["eos_heal"] = eos_heal_summary
     return out
 
 @router.get("/franchise/current")

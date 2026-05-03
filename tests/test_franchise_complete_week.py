@@ -503,7 +503,7 @@ def test_eos_advance_conference_when_four_r1_winners_and_round2_empty():
             }
         }
     }
-    n = franchise_routes._eos_advance_conference_brackets_if_round1_complete(doc)
+    n = franchise_routes._eos_advance_all_conference_brackets_until_idle(doc)
     assert n == 1
     br = doc["conference_tournaments"]["1"]["bracket"]
     assert len(br.get("round2") or []) == 2

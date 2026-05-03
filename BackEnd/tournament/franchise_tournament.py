@@ -370,6 +370,45 @@ def _eos_team_id_canonical(tid: Any) -> str:
     return s
 
 
+def eos_meta_bracket_slot_has_winner(franchise_doc: Dict[str, Any], g: Dict[str, Any]) -> bool:
+    """True if the EOS meta row's bracket slot already records a ``winner`` (sync/advance can skip)."""
+    phase = g.get("phase")
+    if phase == "conference":
+        ct = _get_conference_tournament_ct(franchise_doc, int(g["conference"]))
+        if not ct:
+            return False
+        br = ct.get("bracket") or {}
+        rn = bracket_engine.get_round_name(int(g["round"]))
+        lst = br.get(rn) or []
+        i = int(g.get("matchup_index", 0))
+        if i < 0 or i >= len(lst):
+            return False
+        return bool((lst[i] or {}).get("winner"))
+    if phase == "region":
+        rt = (franchise_doc.get("region_tournaments") or {}).get(g["region"]) or {}
+        rnum = int(g["round"])
+        if rnum == 1:
+            lst = rt.get("round1") or []
+            i = int(g.get("matchup_index", 0))
+            if 0 <= i < len(lst):
+                return bool((lst[i] or {}).get("winner"))
+            return False
+        if rnum == 2:
+            fin = rt.get("final") or []
+            if fin:
+                return bool((fin[0] or {}).get("winner"))
+        return False
+    if phase == "national":
+        nat = franchise_doc.get("national_tournament") or {}
+        br = nat.get("bracket") or {}
+        rn = bracket_engine.get_round_name(int(g["round"]))
+        lst = br.get(rn) or []
+        i = int(g.get("matchup_index", 0))
+        if 0 <= i < len(lst):
+            return bool((lst[i] or {}).get("winner"))
+    return False
+
+
 def find_user_game_in_eos_week(
     week_games: List[Dict[str, Any]],
     user_team_id_str: Optional[str],
