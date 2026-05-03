@@ -127,7 +127,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 ### Phase 1 — Extract week closure (no behavior change)
 
 - [x] Introduce a dedicated week-closure function containing post–CPU-loop logic — implemented as **`_finalize_franchise_week_after_cpu_games`** in `franchise_routes.py`, called only from **`_complete_week_finish_cpu_and_persist`** (same call site as before; behavior preserved).
-- [x] Tests: `_try_finalize_franchise_week_if_complete` logs **`outcome=waiting`** when the slate is incomplete; **`outcome=ran_closure`** when the schedule is covered (finalize mocked); **`POST .../phase-b`** returns **`idempotent: true`** when `franchise.week` already advanced past `req.week` — see **`tests/test_franchise_complete_week.py`**. Deeper double-call / ordering tests remain optional if you expand async workers later.
+- [x] Tests: **`tests/test_franchise_complete_week.py`** — `_try_finalize_franchise_week_if_complete` logging (`waiting` / `ran_closure`); **`POST .../phase-b`** **`idempotent: true`** when `franchise.week` already advanced; **phase A → phase B → second phase B** idempotent chain; monolithic **`/franchise/complete-week`** + canonical team id tests assert **`franchise.results[week]`** (not universal `teams.record`); CPU full-sim path stubbed via **`_run_franchise_cpu_full_simulation_core`** where a second matchup would otherwise require rosters.
 
 ### Phase 2 — Per-game idempotent CPU persistence
 
