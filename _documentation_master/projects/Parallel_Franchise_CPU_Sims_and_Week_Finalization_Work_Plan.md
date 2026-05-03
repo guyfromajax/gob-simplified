@@ -1,9 +1,9 @@
 # Parallel franchise CPU sims and week finalization — work plan
 
 **Location:** `_documentation_master/projects/` (canonical project plan)  
-**Status:** Implemented (v1 — in-process phase B, week gated by **`_try_finalize_franchise_week_if_complete`**)  
+**Status:** Implemented (v1 — in-process phase B, week gated by **`_try_finalize_franchise_week_if_complete`**). **Next product milestone (v2):** CPU week sims start at **first franchise Play Quarter** — see **§9**.  
 **Goal:** Run CPU game sims in parallel (server-side) while the user plays their franchise game; separate **per-game persistence** from **week-level closure** (rankings, stat leaders, week advance, etc.) behind a single idempotent `try_finalize_week`-style gate.  
-**Explicitly out of scope for this milestone:** Quarter checkpoints / resume abandoned user games (may follow as phase 2 once this spine exists). **Deferred (not v1):** separate worker/queue, starting CPU sims before phase A / EOG, client polling for week closure (see §4 Phase 3–4).
+**Explicitly out of scope for this milestone:** Quarter checkpoints / resume abandoned user games (may follow as phase 2 once this spine exists). **v1 deferred items** (partial): separate worker/queue, client polling — folded into **§9** as decisions for v2.
 
 ---
 
@@ -169,7 +169,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ## 7. Next concrete step
 
-**v1 is closed** for in-process parallel CPU sims + gated week finalize + EOG/box-score UX (see §4, §5, tests in **`tests/test_franchise_complete_week.py`**). **Optional next milestone:** background job queue, start CPU sims before EOG, client polling — only if product wants CPU work to overlap live gameplay earlier than phase B; otherwise monitor **`[TRY-FINALIZE-WEEK]`** / **`[COMPLETE-WEEK-PHASE-B]`** in production and add timing metrics (§5 optional) if needed.
+**v1 is closed** (see §4, §5, **`tests/test_franchise_complete_week.py`**). **Active work:** **§9 Milestone 2** — Play Quarter triggers CPU sims for the week, then existing week-closure + week advance when **user + all CPUs** are complete.
 
 ---
 
@@ -178,8 +178,58 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 | Area | Files |
 |------|--------|
 | EOG + phase A | `finalizeGame.js`, `End_Of_Game_System.md` |
-| Phase B trigger | `gameCompletionPopup.js`, `franchisePhaseBClient.js`, `postGamePressConference.js` |
+| Phase B trigger (v1) | `gameCompletionPopup.js`, `franchisePhaseBClient.js`, `postGamePressConference.js` |
+| v2 CPU start hook | `bootGame.js` (Play Quarter Q1) + new `start-cpu-sims` client helper (TBD) |
 | Box score pending | `box-score.js`, `pageLoadOverlay.js` |
 | API | `franchise_routes.py` — `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`, **`_finalize_franchise_week_after_cpu_games`**, **`_try_finalize_franchise_week_if_complete`** (`[TRY-FINALIZE-WEEK]` logs), matchup-key helpers, `_complete_week_process_user_game_block` |
 | Tests | `tests/test_franchise_complete_week.py` — try-finalize + phase-B idempotent |
 | EOS | `BackEnd/tournament/franchise_tournament.py` |
+
+---
+
+## 9. Milestone 2 — “Play Quarter starts CPU week sims” (v2)
+
+**Product intent (four steps):**
+
+1. User presses **Play Quarter** to begin **Q1** of their franchise game → that action **also starts** simming **all other scheduled games for that week** in parallel (**distant** + **full turn-by-turn** CPU paths, same rules as today’s CPU loop).
+2. User’s game finishes; **all** computer games for that week are already finished (or finish alongside).
+3. Run **week-level** logic that **requires the full week slate** (recruiting lean / natl-rank–related passes, regular-season rank & prestige, aggregates over every result, EOS advance/init when applicable, inbox/training/community-highlight steps, week-35 capstone, etc.) — i.e. what **`_finalize_franchise_week_after_cpu_games`** does today, **only after** **`_try_finalize_franchise_week_if_complete`** sees a **complete** set of matchups (user row + every CPU row).
+4. **Advance** franchise **`week`** (and EOS week jumps) as part of that same gated closure.
+
+**Today (v1) vs target (v2):** v1 starts the CPU batch **after** the user’s result is saved (**phase A**) and runs heavy work in **phase B** from the **EOG** client. v2 moves the **CPU batch start** to **first Play Quarter** for that week’s user game; **phase A** stays “persist user game”; a **finalize** step after phase A should **merge** user row + any CPU rows already written, run **only missing** CPU sims if any, then **`_try_finalize`** → closure + week advance.
+
+### 9.1 New / changed API (conceptual)
+
+| Piece | Role |
+|-------|------|
+| **`POST …/franchise/complete-week/start-cpu-sims`** (name TBD) | Body: `franchise_id`, `week`. **Idempotent** per matchup. Runs **non-user** week games only. Persists per-game results (games + franchise `results[week]` rows) using existing loop helpers. **Does not** advance week; **`_try_finalize`** returns **`waiting`** until the user row exists. |
+| **`complete_week_phase_a`** | Unchanged in principle: user game → user row + `post_game_status.phase_a_user_week`. |
+| **`complete_week_phase_b`** (or slim follow-up) | After reload: ensure **all** CPUs present (no-op for already-simmed matchups), merge user row, call **`_try_finalize_franchise_week_if_complete`** → **`_finalize_franchise_week_after_cpu_games`** when complete. |
+
+### 9.2 Client hook
+
+- **Franchise mode**, **first transition into live Q1** (pre-game → Q1): fire **`start-cpu-sims`** once per `franchise_id:week` (**single-flight**, same spirit as `franchisePhaseBClient.js`). Prefer **non-blocking** relative to simulate-quarter if feasible (fire-and-forget or short timeout + retry-safe idempotency on server).
+
+**Likely file:** `FrontEnd/static/js/phaser/bootGame.js` (Play Quarter / `handleButtonClick` / `handleSimQuarter` when `quarter === 0` and `mode === 'franchise'` — exact hook TBD in implementation).
+
+### 9.3 Open decisions (record before build)
+
+| Decision | Options |
+|----------|---------|
+| **Where CPU work runs** | **A)** In-process threads on API server (reuse `ThreadPoolExecutor` pattern; simpler, may contend with **Play Quarter** CPU). **B)** Queue + worker (better isolation; more infra). |
+| **Request shape** | One long **`start-cpu-sims`** HTTP vs chunked / job id + poll (only needed if timeouts bite). |
+| **EOS weeks** | Short design pass: confirm early CPU sims cannot violate bracket ordering vs user game (regular season is lower risk). |
+
+### 9.4 Implementation checklist (suggested order)
+
+- [ ] **Spike:** Run CPU-only path with **`results`** missing user row; confirm **`_franchise_week_results_cover_schedule`** is false until phase A merge; confirm **`_try_finalize`** runs closure only after full slate.
+- [ ] **Extract or parameterize** `_complete_week_finish_cpu_and_persist` (or sibling) so “CPU loop only, no finalize” is callable from **`start-cpu-sims`** without duplicating distant/full sim branches.
+- [ ] **Implement `start-cpu-sims`**: auth/ownership, guards (`franchise.week == week`, user scheduled this week), idempotent skips, logging (`[START-CPU-SIMS]`).
+- [ ] **Adjust phase B** (or post–phase-A finalize entry) for “CPUs may already exist.”
+- [ ] **Client:** hook + single-flight + error surfacing (optional toast; must not brick Q1).
+- [ ] **Tests:** idempotent `start-cpu-sims`; phase A + B with CPUs pre-filled; week does not advance until user row present.
+- [ ] **Docs:** `End_Of_Game_System.md` + this §9 when behavior ships.
+
+### 9.5 Backend anchor (existing)
+
+Reuse **`_try_finalize_franchise_week_if_complete`** and **`_finalize_franchise_week_after_cpu_games`** in `BackEnd/api/franchise_routes.py` — v2 is mostly **when** CPUs start and **splitting** the HTTP surface, not replacing week-closure semantics.
