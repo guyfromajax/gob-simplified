@@ -179,7 +179,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 |------|--------|
 | EOG + phase A | `finalizeGame.js`, `End_Of_Game_System.md` |
 | Phase B trigger (v1) | `gameCompletionPopup.js`, `franchisePhaseBClient.js`, `postGamePressConference.js` |
-| v2 CPU start hook | `bootGame.js` (Play Quarter Q1) — **call `POST /franchise/complete-week/start-cpu-sims`** (not wired yet) |
+| v2 CPU start hook | `bootGame.js` + **`franchiseStartCpuSimsClient.js`** → **`POST /franchise/complete-week/start-cpu-sims`** |
 | start-cpu-sims API | `franchise_routes.py` — `complete_week_start_cpu_sims`, **`persist_cpu_results_only`** |
 | Box score pending | `box-score.js`, `pageLoadOverlay.js` |
 | API | `franchise_routes.py` — `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`, **`_finalize_franchise_week_after_cpu_games`**, **`_try_finalize_franchise_week_if_complete`** (`[TRY-FINALIZE-WEEK]` logs), matchup-key helpers, `_complete_week_process_user_game_block` |
@@ -227,7 +227,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 - [x] **`POST /franchise/complete-week/start-cpu-sims`** — guards: `franchise.week == req.week`, rejects if phase A done (**409**), logs **`[START-CPU-SIMS]`**. Tests in **`tests/test_franchise_complete_week.py`**.
 - [ ] **Auth / ownership** — same pattern as **`complete_week_phase_a`** today (no `Depends` on these routes); tighten if product requires it.
 - [ ] **Adjust phase B** (or post–phase-A finalize entry) for “CPUs may already exist.”
-- [ ] **Client:** hook + single-flight + error surfacing (optional toast; must not brick Q1).
+- [x] **Client:** `bootGame.js` — **`maybeFireFranchiseStartCpuSimsAtQ1Entry()`** on franchise **quarter === 0** for **Play Quarter**, **Sim Quarter**, and **Sim Full Game**; **`franchiseStartCpuSimsClient.js`** single-flight + non-fatal `.catch` (must not brick Q1).
 - [ ] **Tests:** idempotent `start-cpu-sims`; phase A + B with CPUs pre-filled; week does not advance until user row present.
 - [ ] **Docs:** `End_Of_Game_System.md` + this §9 when behavior ships.
 

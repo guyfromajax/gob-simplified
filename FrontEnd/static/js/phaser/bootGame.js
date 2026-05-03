@@ -6,6 +6,7 @@ import { finalizeGame } from './finalizeGame.js';
 import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
 import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
+import { getOrStartFranchiseStartCpuSims } from './utils/franchiseStartCpuSimsClient.js';
 
 // API_CONFIG is loaded as a global script, access via window
 const API_CONFIG = window.API_CONFIG;
@@ -75,6 +76,23 @@ const urlParams = new URLSearchParams(window.location.search);
 /** Read current query string — this module stays loaded; history.replaceState may add game_id after first parse. */
 function readLiveSearchParams() {
   return new URLSearchParams(window.location.search);
+}
+
+/** Milestone 2: first Q1 entry (pre-game quarter 0) kicks off parallel CPU week sims on the server. */
+function maybeFireFranchiseStartCpuSimsAtQ1Entry() {
+  if (mode !== 'franchise') return;
+  if (typeof quarter !== 'number' || quarter !== 0) return;
+  const p = readLiveSearchParams();
+  const fid = p.get('franchise_id') || franchiseId;
+  if (!fid) return;
+  const w = parseInt(p.get('week'), 10);
+  if (Number.isNaN(w)) {
+    console.warn('[BOOTGAME][start-cpu-sims] skipped: invalid or missing week in URL');
+    return;
+  }
+  getOrStartFranchiseStartCpuSims({ franchise_id: fid, week: w }).catch((err) => {
+    console.warn('[BOOTGAME][start-cpu-sims] non-fatal:', err);
+  });
 }
 
 // ✅ DEBUG: Log URL params when court.html loads (to see what game-plan passed)
@@ -1987,7 +2005,9 @@ async function handleButtonClick(animate) {
     if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
-  
+
+  maybeFireFranchiseStartCpuSimsAtQ1Entry();
+
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
   if (!gameId) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -2153,6 +2173,8 @@ async function handleSimQuarter() {
     if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
+
+  maybeFireFranchiseStartCpuSimsAtQ1Entry();
 
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
@@ -2420,6 +2442,8 @@ async function handleSimFullGame() {
     if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
+
+  maybeFireFranchiseStartCpuSimsAtQ1Entry();
 
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();

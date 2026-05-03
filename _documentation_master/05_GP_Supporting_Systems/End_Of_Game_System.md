@@ -207,6 +207,12 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - **Response (success):** `{ status, phase: "a", idempotent, week, results_count }`. If phase A already completed for that week, returns **`idempotent: true`** without re-running side effects.
 - **Frontend:** `finalizeGame.js` shows **“Saving game…”**, POSTs phase-a when `canCompleteWeek` (franchise, no tournament, valid `week`). On success, writes `localStorage.franchise_complete_week_pending` as `JSON.stringify({ franchise_id, week })` and passes `franchisePhaseBPending` / `franchisePhaseAOk` into `finalScore` for the EOG popup.
 
+**Start CPU sims — `POST /franchise/complete-week/start-cpu-sims`** (May 2026)
+
+- **Body:** `{ franchise_id, week }`.
+- **Behavior:** Sims **non-user** week games only; persists **`results[week]`** (and EOS tournament blobs on EOS weeks). Does **not** advance franchise `week` or run week-closure aggregates. **409** if phase A already completed for that week (use phase B).
+- **Frontend:** `bootGame.js` calls **`getOrStartFranchiseStartCpuSims`** (`franchiseStartCpuSimsClient.js`, single-flight, non-fatal errors) when franchise **pre-game (`quarter === 0`)** starts via **Play Quarter**, **Sim Quarter**, or **Sim Full Game**, so CPU games can run in parallel while the user plays.
+
 **Phase B — `POST /franchise/complete-week/phase-b`**
 
 - **Body:** `CompleteWeekPhaseBRequest`: **`franchise_id`**, **`week`** only.
