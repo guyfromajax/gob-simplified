@@ -2934,38 +2934,72 @@ function showChampionshipCompleteModal(summary) {
 
 function showNewSeasonConfirmModal() {
   const overlay = document.createElement('div');
-  overlay.className = 'fcc-modal-overlay';
+  overlay.className = 'gob-modal-overlay fcc-new-season-modal is-visible';
+  overlay.setAttribute('aria-hidden', 'false');
   overlay.innerHTML = `
-    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="New Season">
-      <h3 class="fcc-modal-title">Go To Next Season?</h3>
-      <p class="fcc-modal-copy">This will create the next season for this franchise instance.</p>
-      <p class="fcc-modal-copy">Your current season cannot be reopened after you proceed.</p>
-      <div class="fcc-modal-actions">
-        <button class="fcc-modal-btn fcc-modal-btn-secondary" id="fcc-new-season-cancel">Cancel</button>
-        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-new-season-proceed">Proceed</button>
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="fcc-new-season-title" aria-describedby="fcc-new-season-copy">
+      <div class="gob-modal-accent is-green"></div>
+      <div class="gob-modal-body">
+        <h3 id="fcc-new-season-title" class="gob-modal-title">Go To Next Season?</h3>
+        <p id="fcc-new-season-copy" class="gob-modal-subtitle">This will create the next season for this franchise instance. Your current season cannot be reopened after you proceed.</p>
+      </div>
+      <div class="gob-modal-actions">
+        <button type="button" class="gob-modal-btn-secondary" id="fcc-new-season-cancel">Cancel</button>
+        <button type="button" class="gob-modal-btn-primary is-green" id="fcc-new-season-proceed">Start Next Season</button>
       </div>
     </div>
   `;
+  const close = () => {
+    document.removeEventListener('keydown', onKeydown);
+    overlay.remove();
+  };
+  const onKeydown = (event) => {
+    if (event.key === 'Escape') close();
+  };
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay || event.target.classList.contains('gob-modal-backdrop')) close();
+  });
+  document.addEventListener('keydown', onKeydown);
+  overlay.closeGobModal = close;
   document.body.appendChild(overlay);
+  overlay.querySelector('#fcc-new-season-cancel')?.focus();
   return overlay;
 }
 
 function showCutPlayersRequiredModal(cutCount) {
   const overlay = document.createElement('div');
-  overlay.className = 'fcc-modal-overlay';
+  overlay.className = 'gob-modal-overlay fcc-cut-required-modal is-visible';
+  overlay.setAttribute('aria-hidden', 'false');
   overlay.innerHTML = `
-    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="Cut Players Required">
-      <h3 class="fcc-modal-title">Cut Players Required</h3>
-      <p class="fcc-modal-copy">You need to cut ${cutCount} player${cutCount === 1 ? '' : 's'}.</p>
-      <div class="fcc-modal-actions">
-        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-cut-required-close">Close</button>
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="fcc-cut-required-title" aria-describedby="fcc-cut-required-copy">
+      <div class="gob-modal-accent"></div>
+      <div class="gob-modal-body">
+        <h3 id="fcc-cut-required-title" class="gob-modal-title">Cut Players Required</h3>
+        <p id="fcc-cut-required-copy" class="gob-modal-subtitle">You need to cut ${cutCount} player${cutCount === 1 ? '' : 's'} before the next game.</p>
+      </div>
+      <div class="gob-modal-actions">
+        <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Close</button>
       </div>
     </div>
   `;
-  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', () => {
+  const close = () => {
+    document.removeEventListener('keydown', onKeydown);
     overlay.remove();
+  };
+  const onKeydown = (event) => {
+    if (event.key === 'Escape') close();
+  };
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay || event.target.classList.contains('gob-modal-backdrop')) close();
+  });
+  document.addEventListener('keydown', onKeydown);
+  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', () => {
+    close();
   });
   document.body.appendChild(overlay);
+  overlay.querySelector('#fcc-cut-required-close')?.focus();
 }
 
 function updatePlayButton(data) {
@@ -3171,47 +3205,30 @@ playNowBtn.addEventListener('click', async () => {
       const currentRound = eosTournament?.current_round;
       
       if (currentRound === 2 && eosTournament?.bracket?.round2) {
-        // Show popup with results and Sim Championship button
-        const popup = document.createElement('div');
-        popup.className = 'sim-popup';
-        popup.innerHTML = `
-          <div class="sim-popup-content">
-            <h3>Semifinals Complete</h3>
-            <p>Round 2 results have been simulated.</p>
-            <button id="sim-championship-btn">Sim Championship Game</button>
-            <button id="close-sim-popup">Close</button>
-          </div>
-        `;
-        document.body.appendChild(popup);
-        
-        document.getElementById('sim-championship-btn').addEventListener('click', async () => {
-          try {
-            const champRes = await fetch(API_CONFIG.buildUrl('/franchise/sim-championship'), {
-              method: 'POST',
-              headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-              body: JSON.stringify({ franchise_id: franchiseId })
-            });
-            if (!champRes.ok) throw new Error('Championship simulation failed');
-            const champData = await champRes.json();
-            document.body.removeChild(popup);
-            showChampionshipCompleteModal({
-              game_id: champData.game_id,
-              home_team_name: champData.home_team_name,
-              away_team_name: champData.away_team_name,
-              home_score: champData.home_score,
-              away_score: champData.away_score,
-              winner_team_name: champData.winner_name,
-            });
-          } catch (err) {
-            console.error(err);
-            alert('Unable to simulate championship');
-          }
-        });
-        
-        document.getElementById('close-sim-popup').addEventListener('click', () => {
-          document.body.removeChild(popup);
+        // Semis done: run championship sim immediately (no intermediate modal).
+        try {
+          const champRes = await fetch(API_CONFIG.buildUrl('/franchise/sim-championship'), {
+            method: 'POST',
+            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ franchise_id: franchiseId }),
+          });
+          if (!champRes.ok) throw new Error('Championship simulation failed');
+          const champData = await champRes.json();
+          showChampionshipCompleteModal({
+            game_id: champData.game_id,
+            home_team_name: champData.home_team_name,
+            away_team_name: champData.away_team_name,
+            home_score: champData.home_score,
+            away_score: champData.away_score,
+            winner_team_name: champData.winner_name,
+          });
+        } catch (champErr) {
+          console.error(champErr);
+          alert('Unable to simulate championship');
           location.reload();
-        });
+        }
+        playNowBtn.disabled = false;
+        playNowBtn.textContent = originalText;
       } else {
         location.reload(); // Reload to show updated bracket
       }
@@ -3227,8 +3244,12 @@ playNowBtn.addEventListener('click', async () => {
   // End-of-season franchise rollover: keep the same franchise instance and build the next season from franchise data
   if (mode === 'new-season') {
     const modal = showNewSeasonConfirmModal();
+    const closeModal = () => {
+      if (typeof modal.closeGobModal === 'function') modal.closeGobModal();
+      else modal.remove();
+    };
     modal.querySelector('#fcc-new-season-cancel')?.addEventListener('click', () => {
-      modal.remove();
+      closeModal();
     });
     modal.querySelector('#fcc-new-season-proceed')?.addEventListener('click', async () => {
       const originalText = playNowBtn.textContent;
@@ -3248,7 +3269,7 @@ playNowBtn.addEventListener('click', async () => {
         playNowBtn.disabled = false;
         playNowBtn.textContent = originalText;
       } finally {
-        modal.remove();
+        closeModal();
       }
     });
     return;

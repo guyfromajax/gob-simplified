@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **April 26 Update** Added the Post-Game Press Conference feature. Your press conference answers impact your program in a multitude of different ways. Do you like this feature? Or no? LMK via the purpole Feedback button after you run through a few post-game pressers.
+- **May 3 Update** Removed post-game press conferences, improved speed of simming computer games, fixed tournament progression bugs.
 
 Source:
 - `FrontEnd/static/mode-select.html`

@@ -1382,8 +1382,7 @@ input[type="reset"] {
 }
 
 /* Reusable FCC modal styling (EOS and confirmation popups) */
-.fcc-modal-overlay,
-.sim-popup {
+.fcc-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.65);
@@ -1394,8 +1393,7 @@ input[type="reset"] {
   padding: 20px;
 }
 
-.fcc-modal-card,
-.sim-popup-content {
+.fcc-modal-card {
   width: min(520px, 100%);
   background: #ffffff;
   border-radius: 10px;
@@ -1404,8 +1402,7 @@ input[type="reset"] {
   text-align: center;
 }
 
-.fcc-modal-title,
-.sim-popup-content h3 {
+.fcc-modal-title {
   margin: 0 0 12px;
   font-family: 'Bebas Neue', cursive;
   font-size: 34px;
@@ -1413,8 +1410,7 @@ input[type="reset"] {
   color: #1a1a2e;
 }
 
-.fcc-modal-copy,
-.sim-popup-content p {
+.fcc-modal-copy {
   margin: 6px 0;
   font-family: 'Inter', sans-serif;
   color: #222;
@@ -1428,8 +1424,7 @@ input[type="reset"] {
   flex-wrap: wrap;
 }
 
-.fcc-modal-btn,
-.sim-popup-content button {
+.fcc-modal-btn {
   border: none;
   border-radius: 6px;
   padding: 10px 16px;
@@ -1439,7 +1434,6 @@ input[type="reset"] {
 }
 
 .fcc-modal-btn-primary,
-#sim-championship-btn,
 #fcc-champ-back,
 #fcc-new-season-proceed {
   background: #ff7a00;
@@ -1447,11 +1441,47 @@ input[type="reset"] {
 }
 
 .fcc-modal-btn-secondary,
-#close-sim-popup,
 #fcc-champ-box-score,
 #fcc-new-season-cancel {
   background: #4065af;
   color: #fff;
+}
+
+.fcc-new-season-modal,
+.fcc-cut-required-modal {
+  z-index: 2000;
+}
+
+.fcc-new-season-modal .gob-modal-box,
+.fcc-cut-required-modal .gob-modal-box {
+  animation: fcc-modal-enter 200ms ease both;
+}
+
+.fcc-new-season-modal #fcc-new-season-cancel.gob-modal-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.fcc-new-season-modal #fcc-new-season-proceed.gob-modal-btn-primary.is-green {
+  background: #34EC27;
+  border-color: rgba(52, 236, 39, 0.5);
+  color: #15181f;
+}
+
+.fcc-cut-required-modal #fcc-cut-required-close.gob-modal-btn-dismiss {
+  width: 100%;
+}
+
+@keyframes fcc-modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Rankings tab */
