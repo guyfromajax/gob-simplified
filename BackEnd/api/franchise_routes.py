@@ -3285,8 +3285,22 @@ def _try_finalize_franchise_week_if_complete(
     """
     deduped = _dedupe_franchise_week_results_by_matchup(results)
     if not _franchise_week_results_cover_schedule(deduped, week_games):
+        expected = _expected_franchise_week_matchup_key_set(week_games)
+        actual = {_week_result_matchup_key(r) for r in deduped}
+        missing_n = len(expected - actual)
+        extra_n = len(actual - expected)
+        logger.info(
+            "[TRY-FINALIZE-WEEK] outcome=waiting franchise_id=%s week=%s "
+            "expected_matchups=%s deduped_rows=%s missing_matchups=%s extra_matchups=%s",
+            franchise_id_str,
+            week,
+            len(expected),
+            len(deduped),
+            missing_n,
+            extra_n,
+        )
         return None
-    return _finalize_franchise_week_after_cpu_games(
+    out = _finalize_franchise_week_after_cpu_games(
         franchise_doc,
         franchise_id,
         franchise_id_str,
@@ -3295,6 +3309,13 @@ def _try_finalize_franchise_week_if_complete(
         user_team_id_str,
         community_highlight_pending,
     )
+    logger.info(
+        "[TRY-FINALIZE-WEEK] outcome=ran_closure franchise_id=%s week=%s deduped_matchups=%s",
+        franchise_id_str,
+        week,
+        len(deduped),
+    )
+    return out
 
 
 def _complete_week_finish_cpu_and_persist(
@@ -3944,6 +3965,12 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
 
     current_week = int(franchise_doc.get("week", 1))
     if current_week > req.week:
+        logger.info(
+            "[COMPLETE-WEEK-PHASE-B] outcome=already_finalized franchise_id=%s req_week=%s franchise_week=%s",
+            req.franchise_id,
+            req.week,
+            current_week,
+        )
         return {
             "status": "ok",
             "phase": "b",

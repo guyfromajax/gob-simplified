@@ -1,9 +1,9 @@
 # Parallel franchise CPU sims and week finalization — work plan
 
 **Location:** `_documentation_master/projects/` (canonical project plan)  
-**Status:** Planning  
+**Status:** Implemented (v1 — in-process phase B, week gated by **`_try_finalize_franchise_week_if_complete`**)  
 **Goal:** Run CPU game sims in parallel (server-side) while the user plays their franchise game; separate **per-game persistence** from **week-level closure** (rankings, stat leaders, week advance, etc.) behind a single idempotent `try_finalize_week`-style gate.  
-**Explicitly out of scope for this milestone:** Quarter checkpoints / resume abandoned user games (may follow as phase 2 once this spine exists).
+**Explicitly out of scope for this milestone:** Quarter checkpoints / resume abandoned user games (may follow as phase 2 once this spine exists). **Deferred (not v1):** separate worker/queue, starting CPU sims before phase A / EOG, client polling for week closure (see §4 Phase 3–4).
 
 ---
 
@@ -91,9 +91,11 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 | **Per-game (already parallel-shaped or loop-local)** | Distant/full sim persistence, `games` collection, `stat_updater.finalize_game`, `_finalize_team_attributes_for_game`, EOS `save_*` on `franchise_doc`, `_award_gp_sim` / geek point writes, `results.append`. |
 | **Week closure (needs all CPU rows + user row, or equivalent merge)** | Full `results` write, both recruiting lean passes, rank/prestige v2, `update_fields` week/training/inbox, EOS **advance/init** branches, single `franchises.update_one`, community highlight flush, week-35 awards. |
 
-### E. Product / planning (still open)
+### E. Product / planning (v1 decisions — May 2026)
 
-- [ ] **Product sign-off:** Remove PGPC vs keep vs feature-flag; **when** to start background CPU jobs (tip-off vs other trigger).
+- [x] **PGPC at franchise EOG:** Kept behind **`FRANCHISE_PGPC_AT_EOG_ENABLED`** in `gameCompletionPopup.js` (default **`false`**). Set to **`true`** to restore Post-Game Press Conference on the EOG modal; code paths remain in repo.
+- [x] **When CPU / phase B runs (v1):** After the user’s game is finalized for the week — **`POST /franchise/complete-week/phase-a`** persists the user row; the client starts **`POST /franchise/complete-week/phase-b`** when the franchise completion UI is shown (single-flight per `franchise_id:week`). CPU sims are **not** started at tip-off or week open in v1.
+- [ ] **Future product (optional):** Start background CPU jobs earlier than EOG; requires async job design + client polling or push (see §4 Phase 3–4 deferred items).
 
 ---
 
@@ -120,12 +122,12 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 - [x] Walk `_complete_week_finish_cpu_and_persist` end-to-end and list **every** side effect after the CPU `for` loop — see **§2.4 Phase 0 inventory**.
 - [x] Confirm **which** effects require “full `results` list” vs per-game — see **§2.4** tables **B** vs **C/D**.
-- [ ] Product sign-off: remove PGPC vs keep; when to start background jobs.
+- [x] Product decisions for v1: PGPC flag (§2.E); phase B start after phase A + EOG client (not tip-off).
 
 ### Phase 1 — Extract week closure (no behavior change)
 
 - [x] Introduce a dedicated week-closure function containing post–CPU-loop logic — implemented as **`_finalize_franchise_week_after_cpu_games`** in `franchise_routes.py`, called only from **`_complete_week_finish_cpu_and_persist`** (same call site as before; behavior preserved).
-- [ ] Add unit/integration tests: double-call → second call no-op; “user last” vs “CPU last” ordering simulated by calling finalize from two call sites in tests (deferred until Phase 2 idempotency work; optional smoke test can call Phase B twice with idempotent response today).
+- [x] Tests: `_try_finalize_franchise_week_if_complete` logs **`outcome=waiting`** when the slate is incomplete; **`outcome=ran_closure`** when the schedule is covered (finalize mocked); **`POST .../phase-b`** returns **`idempotent: true`** when `franchise.week` already advanced past `req.week` — see **`tests/test_franchise_complete_week.py`**. Deeper double-call / ordering tests remain optional if you expand async workers later.
 
 ### Phase 2 — Per-game idempotent CPU persistence
 
@@ -140,17 +142,17 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ### Phase 4 — UX + cleanup
 
-- [x] Franchise EOG: **`FRANCHISE_PGPC_AT_EOG_ENABLED`** (`gameCompletionPopup.js`, default **`false`**) — PGPC code kept; Box Score + **Go To Locker Room** awaits phase B then clears pending + navigates.
-- [ ] Optional: “simming…” overlay on court before leaving EOG if phase B is still running (only if product wants extra feedback).
+- [x] Franchise EOG: **`FRANCHISE_PGPC_AT_EOG_ENABLED`** (`gameCompletionPopup.js`, default **`false`**) — PGPC code kept; Box Score + **Go To Locker Room** shows **`PageLoadOverlay`** (“Simulating Computer Games”), awaits phase B, then clears pending + navigates to FCC (same pulse as box-score path).
+- [x] Optional pre-navigation overlay: satisfied by **Go To Locker Room** + box-score **`PageLoadOverlay`** until phase B completes (no separate idle overlay on the EOG modal itself).
 - [x] Update **`End_Of_Game_System.md`** and **`Press_Conference_System.md`** for the above + phase B parallel sim note.
 
 ---
 
 ## 5. Observability (add early)
 
-- Log **predicate inputs** at `try_finalize_week`: counts finalized vs expected for week W.
-- Log outcome: `waiting` | `ran_closure` | `already_finalized` | `error`.
-- Optional: metric for time from phase A success to week closure.
+- [x] **`_try_finalize_franchise_week_if_complete`** logs **`[TRY-FINALIZE-WEEK]`** with **`outcome=waiting`** (`expected_matchups`, `deduped_rows`, `missing_matchups`, `extra_matchups`) when the week slate is incomplete; **`outcome=ran_closure`** when week closure runs.
+- [x] **`complete_week_phase_b`** logs **`[COMPLETE-WEEK-PHASE-B] outcome=already_finalized`** when `franchise.week` is already past `req.week` (idempotent retry after week advance).
+- [ ] Optional: metric for time from phase A success to week closure.
 
 ---
 
@@ -167,7 +169,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ## 7. Next concrete step
 
-Phase 0 **code inventory is done** (§2.4). **Phase 1:** `_finalize_franchise_week_after_cpu_games`. **Phase 2:** matchup keys, dedupe, skip-if-present, **`_try_finalize_franchise_week_if_complete`**. **Phase 3 (in-process):** parallel full CPU sims inside phase B; **`FRANCHISE_CPU_SIM_MAX_WORKERS`**. **Next:** optional separate job queue / earlier triggers; tests; product sign-off for PGPC if still open.
+**v1 is closed** for in-process parallel CPU sims + gated week finalize + EOG/box-score UX (see §4, §5, tests in **`tests/test_franchise_complete_week.py`**). **Optional next milestone:** background job queue, start CPU sims before EOG, client polling — only if product wants CPU work to overlap live gameplay earlier than phase B; otherwise monitor **`[TRY-FINALIZE-WEEK]`** / **`[COMPLETE-WEEK-PHASE-B]`** in production and add timing metrics (§5 optional) if needed.
 
 ---
 
@@ -178,5 +180,6 @@ Phase 0 **code inventory is done** (§2.4). **Phase 1:** `_finalize_franchise_we
 | EOG + phase A | `finalizeGame.js`, `End_Of_Game_System.md` |
 | Phase B trigger | `gameCompletionPopup.js`, `franchisePhaseBClient.js`, `postGamePressConference.js` |
 | Box score pending | `box-score.js`, `pageLoadOverlay.js` |
-| API | `franchise_routes.py` — `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`, **`_finalize_franchise_week_after_cpu_games`**, **`_try_finalize_franchise_week_if_complete`**, matchup-key helpers, `_complete_week_process_user_game_block` |
+| API | `franchise_routes.py` — `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`, **`_finalize_franchise_week_after_cpu_games`**, **`_try_finalize_franchise_week_if_complete`** (`[TRY-FINALIZE-WEEK]` logs), matchup-key helpers, `_complete_week_process_user_game_block` |
+| Tests | `tests/test_franchise_complete_week.py` — try-finalize + phase-B idempotent |
 | EOS | `BackEnd/tournament/franchise_tournament.py` |

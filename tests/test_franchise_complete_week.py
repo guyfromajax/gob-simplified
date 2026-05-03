@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
@@ -218,4 +219,85 @@ def test_find_user_matchup_eos_phase_b_fallback_when_week_games_omits_user():
         saved_week_results=saved,
     )
     assert {str(t1), str(t2)} == {str(uid), str(peer)}
+
+
+def test_try_finalize_franchise_week_logs_waiting_when_schedule_incomplete(caplog):
+    """Observability: incomplete slate logs outcome=waiting before refusing closure."""
+    t1, t2, t3, t4 = ObjectId(), ObjectId(), ObjectId(), ObjectId()
+    week_games = [(t1, t2), (t3, t4)]
+    results = [
+        {
+            "away_id": str(t1),
+            "home_id": str(t2),
+            "away_score": 70,
+            "home_score": 60,
+        }
+    ]
+    with caplog.at_level(logging.INFO, logger="BackEnd.api.franchise_routes"):
+        out = franchise_routes._try_finalize_franchise_week_if_complete(
+            franchise_doc={},
+            franchise_id=ObjectId(),
+            franchise_id_str="deadbeefdeadbeefdeadbeef",
+            week=1,
+            week_games=week_games,
+            results=results,
+            user_team_id_str=None,
+        )
+    assert out is None
+    assert any(
+        "[TRY-FINALIZE-WEEK]" in r.message and "outcome=waiting" in r.message
+        for r in caplog.records
+    )
+
+
+def test_try_finalize_franchise_week_ran_closure_when_schedule_complete(caplog):
+    """Week closure runs and logs outcome=ran_closure when results cover the schedule."""
+    t1, t2, t3, t4 = ObjectId(), ObjectId(), ObjectId(), ObjectId()
+    week_games = [(t1, t2), (t3, t4)]
+    results = [
+        {"away_id": str(t1), "home_id": str(t2), "away_score": 70, "home_score": 60},
+        {"away_id": str(t3), "home_id": str(t4), "away_score": 55, "home_score": 58},
+    ]
+    fake_payload = {"week": 1, "results": []}
+    with patch.object(
+        franchise_routes,
+        "_finalize_franchise_week_after_cpu_games",
+        return_value=fake_payload,
+    ):
+        with caplog.at_level(logging.INFO, logger="BackEnd.api.franchise_routes"):
+            out = franchise_routes._try_finalize_franchise_week_if_complete(
+                franchise_doc={},
+                franchise_id=ObjectId(),
+                franchise_id_str="deadbeefdeadbeefdeadbeef",
+                week=1,
+                week_games=week_games,
+                results=results,
+                user_team_id_str=None,
+            )
+    assert out == fake_payload
+    assert any(
+        "[TRY-FINALIZE-WEEK]" in r.message and "outcome=ran_closure" in r.message
+        for r in caplog.records
+    )
+
+
+def test_phase_b_http_idempotent_when_franchise_week_already_advanced(caplog):
+    """Second phase-B style call after week advance: HTTP 200, idempotent, no CPU work."""
+    db.franchises.delete_many({})
+    fid = db.franchises.insert_one({"week": 2, "schedule": [[]]}).inserted_id
+    with caplog.at_level(logging.INFO, logger="BackEnd.api.franchise_routes"):
+        res = client.post(
+            "/franchise/complete-week/phase-b",
+            json={"franchise_id": str(fid), "week": 1},
+        )
+    assert res.status_code == 200
+    data = res.json()
+    assert data.get("idempotent") is True
+    assert data.get("phase") == "b"
+    assert data.get("results") == []
+    assert any(
+        "[COMPLETE-WEEK-PHASE-B]" in r.message and "already_finalized" in r.message
+        for r in caplog.records
+    )
+    db.franchises.delete_many({})
 
