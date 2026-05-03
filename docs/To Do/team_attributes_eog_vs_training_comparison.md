@@ -11,7 +11,7 @@ Quick current-code comparison of how franchise-mode team attributes move in:
 
 | Attribute | End of Game (EOG) | Training |
 |-----------|-------------------|----------|
-| `shot_threshold` | FG%-driven. Lower is better. Winners: `-10 to -5`, `-5 to +5`, or `+5 to +15`. Losers: `0 to +5`, `+5 to +10`, or `+10 to +25`. | Scrimmages only: `0 -> +10 to +20`, `1 -> -5 to +5`, `2 -> -5 to -15`, `3 -> -5 to -25`, `4 -> -10 to -25`, `5 -> -10 to -30`. |
+| `shot_threshold` | FG%-driven. Lower is better. FG% > 50%: **both** `-10 to -5`. FG% > 45% (≤50%): winner `-5 to 0`, loser `0 to +5`. FG% ≤ 45%: **both** `+5 to +10`. | Scrimmages only: `0 -> +5 to +10`, `1 -> -5 to 0`, `2 -> -5 to -15`, `3 -> -10 to -15`, `4 -> -10 to -20`, `5+ -> -15 to -20`. |
 | `rebound_modifier` | TREB vs opponent TREB: `> opp + 8 -> +0.00 to +0.05`; `< opp - 8 -> -0.10 to -0.05`; otherwise `-0.05 to -0.01`. | Rebounding drill: `1-2 -> +0.01 to +0.05`, `3-4 -> +0.04 to +0.08`, `5+ -> +0.06 to +0.10`. Scrimmages: `1-2 -> +0.00 to +0.03`, `3-4 -> +0.03 to +0.05`, `5+ -> +0.04 to +0.07`. |
 | `offensive_efficiency` | Usage-based sink from completed-game offensive play count: `>12 -> -2 to -1`, `8-12 -> -3 to -2`, `<8 -> -4 to -3`. | Offense Install: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`. |
 | `defensive_efficiency` | Usage-based sink from completed-game defensive play concentration: `>49% one play -> -4 to -3`, `>39% -> -3 to -2`, else `-2 to -1`. | Defense Install uses the same standard install range as offense. |

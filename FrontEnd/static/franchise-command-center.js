@@ -3917,6 +3917,7 @@ function getTeamAttrVisualConfig(attrKey, value) {
   let pulse = false;
 
   if (attrKey === 'shot_threshold') {
+    // Linear pill: center 110, span 10–210 (lower raw = better / positive fill toward right).
     const deviation = 110 - value;
     normalized = (deviation / 100) * 10;
     fillPercent = Math.min((Math.abs(deviation) / 100) * 50, 50);

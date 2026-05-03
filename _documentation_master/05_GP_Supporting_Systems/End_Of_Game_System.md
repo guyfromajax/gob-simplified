@@ -54,8 +54,10 @@ Team attributes will adjust at the end of game based on the notes below. Note th
 - End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
   - `shot_threshold`
     - Golf-score style attr: lower is better, higher is worse.
-    - **Winning team:** If game FG% > 50%: `+= random.randint(-10, -5)`; if FG% > 45%: `+= random.randint(-5, 5)`; else `+= random.randint(5, 15)`.
-    - **Losing team:** If game FG% > 50%: `+= random.randint(0, 5)`; if FG% > 45%: `+= random.randint(5, 10)`; else `+= random.randint(10, 25)`.
+    - **Both teams:** If game FG% > 50%: `+= random.randint(-10, -5)`.
+    - **Winning team:** If FG% > 45% (and ≤ 50%): `+= random.randint(-5, 0)`.
+    - **Losing team:** If FG% > 45% (and ≤ 50%): `+= random.randint(0, 5)`.
+    - **Both teams:** If FG% ≤ 45%: `+= random.randint(5, 10)`.
   - `discipline` (both teams, same criteria)
     - Compare team `(F + TO)` to opponent `(F + TO) + 8`.
     - If lower: `+= random.randint(0, 1)`.

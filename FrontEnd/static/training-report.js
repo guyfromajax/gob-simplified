@@ -1291,6 +1291,22 @@ function createTeamAttrItem(attrKey, currentValue, change) {
       } else {
         changeSpan.className += ' change-negative';
       }
+    } else if (attrKey === 'shot_threshold') {
+      // Golf score: lower raw threshold is better. Invert sign for user-facing copy (+ green / − red).
+      const displayDelta = -change;
+      const exceptionalThreshold = getExceptionalGainThreshold();
+      const formattedChange =
+        displayDelta > 0 ? `+${displayDelta}` : displayDelta < 0 ? `${displayDelta}` : '0';
+      changeSpan.textContent = formattedChange;
+      if (displayDelta >= exceptionalThreshold) {
+        changeSpan.className += ' change-gold';
+      } else if (displayDelta > 0) {
+        changeSpan.className += ' change-positive';
+      } else if (displayDelta < 0) {
+        changeSpan.className += ' change-negative';
+      } else {
+        changeSpan.className += ' change-zero';
+      }
     } else {
       // Standard handling for other attributes
       const formattedChange = change > 0 ? `+${change}` : change.toString();
@@ -1352,8 +1368,9 @@ function createPill(originalValue, attrKey) {
   let value = originalValue;
   
   if (attrKey === 'shot_threshold') {
-    maxValue = 100; // Range is 10 to 210, center at 110, so max deviation is 100
-    value = 110 - originalValue; // Invert: lower is better (positive/green), higher is worse (negative/red)
+    // Golf score: raw 10 best (right), 210 worst (left); center 110; ±100 span for fill.
+    maxValue = 100;
+    value = 110 - originalValue;
   } else if (attrKey === 'rebound_modifier') {
     // Rebound modifier is 0.0-0.4, center at 0.2
     // We'll show deviation from 0.2

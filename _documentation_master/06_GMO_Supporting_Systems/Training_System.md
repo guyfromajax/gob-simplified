@@ -376,12 +376,12 @@ Traning Camp Height / Weight bonsuses
 - `5+ points -> +0.04 to +0.07`
 
 **Shot Threshold:**
-- 0 points: `+= random.randint(10, 20)`
-- 1 point: `+= random.randint(-5, 5)`
+- 0 points: `+= random.randint(5, 10)`
+- 1 point: `+= random.randint(-5, 0)`
 - 2 points: `-= random.randint(5, 15)`
-- 3 points: `-= random.randint(5, 25)`
-- 4 points: `-= random.randint(10, 25)`
-- 5 points: `-= random.randint(10, 30)`
+- 3 points: `-= random.randint(10, 15)`
+- 4 points: `-= random.randint(10, 20)`
+- 5+ points: `-= random.randint(15, 20)`
 
 #### Coaching Focus Amplifiers
 
@@ -553,6 +553,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
     - Red fill to the left for negative values
     - Proportional fill based on max value
     - No value displayed on top of pill (value shown in change indicator only)
+    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **110** with span **10–210** (better toward the right). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** (red).
   - **Progress Bar:** Team Chemistry (0-25 scale, blue fill)
     - Shows value as "X / 25" centered on bar
     - Only attribute that displays its value

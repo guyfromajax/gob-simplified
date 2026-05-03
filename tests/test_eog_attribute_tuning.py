@@ -1,3 +1,4 @@
+import pytest
 from bson import ObjectId
 
 from BackEnd.api import franchise_routes
@@ -11,6 +12,15 @@ class _FakeGamesCollection:
         if query.get("_id") == self._game_doc.get("_id"):
             return self._game_doc
         return None
+
+    def update_one(self, query, update, upsert=False):
+        """Persist eog_inputs merge for tests (franchise_routes.update_team_attributes_after_game)."""
+        if query.get("_id") != self._game_doc.get("_id"):
+            return None
+        payload = (update or {}).get("$set") or {}
+        if "eog_inputs" in payload:
+            self._game_doc["eog_inputs"] = payload["eog_inputs"]
+        return {"matched_count": 1}
 
 
 class _FakeTeamsCollection:
@@ -144,31 +154,31 @@ def test_eog_attribute_tuning_ranges_applied(monkeypatch):
     home_changes = changes[home_team_id]
     away_changes = changes[away_team_id]
 
-    # Winner paths
-    assert home_changes["shot_threshold"] == -5
-    assert home_changes["discipline"] == 1
-    assert home_changes["fight"] == 1
+    # Winner paths (random.randint patched to low end `a`; snapshot from eog_inputs)
+    assert home_changes["shot_threshold"] == -10
+    assert home_changes["discipline"] == 0
+    assert home_changes["fight"] == 0
     assert home_changes["rebound_modifier"] == 0.0
-    assert home_changes["offensive_efficiency"] == -2
+    assert home_changes["offensive_efficiency"] == -4
     assert home_changes["defensive_efficiency"] == -2
     assert home_changes["fb_efficiency"] == -2
-    assert home_changes["fb_opp_modifier"] == 0
-    assert home_changes["pt_efficiency"] == -1
-    assert home_changes["pt_opp_modifier"] == 1
+    assert home_changes["fb_opp_modifier"] == -2
+    assert home_changes["pt_efficiency"] == -3
+    assert home_changes["pt_opp_modifier"] == -3
     assert home_changes["team_chemistry"] == 1
 
     # Loser paths
-    assert away_changes["shot_threshold"] == 10
+    assert away_changes["shot_threshold"] == 5
     assert away_changes["discipline"] == -3
-    assert away_changes["fight"] == -4
-    assert away_changes["rebound_modifier"] == -0.1
-    assert away_changes["offensive_efficiency"] == -2
+    assert away_changes["fight"] == -3
+    assert away_changes["rebound_modifier"] == pytest.approx(-0.05)
+    assert away_changes["offensive_efficiency"] == -4
     assert away_changes["defensive_efficiency"] == -2
     assert away_changes["fb_efficiency"] == -2
     assert away_changes["fb_opp_modifier"] == -2
     assert away_changes["pt_efficiency"] == -3
     assert away_changes["pt_opp_modifier"] == -3
-    assert away_changes["team_chemistry"] == -3
+    assert away_changes["team_chemistry"] == -4
 
     # Both teams should have been persisted to FTD.
     assert len(fake_ftd.update_calls) == 2

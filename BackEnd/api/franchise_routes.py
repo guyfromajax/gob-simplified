@@ -1228,20 +1228,15 @@ def update_team_attributes_after_game(
         )
         
         # shot_threshold is a golf score: lower is better, higher is worse.
-        if is_winner:
-            if fg_pct > 50:
-                changes["shot_threshold"] = random.randint(-10, -5)
-            elif fg_pct > 45:
-                changes["shot_threshold"] = random.randint(-5, 5)
+        if fg_pct > 50:
+            changes["shot_threshold"] = random.randint(-10, -5)
+        elif fg_pct > 45:
+            if is_winner:
+                changes["shot_threshold"] = random.randint(-5, 0)
             else:
-                changes["shot_threshold"] = random.randint(5, 15)
-        else:
-            if fg_pct > 50:
                 changes["shot_threshold"] = random.randint(0, 5)
-            elif fg_pct > 45:
-                changes["shot_threshold"] = random.randint(5, 10)
-            else:
-                changes["shot_threshold"] = random.randint(10, 25)
+        else:
+            changes["shot_threshold"] = random.randint(5, 10)
         
         team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
         opp_f_plus_to_with_buffer = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0) + 8

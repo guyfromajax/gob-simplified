@@ -1405,23 +1405,23 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     """
     Apply training points to shot_threshold (doc ranges).
     
-    - 0 points: += random.randint(10, 20)
-    - 1 point: -= random.randint(-5, 5)  (i.e. add -5 to 5)
+    - 0 points: += random.randint(5, 10)
+    - 1 point: += random.randint(-5, 0)  (neutral to slight improvement)
     - 2 points: -= random.randint(5, 15)
-    - 3 points: -= random.randint(5, 25)
-    - 4 points: -= random.randint(10, 25)
-    - 5 points: -= random.randint(10, 30)
+    - 3 points: -= random.randint(10, 15)
+    - 4 points: -= random.randint(10, 20)
+    - 5+ points: -= random.randint(15, 20)
     """
     current_val = team.get("shot_threshold", 0)
     lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
 
     if points == 0:
-        increase = random.randint(10, 20)
+        increase = random.randint(5, 10)
         team["shot_threshold"] = max(lower, min(upper, current_val + increase))
         return
 
     if points == 1:
-        delta = random.randint(-5, 5)
+        delta = random.randint(-5, 0)
         team["shot_threshold"] = max(lower, min(upper, current_val + delta))
         return
 
@@ -1429,13 +1429,13 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     if points == 2:
         decrease = random.randint(5, 15)
     elif points == 3:
-        decrease = random.randint(5, 25)
+        decrease = random.randint(10, 15)
     elif points == 4:
-        decrease = random.randint(10, 25)
+        decrease = random.randint(10, 20)
     elif points == 5:
-        decrease = random.randint(10, 30)
+        decrease = random.randint(15, 20)
     else:
-        decrease = random.randint(10, 30)
+        decrease = random.randint(15, 20)
     team["shot_threshold"] = max(lower, min(upper, current_val - decrease))
 
 

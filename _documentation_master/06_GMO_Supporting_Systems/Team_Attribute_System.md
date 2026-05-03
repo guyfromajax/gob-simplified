@@ -157,17 +157,25 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 
 - Initial seed: Franchise init / missing-FTD creation (`range: 100 to 120`, random).
 - Faucet: Training System / Scrimmages.
-  Condition: `scrimmages` slider at `0` or `1`.
-  Range: `0 pts -> +10 to +20`, `1 pt -> -5 to +5` (can increase or decrease).
+  Condition: `scrimmages` slider at `0`.
+  Range: `0 pts -> +5 to +10` (worse shooting attribute).
+- Faucet / slight sink: Training System / Scrimmages.
+  Condition: `scrimmages` at `1` pt.
+  Range: `+= random.randint(-5, 0)` (neutral to slight improvement).
 - Sink: Training System / Scrimmages.
-  Condition: `scrimmages` slider at `1-5`.
-  Range: `1 pt -> -5 to +5`, `2 pts -> -5 to -15`, `3 pts -> -5 to -25`, `4 pts -> -10 to -25`, `5 pts -> -10 to -30`.
+  Condition: `scrimmages` at `2+` pts.
+  Range: `2 pts -> -5 to -15`, `3 pts -> -10 to -15`, `4 pts -> -10 to -20`, `5+ pts -> -15 to -20`.
 - Faucet: End Of Game System.
   Condition: team FG% `<= 45%`.
-  Range: winner `+5 to +15`, loser `+10 to +25`.
+  Range: **both** teams `+5 to +10`.
+- Mixed EOG: End Of Game System.
+  Condition: team FG% `> 45%` and `≤ 50%`.
+  Range: winner `+= random.randint(-5, 0)`; loser `+= random.randint(0, 5)`.
 - Sink: End Of Game System.
-  Condition: team FG% `> 45%`.
-  Range: winner `-5 to +5` or `-10 to -5` if FG% `> 50%`; loser `+5 to +10` or `0 to +5` if FG% `> 50%`.
+  Condition: team FG% `> 50%`.
+  Range: **both** teams `+= random.randint(-10, -5)`.
+
+**UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **110** as center, **10** at the favorable end and **210** at the unfavorable end. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red.
 
 ### Rebounding (`rebound_modifier`) (range: 0.0 to 0.4)
 This is the team's intangible mindset when it comes to rebounding. Their overall belief in their identity as a basketball team who gets more rebounds than their opponent. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
