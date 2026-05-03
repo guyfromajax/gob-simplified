@@ -169,7 +169,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ## 7. Next concrete step
 
-**v1 is closed** (see §4, §5, **`tests/test_franchise_complete_week.py`**). **Active work:** **§9 Milestone 2** — Play Quarter triggers CPU sims for the week, then existing week-closure + week advance when **user + all CPUs** are complete.
+**v1 is closed** (see §4, §5, **`tests/test_franchise_complete_week.py`**). **§9 Milestone 2 (core):** shipped — **`start-cpu-sims`**, client Q1 hook, phase B unchanged for pre-filled CPUs. **Optional follow-ups:** §9.3 (queue / timeouts / EOS review), §9.4 auth, extra **`start-cpu-sims`** HTTP idempotency test.
 
 ---
 
@@ -190,6 +190,8 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ## 9. Milestone 2 — “Play Quarter starts CPU week sims” (v2)
 
+**Status (May 2026):** **Core spine shipped** — `POST /franchise/complete-week/start-cpu-sims`, **`persist_cpu_results_only`**, client hook (**`bootGame.js`** + **`franchiseStartCpuSimsClient.js`**), tests for partial persist / 409 / start-cpu → phase A → phase B, and **`End_Of_Game_System.md`**. Remaining: **§9.3** product/ops decisions (optional), **§9.4** auth tightening if required, optional extra tests.
+
 **Product intent (four steps):**
 
 1. User presses **Play Quarter** to begin **Q1** of their franchise game → that action **also starts** simming **all other scheduled games for that week** in parallel (**distant** + **full turn-by-turn** CPU paths, same rules as today’s CPU loop).
@@ -209,9 +211,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ### 9.2 Client hook
 
-- **Franchise mode**, **first transition into live Q1** (pre-game → Q1): fire **`start-cpu-sims`** once per `franchise_id:week` (**single-flight**, same spirit as `franchisePhaseBClient.js`). Prefer **non-blocking** relative to simulate-quarter if feasible (fire-and-forget or short timeout + retry-safe idempotency on server).
-
-**Likely file:** `FrontEnd/static/js/phaser/bootGame.js` (Play Quarter / `handleButtonClick` / `handleSimQuarter` when `quarter === 0` and `mode === 'franchise'` — exact hook TBD in implementation).
+- **Franchise mode**, **pre-game (`quarter === 0`)** → **Play Quarter**, **Sim Quarter**, or **Sim Full Game:** **`maybeFireFranchiseStartCpuSimsAtQ1Entry()`** in **`FrontEnd/static/js/phaser/bootGame.js`** fires **`getOrStartFranchiseStartCpuSims`** (**`franchiseStartCpuSimsClient.js`**, single-flight). **Non-blocking** (`.catch` only; does not await before simulating Q1).
 
 ### 9.3 Open decisions (record before build)
 
@@ -224,12 +224,12 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 ### 9.4 Implementation checklist (suggested order)
 
 - [x] **Spike + parameterize:** **`persist_cpu_results_only`** on **`_complete_week_finish_cpu_and_persist`** — partial `$set` of **`results.{week}`** (+ EOS blobs); no **`_try_finalize`** / no week advance.
-- [x] **`POST /franchise/complete-week/start-cpu-sims`** — guards: `franchise.week == req.week`, rejects if phase A done (**409**), logs **`[START-CPU-SIMS]`**. Tests in **`tests/test_franchise_complete_week.py`**.
+- [x] **`POST /franchise/complete-week/start-cpu-sims`** — guards: `franchise.week == req.week`, rejects if phase A done (**409**), logs **`[START-CPU-SIMS]`**.
 - [ ] **Auth / ownership** — same pattern as **`complete_week_phase_a`** today (no `Depends` on these routes); tighten if product requires it.
-- [ ] **Adjust phase B** (or post–phase-A finalize entry) for “CPUs may already exist.”
+- [x] **Phase B with CPUs pre-filled:** no separate endpoint change required — **`complete_week_phase_b`** reloads **`results[week]`** and **`_complete_week_finish_cpu_and_persist`** skips matchups already present; **`test_start_cpu_then_phase_a_phase_b_advances_week`** covers start-cpu → phase A → phase B.
 - [x] **Client:** `bootGame.js` — **`maybeFireFranchiseStartCpuSimsAtQ1Entry()`** on franchise **quarter === 0** for **Play Quarter**, **Sim Quarter**, and **Sim Full Game**; **`franchiseStartCpuSimsClient.js`** single-flight + non-fatal `.catch` (must not brick Q1).
-- [ ] **Tests:** idempotent `start-cpu-sims`; phase A + B with CPUs pre-filled; week does not advance until user row present.
-- [ ] **Docs:** `End_Of_Game_System.md` + this §9 when behavior ships.
+- [x] **Tests:** **`tests/test_franchise_complete_week.py`** — **`test_start_cpu_sims_partial_persists_without_advancing_week`**, **`test_start_cpu_sims_409_when_phase_a_already_done`**, **`test_start_cpu_then_phase_a_phase_b_advances_week`**. Optional later: second HTTP **`start-cpu-sims`** idempotency assert (server + client single-flight already safe).
+- [x] **Docs:** **`End_Of_Game_System.md`** — **Start CPU sims** subsection; this §9 checklist kept in sync.
 
 ### 9.5 Backend anchor (existing)
 
