@@ -180,7 +180,7 @@ The End of Game System handles game completion, displays final scores, and provi
   - `away` - Away team name
   - **✅ SS&S (January 2025):** Also includes `mode`, `tournament_id`, `franchise_id`, and `team_id` for proper navigation from Box Score page
 
-**Box Score primary action (Back to Locker Room / Sim Computer Games):**
+**Box Score primary action (Back to Locker Room / Go To Locker Room when phase B pending from EOG):**
 - **Location:** `FrontEnd/static/box-score.js` - `setupLockerRoomButton()` function
 - **Navigation Logic (Priority Order):**
   1. **Mode Parameter (Highest Priority):** If `mode` is set in URL params, use it directly
@@ -214,8 +214,8 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - **Behavior:** Loads saved week results from DB, runs `_complete_week_finish_cpu_and_persist` (CPU sims, recruiting, rank/prestige, EOS, week advance). Full turn-based CPU games (`run_simulation`) may run **in parallel** inside one phase-b request (`ThreadPoolExecutor`; optional env **`FRANCHISE_CPU_SIM_MAX_WORKERS`**, default **4**). Clears `post_game_status.phase_a_user_week` on successful persist.
 - **Response:** Extends the usual complete-week payload with `status`, `phase: "b"`, `idempotent`.
 - **Frontend triggers:**
-  - EOG popup: **`getOrStartFranchisePhaseB`** runs when the franchise completion modal is shown (`gameCompletionPopup.js`). **Franchise EOG primary CTA:** controlled by **`FRANCHISE_PGPC_AT_EOG_ENABLED`** in `gameCompletionPopup.js`. When **`false`** (current default), the popup shows **Box Score** + **Go To Locker Room**; **Go To Locker Room** awaits the same phase-b Promise, then clears pending `localStorage` and navigates to the FCC. When **`true`**, the legacy **Post-Game Press Conference** button is shown and **`postGamePressConference.js`** attaches to the same phase-b Promise (PGPC code paths remain in the repo). Box-score entry may still show **Sim Computer Games** when `post_game_phase_b=1`.
-  - Box score: **Back to Locker Room** or **Sim Computer Games** (see below) — same POST and overlay when pending matches URL `franchise_id`. Legacy pending shape `{ body: full CompleteWeekRequest }` still POSTs monolithic **`/franchise/complete-week`**.
+  - EOG popup: **`getOrStartFranchisePhaseB`** runs when the franchise completion modal is shown (`gameCompletionPopup.js`). **Franchise EOG primary CTA:** controlled by **`FRANCHISE_PGPC_AT_EOG_ENABLED`** in `gameCompletionPopup.js`. When **`false`** (current default), the popup shows **Box Score** + **Go To Locker Room**; **Go To Locker Room** dismisses the modal, shows the same **`PageLoadOverlay`** pulse as box-score (“Simulating Computer Games”), **awaits** the same phase-b Promise, then clears pending `localStorage` and navigates to the FCC (no extra click). When **`true`**, the legacy **Post-Game Press Conference** button is shown and **`postGamePressConference.js`** attaches to the same phase-b Promise (PGPC code paths remain in the repo). Box-score entry with `post_game_phase_b=1` uses the **Go To Locker Room** label for the phase-b finish action (see below).
+  - Box score: **Back to Locker Room** or **Go To Locker Room** (phase-b pending from EOG; see below) — same POST and overlay when pending matches URL `franchise_id`. Legacy pending shape `{ body: full CompleteWeekRequest }` still POSTs monolithic **`/franchise/complete-week`**.
 
 **Monolith — `POST /franchise/complete-week`**
 
@@ -225,7 +225,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 **Box score URL flag (`post_game_phase_b=1`)**
 
 - When the EOG popup builds the **Box Score** link and phase B is pending, it appends **`post_game_phase_b=1`**.
-- `box-score.js` shows **Sim Computer Games** only if that flag is present **and** `localStorage.franchise_complete_week_pending` exists **and** `franchise_id` matches the URL. All other entry paths keep **Back to Locker Room**; phase-b wiring when pending is unchanged.
+- `box-score.js` shows **Go To Locker Room** (same phase-b + overlay behavior as the historical “Sim Computer Games” control) only if that flag is present **and** `localStorage.franchise_complete_week_pending` exists **and** `franchise_id` matches the URL. All other entry paths keep **Back to Locker Room**; phase-b wiring when pending is unchanged.
 
 ### Franchise complete-week team id resolution (February 2026)
 

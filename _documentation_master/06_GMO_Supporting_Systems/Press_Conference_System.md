@@ -11,7 +11,7 @@ Franchise-only flow that runs **after the user’s game is saved** (`POST /franc
 
 1. **End of game:** `finalizeGame` runs (tournament save, franchise **phase A**, etc.). For franchise mode, phase A persists the user result and sets pending state (`localStorage`: `franchise_complete_week_pending`, `franchise_eog_pgpc_snapshot`) for optional resume—not fully productized, but written after successful phase A.
 2. **EOG modal:** `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` shows **Game Complete** with real score / POTG.
-   - **Franchise with phase B pending and `FRANCHISE_PGPC_AT_EOG_ENABLED`:** **Box Score** is hidden on this popup; primary CTA is **Post-Game Press Conference** (replaces “Sim Computer Games” on this surface only).
+   - **Franchise with phase B pending and `FRANCHISE_PGPC_AT_EOG_ENABLED`:** **Box Score** is hidden on this popup; primary CTA is **Post-Game Press Conference** (replaces the usual Box Score + locker row on this surface only).
    - **Franchise with phase B pending and flag `false`:** **Box Score** + **Go To Locker Room** (same as other modes); **Go To Locker Room** waits for phase B then navigates to the FCC.
    - **Other modes:** Box Score + Go To Locker Room unchanged.
    - **Background scoreboard:** When the EOG popup opens, the court scoreboard DOM is synced to **final** home/away scores and a **FINAL / 0:00** clock readout so the dimmed court behind the modal is not stuck at Q1 / 0–0.

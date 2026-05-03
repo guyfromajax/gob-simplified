@@ -1949,13 +1949,13 @@ function setupLockerRoomButton() {
   }
 
   cleanButton.textContent = showSimComputerGamesLabel
-    ? 'Sim Computer Games'
+    ? 'Go To Locker Room'
     : 'Back to Locker Room';
 
   cleanButton.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Franchise EOG: if phase-a ran and user opened box score first, finish CPU week before FCC
+    // Franchise EOG: if phase-a ran and user opened box score first, finish CPU week before FCC (button label: "Go To Locker Room" when post_game_phase_b pending)
     if (navMode === 'franchise' && isFinalGame && typeof localStorage !== 'undefined') {
       const pendingRaw = localStorage.getItem('franchise_complete_week_pending');
       if (pendingRaw && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {

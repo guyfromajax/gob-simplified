@@ -708,11 +708,29 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   ) {
     lockerRoomBtn.addEventListener('click', async (e) => {
       e.preventDefault();
+      let okToNavigate = false;
       try {
+        try {
+          popup.remove();
+        } catch (_) {}
+        const pulseTeamName = userTeamName || '';
+        const overlayTitle = pulseTeamName || 'Your team';
+        if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+          window.PageLoadOverlay.show({
+            variant: 'pulse',
+            title: overlayTitle,
+            subtitle: 'Simulating Computer Games',
+            teamName: pulseTeamName,
+            assetKey: 'banner_primary',
+          });
+        }
         const res = await getOrStartFranchisePhaseB(franchisePhaseBPending);
-        if (res.ok && typeof localStorage !== 'undefined') {
-          localStorage.removeItem('franchise_complete_week_pending');
-          localStorage.removeItem('franchise_eog_pgpc_snapshot');
+        if (res.ok) {
+          okToNavigate = true;
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('franchise_complete_week_pending');
+            localStorage.removeItem('franchise_eog_pgpc_snapshot');
+          }
         } else {
           try {
             console.error(
@@ -721,11 +739,19 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
               await res.text()
             );
           } catch (_) {}
+          alert('Could not finish the week (computer games). Try again.');
         }
       } catch (err) {
         console.error('[gameCompletionPopup] phase-b error before FCC navigation:', err);
+        alert('Could not finish the week (computer games). Try again.');
+      } finally {
+        if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+          window.PageLoadOverlay.hide();
+        }
       }
-      window.location.assign(lockerRoomUrl);
+      if (okToNavigate) {
+        window.location.assign(lockerRoomUrl);
+      }
     });
   }
 
