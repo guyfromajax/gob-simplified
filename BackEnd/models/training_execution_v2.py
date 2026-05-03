@@ -114,10 +114,9 @@ def execute_training(
     logger.warning(f"📚 [TRAINING] Total plays tracked: {len(original_plays_effectiveness)}")
     logger.warning(f"📚 [TRAINING] Total defenses tracked: {len(original_defenses_effectiveness)}")
     
-    # Step 0: Reduce play/defense effectiveness by 5-15 (pre-training decay)
+    # Step 0: Pre-training defense effectiveness decay (offense play CMD decay runs at EOG; see build_eog_offensive_play_effectiveness_decay_ftd_updates).
     # Skip for first training (training camp) in franchise mode
     if not skip_pre_training_depreciation:
-        plays_data = _apply_pre_training_effectiveness_decay(plays_data)
         scouting_data = _apply_pre_training_defense_decay(scouting_data)
     else:
         logger.warning("⏭️ [TRAINING] Skipping pre-training depreciation (first training/training camp)")
@@ -1841,27 +1840,72 @@ def _apply_ng_reduction_from_conditioning(players: List[dict], conditioning_poin
     return reduced_players
 
 
-def _apply_pre_training_effectiveness_decay(plays_data: Dict) -> Dict:
+def build_eog_offensive_play_effectiveness_decay_ftd_updates(
+    game_team_plays: Dict[str, Any],
+    ftd_plays: Dict[str, Any],
+) -> Dict[str, Any]:
     """
-    Reduce all plays' effectiveness scores by 5-15 before training.
-    Only applies to plays with effectiveness > 0.
-    Minimum value is 0 (cannot be negative).
-    
-    Returns:
-        Updated plays_data dict
+    End-of-game: reduce each offensive play's CMD (effectiveness) on FTD by the integer
+    part of its share of team offensive playcalls (times_run) for that game.
+
+    For each play in ``game_team_plays`` (via :func:`iter_team_plays`), decay is
+    ``int(100 * times_run / total_times_run)`` when ``total_times_run > 0``, else 0.
+    New effectiveness is ``max(0, current_ftd_effectiveness - decay)``. Only keys
+    that change are included (Mongo ``$set`` paths ``plays.<storage_key>.effectiveness``).
+
+    Offensive usage matches franchise EOG helpers: sum of ``game_stats.times_run`` over
+    the same play dict shape as training / stat rollup.
     """
-    updated_plays = plays_data.copy() if plays_data else {}
-    
-    for play_key, play_data, display_name in iter_team_plays(updated_plays):
-        if isinstance(play_data, dict):
-            current_effectiveness = play_data.get("effectiveness", 0)
-            if current_effectiveness > 0:
-                decay = random.randint(5, 15)
-                new_effectiveness = max(0, current_effectiveness - decay)
-                play_data["effectiveness"] = new_effectiveness
-                logger.warning(f"📉 [PLAY DECAY] {display_name}: {current_effectiveness} → {new_effectiveness} (decay: -{decay})")
-    
-    return updated_plays
+    if not isinstance(game_team_plays, dict) or not isinstance(ftd_plays, dict):
+        return {}
+
+    total_times_run = 0
+    times_by_storage_key: Dict[str, int] = {}
+    for storage_key, play_data, _display_name in iter_team_plays(game_team_plays):
+        if not isinstance(play_data, dict):
+            continue
+        gs = play_data.get("game_stats") or {}
+        if not isinstance(gs, dict):
+            continue
+        tr = int(gs.get("times_run", 0) or 0)
+        times_by_storage_key[storage_key] = tr
+        if tr > 0:
+            total_times_run += tr
+
+    set_doc: Dict[str, Any] = {}
+    for storage_key, play_data, display_name in iter_team_plays(game_team_plays):
+        if not isinstance(play_data, dict):
+            continue
+        tr = times_by_storage_key.get(storage_key, 0)
+        if total_times_run > 0:
+            decay = int(100.0 * float(tr) / float(total_times_run))
+        else:
+            decay = 0
+        ftd_row = ftd_plays.get(storage_key)
+        if not isinstance(ftd_row, dict):
+            logger.warning(
+                "📉 [EOG-PLAY-EFF] Skipping %s (storage_key=%s): no matching FTD play row",
+                display_name,
+                storage_key,
+            )
+            continue
+        try:
+            current_eff = int(ftd_row.get("effectiveness", 0) or 0)
+        except (TypeError, ValueError):
+            current_eff = 0
+        new_eff = max(0, current_eff - decay)
+        if new_eff != current_eff:
+            set_doc[f"plays.{storage_key}.effectiveness"] = new_eff
+            logger.warning(
+                "📉 [EOG-PLAY-EFF] %s: effectiveness %s → %s (times_run=%s total=%s decay=%s)",
+                display_name,
+                current_eff,
+                new_eff,
+                tr,
+                total_times_run,
+                decay,
+            )
+    return set_doc
 
 
 def _apply_pre_training_defense_decay(scouting_data: Dict) -> Dict:

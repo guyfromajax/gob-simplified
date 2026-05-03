@@ -46,7 +46,7 @@ Generated from a static trace of the FrontEnd codebase (Spring 2026). This is a 
 | `mode-select.html` | **New franchise confirm:** `#new-franchise-modal` (`.confirm-modal`). **Alpha disclaimer:** `#alpha-disclaimer` (slide-in panel; not a centered modal but blocking-style notice). |
 | `signup.html` | **Access request thanks:** `#access-request-modal-backdrop` + `.access-request-modal`. |
 | `game-plan.html` | **Validation:** `#validation-modal` (`#modal-message`, save errors via `showModal()` in `game-plan.js`). |
-| `playbooks.html` | **Generic confirm:** `#confirm-modal` (wired by `ConfirmModal` in `playbooks.js`—delete/reset flows). |
+| `playbooks.html` | **Save confirm:** `#save-confirm-modal` (post-save shot weights). Per-section **Even Distribution** controls and the old `#confirm-modal` confirm were removed from `playbooks.html` / `playbooks.js` (2026). |
 | `set-lineup.html` | **Playbook picker:** `#playbooks-modal` + `#playbooks-modal-backdrop`, `.lineup-modal-dialog`. |
 | `franchise-command-center.html` | **Loaders:** `#page-load-overlay`, `#cc-loading-overlay`. |
 | `tournament.html` | **Scouting report:** `#scouting-report-modal` (`.scouting-modal`). |

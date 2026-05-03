@@ -37,7 +37,12 @@ from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
 from BackEnd.utils.game_id_utils import generate_game_id
-from BackEnd.models.training_execution_v2 import TEAM_ATTR_CLAMPS, PLAYER_ATTR_CLAMP, parse_coaching_focus
+from BackEnd.models.training_execution_v2 import (
+    TEAM_ATTR_CLAMPS,
+    PLAYER_ATTR_CLAMP,
+    parse_coaching_focus,
+    build_eog_offensive_play_effectiveness_decay_ftd_updates,
+)
 from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
@@ -1387,6 +1392,27 @@ def update_team_attributes_after_game(
         away_oid, away_team_id, away_is_winner, away_totals, home_totals,
         away_scouting, home_scouting, away_team_obj, home_team_obj
     ) if away_oid else {}
+
+    def _persist_eog_offensive_play_effectiveness_decay(team_oid: ObjectId | None, team_plays: Any) -> None:
+        """Reduce FTD play CMD from this game's offensive playcall mix (EOG team-attributes pass)."""
+        if not team_oid:
+            return
+        gp = team_plays if isinstance(team_plays, dict) else {}
+        ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": franchise_id, "team_id": team_oid},
+            {"plays": 1},
+        )
+        if not ftd:
+            return
+        set_doc = build_eog_offensive_play_effectiveness_decay_ftd_updates(gp, ftd.get("plays") or {})
+        if set_doc:
+            franchise_team_data_collection.update_one(
+                {"franchise_id": franchise_id, "team_id": team_oid},
+                {"$set": set_doc},
+            )
+
+    _persist_eog_offensive_play_effectiveness_decay(home_oid, home_team_obj.get("plays"))
+    _persist_eog_offensive_play_effectiveness_decay(away_oid, away_team_obj.get("plays"))
     
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculated changes - home_changes keys: {list(home_changes.keys())}, away_changes keys: {list(away_changes.keys())}")
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Home changes sample: {dict(list(home_changes.items())[:3]) if home_changes else 'None'}")

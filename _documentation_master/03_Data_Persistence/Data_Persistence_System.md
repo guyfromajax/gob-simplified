@@ -1028,11 +1028,13 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Snapshot is built once from:
   - `teams[team_id].scouting` for FB/PT special-situations
   - `team_totals` (fallback: aggregated `box_score`) for totals-based metrics
-- `update_team_attributes_after_game()` now computes EOG attribute changes from `eog_inputs` only.
+- `update_team_attributes_after_game()` now computes EOG **team_attribute** changes from `eog_inputs` only.
+- The same function also applies **franchise FTD** updates to **`plays.*.effectiveness`** (offensive CMD) using each finished game’s **`times_run`** mix: decay points = `int(100 * play_times_run / sum_times_run)` per play, clamped against current FTD effectiveness (`training_execution_v2.build_eog_offensive_play_effectiveness_decay_ftd_updates`). This is independent of `eog_inputs` but runs in the same EOG persistence pass.
 
 **Files Changed:**
 - `BackEnd/eog_attr_rules.py` - `build_eog_inputs_from_game_doc(...)` canonical snapshot builder
-- `BackEnd/api/franchise_routes.py` - persists `games.eog_inputs` and uses it as the sole EOG calculation source
+- `BackEnd/api/franchise_routes.py` - persists `games.eog_inputs` and uses it as the sole EOG **team-attribute** calculation source; applies FTD offensive play CMD decay after attribute deltas
+- `BackEnd/models/training_execution_v2.py` - `build_eog_offensive_play_effectiveness_decay_ftd_updates`
 
 ### Quarter Scoring Canonical Sync ✅ **FIXED** (February 2026)
 

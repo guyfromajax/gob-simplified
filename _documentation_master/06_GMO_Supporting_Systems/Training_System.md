@@ -19,7 +19,7 @@ This document should reflect the current franchise training implementation in co
    - `GET /franchise/training-report` - Get training report data
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
 8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
-9. **Pre-Training Decay**: Plays/defenses with effectiveness > 0 reduced by `random.randint(5, 15)`
+9. **Pre-Training defense CMD decay**: Scouting defense rows with effectiveness > 0 reduced by `random.randint(5, 15)` before install training. **Offensive** play effectiveness is **not** decayed here; it is reduced at **EOG** from playcall share (see `End_Of_Game_System.md`).
 
 **Training System Flow (16 Steps)**
 
@@ -30,8 +30,8 @@ This document should reflect the current franchise training implementation in co
 5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/distant-cpu` (see **Training loading feed** below). Tournament/single-game modes still use their existing endpoints.
 6. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
-7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` then merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines and decay (same remap as gameplay).
-8. **Pre-Training Decay**: All plays/defenses with effectiveness > 0 reduced by 5-15 points (skipped for training camp: week 1 before first games)
+7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` then merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines and **defense-only** pre-training decay (same remap as gameplay).
+8. **Pre-Training defense decay**: Scouting defenses with effectiveness > 0 reduced by 5–15 points (skipped for training camp: week 1 before first games). Offensive play CMD is unchanged at this step.
 9. **Pre-Training Conditions**: Random decreases applied to player attributes (excluding EM, MO, NG); team attributes are no longer decayed here (skipped for training camp: week 1 before first games)
 10. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
 11. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
@@ -87,6 +87,33 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 **Long Form Documentation**
 
+**Table of contents** (Markdown anchor targets; slug style matches common renderers such as GitHub.)
+
+- [Training loading feed (franchise, between user and distant phases)](#training-loading-feed-franchise-between-user-and-distant-phases)
+- [Post-Training Camp Cut Flow](#post-training-camp-cut-flow)
+- [Training Page Layout](#training-page-layout)
+- [Slider Behavior](#slider-behavior)
+- [Coaching Focus Selection](#coaching-focus-selection)
+- [Submit Button Behavior](#submit-button-behavior)
+- [Auto-Train Button](#auto-train-button)
+- [Backend Training Execution System](#backend-training-execution-system)
+  - [Coaching focus string (API ↔ amplifiers)](#coaching-focus-string-api-amplifiers)
+  - [Community Engagement](#community-engagement-culture-builder-community)
+  - [Training Execution Flow](#training-execution-flow) — pre-training **defense** decay, **offense CMD** unchanged in training (EOG decay: `End_Of_Game_System.md`), install training, clamps, report deltas
+  - [Drill-to-Attribute Mapping](#drill-to-attribute-mapping)
+  - [Training Point Ranges](#training-point-ranges)
+  - [Coaching Focus Amplifiers](#coaching-focus-amplifiers)
+  - [Breaks Effect](#breaks-effect)
+  - [NG Reduction from Scrimmages and Conditioning](#ng-reduction-from-scrimmages-and-conditioning)
+- [Training Report Page](#training-report-page)
+  - [FCC Inbox](#fcc-inbox-training-report-shortcut), [Page Layout](#page-layout), [Recruiting summary](#recruiting-summary-franchise-only), [Training Focus Display Format](#training-focus-display-format), [Schedule Integration](#schedule-integration)
+- [Data Flow](#data-flow)
+- [Team ID Resolution](#team-id-resolution)
+- [Computer Team Training (Franchise Mode Only)](#computer-team-training-franchise-mode-only)
+- [Data Storage](#data-storage)
+- [Key Files](#key-files)
+- [Current Play / Report Identity Notes](#current-play--report-identity-notes)
+
 ### Training Page Layout
 
 **Desktop-only page** using a 4-column grid layout. All content fits above the fold at common desktop resolutions.
@@ -117,10 +144,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
   - Defense (Defense Install slider)
   - Presses / Traps (P/T Defense Install, P/T Offense Install sliders)
 - **Bottom of Team Drills Section:**
-  - Playbook Training Mode (radio buttons):
-    - Current Playbooks (default)
-    - All Plays / Even Distribution
-    - Custom
+  - Playbook training mode (**franchise**): toggle between **Current Playbooks** (default) and **Custom Playbook** (opens `training-playbooks.html` to choose plays/defenses for install CMD only). Tournament/single-game pages that still expose playbook mode may use the historical `playbook_training_mode` values from the API.
 
 **General Section (Full Width):**
 - Four sliders in a 4-column grid:
@@ -216,13 +240,13 @@ The training execution system applies pre-training conditions, allocates trainin
 
 **Postseason training freeze (franchise weeks 27-34):** Training is disabled during the EOS tournament window. This blocks user training, full training, and distant CPU-only training, so player anchor attributes, play effectiveness, and defense effectiveness do not change from training in weeks 27-34. Week 35 already stays outside the training loop because it is the postseason recruiting week. This freeze is implemented as a centralized postseason policy so it can be relaxed later for a smaller postseason training variant.
 
-**Defense scouting keys (before decay and baselines):** At the start of `execute_training`, `scouting_data["defense"]` is passed through `_remap_defense_scouting_keys_for_merge` (`BackEnd/models/team_manager.py`) so legacy row keys (display names such as `Man`, `2-3 Zone`, etc.) fold onto canonical half-court keys (`man`, `2-3-zone`, …), matching gameplay normalization. Defense install training only writes effectiveness to those canonical rows; baselines for `defenses_effectiveness_changes` and pre-training defense decay both use this normalized map.
+**Defense scouting keys (before defense decay and baselines):** At the start of `execute_training`, `scouting_data["defense"]` is passed through `_remap_defense_scouting_keys_for_merge` (`BackEnd/models/team_manager.py`) so legacy row keys (display names such as `Man`, `2-3 Zone`, etc.) fold onto canonical half-court keys (`man`, `2-3-zone`, …), matching gameplay normalization. Defense install training only writes effectiveness to those canonical rows; baselines for `defenses_effectiveness_changes` and pre-training **defense** decay both use this normalized map.
 
-0. **Pre-Training Effectiveness Decay** (`_apply_pre_training_effectiveness_decay`, `_apply_pre_training_defense_decay`)
-   - All plays and defenses with effectiveness > 0 are reduced by `random.randint(5, 15)`
+0. **Pre-Training defense effectiveness decay** (`_apply_pre_training_defense_decay` only)
+   - All **scouting defense** rows with effectiveness > 0 are reduced by `random.randint(5, 15)`
    - Minimum effectiveness is clamped to 0 (cannot be negative)
-   - This represents natural skill degradation between training sessions
-   - Original effectiveness values are tracked for change calculation (after the defense-key remap above for defense rows)
+   - **Offensive plays:** CMD is **not** reduced during training. Between games, franchise offensive play effectiveness is reduced at **EOG** from each play’s share of team `times_run` (see `End_Of_Game_System.md`).
+   - Original effectiveness values are captured **before** this step for the training report; play baselines therefore reflect pre-training values with **no** play-side random decay; defense baselines use post-remap, pre-decay values.
    - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
 
 1. **Pre-Training Conditions** (`apply_pre_training_conditions`)
@@ -589,12 +613,11 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
     - **Positive changes:** Green text with "+" prefix (e.g., "+10")
     - **Negative changes:** Red text with "-" prefix (e.g., "-5")
     - **Zero changes:** White text (e.g., "0")
-- **Pre-Training Effectiveness Decay:**
-  - Before applying training points, all plays and defenses with effectiveness > 0 are reduced by a random value between 5-15
-  - Minimum effectiveness value is 0 (cannot be negative)
-  - This decay represents natural skill degradation between training sessions
-  - The change indicator shows the net change from the original effectiveness (before decay) to the final effectiveness (after decay + training)
-  - **Note:** Pre-training depreciation is skipped for training camp in franchise mode - determined by `week == 1 and not results.get("1")`, so no skill degradation occurs before first games
+- **Effectiveness change indicator (Playbook Summary):**
+  - **Defense:** Original baseline is taken **before** pre-training random defense decay; the bar and delta reflect decay plus any install training on defenses.
+  - **Offense (motion/set):** Original baseline is **unchanged** at session start (no random play decay in training). Delta reflects **install training only** for that session. Longer-term CMD drift from game usage is applied at **EOG** (franchise), not on the training report.
+  - Minimum displayed effectiveness logic still clamps at 0 in the engine where applicable.
+  - **Training camp:** Pre-training **defense** decay is skipped when `week == 1 and not results.get("1")`, so no defense skill degradation before first games; offense still has no training-time decay.
 
 **Training Notes Section:**
 - Header: "Training Notes"
@@ -698,7 +721,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 **Current Behavior:**
 - **Automatic Execution**: From the **franchise training page**, distant training runs as soon as the client completes the user phase (second HTTP request). A **legacy** single POST still runs both in one server handler.
 - **Template-Based**: CPU teams pull a random template from the `distant_training` collection for `tc` or `regular` training type
-- **No Full User-Team Logic**: CPU teams do not run the same pre-training decay, drill-allocation, playbook-training, or report-generation flow as the user team
+- **No Full User-Team Logic**: CPU teams do not run the same pre-training **defense** decay, drill-allocation, playbook-training, or report-generation flow as the user team
 - **What Updates**:
   - team attributes on FTD
   - player attributes on FPD

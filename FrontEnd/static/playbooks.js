@@ -7,7 +7,6 @@
   ];
 
   const TARGET_SHOOTER_OPTIONS = ["PG", "SG", "SF", "PF", "C"];
-  const EVEN_DISTRIBUTION_WARNING_KEY = "playbooks.skipEvenDistributionWarning";
   const MAX_PC_ITEMS_PER_SIDE = 8;
   const SET_PLAY_FOCUS_ORDER = ["attack", "inside", "outside"];
   const TARGET_SHOOTER_ORDER = ["PG", "SG", "SF", "PF", "C"];
@@ -48,27 +47,6 @@
       result[item.id] = parseInteger(item.percentage, 0);
     });
     return result;
-  }
-
-  function distributeEvenly(items, { activeOnly = false } = {}) {
-    const eligible = activeOnly ? items.filter((item) => item.isActive !== false) : items.slice();
-    if (eligible.length === 0) {
-      return;
-    }
-
-    const base = Math.floor(100 / eligible.length);
-    let remainder = 100 - (base * eligible.length);
-
-    items.forEach((item) => {
-      item.percentage = activeOnly && item.isActive === false ? 0 : 0;
-    });
-
-    eligible.forEach((item) => {
-      item.percentage = base + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) {
-        remainder -= 1;
-      }
-    });
   }
 
   function normalizeMotionFocus(value) {
@@ -189,52 +167,6 @@
     `;
   }
 
-  class ConfirmModal {
-    constructor() {
-      this.root = document.getElementById("confirm-modal");
-      this.titleEl = document.getElementById("confirm-modal-title");
-      this.messageEl = document.getElementById("confirm-modal-message");
-      this.checkboxRow = document.getElementById("confirm-modal-checkbox-row");
-      this.checkbox = document.getElementById("confirm-modal-checkbox");
-      this.checkboxLabel = document.getElementById("confirm-modal-checkbox-label");
-      this.cancelBtn = document.getElementById("confirm-cancel-btn");
-      this.acceptBtn = document.getElementById("confirm-accept-btn");
-    }
-
-    open({
-      title,
-      message,
-      acceptLabel = "Confirm",
-      showCheckbox = false,
-      checkboxLabel = "Don't show this pop up again.",
-    }) {
-      this.titleEl.textContent = title;
-      this.messageEl.textContent = message;
-      this.acceptBtn.textContent = acceptLabel;
-      this.checkbox.checked = false;
-      this.checkboxRow.style.display = showCheckbox ? "flex" : "none";
-      this.checkboxLabel.textContent = checkboxLabel;
-      this.root.classList.remove("hidden");
-      this.root.setAttribute("aria-hidden", "false");
-
-      return new Promise((resolve) => {
-        const close = (result) => {
-          this.root.classList.add("hidden");
-          this.root.setAttribute("aria-hidden", "true");
-          this.cancelBtn.removeEventListener("click", onCancel);
-          this.acceptBtn.removeEventListener("click", onAccept);
-          resolve(result);
-        };
-
-        const onCancel = () => close({ confirmed: false, checked: this.checkbox.checked });
-        const onAccept = () => close({ confirmed: true, checked: this.checkbox.checked });
-
-        this.cancelBtn.addEventListener("click", onCancel, { once: true });
-        this.acceptBtn.addEventListener("click", onAccept, { once: true });
-      });
-    }
-  }
-
   class SaveConfirmModal {
     constructor() {
       this.root = document.getElementById('save-confirm-modal');
@@ -297,7 +229,6 @@
       this.toastTimer = null;
       this.toastHideTimer = null;
       this.dragContext = null;
-      this.modal = new ConfirmModal();
       this.saveConfirmModal = new SaveConfirmModal();
       this.draftStorageKey = this.buildDraftStorageKey();
       this.draftRestoreFlagKey = this.buildDraftRestoreFlagKey();
@@ -305,13 +236,7 @@
       this.elements = {
         saveBtn: document.getElementById("save-btn"),
         backBtn: document.getElementById("back-btn"),
-        evenAllBtn: document.getElementById("even-all-btn"),
         sectionsReadyIndicator: document.getElementById("sections-ready-indicator"),
-        motionEvenBtn: document.getElementById("motion-even-btn"),
-        setPlaysEvenBtn: document.getElementById("set-plays-even-btn"),
-        manDefenseEvenBtn: document.getElementById("man-defense-even-btn"),
-        zoneDefenseEvenBtn: document.getElementById("zone-defense-even-btn"),
-        fastBreaksEvenBtn: document.getElementById("fast-breaks-even-btn"),
         toast: document.getElementById("toast"),
         motionRows: document.getElementById("motion-rows"),
         setPlaysRows: document.getElementById("set-plays-rows"),
@@ -447,7 +372,6 @@
         }
       });
       if (this.elements.saveBtn) this.elements.saveBtn.hidden = true;
-      if (this.elements.evenAllBtn) this.elements.evenAllBtn.hidden = true;
       if (this.elements.sectionsReadyIndicator) this.elements.sectionsReadyIndicator.hidden = true;
     }
 
@@ -457,12 +381,6 @@
         this.handleBack();
       });
       this.elements.saveBtn.addEventListener("click", () => this.handleSave());
-      this.elements.evenAllBtn?.addEventListener("click", () => this.handleEvenDistributionAll());
-      this.elements.motionEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("motion"));
-      this.elements.setPlaysEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("setPlays"));
-      this.elements.manDefenseEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("manDefense"));
-      this.elements.zoneDefenseEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("zoneDefense"));
-      this.elements.fastBreaksEvenBtn?.addEventListener("click", () => this.handleEvenDistributionSection("fastBreaks"));
       document.querySelectorAll(".sort-btn").forEach((button) => {
         button.addEventListener("click", () => {
           playSound("click-tiny.wav");
@@ -1019,47 +937,6 @@
         this.elements.sectionsReadyIndicator.classList.toggle("invalid", !allValid);
       }
       this.elements.saveBtn.disabled = !allValid;
-    }
-
-    handleEvenDistributionSection(sectionKey) {
-      playSound("click-tiny.wav");
-      if (sectionKey === "motion") {
-        distributeEvenly(this.state.motion);
-      } else if (sectionKey === "setPlays") {
-        distributeEvenly(this.state.setPlays);
-      } else if (sectionKey === "fastBreaks") {
-        distributeEvenly(this.state.fastBreaks);
-      } else if (sectionKey === "manDefense") {
-        distributeEvenly(this.state.manDefense, { activeOnly: true });
-      } else if (sectionKey === "zoneDefense") {
-        distributeEvenly(this.state.zoneDefense);
-      }
-      this.state.evenDistributionAll = false;
-      this.render();
-    }
-
-    async handleEvenDistributionAll() {
-      const skipWarning = window.localStorage.getItem(EVEN_DISTRIBUTION_WARNING_KEY) === "1";
-      if (!skipWarning) {
-        const result = await this.modal.open({
-          title: "Even Distribution - All",
-          message: "this will change all %s -- your previous settings will be lost",
-          acceptLabel: "Save Anyway",
-          showCheckbox: true,
-        });
-        if (!result.confirmed) return;
-        if (result.checked) {
-          window.localStorage.setItem(EVEN_DISTRIBUTION_WARNING_KEY, "1");
-        }
-      }
-
-      distributeEvenly(this.state.motion);
-      distributeEvenly(this.state.setPlays);
-      distributeEvenly(this.state.fastBreaks);
-      distributeEvenly(this.state.manDefense, { activeOnly: true });
-      distributeEvenly(this.state.zoneDefense);
-      this.state.evenDistributionAll = true;
-      this.render();
     }
 
     async handleSave() {

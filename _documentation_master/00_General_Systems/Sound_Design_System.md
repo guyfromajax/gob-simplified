@@ -98,7 +98,6 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
 | Save Playbooks | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/playbooks.js` — `handleSubmit()` start |
-| Even Distribution (on/off) | click-handgun | `click-handgun.mp3` | `playbooks.js` — `handleEvenDistribution()`, `handleEvenDistributionAll()` |
 | Playcall Center slot buttons (1–6) | click-tiny | `click-tiny.wav` | `playbooks.js` — `handleSlotClick()` |
 | Percentage spinner up/down | click-tiny | `click-tiny.wav` | `playbooks.js` — percentage input `input` when delta ±1 |
 | Percentage manual entry (commit) | click-soft | `click-soft.mp3` | `playbooks.js` — percentage input `change` |

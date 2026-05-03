@@ -182,6 +182,27 @@ body.tp-page {
   box-shadow: 0 0 0 1px rgba(247, 148, 32, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.tp-card.is-disabled {
+  position: relative;
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+.tp-card.is-disabled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(11, 13, 20, 0.58);
+  pointer-events: none;
+}
+
+.tp-card.is-disabled:focus {
+  outline: none;
+}
+
 .tp-card-top {
   display: flex;
   align-items: baseline;
