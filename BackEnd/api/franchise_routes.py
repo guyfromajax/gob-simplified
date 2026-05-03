@@ -2501,7 +2501,10 @@ def _resolve_complete_week_week_games(franchise_doc: dict, req: CompleteWeekRequ
     eos_current_round = None
     week_games_meta = None
     if req.week in ft.EOS_WEEKS and eos_active:
-        week_games_meta = ft.get_eos_week_games(franchise_doc, req.week)
+        # Full calendar slate for this EOS week (including matchups that already have a bracket winner).
+        # Must match results[week] row count after phase A; omitting completed slots caused dedup vs
+        # expected_matchups mismatch and phase-b HTTP 500.
+        week_games_meta = ft.get_eos_week_games(franchise_doc, req.week, include_completed=True)
         week_games = [(g["away_id"], g["home_id"]) for g in week_games_meta]
         eos_current_round = (
             req.week - 26
@@ -2562,9 +2565,7 @@ def _find_user_franchise_week_matchup_normalized_ids(
     for away_id, home_id in week_games:
         if str(away_id) == ut or str(home_id) == ut:
             return _normalize_team_id(str(away_id)), _normalize_team_id(str(home_id))
-    # After phase A persists EOS bracket winners, get_eos_week_games(..., include_completed=False)
-    # drops the user's completed matchup. Phase B still needs normalized (away, home) for the skip
-    # in _complete_week_finish_cpu_and_persist and for result keying.
+    # If week_games omits the user slot (legacy include_completed=False lists), fall back to saved rows.
     if week is not None and week in ft.EOS_WEEKS and saved_week_results:
         for r in saved_week_results:
             if not isinstance(r, dict):
@@ -4052,6 +4053,13 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
         persist_cpu_results_only=True,
     )
     out["idempotent"] = False
+    logger.info(
+        "[START-CPU-SIMS] complete franchise_id=%s week=%s results_count=%s week_matchups=%s",
+        req.franchise_id,
+        req.week,
+        out.get("results_count"),
+        len(week_games),
+    )
     return out
 
 

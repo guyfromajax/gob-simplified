@@ -78,10 +78,9 @@ function readLiveSearchParams() {
   return new URLSearchParams(window.location.search);
 }
 
-/** Milestone 2: first Q1 entry (pre-game quarter 0) kicks off parallel CPU week sims on the server. */
-function maybeFireFranchiseStartCpuSimsAtQ1Entry() {
+/** Milestone 2: first franchise play/sim for this week kicks off parallel CPU week sims (once per session). */
+function maybeFireFranchiseStartCpuSimsOncePerWeek() {
   if (mode !== 'franchise') return;
-  if (typeof quarter !== 'number' || quarter !== 0) return;
   const p = readLiveSearchParams();
   const fid = p.get('franchise_id') || franchiseId;
   if (!fid) return;
@@ -89,6 +88,13 @@ function maybeFireFranchiseStartCpuSimsAtQ1Entry() {
   if (Number.isNaN(w)) {
     console.warn('[BOOTGAME][start-cpu-sims] skipped: invalid or missing week in URL');
     return;
+  }
+  if (typeof console !== 'undefined' && console.info) {
+    console.info('[BOOTGAME][start-cpu-sims] schedule parallel CPU week sims', {
+      franchise_id: fid,
+      week: w,
+      quarter,
+    });
   }
   getOrStartFranchiseStartCpuSims({ franchise_id: fid, week: w }).catch((err) => {
     console.warn('[BOOTGAME][start-cpu-sims] non-fatal:', err);
@@ -2006,7 +2012,7 @@ async function handleButtonClick(animate) {
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
 
-  maybeFireFranchiseStartCpuSimsAtQ1Entry();
+  maybeFireFranchiseStartCpuSimsOncePerWeek();
 
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
   if (!gameId) {
@@ -2174,7 +2180,7 @@ async function handleSimQuarter() {
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
 
-  maybeFireFranchiseStartCpuSimsAtQ1Entry();
+  maybeFireFranchiseStartCpuSimsOncePerWeek();
 
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
@@ -2443,7 +2449,7 @@ async function handleSimFullGame() {
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
 
-  maybeFireFranchiseStartCpuSimsAtQ1Entry();
+  maybeFireFranchiseStartCpuSimsOncePerWeek();
 
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
