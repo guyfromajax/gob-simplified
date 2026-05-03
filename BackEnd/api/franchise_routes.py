@@ -1262,9 +1262,9 @@ def update_team_attributes_after_game(
         if treb > (opp_treb + 8):
             changes["rebound_modifier"] = random.randint(0, 5) / 100.0
         elif treb < (opp_treb - 8):
-            changes["rebound_modifier"] = -random.randint(10, 20) / 100.0
-        else:
             changes["rebound_modifier"] = -random.randint(5, 10) / 100.0
+        else:
+            changes["rebound_modifier"] = -random.randint(1, 5) / 100.0
         
         if offensive_play_count > 12:
             changes["offensive_efficiency"] = random.randint(-2, -1)

@@ -175,14 +175,14 @@ This is the team's intangible mindset when it comes to rebounding. Their overall
 - Initial seed: Franchise init / missing-FTD creation (`0.2` fixed).
 - Faucet: Training System / Rebounding drill.
   Condition: `rebounding` slider contributes rounded effective points.
-  Range: `1-2 slider pts -> +0.00 to +0.03`, `3-4 -> +0.03 to +0.07`, `5 -> +0.04 to +0.10`.
+  Range: `1-2 effective pts -> +0.01 to +0.05`, `3-4 -> +0.04 to +0.08`, `5+ -> +0.06 to +0.10`.
 - Faucet + Sink: Training System / Scrimmages.
   Condition: scrimmages contributes rounded effective points.
-  Range: `1-2 slider pts -> -0.03 to +0.03`, `3-4 -> +0.02 to +0.05`, `5 -> +0.03 to +0.07`.
+  Range: `1-2 effective pts -> +0.00 to +0.03`, `3-4 -> +0.03 to +0.05`, `5+ -> +0.04 to +0.07`.
 - Faucet + Sink: End Of Game System.
   Condition: compare team TREB to opponent TREB.
   <!-- Range: `> opp + 5 -> +0.00 to +0.10`, `< opp - 5 -> -0.10 to +0.00`, otherwise `-0.05 to +0.05`. -->
-  Range: `> opp + 8 -> +0.00 to +0.05`, `< opp - 8 -> -0.20 to -0.10`, otherwise `-0.10 to -0.05`.
+  Range: `> opp + 8 -> +0.00 to +0.05`, `< opp - 8 -> -0.10 to -0.05`, otherwise `-0.05 to -0.01`.
 
 ### Offense Efficiency (`offensive_efficiency`) (range: -10 to 10)
 This is how well your team executes the Xs & Os of your offense — running plays, setting screens, making reads, and getting open. This affects how cleanly your offense operates as a unit, independent of raw talent. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and offense-focused training activities.

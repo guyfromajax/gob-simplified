@@ -366,14 +366,14 @@ Traning Camp Height / Weight bonsuses
   `0 -> -3 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`
 
 **Rebound Modifier (Technical Drills - in 0.01 increments):**
-- `1-2 points -> +0.00 to +0.03`
-- `3-4 points -> +0.03 to +0.07`
-- `5 points -> +0.04 to +0.10`
+- `1-2 points -> +0.01 to +0.05`
+- `3-4 points -> +0.04 to +0.08`
+- `5+ points -> +0.06 to +0.10`
 
 **Rebound Modifier (Scrimmages - in 0.01 increments):**
-- `1-2 points -> -0.03 to +0.03`
-- `3-4 points -> +0.02 to +0.05`
-- `5 points -> +0.03 to +0.07`
+- `1-2 points -> +0.00 to +0.03`
+- `3-4 points -> +0.03 to +0.05`
+- `5+ points -> +0.04 to +0.07`
 
 **Shot Threshold:**
 - 0 points: `+= random.randint(10, 20)`

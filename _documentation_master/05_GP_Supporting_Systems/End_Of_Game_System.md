@@ -67,8 +67,8 @@ Team attributes will adjust at the end of game based on the notes below. Note th
     - **Losing team:** += random.randint(-3, -1).
   - `rebound_modifier` (winning and losing team have same criteria)
     - if team TREB for the game > opponents TREB for the game + 8: += `0.00 to 0.05`
-    - elif TREB for the game < opponents TREB for the game - 8: += `-0.20 to -0.10`
-    - else: += `-0.10 to -0.05`
+    - elif TREB for the game < opponents TREB for the game - 8: += `-0.10 to -0.05`
+    - else: += `-0.05 to -0.01`
   - `offensive_efficiency` (winning and losing team have same criteria)
     - Uses offensive play diversity from the completed game's play-usage snapshot.
     - If total offensive plays used > 12: `+= random.randint(-2, -1)`

@@ -1354,32 +1354,32 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         source: "technical_drills" or "scrimmages" - determines which range to use
     
     Technical Drills ranges (in 0.01 increments).
-    - 1-2 points: +0.00 to +0.03
-    - 3-4 points: +0.03 to +0.07
-    - 5 points: +0.04 to +0.10
+    - 1-2 points: +0.01 to +0.05
+    - 3-4 points: +0.04 to +0.08
+    - 5+ points: +0.06 to +0.10
 
     Scrimmages ranges (in 0.01 increments).
-    - 1-2 points: -0.03 to +0.03
-    - 3-4 points: +0.02 to +0.05
-    - 5 points: +0.03 to +0.07
+    - 1-2 points: +0.00 to +0.03
+    - 3-4 points: +0.03 to +0.05
+    - 5+ points: +0.04 to +0.07
     """
     # Get base increase based on source and points
     if source == "technical_drills":
         if points in (1, 2):
-            increase = random.randint(0, 3) / 100.0
+            increase = random.randint(1, 5) / 100.0
         elif points in (3, 4):
-            increase = random.randint(3, 7) / 100.0
+            increase = random.randint(4, 8) / 100.0
         elif points >= 5:
-            increase = random.randint(4, 10) / 100.0
+            increase = random.randint(6, 10) / 100.0
         else:
             increase = 0.0
     else:  # scrimmages
         if points in (1, 2):
-            increase = random.randint(-3, 3) / 100.0
+            increase = random.randint(0, 3) / 100.0
         elif points in (3, 4):
-            increase = random.randint(2, 5) / 100.0
+            increase = random.randint(3, 5) / 100.0
         elif points >= 5:
-            increase = random.randint(3, 7) / 100.0
+            increase = random.randint(4, 7) / 100.0
         else:
             increase = 0.0
     
