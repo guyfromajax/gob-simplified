@@ -214,6 +214,8 @@ The training execution system applies pre-training conditions, allocates trainin
 
 #### Training Execution Flow
 
+**Postseason training freeze (franchise weeks 27-34):** Training is disabled during the EOS tournament window. This blocks user training, full training, and distant CPU-only training, so player anchor attributes, play effectiveness, and defense effectiveness do not change from training in weeks 27-34. Week 35 already stays outside the training loop because it is the postseason recruiting week. This freeze is implemented as a centralized postseason policy so it can be relaxed later for a smaller postseason training variant.
+
 **Defense scouting keys (before decay and baselines):** At the start of `execute_training`, `scouting_data["defense"]` is passed through `_remap_defense_scouting_keys_for_merge` (`BackEnd/models/team_manager.py`) so legacy row keys (display names such as `Man`, `2-3 Zone`, etc.) fold onto canonical half-court keys (`man`, `2-3-zone`, …), matching gameplay normalization. Defense install training only writes effectiveness to those canonical rows; baselines for `defenses_effectiveness_changes` and pre-training defense decay both use this normalized map.
 
 0. **Pre-Training Effectiveness Decay** (`_apply_pre_training_effectiveness_decay`, `_apply_pre_training_defense_decay`)

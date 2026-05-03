@@ -93,6 +93,23 @@ WEEK_35_RECRUITING_POINTS_BUDGET = 20
 SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
 RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
 RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
+POSTSEASON_TRAINING_DISABLED_WEEKS = range(27, 35)
+POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS = range(27, 35)
+
+
+def _week_in_policy_range(week: Any, policy_weeks: range) -> bool:
+    try:
+        return int(week) in policy_weeks
+    except (TypeError, ValueError):
+        return False
+
+
+def _postseason_training_disabled_for_week(week: Any) -> bool:
+    return _week_in_policy_range(week, POSTSEASON_TRAINING_DISABLED_WEEKS)
+
+
+def _postseason_eog_team_attrs_disabled_for_week(week: Any) -> bool:
+    return _week_in_policy_range(week, POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS)
 
 
 def _mint_season_transition_token() -> str:
@@ -873,6 +890,7 @@ def _finalize_team_attributes_for_game(
     loser_id: str,
     winner_score: int,
     loser_score: int,
+    week: int | None = None,
 ) -> None:
     """
     Run update_team_attributes_after_game once for this game and persist
@@ -881,10 +899,20 @@ def _finalize_team_attributes_for_game(
     """
     try:
         gid = game_id
+        game_id_str = str(game_id) if not isinstance(game_id, str) else game_id
+        if _postseason_eog_team_attrs_disabled_for_week(week):
+            logger.warning(
+                "🧊 [EOG-POSTSEASON-FREEZE] Skipping team attribute updates for game_id=%s week=%s; writing empty team_attribute_changes",
+                str(game_id),
+                str(week),
+            )
+            _set_team_attribute_changes_on_game(game_id_str, {})
+            return
         logger.warning(
-            "🧭 [EOG-CALL-SITE] About to call update_team_attributes_after_game game_id=%s gid=%s franchise_id=%s home=%s away=%s winner=%s loser=%s",
+            "🧭 [EOG-CALL-SITE] About to call update_team_attributes_after_game game_id=%s gid=%s week=%s franchise_id=%s home=%s away=%s winner=%s loser=%s",
             str(game_id),
             str(gid),
+            str(week),
             str(franchise_id),
             str(home_team_id),
             str(away_team_id),
@@ -908,7 +936,6 @@ def _finalize_team_attributes_for_game(
             list((attribute_changes or {}).keys()),
         )
         tac = attribute_changes if attribute_changes else {}
-        game_id_str = str(game_id) if not isinstance(game_id, str) else game_id
         _set_team_attribute_changes_on_game(game_id_str, tac)
     except Exception as e:
         logger.error(f"❌ [FINALIZE-TEAM-ATTRS] Error for game_id={game_id}: {e}")
@@ -1910,6 +1937,7 @@ def _persist_distant_franchise_game(
         loser_id=loser_id,
         winner_score=winner_score,
         loser_score=loser_score,
+        week=week,
     )
 
     sim_res = _save_game_result(
@@ -2383,6 +2411,7 @@ def save_result(req: FranchiseResultRequest):
         loser_id=loser_id,
         winner_score=winner_score,
         loser_score=loser_score,
+        week=req.week,
     )
 
     return {"status": "success"}
@@ -2927,6 +2956,7 @@ def _complete_week_process_user_game_block(
             loser_id=loser_id,
             winner_score=winner_score,
             loser_score=loser_score,
+            week=req.week,
         )
         season_inbox = list(franchise_doc.get("season_inbox") or [])
         game_doc_for_inbox = summary if isinstance(summary, dict) else {}
@@ -3015,6 +3045,7 @@ def _complete_week_process_user_game_block(
                     loser_id=loser_id,
                     winner_score=winner_score,
                     loser_score=loser_score,
+                    week=req.week,
                 )
                 season_inbox = list(franchise_doc.get("season_inbox") or [])
                 inbox_entry = _build_franchise_game_inbox_entry(
@@ -3742,6 +3773,7 @@ def _complete_week_finish_cpu_and_persist(
                 loser_id=loser_id_str,
                 winner_score=ws,
                 loser_score=ls,
+                week=week,
             )
             if week_games_meta and job_idx < len(week_games_meta):
                 g = week_games_meta[job_idx]
@@ -4009,10 +4041,22 @@ def complete_week_phase_a(req: CompleteWeekRequest):
         "post_game_status.community_highlight_pending": ch_pending,
     }
     if req.week in ft.EOS_WEEKS:
-        for _eos_key in ("conference_tournaments", "region_tournaments", "national_tournament"):
-            _eos_val = franchise_doc.get(_eos_key)
-            if _eos_val is not None:
-                phase_a_fields[_eos_key] = _eos_val
+        # Re-read EOS blobs so ``start-cpu-sims`` (or any concurrent writer) is not clobbered by
+        # ``franchise_doc`` loaded at the start of this request; merge in-memory user bracket edits.
+        fresh_eos = db.franchises.find_one(
+            {"_id": franchise_id},
+            {
+                "conference_tournaments": 1,
+                "region_tournaments": 1,
+                "national_tournament": 1,
+            },
+        ) or {}
+        merged_eos = ft.merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
+            fresh_eos,
+            franchise_doc,
+        )
+        for _eos_key, _eos_val in merged_eos.items():
+            phase_a_fields[_eos_key] = _eos_val
 
     db.franchises.update_one(
         {"_id": franchise_id},
@@ -4574,6 +4618,8 @@ def command_center_data(
             eos_status.get("eliminated_from_current_phase", False)
         ) if eos_status else False
         response["training_disabled_for_eos"] = training_disabled_for_eos
+        response["training_disabled_for_postseason"] = _postseason_training_disabled_for_week(week)
+        response["eog_team_attrs_frozen_for_postseason"] = _postseason_eog_team_attrs_disabled_for_week(week)
         user_eliminated = training_disabled_for_eos
         tournament_complete = bool(national_tournament.get("champion")) if national_tournament else False
         user_has_bye = bool(eos_status.get("has_bye_this_week", False)) if eos_status else False
@@ -8078,6 +8124,12 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
     results = franchise_doc.get("results", {})
     is_first_training = (week == 1 and not results.get("1"))
 
+    if _postseason_training_disabled_for_week(week):
+        raise HTTPException(
+            status_code=400,
+            detail="Training is disabled during postseason tournament weeks.",
+        )
+
     if franchise_training_fully_complete_for_week(training_status, week):
         user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         redirect_team_id = user_team_object_id if user_team_object_id else None
@@ -8384,6 +8436,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     except (TypeError, ValueError):
         week = 1
     results = franchise_doc.get("results", {})
+
+    if _postseason_training_disabled_for_week(week):
+        raise HTTPException(
+            status_code=400,
+            detail="Training is disabled during postseason tournament weeks.",
+        )
     
     # Check if it's first training (training camp) - week 1 and no results yet
     is_first_training = (week == 1 and not results.get("1"))

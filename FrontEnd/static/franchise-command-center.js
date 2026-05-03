@@ -2976,6 +2976,7 @@ function updatePlayButton(data) {
   const eosTournament = data.eos_tournament;
   const week = data.week || 1;
   const trainingDisabledForEos = !!data.training_disabled_for_eos;
+  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason;
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
   const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
   
@@ -3010,6 +3011,9 @@ function updatePlayButton(data) {
   } else if (showSimRest && eosTournamentActive) {
     playNowBtn.textContent = 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
+  } else if (trainingDisabledForPostseason && eosTournamentActive && !eliminated) {
+    playNowBtn.textContent = 'Play Next Game';
+    playNowBtn.dataset.mode = 'play';
   } else if (trainingDisabledForEos || eliminated) {
     playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
@@ -3112,7 +3116,7 @@ playNowBtn.addEventListener('click', async () => {
   
   if (mode === 'training') {
     const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-    if (topData?.training_disabled_for_eos) {
+    if (topData?.training_disabled_for_eos || topData?.training_disabled_for_postseason) {
       return;
     }
     const sessionType = topData?.session_type || 'in-season';

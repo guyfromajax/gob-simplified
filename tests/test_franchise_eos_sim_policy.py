@@ -1,9 +1,12 @@
+from bson import ObjectId
+
 from BackEnd.api import franchise_routes
 from BackEnd.api.franchise_routes import (
     _get_user_eos_phase_status,
     _save_user_eos_bracket_result,
     _should_use_tbt_for_eos_game,
 )
+from BackEnd.tournament import franchise_tournament as ft
 
 
 def test_conference_weeks_only_user_conference_uses_tbt():
@@ -265,3 +268,100 @@ def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
     assert week_30_status["active_this_week"] is True
     assert week_30_status["has_bye_this_week"] is True
     assert week_30_status["eliminated_from_current_phase"] is False
+
+
+def test_merge_phase_a_eos_preserves_cpu_r1_winners_when_stale_bracket_missing_them():
+    """Regression: phase A must not $set conference_tournaments from a doc loaded before start-cpu-sims."""
+    th, ta, tb, tc, td, te, tf = (str(ObjectId()) for _ in range(7))
+    tw_user = str(ObjectId())
+    fresh_ct = {
+        "1": {
+            "current_round": 1,
+            "bracket": {
+                "round1": [
+                    {
+                        "home_team": th,
+                        "away_team": tw_user,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                    {
+                        "home_team": ta,
+                        "away_team": tb,
+                        "winner": ta,
+                        "game_id": "cpu-g1",
+                        "score": {"home": 70, "away": 65},
+                    },
+                    {
+                        "home_team": tc,
+                        "away_team": td,
+                        "winner": tc,
+                        "game_id": "cpu-g2",
+                        "score": {"home": 68, "away": 60},
+                    },
+                    {
+                        "home_team": te,
+                        "away_team": tf,
+                        "winner": te,
+                        "game_id": "cpu-g3",
+                        "score": {"home": 72, "away": 71},
+                    },
+                ],
+                "round2": [],
+                "final": [],
+            },
+        }
+    }
+    stale_ct = {
+        "1": {
+            "current_round": 1,
+            "bracket": {
+                "round1": [
+                    {
+                        "home_team": th,
+                        "away_team": tw_user,
+                        "winner": tw_user,
+                        "game_id": "",
+                        "score": {"home": 60, "away": 70},
+                    },
+                    {
+                        "home_team": ta,
+                        "away_team": tb,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                    {
+                        "home_team": tc,
+                        "away_team": td,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                    {
+                        "home_team": te,
+                        "away_team": tf,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                ],
+                "round2": [],
+                "final": [],
+            },
+        }
+    }
+    merged = ft.merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
+        {"conference_tournaments": fresh_ct},
+        {"conference_tournaments": stale_ct},
+    )
+    r1 = merged["conference_tournaments"]["1"]["bracket"]["round1"]
+    assert r1[0]["winner"] == tw_user
+    assert r1[0]["score"] == {"home": 60, "away": 70}
+    assert r1[1]["winner"] == ta
+    assert r1[1]["game_id"] == "cpu-g1"
+    assert r1[2]["winner"] == tc
+    assert r1[2]["game_id"] == "cpu-g2"
+    assert r1[3]["winner"] == te
+    assert r1[3]["game_id"] == "cpu-g3"

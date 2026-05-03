@@ -295,6 +295,13 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.
 - **Why this method:** Prevents source drift between `team_stats`, `teams.scouting`, and totals; keeps EOG deltas deterministic and aligned to final game state.
 
+### Postseason Team Attribute Freeze
+
+- **Franchise weeks 27-34:** EOG team attribute changes are frozen for EOS tournament games.
+- **Persistence rule:** The game doc still receives `team_attribute_changes: {}` for box score compatibility, but franchise team-data attributes are not mutated.
+- **Scope:** Game results, stats, inbox entries, and tournament bracket advancement still persist normally. In-game NG effects may still change live game state during play; the frozen values are the postgame anchor team attributes.
+- **Reversibility:** The freeze is controlled by a centralized postseason policy in `BackEnd/api/franchise_routes.py` so future postseason EOG team attribute changes can be re-enabled without rewriting the EOG formulas.
+
 ### EOG Persistence Guardrails (February 2026)
 
 - **Issue observed:** EOG logs showed `totals_source=none` and zero team totals/scouting during `complete-week`, causing incorrect deltas (for example PT/FB opponent modifiers and discipline).

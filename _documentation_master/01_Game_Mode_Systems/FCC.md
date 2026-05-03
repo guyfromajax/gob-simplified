@@ -138,10 +138,13 @@ The CTA logic depends on:
 - `eos_tournament_active`
 - `eos_tournament.completed`
 - `training_disabled_for_eos`
+- `training_disabled_for_postseason`
 - `user_eliminated`
 - `offer_sim_rest`
 - `cut_required`
 - `week`
+
+During franchise postseason weeks 27-34, `training_disabled_for_postseason` skips the normal Run Training CTA. If the user is still active and does not have a sim-rest/bye state, the primary CTA reads `Play Next Game`. Existing eliminated, bye, week 35 recruiting, and season rollover states keep priority.
 
 ---
 
@@ -937,6 +940,8 @@ Current response fields used by FCC include:
 - `eos_tournament`
 - `championship_summary`
 - `training_disabled_for_eos`
+- `training_disabled_for_postseason`
+- `eog_team_attrs_frozen_for_postseason`
 - `user_eliminated`
 - `offer_sim_rest`
 

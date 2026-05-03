@@ -11,6 +11,7 @@ Does not affect Tournament mode (standalone) tournaments.
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
 from bson import ObjectId
@@ -473,6 +474,146 @@ def save_conference_game_result(
         )
     ct["bracket"] = bracket
     conf_tournaments[key] = ct
+
+
+def _eos_matchup_pair_key(m: Any) -> tuple[str, str]:
+    if not isinstance(m, dict):
+        return ("", "")
+    h, a = m.get("home_team"), m.get("away_team")
+    return (str(h) if h is not None else "", str(a) if a is not None else "")
+
+
+def _merge_eos_round_matchup_lists(fresh_list: List[Any], stale_list: List[Any]) -> List[Any]:
+    """
+    Copy ``fresh_list`` matchup dicts; for any slot with no ``winner``, copy ``winner``,
+    ``game_id``, and ``score`` from the stale list slot with the same (home_team, away_team).
+
+    Used when phase A re-reads EOS blobs from Mongo after ``start-cpu-sims`` so CPU-written
+    winners are not overwritten by an in-memory franchise doc loaded before those writes.
+    """
+    stale_by_pair: Dict[tuple[str, str], Dict[str, Any]] = {}
+    for sm in stale_list or []:
+        if isinstance(sm, dict):
+            stale_by_pair.setdefault(_eos_matchup_pair_key(sm), sm)
+    out: List[Any] = []
+    for fm in fresh_list or []:
+        if not isinstance(fm, dict):
+            out.append(fm)
+            continue
+        m = deepcopy(fm)
+        if not m.get("winner"):
+            sm = stale_by_pair.get(_eos_matchup_pair_key(m))
+            if isinstance(sm, dict) and sm.get("winner"):
+                m["winner"] = sm.get("winner")
+                if "game_id" in sm:
+                    m["game_id"] = sm.get("game_id")
+                if sm.get("score") is not None:
+                    m["score"] = deepcopy(sm.get("score"))
+        out.append(m)
+    return out
+
+
+def _merge_bracket_round_dict(fresh_bracket: Dict[str, Any], stale_bracket: Dict[str, Any]) -> Dict[str, Any]:
+    out = deepcopy(fresh_bracket) if isinstance(fresh_bracket, dict) else {}
+    for rk in bracket_engine.ROUND_KEYS:
+        fl = out.get(rk)
+        if not isinstance(fl, list):
+            continue
+        sl = (stale_bracket or {}).get(rk) or []
+        out[rk] = _merge_eos_round_matchup_lists(fl, sl)
+    return out
+
+
+def _merge_one_conference_tournament_ct(f_ct: Dict[str, Any], s_ct: Dict[str, Any]) -> Dict[str, Any]:
+    out = deepcopy(f_ct)
+    fb = out.get("bracket") or {}
+    sb = (s_ct or {}).get("bracket") or {}
+    out["bracket"] = _merge_bracket_round_dict(fb, sb)
+    return out
+
+
+def merge_conference_tournaments_phase_a(fresh: Any, stale: Any) -> Dict[str, Any]:
+    if not isinstance(stale, dict):
+        return deepcopy(fresh) if isinstance(fresh, dict) else {}
+    if not isinstance(fresh, dict) or not fresh:
+        return deepcopy(stale)
+    out = deepcopy(fresh)
+    for key_raw, s_ct in stale.items():
+        if not isinstance(s_ct, dict):
+            continue
+        try:
+            ks = str(int(str(key_raw)))
+        except (TypeError, ValueError):
+            ks = str(key_raw)
+        f_ct = out.get(ks) or out.get(key_raw)
+        if not isinstance(f_ct, dict):
+            out[ks] = deepcopy(s_ct)
+            continue
+        out[ks] = _merge_one_conference_tournament_ct(f_ct, s_ct)
+    return out
+
+
+def merge_region_tournaments_phase_a(fresh: Any, stale: Any) -> Dict[str, Any]:
+    if not isinstance(stale, dict):
+        return deepcopy(fresh) if isinstance(fresh, dict) else {}
+    if not isinstance(fresh, dict) or not fresh:
+        return deepcopy(stale)
+    out = deepcopy(fresh)
+    for region_key, s_rt in stale.items():
+        if not isinstance(s_rt, dict):
+            continue
+        f_rt = out.get(region_key)
+        if not isinstance(f_rt, dict):
+            out[region_key] = deepcopy(s_rt)
+            continue
+        merged_rt = deepcopy(f_rt)
+        for rk in ("round1", "final"):
+            if rk in merged_rt and isinstance(merged_rt[rk], list):
+                sl = s_rt.get(rk) or []
+                merged_rt[rk] = _merge_eos_round_matchup_lists(merged_rt[rk], sl)
+        out[region_key] = merged_rt
+    return out
+
+
+def merge_national_tournament_phase_a(fresh: Any, stale: Any) -> Dict[str, Any]:
+    if not isinstance(stale, dict):
+        return deepcopy(fresh) if isinstance(fresh, dict) else {}
+    if not isinstance(fresh, dict) or not fresh:
+        return deepcopy(stale)
+    out = deepcopy(fresh)
+    fb = out.get("bracket") or {}
+    sb = stale.get("bracket") or {}
+    out["bracket"] = _merge_bracket_round_dict(fb, sb)
+    return out
+
+
+def merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
+    fresh_projection: Dict[str, Any],
+    stale_franchise_doc: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Reconcile EOS tournament blobs for ``complete_week`` phase A ``$set``.
+
+    ``fresh_projection`` should be a recent ``find_one`` on the franchise (CPU sims, etc.);
+    ``stale_franchise_doc`` is the in-memory doc after ``_complete_week_process_user_game_block``.
+    """
+    merged: Dict[str, Any] = {}
+    if not isinstance(fresh_projection, dict):
+        fresh_projection = {}
+    if not isinstance(stale_franchise_doc, dict):
+        stale_franchise_doc = {}
+    for key in ("conference_tournaments", "region_tournaments", "national_tournament"):
+        stale_val = stale_franchise_doc.get(key)
+        if stale_val is None:
+            continue
+        fresh_val = fresh_projection.get(key)
+        if key == "conference_tournaments":
+            merged[key] = merge_conference_tournaments_phase_a(fresh_val, stale_val)
+        elif key == "region_tournaments":
+            merged[key] = merge_region_tournaments_phase_a(fresh_val, stale_val)
+        else:
+            merged[key] = merge_national_tournament_phase_a(fresh_val, stale_val)
+    return merged
 
 
 def log_eos_conference_bracket_snapshot(franchise_doc: Dict[str, Any], label: str) -> None:
