@@ -1247,9 +1247,9 @@ def update_team_attributes_after_game(
         else:
             changes["discipline"] = random.randint(-1, 0)
         
-        # fight: winning +(0, 1), losing +(−3 to −1)
+        # fight: winning −1..+1, losing −3..−1
         if is_winner:
-            changes["fight"] = random.randint(0, 1)
+            changes["fight"] = random.randint(-1, 1)
         else:
             changes["fight"] = random.randint(-3, -1)
         

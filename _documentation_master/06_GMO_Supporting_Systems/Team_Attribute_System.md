@@ -255,7 +255,7 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet: Training System / Strength + Conditioning.
   Condition: strength and conditioning contribute positive rounded effective points.
-  Range: standard team-attr training range after rounding: `0 -> -3 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +2 to +5`, `4 -> +2 to +6`, `5 -> +2 to +7`.
+  Range (shared fight/discipline bucket table after 0.5× accrual rounds): `0 -> -4 to -3`, `1 -> -3 to -1`, `2 -> -1 to +1`, `3 -> +1 to +2`, `4 -> +2 to +3`, `5+ -> +2 to +4`.
 - Sink: Training System / Breaks.
   Condition: `breaks` slider at `4` or `5`.
   Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
@@ -263,7 +263,7 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
   If the user chooses any of the Culture Builder:  Range: `0 to +1`
 - Faucet: End Of Game System.
   Condition: team won the game.
-  Range: `0 to +1`.
+  Range: `-1 to +1`.
 - Sink: End Of Game System.
   Condition: team lost the game.
   Range: `-3 to -1`.
@@ -273,8 +273,8 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
 
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet: Training System / Inside Defense, Outside Defense, Passing, Ball Handling.
-  Condition: those drills contribute positive rounded effective points.
-  Range: standard team-attr training range after rounding: `0 -> -3 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +2 to +5`, `4 -> +2 to +6`, `5 -> +2 to +7`.
+  Condition: those drills contribute positive rounded effective points (0.25× per drill point, summed, half-up).
+  Range: same bucket table as **Fight** after rounding: `0 -> -4 to -3`, `1 -> -3 to -1`, `2 -> -1 to +1`, `3 -> +1 to +2`, `4 -> +2 to +3`, `5+ -> +2 to +4`.
 - Sink: Training System / Breaks.
   Condition: `breaks` slider at `4` or `5`.
   Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.

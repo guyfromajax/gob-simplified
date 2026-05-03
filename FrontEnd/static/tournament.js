@@ -2315,7 +2315,7 @@ function createPlayRow(playName, playData, change, players = []) {
   const metricsContainer = document.createElement('div');
   metricsContainer.className = 'playbook-metrics-container';
   
-  // Command (Effectiveness) - Blue, 0-100 scale
+  // Command metric - Blue, 0-100 scale
   const commandMetric = createMetricBar('Command', effectiveness, 100, '#4a90e2', null);
   metricsContainer.appendChild(commandMetric);
   
@@ -2408,7 +2408,7 @@ function createMetricBar(title, value, maxValue, color, change) {
   progressContainer.appendChild(progressBar);
   metricDiv.appendChild(progressContainer);
   
-  // Change indicator (only for Command/Effectiveness)
+  // Change indicator (only for Command)
   if (change !== null && change !== undefined) {
     const changeDiv = document.createElement('div');
     changeDiv.className = 'playbook-change';

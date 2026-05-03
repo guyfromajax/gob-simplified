@@ -1291,6 +1291,8 @@ def _normalize_allocations(allocations: Dict) -> Dict:
 def _apply_team_training_points(team: dict, team_attr: str, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to a team attribute.
+
+    `fight` and `discipline` share the same point-bucket → delta table (`fight_discipline_training_ranges`).
     """
     if team_attr not in TEAM_ATTR_CLAMPS:
         return
@@ -1303,13 +1305,14 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         4: (3, 6),
         5: (3, 7),
     }
-    discipline_fight_ranges = {
-        0: (-3, -1),
-        1: (1, 2),
-        2: (2, 3),
-        3: (2, 5),
-        4: (2, 6),
-        5: (2, 7),
+    # Shared by Strength+Conditioning → fight and defense/passing/BH → discipline.
+    fight_discipline_training_ranges = {
+        0: (-4, -3),
+        1: (-3, -1),
+        2: (-1, 1),
+        3: (1, 2),
+        4: (2, 3),
+        5: (2, 4),
     }
     chemistry_ranges = {
         0: (-3, -1),
@@ -1320,8 +1323,8 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         5: (3, 7),
     }
 
-    if team_attr in {"fight", "discipline"}:
-        ranges = discipline_fight_ranges
+    if team_attr in ("fight", "discipline"):
+        ranges = fight_discipline_training_ranges
     elif team_attr == "team_chemistry":
         ranges = chemistry_ranges
     else:

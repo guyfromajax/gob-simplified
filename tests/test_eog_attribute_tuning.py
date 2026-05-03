@@ -157,7 +157,7 @@ def test_eog_attribute_tuning_ranges_applied(monkeypatch):
     # Winner paths (random.randint patched to low end `a`; snapshot from eog_inputs)
     assert home_changes["shot_threshold"] == -10
     assert home_changes["discipline"] == 0
-    assert home_changes["fight"] == 0
+    assert home_changes["fight"] == -1
     assert home_changes["rebound_modifier"] == 0.0
     assert home_changes["offensive_efficiency"] == -4
     assert home_changes["defensive_efficiency"] == -2

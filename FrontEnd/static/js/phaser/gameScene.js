@@ -1425,7 +1425,7 @@ export function createGameScene(Phaser) {
       const showPlayTooltip = (event, category, teamKey) => {
         const tooltip = document.getElementById('play-tooltip');
         const playNameEl = document.getElementById('tooltip-play-name');
-        const effectivenessEl = document.getElementById('tooltip-play-effectiveness');
+        const commandEl = document.getElementById('tooltip-play-command');
         
         if (!tooltip || !this.teamPlaysData) return;
         
@@ -1441,14 +1441,16 @@ export function createGameScene(Phaser) {
         const lastPlayByCategory = this.teamStatsData?.[teamName]?.offense?.last_play_by_category || {};
         const lastPlayName = lastPlayByCategory[category];
         
-        // Get effectiveness from plays data
+        // Get command score from plays data (API field: game_stats.effectiveness)
         const teamPlays = this.teamPlaysData[teamName] || [];
         const playData = teamPlays.find(p => p.name === lastPlayName);
-        const effectiveness = playData?.game_stats?.effectiveness ?? '--';
+        const commandScore = playData?.game_stats?.effectiveness ?? '--';
         
         // Update tooltip content
         playNameEl.textContent = lastPlayName || 'None';
-        effectivenessEl.textContent = effectiveness !== '--' ? `${effectiveness}` : '--';
+        if (commandEl) {
+          commandEl.textContent = commandScore !== '--' ? `${commandScore}` : '--';
+        }
         
         // Position and show tooltip
         tooltip.classList.add('visible');

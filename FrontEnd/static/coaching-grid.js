@@ -1,14 +1,14 @@
 // Coaching Grid JavaScript
-// Maps effectiveness (0-100) and momentum (0-10) to grid positions
+// Maps command score (0-100) and momentum (0-10) to grid positions
 
 /**
- * Convert effectiveness value (0-100) to Y coordinate percentage
+ * Convert command score (0-100) to Y coordinate percentage
  * 0 = bottom (100%), 100 = top (0%)
  * Midpoint (50) = center (50%)
  */
-function effectivenessToY(effectiveness) {
-  // Invert: higher effectiveness = higher on grid (lower Y percentage)
-  return 100 - effectiveness;
+function commandScoreToY(commandScore) {
+  // Invert: higher command score = higher on grid (lower Y percentage)
+  return 100 - commandScore;
 }
 
 /**
@@ -28,18 +28,18 @@ function positionDots() {
   const dots = document.querySelectorAll('.archetype-dot');
   
   dots.forEach(dot => {
-    const effectiveness = parseFloat(dot.dataset.effectiveness);
+    const commandScore = parseFloat(dot.dataset.command);
     const momentum = parseFloat(dot.dataset.momentum);
     
     // Convert to percentages
     const xPercent = momentumToX(momentum);
-    const yPercent = effectivenessToY(effectiveness);
+    const yPercent = commandScoreToY(commandScore);
     
     // Position the dot
     dot.style.left = `${xPercent}%`;
     dot.style.top = `${yPercent}%`;
     
-    console.log(`Positioned ${dot.dataset.archetype}: effectiveness=${effectiveness}, momentum=${momentum} -> (${xPercent}%, ${yPercent}%)`);
+    console.log(`Positioned ${dot.dataset.archetype}: command=${commandScore}, momentum=${momentum} -> (${xPercent}%, ${yPercent}%)`);
   });
 }
 

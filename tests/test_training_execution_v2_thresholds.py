@@ -60,7 +60,7 @@ def test_player_attr_range_point_5_sophomore(monkeypatch):
 def test_pre_training_decay_ranges_by_year():
     assert training._pre_training_decay_range_for_year("freshman") == (-5, -2)
     assert training._pre_training_decay_range_for_year("sophomore") == (-4, -1)
-    assert training._pre_training_decay_range_for_year("junior") == (-3, 0)
+    assert training._pre_training_decay_range_for_year("junior") == (-3, -1)
     assert training._pre_training_decay_range_for_year("senior") == (-2, 0)
 
 
@@ -135,7 +135,7 @@ def test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages
     assert shot_threshold_calls == [3]
 
 
-def test_team_attr_standard_ranges_match_documentation(monkeypatch):
+def test_fight_and_discipline_share_training_bucket_randint_pairs(monkeypatch):
     calls = []
 
     def fake_randint(a, b):
@@ -144,15 +144,17 @@ def test_team_attr_standard_ranges_match_documentation(monkeypatch):
 
     monkeypatch.setattr(training.random, "randint", fake_randint)
 
-    team = {"discipline": 0}
-    training._apply_team_training_points(team, "discipline", 0)
-    training._apply_team_training_points(team, "discipline", 1)
-    training._apply_team_training_points(team, "discipline", 2)
-    training._apply_team_training_points(team, "discipline", 3)
-    training._apply_team_training_points(team, "discipline", 4)
-    training._apply_team_training_points(team, "discipline", 5)
+    expected_pairs = [(-4, -3), (-3, -1), (-1, 1), (1, 2), (2, 3), (2, 4)]
 
-    assert calls == [(-2, 0), (1, 2), (2, 3), (2, 5), (2, 6), (2, 7)]
+    team_d = {"discipline": 0}
+    for bucket in range(6):
+        training._apply_team_training_points(team_d, "discipline", bucket)
+
+    team_f = {"fight": 0}
+    for bucket in range(6):
+        training._apply_team_training_points(team_f, "fight", bucket)
+
+    assert calls == expected_pairs * 2
 
 
 def test_training_gain_is_halved_when_player_starts_above_100(monkeypatch):

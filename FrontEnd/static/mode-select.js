@@ -7,7 +7,7 @@ function playSound(filename) {
 }
 
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
-const ALPHA_DISCLAIMER_VERSION = '2026-04-26-post-game-press-conference';
+const ALPHA_DISCLAIMER_VERSION = '2026-05-03-alpha-box';
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');

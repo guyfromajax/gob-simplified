@@ -497,7 +497,7 @@ function renderLineupPlaybooksModal(data) {
               <div class="lineup-playbook-card-pct">${escapeLineupPlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
             </div>
             <div class="lineup-playbook-card-meta">
-              <div class="lineup-playbook-card-eff ${getLineupPlaybookEffClass(item.effectiveness)}">${escapeLineupPlaybookHtml(`EFF: ${Number(item.effectiveness || 0)}`)}</div>
+              <div class="lineup-playbook-card-eff ${getLineupPlaybookEffClass(item.effectiveness)}">${escapeLineupPlaybookHtml(`CMD: ${Number(item.effectiveness || 0)}`)}</div>
               ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="lineup-playbook-card-top-scorer">${escapeLineupPlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
             </div>
           </article>
