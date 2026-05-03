@@ -484,6 +484,32 @@ def test_phase_a_then_phase_b_then_second_phase_b_is_idempotent():
     db.franchises.delete_many({})
 
 
+def test_eos_advance_conference_when_four_r1_winners_and_round2_empty():
+    """Stuck R1 (repair) + empty R2: advance_conference_bracket must build semis."""
+    from BackEnd.api import franchise_routes
+
+    ids = [str(ObjectId()) for _ in range(8)]
+    r1 = [
+        {"home_team": ids[0], "away_team": ids[1], "winner": ids[0], "game_id": "g0", "score": {}},
+        {"home_team": ids[2], "away_team": ids[3], "winner": ids[2], "game_id": "g1", "score": {}},
+        {"home_team": ids[4], "away_team": ids[5], "winner": ids[4], "game_id": "g2", "score": {}},
+        {"home_team": ids[6], "away_team": ids[7], "winner": ids[6], "game_id": "g3", "score": {}},
+    ]
+    doc = {
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {"round1": r1, "round2": [], "final": []},
+            }
+        }
+    }
+    n = franchise_routes._eos_advance_conference_brackets_if_round1_complete(doc)
+    assert n == 1
+    br = doc["conference_tournaments"]["1"]["bracket"]
+    assert len(br.get("round2") or []) == 2
+    assert int(doc["conference_tournaments"]["1"]["current_round"]) == 2
+
+
 def test_phase_b_http_idempotent_when_franchise_week_already_advanced(caplog):
     """Second phase-B style call after week advance: HTTP 200, idempotent, no CPU work."""
     db.franchises.delete_many({})
