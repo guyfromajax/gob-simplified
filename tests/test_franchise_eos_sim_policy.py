@@ -115,6 +115,88 @@ def test_user_eos_bracket_result_persists_without_game_id():
     assert matchup["game_id"] == ""
 
 
+def test_save_user_eos_bracket_falls_back_to_playable_meta_when_calendar_final_empty():
+    """Regression: franchise week 29 + current_round 2 + empty final → calendar meta has no row;
+    playable meta (include_completed=False) still lists the open semifinal."""
+    uid_user = "eeeeeeeeeeeeeeeeeeeeeeee"
+    uid_opp = "ffffffffffffffffffffffff"
+    t_a = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    t_b = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    franchise_doc = {
+        "conference_tournaments": {
+            "1": {
+                "current_round": 2,
+                "bracket": {
+                    "round1": [
+                        {
+                            "home_team": t_a,
+                            "away_team": t_b,
+                            "winner": t_a,
+                            "game_id": "g1",
+                            "score": {},
+                        },
+                        {
+                            "home_team": t_a,
+                            "away_team": t_b,
+                            "winner": t_a,
+                            "game_id": "g2",
+                            "score": {},
+                        },
+                        {
+                            "home_team": t_a,
+                            "away_team": t_b,
+                            "winner": t_a,
+                            "game_id": "g3",
+                            "score": {},
+                        },
+                        {
+                            "home_team": t_a,
+                            "away_team": t_b,
+                            "winner": t_a,
+                            "game_id": "g4",
+                            "score": {},
+                        },
+                    ],
+                    "round2": [
+                        {
+                            "home_team": t_a,
+                            "away_team": t_b,
+                            "winner": t_a,
+                            "game_id": "gs0",
+                            "score": {},
+                        },
+                        {
+                            "home_team": uid_opp,
+                            "away_team": uid_user,
+                            "winner": None,
+                            "game_id": None,
+                            "score": {},
+                        },
+                    ],
+                    "final": [],
+                },
+                "seeds": {uid_user: 6, uid_opp: 2},
+            }
+        }
+    }
+    # Calendar week 29 uses final only — empty bracket.final → no meta rows.
+    _save_user_eos_bracket_result(
+        franchise_doc,
+        week_games_meta=[],
+        user_team_id_str=uid_user,
+        team1_id=uid_user,
+        team2_id=uid_opp,
+        team1_score=60,
+        team2_score=70,
+        game_id="game-semis-fix",
+        week=29,
+    )
+    matchup = franchise_doc["conference_tournaments"]["1"]["bracket"]["round2"][1]
+    assert matchup["winner"] == uid_opp
+    assert matchup["game_id"] == "game-semis-fix"
+    assert matchup["score"] == {"home": 70, "away": 60}
+
+
 def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
     user_team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
 

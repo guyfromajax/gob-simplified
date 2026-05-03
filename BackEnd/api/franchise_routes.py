@@ -2589,14 +2589,16 @@ def _save_user_eos_bracket_result(
     team1_score: int,
     team2_score: int,
     game_id: str | None,
+    week: int | None = None,
 ) -> dict | None:
     """Persist the played user EOS game into its tournament bracket."""
-    if not week_games_meta:
+    if week_games_meta is None:
         return None
-    found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
+    meta_primary = list(week_games_meta)
+    found = ft.find_user_game_in_eos_week(meta_primary, user_team_id_str)
+    resolved: str | None = None
     if not found and user_team_id_str:
         raw = str(user_team_id_str).strip()
-        resolved: str | None = None
         try:
             if ObjectId.is_valid(raw):
                 resolved = str(ObjectId(raw))
@@ -2613,13 +2615,28 @@ def _save_user_eos_bracket_result(
             if doc and doc.get("_id") is not None:
                 resolved = str(doc["_id"])
         if resolved:
-            found = ft.find_user_game_in_eos_week(week_games_meta, resolved)
+            found = ft.find_user_game_in_eos_week(meta_primary, resolved)
             if found:
                 logger.warning(
                     "🧭 [COMPLETE-WEEK] Resolved user_team_id for EOS bracket save: raw=%s resolved=%s",
                     raw,
                     resolved,
                 )
+    # Calendar meta (include_completed=True) follows franchise week; playable meta follows
+    # current_round. When week advanced but a conference semifinal row never got a winner,
+    # calendar meta for the new week points at an empty final — retry playable list so we can
+    # still write round2 and unblock advance (see get_eos_week_games docstring).
+    if not found and week is not None and week in ft.EOS_WEEKS:
+        playable = ft.get_eos_week_games(franchise_doc, week, include_completed=False)
+        found = ft.find_user_game_in_eos_week(playable, user_team_id_str)
+        if not found and resolved:
+            found = ft.find_user_game_in_eos_week(playable, resolved)
+        if found:
+            logger.warning(
+                "[EOS-BRACKET-DEBUG] user_eos_bracket_save_using_playable_meta franchise_id=%s week=%s",
+                str(franchise_doc.get("_id")),
+                week,
+            )
     if not found:
         logger.warning(
             "⚠️ [COMPLETE-WEEK] Could not find user EOS matchup for bracket persistence. user_team_id=%s game_id=%s",
@@ -2721,6 +2738,7 @@ def _complete_week_process_user_game_block(
         team1_score=user.team1_score,
         team2_score=user.team2_score,
         game_id=user_game_id,
+        week=req.week,
     )
     
     user_winner_id = team1_id if user.team1_score > user.team2_score else team2_id
@@ -2964,6 +2982,7 @@ def _complete_week_process_user_game_block(
                     team1_score=user.team1_score,
                     team2_score=user.team2_score,
                     game_id=user_game_id,
+                    week=req.week,
                 )
                 logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game: game_id={user_game_id}")
                 stat_updater.finalize_game(
