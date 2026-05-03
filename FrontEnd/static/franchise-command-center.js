@@ -2976,7 +2976,7 @@ function updatePlayButton(data) {
   const eosTournament = data.eos_tournament;
   const week = data.week || 1;
   const trainingDisabledForEos = !!data.training_disabled_for_eos;
-  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason;
+  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || (week >= 27 && week <= 34);
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
   const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
   
@@ -3011,7 +3011,7 @@ function updatePlayButton(data) {
   } else if (showSimRest && eosTournamentActive) {
     playNowBtn.textContent = 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
-  } else if (trainingDisabledForPostseason && eosTournamentActive && !eliminated) {
+  } else if (trainingDisabledForPostseason && !eliminated) {
     playNowBtn.textContent = 'Play Next Game';
     playNowBtn.dataset.mode = 'play';
   } else if (trainingDisabledForEos || eliminated) {
