@@ -2388,7 +2388,53 @@ def _phase_a_user_week_done(franchise_doc: dict, week: int) -> bool:
 
 
 def _week_result_matchup_key(row: dict) -> frozenset:
+    """
+    Canonical franchise week slot id: unordered pair of team ids for one scheduled game.
+    Used for dedupe, idempotent phase-B retries, and completeness checks (Phase 2).
+    """
     return frozenset({str(row.get("away_id")), str(row.get("home_id"))})
+
+
+def _dedupe_franchise_week_results_by_matchup(results: list) -> list:
+    """First row wins per matchup key; stable order."""
+    seen: set[frozenset] = set()
+    out: list = []
+    for r in results:
+        k = _week_result_matchup_key(r)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(dict(r))
+    return out
+
+
+def _expected_franchise_week_matchup_key_set(week_games: list) -> set[frozenset]:
+    keys: set[frozenset] = set()
+    for pair in week_games:
+        if not pair or len(pair) < 2:
+            continue
+        keys.add(frozenset({str(pair[0]), str(pair[1])}))
+    return keys
+
+
+def _week_results_list_contains_matchup(
+    results: list, away_id: Any, home_id: Any
+) -> bool:
+    k = frozenset({str(away_id), str(home_id)})
+    for r in results:
+        if _week_result_matchup_key(r) == k:
+            return True
+    return False
+
+
+def _franchise_week_results_cover_schedule(results: list, week_games: list) -> bool:
+    """True iff deduped results contain exactly one row per scheduled matchup in week_games."""
+    deduped = _dedupe_franchise_week_results_by_matchup(results)
+    if len(deduped) != len(week_games):
+        return False
+    expected = _expected_franchise_week_matchup_key_set(week_games)
+    actual = {_week_result_matchup_key(r) for r in deduped}
+    return expected == actual
 
 
 def _merge_phase_a_user_row_into_week_results(
@@ -3022,6 +3068,201 @@ def _sync_eos_bracket_from_existing_game_doc(
         )
 
 
+def _finalize_franchise_week_after_cpu_games(
+    franchise_doc: dict,
+    franchise_id: ObjectId,
+    franchise_id_str: str,
+    week: int,
+    results: list,
+    user_team_id_str: Any,
+    community_highlight_pending: dict | None = None,
+) -> dict:
+    """
+    Phase 1 week-closure extraction: everything that ran sequentially after the CPU sim loop
+    in ``_complete_week_finish_cpu_and_persist``. Requires a full ``results`` list for ``week``
+    (user row from phase A + all CPU rows). Mutates ``franchise_doc`` for recruiting / rank /
+    EOS; persists franchise and follow-up hooks. Same behavior as the inlined block it replaced.
+    """
+    existing_results = franchise_doc.get("results", {})
+    existing_results[str(week)] = results
+    _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
+    _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
+    try:
+        _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, week, results)
+    except Exception:
+        logger.exception(
+            "❌ [COMPLETE-WEEK] Rank/prestige update failed; continuing with franchise week/results persistence. franchise_id=%s week=%s results_count=%s",
+            franchise_id_str,
+            week,
+            len(results),
+        )
+
+    next_week = week + 1
+
+    update_fields = {
+        "results": existing_results,
+        "week": next_week,
+        "season_inbox": franchise_doc.get("season_inbox", []),
+        "training_status.training_completed": False,
+        "training_status.session_type": "in-season",
+    }
+
+    if week == ScheduleManager.REGULAR_SEASON_WEEKS:
+        ftd_docs = list(
+            franchise_team_data_collection.find(
+                {"franchise_id": franchise_id},
+                {"team_id": 1},
+            )
+        )
+        eos_team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id")]
+        if len(eos_team_ids) < 128:
+            logger.warning(
+                "⚠️ [EOS] Fewer than 128 teams in FTD (got %s); conference brackets may be incomplete.",
+                len(eos_team_ids),
+            )
+        franchise_doc["results"] = existing_results
+        conference_tournaments = ft.initialize_conference_tournaments(
+            franchise_doc, db.teams, team_ids=eos_team_ids
+        )
+        update_fields["conference_tournaments"] = conference_tournaments
+        update_fields["eos_tournament_active"] = True
+        update_fields["week"] = ft.EOS_CONFERENCE_WEEKS[0]
+        logger.info("✅ [EOS] Conference tournaments initialized, week set to 27")
+        maybe_award_conference_rs_championship(
+            owner_user_id=franchise_doc.get("user_id"),
+            user_team_id_str=user_team_id_str,
+            conference_tournaments=conference_tournaments,
+        )
+    elif week in ft.EOS_WEEKS:
+        next_week = week + 1
+        if week in ft.EOS_CONFERENCE_WEEKS:
+            ft.log_eos_conference_bracket_snapshot(
+                franchise_doc,
+                f"complete_week_pre_advance week={week} fid={franchise_id_str}",
+            )
+            for c in range(1, 17):
+                advanced, champ = ft.advance_conference_bracket(franchise_doc, c)
+            ft.log_eos_conference_bracket_snapshot(
+                franchise_doc,
+                f"complete_week_post_advance week={week} fid={franchise_id_str}",
+            )
+            if week == ft.EOS_CONFERENCE_WEEKS[-1]:
+                eos_team_ids = [
+                    d["team_id"]
+                    for d in franchise_team_data_collection.find(
+                        {"franchise_id": franchise_id}, {"team_id": 1}
+                    )
+                    if d.get("team_id")
+                ]
+                region_tournaments = ft.initialize_region_tournaments(
+                    franchise_doc, db.teams, team_ids=eos_team_ids
+                )
+                update_fields["region_tournaments"] = region_tournaments
+                next_week = ft.EOS_REGION_WEEKS[0]
+            update_fields["week"] = next_week
+            update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
+        elif week in ft.EOS_REGION_WEEKS:
+            if week == ft.EOS_REGION_WEEKS[-1]:
+                region_champions = ft.get_region_champions(franchise_doc)
+                ftd_docs = list(
+                    franchise_team_data_collection.find(
+                        {"franchise_id": franchise_id}, {"team_id": 1}
+                    )
+                )
+                team_ids = [d["team_id"] for d in ftd_docs if d.get("team_id")]
+                national_tournament = ft.initialize_national_tournament(
+                    franchise_doc,
+                    db.teams,
+                    region_champions,
+                    franchise_doc.get("results", {}),
+                    team_ids,
+                )
+                update_fields["national_tournament"] = national_tournament
+                next_week = ft.EOS_NATIONAL_WEEKS[0]
+            else:
+                next_week = ft.EOS_REGION_WEEKS[1]
+            update_fields["week"] = next_week
+            update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
+        elif week in ft.EOS_NATIONAL_WEEKS:
+            advanced, champion = ft.advance_national_bracket(franchise_doc)
+            update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
+            if week == ft.EOS_NATIONAL_WEEKS[-1]:
+                update_fields["eos_tournament_active"] = False
+                next_week = 35
+            else:
+                next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
+            update_fields["week"] = next_week
+    logger.warning(
+        "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
+        franchise_id_str,
+        week,
+        update_fields.get("week"),
+        len(results),
+        sorted(update_fields.keys()),
+    )
+    update_fields["post_game_status.phase_a_user_week"] = None
+    if community_highlight_pending is not None:
+        update_fields["post_game_status.community_highlight_pending"] = community_highlight_pending
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": update_fields},
+    )
+    try:
+        flush_community_highlight_pending_after_week(franchise_id, week)
+    except Exception:
+        logger.exception(
+            "[COMMUNITY_HIGHLIGHTS] flush after week persist failed franchise_id=%s week=%s",
+            franchise_id_str,
+            week,
+        )
+    if update_fields.get("week") == 35:
+        refreshed = db.franchises.find_one({"_id": franchise_id})
+        if refreshed:
+            _persist_week_35_awards_if_needed(refreshed)
+
+    id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
+    scoreboard = []
+    for r in results:
+        scoreboard.append(
+            {
+                "team1": id_to_name.get(r["away_id"], r["away_id"]),
+                "team2": id_to_name.get(r["home_id"], r["home_id"]),
+                "team1_score": r["away_score"],
+                "team2_score": r["home_score"],
+            }
+        )
+
+    return {"week": week, "results": scoreboard}
+
+
+def _try_finalize_franchise_week_if_complete(
+    franchise_doc: dict,
+    franchise_id: ObjectId,
+    franchise_id_str: str,
+    week: int,
+    week_games: list,
+    results: list,
+    user_team_id_str: Any,
+    community_highlight_pending: dict | None = None,
+) -> dict | None:
+    """
+    Run week closure only when ``results`` holds one outcome per ``week_games`` slot.
+    Used after the CPU loop today; later, parallel workers can call this after each merge.
+    """
+    deduped = _dedupe_franchise_week_results_by_matchup(results)
+    if not _franchise_week_results_cover_schedule(deduped, week_games):
+        return None
+    return _finalize_franchise_week_after_cpu_games(
+        franchise_doc,
+        franchise_id,
+        franchise_id_str,
+        week,
+        deduped,
+        user_team_id_str,
+        community_highlight_pending,
+    )
+
+
 def _complete_week_finish_cpu_and_persist(
     franchise_doc: dict,
     franchise_id: ObjectId,
@@ -3060,6 +3301,9 @@ def _complete_week_finish_cpu_and_persist(
             eos_game_meta=eos_meta,
         )
 
+    # Phase 2: stable matchup keys + dedupe so phase-B retries / merged rows cannot double-count games.
+    results = _dedupe_franchise_week_results_by_matchup([dict(r) for r in results])
+
     # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
@@ -3083,6 +3327,8 @@ def _complete_week_finish_cpu_and_persist(
     
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
+            continue
+        if _week_results_list_contains_matchup(results, away_id, home_id):
             continue
         existing = db.games.find_one({
             "week": week,
@@ -3377,148 +3623,35 @@ def _complete_week_finish_cpu_and_persist(
             "away_score": sim_res["team1_score"],
             "home_score": sim_res["team2_score"],
         })
-    
-    existing_results = franchise_doc.get("results", {})
-    existing_results[str(week)] = results
-    _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
-    _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
-    try:
-        _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, week, results)
-    except Exception:
-        logger.exception(
-            "❌ [COMPLETE-WEEK] Rank/prestige update failed; continuing with franchise week/results persistence. franchise_id=%s week=%s results_count=%s",
-            franchise_id_str,
-            week,
-            len(results),
-        )
-    
-    # Reset training status for next week
-    next_week = week + 1
-    
-    # ✅ EOS TOURNAMENT: Initialize tournament after week 26 (regular season) completion
-    update_fields = {
-        "results": existing_results,
-        "week": next_week,
-        "season_inbox": franchise_doc.get("season_inbox", []),
-        "training_status.training_completed": False,
-        "training_status.session_type": "in-season"
-    }
-    
-    if week == ScheduleManager.REGULAR_SEASON_WEEKS:
-        # Regular season complete - initialize Conference Tournaments (EOS weeks 27–34)
-        ftd_docs = list(franchise_team_data_collection.find(
-            {"franchise_id": franchise_id},
-            {"team_id": 1}
-        ))
-        eos_team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id")]
-        if len(eos_team_ids) < 128:
-            logger.warning(
-                "⚠️ [EOS] Fewer than 128 teams in FTD (got %s); conference brackets may be incomplete.",
-                len(eos_team_ids),
-            )
-        franchise_doc["results"] = existing_results
-        conference_tournaments = ft.initialize_conference_tournaments(
-            franchise_doc, db.teams, team_ids=eos_team_ids
-        )
-        update_fields["conference_tournaments"] = conference_tournaments
-        update_fields["eos_tournament_active"] = True
-        update_fields["week"] = ft.EOS_CONFERENCE_WEEKS[0]
-        logger.info("✅ [EOS] Conference tournaments initialized, week set to 27")
-        maybe_award_conference_rs_championship(
-            owner_user_id=franchise_doc.get("user_id"),
-            user_team_id_str=user_team_id_str,
-            conference_tournaments=conference_tournaments,
-        )
-    elif week in ft.EOS_WEEKS:
-        # EOS week: advance brackets and set next week (or init region/national)
-        next_week = week + 1
-        if week in ft.EOS_CONFERENCE_WEEKS:
-            ft.log_eos_conference_bracket_snapshot(
-                franchise_doc,
-                f"complete_week_pre_advance week={week} fid={franchise_id_str}",
-            )
-            for c in range(1, 17):
-                advanced, champ = ft.advance_conference_bracket(franchise_doc, c)
-            ft.log_eos_conference_bracket_snapshot(
-                franchise_doc,
-                f"complete_week_post_advance week={week} fid={franchise_id_str}",
-            )
-            if week == ft.EOS_CONFERENCE_WEEKS[-1]:
-                eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
-                    {"franchise_id": franchise_id}, {"team_id": 1}
-                ) if d.get("team_id")]
-                region_tournaments = ft.initialize_region_tournaments(
-                    franchise_doc, db.teams, team_ids=eos_team_ids
-                )
-                update_fields["region_tournaments"] = region_tournaments
-                next_week = ft.EOS_REGION_WEEKS[0]
-            update_fields["week"] = next_week
-            update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
-        elif week in ft.EOS_REGION_WEEKS:
-            if week == ft.EOS_REGION_WEEKS[-1]:
-                region_champions = ft.get_region_champions(franchise_doc)
-                ftd_docs = list(franchise_team_data_collection.find(
-                    {"franchise_id": franchise_id}, {"team_id": 1}
-                ))
-                team_ids = [d["team_id"] for d in ftd_docs if d.get("team_id")]
-                national_tournament = ft.initialize_national_tournament(
-                    franchise_doc, db.teams, region_champions,
-                    franchise_doc.get("results", {}), team_ids,
-                )
-                update_fields["national_tournament"] = national_tournament
-                next_week = ft.EOS_NATIONAL_WEEKS[0]
-            else:
-                next_week = ft.EOS_REGION_WEEKS[1]
-            update_fields["week"] = next_week
-            update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
-        elif week in ft.EOS_NATIONAL_WEEKS:
-            advanced, champion = ft.advance_national_bracket(franchise_doc)
-            update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
-            if week == ft.EOS_NATIONAL_WEEKS[-1]:
-                update_fields["eos_tournament_active"] = False
-                next_week = 35
-            else:
-                next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
-            update_fields["week"] = next_week
-    logger.warning(
-        "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
-        franchise_id_str,
-        week,
-        update_fields.get("week"),
-        len(results),
-        sorted(update_fields.keys()),
+
+    finalized = _try_finalize_franchise_week_if_complete(
+        franchise_doc=franchise_doc,
+        franchise_id=franchise_id,
+        franchise_id_str=franchise_id_str,
+        week=week,
+        week_games=week_games,
+        results=results,
+        user_team_id_str=user_team_id_str,
+        community_highlight_pending=community_highlight_pending,
     )
-    update_fields["post_game_status.phase_a_user_week"] = None
-    if community_highlight_pending is not None:
-        update_fields["post_game_status.community_highlight_pending"] = community_highlight_pending
-    db.franchises.update_one(
-        {"_id": franchise_id},
-        {"$set": update_fields},
-    )
-    try:
-        flush_community_highlight_pending_after_week(franchise_id, week)
-    except Exception:
-        logger.exception(
-            "[COMMUNITY_HIGHLIGHTS] flush after week persist failed franchise_id=%s week=%s",
-            franchise_id_str,
+    if finalized is None:
+        dedup_n = len(_dedupe_franchise_week_results_by_matchup(results))
+        logger.error(
+            "[COMPLETE-WEEK] Week %s incomplete after CPU loop franchise_id=%s "
+            "(deduped_rows=%s expected_matchups=%s); refusing week advance",
             week,
+            franchise_id_str,
+            dedup_n,
+            len(week_games),
         )
-    if update_fields.get("week") == 35:
-        refreshed = db.franchises.find_one({"_id": franchise_id})
-        if refreshed:
-            _persist_week_35_awards_if_needed(refreshed)
-    
-    id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
-    scoreboard = []
-    for r in results:
-        scoreboard.append({
-            "team1": id_to_name.get(r["away_id"], r["away_id"]),
-            "team2": id_to_name.get(r["home_id"], r["home_id"]),
-            "team1_score": r["away_score"],
-            "team2_score": r["home_score"],
-        })
-    
-    return {"week": week, "results": scoreboard}
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Internal error: incomplete week results after CPU simulations; "
+                "franchise week was not advanced."
+            ),
+        )
+    return finalized
 
 @router.post("/franchise/complete-week")
 def complete_week(req: CompleteWeekRequest):
