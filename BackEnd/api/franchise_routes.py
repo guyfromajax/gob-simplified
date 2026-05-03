@@ -3414,8 +3414,6 @@ def _complete_week_finish_cpu_and_persist(
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
             continue
-        if _week_results_list_contains_matchup(results, away_id, home_id):
-            continue
         existing = db.games.find_one({
             "week": week,
             "franchise_id": str(franchise_id_str),
@@ -3424,6 +3422,34 @@ def _complete_week_finish_cpu_and_persist(
                 {"team1_id": home_id, "team2_id": away_id},
             ],
         })
+        # start-cpu-sims (or retries) can persist results.{week} rows before phase B runs. An early
+        # continue here used to skip the entire block — including _sync_eos_bracket_from_existing_game_doc
+        # — leaving bracket.round2 (etc.) null while results looked complete (week 28 semis stuck).
+        if _week_results_list_contains_matchup(results, away_id, home_id):
+            if (
+                week in ft.EOS_WEEKS
+                and week_games_meta
+                and idx < len(week_games_meta)
+                and existing
+            ):
+                g_meta = week_games_meta[idx]
+                logger.warning(
+                    "[EOS-BRACKET-DEBUG] sync_from_existing_results_row idx=%s phase=%s conf=%s round=%s midx=%s game_id=%s",
+                    idx,
+                    g_meta.get("phase"),
+                    g_meta.get("conference"),
+                    g_meta.get("round"),
+                    g_meta.get("matchup_index"),
+                    str(existing.get("_id")),
+                )
+                _sync_eos_bracket_from_existing_game_doc(
+                    franchise_doc,
+                    existing=existing,
+                    away_id=away_id,
+                    home_id=home_id,
+                    g=g_meta,
+                )
+            continue
         if existing:
             results.append({
                 "away_id": str(existing["team1_id"]),
