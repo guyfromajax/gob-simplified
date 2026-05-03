@@ -8913,6 +8913,28 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    playbook_mode = training_data.get("playbook_training_mode", "current-playbooks")
+    raw_tpf = training_data.get("training_playbook_focus")
+    training_playbook_focus_payload: dict | None = None
+    if playbook_mode == "custom":
+        if not isinstance(raw_tpf, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Custom playbook training requires training_playbook_focus with offense and defense id lists.",
+            )
+        off_ids = [str(x) for x in (raw_tpf.get("offense") or []) if x is not None and str(x).strip()]
+        def_ids = [str(x) for x in (raw_tpf.get("defense") or []) if x is not None and str(x).strip()]
+        if len(off_ids) < 1 or len(def_ids) < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="training_playbook_focus must include at least one offense play_id and one defense row id.",
+            )
+        training_playbook_focus_payload = {"offense": off_ids, "defense": def_ids}
+    elif raw_tpf is not None:
+        # Ignore stray focus when using current playbooks
+        if isinstance(training_data, dict):
+            training_data.pop("training_playbook_focus", None)
     
     players_load_time = (time.time() - players_load_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
@@ -8929,9 +8951,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         strategy_settings=strategy_settings,
         playbook_settings=playbook_settings,
         scouting_data=scouting_data,
-        playbook_training_mode=training_data.get("playbook_training_mode", "current-playbooks"),
+        playbook_training_mode=playbook_mode,
         skip_pre_training_depreciation=is_first_training,
         coaching_focus_custom_by_player=normalized_custom,
+        training_playbook_focus=training_playbook_focus_payload,
     )
     training_exec_time = (time.time() - training_exec_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")

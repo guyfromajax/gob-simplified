@@ -32,6 +32,11 @@ let customFocusDraft = {};
 /** @type {Record<string, string[]>} committed picks after Assign */
 let customFocusCommitted = {};
 
+/** Session keys for Custom Training Playbook → training-playbooks.html */
+const STORAGE_PLAYBOOK_FOCUS = 'gob_training_playbook_focus';
+const STORAGE_PLAYBOOK_MODE = 'gob_playbook_training_mode';
+const STORAGE_TEAM_DRILLS_SNAPSHOT = 'gob_training_team_drills_snapshot';
+
 /** Main PM radio value; modal assigns a concrete leaf here before submit */
 const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
 
@@ -844,6 +849,7 @@ backBtn.addEventListener('click', function() {
  * Collect all training data for submission
  */
 function collectTrainingData() {
+  const pageParams = new URLSearchParams(window.location.search);
   const data = {
     // Player Drills
     player_drills: {
@@ -902,8 +908,27 @@ function collectTrainingData() {
       return cf;
     })(),
     
-    // Playbook Training Mode
-    playbook_training_mode: document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks'
+    // Playbook Training Mode (+ optional custom CMD focus for franchise)
+    playbook_training_mode: (function () {
+      if (pageParams.get('mode') === 'franchise') {
+        const sm = sessionStorage.getItem(STORAGE_PLAYBOOK_MODE);
+        if (sm === 'custom' && sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS)) {
+          return 'custom';
+        }
+      }
+      return document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks';
+    })(),
+    training_playbook_focus: (function () {
+      if (pageParams.get('mode') !== 'franchise') return null;
+      if (sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) !== 'custom') return null;
+      const raw = sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch (_e) {
+        return null;
+      }
+    })(),
   };
 
   if (data.coaching_focus === 'player-maximizer-custom') {
@@ -1120,6 +1145,12 @@ submitBtn.addEventListener('click', async function() {
       result = await response.json();
     }
 
+    try {
+      sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
+      sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
+      sessionStorage.removeItem(STORAGE_TEAM_DRILLS_SNAPSHOT);
+    } catch (_clearErr) {}
+
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
@@ -1222,11 +1253,81 @@ window.addEventListener('pageshow', (event) => {
   }
 });
 
+function syncCustomPlaybookBanner() {
+  try {
+    if (
+      sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) === 'custom' &&
+      !sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS)
+    ) {
+      sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
+    }
+  } catch (_e) {}
+  const banner = document.getElementById('custom-playbook-banner');
+  const currentRadio = document.querySelector(
+    'input[name="playbook-training-mode"][value="current-playbooks"]'
+  );
+  const on =
+    sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) === 'custom' &&
+    sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS);
+  if (banner) banner.hidden = !on;
+  if (currentRadio) {
+    if (on) currentRadio.checked = false;
+    else currentRadio.checked = true;
+  }
+}
+
+function wireCustomTrainingPlaybook() {
+  const pageParams = new URLSearchParams(window.location.search);
+  if (pageParams.get('mode') !== 'franchise') {
+    const wrap = document.querySelector('.playbook-mode-selection');
+    if (wrap) wrap.style.display = 'none';
+    return;
+  }
+  const btn = document.getElementById('open-custom-training-playbook');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    const snap = collectTrainingData();
+    try {
+      sessionStorage.setItem(
+        STORAGE_TEAM_DRILLS_SNAPSHOT,
+        JSON.stringify({
+          team_offense: snap.team_drills.team_offense || {},
+          team_defense: snap.team_drills.team_defense || {},
+        })
+      );
+    } catch (_e) {}
+    const p = new URLSearchParams(window.location.search);
+    const q = new URLSearchParams();
+    q.set('mode', p.get('mode') || 'franchise');
+    if (p.get('franchise_id')) q.set('franchise_id', p.get('franchise_id'));
+    const tid = p.get('team_id') || p.get('user_team_id');
+    if (tid) q.set('team_id', tid);
+    if (p.get('session_type')) q.set('session_type', p.get('session_type'));
+    window.location.href = `/training-playbooks.html?${q.toString()}`;
+  });
+  const currentRadio = document.querySelector(
+    'input[name="playbook-training-mode"][value="current-playbooks"]'
+  );
+  if (currentRadio) {
+    currentRadio.addEventListener('change', function () {
+      if (this.checked) {
+        try {
+          sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
+          sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
+        } catch (_e) {}
+        syncCustomPlaybookBanner();
+      }
+    });
+  }
+  syncCustomPlaybookBanner();
+}
+
 // Initialize training points on page load
 (async function initTrainingPage() {
   const redirected = await redirectIfTrainingAlreadyCommitted();
   if (redirected) return;
   await initializeTrainingPoints();
+  wireCustomTrainingPlaybook();
 })();
 
 // Debug: Verify scrimmages element exists on page load

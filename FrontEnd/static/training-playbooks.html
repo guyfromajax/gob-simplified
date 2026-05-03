@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Training Playbooks - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/training-playbooks.css">
+</head>
+<body class="tp-page">
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+  <div class="resource-page-container fcc-brand-page-shell tp-shell">
+    <header class="tp-header">
+      <a id="tp-back" class="tp-back" href="#">← Back to Training Orders</a>
+      <h1 class="tp-title">TRAINING PLAYBOOK</h1>
+      <button type="button" id="tp-save" class="tp-btn-primary" disabled>Save &amp; Continue</button>
+    </header>
+
+    <section class="tp-dock" aria-label="Selection summary">
+      <div class="tp-dock-card" data-dock="offense">
+        <div class="tp-dock-head">Offense</div>
+        <div class="tp-dock-pct" id="tp-dock-off-pct">—</div>
+        <div class="tp-dock-bar"><div class="tp-dock-bar-fill" id="tp-dock-off-fill"></div></div>
+        <div class="tp-dock-foot">
+          <span id="tp-dock-off-meta"></span>
+          <span id="tp-dock-off-install"></span>
+        </div>
+      </div>
+      <div class="tp-dock-card" data-dock="defense">
+        <div class="tp-dock-head">Defense</div>
+        <div class="tp-dock-pct" id="tp-dock-def-pct">—</div>
+        <div class="tp-dock-bar"><div class="tp-dock-bar-fill" id="tp-dock-def-fill"></div></div>
+        <div class="tp-dock-foot">
+          <span id="tp-dock-def-meta"></span>
+          <span id="tp-dock-def-install"></span>
+        </div>
+      </div>
+    </section>
+
+    <main class="tp-main">
+      <section class="tp-section">
+        <h2 class="tp-section-title">Offense</h2>
+        <div id="tp-offense-grid" class="tp-grid"></div>
+      </section>
+      <section class="tp-section">
+        <h2 class="tp-section-title">Defense</h2>
+        <div id="tp-defense-grid" class="tp-grid"></div>
+      </section>
+    </main>
+
+    <footer class="tp-footer">
+      <button type="button" id="tp-cancel" class="tp-btn-ghost">Cancel</button>
+      <button type="button" id="tp-save-footer" class="tp-btn-primary" disabled>Save &amp; Continue</button>
+    </footer>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/training-playbooks.js"></script>
+</body>
+</html>

@@ -16,7 +16,9 @@ from BackEnd.constants import ALL_ATTRS
 from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
 from BackEnd.utils.defense_identity import (
     DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
+    PLAYBOOK_MAN_KEY_TO_DEFENSE_ID,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
+    canonical_scouting_defense_key,
     defense_display_name,
 )
 from BackEnd.utils.team_play_utils import iter_team_plays
@@ -54,6 +56,7 @@ def execute_training(
     playbook_training_mode: str = "current-playbooks",
     skip_pre_training_depreciation: bool = False,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
+    training_playbook_focus: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
@@ -143,7 +146,8 @@ def execute_training(
         playbook_training_mode,
         strategy_settings,
         playbook_settings,
-        coaching_focus
+        coaching_focus,
+        training_playbook_focus=training_playbook_focus,
     )
     
     # Calculate effectiveness changes for training report
@@ -1884,6 +1888,18 @@ def _apply_pre_training_defense_decay(scouting_data: Dict) -> Dict:
     return updated_scouting_data
 
 
+def _playbook_row_id_to_canonical_defense(row_id: str) -> Optional[str]:
+    """Map GET /api/playbooks defense row id (e.g. man_normal, zone_23) to scouting_data['defense'] key."""
+    s = str(row_id).strip()
+    if not s:
+        return None
+    if s in PLAYBOOK_MAN_KEY_TO_DEFENSE_ID:
+        return PLAYBOOK_MAN_KEY_TO_DEFENSE_ID[s]
+    if s in PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID:
+        return PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID[s]
+    return canonical_scouting_defense_key(s)
+
+
 def apply_play_defense_training(
     plays_data: Dict,
     scouting_data: Dict,
@@ -1891,7 +1907,8 @@ def apply_play_defense_training(
     playbook_training_mode: str,
     strategy_settings: Dict,
     playbook_settings: Dict,
-    coaching_focus: Optional[str] = None
+    coaching_focus: Optional[str] = None,
+    training_playbook_focus: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[Dict, Dict]:
     """
     Apply training to plays and defenses based on training mode and settings.
@@ -1988,6 +2005,7 @@ def apply_play_defense_training(
             playbook_settings,
             authoritarian_execution_eff_mult=authoritarian_execution_eff_mult,
             authoritarian_teamwork_eff_mult=authoritarian_teamwork_eff_mult,
+            training_playbook_focus=training_playbook_focus,
         )
     
     # Apply defense training
@@ -2001,6 +2019,7 @@ def apply_play_defense_training(
             playbook_settings,
             authoritarian_execution_eff_mult=authoritarian_execution_eff_mult,
             authoritarian_teamwork_eff_mult=authoritarian_teamwork_eff_mult,
+            training_playbook_focus=training_playbook_focus,
         )
     
     return updated_plays, updated_scouting_data
@@ -2014,6 +2033,7 @@ def _apply_offense_play_training(
     playbook_settings: Dict,
     authoritarian_execution_eff_mult: Optional[float] = None,
     authoritarian_teamwork_eff_mult: Optional[float] = None,
+    training_playbook_focus: Optional[Dict[str, List[str]]] = None,
 ) -> Dict:
     """
     Apply training points to offensive plays.
@@ -2037,6 +2057,39 @@ def _apply_offense_play_training(
     logger.warning(f"🎯 [PLAY TRAINING] Starting offense play training with {len(updated_plays)} plays")
     logger.warning(f"🎯 [PLAY TRAINING] Total points: {total_points}, mode: {playbook_training_mode}")
     logger.warning(f"🎯 [PLAY TRAINING] Plays data structure: {list(updated_plays.keys())[:5] if updated_plays else 'empty'}")
+    
+    # Custom Training Playbook: even CMD split across selected offense play_ids only.
+    if playbook_training_mode == "custom" and training_playbook_focus and total_points > 0:
+        allowed_ids = {str(x) for x in (training_playbook_focus.get("offense") or [])}
+        eligible: List[Tuple[Any, Dict, str]] = []
+        for play_key, play_data, display_name in iter_team_plays(updated_plays):
+            if not isinstance(play_data, dict):
+                continue
+            pid = str(play_data.get("play_id") or "") or str(play_key)
+            if pid in allowed_ids and play_data.get("play_type") in ("motion", "set_play"):
+                eligible.append((play_key, play_data, display_name))
+        if not eligible:
+            logger.warning("🎯 [PLAY TRAINING] CUSTOM offense: no matching plays for allowed ids; skipping offense CMD")
+            return updated_plays
+        points_per_play = math.floor(total_points / len(eligible))
+        remainder = total_points - (points_per_play * len(eligible))
+        for i, (play_key, play_data, display_name) in enumerate(eligible):
+            points = points_per_play + (1 if i < remainder else 0)
+            is_set_play = play_data.get("play_type") == "set_play"
+            is_motion_play = play_data.get("play_type") == "motion"
+            points = _scale_install_training_effectiveness_points(
+                points, authoritarian_execution_eff_mult, is_set_play
+            )
+            points = _scale_install_training_effectiveness_points(
+                points, authoritarian_teamwork_eff_mult, is_motion_play
+            )
+            old_effectiveness = play_data.get("effectiveness", 0)
+            new_effectiveness = old_effectiveness + points
+            updated_plays[play_key]["effectiveness"] = new_effectiveness
+            logger.warning(
+                f"🎯 [PLAY TRAINING] CUSTOM {display_name}: {old_effectiveness} → {new_effectiveness} (+{points})"
+            )
+        return updated_plays
     
     # Check if we should use playbook settings or default to even distribution
     use_playbooks = (
@@ -2253,6 +2306,7 @@ def _apply_defense_training(
     playbook_settings: Dict,
     authoritarian_execution_eff_mult: Optional[float] = None,
     authoritarian_teamwork_eff_mult: Optional[float] = None,
+    training_playbook_focus: Optional[Dict[str, List[str]]] = None,
 ) -> Dict:
     """
     Apply training points to defensive plays.
@@ -2272,6 +2326,35 @@ def _apply_defense_training(
         updated_scouting_data["defense"] = {}
     
     defense_data = updated_scouting_data["defense"]
+    
+    # Custom Training Playbook: even CMD split across unique canonical defenses from selected row ids.
+    if playbook_training_mode == "custom" and training_playbook_focus and total_points > 0:
+        seen_canon: List[str] = []
+        for row_id in training_playbook_focus.get("defense") or []:
+            ck = _playbook_row_id_to_canonical_defense(str(row_id))
+            if ck and ck not in seen_canon and ck in defense_data:
+                seen_canon.append(ck)
+        if seen_canon:
+            points_per = math.floor(total_points / len(seen_canon))
+            remainder = total_points - (points_per * len(seen_canon))
+            for i, defense_name in enumerate(seen_canon):
+                points = points_per + (1 if i < remainder else 0)
+                is_man = defense_name == "man"
+                is_zone = defense_name in TRAINING_ZONE_DEFENSE_NAMES
+                points = _scale_install_training_effectiveness_points(
+                    points, authoritarian_execution_eff_mult, is_man
+                )
+                points = _scale_install_training_effectiveness_points(
+                    points, authoritarian_teamwork_eff_mult, is_zone
+                )
+                old_eff = defense_data[defense_name].get("effectiveness", 0)
+                defense_data[defense_name]["effectiveness"] = old_eff + points
+                logger.warning(
+                    f"📚 [TRAINING] CUSTOM defense '{defense_name}': {old_eff} → {old_eff + points} (+{points})"
+                )
+            return updated_scouting_data
+        logger.warning("📚 [TRAINING] CUSTOM defense: no matching scouting rows; skipping defense CMD")
+        return updated_scouting_data
     
     # Check if we should use playbook settings or default to even distribution
     use_playbooks = (
