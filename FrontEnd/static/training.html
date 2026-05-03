@@ -209,12 +209,11 @@
             <p id="custom-playbook-banner" class="custom-playbook-banner" hidden>
               Custom playbook is configured for this session (CMD gains only on selected plays).
             </p>
-            <div class="radio-group playbook-mode-row">
-              <label class="radio-label">
-                <input type="radio" name="playbook-training-mode" value="current-playbooks" checked>
-                <span>Current Playbooks</span>
-              </label>
-              <button type="button" id="open-custom-training-playbook" class="custom-playbook-open-btn">
+            <div class="playbook-mode-toggle" role="group" aria-label="Playbook training mode">
+              <button type="button" id="playbook-mode-current-btn" class="playbook-mode-btn is-selected" aria-pressed="true">
+                Current Playbooks
+              </button>
+              <button type="button" id="playbook-mode-custom-btn" class="playbook-mode-btn is-ghost" aria-pressed="false">
                 Custom Playbook
               </button>
             </div>

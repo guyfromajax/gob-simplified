@@ -37,6 +37,48 @@ const STORAGE_PLAYBOOK_FOCUS = 'gob_training_playbook_focus';
 const STORAGE_PLAYBOOK_MODE = 'gob_playbook_training_mode';
 const STORAGE_TEAM_DRILLS_SNAPSHOT = 'gob_training_team_drills_snapshot';
 
+/** Franchise training form draft while visiting custom playbooks or recruiting (sessionStorage). */
+function trainingFormDraftStorageKey(urlParams) {
+  if (urlParams.get('mode') !== 'franchise') return null;
+  const fid = urlParams.get('franchise_id');
+  const tid = urlParams.get('team_id') || urlParams.get('user_team_id') || '';
+  const st = urlParams.get('session_type') || 'in-season';
+  if (!fid) return null;
+  return `gob_training_form_draft_${fid}|${tid}|w${currentWeek}|${st}`;
+}
+
+function saveTrainingFormDraft() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const key = trainingFormDraftStorageKey(urlParams);
+  if (!key) return;
+  const sliders = {};
+  document.querySelectorAll('.slider').forEach(function (el) {
+    if (el.id) sliders[el.id] = parseInt(el.value, 10) || 0;
+  });
+  const checked = document.querySelector('input[name="coaching-focus"]:checked');
+  const payload = {
+    v: 1,
+    week: currentWeek,
+    total_points_budget: TOTAL_POINTS,
+    sliders: sliders,
+    coaching_radio: checked ? checked.value : null,
+    player_maximizer_resolved: playerMaximizerResolvedFocus,
+    custom_focus_committed: JSON.parse(JSON.stringify(customFocusCommitted)),
+  };
+  try {
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  } catch (_e) {}
+}
+
+function clearTrainingFormDraftForCurrentContext() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const key = trainingFormDraftStorageKey(urlParams);
+  if (!key) return;
+  try {
+    sessionStorage.removeItem(key);
+  } catch (_e) {}
+}
+
 /** Main PM radio value; modal assigns a concrete leaf here before submit */
 const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
 
@@ -689,6 +731,79 @@ if (autoTrainModalClose && autoTrainModal) {
   });
 }
 
+function findCoachingFocusRadioByValue(value) {
+  let found = null;
+  coachingRadios.forEach(function (r) {
+    if (r.value === value) found = r;
+  });
+  return found;
+}
+
+/** Archetype block highlight only (no sound, no PM modal). */
+function applyCoachingFocusArchetypeUi(value) {
+  document.querySelectorAll('.archetype-block').forEach(function (block) {
+    block.classList.remove('active', 'header-selected', 'sub-option-selected');
+  });
+  let archetype = null;
+  if (value.startsWith('authoritarian')) archetype = 'authoritarian';
+  else if (value.startsWith('systems-coach')) archetype = 'systems-coach';
+  else if (value.startsWith('player-maximizer')) archetype = 'player-maximizer';
+  else if (value.startsWith('culture-builder')) archetype = 'culture-builder';
+  if (!archetype) return;
+  const archetypeBlock = document.querySelector(`[data-archetype="${archetype}"]`);
+  if (!archetypeBlock) return;
+  const isHeaderRadio = value === archetype;
+  if (isHeaderRadio) archetypeBlock.classList.add('active', 'header-selected');
+  else archetypeBlock.classList.add('active', 'sub-option-selected');
+}
+
+function restoreTrainingFormDraft() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const key = trainingFormDraftStorageKey(urlParams);
+  if (!key) return;
+  let raw;
+  try {
+    raw = sessionStorage.getItem(key);
+  } catch (_e) {
+    return;
+  }
+  if (!raw) return;
+  let o;
+  try {
+    o = JSON.parse(raw);
+  } catch (_e) {
+    return;
+  }
+  if (!o || o.v !== 1) return;
+  if (Number(o.week) !== Number(currentWeek)) return;
+  if (Number(o.total_points_budget) !== Number(TOTAL_POINTS)) return;
+
+  if (o.sliders && typeof o.sliders === 'object') {
+    Object.keys(o.sliders).forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el && el.classList && el.classList.contains('slider')) {
+        const v = Math.max(0, Math.min(5, parseInt(o.sliders[id], 10) || 0));
+        setSliderValue(el, v);
+      }
+    });
+  }
+
+  playerMaximizerResolvedFocus = o.player_maximizer_resolved || null;
+  customFocusCommitted =
+    o.custom_focus_committed && typeof o.custom_focus_committed === 'object'
+      ? Object.assign({}, o.custom_focus_committed)
+      : {};
+
+  const radioVal = o.coaching_radio;
+  if (radioVal) {
+    const inp = findCoachingFocusRadioByValue(radioVal);
+    if (inp) {
+      inp.checked = true;
+      applyCoachingFocusArchetypeUi(radioVal);
+    }
+  }
+}
+
 /**
  * Handle coaching focus radio button selection
  * All radios in this section are part of ONE global radio group
@@ -713,39 +828,7 @@ coachingRadios.forEach(radio => {
       }
     }
     
-    // Remove all active states
-    document.querySelectorAll('.archetype-block').forEach(block => {
-      block.classList.remove('active', 'header-selected', 'sub-option-selected');
-    });
-    
-    // Determine which archetype this radio belongs to
-    let archetype = null;
-    
-    if (value.startsWith('authoritarian')) {
-      archetype = 'authoritarian';
-    } else if (value.startsWith('systems-coach')) {
-      archetype = 'systems-coach';
-    } else if (value.startsWith('player-maximizer')) {
-      archetype = 'player-maximizer';
-    } else if (value.startsWith('culture-builder')) {
-      archetype = 'culture-builder';
-    }
-    
-    if (!archetype) return;
-    
-    const archetypeBlock = document.querySelector(`[data-archetype="${archetype}"]`);
-    if (!archetypeBlock) return;
-    
-    // Check if this is a header radio or sub-option radio
-    const isHeaderRadio = value === archetype;
-    
-    if (isHeaderRadio) {
-      // Header selected - highlight entire block
-      archetypeBlock.classList.add('active', 'header-selected');
-    } else {
-      // Sub-option selected - subtle outline on block, highlight the radio
-      archetypeBlock.classList.add('active', 'sub-option-selected');
-    }
+    applyCoachingFocusArchetypeUi(value);
 
     if (value.startsWith('player-maximizer')) {
       if (value === CHOOSE_ATTRIBUTES_VALUE) {
@@ -915,6 +998,7 @@ function collectTrainingData() {
         if (sm === 'custom' && sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS)) {
           return 'custom';
         }
+        return 'current-playbooks';
       }
       return document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks';
     })(),
@@ -1149,6 +1233,7 @@ submitBtn.addEventListener('click', async function() {
       sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
       sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
       sessionStorage.removeItem(STORAGE_TEAM_DRILLS_SNAPSHOT);
+      clearTrainingFormDraftForCurrentContext();
     } catch (_clearErr) {}
 
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
@@ -1224,6 +1309,7 @@ async function initializeTrainingPoints() {
           if (showRecruitingInvites) {
             recruitingInvitesBtn.onclick = function () {
               playSound('confirm-1.mp3');
+              saveTrainingFormDraft();
               const params = new URLSearchParams();
               params.set('franchise_id', franchiseId);
               if (teamId) params.set('team_id', teamId);
@@ -1233,6 +1319,7 @@ async function initializeTrainingPoints() {
             };
           }
         }
+        restoreTrainingFormDraft();
         console.log(`🎯 [TRAINING] Training points set to ${TOTAL_POINTS} (first training: ${data.is_first_training})`);
       } else {
         console.warn('⚠️ [TRAINING] Failed to fetch training points, using default 24');
@@ -1253,7 +1340,7 @@ window.addEventListener('pageshow', (event) => {
   }
 });
 
-function syncCustomPlaybookBanner() {
+function syncPlaybookModeToggleUi() {
   try {
     if (
       sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) === 'custom' &&
@@ -1263,16 +1350,19 @@ function syncCustomPlaybookBanner() {
     }
   } catch (_e) {}
   const banner = document.getElementById('custom-playbook-banner');
-  const currentRadio = document.querySelector(
-    'input[name="playbook-training-mode"][value="current-playbooks"]'
-  );
-  const on =
+  const btnCurrent = document.getElementById('playbook-mode-current-btn');
+  const btnCustom = document.getElementById('playbook-mode-custom-btn');
+  const customOn =
     sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) === 'custom' &&
     sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS);
-  if (banner) banner.hidden = !on;
-  if (currentRadio) {
-    if (on) currentRadio.checked = false;
-    else currentRadio.checked = true;
+  if (banner) banner.hidden = !customOn;
+  if (btnCurrent && btnCustom) {
+    btnCurrent.classList.toggle('is-selected', !customOn);
+    btnCurrent.classList.toggle('is-ghost', !!customOn);
+    btnCurrent.setAttribute('aria-pressed', customOn ? 'false' : 'true');
+    btnCustom.classList.toggle('is-selected', !!customOn);
+    btnCustom.classList.toggle('is-ghost', !customOn);
+    btnCustom.setAttribute('aria-pressed', customOn ? 'true' : 'false');
   }
 }
 
@@ -1283,43 +1373,43 @@ function wireCustomTrainingPlaybook() {
     if (wrap) wrap.style.display = 'none';
     return;
   }
-  const btn = document.getElementById('open-custom-training-playbook');
-  if (!btn) return;
-  btn.addEventListener('click', function () {
-    const snap = collectTrainingData();
-    try {
-      sessionStorage.setItem(
-        STORAGE_TEAM_DRILLS_SNAPSHOT,
-        JSON.stringify({
-          team_offense: snap.team_drills.team_offense || {},
-          team_defense: snap.team_drills.team_defense || {},
-        })
-      );
-    } catch (_e) {}
-    const p = new URLSearchParams(window.location.search);
-    const q = new URLSearchParams();
-    q.set('mode', p.get('mode') || 'franchise');
-    if (p.get('franchise_id')) q.set('franchise_id', p.get('franchise_id'));
-    const tid = p.get('team_id') || p.get('user_team_id');
-    if (tid) q.set('team_id', tid);
-    if (p.get('session_type')) q.set('session_type', p.get('session_type'));
-    window.location.href = `/training-playbooks.html?${q.toString()}`;
-  });
-  const currentRadio = document.querySelector(
-    'input[name="playbook-training-mode"][value="current-playbooks"]'
-  );
-  if (currentRadio) {
-    currentRadio.addEventListener('change', function () {
-      if (this.checked) {
-        try {
-          sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
-          sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
-        } catch (_e) {}
-        syncCustomPlaybookBanner();
-      }
+  const btnCurrent = document.getElementById('playbook-mode-current-btn');
+  const btnCustom = document.getElementById('playbook-mode-custom-btn');
+  if (btnCurrent) {
+    btnCurrent.addEventListener('click', function () {
+      playSound('click-tiny.wav');
+      try {
+        sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
+        sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
+      } catch (_e) {}
+      syncPlaybookModeToggleUi();
     });
   }
-  syncCustomPlaybookBanner();
+  if (btnCustom) {
+    btnCustom.addEventListener('click', function () {
+      playSound('click-tiny.wav');
+      saveTrainingFormDraft();
+      const snap = collectTrainingData();
+      try {
+        sessionStorage.setItem(
+          STORAGE_TEAM_DRILLS_SNAPSHOT,
+          JSON.stringify({
+            team_offense: snap.team_drills.team_offense || {},
+            team_defense: snap.team_drills.team_defense || {},
+          })
+        );
+      } catch (_e) {}
+      const p = new URLSearchParams(window.location.search);
+      const q = new URLSearchParams();
+      q.set('mode', p.get('mode') || 'franchise');
+      if (p.get('franchise_id')) q.set('franchise_id', p.get('franchise_id'));
+      const tid = p.get('team_id') || p.get('user_team_id');
+      if (tid) q.set('team_id', tid);
+      if (p.get('session_type')) q.set('session_type', p.get('session_type'));
+      window.location.href = `/training-playbooks.html?${q.toString()}`;
+    });
+  }
+  syncPlaybookModeToggleUi();
 }
 
 // Initialize training points on page load
