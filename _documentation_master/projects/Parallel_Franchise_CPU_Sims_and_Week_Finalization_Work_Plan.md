@@ -140,9 +140,9 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ### Phase 4 — UX + cleanup
 
-- [ ] EOG modal: “Go To Locker Room” vs “simming…” modal per spec; auto-navigate when closure completes if user already dismissed EOG to waiting UI.
-- [ ] Remove or feature-flag PGPC if approved.
-- [ ] Update `End_Of_Game_System.md` and `Press_Conference_System.md` to match shipped behavior.
+- [x] Franchise EOG: **`FRANCHISE_PGPC_AT_EOG_ENABLED`** (`gameCompletionPopup.js`, default **`false`**) — PGPC code kept; Box Score + **Go To Locker Room** awaits phase B then clears pending + navigates.
+- [ ] Optional: “simming…” overlay on court before leaving EOG if phase B is still running (only if product wants extra feedback).
+- [x] Update **`End_Of_Game_System.md`** and **`Press_Conference_System.md`** for the above + phase B parallel sim note.
 
 ---
 

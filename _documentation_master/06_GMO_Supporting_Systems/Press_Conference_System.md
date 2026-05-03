@@ -3,16 +3,20 @@
 
 Franchise-only flow that runs **after the user’s game is saved** (`POST /franchise/complete-week/phase-a`) and **overlaps** simulation of CPU games (`POST /franchise/complete-week/phase-b`). The user answers press questions in a modal on `court.html` while phase B may still be running.
 
+**Franchise EOG gate (May 2026):** PGPC is **not shown** on the franchise game-complete modal while **`FRANCHISE_PGPC_AT_EOG_ENABLED`** is **`false`** in `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` (default). PGPC modules and API remain in the codebase; set the flag to **`true`** to restore the old EOG CTA and press-conference overlay.
+
 ---
 
 ## When it runs
 
 1. **End of game:** `finalizeGame` runs (tournament save, franchise **phase A**, etc.). For franchise mode, phase A persists the user result and sets pending state (`localStorage`: `franchise_complete_week_pending`, `franchise_eog_pgpc_snapshot`) for optional resume—not fully productized, but written after successful phase A.
 2. **EOG modal:** `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` shows **Game Complete** with real score / POTG.
-   - **Franchise with phase B pending:** **Box Score** is hidden on this popup; primary CTA is **Post-Game Press Conference** (replaces “Sim Computer Games” on this surface only). Other modes keep Box Score + Go To Locker Room.
+   - **Franchise with phase B pending and `FRANCHISE_PGPC_AT_EOG_ENABLED`:** **Box Score** is hidden on this popup; primary CTA is **Post-Game Press Conference** (replaces “Sim Computer Games” on this surface only).
+   - **Franchise with phase B pending and flag `false`:** **Box Score** + **Go To Locker Room** (same as other modes); **Go To Locker Room** waits for phase B then navigates to the FCC.
+   - **Other modes:** Box Score + Go To Locker Room unchanged.
    - **Background scoreboard:** When the EOG popup opens, the court scoreboard DOM is synced to **final** home/away scores and a **FINAL / 0:00** clock readout so the dimmed court behind the modal is not stuck at Q1 / 0–0.
 3. **PGPC CTA:** Optional **Sammy reminder** modal (`pgpcSammyReminderModal.js`) unless suppressed; then `launchPostGamePressConference` opens the PGPC overlay.
-4. **Phase B timing:** `POST /franchise/complete-week/phase-b` starts **as soon as the franchise EOG popup appears** (`getOrStartFranchisePhaseB` in `FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js`, invoked from `gameCompletionPopup.js`). It is **not** gated on Sammy or the PGPC button. When the user opens PGPC, `launchPostGamePressConference` **reuses the same in-flight Promise** (single-flight per `franchise_id` + `week` in a tab) so phase B is not requested twice. Outcome handlers (e.g. clearing `franchise_complete_week_pending` on success) still run from PGPC after handlers attach. If the user finishes all press answers before phase B returns, the existing **“Simming Computer Games”** waiting UI (team logo + pulse) still applies.
+4. **Phase B timing:** `POST /franchise/complete-week/phase-b` starts **as soon as the franchise EOG popup appears** (`getOrStartFranchisePhaseB` in `FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js`, invoked from `gameCompletionPopup.js`). It is **not** gated on Sammy or the PGPC button. When PGPC is enabled and the user opens it, `launchPostGamePressConference` **reuses the same in-flight Promise** (single-flight per `franchise_id` + `week` in a tab) so phase B is not requested twice. When PGPC is disabled at EOG, **Go To Locker Room** awaits that same Promise and clears `franchise_complete_week_pending` on success. If PGPC is enabled and the user finishes all press answers before phase B returns, the existing **“Simming Computer Games”** waiting UI (team logo + pulse) still applies.
 
 ---
 

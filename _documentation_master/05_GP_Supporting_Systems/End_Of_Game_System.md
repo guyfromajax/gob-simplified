@@ -18,7 +18,7 @@
 5. **Key Files**:
    - `FrontEnd/static/js/phaser/gameScene.js` - Detects game completion, calls completion popup
    - `FrontEnd/static/js/phaser/finalizeGame.js` - Tournament save-result; franchise **phase-a** at EOG (see split API below)
-   - `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Creates completion popup; franchise phase B pending: starts **phase-b** in background when popup shows; **Post-Game Press Conference** opens PGPC only (`franchisePhaseBClient.js`); see `Press_Conference_System.md`
+   - `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Creates completion popup; franchise phase B pending: starts **phase-b** in background when popup shows; PGPC vs locker CTA via **`FRANCHISE_PGPC_AT_EOG_ENABLED`** (`franchisePhaseBClient.js`); see `Press_Conference_System.md`
    - `FrontEnd/static/box-score.js` - Locker room navigation; franchise **phase-b** when week finish is pending
    - `FrontEnd/static/js/shared/pageLoadOverlay.js` - Full-page pulse overlay during **phase-b** (banner + copy + green bar)
    - `BackEnd/api/franchise_routes.py` - `complete_week_phase_a`, `complete_week_phase_b`, monolithic `complete_week`
@@ -211,10 +211,10 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 
 - **Body:** `CompleteWeekPhaseBRequest`: **`franchise_id`**, **`week`** only.
 - **Preconditions:** Let `current_week` be the franchise doc’s `week`. If **`current_week > req.week`**, the week already advanced — returns **200** with **`idempotent: true`** (no-op). If **`current_week < req.week`**, **400**. If **`current_week == req.week`**, phase A must be done and `results[week]` must be a non-empty list; otherwise **409** (run phase-a or use the monolith).
-- **Behavior:** Loads saved week results from DB, runs `_complete_week_finish_cpu_and_persist` (CPU sims, recruiting, rank/prestige, EOS, week advance). Clears `post_game_status.phase_a_user_week` on successful persist.
+- **Behavior:** Loads saved week results from DB, runs `_complete_week_finish_cpu_and_persist` (CPU sims, recruiting, rank/prestige, EOS, week advance). Full turn-based CPU games (`run_simulation`) may run **in parallel** inside one phase-b request (`ThreadPoolExecutor`; optional env **`FRANCHISE_CPU_SIM_MAX_WORKERS`**, default **4**). Clears `post_game_status.phase_a_user_week` on successful persist.
 - **Response:** Extends the usual complete-week payload with `status`, `phase: "b"`, `idempotent`.
 - **Frontend triggers:**
-  - EOG popup: **`getOrStartFranchisePhaseB`** runs when the franchise completion modal is shown (`gameCompletionPopup.js`). **Post-Game Press Conference** opens PGPC (`postGamePressConference.js`), which attaches to the **same** phase-b Promise—Q&A overlaps CPU sims; waiting state uses in-modal pulse if answers finish first; then week complete + FCC. (Box-score path may still show **Sim Computer Games** when `post_game_phase_b=1`.)
+  - EOG popup: **`getOrStartFranchisePhaseB`** runs when the franchise completion modal is shown (`gameCompletionPopup.js`). **Franchise EOG primary CTA:** controlled by **`FRANCHISE_PGPC_AT_EOG_ENABLED`** in `gameCompletionPopup.js`. When **`false`** (current default), the popup shows **Box Score** + **Go To Locker Room**; **Go To Locker Room** awaits the same phase-b Promise, then clears pending `localStorage` and navigates to the FCC. When **`true`**, the legacy **Post-Game Press Conference** button is shown and **`postGamePressConference.js`** attaches to the same phase-b Promise (PGPC code paths remain in the repo). Box-score entry may still show **Sim Computer Games** when `post_game_phase_b=1`.
   - Box score: **Back to Locker Room** or **Sim Computer Games** (see below) — same POST and overlay when pending matches URL `franchise_id`. Legacy pending shape `{ body: full CompleteWeekRequest }` still POSTs monolithic **`/franchise/complete-week`**.
 
 **Monolith — `POST /franchise/complete-week`**
@@ -267,7 +267,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 
 - **`FrontEnd/static/js/phaser/gameScene.js`** - Detects game completion, calls completion popup
 - **`FrontEnd/static/js/phaser/finalizeGame.js`** - Franchise EOG: **phase-a**; builds `finalScore` with phase B pending for popup
-- **`FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`** - Completion popup; kicks off **`getOrStartFranchisePhaseB`** when franchise + phase B pending; `post_game_phase_b` on box-score link when pending
+- **`FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`** - Completion popup; kicks off **`getOrStartFranchisePhaseB`** when franchise + phase B pending; **`FRANCHISE_PGPC_AT_EOG_ENABLED`** toggles PGPC vs Box Score + locker on franchise EOG; `post_game_phase_b` on box-score link when pending
 - **`FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js`** - Single-flight `POST …/phase-b` Promise per franchise week (EOG + PGPC share)
 - **`FrontEnd/static/js/phaser/utils/postGamePressConference.js`** - PGPC modal; attaches to shared phase-b Promise + `press_conference_sessions` API
 - **`FrontEnd/static/box-score.js`** - **phase-b** when `franchise_complete_week_pending` matches; label branching per `post_game_phase_b`

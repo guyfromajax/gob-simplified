@@ -6,6 +6,12 @@ import {
 } from './pgpcSammyReminderModal.js';
 
 /**
+ * Franchise EOG: when true, primary CTA opens post-game press conference (PGPC) while phase B runs.
+ * When false, EOG shows Box Score + Go To Locker Room; PGPC / Sammy / press-conference modules stay in the codebase for a quick revert.
+ */
+export const FRANCHISE_PGPC_AT_EOG_ENABLED = false;
+
+/**
  * Push final scores (and a simple FINAL clock readout) to the court scoreboard DOM
  * so the background behind the EOG modal matches the popup, not a stale Q1/0–0 state.
  */
@@ -210,6 +216,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
           }
         : null));
 
+  const franchisePgpcOnly =
+    Boolean(franchisePhaseBPending) && FRANCHISE_PGPC_AT_EOG_ENABLED;
+
   // Box Score URL — after user side is resolved so `my_team` matches header banner on box-score.
   // post_game_phase_b=1: opened from EOG while phase B is pending; box-score shows "Sim Computer Games" when localStorage matches.
   const boxScoreParams = new URLSearchParams();
@@ -231,11 +240,11 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   }
   const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
 
-  const lockerActionHtml = franchisePhaseBPending
+  const lockerActionHtml = franchisePgpcOnly
     ? `<button type="button" class="completion-button locker-room-button franchise-pgpc-button">Post-Game Press Conference</button>`
     : `<a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>`;
 
-  const actionsSectionHtml = franchisePhaseBPending
+  const actionsSectionHtml = franchisePgpcOnly
     ? `
       <section class="gc-section gc-actions-section">
         <div class="button-container gc-actions-pgpc-only">
@@ -650,7 +659,12 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   }
 
   const pgpcBtn = popup.querySelector('.franchise-pgpc-button');
-  if (pgpcBtn && franchisePhaseBPending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
+  if (
+    pgpcBtn &&
+    franchisePgpcOnly &&
+    typeof API_CONFIG !== 'undefined' &&
+    API_CONFIG.buildUrl
+  ) {
     pgpcBtn.addEventListener('click', (e) => {
       e.preventDefault();
       if (document.getElementById('pgpc-sammy-reminder-backdrop')) return;
@@ -681,6 +695,37 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         userPrimaryColor: userTeamPrimaryColor,
         onGotIt: beginPgpc,
       });
+    });
+  }
+
+  if (
+    lockerRoomBtn &&
+    mode === 'franchise' &&
+    franchisePhaseBPending &&
+    !FRANCHISE_PGPC_AT_EOG_ENABLED &&
+    typeof API_CONFIG !== 'undefined' &&
+    API_CONFIG.buildUrl
+  ) {
+    lockerRoomBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const res = await getOrStartFranchisePhaseB(franchisePhaseBPending);
+        if (res.ok && typeof localStorage !== 'undefined') {
+          localStorage.removeItem('franchise_complete_week_pending');
+          localStorage.removeItem('franchise_eog_pgpc_snapshot');
+        } else {
+          try {
+            console.error(
+              '[gameCompletionPopup] phase-b failed before FCC navigation:',
+              res.status,
+              await res.text()
+            );
+          } catch (_) {}
+        }
+      } catch (err) {
+        console.error('[gameCompletionPopup] phase-b error before FCC navigation:', err);
+      }
+      window.location.assign(lockerRoomUrl);
     });
   }
 
