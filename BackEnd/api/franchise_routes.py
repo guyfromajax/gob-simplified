@@ -7,7 +7,9 @@ from pathlib import Path
 from bson import ObjectId
 import logging
 import math
+import os
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import uuid
 from copy import deepcopy
@@ -2437,6 +2439,38 @@ def _franchise_week_results_cover_schedule(results: list, week_games: list) -> b
     return expected == actual
 
 
+def _order_franchise_week_results_like_schedule(results: list, week_games: list) -> list:
+    """Stable schedule order (enumerate week_games) for scoreboard / downstream parity."""
+    key_to_pos: dict[frozenset, int] = {}
+    for i, pair in enumerate(week_games):
+        if not pair or len(pair) < 2:
+            continue
+        key_to_pos[frozenset({str(pair[0]), str(pair[1])})] = i
+    return sorted(
+        [dict(r) for r in results],
+        key=lambda r: key_to_pos.get(_week_result_matchup_key(r), 10**9),
+    )
+
+
+def _franchise_cpu_full_sim_max_workers() -> int:
+    """Phase 3: cap parallel turn-based CPU sims (full ``run_simulation`` path)."""
+    try:
+        return max(1, int(os.environ.get("FRANCHISE_CPU_SIM_MAX_WORKERS", "4")))
+    except (TypeError, ValueError):
+        return 4
+
+
+def _run_franchise_cpu_full_simulation_core(home_name: str, away_name: str) -> tuple[int, int, dict]:
+    """CPU-only turn-based sim; no DB writes (safe for ThreadPoolExecutor)."""
+    gm = run_simulation(home_name, away_name)
+    away_score = int(gm.score.get(away_name, 0) or 0)
+    home_score = int(gm.score.get(home_name, 0) or 0)
+    summary = summarize_game_state(gm)
+    if not isinstance(summary, dict):
+        summary = {}
+    return away_score, home_score, summary
+
+
 def _merge_phase_a_user_row_into_week_results(
     existing_week_results: list | None, user_row: dict
 ) -> list:
@@ -3303,6 +3337,8 @@ def _complete_week_finish_cpu_and_persist(
 
     # Phase 2: stable matchup keys + dedupe so phase-B retries / merged rows cannot double-count games.
     results = _dedupe_franchise_week_results_by_matchup([dict(r) for r in results])
+    # Phase 3: deferred full turn-based sims (run in parallel, persist sequentially).
+    full_jobs: list[tuple[int, Any, Any, str, str]] = []
 
     # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
     ftd_docs = list(franchise_team_data_collection.find(
@@ -3499,13 +3535,110 @@ def _complete_week_finish_cpu_and_persist(
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
         away_name = away_doc.get("name", "")
-        try:
-            gm = run_simulation(home_name, away_name)
-            away_score = gm.score.get(away_name, 0)
-            home_score = gm.score.get(home_name, 0)
-            summary = summarize_game_state(gm)
-            from BackEnd.utils.game_id_utils import generate_game_id
+        full_jobs.append((idx, away_id, home_id, away_name, home_name))
+        continue
+
+    if full_jobs:
+        max_workers = min(_franchise_cpu_full_sim_max_workers(), len(full_jobs))
+        logger.info(
+            "[COMPLETE-WEEK-PHASE3] Parallel full CPU sims franchise_id=%s week=%s jobs=%s max_workers=%s",
+            franchise_id_str,
+            week,
+            len(full_jobs),
+            max_workers,
+        )
+        future_meta = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for sched_idx, aid, hid, an, hn in full_jobs:
+                fut = executor.submit(_run_franchise_cpu_full_simulation_core, hn, an)
+                future_meta[fut] = (sched_idx, aid, hid, an, hn)
+        sim_ok: dict[int, tuple[int, int, dict]] = {}
+        sim_err: dict[int, Exception] = {}
+        for fut in as_completed(future_meta):
+            sched_idx, aid, hid, an, hn = future_meta[fut]
+            try:
+                sim_ok[sched_idx] = fut.result()
+            except Exception as ex:
+                sim_err[sched_idx] = ex
+
+        for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+            if job_idx in sim_err:
+                logger.error(
+                    "❌ [COMPLETE-WEEK] Parallel full-sim core failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
+                    franchise_id_str,
+                    week,
+                    job_idx,
+                    exc_info=sim_err[job_idx],
+                )
+                away_score = random.randint(50, 90)
+                home_score = random.randint(50, 90)
+                sim_res = _save_game_result(
+                    aid, hid, away_score, home_score, week, franchise_id=franchise_id_str
+                )
+                ex_winner = (
+                    sim_res["team1_id"]
+                    if sim_res["team1_score"] > sim_res["team2_score"]
+                    else sim_res["team2_id"]
+                )
+                ex_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
+                _award_gp_sim(ex_winner, ex_g, (aid, hid))
+                if week in ft.EOS_WEEKS and week_games_meta and job_idx < len(week_games_meta):
+                    g_fb = week_games_meta[job_idx]
+                    wid_fb = ft._eos_team_id_canonical(ex_winner) or str(ex_winner)
+                    score_fb = {
+                        "home": int(sim_res["team2_score"]),
+                        "away": int(sim_res["team1_score"]),
+                    }
+                    ph = g_fb.get("phase")
+                    if ph == "conference":
+                        ft.save_conference_game_result(
+                            franchise_doc,
+                            g_fb["conference"],
+                            g_fb["round"],
+                            g_fb["matchup_index"],
+                            "",
+                            wid_fb,
+                            score_fb,
+                        )
+                    elif ph == "region":
+                        ft.save_region_game_result(
+                            franchise_doc,
+                            g_fb["region"],
+                            g_fb["round"],
+                            g_fb["matchup_index"],
+                            "",
+                            wid_fb,
+                            score_fb,
+                        )
+                    elif ph == "national":
+                        ft.save_national_game_result(
+                            franchise_doc,
+                            g_fb["round"],
+                            g_fb["matchup_index"],
+                            "",
+                            wid_fb,
+                            score_fb,
+                        )
+                    logger.warning(
+                        "[EOS-BRACKET-DEBUG] eos_full_sim_fallback_bracket_sync week=%s idx=%s phase=%s conf=%s",
+                        week,
+                        job_idx,
+                        ph,
+                        g_fb.get("conference"),
+                    )
+                results.append(
+                    {
+                        "away_id": sim_res["team1_id"],
+                        "home_id": sim_res["team2_id"],
+                        "away_score": sim_res["team1_score"],
+                        "home_score": sim_res["team2_score"],
+                    }
+                )
+                continue
+
+            away_score, home_score, summary = sim_ok[job_idx]
             computer_game_id = generate_game_id()
+            summary = dict(summary)
             summary["_id"] = computer_game_id
             summary["franchise_id"] = str(franchise_id_str)
             summary["week"] = week
@@ -3513,10 +3646,11 @@ def _complete_week_finish_cpu_and_persist(
             stat_updater.finalize_game(
                 computer_game_id, mode="franchise", franchise_id=franchise_id_str
             )
-            sim_res = _save_game_result(away_id, home_id, away_score, home_score, week, franchise_id=franchise_id_str, game_id=computer_game_id)
-            # Run team attribute update once for this computer game and set on doc for box score display
-            home_id_str = _normalize_team_id_to_string(home_id) or str(home_id)
-            away_id_str = _normalize_team_id_to_string(away_id) or str(away_id)
+            sim_res = _save_game_result(
+                aid, hid, away_score, home_score, week, franchise_id=franchise_id_str, game_id=computer_game_id
+            )
+            home_id_str = _normalize_team_id_to_string(hid) or str(hid)
+            away_id_str = _normalize_team_id_to_string(aid) or str(aid)
             if home_score > away_score:
                 winner_id_str, loser_id_str = home_id_str, away_id_str
                 ws, ls = home_score, away_score
@@ -3533,96 +3667,52 @@ def _complete_week_finish_cpu_and_persist(
                 winner_score=ws,
                 loser_score=ls,
             )
-            if week_games_meta and idx < len(week_games_meta):
-                g = week_games_meta[idx]
-                winner_id = home_id if home_score > away_score else away_id
+            if week_games_meta and job_idx < len(week_games_meta):
+                g = week_games_meta[job_idx]
+                winner_id = hid if home_score > away_score else aid
                 score = {"home": home_score, "away": away_score}
                 if g["phase"] == "conference":
                     ft.save_conference_game_result(
-                        franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                        str(computer_game_id), str(winner_id), score,
+                        franchise_doc,
+                        g["conference"],
+                        g["round"],
+                        g["matchup_index"],
+                        str(computer_game_id),
+                        str(winner_id),
+                        score,
                     )
                 elif g["phase"] == "region":
                     ft.save_region_game_result(
-                        franchise_doc, g["region"], g["round"], g["matchup_index"],
-                        str(computer_game_id), str(winner_id), score,
+                        franchise_doc,
+                        g["region"],
+                        g["round"],
+                        g["matchup_index"],
+                        str(computer_game_id),
+                        str(winner_id),
+                        score,
                     )
                 elif g["phase"] == "national":
                     ft.save_national_game_result(
-                        franchise_doc, g["round"], g["matchup_index"],
-                        str(computer_game_id), str(winner_id), score,
+                        franchise_doc,
+                        g["round"],
+                        g["matchup_index"],
+                        str(computer_game_id),
+                        str(winner_id),
+                        score,
                     )
-            winner_oid = home_id if home_score > away_score else away_id
-            sim_eos_g = week_games_meta[idx] if week_games_meta and idx < len(week_games_meta) else None
-            _award_gp_sim(winner_oid, sim_eos_g, (away_id, home_id))
-        except Exception:
-            logger.exception(
-                "❌ [COMPLETE-WEEK] EOS full-sim path failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
-                franchise_id_str,
-                week,
-                idx,
-            )
-            away_score = random.randint(50, 90)
-            home_score = random.randint(50, 90)
-            sim_res = _save_game_result(away_id, home_id, away_score, home_score, week, franchise_id=franchise_id_str)
-            ex_winner = (
-                sim_res["team1_id"]
-                if sim_res["team1_score"] > sim_res["team2_score"]
-                else sim_res["team2_id"]
-            )
-            ex_g = week_games_meta[idx] if week_games_meta and idx < len(week_games_meta) else None
-            _award_gp_sim(ex_winner, ex_g, (away_id, home_id))
-            # Try block wrote bracket; this path previously did not → stuck at 3/4 R1 winners.
-            if week in ft.EOS_WEEKS and week_games_meta and idx < len(week_games_meta):
-                g_fb = week_games_meta[idx]
-                wid_fb = ft._eos_team_id_canonical(ex_winner) or str(ex_winner)
-                score_fb = {
-                    "home": int(sim_res["team2_score"]),
-                    "away": int(sim_res["team1_score"]),
+            winner_oid = hid if home_score > away_score else aid
+            sim_eos_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
+            _award_gp_sim(winner_oid, sim_eos_g, (aid, hid))
+            results.append(
+                {
+                    "away_id": sim_res["team1_id"],
+                    "home_id": sim_res["team2_id"],
+                    "away_score": sim_res["team1_score"],
+                    "home_score": sim_res["team2_score"],
                 }
-                ph = g_fb.get("phase")
-                if ph == "conference":
-                    ft.save_conference_game_result(
-                        franchise_doc,
-                        g_fb["conference"],
-                        g_fb["round"],
-                        g_fb["matchup_index"],
-                        "",
-                        wid_fb,
-                        score_fb,
-                    )
-                elif ph == "region":
-                    ft.save_region_game_result(
-                        franchise_doc,
-                        g_fb["region"],
-                        g_fb["round"],
-                        g_fb["matchup_index"],
-                        "",
-                        wid_fb,
-                        score_fb,
-                    )
-                elif ph == "national":
-                    ft.save_national_game_result(
-                        franchise_doc,
-                        g_fb["round"],
-                        g_fb["matchup_index"],
-                        "",
-                        wid_fb,
-                        score_fb,
-                    )
-                logger.warning(
-                    "[EOS-BRACKET-DEBUG] eos_full_sim_fallback_bracket_sync week=%s idx=%s phase=%s conf=%s",
-                    week,
-                    idx,
-                    ph,
-                    g_fb.get("conference"),
-                )
-        results.append({
-            "away_id": sim_res["team1_id"],
-            "home_id": sim_res["team2_id"],
-            "away_score": sim_res["team1_score"],
-            "home_score": sim_res["team2_score"],
-        })
+            )
+
+    results = _order_franchise_week_results_like_schedule(results, week_games)
 
     finalized = _try_finalize_franchise_week_if_complete(
         franchise_doc=franchise_doc,

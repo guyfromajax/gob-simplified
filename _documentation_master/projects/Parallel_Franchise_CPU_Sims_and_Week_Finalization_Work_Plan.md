@@ -131,13 +131,12 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 - [x] Stable matchup id: **`_week_result_matchup_key`** (documented) plus **`_expected_franchise_week_matchup_key_set`**, **`_week_results_list_contains_matchup`**, **`_franchise_week_results_cover_schedule`** in `BackEnd/api/franchise_routes.py`.
 - [x] Dedupe at CPU loop start (**`_dedupe_franchise_week_results_by_matchup`**); skip CPU iterations when that matchup already appears in `results`; gate closure with **`_try_finalize_franchise_week_if_complete`** → **`_finalize_franchise_week_after_cpu_games`** only when the schedule is fully covered (else **HTTP 500**, no week advance).
-- [ ] Phase 3: job pool + invoke **`_try_finalize_franchise_week_if_complete`** after each per-game persist.
+- [ ] Optional: external job pool invoking **`_try_finalize_franchise_week_if_complete`** after each per-game persist (not needed for current in-process `ThreadPoolExecutor` phase B).
 
 ### Phase 3 — Parallel execution
 
-- [ ] Server: enqueue or pool CPU sims (concurrency limit, timeout, structured logging).
-- [ ] Start jobs at agreed trigger (e.g. user enters game for week W).
-- [ ] Client: EOG flow waits on **week finalized** not on “single long HTTP request” (unless you keep one long poll that waits server-side).
+- [x] **In-process parallel (phase B unchanged from client):** full `run_simulation` CPU games are batched with **`ThreadPoolExecutor`** (`as_completed`); DB / EOS / GP persist **sequentially** in schedule index order. Env **`FRANCHISE_CPU_SIM_MAX_WORKERS`** (default **4**, minimum 1). Helpers: **`_run_franchise_cpu_full_simulation_core`**, **`_franchise_cpu_full_sim_max_workers`**, **`_order_franchise_week_results_like_schedule`** in `franchise_routes.py`. Log line **`[COMPLETE-WEEK-PHASE3]`**.
+- [ ] Optional later: separate worker process / queue, start jobs earlier than EOG, or client polling (not required while phase B stays one HTTP request).
 
 ### Phase 4 — UX + cleanup
 
@@ -168,7 +167,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ## 7. Next concrete step
 
-Phase 0 **code inventory is done** (§2.4). **Phase 1:** `_finalize_franchise_week_after_cpu_games`. **Phase 2 (partial):** matchup-key helpers, dedupe, skip-if-present, **`_try_finalize_franchise_week_if_complete`** in `franchise_routes.py`. **Next:** Phase 3 parallel workers + tests; product sign-off for PGPC / job timing.
+Phase 0 **code inventory is done** (§2.4). **Phase 1:** `_finalize_franchise_week_after_cpu_games`. **Phase 2:** matchup keys, dedupe, skip-if-present, **`_try_finalize_franchise_week_if_complete`**. **Phase 3 (in-process):** parallel full CPU sims inside phase B; **`FRANCHISE_CPU_SIM_MAX_WORKERS`**. **Next:** optional separate job queue / earlier triggers; tests; product sign-off for PGPC if still open.
 
 ---
 
