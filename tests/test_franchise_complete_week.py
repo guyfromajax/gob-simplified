@@ -348,6 +348,95 @@ def test_try_finalize_franchise_week_ran_closure_when_schedule_complete(caplog):
     )
 
 
+def test_start_cpu_sims_partial_persists_without_advancing_week():
+    """POST start-cpu-sims runs non-user CPUs only; franchise week does not advance."""
+    franchise_id, ids = setup_franchise()
+    with patch.object(
+        franchise_routes,
+        "_run_franchise_cpu_full_simulation_core",
+        side_effect=_fake_franchise_cpu_full_sim,
+    ):
+        res = client.post(
+            "/franchise/complete-week/start-cpu-sims",
+            json={"franchise_id": franchise_id, "week": 1},
+        )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data.get("phase") == "start_cpu_sims"
+    assert data.get("results_count") == 1
+    doc = db.franchises.find_one({"_id": ObjectId(franchise_id)})
+    assert doc.get("week") == 1
+    rows = doc.get("results", {}).get("1") or []
+    assert len(rows) == 1
+    cd = _week_result_for_pair(rows, ids[2], ids[3])
+    assert int(cd["away_score"]) == 54 and int(cd["home_score"]) == 58
+    db.games.delete_many({})
+    db.teams.delete_many({})
+    db.franchises.delete_many({})
+
+
+def test_start_cpu_sims_409_when_phase_a_already_done():
+    """After phase A, start-cpu-sims is rejected; client should use phase-b."""
+    franchise_id, ids = setup_franchise()
+    db.franchises.update_one(
+        {"_id": ObjectId(franchise_id)},
+        {"$set": {"post_game_status.phase_a_user_week": 1}},
+    )
+    res = client.post(
+        "/franchise/complete-week/start-cpu-sims",
+        json={"franchise_id": franchise_id, "week": 1},
+    )
+    assert res.status_code == 409
+    db.games.delete_many({})
+    db.teams.delete_many({})
+    db.franchises.delete_many({})
+
+
+def test_start_cpu_then_phase_a_phase_b_advances_week():
+    """CPU sims at start-cpu-sims; phase A adds user row; phase B finalizes and advances week."""
+    franchise_id, ids = setup_franchise()
+    with patch.object(
+        franchise_routes,
+        "_run_franchise_cpu_full_simulation_core",
+        side_effect=_fake_franchise_cpu_full_sim,
+    ):
+        rs = client.post(
+            "/franchise/complete-week/start-cpu-sims",
+            json={"franchise_id": franchise_id, "week": 1},
+        )
+    assert rs.status_code == 200, rs.text
+
+    payload = {
+        "franchise_id": franchise_id,
+        "week": 1,
+        "result": {"team1_id": "A", "team2_id": "B", "team1_score": 70, "team2_score": 60},
+    }
+    with patch.object(
+        franchise_routes,
+        "_run_franchise_cpu_full_simulation_core",
+        side_effect=_fake_franchise_cpu_full_sim,
+    ):
+        ra = client.post("/franchise/complete-week/phase-a", json=payload)
+    assert ra.status_code == 200, ra.text
+
+    with patch.object(
+        franchise_routes,
+        "_run_franchise_cpu_full_simulation_core",
+        side_effect=_fake_franchise_cpu_full_sim,
+    ):
+        rb = client.post(
+            "/franchise/complete-week/phase-b",
+            json={"franchise_id": franchise_id, "week": 1},
+        )
+    assert rb.status_code == 200, rb.text
+    doc = db.franchises.find_one({"_id": ObjectId(franchise_id)})
+    assert doc["week"] == 2
+    assert len(doc.get("results", {}).get("1") or []) == 2
+    db.games.delete_many({})
+    db.teams.delete_many({})
+    db.franchises.delete_many({})
+
+
 def test_phase_a_then_phase_b_then_second_phase_b_is_idempotent():
     """Split complete-week: phase A persists user row; phase B runs CPU + closure; repeat phase B is no-op."""
     franchise_id, ids = setup_franchise()

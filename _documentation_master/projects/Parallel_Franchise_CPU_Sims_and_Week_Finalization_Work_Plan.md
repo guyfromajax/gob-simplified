@@ -179,7 +179,8 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 |------|--------|
 | EOG + phase A | `finalizeGame.js`, `End_Of_Game_System.md` |
 | Phase B trigger (v1) | `gameCompletionPopup.js`, `franchisePhaseBClient.js`, `postGamePressConference.js` |
-| v2 CPU start hook | `bootGame.js` (Play Quarter Q1) + new `start-cpu-sims` client helper (TBD) |
+| v2 CPU start hook | `bootGame.js` (Play Quarter Q1) — **call `POST /franchise/complete-week/start-cpu-sims`** (not wired yet) |
+| start-cpu-sims API | `franchise_routes.py` — `complete_week_start_cpu_sims`, **`persist_cpu_results_only`** |
 | Box score pending | `box-score.js`, `pageLoadOverlay.js` |
 | API | `franchise_routes.py` — `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`, **`_finalize_franchise_week_after_cpu_games`**, **`_try_finalize_franchise_week_if_complete`** (`[TRY-FINALIZE-WEEK]` logs), matchup-key helpers, `_complete_week_process_user_game_block` |
 | Tests | `tests/test_franchise_complete_week.py` — try-finalize + phase-B idempotent |
@@ -202,7 +203,7 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 | Piece | Role |
 |-------|------|
-| **`POST …/franchise/complete-week/start-cpu-sims`** (name TBD) | Body: `franchise_id`, `week`. **Idempotent** per matchup. Runs **non-user** week games only. Persists per-game results (games + franchise `results[week]` rows) using existing loop helpers. **Does not** advance week; **`_try_finalize`** returns **`waiting`** until the user row exists. |
+| **`POST /franchise/complete-week/start-cpu-sims`** | Body: `franchise_id`, `week` (`CompleteWeekStartCpuSimsRequest`). **409** if phase A already ran for that week. Runs **non-user** matchups via **`_complete_week_finish_cpu_and_persist(..., persist_cpu_results_only=True)`** — persists **`results.{week}`** (+ EOS tournament blobs on EOS weeks). **Does not** advance `franchise.week`; no week-closure until phase B when user row exists. |
 | **`complete_week_phase_a`** | Unchanged in principle: user game → user row + `post_game_status.phase_a_user_week`. |
 | **`complete_week_phase_b`** (or slim follow-up) | After reload: ensure **all** CPUs present (no-op for already-simmed matchups), merge user row, call **`_try_finalize_franchise_week_if_complete`** → **`_finalize_franchise_week_after_cpu_games`** when complete. |
 
@@ -222,9 +223,9 @@ Each iteration may: read `db.games` for existing doc; `_sync_eos_bracket_from_ex
 
 ### 9.4 Implementation checklist (suggested order)
 
-- [ ] **Spike:** Run CPU-only path with **`results`** missing user row; confirm **`_franchise_week_results_cover_schedule`** is false until phase A merge; confirm **`_try_finalize`** runs closure only after full slate.
-- [ ] **Extract or parameterize** `_complete_week_finish_cpu_and_persist` (or sibling) so “CPU loop only, no finalize” is callable from **`start-cpu-sims`** without duplicating distant/full sim branches.
-- [ ] **Implement `start-cpu-sims`**: auth/ownership, guards (`franchise.week == week`, user scheduled this week), idempotent skips, logging (`[START-CPU-SIMS]`).
+- [x] **Spike + parameterize:** **`persist_cpu_results_only`** on **`_complete_week_finish_cpu_and_persist`** — partial `$set` of **`results.{week}`** (+ EOS blobs); no **`_try_finalize`** / no week advance.
+- [x] **`POST /franchise/complete-week/start-cpu-sims`** — guards: `franchise.week == req.week`, rejects if phase A done (**409**), logs **`[START-CPU-SIMS]`**. Tests in **`tests/test_franchise_complete_week.py`**.
+- [ ] **Auth / ownership** — same pattern as **`complete_week_phase_a`** today (no `Depends` on these routes); tighten if product requires it.
 - [ ] **Adjust phase B** (or post–phase-A finalize entry) for “CPUs may already exist.”
 - [ ] **Client:** hook + single-flight + error surfacing (optional toast; must not brick Q1).
 - [ ] **Tests:** idempotent `start-cpu-sims`; phase A + B with CPUs pre-filled; week does not advance until user row present.

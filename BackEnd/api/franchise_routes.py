@@ -1584,6 +1584,13 @@ class CompleteWeekPhaseBRequest(BaseModel):
     week: int
 
 
+class CompleteWeekStartCpuSimsRequest(BaseModel):
+    """Start simming non-user CPU games for a week before phase A (e.g. first Play Quarter)."""
+
+    franchise_id: str
+    week: int
+
+
 class SaveRecruitingOrdersRequest(BaseModel):
     franchise_id: str
     recruit_ids: list[str] | None = None
@@ -3332,6 +3339,8 @@ def _complete_week_finish_cpu_and_persist(
     team2_id: Any,
     results: list,
     community_highlight_pending: dict | None = None,
+    *,
+    persist_cpu_results_only: bool = False,
 ) -> dict:
     def _award_gp_sim(winner_tid: Any, eos_g: dict | None, matchup_ids: tuple[Any, Any]) -> None:
         eos_meta = eos_g if week in ft.EOS_WEEKS else None
@@ -3735,6 +3744,32 @@ def _complete_week_finish_cpu_and_persist(
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
 
+    if persist_cpu_results_only:
+        wk = str(week)
+        partial_update: dict[str, Any] = {f"results.{wk}": results}
+        if week in ft.EOS_WEEKS:
+            for _eos_key in ("conference_tournaments", "region_tournaments", "national_tournament"):
+                _eos_val = franchise_doc.get(_eos_key)
+                if _eos_val is not None:
+                    partial_update[_eos_key] = _eos_val
+        db.franchises.update_one(
+            {"_id": franchise_id},
+            {"$set": partial_update},
+        )
+        logger.info(
+            "[START-CPU-SIMS] persisted partial week results franchise_id=%s week=%s row_count=%s",
+            franchise_id_str,
+            week,
+            len(results),
+        )
+        return {
+            "status": "ok",
+            "phase": "start_cpu_sims",
+            "week": week,
+            "results_count": len(results),
+            "persist_cpu_results_only": True,
+        }
+
     finalized = _try_finalize_franchise_week_if_complete(
         franchise_doc=franchise_doc,
         franchise_id=franchise_id,
@@ -3945,6 +3980,79 @@ def complete_week_phase_a(req: CompleteWeekRequest):
         "week": req.week,
         "results_count": len(merged),
     }
+
+
+@router.post("/franchise/complete-week/start-cpu-sims")
+def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
+    """
+    Run distant + full CPU sims for all **non-user** week matchups and persist ``results.{week}``
+    without advancing the franchise week. Idempotent per matchup (skips rows / games already present).
+
+    Call when the user begins their franchise game for this week (e.g. first Play Quarter). After the
+    user game is saved (phase A), phase B merges the user row and finalizes the week when the slate is complete.
+    """
+    logger.info(
+        "[START-CPU-SIMS] entry franchise_id=%s week=%s",
+        req.franchise_id,
+        req.week,
+    )
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    current_week = int(franchise_doc.get("week", 1))
+    if current_week != req.week:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Franchise week is {current_week}, not {req.week}; cannot start CPU sims for this request.",
+        )
+
+    if _phase_a_user_week_done(franchise_doc, req.week):
+        raise HTTPException(
+            status_code=409,
+            detail="User game for this week is already saved (phase A). Use POST /franchise/complete-week/phase-b to finalize.",
+        )
+
+    fake_req = SimpleNamespace(week=req.week, franchise_id=req.franchise_id)
+    week_games, week_games_meta, eos_current_round = _resolve_complete_week_week_games(
+        franchise_doc, fake_req  # type: ignore[arg-type]
+    )
+    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    wk = str(req.week)
+    saved_existing = franchise_doc.get("results", {}).get(wk)
+    saved_list = saved_existing if isinstance(saved_existing, list) else []
+    team1_id, team2_id = _find_user_franchise_week_matchup_normalized_ids(
+        week_games,
+        user_team_id_str,
+        week=req.week,
+        saved_week_results=saved_list,
+    )
+    results = [dict(r) for r in saved_list]
+
+    out = _complete_week_finish_cpu_and_persist(
+        franchise_doc,
+        franchise_id,
+        req.franchise_id,
+        req.week,
+        week_games,
+        week_games_meta,
+        eos_current_round,
+        user_team_id_str,
+        user_eos_sim_scope,
+        team1_id,
+        team2_id,
+        results,
+        community_highlight_pending=None,
+        persist_cpu_results_only=True,
+    )
+    out["idempotent"] = False
+    return out
 
 
 @router.post("/franchise/complete-week/phase-b")
