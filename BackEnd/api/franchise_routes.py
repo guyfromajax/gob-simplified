@@ -2613,6 +2613,16 @@ def _week_results_list_contains_matchup(
     return False
 
 
+def _week_results_row_for_matchup(
+    results: list, away_id: Any, home_id: Any
+) -> dict | None:
+    k = frozenset({str(away_id), str(home_id)})
+    for r in results:
+        if _week_result_matchup_key(r) == k:
+            return dict(r)
+    return None
+
+
 def _franchise_week_results_cover_schedule(results: list, week_games: list) -> bool:
     """True iff deduped results contain exactly one row per scheduled matchup in week_games."""
     deduped = _dedupe_franchise_week_results_by_matchup(results)
@@ -3308,6 +3318,100 @@ def _sync_eos_bracket_from_existing_game_doc(
         )
 
 
+def _sync_eos_bracket_from_result_row(
+    franchise_doc: dict,
+    *,
+    row: dict,
+    away_id: Any,
+    home_id: Any,
+    week: int,
+    franchise_id_str: str,
+    g: dict[str, Any],
+) -> None:
+    """Write EOS bracket winner/scores from an already-completed results row.
+
+    Some phase-B retries can see a completed franchise ``results.week`` row before a
+    matching ``games`` document exists. In that case, preserve the actual completed
+    score and create a minimal game record so the bracket gets both winner and game_id.
+    """
+    row_away = row.get("away_id")
+    row_home = row.get("home_id")
+    row_away_s = int(row.get("away_score", 0) or 0)
+    row_home_s = int(row.get("home_score", 0) or 0)
+    sched_away = str(away_id)
+    sched_home = str(home_id)
+
+    if str(row_away) == sched_away and str(row_home) == sched_home:
+        away_s, home_s = row_away_s, row_home_s
+    elif str(row_away) == sched_home and str(row_home) == sched_away:
+        away_s, home_s = row_home_s, row_away_s
+    else:
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] result_row_team_order_unexpected row_away=%s row_home=%s sched_away=%s sched_home=%s",
+            row_away,
+            row_home,
+            sched_away,
+            sched_home,
+        )
+        away_s, home_s = row_away_s, row_home_s
+
+    game_id = generate_game_id()
+    _save_game_result(
+        away_id,
+        home_id,
+        away_s,
+        home_s,
+        week,
+        franchise_id=franchise_id_str,
+        game_id=game_id,
+    )
+
+    winner_raw = home_id if home_s >= away_s else away_id
+    wid = ft._eos_team_id_canonical(winner_raw) or str(winner_raw)
+    score = {"home": home_s, "away": away_s}
+    logger.warning(
+        "[EOS-BRACKET-DEBUG] sync_from_result_row_apply winner=%s home_s=%s away_s=%s phase=%s conf=%s round=%s midx=%s game_id=%s",
+        wid[:16] if wid else "",
+        home_s,
+        away_s,
+        g.get("phase"),
+        g.get("conference") or g.get("region"),
+        g.get("round"),
+        g.get("matchup_index"),
+        game_id[:12],
+    )
+    phase = g.get("phase")
+    if phase == "conference":
+        ft.save_conference_game_result(
+            franchise_doc,
+            g["conference"],
+            g["round"],
+            g["matchup_index"],
+            game_id,
+            wid,
+            score,
+        )
+    elif phase == "region":
+        ft.save_region_game_result(
+            franchise_doc,
+            g["region"],
+            g["round"],
+            g["matchup_index"],
+            game_id,
+            wid,
+            score,
+        )
+    elif phase == "national":
+        ft.save_national_game_result(
+            franchise_doc,
+            g["round"],
+            g["matchup_index"],
+            game_id,
+            wid,
+            score,
+        )
+
+
 def _finalize_franchise_week_after_cpu_games(
     franchise_doc: dict,
     franchise_id: ObjectId,
@@ -3794,30 +3898,41 @@ def _complete_week_finish_cpu_and_persist(
         # start-cpu-sims (or retries) can persist results.{week} rows before phase B runs. An early
         # continue here used to skip the entire block — including _sync_eos_bracket_from_existing_game_doc
         # — leaving bracket.round2 (etc.) null while results looked complete (week 28 semis stuck).
-        if _week_results_list_contains_matchup(results, away_id, home_id):
+        existing_result_row = _week_results_row_for_matchup(results, away_id, home_id)
+        if existing_result_row:
             if (
                 week in ft.EOS_WEEKS
                 and week_games_meta
                 and idx < len(week_games_meta)
-                and existing
             ):
                 g_meta = week_games_meta[idx]
-                logger.warning(
-                    "[EOS-BRACKET-DEBUG] sync_from_existing_results_row idx=%s phase=%s conf=%s round=%s midx=%s game_id=%s",
-                    idx,
-                    g_meta.get("phase"),
-                    g_meta.get("conference"),
-                    g_meta.get("round"),
-                    g_meta.get("matchup_index"),
-                    str(existing.get("_id")),
-                )
-                _sync_eos_bracket_from_existing_game_doc(
-                    franchise_doc,
-                    existing=existing,
-                    away_id=away_id,
-                    home_id=home_id,
-                    g=g_meta,
-                )
+                if existing:
+                    logger.warning(
+                        "[EOS-BRACKET-DEBUG] sync_from_existing_results_row idx=%s phase=%s conf=%s round=%s midx=%s game_id=%s",
+                        idx,
+                        g_meta.get("phase"),
+                        g_meta.get("conference"),
+                        g_meta.get("round"),
+                        g_meta.get("matchup_index"),
+                        str(existing.get("_id")),
+                    )
+                    _sync_eos_bracket_from_existing_game_doc(
+                        franchise_doc,
+                        existing=existing,
+                        away_id=away_id,
+                        home_id=home_id,
+                        g=g_meta,
+                    )
+                else:
+                    _sync_eos_bracket_from_result_row(
+                        franchise_doc,
+                        row=existing_result_row,
+                        away_id=away_id,
+                        home_id=home_id,
+                        week=week,
+                        franchise_id_str=franchise_id_str,
+                        g=g_meta,
+                    )
             continue
         if existing:
             results.append({
