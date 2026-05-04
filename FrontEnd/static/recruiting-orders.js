@@ -961,6 +961,8 @@
   }
 
   function handleSaveClick() {
+    if (!currentEntries.length) return;
+    Recruiting.playSound('confirm-2.mp3');
     saveOrders(function () {
       if (isWeek35Mode()) {
         showModal({

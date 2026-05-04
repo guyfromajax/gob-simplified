@@ -89,6 +89,33 @@ RECRUIT_POSITION_WEIGHTS: Dict[str, Dict[str, float]] = {
     },
 }
 
+# Recruits under 71 inches: PF/C shift weight from height into RB/ST (PF) or SC/ID (C). See Position_Ratings_System.md.
+RECRUIT_SHORT_HEIGHT_THRESHOLD_IN = 71.0
+
+RECRUIT_PF_WEIGHTS_SHORT: Dict[str, float] = {
+    "RB": 0.35,
+    "ST": 0.35,
+    "IQ": 0.05,
+    "SC": 0.05,
+    "ID": 0.15,
+    "height": 0.00,
+    "FT": 0.05,
+    "PS": 0.00,
+    "SH": 0.00,
+}
+
+RECRUIT_C_WEIGHTS_SHORT: Dict[str, float] = {
+    "SC": 0.35,
+    "ID": 0.35,
+    "height": 0.00,
+    "ST": 0.15,
+    "RB": 0.15,
+    "PS": 0.00,
+    "IQ": 0.00,
+    "FT": 0.00,
+    "AG": 0.00,
+}
+
 PositionRatingProfile = Literal["player", "recruit"]
 
 
@@ -123,6 +150,33 @@ def _height_to_rating(height: float) -> float:
     return 1 + (h - 60) * (99 / 24)
 
 
+def _recruit_height_inches(player: dict) -> float:
+    try:
+        return float(_get_attr(player, "height"))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _recruit_uses_short_big_weights(player: dict) -> bool:
+    """True when ``profile == recruit`` should use PF/C short-height tables (height < 71 in.)."""
+
+    return _recruit_height_inches(player) < RECRUIT_SHORT_HEIGHT_THRESHOLD_IN
+
+
+def _position_weights_table(player: dict, profile: PositionRatingProfile) -> Dict[str, Dict[str, float]]:
+    if profile != "recruit":
+        return POSITION_WEIGHTS
+    base = RECRUIT_POSITION_WEIGHTS
+    if not _recruit_uses_short_big_weights(player):
+        return base
+    # Shallow-copy dict and replace PF/C only so other positions stay shared.
+    return {
+        **{k: v for k, v in base.items() if k not in ("PF", "C")},
+        "PF": RECRUIT_PF_WEIGHTS_SHORT,
+        "C": RECRUIT_C_WEIGHTS_SHORT,
+    }
+
+
 def _clamp(value: float, lower: int = 1, upper: int | None = 100) -> int:
     """Round and clamp a value to an integer with a lower bound and optional upper bound."""
 
@@ -141,7 +195,7 @@ def compute_position_ratings(player: dict, profile: PositionRatingProfile = "pla
 
     ratings: Dict[str, int] = {}
     height_rating = _height_to_rating(_get_attr(player, "height"))
-    position_weights = RECRUIT_POSITION_WEIGHTS if profile == "recruit" else POSITION_WEIGHTS
+    position_weights = _position_weights_table(player, profile)
 
     for pos, weights in position_weights.items():
         total = 0.0

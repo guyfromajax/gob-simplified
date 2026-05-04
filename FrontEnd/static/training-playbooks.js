@@ -7,6 +7,18 @@
   const STORAGE_MODE = 'gob_playbook_training_mode';
   const STORAGE_INSTALL = 'gob_training_team_drills_snapshot';
 
+  function playSound(filename) {
+    try {
+      const base =
+        typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath
+          ? API_CONFIG.buildStaticPath('/sounds/')
+          : '/sounds/';
+      const a = new Audio(base + encodeURIComponent(filename));
+      a.volume = 0.7;
+      a.play().catch(() => {});
+    } catch (e) {}
+  }
+
   /** Man variants disabled for custom training CMD selection (temporary). */
   const DISABLED_MAN_DEFENSE_IDS = new Set(['man_pressure', 'man_loose']);
 
@@ -250,6 +262,7 @@
 
     if (!disabled) {
       btn.addEventListener('click', () => {
+        playSound('click-tiny.wav');
         if (selectedSet.has(row.id)) selectedSet.delete(row.id);
         else selectedSet.add(row.id);
         syncCardVisual(btn, row.id, selectedSet);
@@ -315,6 +328,7 @@
   }
 
   function persistAndLeave() {
+    playSound('confirm-2.mp3');
     const payload = {
       offense: Array.from(offenseSel),
       defense: Array.from(defenseSel).filter((id) => !DISABLED_MAN_DEFENSE_IDS.has(String(id))),

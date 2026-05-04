@@ -48,3 +48,21 @@ def test_recruit_center_weights_scoring_and_inside_defense_more_than_height():
     player = {"height": 90, "attributes": {"SC": 100, "ID": 100}}
     ratings = compute_position_ratings(player, profile="recruit")
     assert ratings["C"] == 70
+
+
+def test_short_recruit_pf_and_c_drop_height_weight_from_sum():
+    """Height < 71 in.: PF/C use 0% height; tall recruit still applies 10% height to PF/C."""
+    tall = {"height": 84, "attributes": {}}
+    short = {"height": 70, "attributes": {}}
+    assert compute_position_ratings(tall, profile="recruit")["PF"] == 10
+    assert compute_position_ratings(short, profile="recruit")["PF"] == 1
+    assert compute_position_ratings(tall, profile="recruit")["C"] == 10
+    assert compute_position_ratings(short, profile="recruit")["C"] == 1
+
+
+def test_player_short_height_does_not_use_recruit_short_pf_weights():
+    """Roster players always use POSITION_WEIGHTS (no <71 recruit branch)."""
+    player = {"height": 70, "attributes": {}}
+    recruit = {"height": 70, "attributes": {}}
+    assert compute_position_ratings(player)["PF"] > 1
+    assert compute_position_ratings(recruit, profile="recruit")["PF"] == 1

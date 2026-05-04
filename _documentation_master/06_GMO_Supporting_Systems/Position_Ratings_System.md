@@ -27,7 +27,7 @@ Height (in inches) is converted to a 1–100 rating using a linear scale:
 - Formula: `1 + (height - 60) × (99 / 24)`
 - Values below 60 clamp to 1, values above 84 clamp to 100
 
-Height is used as a direct factor in **C** position calculations (not PF).
+Height is used as a direct factor in **PF** and **C** position calculations (weights differ for recruits vs roster players; see PF/C sections). For **recruits** under **71 inches**, PF/C use alternate tables that move weight off **height** into **RB/ST** (PF) or **SC/ID** (C).
 
 ## Position Weights
 
@@ -72,12 +72,12 @@ SH, OD, (AG, SC), (IQ, PS)
 ### Power Forward (PF)
 RB, ST, ID, (IQ, SC)
 
-- **RB** (Rebounding): 25% (Recruits 30%)
-- **ST** (Strength): 25% (Recruits 30%)
+- **RB** (Rebounding): 25% (Recruits 30%) (if recruit's height < 71, 35%)
+- **ST** (Strength): 25% (Recruits 30%) (if recruit's height < 71, 35%)
 - **IQ** (Basketball IQ): 5%
 - **SC** (Scoring): 5%
 - **ID** (Inside Defense): 15%
-- **height**: 20% (Recruits 10%)
+- **height**: 20% (Recruits 10%) (if recruit's height < 71, 0%)
 - **FT** (Free Throw): 5%
 - **PS** (Passing): 0%
 - **SH** (Shooting): 0%
@@ -85,9 +85,9 @@ RB, ST, ID, (IQ, SC)
 ### Center (C)
 (SC, ID, height), (ST, RB)
 
-- **SC** (Scoring): 15% (Recruits: 30%)
-- **ID** (Inside Defense): 15% (Recruits: 30%)
-- **height**: 40% (Recruits: 10%)
+- **SC** (Scoring): 15% (Recruits: 30%) (if recruit's height < 71, 35%)
+- **ID** (Inside Defense): 15% (Recruits: 30%) (if recruit's height < 71, 35%)
+- **height**: 40% (Recruits: 10%) (if recruit's height < 71, 0%)
 - **ST** (Strength): 15%
 - **RB** (Rebounding): 15%
 - **PS** (Passing): 0%
@@ -132,7 +132,7 @@ Position ratings are used for:
 
 The calculation logic is implemented in `BackEnd/utils/position_ratings.py`:
 
-- `compute_position_ratings(player: dict) -> Dict[str, int]`: Main calculation function
+- `compute_position_ratings(player: dict, profile: "player" | "recruit") -> Dict[str, int]`: Main calculation function; recruit profile applies `RECRUIT_POSITION_WEIGHTS`, and when recruit **height is under 71 inches** replaces **PF** and **C** rows with `RECRUIT_PF_WEIGHTS_SHORT` / `RECRUIT_C_WEIGHTS_SHORT`.
 - `_height_to_rating(height: float) -> float`: Height conversion function
 - `_clamp(value: float, lower: int = 1, upper: int = 100) -> int`: Result clamping
 
