@@ -671,22 +671,55 @@ def _build_team_leader_summary(franchise_id: ObjectId, team_id: str) -> dict[str
     top_rebounder: Optional[dict[str, Any]] = None
     top_scoring_avg = -1.0
     top_rebounding_avg = -1.0
+    # Raw FPD season totals for the leader row (FCC Next container); logged for debugging PTS/GP mismatch.
+    leader_pts_total = 0.0
+    leader_pts_gp = 0
+    leader_pts_name = ""
+    leader_reb_total = 0.0
+    leader_reb_gp = 0
+    leader_reb_name = ""
 
     for player in players:
         stats = player.get("stats") or {}
         gp = int(stats.get("GP", 0) or 0)
         if gp <= 0:
             continue
-        pts_avg = float(stats.get("PTS", 0) or 0) / gp
+        pts_total = float(stats.get("PTS", 0) or 0)
+        pts_avg = pts_total / gp
         reb_total = float(stats.get("TREB", ((stats.get("OREB", 0) or 0) + (stats.get("DREB", 0) or 0))) or 0)
         reb_avg = reb_total / gp
         player_name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip() or "Unknown"
         if pts_avg > top_scoring_avg:
             top_scoring_avg = pts_avg
             top_scorer = {"name": player_name, "average": round(pts_avg, 1)}
+            leader_pts_total = pts_total
+            leader_pts_gp = gp
+            leader_pts_name = player_name
         if reb_avg > top_rebounding_avg:
             top_rebounding_avg = reb_avg
             top_rebounder = {"name": player_name, "average": round(reb_avg, 1)}
+            leader_reb_total = reb_total
+            leader_reb_gp = gp
+            leader_reb_name = player_name
+
+    logger.warning(
+        "🧭 [FCC-NEXT-LEADERS] franchise_id=%s team_id=%s roster_players=%s | "
+        "top_scorer name=%s PTS_season=%s GP=%s pts_per_game=%s card_avg=%s | "
+        "top_rebounder name=%s REB_season=%s GP=%s reb_per_game=%s card_avg=%s",
+        str(franchise_id),
+        str(team_id),
+        len(players),
+        leader_pts_name or "(none)",
+        leader_pts_total,
+        leader_pts_gp,
+        round(leader_pts_total / leader_pts_gp, 3) if leader_pts_gp else 0.0,
+        top_scorer.get("average") if top_scorer else None,
+        leader_reb_name or "(none)",
+        leader_reb_total,
+        leader_reb_gp,
+        round(leader_reb_total / leader_reb_gp, 3) if leader_reb_gp else 0.0,
+        top_rebounder.get("average") if top_rebounder else None,
+    )
 
     return {
         "top_scorer": top_scorer,
