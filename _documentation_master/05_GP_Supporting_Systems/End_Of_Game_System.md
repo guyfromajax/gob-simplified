@@ -95,7 +95,8 @@ Team attributes will adjust at the end of game based on the notes below. Note th
     - Uses team's total HCT + FCP uses for the game.
     - If total > 20: `+= random.randint(-3, -1)`
     - elif total > 16: `+= random.randint(-2, -1)`
-    - else (≤16 attempts, including 13–16): `+= random.randint(0, 1)`
+    - elif total ≤ 12: `+= random.randint(0, 1)`
+    - else (13–16 attempts): `+= random.randint(0, 1)`
   - `pt_opp_modifier` - Press/Trap opponent modifier
     - If opponent HCT + FCP uses > 16: `+= random.randint(-3, -2)`
     - elif opponent uses > 12: `+= random.randint(-2, -1)`

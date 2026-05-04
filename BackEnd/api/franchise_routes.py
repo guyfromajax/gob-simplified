@@ -1317,8 +1317,10 @@ def update_team_attributes_after_game(
                 changes["pt_efficiency"] = random.randint(-3, -1)
             elif team_pt_total > 16:
                 changes["pt_efficiency"] = random.randint(-2, -1)
+            elif team_pt_total <= 12:
+                changes["pt_efficiency"] = random.randint(0, 1)
             else:
-                # ≤16 attempts (includes ≤12 and 13–16): `0…+1` per Team_Attribute_System EOG table.
+                # 13–16 attempts (between ≤12 and >16 bands in EOG doc).
                 changes["pt_efficiency"] = random.randint(0, 1)
 
             if opponent_pt_total > 16:

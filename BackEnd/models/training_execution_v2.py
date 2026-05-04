@@ -316,8 +316,10 @@ COACHING_FOCUS_ARCHETYPE_PREFIXES = (
 )
 
 # Human-facing leaf labels for APIs/reports/logs. Radio/API `value` remains the dict key.
-# NOTE: **Authoritarian** `authoritarian-teamwork` = UI **"Teamwork"** (PS/IQ + motion/zone install mult).
-# **Culture Builder** `culture-builder-teamwork` = UI **"Team Building"** (flat team_chemistry +1–3 only).
+# NOTE: **Authoritarian** `authoritarian-teamwork` = UI **"Teamwork"** (PS/IQ + motion/zone install mult;
+# flat **team_chemistry** +1–2; no shared Authoritarian **discipline** flat).
+# **Culture Builder** `culture-builder-teamwork` = UI **"Team Building"** (flat **team_chemistry** +1–3 only;
+# no shared Culture Builder **fight** flat).
 # The shared `-teamwork` suffix on the Culture leaf is legacy for backward compatibility—do not conflate.
 COACHING_FOCUS_LEAF_DISPLAY_NAME: Dict[str, str] = {
     "authoritarian-teamwork": "Teamwork",
@@ -642,13 +644,25 @@ def apply_training_points(
         team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + team_ch_bump))
 
     # Flat team-attribute bonuses from coaching focus, beyond normal gain amplification.
-    if archetype == "culture-builder" and "fight" in team:
+    # Culture Builder fight bump applies to Inspire / Confidence / Community only — not Team Building.
+    if (
+        archetype == "culture-builder"
+        and sub_option != "culture-builder-teamwork"
+        and "fight" in team
+    ):
         fight_lo, fight_hi = TEAM_ATTR_CLAMPS["fight"]
         team["fight"] = max(fight_lo, min(fight_hi, team.get("fight", 0) + random.randint(1, 2)))
 
-    if archetype == "authoritarian" and "discipline" in team:
+    # Authoritarian discipline bump applies to Discipline / Rebounding / Execution — not Teamwork.
+    if archetype == "authoritarian" and sub_option != "authoritarian-teamwork" and "discipline" in team:
         disc_lo, disc_hi = TEAM_ATTR_CLAMPS["discipline"]
         team["discipline"] = max(disc_lo, min(disc_hi, team.get("discipline", 0) + random.randint(1, 2)))
+
+    if sub_option == "authoritarian-teamwork":
+        ch_lo, ch_hi = TEAM_ATTR_CLAMPS["team_chemistry"]
+        ch_bump = random.randint(1, 2)
+        cur_ch = team.get("team_chemistry", 0)
+        team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + ch_bump))
     
     # Apply team training points
     for category, allocation_data in normalized_allocations.items():

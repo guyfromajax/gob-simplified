@@ -19,10 +19,10 @@
 
 | # | UI label | `value` | Status | What the code actually does |
 |---|----------|---------|--------|-----------------------------|
-| 1 | Discipline | `authoritarian-discipline` | **Implemented** | **`_should_amplify_player_attr`:** amplifies drill gains on **BH**. **`_should_amplify_team_attr`:** amplifies **fight**, **discipline** when those team attrs receive positive training points. Focus multiplier: random 1.5–1.8× on qualifying gains. Any Authoritarian archetype also adds a flat per-session **discipline** bonus of `+1 to +2`. |
+| 1 | Discipline | `authoritarian-discipline` | **Implemented** | **`_should_amplify_player_attr`:** amplifies drill gains on **BH**. **`_should_amplify_team_attr`:** amplifies **fight**, **discipline** when those team attrs receive positive training points. Focus multiplier: random 1.5–1.8× on qualifying gains. **Discipline**, **Rebounding**, and **Execution** (not **Teamwork**) also receive the shared flat per-session **discipline** bonus of `+1 to +2`. |
 | 2 | Rebounding | `authoritarian-rebounding` | **Implemented** | Amplifies **RB** (player) and **rebound_modifier** (team), same multiplier pattern as above. |
 | 3 | Execution | `authoritarian-execution` | **Implemented** (efficiency only) | **`apply_play_defense_training`:** one random **1.5–1.8×** per session scales integer **effectiveness** gains on **set plays** (`_apply_offense_play_training`) and **Man** defense (`_apply_defense_training`). Motion/zone plays get base gains only. **`_should_amplify_*`** stays `False` here—play path is separate. Momentum/cloaking are not trained by install points. |
-| 4 | Teamwork | `authoritarian-teamwork` | **Implemented** (drills + install) | **Drills:** amplifies **PS**, **IQ** (`_apply_player_training_points`). **Install training:** one random **1.5–1.8×** per session on **effectiveness** gains for **`play_type == motion`** and zone defenses (`2-3`, `3-2`, `1-3-1`) — same pattern as Authoritarian / Execution for set + Man. |
+| 4 | Teamwork | `authoritarian-teamwork` | **Implemented** (drills + install) | **Drills:** amplifies **PS**, **IQ** (`_apply_player_training_points`). **Install training:** one random **1.5–1.8×** per session on **effectiveness** gains for **`play_type == motion`** and zone defenses (`2-3`, `3-2`, `1-3-1`) — same pattern as Authoritarian / Execution for set + Man. **Flat:** **team_chemistry** `+= random.randint(1, 2)` once per session (clamped). **No** shared Authoritarian **discipline** `+1 to +2` flat (that applies only to Discipline / Rebounding / Execution). |
 
 ---
 
@@ -56,7 +56,7 @@
 | 13 | Inspire | `culture-builder-inspire` | **Implemented** | See **Inspire (plain summary)** below (flat EM/MO + **team_chemistry** amplify only). |
 | 14 | Confidence | `culture-builder-confidence` | **Implemented** | **`_should_amplify_player_attr`:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use `random.choice([1.5, 1.6, 1.7, 1.8])` after CH’s 0.5 drill coeff. See **Confidence (plain summary)** below. |
 | 15 | Community Engagement | `culture-builder-community` | **Implemented** | **Training (`training_execution_v2`):** all players **EM** +1–2 (flat block). **Franchise GP only:** sets **`pending_community_engagement`** on user FTD (`franchise_routes` `run_franchise_training`). **Home crowd roll:** consumed at franchise game start (`consume_franchise_community_engagement_for_matchup` in `home_crowd.py`, called from `/api/init-game` and the new-game `simulate-quarter` path); shifts the **Home Crowd System** weight band up/down vs actual home `team_chemistry`, Upper Bonus row when applicable; **both** teams pending CE → cancel. CPU: distant template `community_engagement` sets pending on CPU FTD. Single/tournament: no training → N/A. See **Community Engagement (plain summary)** below. |
-| 16 | Team Building | `culture-builder-teamwork` | **Implemented** | **Dedicated block:** **team_chemistry** `+= random.randint(1, 3)` once per training (clamped 7–25). Any Culture Builder archetype also adds flat **fight** `+= random.randint(1, 2)` once per training. Radio **`value`** unchanged for API/back-compat. No drill multipliers, no PS / motion / zone play hooks. |
+| 16 | Team Building | `culture-builder-teamwork` | **Implemented** | **Dedicated block:** **team_chemistry** `+= random.randint(1, 3)` once per training (clamped 7–25). **No** shared Culture Builder **fight** `+1 to +2` flat (that applies only to Inspire, Confidence, and Community Engagement). Radio **`value`** unchanged for API/back-compat. No drill multipliers, no PS / motion / zone play hooks. |
 
 ### Inspire (plain summary)
 
@@ -103,7 +103,7 @@ Leaf options above: **16** valid training leaves (four per archetype API block) 
 \* **Inspire** — see **Inspire (plain summary)** above.  
 † **Confidence** — see **Confidence (plain summary)** above.  
 § **Community Engagement** — see **Community Engagement (plain summary)** above.  
-‡ **Team Building** — `culture-builder-teamwork`; flat +1–3 **team_chemistry** plus the shared Culture Builder flat **fight** +1–2 (row 16).
+‡ **Team Building** — `culture-builder-teamwork`; flat +1–3 **team_chemistry** only (no shared Culture Builder **fight** flat).
 
 ---
 

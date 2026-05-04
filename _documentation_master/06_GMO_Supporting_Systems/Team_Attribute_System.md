@@ -137,7 +137,7 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 | **Offensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if total offensive **`times_run`** **> 12**; **−2…−1** if **> 7** (i.e. **8–12**); **−3…−2** if **≤ 7**. |
 | **Defensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if max HCO defense **`used`** share **≤ 39%**; **−2…−1** if **> 39%** and **≤ 49%**; **−3…−2** if **> 49%**. |
 | **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else Non-distant: **-1…+1** / **−2…−1** / **−3…−2** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
-| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else: **−3…−1** if **`pt_total_attempts` > 20**; **−2…−1** if **> 16**; **0…+1** if **≤ 16** (covers **≤ 12** and **13–16**). |
+| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else: **0…+1** if **≤ 12**; **0…+1** if **13–16**; **−2…−1** if **> 16** and **≤ 20**; **−3…−1** if **> 20**. |
 | **Fast break opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−2…−1** / **−3…−2** when opponent FB tries are **≤ 10** / **> 10** / **> 15**. |
 | **PT opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−2…−1** / **−3…−2** when opponent **`pt_total_attempts`** is **≤ 12** / **> 12** / **> 16**. |
 | **Fight** | **Up** if win (**0…+2**); **down** if lose (**−3…−1**) | Margin does not change fight; only W/L. |
@@ -152,9 +152,9 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 | Attribute | Direction | Rule |
 |-----------|-----------|------|
-| **Fight** | **Up, down, or mixed** by bucket | Effective points = **0.5× strength + 0.5× conditioning** (half-up) → bucket **0…5** random delta: **0 → −4…−3**; **1 → −1…+1**; **2 → 0…+2**; **3 → +1…+3**; **4 → +2…+4**; **5 → +3…+5**. **Culture Builder:** **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** fight deltas. **Breaks 4:** fight **−2…0**; **breaks 5+:** **−3…−1**. |
-| **Discipline** | **Up, down, or mixed** by bucket | Effective points = **0.25×** (inside + outside defense + passing + ball handling), half-up → **same bucket table as Fight**. **Authoritarian** archetype: **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** discipline deltas. **Breaks 4:** discipline **−2…0**; **breaks 5+:** **−3…−1**. |
-| **Team chemistry** | **Down** at 0 pts mix; **up** at 1+ | Chemistry-weighted sum: **free throws ×0.25 + film ×0.25 + scrimmages ×0.5**, rounded half-up → bucket: **0 → down −3…−1**; **1 → up +1…+2**; **2 → +2…+3**; **3 → +3…+4**; **4 → +3…+6**; **5 → +3…+7**. **Team Building** focus: **+1…+3** once. **Culture Builder–Inspire:** multiplies **positive** chemistry deltas. **Breaks 3:** **±1**; **breaks 4:** **±2**; **breaks 5+:** **±3** (applied to chemistry after other training, then clamped). |
+| **Fight** | **Up, down, or mixed** by bucket | Effective points = **0.5× strength + 0.5× conditioning** (half-up) → bucket **0…5** random delta: **0 → −4…−3**; **1 → −1…+1**; **2 → 0…+2**; **3 → +1…+3**; **4 → +2…+4**; **5 → +3…+5**. **Culture Builder** (Inspire / Confidence / Community Engagement; not **Team Building**): **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** fight deltas. **Breaks 4:** fight **−2…0**; **breaks 5+:** **−3…−1**. |
+| **Discipline** | **Up, down, or mixed** by bucket | Effective points = **0.25×** (inside + outside defense + passing + ball handling), half-up → **same bucket table as Fight**. **Authoritarian** (Discipline / Rebounding / Execution; not **Teamwork**): **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** discipline deltas. **Breaks 4:** discipline **−2…0**; **breaks 5+:** **−3…−1**. |
+| **Team chemistry** | **Down** at 0 pts mix; **up** at 1+ | Chemistry-weighted sum: **free throws ×0.25 + film ×0.25 + scrimmages ×0.5**, rounded half-up → bucket: **0 → down −3…−1**; **1 → up +1…+2**; **2 → +2…+3**; **3 → +3…+4**; **4 → +3…+6**; **5 → +3…+7**. **Team Building** focus: **+1…+3** once. **Authoritarian–Teamwork** focus: **+1…+2** once. **Culture Builder–Inspire:** multiplies **positive** chemistry deltas. **Breaks 3:** **±1**; **breaks 4:** **±2**; **breaks 5+:** **±3** (applied to chemistry after other training, then clamped). |
 | **Shot threshold** | Scrimmages only | **0 pts → up +5…+10** (worse). **1 → down or flat −5…0**. **2 → down −5…−15**; **3 → −10…−15**; **4 → −10…−20**; **5+ → −15…−20** (larger scrimmage = more **down** = better golf score). **Breaks** can scale how much of a **session “gain”** sticks (for shot threshold, a **decrease** counts as a gain). |
 | **Rebound modifier** | **Up** only (no install path) | **Rebounding drill:** half-up(**0.5 × rebounding points**), then by bucket: **1–2 → +0.01…+0.05**; **3–4 → +0.04…+0.08**; **5+ → +0.06…+0.10**. **Scrimmages slice** uses half-up(**0.5 × scrimmage points**): **1–2 → +0.00…+0.03**; **3–4 → +0.03…+0.05**; **5+ → +0.04…+0.07**. **Authoritarian–Rebounding** / focus match can **amplify positive** rebound bumps. |
 
@@ -286,7 +286,8 @@ This is how well your team executes full court presses and half court traps — 
   Condition: every completed franchise game (non-distant); team HCT + FCP uses.
   If total > 20: Range: `-3 to -1`
   Elif total > 16: Range: `-2 to -1`
-  Else (≤16, including 13–16): Range: `0 to +1`
+  Elif total ≤ 12: Range: `0 to +1`
+  Else (13–16 attempts): Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -301,8 +302,8 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
 - Sink: Training System / Breaks.
   Condition: `breaks` slider at `4` or `5`.
   Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
-- Faucet: Traning System / Coaching Focus
-  If the user chooses any of the Culture Builder:  Range: `+1 to +2`
+- Faucet: Training System / Coaching Focus
+  If the user chooses **Culture Builder** — **Inspire**, **Confidence**, or **Community Engagement** (not **Team Building**): Range: `+1 to +2`
 - Faucet: End Of Game System.
   Condition: team won the game.
   Range: `0 to +2`.
@@ -320,8 +321,8 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
 - Sink: Training System / Breaks.
   Condition: `breaks` slider at `4` or `5`.
   Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
-- Faucet: Traning System / Coaching Focus
-  If the user chooses any of the Authoritarian:  Range: `+1 to +2`
+- Faucet: Training System / Coaching Focus
+  If the user chooses **Authoritarian** — **Discipline**, **Rebounding**, or **Execution** (not **Teamwork**): Range: `+1 to +2`
 - Faucet: End Of Game System.
   Condition: team `(F + TO)` is lower than opponent `(F + TO)` + 8.
   Range: `+1 to +2`.
@@ -349,6 +350,9 @@ The connective tissue of your roster. Chemistry influences how well players supp
 - Faucet: Training System / Team Building.
   Condition: coaching focus = `culture-builder-teamwork`.
   Range: `+1 to +3`.
+- Faucet: Training System / Authoritarian Teamwork.
+  Condition: coaching focus = `authoritarian-teamwork`.
+  Range: `+1 to +2`.
 - Faucet: End Of Game System.
   Condition: team won the game.
   Range: score delta `<4 -> +1 to +2`, `<10 -> +1 to +3`, `>=10 -> +2 to +4`.
