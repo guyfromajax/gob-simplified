@@ -563,6 +563,30 @@ def _merge_bracket_round_dict(fresh_bracket: Dict[str, Any], stale_bracket: Dict
     return out
 
 
+def _resolve_region_final_placeholders(rt: Dict[str, Any]) -> Dict[str, Any]:
+    """Replace resolved R1_0/R1_1 final placeholders with their known R1 winners."""
+    out = deepcopy(rt)
+    round1 = out.get("round1") or []
+    final = out.get("final") or []
+    if not final or not isinstance(final[0], dict):
+        return out
+
+    f = final[0]
+    for idx, placeholder in ((0, "R1_0"), (1, "R1_1")):
+        if idx >= len(round1) or not isinstance(round1[idx], dict):
+            continue
+        winner = round1[idx].get("winner")
+        if not winner:
+            continue
+        winner_str = str(winner)
+        if f.get("away_team") == placeholder:
+            f["away_team"] = winner_str
+        if f.get("home_team") == placeholder:
+            f["home_team"] = winner_str
+    out["final"] = final
+    return out
+
+
 def _merge_one_conference_tournament_ct(f_ct: Dict[str, Any], s_ct: Dict[str, Any]) -> Dict[str, Any]:
     out = deepcopy(f_ct)
     fb = out.get("bracket") or {}
@@ -610,7 +634,7 @@ def merge_region_tournaments_phase_a(fresh: Any, stale: Any) -> Dict[str, Any]:
             if rk in merged_rt and isinstance(merged_rt[rk], list):
                 sl = s_rt.get(rk) or []
                 merged_rt[rk] = _merge_eos_round_matchup_lists(merged_rt[rk], sl)
-        out[region_key] = merged_rt
+        out[region_key] = _resolve_region_final_placeholders(merged_rt)
     return out
 
 
