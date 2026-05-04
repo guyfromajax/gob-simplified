@@ -505,6 +505,17 @@ input[type="reset"] {
   white-space: nowrap;
 }
 
+.lean-cell-full-list {
+  white-space: normal;
+  max-width: min(36em, 100%);
+}
+
+.lean-after-name {
+  display: inline-block;
+  margin-left: 0.35em;
+  vertical-align: middle;
+}
+
 .picked-rank-badge {
   min-width: 32px;
   height: 30px;

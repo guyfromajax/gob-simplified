@@ -87,19 +87,26 @@
     return 0;
   }
 
-  function isLeaningToUser(recruit) {
-    return getLeanRankForUser(recruit) === 1;
+  /** True when the user's team appears in this recruit's lean slots 1, 2, or 3. */
+  function isUserInLeanTopThree(recruit) {
+    return getLeanRankForUser(recruit) > 0;
   }
 
   function getLeanCellHtml(recruit) {
     var rank = getLeanRankForUser(recruit);
-    if (rank === 1) {
-      return '<span class="lean-cell"><span class="lean-dot is-solid"></span>Leaning You</span>';
+    if (rank >= 1 && rank <= 3) {
+      var display = recruit.leanDisplay && String(recruit.leanDisplay).trim() ? recruit.leanDisplay : 'Open';
+      return '<span class="lean-cell lean-cell-full-list">' + escapeHtml(display) + '</span>';
     }
-    if (rank === 2 || rank === 3) {
-      return '<span class="lean-cell"><span class="lean-dot"></span>In Top ' + rank + '</span>';
-    }
-    return escapeHtml(recruit.leanDisplay || 'Open');
+    return '<span class="lean-cell">' + escapeHtml(recruit.leanDisplay || 'Open') + '</span>';
+  }
+
+  function getRecruitNameCellHtml(recruit) {
+    if (!recruit) return '<span class="recruiting-top-grid-empty">--</span>';
+    var dot = isUserInLeanTopThree(recruit)
+      ? '<span class="lean-dot is-solid lean-after-name" aria-label="Your team is on this recruit\u2019s lean list"></span>'
+      : '';
+    return escapeHtml(recruit.name || '') + dot;
   }
 
   function getPositionCounts() {
@@ -114,7 +121,7 @@
 
   function getLeaningPickCount() {
     return currentEntries.reduce(function (total, entry) {
-      return total + (isLeaningToUser(recruitMap[entry.id]) ? 1 : 0);
+      return total + (isUserInLeanTopThree(recruitMap[entry.id]) ? 1 : 0);
     }, 0);
   }
 
@@ -296,7 +303,7 @@
       }
       if (recruit.rt != null && recruit.rt < rtMin) return false;
       if (recruit.rt == null && rtMin > 0) return false;
-      if (poolFilters.leansOnly && !isLeaningToUser(recruit)) return false;
+      if (poolFilters.leansOnly && !isUserInLeanTopThree(recruit)) return false;
       return true;
     });
   }
@@ -311,9 +318,9 @@
       var tr = document.createElement('tr');
       tr.dataset.recruitId = recruit.recruitId;
       if (rank) tr.classList.add('recruit-selected');
-      if (isLeaningToUser(recruit)) tr.classList.add('is-leaning-row');
+      if (isUserInLeanTopThree(recruit)) tr.classList.add('is-leaning-row');
       tr.innerHTML = [
-        '<td>' + escapeHtml(recruit.name) + '</td>',
+        '<td>' + getRecruitNameCellHtml(recruit) + '</td>',
         '<td>' + escapeHtml(recruit.homeRegion) + '</td>',
         '<td>' + escapeHtml(recruit.archetype) + '</td>',
         '<td>' + escapeHtml(recruit.height) + '</td>',
@@ -371,7 +378,7 @@
       head.innerHTML = [
         '<tr>',
         '<th>Priority</th>',
-        '<th>Name</th>',
+        '<th>Recruit</th>',
         '<th>Home Region</th>',
         '<th>Archetype</th>',
         '<th>HT</th>',
@@ -420,14 +427,14 @@
     var pointsValue = recruit ? Number(entry.points || 0) : 0;
     return [
       '<td class="priority-cell">' + (index + 1) + '</td>',
-      '<td>' + (recruit ? recruit.name : '<span class="recruiting-top-grid-empty">--</span>') + '</td>',
+      '<td>' + getRecruitNameCellHtml(recruit) + '</td>',
       '<td>' + (recruit ? recruit.homeRegion : '--') + '</td>',
       '<td>' + (recruit ? recruit.archetype : '--') + '</td>',
       '<td>' + (recruit ? recruit.height : '--') + '</td>',
       '<td>' + (recruit && recruit.weight != null ? recruit.weight : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
       '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
-      '<td>' + (recruit ? (recruit.leanDisplay || '--') : '--') + '</td>',
+      '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
@@ -438,12 +445,12 @@
   function buildVisitRow(index, recruit) {
     return [
       '<td class="priority-cell">' + (index + 1) + '</td>',
-      '<td>' + (recruit ? recruit.name : '<span class="recruiting-top-grid-empty">--</span>') + '</td>',
+      '<td>' + getRecruitNameCellHtml(recruit) + '</td>',
       '<td>' + (recruit ? recruit.homeRegion : '--') + '</td>',
       '<td>' + (recruit ? recruit.archetype : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
       '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
-      '<td>' + (recruit ? (recruit.leanDisplay || '--') : '--') + '</td>',
+      '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
     ].join('');
@@ -526,7 +533,7 @@
       '<div class="slot-name">' + escapeHtml(recruit.name) + '</div>',
       '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
       '</div>',
-      isLeaningToUser(recruit) ? '<span class="lean-dot is-solid" aria-label="Leaning to you"></span>' : '<span></span>',
+      isUserInLeanTopThree(recruit) ? '<span class="lean-dot is-solid" aria-label="Your team is on this recruit\u2019s lean list"></span>' : '<span></span>',
       '<button class="slot-remove" type="button" data-action="remove" data-index="' + index + '" aria-label="Remove ' + escapeHtml(recruit.name) + '">×</button>'
     ].join('');
   }
@@ -541,7 +548,7 @@
       var slot = document.createElement('div');
       slot.className = 'invite-slot ' + (recruit ? 'is-filled' : 'is-empty');
       if (!recruit && i === currentEntries.length) slot.classList.add('is-next-empty');
-      if (recruit && isLeaningToUser(recruit)) slot.classList.add('is-leaning');
+      if (recruit && isUserInLeanTopThree(recruit)) slot.classList.add('is-leaning');
       if (recruit && recruit.recruitId === lastAddedRecruitId) slot.classList.add('is-new-add');
       slot.dataset.index = String(i);
       slot.dataset.filled = recruit ? 'true' : 'false';
