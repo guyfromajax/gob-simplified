@@ -156,14 +156,14 @@ def test_eog_attribute_tuning_ranges_applied(monkeypatch):
 
     # Winner paths (random.randint patched to low end `a`; snapshot from eog_inputs)
     assert home_changes["shot_threshold"] == -10
-    assert home_changes["discipline"] == 0
-    assert home_changes["fight"] == -1
+    assert home_changes["discipline"] == 1
+    assert home_changes["fight"] == 0
     assert home_changes["rebound_modifier"] == 0.0
-    assert home_changes["offensive_efficiency"] == -4
-    assert home_changes["defensive_efficiency"] == -2
-    assert home_changes["fb_efficiency"] == -2
-    assert home_changes["fb_opp_modifier"] == -2
-    assert home_changes["pt_efficiency"] == -3
+    assert home_changes["offensive_efficiency"] == -3
+    assert home_changes["defensive_efficiency"] == 0
+    assert home_changes["fb_efficiency"] == -1
+    assert home_changes["fb_opp_modifier"] == 0
+    assert home_changes["pt_efficiency"] == -2
     assert home_changes["pt_opp_modifier"] == -3
     assert home_changes["team_chemistry"] == 1
 
@@ -172,13 +172,13 @@ def test_eog_attribute_tuning_ranges_applied(monkeypatch):
     assert away_changes["discipline"] == -3
     assert away_changes["fight"] == -3
     assert away_changes["rebound_modifier"] == pytest.approx(-0.05)
-    assert away_changes["offensive_efficiency"] == -4
-    assert away_changes["defensive_efficiency"] == -2
-    assert away_changes["fb_efficiency"] == -2
-    assert away_changes["fb_opp_modifier"] == -2
-    assert away_changes["pt_efficiency"] == -3
+    assert away_changes["offensive_efficiency"] == -3
+    assert away_changes["defensive_efficiency"] == 0
+    assert away_changes["fb_efficiency"] == -1
+    assert away_changes["fb_opp_modifier"] == 0
+    assert away_changes["pt_efficiency"] == -2
     assert away_changes["pt_opp_modifier"] == -3
-    assert away_changes["team_chemistry"] == -4
+    assert away_changes["team_chemistry"] == -3
 
     # Both teams should have been persisted to FTD.
     assert len(fake_ftd.update_calls) == 2

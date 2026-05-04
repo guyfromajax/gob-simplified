@@ -17,12 +17,8 @@ Resolution of “who is the user’s next-week opponent” is **`_user_next_regu
   - player box scores
   - team totals
 - This allows the normal end-of-game team-attribute system to run for distant games as well.
-- Totals-driven EOG attributes use the same rules as TBT games.
-- Special-situations-driven attrs do not have true TBT scouting inputs in distant sim, so for distant games only:
-  - `fb_efficiency` = `random.randint(-2, 1)`
-  - `fb_opp_modifier` = `random.randint(-2, 1)`
-  - `pt_efficiency` = `random.randint(-2, 1)`
-  - `pt_opp_modifier` = `random.randint(-2, 1)`
+- Totals-driven EOG attributes (box score / team totals paths) still use the same rules as other franchise games where applicable.
+- Install-style team attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `fb_opp_modifier`, `pt_efficiency`, `pt_opp_modifier`) do not have reliable full-sim usage inputs in distant sim, so for distant games only each of the six is set to `random.randint(-2, 1)`.
 - The game doc is marked with `simulation_engine="distant"` so EOG can branch explicitly without affecting TBT behavior.
 
 ## Architecture

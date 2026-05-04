@@ -16,7 +16,7 @@ from BackEnd.eog_attr_rules import (
 
 
 class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
-    def test_fb_opp_modifier_uses_low_rate_branch(self):
+    def test_fb_opp_modifier_uses_low_volume_branch(self):
         calls = []
 
         def fake_randint(a, b):
@@ -26,7 +26,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         with patch.object(random, "randint", side_effect=fake_randint):
             change = calculate_fb_opp_modifier_change({"fb_rate": 10, "fb_entries": 5})
         self.assertEqual(change, 0)
-        self.assertEqual(calls[-1], (0, 2))
+        self.assertEqual(calls[-1], (0, 1))
 
     def test_fb_opp_modifier_uses_high_volume_branch(self):
         calls = []
@@ -37,8 +37,8 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         with patch.object(random, "randint", side_effect=fake_randint):
             change = calculate_fb_opp_modifier_change({"fb_rate": 40, "fb_entries": 13})
-        self.assertEqual(change, -3)
-        self.assertEqual(calls[-1], (-3, -2))
+        self.assertEqual(change, -2)
+        self.assertEqual(calls[-1], (-2, -1))
 
     def test_fb_opp_modifier_uses_mid_branch(self):
         calls = []
@@ -49,10 +49,10 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         with patch.object(random, "randint", side_effect=fake_randint):
             change = calculate_fb_opp_modifier_change({"fb_rate": 35, "fb_entries": 8})
-        self.assertEqual(change, 0)
-        self.assertEqual(calls[-1], (-1, 0))
+        self.assertEqual(change, 1)
+        self.assertEqual(calls[-1], (0, 1))
 
-    def test_pt_opp_modifier_uses_low_rate_branch(self):
+    def test_pt_opp_modifier_uses_low_volume_branch(self):
         calls = []
 
         def fake_randint(a, b):
@@ -61,8 +61,8 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         with patch.object(random, "randint", side_effect=fake_randint):
             change = calculate_pt_opp_modifier_change({"pt_combined_rate": 10, "pt_total_attempts": 2})
-        self.assertEqual(change, 2)
-        self.assertEqual(calls[-1], (1, 2))
+        self.assertEqual(change, 1)
+        self.assertEqual(calls[-1], (0, 1))
 
     def test_pt_opp_modifier_uses_high_volume_branch(self):
         calls = []
@@ -73,8 +73,8 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         with patch.object(random, "randint", side_effect=fake_randint):
             change = calculate_pt_opp_modifier_change({"pt_combined_rate": 35, "pt_total_attempts": 13})
-        self.assertEqual(change, -2)
-        self.assertEqual(calls[-1], (-3, -2))
+        self.assertEqual(change, -1)
+        self.assertEqual(calls[-1], (-2, -1))
 
     def test_pt_opp_modifier_uses_mid_branch(self):
         calls = []
@@ -85,8 +85,8 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         with patch.object(random, "randint", side_effect=fake_randint):
             change = calculate_pt_opp_modifier_change({"pt_combined_rate": 35, "pt_total_attempts": 8})
-        self.assertEqual(change, -2)
-        self.assertEqual(calls[-1], (-2, -1))
+        self.assertEqual(change, 0)
+        self.assertEqual(calls[-1], (0, 1))
 
     def test_pre_training_decay_ranges_match_doc(self):
         self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-5, -2))
@@ -326,7 +326,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                     "name": "Morristown",
                     "scouting": {
                         "offense": {"Fast_Break_Entries": 4, "Fast_Break_Success": 3},
-                        "defense": {"HCT": {"used": 6, "success": 4}, "FCP": {"used": 5, "success": 4}},
+                        "defense": {"HCT": {"used": 11, "success": 4}, "FCP": {"used": 6, "success": 4}},
                     },
                 },
             },
@@ -336,6 +336,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
         opponent_scouting = eog_inputs["away"]["scouting"]
+        self.assertGreater(int(opponent_scouting.get("pt_total_attempts", 0)), 16)
 
         with patch.object(random, "randint", return_value=-3) as fake_randint:
             change = calculate_pt_opp_modifier_change(opponent_scouting)

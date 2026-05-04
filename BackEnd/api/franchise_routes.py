@@ -1247,7 +1247,7 @@ def update_team_attributes_after_game(
         team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
         opp_f_plus_to_with_buffer = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0) + 8
         if team_f_plus_to < opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(1, 3)
+            changes["discipline"] = random.randint(1, 2)
         elif team_f_plus_to > opp_f_plus_to_with_buffer:
             changes["discipline"] = random.randint(-3, -2)
         else:
@@ -1267,61 +1267,66 @@ def update_team_attributes_after_game(
         else:
             changes["rebound_modifier"] = -random.randint(1, 5) / 100.0
         
-        if offensive_play_count > 12:
-            changes["offensive_efficiency"] = random.randint(-2, -1)
-        elif offensive_play_count > 7:
-            changes["offensive_efficiency"] = random.randint(-3, -2)
-        else:
-            changes["offensive_efficiency"] = random.randint(-4, -3)
-
-        if defensive_max_share > 0.49:
-            changes["defensive_efficiency"] = random.randint(-4, -3)
-        elif defensive_max_share > 0.39:
-            changes["defensive_efficiency"] = random.randint(-3, -2)
-        else:
-            changes["defensive_efficiency"] = random.randint(-2, -1)
-        
         if is_distant_sim:
+            changes["offensive_efficiency"] = random.randint(-2, 1)
+            changes["defensive_efficiency"] = random.randint(-2, 1)
             changes["fb_efficiency"] = random.randint(-2, 1)
             changes["fb_opp_modifier"] = random.randint(-2, 1)
             changes["pt_efficiency"] = random.randint(-2, 1)
             changes["pt_opp_modifier"] = random.randint(-2, 1)
             logger.warning(
-                "🧪 [EOG-DISTANT-FBPT] team=%s fb_efficiency=%s fb_opp_modifier=%s pt_efficiency=%s pt_opp_modifier=%s",
+                "🧪 [EOG-DISTANT-ATTRS] team=%s off_eff=%s def_eff=%s fb_eff=%s fb_opp=%s pt_eff=%s pt_opp=%s",
                 str(team_id_label),
+                changes.get("offensive_efficiency"),
+                changes.get("defensive_efficiency"),
                 changes.get("fb_efficiency"),
                 changes.get("fb_opp_modifier"),
                 changes.get("pt_efficiency"),
                 changes.get("pt_opp_modifier"),
             )
         else:
-            if team_fb_max_share > 0.60:
-                changes["fb_efficiency"] = random.randint(-4, -3)
-            elif team_fb_max_share > 0.50:
-                changes["fb_efficiency"] = random.randint(-3, -2)
+            if offensive_play_count > 12:
+                changes["offensive_efficiency"] = random.randint(0, 1)
+            elif offensive_play_count > 7:
+                changes["offensive_efficiency"] = random.randint(-2, -1)
             else:
-                changes["fb_efficiency"] = random.randint(-2, -1)
+                changes["offensive_efficiency"] = random.randint(-3, -2)
 
-            if opponent_fb_total > 20:
-                changes["fb_opp_modifier"] = random.randint(-4, -3)
-            elif opponent_fb_total > 10:
-                changes["fb_opp_modifier"] = random.randint(-3, -2)
+            if defensive_max_share <= 0.39:
+                changes["defensive_efficiency"] = random.randint(0, 1)
+            elif defensive_max_share <= 0.49:
+                changes["defensive_efficiency"] = random.randint(-2, -1)
             else:
+                changes["defensive_efficiency"] = random.randint(-3, -2)
+
+            if team_fb_max_share > 0.60:
+                changes["fb_efficiency"] = random.randint(-3, -2)
+            elif team_fb_max_share > 0.50:
+                changes["fb_efficiency"] = random.randint(-2, -1)
+            else:
+                changes["fb_efficiency"] = random.randint(-1, 1)
+
+            if opponent_fb_total > 15:
+                changes["fb_opp_modifier"] = random.randint(-3, -2)
+            elif opponent_fb_total > 10:
                 changes["fb_opp_modifier"] = random.randint(-2, -1)
+            else:
+                changes["fb_opp_modifier"] = random.randint(0, 1)
 
             if team_pt_total > 20:
-                changes["pt_efficiency"] = random.randint(-4, -3)
-            elif team_pt_total > 15:
-                changes["pt_efficiency"] = random.randint(-3, -2)
-            else:
+                changes["pt_efficiency"] = random.randint(-3, -1)
+            elif team_pt_total > 16:
                 changes["pt_efficiency"] = random.randint(-2, -1)
-
-            if opponent_pt_total > 20:
-                changes["pt_opp_modifier"] = random.randint(-4, -3)
-            elif opponent_pt_total > 10:
-                changes["pt_opp_modifier"] = random.randint(-3, -2)
             else:
+                # ≤16 attempts (includes ≤12 and 13–16): `0…+1` per Team_Attribute_System EOG table.
+                changes["pt_efficiency"] = random.randint(0, 1)
+
+            if opponent_pt_total > 16:
+                changes["pt_opp_modifier"] = random.randint(-3, -2)
+            elif opponent_pt_total > 12:
                 changes["pt_opp_modifier"] = random.randint(-2, -1)
+            else:
+                changes["pt_opp_modifier"] = random.randint(0, 1)
         
         # team_chemistry
         score_delta = winner_score - loser_score
@@ -1336,9 +1341,9 @@ def update_team_attributes_after_game(
             if score_delta < 4:
                 changes["team_chemistry"] = random.randint(-2, -1)
             elif score_delta < 10:
-                changes["team_chemistry"] = random.randint(-4, -2)
+                changes["team_chemistry"] = random.randint(-3, -2)
             else:
-                changes["team_chemistry"] = random.randint(-6, -4)
+                changes["team_chemistry"] = random.randint(-5, -3)
 
         # Apply changes and clamp to valid ranges
         ftd_update = {}

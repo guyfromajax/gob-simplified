@@ -44,25 +44,29 @@ def _aggregate_from_box(team_box_score: dict) -> dict:
 
 
 def calculate_fb_opp_modifier_change(opponent_scouting: dict) -> int:
-    """Calculate EOG fb_opp_modifier change from opponent fast-break performance."""
-    opponent_fb_rate = opponent_scouting.get("fb_rate", 0)
-    opponent_fb_entries = opponent_scouting.get("fb_entries", 0)
-    if opponent_fb_rate < 20:
-        return random.randint(0, 2)
-    if opponent_fb_rate > 55 or opponent_fb_entries > 12:
+    """
+    EOG fb_opp_modifier from opponent fast-break try volume.
+    Mirrors franchise `update_team_attributes_after_game` (opponent FB try totals / entries).
+    """
+    opponent_fb_entries = int(opponent_scouting.get("fb_entries", 0) or 0)
+    if opponent_fb_entries > 15:
         return random.randint(-3, -2)
-    return random.randint(-1, 0)
+    if opponent_fb_entries > 10:
+        return random.randint(-2, -1)
+    return random.randint(0, 1)
 
 
 def calculate_pt_opp_modifier_change(opponent_scouting: dict) -> int:
-    """Calculate EOG pt_opp_modifier change from opponent press/trap performance."""
-    opponent_pt_rate = opponent_scouting.get("pt_combined_rate", 0)
-    opponent_pt_attempts = opponent_scouting.get("pt_total_attempts", 0)
-    if opponent_pt_rate < 20:
-        return random.randint(1, 2)
-    if opponent_pt_rate > 50 or opponent_pt_attempts > 12:
+    """
+    EOG pt_opp_modifier from opponent press/trap attempt totals.
+    Mirrors franchise `update_team_attributes_after_game` (`pt_total_attempts`).
+    """
+    opponent_pt_attempts = int(opponent_scouting.get("pt_total_attempts", 0) or 0)
+    if opponent_pt_attempts > 16:
         return random.randint(-3, -2)
-    return random.randint(-2, -1)
+    if opponent_pt_attempts > 12:
+        return random.randint(-2, -1)
+    return random.randint(0, 1)
 
 
 def _calculate_special_situations_from_team_scouting(team_obj: dict) -> dict:

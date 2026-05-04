@@ -134,15 +134,15 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 | Attribute | Direction | Rule (after clamp) |
 |-----------|-----------|---------------------|
-| **Offensive efficiency** | Always **down** | **−2…−1** if total offensive **`times_run`** **> 12**; **−3…−2** if **> 7** (i.e. **8–12**); **−4…−3** if **≤ 7**. |
-| **Defensive efficiency** | Always **down** | **−2…−1** if max HCO defense **`used`** share **≤ 39%**; **−3…−2** if **> 39%** and **≤ 49%**; **−4…−3** if **> 49%**. |
-| **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
-| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when own **`pt_total_attempts`** is **≤ 15** / **> 15** / **> 20**. |
-| **Fast break opp. modifier** | **Distant sim:** −2…+1. Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when opponent FB tries are **≤ 10** / **> 10** / **> 20**. |
-| **PT opp. modifier** | **Distant sim:** −2…+1. Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when opponent **`pt_total_attempts`** is **≤ 10** / **> 10** / **> 20**. |
+| **Offensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if total offensive **`times_run`** **> 12**; **−2…−1** if **> 7** (i.e. **8–12**); **−3…−2** if **≤ 7**. |
+| **Defensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if max HCO defense **`used`** share **≤ 39%**; **−2…−1** if **> 39%** and **≤ 49%**; **−3…−2** if **> 49%**. |
+| **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else Non-distant: **-1…+1** / **−2…−1** / **−3…−2** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
+| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else: **−3…−1** if **`pt_total_attempts` > 20**; **−2…−1** if **> 16**; **0…+1** if **≤ 16** (covers **≤ 12** and **13–16**). |
+| **Fast break opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−2…−1** / **−3…−2** when opponent FB tries are **≤ 10** / **> 10** / **> 15**. |
+| **PT opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−2…−1** / **−3…−2** when opponent **`pt_total_attempts`** is **≤ 12** / **> 12** / **> 16**. |
 | **Fight** | **Up** if win (**0…+2**); **down** if lose (**−3…−1**) | Margin does not change fight; only W/L. |
-| **Discipline** | **Up** (**+1…+3**) if your **F + TO** is **lower** than opponent **F + TO + 8**. **Down** (**−3…−2**) if yours is **higher**. Else **down or flat** (**−1…0**) | “Lower fouls + turnovers (with buffer)” rewards discipline. |
-| **Team chemistry** | **Up** on win; **down** on loss | Win: **+1…+2** if margin **< 4**; **+1…+3** if **< 10**; **+2…+4** if blowout. Loss: **−2…−1** / **−4…−2** / **−6…−4** for the same margin bands. |
+| **Discipline** | **Up** (**+1…+2**) if your **F + TO** is **lower** than opponent **F + TO + 8**. **Down** (**−3…−2**) if yours is **higher**. Else **down or flat** (**−1…0**) | “Lower fouls + turnovers (with buffer)” rewards discipline. |
+| **Team chemistry** | **Up** on win; **down** on loss | Win: **+1…+2** if margin **< 4**; **+1…+3** if **< 10**; **+2…+4** if blowout. Loss: **−2…−1** / **−3…−2** / **−5…−3** for the same margin bands. |
 | **Shot threshold** | See golf note | **FG% > 50%:** **down** (**−10…−5**) both teams. **FG% > 45% and ≤ 50%:** winner **down or flat** (**−5…0**), loser **up** (**0…+5**). **FG% ≤ 45%:** **up** (**+5…+10**) both. |
 | **Rebound modifier** | **Up** only with big edge; else **down** | **Up** (**+0.00…+0.05**) if your **DREB+OREB** **> opponent + 8**. **Down** (**−0.10…−0.05**) if **< opponent − 8**. Otherwise **down** (**−0.05…−0.01**). |
 
@@ -235,10 +235,13 @@ This is how well your team executes the Xs & Os of your offense — running play
   Condition: offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Sink: End Of Game System.
-  Condition: every completed franchise game.
-  If total offensive plays used > 12: Range: `-2 to -1`
-  Elif total offensive plays used < 13 and > 7: Range: `-3 to -2`
-  Elif total offensive plays used < 8: Range: `-4 to -3`
+  Condition: every completed franchise game (non-distant); sum of offensive `times_run` across playbook rows.
+  If total > 12: Range: `0 to +1`
+  Elif total > 7 (i.e. 8–12): Range: `-2 to -1`
+  Else (≤ 7): Range: `-3 to -2`
+- Faucet + Sink: End Of Game System / distant-sim override.
+  Condition: distant-simmed franchise games only.
+  Range: `-2 to +1`.
 
 ### Defense Efficiency (`defensive_efficiency`) (range: -10 to 10)
 This is how well your team executes the Xs & Os of your defense — rotating on time, closing out, communicating switches, and making life difficult for the offense. Raw athleticism only takes you so far; this is what separates a disciplined unit from a collection of individuals. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and defense-focused training activities.
@@ -248,10 +251,13 @@ This is how well your team executes the Xs & Os of your defense — rotating on 
   Condition: defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Sink: End Of Game System.
-  Condition: every completed franchise game.
-  If any one defensive play > 49% of all defensive plays called for that game: Range: `-4 to -3`
-  Elif any one defensive play > 39% of all defensive plays called for that game: Range: `-3 to -2`
-  Else: Range: `-2 to -1`
+  Condition: every completed franchise game (non-distant); max HCO defense `used` share among `man` / `2-3-zone` / `3-2-zone` / `1-3-1-zone`.
+  If max share ≤ 39%: Range: `0 to +1`
+  Elif max share ≤ 49%: Range: `-2 to -1`
+  Else (> 49%): Range: `-3 to -2`
+- Faucet + Sink: End Of Game System / distant-sim override.
+  Condition: distant-simmed franchise games only.
+  Range: `-2 to +1`.
 
 ### Fast Break Efficiency (`fb_efficiency`) (range: -10 to 10)
 This is how well your team executes in transition — pushing the pace, hitting the right moments to run, and converting opportunities before the defense can set up. This affects both how often your team generates fast break chances and how effectively they finish them. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed fast break install, a balanced Fast Break playbook and dedicated fast break training activities.
@@ -261,10 +267,10 @@ This is how well your team executes in transition — pushing the pace, hitting 
   Condition: fast-break offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Sink: End of Game System
-  Condition: every completed franchise game
-  If any one Fast Break Play > 60% of Fast Break plays called for that game: Range: `-4 to -3`
-  Elif any one Fast Break Play > 50%: Range: `-3 to -2`
-  Else: Range: `-2 to -1`
+  Condition: every completed franchise game (non-distant)
+  If any one Fast Break Play > 60% of Fast Break tries: Range: `-3 to -2`
+  Elif any one Fast Break Play > 50%: Range: `-2 to -1`
+  Else: Range: `-1 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -277,9 +283,10 @@ This is how well your team executes full court presses and half court traps — 
   Condition: press/trap defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Sink: End of Game System
-  If total presses & traps run > 20: Range: `-4 to -3`
-  Elif total presses & traps run > 15: Range: `-3 to -2`
-  Else: Range: `-2 to -1`
+  Condition: every completed franchise game (non-distant); team HCT + FCP uses.
+  If total > 20: Range: `-3 to -1`
+  Elif total > 16: Range: `-2 to -1`
+  Else (≤16, including 13–16): Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -317,7 +324,7 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
   If the user chooses any of the Authoritarian:  Range: `+1 to +2`
 - Faucet: End Of Game System.
   Condition: team `(F + TO)` is lower than opponent `(F + TO)` + 8.
-  Range: `+1 to +3`.
+  Range: `+1 to +2`.
 - Sink: End Of Game System.
   Condition: team `(F + TO)` is greater than opponent `(F + TO)` + 8.
   Range: `-3 to -2`.
@@ -347,7 +354,7 @@ The connective tissue of your roster. Chemistry influences how well players supp
   Range: score delta `<4 -> +1 to +2`, `<10 -> +1 to +3`, `>=10 -> +2 to +4`.
 - Sink: End Of Game System.
   Condition: team lost the game.
-  Range: score delta `<4 -> -2 to -1`, `<10 -> -2 to -4`, `>=10 -> -6 to -4`.
+  Range: score delta `<4 -> -2 to -1`, `<10 -> -3 to -2`, `>=10 -> -5 to -3`.
 
 ### FB Opp Modifier (`fb_opp_modifier`) (range: -10 to 10)
 This is how well your team defends fast breaks and transition offenses. Containing the pace, cutting off passing lanes, and not allowing easy transition buckets. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Fast Break Defense install and film study of your opponent.
@@ -357,10 +364,10 @@ This is how well your team defends fast breaks and transition offenses. Containi
   Condition: fast-break defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Sink: End of Game System
-  Condition: every completed franchise game
-  If opponent ran > 20 Fast Breaks: Range: `-4 to -3`
-  Elif Opponent ran > 10 Fast Breaks: Range: `-3 to -2`
-  Else: Range: `-2 to -1`
+  Condition: every completed franchise game (non-distant); opponent fast-break try total.
+  If opponent tries > 15: Range: `-3 to -2`
+  Elif opponent tries > 10: Range: `-2 to -1`
+  Else: Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -373,10 +380,10 @@ This is how well your team and work through your opponent's presses and traps. H
   Condition: press/trap offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Sink: End of Game System
-  Condition: every completed franchise game
-  If opponent ran > 20 Presses + Traps: Range: `-4 to -3`
-  Elif Opponent ran > 10 Presses + Traps: Range: `-3 to -2`
-  Else: Range: `-2 to -1`
+  Condition: every completed franchise game (non-distant); opponent HCT + FCP uses.
+  If opponent uses > 16: Range: `-3 to -2`
+  Elif opponent uses > 12: Range: `-2 to -1`
+  Else: Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
