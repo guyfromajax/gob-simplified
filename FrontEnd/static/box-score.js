@@ -367,6 +367,7 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
       return {
         playerId: p._id || p.playerId,
         team: teamKey,
+        team_id: teamId || undefined, // mergeFullRosters must preserve canonical id for Play Usage top-scorer name lookup
         name: p.name,
         jersey: boxScorePlayer?.jersey !== undefined ? boxScorePlayer.jersey : (typeof p.jersey === 'number' ? p.jersey : (p.jersey !== undefined && p.jersey !== null && p.jersey !== '' ? p.jersey : '')),
         pos: p.pos || p.position || null,
