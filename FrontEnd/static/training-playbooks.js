@@ -46,10 +46,11 @@
   }
 
   function cmdBarClass(n) {
-    if (n < 41) return 'is-red';
-    if (n <= 60) return 'is-yellow';
-    if (n <= 80) return 'is-green';
-    return 'is-blue';
+    const x = Number(n);
+    const v = Number.isFinite(x) ? x : 0;
+    if (v < 50) return 'is-yellow'; // 0–49
+    if (v <= 79) return 'is-green'; // 50–79
+    return 'is-blue'; // 80+
   }
 
   function trainingOrdersUrl() {
