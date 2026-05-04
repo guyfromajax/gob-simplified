@@ -79,6 +79,22 @@ input[type="reset"] {
   margin: 0 0 22px;
 }
 
+/* Default shell uses overflow:clip (resource-pages.css), which prevents viewport sticky for the invite dock. */
+.recruiting-orders-shell.resource-page-container.fcc-brand-page-shell {
+  overflow: visible;
+}
+
+.recruiting-orders-shell {
+  /* Offset for .invite-dock sticky top = below .recruiting-header (also sticky, z-index 20) */
+  --recruiting-invite-dock-top: 92px;
+}
+
+@media (max-width: 900px) {
+  .recruiting-orders-shell {
+    --recruiting-invite-dock-top: 148px;
+  }
+}
+
 .invite-dock {
   position: sticky;
   top: 12px;
@@ -89,6 +105,11 @@ input[type="reset"] {
   background: linear-gradient(180deg, rgba(31, 37, 52, 0.97), rgba(20, 24, 34, 0.96));
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(14px);
+}
+
+.recruiting-orders-shell .invite-dock {
+  top: max(12px, env(safe-area-inset-top, 0px) + var(--recruiting-invite-dock-top));
+  z-index: 12;
 }
 
 .invite-dock-header {
