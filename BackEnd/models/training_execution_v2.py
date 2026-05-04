@@ -644,11 +644,11 @@ def apply_training_points(
     # Flat team-attribute bonuses from coaching focus, beyond normal gain amplification.
     if archetype == "culture-builder" and "fight" in team:
         fight_lo, fight_hi = TEAM_ATTR_CLAMPS["fight"]
-        team["fight"] = max(fight_lo, min(fight_hi, team.get("fight", 0) + random.randint(0, 1)))
+        team["fight"] = max(fight_lo, min(fight_hi, team.get("fight", 0) + random.randint(1, 2)))
 
     if archetype == "authoritarian" and "discipline" in team:
         disc_lo, disc_hi = TEAM_ATTR_CLAMPS["discipline"]
-        team["discipline"] = max(disc_lo, min(disc_hi, team.get("discipline", 0) + random.randint(0, 1)))
+        team["discipline"] = max(disc_lo, min(disc_hi, team.get("discipline", 0) + random.randint(1, 2)))
     
     # Apply team training points
     for category, allocation_data in normalized_allocations.items():
@@ -1307,11 +1307,11 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     # Shared by Strength+Conditioning → fight and defense/passing/BH → discipline.
     fight_discipline_training_ranges = {
         0: (-4, -3),
-        1: (-3, -1),
-        2: (-1, 1),
-        3: (1, 2),
-        4: (2, 3),
-        5: (2, 4),
+        1: (-1, 1),
+        2: (0, 2),
+        3: (1, 3),
+        4: (2, 4),
+        5: (3, 5),
     }
     chemistry_ranges = {
         0: (-3, -1),
@@ -1841,16 +1841,18 @@ def build_eog_offensive_play_effectiveness_decay_ftd_updates(
     ftd_plays: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
-    End-of-game: reduce each offensive play's CMD (effectiveness) on FTD by the integer
-    part of its share of team offensive playcalls (times_run) for that game.
+    End-of-game: optionally reduce each offensive play's CMD (effectiveness) on FTD.
 
-    For each play in ``game_team_plays`` (via :func:`iter_team_plays`), decay is
-    ``int(100 * times_run / total_times_run)`` when ``total_times_run > 0``, else 0.
-    New effectiveness is ``max(0, current_ftd_effectiveness - decay)``. Only keys
-    that change are included (Mongo ``$set`` paths ``plays.<storage_key>.effectiveness``).
+    Let ``usage_int = int(100 * times_run / total_times_run)`` when ``total_times_run > 0``,
+    else 0. Let ``success_rate_pct = (successes / times_run) * 100`` when ``times_run > 0``,
+    else 0 (``successes`` from ``game_stats``).
 
-    Offensive usage matches franchise EOG helpers: sum of ``game_stats.times_run`` over
-    the same play dict shape as training / stat rollup.
+    Decay is ``usage_int`` only when ``4 * usage_int < success_rate_pct``; otherwise decay is 0.
+    New effectiveness is ``max(0, current_ftd_effectiveness - decay)``. Only keys that change
+    are included (Mongo ``$set`` paths ``plays.<storage_key>.effectiveness``).
+
+    ``total_times_run`` is the sum of ``game_stats.times_run`` over the team's offensive plays
+    for that game (same shape as training / stat rollup). Defense EOG decay is separate.
     """
     if not isinstance(game_team_plays, dict) or not isinstance(ftd_plays, dict):
         return {}
@@ -1873,8 +1875,14 @@ def build_eog_offensive_play_effectiveness_decay_ftd_updates(
         if not isinstance(play_data, dict):
             continue
         tr = times_by_storage_key.get(storage_key, 0)
-        if total_times_run > 0:
-            decay = int(100.0 * float(tr) / float(total_times_run))
+        gs_loop = play_data.get("game_stats") or {}
+        if not isinstance(gs_loop, dict):
+            gs_loop = {}
+        successes = int(gs_loop.get("successes", 0) or 0)
+        if total_times_run > 0 and tr > 0:
+            usage_int = int(100.0 * float(tr) / float(total_times_run))
+            success_rate_pct = (float(successes) / float(tr)) * 100.0
+            decay = usage_int if (4 * usage_int < success_rate_pct) else 0
         else:
             decay = 0
         ftd_row = ftd_plays.get(storage_key)

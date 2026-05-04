@@ -377,7 +377,7 @@ Traning Camp Height / Weight bonsuses
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
   `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`
 - `fight` and `discipline` (same bucket table after their respective 0.5× / 0.25× accruals round to 0–5):
-  `0 -> -4 to -3`, `1 -> -3 to -1`, `2 -> -1 to +1`, `3 -> +1 to +2`, `4 -> +2 to +3`, `5+ -> +2 to +4`
+  `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`
   - **Fight:** Strength + Conditioning → sum × **0.5**, half-up → `_apply_team_training_points(..., "fight", ...)`.
   - **Discipline:** Inside/Outside defense + Passing + Ball Handling → sum × **0.25**, half-up → `_apply_team_training_points(..., "discipline", ...)`.
 - `team_chemistry`:
@@ -409,7 +409,7 @@ Traning Camp Height / Weight bonsuses
 2. **Install training (play/defense effectiveness only):** Authoritarian **Execution** and **Teamwork** use one session roll of the same `[1.5, 1.6, 1.7, 1.8]` values on integer **effectiveness** (Command) increments only, via `_scale_install_training_effectiveness_points`—not on momentum/cloaking (install does not allocate to those).
 
 **Authoritarian (all four sub-options implemented):**
-- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(0, 1)` once per training session.
+- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(1, 2)` once per training session.
 - **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*).
 - **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus.
 - **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus.
@@ -430,7 +430,7 @@ Traning Camp Height / Weight bonsuses
 - Community Engagement: Improves EM, affects crowd factors (carried to next game)
 - **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged.
 - **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). No flat EM/MO block; no Inspire-style team chemistry mult.
-- Any Culture Builder archetype also adds flat `fight += random.randint(0, 1)` once per training session.
+- Any Culture Builder archetype also adds flat `fight += random.randint(1, 2)` once per training session.
 
 #### Breaks Effect
 

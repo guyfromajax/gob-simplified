@@ -966,8 +966,8 @@ def update_team_attributes_after_game(
     Returns:
         dict: Attribute changes for each team, e.g.:
         {
-            home_team_id: {"shot_threshold": +5, "discipline": -1, ...},
-            away_team_id: {"shot_threshold": +12, "discipline": -2, ...}
+            home_team_id: {"shot_threshold": +5, "discipline": +2, "fight": +1, ...},
+            away_team_id: {"shot_threshold": +12, "discipline": -2, "fight": -2, ...}
         }
     """
     logger.warning(
@@ -1247,15 +1247,15 @@ def update_team_attributes_after_game(
         team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
         opp_f_plus_to_with_buffer = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0) + 8
         if team_f_plus_to < opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(0, 1)
+            changes["discipline"] = random.randint(1, 3)
         elif team_f_plus_to > opp_f_plus_to_with_buffer:
             changes["discipline"] = random.randint(-3, -2)
         else:
             changes["discipline"] = random.randint(-1, 0)
         
-        # fight: winning −1..+1, losing −3..−1
+        # fight: winning 0..+2, losing −3..−1
         if is_winner:
-            changes["fight"] = random.randint(-1, 1)
+            changes["fight"] = random.randint(0, 2)
         else:
             changes["fight"] = random.randint(-3, -1)
         

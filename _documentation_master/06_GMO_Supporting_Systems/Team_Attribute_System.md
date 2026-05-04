@@ -29,7 +29,7 @@
 2. **Missing Attributes**: Initialized from universal collection or generated randomly
 3. **Attribute Updates**: Training updates these team measures in Franchise/Tournament. In **franchise** mode, **end-of-game (EOG)** also adjusts the same FTD team fields from game output via `update_team_attributes_after_game` (see `End_Of_Game_System.md`).
 4. **Persistence**: Changes saved to the appropriate document for the game mode.
-5. **Play CMD (franchise):** The scalar list in this doc is not play effectiveness. That same EOG hook applies FTD **offensive** `plays.*.effectiveness` decay from each game’s `times_run` share and FTD **`scouting_data.defense.*.effectiveness`** decay from each game’s defensive playcall **`used`** share (same percentage rule as offense). Training no longer applies random pre-training defense decay (`Training_System.md`).
+5. **Play CMD (franchise):** The scalar list in this doc is not play effectiveness. That same EOG hook applies FTD **offensive** `plays.*.effectiveness` decay when **`4 * usage_int < success_rate_pct`** (`usage_int` from `times_run` share vs team total, `success_rate_pct` from `game_stats.successes` / `times_run`; see `End_Of_Game_System.md`), and FTD **`scouting_data.defense.*.effectiveness`** decay from each game’s defensive playcall **`used`** share (integer percent of team defensive calls). Training no longer applies random pre-training defense decay (`Training_System.md`).
 
 ## Long Form Documentation
 
@@ -256,15 +256,15 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet: Training System / Strength + Conditioning.
   Condition: strength and conditioning contribute positive rounded effective points.
-  Range (shared fight/discipline bucket table after 0.5× accrual rounds): `0 -> -4 to -3`, `1 -> -3 to -1`, `2 -> -1 to +1`, `3 -> +1 to +2`, `4 -> +2 to +3`, `5+ -> +2 to +4`.
+  Range (shared fight/discipline bucket table after 0.5× accrual rounds): `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`.
 - Sink: Training System / Breaks.
   Condition: `breaks` slider at `4` or `5`.
   Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
 - Faucet: Traning System / Coaching Focus
-  If the user chooses any of the Culture Builder:  Range: `0 to +1`
+  If the user chooses any of the Culture Builder:  Range: `+1 to +2`
 - Faucet: End Of Game System.
   Condition: team won the game.
-  Range: `-1 to +1`.
+  Range: `0 to +2`.
 - Sink: End Of Game System.
   Condition: team lost the game.
   Range: `-3 to -1`.
@@ -275,19 +275,19 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet: Training System / Inside Defense, Outside Defense, Passing, Ball Handling.
   Condition: those drills contribute positive rounded effective points (0.25× per drill point, summed, half-up).
-  Range: same bucket table as **Fight** after rounding: `0 -> -4 to -3`, `1 -> -3 to -1`, `2 -> -1 to +1`, `3 -> +1 to +2`, `4 -> +2 to +3`, `5+ -> +2 to +4`.
+  Range: same bucket table as **Fight** after rounding: `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`.
 - Sink: Training System / Breaks.
   Condition: `breaks` slider at `4` or `5`.
   Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
 - Faucet: Traning System / Coaching Focus
-  If the user chooses any of the Authoritarian:  Range: `0 to +1`
+  If the user chooses any of the Authoritarian:  Range: `+1 to +2`
 - Faucet: End Of Game System.
   Condition: team `(F + TO)` is lower than opponent `(F + TO)` + 8.
-  Range: `0 to +1`.
+  Range: `+1 to +3`.
 - Sink: End Of Game System.
-  Condition: team `(F + TO)` is greater than or equal to opponent `(F + TO)` + 8.
+  Condition: team `(F + TO)` is greater than opponent `(F + TO)` + 8.
   Range: `-3 to -2`.
-- Else: Range: `-1 to 0`
+- Else (tie vs buffered opponent total): Range: `-1 to 0`
 
 ### Momentum (`momentum_score`) (range: -10 to 10)
 

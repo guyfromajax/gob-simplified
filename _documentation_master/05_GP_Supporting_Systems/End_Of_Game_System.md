@@ -60,12 +60,12 @@ Team attributes will adjust at the end of game based on the notes below. Note th
     - **Both teams:** If FG% ≤ 45%: `+= random.randint(5, 10)`.
   - `discipline` (both teams, same criteria)
     - Compare team `(F + TO)` to opponent `(F + TO) + 8`.
-    - If lower: `+= random.randint(0, 1)`.
+    - If lower: `+= random.randint(1, 3)`.
     - If higher: `+= random.randint(-3, -2)`.
     - If equal: `+= random.randint(-1, 0)`.
     - F = team fouls for the game (from box score / team totals).
   - `fight`
-    - **Winning team:** += random.randint(-1, 1).
+    - **Winning team:** += random.randint(0, 2).
     - **Losing team:** += random.randint(-3, -1).
   - `rebound_modifier` (winning and losing team have same criteria)
     - if team TREB for the game > opponents TREB for the game + 8: += `0.00 to 0.05`
@@ -119,8 +119,9 @@ Team attributes will adjust at the end of game based on the notes below. Note th
       - losing team += random.randint(-6,-4)
 - **Offensive play CMD (effectiveness) decay — franchise FTD only:**
   - After the team-attribute `calculate_attr_changes` pass, `update_team_attributes_after_game()` applies **separate** updates to **`franchise_team_data.plays.<storage_key>.effectiveness`** for each team (same EOG entry point as FTD `team_attributes`).
-  - For each offensive play row in the finished-game snapshot (`iter_team_plays` over `teams[team_id].plays`), let `times_run` be that play’s `game_stats.times_run` and `T` the sum of `times_run` over all those plays for that team in that game.
-  - If `T > 0`, decay points = **`int(100.0 * times_run / T)`** (integer part of the play’s **percent share** of team offensive playcalls for the game). If `T == 0`, decay is **0** for every play.
+  - For each offensive play row in the finished-game snapshot (`iter_team_plays` over `teams[team_id].plays`), let `times_run` be that play’s `game_stats.times_run`, `successes` that play’s `game_stats.successes`, and `T` the sum of `times_run` over all those plays for that team in that game.
+  - Let **`usage_int` = `int(100.0 * times_run / T)`** when **`T > 0`** and **`times_run > 0`**, else **0**. Let **`success_rate_pct` = `(successes / times_run) * 100`** when **`times_run > 0`**, else **0**.
+  - Decay points = **`usage_int`** only when **`4 * usage_int < success_rate_pct`**; otherwise decay is **0**. If **`T == 0`** or a play has **`times_run == 0`**, that play’s decay is **0**.
   - New effectiveness = **`max(0, current_ftd_effectiveness - decay)`**; only keys that change are `$set` on FTD.
   - **Implementation:** `build_eog_offensive_play_effectiveness_decay_ftd_updates()` in `BackEnd/models/training_execution_v2.py`; persistence in `BackEnd/api/franchise_routes.py` immediately after home/away attribute changes are computed.
   - **Not** applied when postseason EOG freezes team-attribute updates (weeks 27–34): that early return skips the whole `update_team_attributes_after_game` body, including this decay.
@@ -130,7 +131,7 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - **Implementation:** `build_eog_defensive_effectiveness_decay_ftd_updates()` in `BackEnd/models/training_execution_v2.py`; persistence in `BackEnd/api/franchise_routes.py` alongside offensive play decay. Pre-training random defense decay was removed from `execute_training`.
 - **Data Sources:**
   - Team totals (F, TO, FG%, TREB) come from the canonical finished-game snapshot built for EOG and box score display.
-  - Offensive play usage reads the completed game's `teams[team_id].plays[*].game_stats.times_run`.
+  - Offensive play decay reads `teams[team_id].plays[*].game_stats.times_run` and **`successes`** (same snapshot as usage totals).
   - Defensive play usage reads the completed game's `teams[team_id].scouting.defense` usage counts.
   - Fast break play usage reads the completed game's `teams[team_id].scouting.offense.fast_break_plays[*].A`.
   - Press/trap totals read the same HCT/FCP usage fields shown in the box score's Special Situations section.
@@ -303,7 +304,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
   - `team_totals` for box-score totals (`FGM/FGA`, `TO/STL`, `DREB/OREB`)
   - fallback to aggregated `box_score` only if `team_totals` is missing
 - **Distant-sim note:** Distant franchise games persist `simulation_engine="distant"` on the game doc. EOG uses this as an explicit branch signal so only the four FB/PT attrs switch to the simplified random rule; TBT games keep the normal scouting-based formulas.
-- **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()` (FTD `team_attributes` deltas, FTD offensive **`plays.*.effectiveness`** decay from `times_run` share, and FTD **`scouting_data.defense.*.effectiveness`** decay from defensive `used` share; see **Offensive play CMD** / **Defensive scouting effectiveness** above).
+- **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()` (FTD `team_attributes` deltas, FTD offensive **`plays.*.effectiveness`** decay when **`4 * usage_int < success_rate_pct`** (see **Offensive play CMD** above), and FTD **`scouting_data.defense.*.effectiveness`** decay from defensive `used` share; see **Defensive scouting effectiveness** above).
 - **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
 - **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.
 - **Why this method:** Prevents source drift between `team_stats`, `teams.scouting`, and totals; keeps EOG deltas deterministic and aligned to final game state.
