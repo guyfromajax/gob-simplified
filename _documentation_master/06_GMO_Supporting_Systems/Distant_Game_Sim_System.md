@@ -28,10 +28,15 @@ Resolution of “who is the user’s next-week opponent” is **`_user_next_regu
 ## Architecture
 
 ### Win Probability Calculation (implement now)
-1. Calculate each team's **combined score**: prestige + int(0.1 * total_player_attrs)
-2. Home team gets a +(2 * home team chemistry attribute value) bonus added to their combined score
-3. Roll `randint(1, combined_total)`- If roll <= home_team_score: home team wins
-   - If roll > home_team_score: away team wins
+1. Calculate each team's **base score**: `prestige + int(0.1 * total_player_attrs)` (same inputs as standings / FTD).
+2. **Momentum:** add `mo_multiplier × team_wins` to that team's score for this roll.
+   - **`team_wins`:** franchise **regular-season wins only** (weeks **1–26** in `franchise.results`), same aggregation as **`calculate_franchise_standings`** used for **`GET /franchise/standings`** (standings.html). Postseason / EOS weeks in `results` do not change this win count.
+   - **`team_chemistry`** for the multiplier comes from FTD **`team_attributes.team_chemistry`**. Clamp to **7–25** for band lookup: values **&lt; 7** are treated as **7** for bands; **&gt; 25** as **25** (same effect as explicit floor/ceiling multipliers: low → 1×, top band → 6×).
+   - Bands on clamped chemistry: **&lt; 11 → 1**, **&lt; 16 → 2**, **&lt; 21 → 3**, **&lt; 25 → 4**, **= 25 → 6**.
+3. **Home edge:** add **`2 × home_team_chemistry`** (raw FTD value; same field as today) to the **home** team's score only.
+4. Roll **`randint(1, combined_total)`** where **`combined_total = home_team_score + away_team_score`**. If **`roll ≤ home_team_score`**: home wins; else away wins.
+
+**Order:** base → momentum (both teams) → home chemistry bonus (home only) → roll.
 
 ### Margin of Victory (implement now)
 

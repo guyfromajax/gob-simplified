@@ -1880,12 +1880,76 @@ def _distant_sim_home_team_chemistry_bonus(home_ftd: dict) -> int:
     return 2 * tc
 
 
+def _distant_sim_regular_season_standings(
+    franchise_doc: dict[str, Any],
+    team_ids_map: dict[str, Any],
+) -> dict[str, dict[str, int]]:
+    """
+    W/L/PF/PA from franchise.results for regular season weeks only (same slice as standings W/L
+    when postseason rows live under higher week keys). Uses calculate_franchise_standings.
+    """
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    rs_slice: dict[str, Any] = {}
+    for wk, games in (franchise_doc.get("results") or {}).items():
+        try:
+            wi = int(wk)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= wi <= ScheduleManager.REGULAR_SEASON_WEEKS:
+            rs_slice[str(wk)] = games
+    return calculate_franchise_standings(rs_slice, team_ids_map)
+
+
+def _distant_sim_momentum_multiplier(team_chemistry_raw: Any) -> int:
+    """Momentum multiplier from team chemistry (clamped 7–25 for bands). Distant_Game_Sim_System.md."""
+    try:
+        tc_raw = int(team_chemistry_raw)
+    except (TypeError, ValueError):
+        tc_raw = 7
+    tc = max(7, min(25, tc_raw))
+    if tc < 11:
+        return 1
+    if tc < 16:
+        return 2
+    if tc < 21:
+        return 3
+    if tc < 25:
+        return 4
+    return 6
+
+
+def _distant_sim_momentum_term(ftd_doc: dict, season_wins: int) -> int:
+    """mo_multiplier × regular-season wins (Distant_Game_Sim_System.md)."""
+    raw = (ftd_doc.get("team_attributes") or {}).get("team_chemistry")
+    mult = _distant_sim_momentum_multiplier(raw)
+    w = max(0, int(season_wins))
+    return mult * w
+
+
+def _distant_sim_team_combined(
+    ftd_doc: dict,
+    team_object_id: Any,
+    *,
+    is_home: bool,
+    rs_standings: dict[str, dict[str, int]],
+) -> int:
+    """Base + momentum (RS wins) + home-only 2×chemistry bonus. See Distant_Game_Sim_System.md."""
+    tid = str(team_object_id)
+    wins = int((rs_standings.get(tid) or {}).get("W", 0) or 0)
+    base = (ftd_doc.get("prestige") or 0) + int(0.1 * (ftd_doc.get("total_player_attrs") or 0))
+    out = base + _distant_sim_momentum_term(ftd_doc, wins)
+    if is_home:
+        out += _distant_sim_home_team_chemistry_bonus(ftd_doc)
+    return out
+
+
 def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
     """
     Lightweight sim for distant (non-user-conference) games.
     Uses win probability roll, margin from dominance buckets, and clamped final scores.
     Returns (home_score, away_score).
-    Callers pass home_combined including the home chemistry bonus (see _distant_sim_home_team_chemistry_bonus).
+    Callers pass home_combined / away_combined after base + momentum + home chemistry bonus.
     See _documentation_master/06_GMO_Supporting_Systems/Distant_Game_Sim_System.md
     """
     combined_total = home_combined + away_combined
@@ -3665,6 +3729,7 @@ def _complete_week_finish_cpu_and_persist(
         },
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+    distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
     team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
     if user_team_id_str and ObjectId.is_valid(user_team_id_str):
         team_ids_for_conf.append(ObjectId(user_team_id_str))
@@ -3746,12 +3811,12 @@ def _complete_week_finish_cpu_and_persist(
             if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
                 home_ftd = ftd_by_team_id.get(str(home_id), {})
                 away_ftd = ftd_by_team_id.get(str(away_id), {})
-                home_combined = (
-                    (home_ftd.get("prestige") or 0)
-                    + int(0.1 * (home_ftd.get("total_player_attrs") or 0))
-                    + _distant_sim_home_team_chemistry_bonus(home_ftd)
+                home_combined = _distant_sim_team_combined(
+                    home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings
                 )
-                away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+                away_combined = _distant_sim_team_combined(
+                    away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
+                )
                 home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
                 try:
                     sim_res, distant_game_id = _persist_distant_franchise_game(
@@ -3826,12 +3891,12 @@ def _complete_week_finish_cpu_and_persist(
         if is_distant:
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_combined = (
-                (home_ftd.get("prestige") or 0)
-                + int(0.1 * (home_ftd.get("total_player_attrs") or 0))
-                + _distant_sim_home_team_chemistry_bonus(home_ftd)
+            home_combined = _distant_sim_team_combined(
+                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings
             )
-            away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+            away_combined = _distant_sim_team_combined(
+                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
+            )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             try:
                 sim_res, _distant_game_id = _persist_distant_franchise_game(
@@ -9723,6 +9788,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         },
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+    distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
 
     results = []
     for g in week_games_meta:
@@ -9735,12 +9801,12 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_combined = (
-                (home_ftd.get("prestige") or 0)
-                + int(0.1 * (home_ftd.get("total_player_attrs") or 0))
-                + _distant_sim_home_team_chemistry_bonus(home_ftd)
+            home_combined = _distant_sim_team_combined(
+                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings
             )
-            away_combined = (away_ftd.get("prestige") or 0) + int(0.1 * (away_ftd.get("total_player_attrs") or 0))
+            away_combined = _distant_sim_team_combined(
+                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
+            )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             winner_id = home_id if home_score > away_score else away_id
             score = {"home": home_score, "away": away_score}
