@@ -139,7 +139,8 @@ def repair_franchise_eos_bracket_from_results(
 ) -> dict[str, Any]:
     """
     For each EOS ``week``, each ``get_eos_week_games(..., include_completed=True)`` slot with no
-    bracket ``winner``, apply ``_sync_eos_bracket_from_existing_game_doc`` when ``results.{week}``
+    bracket ``winner``, apply ``_sync_eos_bracket_from_existing_game_doc`` (which delegates to
+    ``record_tournament_game_result``) when ``results.{week}``
     has a decisive row and/or ``games`` has the matchup.
 
     Mutates ``franchise_doc`` in place when ``dry_run`` is False and persists EOS keys to Mongo.
@@ -210,6 +211,8 @@ def repair_franchise_eos_bracket_from_results(
                 away_id=away_id,
                 home_id=home_id,
                 g=g,
+                week=int(week),
+                franchise_id_str=franchise_id_str,
             )
             applied.append(
                 {

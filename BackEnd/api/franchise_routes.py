@@ -33,6 +33,7 @@ from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_player
 from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
 from BackEnd.tournament.bracket_engine import get_round_name
 from BackEnd.tournament import franchise_tournament as ft
+from BackEnd.tournament import franchise_tournament_progression as ftp
 from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
@@ -2777,111 +2778,39 @@ def _save_user_eos_bracket_result(
     team2_score: int,
     game_id: str | None,
     week: int | None = None,
+    franchise_id_str: str | None = None,
 ) -> dict | None:
-    """Persist the played user EOS game into its tournament bracket."""
-    if week_games_meta is None:
+    """
+    Persist the played user EOS game: ``games`` row + bracket slot via
+    ``franchise_tournament_progression.record_tournament_game_result``.
+    """
+    g = ftp.find_user_eos_game_meta(franchise_doc, week_games_meta, user_team_id_str, week)
+    if not g:
         return None
-    meta_primary = list(week_games_meta)
-    found = ft.find_user_game_in_eos_week(meta_primary, user_team_id_str)
-    resolved: str | None = None
-    if not found and user_team_id_str:
-        raw = str(user_team_id_str).strip()
-        try:
-            if ObjectId.is_valid(raw):
-                resolved = str(ObjectId(raw))
-        except Exception:
-            resolved = None
-        if not resolved:
-            try:
-                doc = db.teams.find_one(
-                    {"$or": [{"team_id": raw}, {"name": raw}, {"code": raw}]},
-                    {"_id": 1},
-                )
-            except Exception:
-                doc = None
-            if doc and doc.get("_id") is not None:
-                resolved = str(doc["_id"])
-        if resolved:
-            found = ft.find_user_game_in_eos_week(meta_primary, resolved)
-            if found:
-                logger.warning(
-                    "🧭 [COMPLETE-WEEK] Resolved user_team_id for EOS bracket save: raw=%s resolved=%s",
-                    raw,
-                    resolved,
-                )
-    # Calendar meta (include_completed=True) follows franchise week; playable meta follows
-    # current_round. When week advanced but a conference semifinal row never got a winner,
-    # calendar meta for the new week points at an empty final — retry playable list so we can
-    # still write round2 and unblock advance (see get_eos_week_games docstring).
-    if not found and week is not None and week in ft.EOS_WEEKS:
-        playable = ft.get_eos_week_games(franchise_doc, week, include_completed=False)
-        found = ft.find_user_game_in_eos_week(playable, user_team_id_str)
-        if not found and resolved:
-            found = ft.find_user_game_in_eos_week(playable, resolved)
-        if found:
-            logger.warning(
-                "[EOS-BRACKET-DEBUG] user_eos_bracket_save_using_playable_meta franchise_id=%s week=%s",
-                str(franchise_doc.get("_id")),
-                week,
-            )
-    if not found:
-        logger.warning(
-            "⚠️ [COMPLETE-WEEK] Could not find user EOS matchup for bracket persistence. user_team_id=%s game_id=%s",
-            user_team_id_str,
-            game_id,
-        )
-        return None
-    _, g = found
-    winner_raw = team1_id if team1_score > team2_score else team2_id
-    winner_id_str = ft._eos_team_id_canonical(winner_raw)
-    logger.warning(
-        "[EOS-BRACKET-DEBUG] user_eos_bracket_save_start franchise_id=%s phase=%s conf=%s round=%s "
-        "idx=%s user_team_id_str=%s winner=%s",
-        str(franchise_doc.get("_id")),
-        g.get("phase"),
-        g.get("conference") or g.get("region"),
-        g.get("round"),
-        g.get("matchup_index"),
-        user_team_id_str,
-        (winner_id_str or str(winner_raw))[:24],
+    fid = franchise_id_str or str(franchise_doc.get("_id") or "")
+    wk = week
+    if wk is None:
+        ph = g.get("phase")
+        if ph == "conference":
+            wk = 26 + int(g.get("round", 1) or 1)
+        elif ph == "region":
+            wk = 30 if int(g.get("round", 1) or 1) == 1 else 31
+        elif ph == "national":
+            wk = 31 + int(g.get("round", 1) or 1)
+        else:
+            wk = 27
+    ftp.record_tournament_game_result(
+        franchise_doc,
+        g,
+        week=wk,
+        franchise_id_str=fid or "000000000000000000000000",
+        game_id=game_id,
+        team1_id=team1_id,
+        team2_id=team2_id,
+        team1_score=team1_score,
+        team2_score=team2_score,
+        source="user",
     )
-    home_id_g = g["home_id"]
-    hg = ft._eos_team_id_canonical(home_id_g)
-    t1 = ft._eos_team_id_canonical(team1_id)
-    score = {
-        "home": team1_score if t1 == hg else team2_score,
-        "away": team2_score if t1 == hg else team1_score,
-    }
-    bracket_game_id = str(game_id or "")
-    if g["phase"] == "conference":
-        ft.save_conference_game_result(
-            franchise_doc,
-            g["conference"],
-            g["round"],
-            g["matchup_index"],
-            bracket_game_id,
-            winner_id_str or str(winner_raw),
-            score,
-        )
-    elif g["phase"] == "region":
-        ft.save_region_game_result(
-            franchise_doc,
-            g["region"],
-            g["round"],
-            g["matchup_index"],
-            bracket_game_id,
-            winner_id_str or str(winner_raw),
-            score,
-        )
-    elif g["phase"] == "national":
-        ft.save_national_game_result(
-            franchise_doc,
-            g["round"],
-            g["matchup_index"],
-            bracket_game_id,
-            winner_id_str or str(winner_raw),
-            score,
-        )
     logger.warning(
         "[EOS-BRACKET-DEBUG] user_eos_bracket_save_done franchise_id=%s phase=%s",
         str(franchise_doc.get("_id")),
@@ -2905,7 +2834,40 @@ def _complete_week_process_user_game_block(
     
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
-    user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week, franchise_id=req.franchise_id, game_id=user_game_id)
+    eos_g_meta = None
+    if req.week in ft.EOS_WEEKS and week_games_meta:
+        eos_g_meta = ftp.find_user_eos_game_meta(
+            franchise_doc, week_games_meta, user_team_id_str, req.week
+        )
+    if eos_g_meta:
+        ftp.record_tournament_game_result(
+            franchise_doc,
+            eos_g_meta,
+            week=req.week,
+            franchise_id_str=str(req.franchise_id),
+            game_id=user_game_id,
+            team1_id=team1_id,
+            team2_id=team2_id,
+            team1_score=user.team1_score,
+            team2_score=user.team2_score,
+            source="user",
+        )
+        user_res = {
+            "team1_id": str(team1_id),
+            "team2_id": str(team2_id),
+            "team1_score": user.team1_score,
+            "team2_score": user.team2_score,
+        }
+    else:
+        user_res = _save_game_result(
+            team1_id,
+            team2_id,
+            user.team1_score,
+            user.team2_score,
+            req.week,
+            franchise_id=req.franchise_id,
+            game_id=user_game_id,
+        )
     user_row = {
         "away_id": user_res["team1_id"],
         "home_id": user_res["team2_id"],
@@ -2913,25 +2875,10 @@ def _complete_week_process_user_game_block(
         "home_score": user_res["team2_score"],
     }
     
-    # ✅ EOS (weeks 27–34): save user's game result to the correct bracket (conference/region/national)
-    # Do not require req.game_id here. Some gameplay paths omit it, but the bracket still
-    # needs the winner so later tournament rounds can be generated.
-    _save_user_eos_bracket_result(
-        franchise_doc,
-        week_games_meta=week_games_meta,
-        user_team_id_str=user_team_id_str,
-        team1_id=team1_id,
-        team2_id=team2_id,
-        team1_score=user.team1_score,
-        team2_score=user.team2_score,
-        game_id=user_game_id,
-        week=req.week,
-    )
-    
     user_winner_id = team1_id if user.team1_score > user.team2_score else team2_id
-    eos_matchup_for_user = None
+    eos_matchup_for_user = eos_g_meta
     ch_game_id: str | None = None
-    if req.week in ft.EOS_WEEKS and week_games_meta:
+    if eos_matchup_for_user is None and req.week in ft.EOS_WEEKS and week_games_meta:
         found_user_eos = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
         if found_user_eos:
             eos_matchup_for_user = found_user_eos[1]
@@ -3171,6 +3118,7 @@ def _complete_week_process_user_game_block(
                     team2_score=user.team2_score,
                     game_id=user_game_id,
                     week=req.week,
+                    franchise_id_str=str(req.franchise_id),
                 )
                 logger.info(f"🔍 [COMPLETE_WEEK] Calling finalize_game() for user's game: game_id={user_game_id}")
                 stat_updater.finalize_game(
@@ -3240,11 +3188,16 @@ def _sync_eos_bracket_from_existing_game_doc(
     away_id: Any,
     home_id: Any,
     g: dict[str, Any],
+    week: int | None = None,
+    franchise_id_str: str | None = None,
 ) -> None:
     """Write EOS bracket winner/scores from an already-saved games row.
 
     When ``complete_week`` hits ``existing`` it used to ``continue`` without updating the
     in-memory bracket, so ``advance_bracket`` saw fewer than four R1 winners (e.g. 3/4).
+
+    Delegates to ``franchise_tournament_progression.record_tournament_game_result`` with
+    ``source="existing_games"`` (bracket only; ``games`` row is already authoritative).
     """
     ex_id = existing.get("_id")
     gid = str(ex_id) if ex_id is not None else ""
@@ -3278,7 +3231,6 @@ def _sync_eos_bracket_from_existing_game_doc(
     else:
         winner_raw = home_id
     wid = ft._eos_team_id_canonical(winner_raw) or str(winner_raw)
-    score = {"home": home_s, "away": away_s}
     logger.warning(
         "[EOS-BRACKET-DEBUG] sync_from_existing_apply winner=%s home_s=%s away_s=%s phase=%s",
         wid[:16] if wid else "",
@@ -3286,36 +3238,34 @@ def _sync_eos_bracket_from_existing_game_doc(
         away_s,
         g.get("phase"),
     )
-    phase = g.get("phase")
-    if phase == "conference":
-        ft.save_conference_game_result(
-            franchise_doc,
-            g["conference"],
-            g["round"],
-            g["matchup_index"],
-            gid,
-            wid,
-            score,
-        )
-    elif phase == "region":
-        ft.save_region_game_result(
-            franchise_doc,
-            g["region"],
-            g["round"],
-            g["matchup_index"],
-            gid,
-            wid,
-            score,
-        )
-    elif phase == "national":
-        ft.save_national_game_result(
-            franchise_doc,
-            g["round"],
-            g["matchup_index"],
-            gid,
-            wid,
-            score,
-        )
+    wk = week if week is not None else existing.get("week")
+    if wk is None:
+        ph = g.get("phase")
+        if ph == "conference":
+            wk = 26 + int(g.get("round", 1) or 1)
+        elif ph == "region":
+            wk = 30 if int(g.get("round", 1) or 1) == 1 else 31
+        elif ph == "national":
+            wk = 31 + int(g.get("round", 1) or 1)
+        else:
+            wk = 27
+    fid = franchise_id_str or str(existing.get("franchise_id") or "") or str(franchise_doc.get("_id") or "")
+    g_full = dict(g)
+    g_full.setdefault("away_id", away_id)
+    g_full.setdefault("home_id", home_id)
+    ftp.record_tournament_game_result(
+        franchise_doc,
+        g_full,
+        week=int(wk),
+        franchise_id_str=fid or "000000000000000000000000",
+        game_id=gid or None,
+        team1_id=away_id,
+        team2_id=home_id,
+        team1_score=away_s,
+        team2_score=home_s,
+        source="existing_games",
+        skip_games_upsert=True,
+    )
 
 
 def _sync_eos_bracket_from_result_row(
@@ -3365,10 +3315,8 @@ def _sync_eos_bracket_from_result_row(
         franchise_id=franchise_id_str,
         game_id=game_id,
     )
-
     winner_raw = home_id if home_s >= away_s else away_id
     wid = ft._eos_team_id_canonical(winner_raw) or str(winner_raw)
-    score = {"home": home_s, "away": away_s}
     logger.warning(
         "[EOS-BRACKET-DEBUG] sync_from_result_row_apply winner=%s home_s=%s away_s=%s phase=%s conf=%s round=%s midx=%s game_id=%s",
         wid[:16] if wid else "",
@@ -3380,36 +3328,22 @@ def _sync_eos_bracket_from_result_row(
         g.get("matchup_index"),
         game_id[:12],
     )
-    phase = g.get("phase")
-    if phase == "conference":
-        ft.save_conference_game_result(
-            franchise_doc,
-            g["conference"],
-            g["round"],
-            g["matchup_index"],
-            game_id,
-            wid,
-            score,
-        )
-    elif phase == "region":
-        ft.save_region_game_result(
-            franchise_doc,
-            g["region"],
-            g["round"],
-            g["matchup_index"],
-            game_id,
-            wid,
-            score,
-        )
-    elif phase == "national":
-        ft.save_national_game_result(
-            franchise_doc,
-            g["round"],
-            g["matchup_index"],
-            game_id,
-            wid,
-            score,
-        )
+    g_full = dict(g)
+    g_full.setdefault("away_id", away_id)
+    g_full.setdefault("home_id", home_id)
+    ftp.record_tournament_game_result(
+        franchise_doc,
+        g_full,
+        week=week,
+        franchise_id_str=franchise_id_str,
+        game_id=game_id,
+        team1_id=away_id,
+        team2_id=home_id,
+        team1_score=away_s,
+        team2_score=home_s,
+        source="existing_results",
+        skip_games_upsert=True,
+    )
 
 
 def _finalize_franchise_week_after_cpu_games(
@@ -3485,7 +3419,7 @@ def _finalize_franchise_week_after_cpu_games(
                 f"complete_week_pre_advance week={week} fid={franchise_id_str}",
             )
             for c in range(1, 17):
-                advanced, champ = ft.advance_conference_bracket(franchise_doc, c)
+                advanced, champ = ftp.advance_conference_bracket(franchise_doc, c)
             ft.log_eos_conference_bracket_snapshot(
                 franchise_doc,
                 f"complete_week_post_advance week={week} fid={franchise_id_str}",
@@ -3528,7 +3462,7 @@ def _finalize_franchise_week_after_cpu_games(
             update_fields["week"] = next_week
             update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
         elif week in ft.EOS_NATIONAL_WEEKS:
-            advanced, champion = ft.advance_national_bracket(franchise_doc)
+            advanced, champion = ftp.advance_national_bracket(franchise_doc)
             update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
             if week == ft.EOS_NATIONAL_WEEKS[-1]:
                 update_fields["eos_tournament_active"] = False
@@ -3700,6 +3634,8 @@ def _eos_sync_bracket_slots_from_games_for_week(
             away_id=away_id,
             home_id=home_id,
             g=g,
+            week=int(week),
+            franchise_id_str=franchise_id_str,
         )
         n += 1
     return n
@@ -3710,7 +3646,7 @@ def _eos_advance_all_conference_brackets_until_idle(franchise_doc: dict) -> int:
     steps = 0
     for c in range(1, 17):
         for _ in range(4):
-            advanced, _ch = ft.advance_conference_bracket(franchise_doc, c)
+            advanced, _ch = ftp.advance_conference_bracket(franchise_doc, c)
             if not advanced:
                 break
             steps += 1
@@ -3922,6 +3858,8 @@ def _complete_week_finish_cpu_and_persist(
                         away_id=away_id,
                         home_id=home_id,
                         g=g_meta,
+                        week=week,
+                        franchise_id_str=franchise_id_str,
                     )
                 else:
                     _sync_eos_bracket_from_result_row(
@@ -3958,6 +3896,8 @@ def _complete_week_finish_cpu_and_persist(
                     away_id=away_id,
                     home_id=home_id,
                     g=g_meta,
+                    week=week,
+                    franchise_id_str=franchise_id_str,
                 )
             continue
     
@@ -4006,21 +3946,19 @@ def _complete_week_finish_cpu_and_persist(
                     "home_score": sim_res["team2_score"],
                 })
                 winner_id = home_id if home_score > away_score else away_id
-                if g["phase"] == "conference":
-                    ft.save_conference_game_result(
-                        franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
-                    )
-                elif g["phase"] == "region":
-                    ft.save_region_game_result(
-                        franchise_doc, g["region"], g["round"], g["matchup_index"],
-                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
-                    )
-                elif g["phase"] == "national":
-                    ft.save_national_game_result(
-                        franchise_doc, g["round"], g["matchup_index"],
-                        distant_game_id, str(winner_id), {"home": home_score, "away": away_score},
-                    )
+                ftp.record_tournament_game_result(
+                    franchise_doc,
+                    g,
+                    week=week,
+                    franchise_id_str=franchise_id_str,
+                    game_id=distant_game_id or None,
+                    team1_id=away_id,
+                    team2_id=home_id,
+                    team1_score=away_score,
+                    team2_score=home_score,
+                    source="distant",
+                    skip_games_upsert=True,
+                )
                 _award_gp_sim(winner_id, g, (away_id, home_id))
                 continue
     
@@ -4132,59 +4070,45 @@ def _complete_week_finish_cpu_and_persist(
                 )
                 away_score = random.randint(50, 90)
                 home_score = random.randint(50, 90)
-                sim_res = _save_game_result(
-                    aid, hid, away_score, home_score, week, franchise_id=franchise_id_str
-                )
+                ex_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
+                if week in ft.EOS_WEEKS and ex_g is not None:
+                    g_fb = ex_g
+                    ftp.record_tournament_game_result(
+                        franchise_doc,
+                        g_fb,
+                        week=week,
+                        franchise_id_str=franchise_id_str,
+                        game_id=None,
+                        team1_id=aid,
+                        team2_id=hid,
+                        team1_score=away_score,
+                        team2_score=home_score,
+                        source="cpu_full",
+                    )
+                    sim_res = {
+                        "team1_id": str(aid),
+                        "team2_id": str(hid),
+                        "team1_score": away_score,
+                        "team2_score": home_score,
+                    }
+                else:
+                    sim_res = _save_game_result(
+                        aid, hid, away_score, home_score, week, franchise_id=franchise_id_str
+                    )
                 ex_winner = (
                     sim_res["team1_id"]
                     if sim_res["team1_score"] > sim_res["team2_score"]
                     else sim_res["team2_id"]
                 )
-                ex_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
                 _award_gp_sim(ex_winner, ex_g, (aid, hid))
-                if week in ft.EOS_WEEKS and week_games_meta and job_idx < len(week_games_meta):
-                    g_fb = week_games_meta[job_idx]
-                    wid_fb = ft._eos_team_id_canonical(ex_winner) or str(ex_winner)
-                    score_fb = {
-                        "home": int(sim_res["team2_score"]),
-                        "away": int(sim_res["team1_score"]),
-                    }
-                    ph = g_fb.get("phase")
-                    if ph == "conference":
-                        ft.save_conference_game_result(
-                            franchise_doc,
-                            g_fb["conference"],
-                            g_fb["round"],
-                            g_fb["matchup_index"],
-                            "",
-                            wid_fb,
-                            score_fb,
-                        )
-                    elif ph == "region":
-                        ft.save_region_game_result(
-                            franchise_doc,
-                            g_fb["region"],
-                            g_fb["round"],
-                            g_fb["matchup_index"],
-                            "",
-                            wid_fb,
-                            score_fb,
-                        )
-                    elif ph == "national":
-                        ft.save_national_game_result(
-                            franchise_doc,
-                            g_fb["round"],
-                            g_fb["matchup_index"],
-                            "",
-                            wid_fb,
-                            score_fb,
-                        )
+                if week in ft.EOS_WEEKS and ex_g is not None:
+                    ph = ex_g.get("phase")
                     logger.warning(
                         "[EOS-BRACKET-DEBUG] eos_full_sim_fallback_bracket_sync week=%s idx=%s phase=%s conf=%s",
                         week,
                         job_idx,
                         ph,
-                        g_fb.get("conference"),
+                        ex_g.get("conference"),
                     )
                 results.append(
                     {
@@ -4206,9 +4130,31 @@ def _complete_week_finish_cpu_and_persist(
             stat_updater.finalize_game(
                 computer_game_id, mode="franchise", franchise_id=franchise_id_str
             )
-            sim_res = _save_game_result(
-                aid, hid, away_score, home_score, week, franchise_id=franchise_id_str, game_id=computer_game_id
-            )
+            sim_res = {
+                "team1_id": str(aid),
+                "team2_id": str(hid),
+                "team1_score": away_score,
+                "team2_score": home_score,
+            }
+            if week_games_meta and job_idx < len(week_games_meta):
+                g_cpu = week_games_meta[job_idx]
+                ftp.record_tournament_game_result(
+                    franchise_doc,
+                    g_cpu,
+                    week=week,
+                    franchise_id_str=franchise_id_str,
+                    game_id=str(computer_game_id),
+                    team1_id=aid,
+                    team2_id=hid,
+                    team1_score=away_score,
+                    team2_score=home_score,
+                    source="cpu_full",
+                    skip_games_upsert=True,
+                )
+            else:
+                sim_res = _save_game_result(
+                    aid, hid, away_score, home_score, week, franchise_id=franchise_id_str, game_id=computer_game_id
+                )
             home_id_str = _normalize_team_id_to_string(hid) or str(hid)
             away_id_str = _normalize_team_id_to_string(aid) or str(aid)
             if home_score > away_score:
@@ -4228,39 +4174,6 @@ def _complete_week_finish_cpu_and_persist(
                 loser_score=ls,
                 week=week,
             )
-            if week_games_meta and job_idx < len(week_games_meta):
-                g = week_games_meta[job_idx]
-                winner_id = hid if home_score > away_score else aid
-                score = {"home": home_score, "away": away_score}
-                if g["phase"] == "conference":
-                    ft.save_conference_game_result(
-                        franchise_doc,
-                        g["conference"],
-                        g["round"],
-                        g["matchup_index"],
-                        str(computer_game_id),
-                        str(winner_id),
-                        score,
-                    )
-                elif g["phase"] == "region":
-                    ft.save_region_game_result(
-                        franchise_doc,
-                        g["region"],
-                        g["round"],
-                        g["matchup_index"],
-                        str(computer_game_id),
-                        str(winner_id),
-                        score,
-                    )
-                elif g["phase"] == "national":
-                    ft.save_national_game_result(
-                        franchise_doc,
-                        g["round"],
-                        g["matchup_index"],
-                        str(computer_game_id),
-                        str(winner_id),
-                        score,
-                    )
             winner_oid = hid if home_score > away_score else aid
             sim_eos_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
             _award_gp_sim(winner_oid, sim_eos_g, (aid, hid))
@@ -9964,22 +9877,18 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             winner_id = home_id if home_score > away_score else away_id
-            score = {"home": home_score, "away": away_score}
-            if g["phase"] == "conference":
-                ft.save_conference_game_result(
-                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                    "", str(winner_id), score,
-                )
-            elif g["phase"] == "region":
-                ft.save_region_game_result(
-                    franchise_doc, g["region"], g["round"], g["matchup_index"],
-                    "", str(winner_id), score,
-                )
-            elif g["phase"] == "national":
-                ft.save_national_game_result(
-                    franchise_doc, g["round"], g["matchup_index"],
-                    "", str(winner_id), score,
-                )
+            ftp.record_tournament_game_result(
+                franchise_doc,
+                g,
+                week=week,
+                franchise_id_str=str(franchise_id),
+                game_id=None,
+                team1_id=away_id,
+                team2_id=home_id,
+                team1_score=away_score,
+                team2_score=home_score,
+                source="distant",
+            )
             results.append({
                 "away_id": str(away_id),
                 "home_id": str(home_id),
@@ -10024,22 +9933,19 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
             stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
             winner_id = home_id if home_score > away_score else away_id
-            score = {"home": home_score, "away": away_score}
-            if g["phase"] == "conference":
-                ft.save_conference_game_result(
-                    franchise_doc, g["conference"], g["round"], g["matchup_index"],
-                    str(game_id), str(winner_id), score,
-                )
-            elif g["phase"] == "region":
-                ft.save_region_game_result(
-                    franchise_doc, g["region"], g["round"], g["matchup_index"],
-                    str(game_id), str(winner_id), score,
-                )
-            elif g["phase"] == "national":
-                ft.save_national_game_result(
-                    franchise_doc, g["round"], g["matchup_index"],
-                    str(game_id), str(winner_id), score,
-                )
+            ftp.record_tournament_game_result(
+                franchise_doc,
+                g,
+                week=week,
+                franchise_id_str=str(franchise_id),
+                game_id=str(game_id),
+                team1_id=away_id,
+                team2_id=home_id,
+                team1_score=away_score,
+                team2_score=home_score,
+                source="cpu_full",
+                skip_games_upsert=True,
+            )
             results.append({
                 "away_id": str(away_id),
                 "home_id": str(home_id),
@@ -10079,7 +9985,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
 
     if week in ft.EOS_CONFERENCE_WEEKS:
         for c in range(1, 17):
-            ft.advance_conference_bracket(franchise_doc, c)
+            ftp.advance_conference_bracket(franchise_doc, c)
         update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
         if week == ft.EOS_CONFERENCE_WEEKS[-1]:
             eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
@@ -10106,7 +10012,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         else:
             update_fields["week"] = ft.EOS_REGION_WEEKS[1]
     elif week in ft.EOS_NATIONAL_WEEKS:
-        ft.advance_national_bracket(franchise_doc)
+        ftp.advance_national_bracket(franchise_doc)
         update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
         if week == ft.EOS_NATIONAL_WEEKS[-1]:
             update_fields["eos_tournament_active"] = False
@@ -10170,11 +10076,27 @@ def sim_championship(req: SimChampionshipRequest):
         db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
         stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
         winner_id = home_id if home_score > away_score else away_id
-        ft.save_national_game_result(
-            franchise_doc, 3, 0, str(game_id), str(winner_id),
-            {"home": home_score, "away": away_score},
+        nat_final_meta = {
+            "phase": "national",
+            "round": 3,
+            "matchup_index": 0,
+            "away_id": away_id,
+            "home_id": home_id,
+        }
+        ftp.record_tournament_game_result(
+            franchise_doc,
+            nat_final_meta,
+            week=week,
+            franchise_id_str=str(franchise_id),
+            game_id=str(game_id),
+            team1_id=away_id,
+            team2_id=home_id,
+            team1_score=away_score,
+            team2_score=home_score,
+            source="cpu_full",
+            skip_games_upsert=True,
         )
-        ft.advance_national_bracket(franchise_doc)
+        ftp.advance_national_bracket(franchise_doc)
         national_tournament = franchise_doc.get("national_tournament", {})
         db.franchises.update_one(
             {"_id": franchise_id},

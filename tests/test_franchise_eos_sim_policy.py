@@ -1,4 +1,5 @@
 from bson import ObjectId
+from unittest.mock import MagicMock
 
 from BackEnd.api import franchise_routes
 from BackEnd.api.franchise_routes import (
@@ -118,6 +119,58 @@ def test_user_eos_bracket_result_persists_without_game_id():
     assert matchup["game_id"] == ""
 
 
+def test_user_eos_bracket_result_persists_user_loss():
+    user_team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    opponent_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    franchise_doc = {
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {
+                            "away_team": user_team_id,
+                            "home_team": opponent_id,
+                            "winner": None,
+                            "game_id": None,
+                            "score": {},
+                        }
+                    ],
+                    "round2": [],
+                    "final": [],
+                },
+            }
+        }
+    }
+    week_games_meta = [
+        {
+            "away_id": user_team_id,
+            "home_id": opponent_id,
+            "phase": "conference",
+            "conference": 1,
+            "round": 1,
+            "matchup_index": 0,
+        }
+    ]
+
+    _save_user_eos_bracket_result(
+        franchise_doc,
+        week_games_meta=week_games_meta,
+        user_team_id_str=user_team_id,
+        team1_id=user_team_id,
+        team2_id=opponent_id,
+        team1_score=61,
+        team2_score=72,
+        game_id="loss-game",
+        week=27,
+    )
+
+    matchup = franchise_doc["conference_tournaments"]["1"]["bracket"]["round1"][0]
+    assert matchup["winner"] == opponent_id
+    assert matchup["game_id"] == "loss-game"
+    assert matchup["score"] == {"home": 72, "away": 61}
+
+
 def test_save_user_eos_bracket_falls_back_to_playable_meta_when_calendar_final_empty():
     """Regression: franchise week 29 + current_round 2 + empty final → calendar meta has no row;
     playable meta (include_completed=False) still lists the open semifinal."""
@@ -198,6 +251,131 @@ def test_save_user_eos_bracket_falls_back_to_playable_meta_when_calendar_final_e
     assert matchup["winner"] == uid_opp
     assert matchup["game_id"] == "game-semis-fix"
     assert matchup["score"] == {"home": 70, "away": 60}
+
+
+def test_eos_result_row_without_game_doc_syncs_conference_bracket(monkeypatch):
+    away_id = ObjectId()
+    home_id = ObjectId()
+    fid = ObjectId()
+    franchise_doc = {
+        "_id": fid,
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {
+                            "away_team": str(away_id),
+                            "home_team": str(home_id),
+                            "winner": None,
+                            "game_id": None,
+                            "score": {},
+                        }
+                    ],
+                    "round2": [],
+                    "final": [],
+                },
+            }
+        },
+    }
+    mock_db = MagicMock()
+    mock_db.games.find_one.return_value = None
+    monkeypatch.setattr(franchise_routes, "db", mock_db)
+    monkeypatch.setattr(franchise_routes, "generate_game_id", lambda: "generated-game-id")
+
+    franchise_routes._sync_eos_bracket_from_result_row(
+        franchise_doc,
+        row={
+            "away_id": str(away_id),
+            "home_id": str(home_id),
+            "away_score": 55,
+            "home_score": 68,
+        },
+        away_id=away_id,
+        home_id=home_id,
+        week=27,
+        franchise_id_str=str(fid),
+        g={
+            "phase": "conference",
+            "conference": 1,
+            "round": 1,
+            "matchup_index": 0,
+        },
+    )
+
+    matchup = franchise_doc["conference_tournaments"]["1"]["bracket"]["round1"][0]
+    assert matchup["winner"] == str(home_id)
+    assert matchup["game_id"] == "generated-game-id"
+    assert matchup["score"] == {"home": 68, "away": 55}
+    mock_db.games.update_one.assert_called_once()
+
+
+def test_region_phase_a_merge_resolves_final_placeholders_from_known_winners():
+    user_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    cpu_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    stale_user_side = {
+        "A": {
+            "round1": [
+                {
+                    "away_team": user_id,
+                    "home_team": "cccccccccccccccccccccccc",
+                    "winner": user_id,
+                    "game_id": "user-r1",
+                    "score": {"away": 71, "home": 60},
+                },
+                {
+                    "away_team": "dddddddddddddddddddddddd",
+                    "home_team": "eeeeeeeeeeeeeeeeeeeeeeee",
+                    "winner": None,
+                    "game_id": None,
+                    "score": {},
+                },
+            ],
+            "final": [
+                {
+                    "away_team": user_id,
+                    "home_team": "R1_1",
+                    "winner": None,
+                    "game_id": None,
+                    "score": {},
+                }
+            ],
+        }
+    }
+    fresh_cpu_side = {
+        "A": {
+            "round1": [
+                {
+                    "away_team": user_id,
+                    "home_team": "cccccccccccccccccccccccc",
+                    "winner": None,
+                    "game_id": None,
+                    "score": {},
+                },
+                {
+                    "away_team": "dddddddddddddddddddddddd",
+                    "home_team": "eeeeeeeeeeeeeeeeeeeeeeee",
+                    "winner": cpu_id,
+                    "game_id": "cpu-r1",
+                    "score": {"away": 53, "home": 54},
+                },
+            ],
+            "final": [
+                {
+                    "away_team": "R1_0",
+                    "home_team": cpu_id,
+                    "winner": None,
+                    "game_id": None,
+                    "score": {},
+                }
+            ],
+        }
+    }
+
+    merged = ft.merge_region_tournaments_phase_a(fresh_cpu_side, stale_user_side)
+    final = merged["A"]["final"][0]
+    assert final["away_team"] == user_id
+    assert final["home_team"] == cpu_id
 
 
 def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
