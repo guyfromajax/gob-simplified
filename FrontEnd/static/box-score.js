@@ -1933,10 +1933,11 @@ function setupLockerRoomButton() {
   const period = urlParams.get('period');
   const startWithInbound = urlParams.get('start_with_inbound');
   const startingPossession = urlParams.get('starting_possession');
+  // SS&S with POTG-style completion: Q4 finals without `is_final` (and some distant/tie docs) were misclassified as in-progress → set-lineup "Back" with broken params.
   const isFinalGame = !!(
     gameData &&
     urlParams.get('game_id') &&
-    (gameData.is_final === true || Number(gameData.quarter) >= 5)
+    isGameCompleteForPotg(gameData)
   );
 
   const buildLineupBackUrl = () => {
@@ -2024,6 +2025,20 @@ function setupLockerRoomButton() {
       e.stopPropagation();
       playSound('x-back.mp3');
       window.location.href = backUrl;
+    });
+    return;
+  }
+
+  const rawReturn = urlParams.get('return_url');
+  const safeReturnUrl =
+    typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(rawReturn) : null;
+  if (safeReturnUrl && gameData && urlParams.get('game_id') && isFinalGame) {
+    cleanButton.textContent = 'Back';
+    cleanButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      playSound('x-back.mp3');
+      window.location.href = safeReturnUrl;
     });
     return;
   }
