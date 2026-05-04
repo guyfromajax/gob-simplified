@@ -1234,7 +1234,8 @@ function topScorerLabelFromPlayerPoints(playerPoints, nameById) {
     }
   }
   if (bestId == null || bestPts <= 0) return '';
-  return nameById[bestId] || 'Player';
+  const label = nameById[bestId] || 'Player';
+  return `${label} (${bestPts})`;
 }
 
 function buildPlayUsageRowsForTeam(playsObj, teamIdForNames) {
