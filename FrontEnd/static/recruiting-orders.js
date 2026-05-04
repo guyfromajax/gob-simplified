@@ -40,6 +40,17 @@
       .replace(/'/g, '&#39;');
   }
 
+  /** Invite list cards: "David Jones" → "D Jones" (first initial + last name). Single token unchanged. */
+  function formatInviteListNameDisplay(name) {
+    var s = String(name == null ? '' : name).trim();
+    if (!s) return '';
+    var parts = s.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return escapeHtml(parts[0]);
+    var initial = parts[0].charAt(0);
+    var last = parts[parts.length - 1];
+    return escapeHtml(initial + ' ' + last);
+  }
+
   function getVisitStorageKey() {
     return FILTER_STORAGE_KEY + ':' + (context.franchiseId || 'global') + ':' + (context.teamId || 'team');
   }
@@ -530,7 +541,7 @@
     return [
       '<div class="slot-grip" aria-hidden="true">' + buildGripHtml() + '</div>',
       '<div class="slot-body">',
-      '<div class="slot-name">' + escapeHtml(recruit.name) + '</div>',
+      '<div class="slot-name" title="' + escapeHtml(recruit.name) + '">' + formatInviteListNameDisplay(recruit.name) + '</div>',
       '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
       '</div>',
       isUserInLeanTopThree(recruit) ? '<span class="lean-dot is-solid" aria-label="Your team is on this recruit\u2019s lean list"></span>' : '<span></span>',

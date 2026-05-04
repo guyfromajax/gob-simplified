@@ -79,6 +79,20 @@ input[type="reset"] {
   margin: 0 0 22px;
 }
 
+/* Tall scroll parent so #invite-dock position:sticky lasts through orders + recruit pool (week 35: inner block hidden only). */
+.recruiting-orders-sticky-scope {
+  overflow: visible;
+}
+
+/* Collapse wrapper so #invite-dock is a layout child of .recruiting-orders-sticky-scope (sticky scroll range). */
+.recruiting-visits-dock-contents {
+  display: contents;
+}
+
+.recruiting-orders-sticky-scope .invite-dock {
+  margin: 0 0 22px;
+}
+
 /* Default shell uses overflow:clip (resource-pages.css), which prevents viewport sticky for the invite dock. */
 .recruiting-orders-shell.resource-page-container.fcc-brand-page-shell {
   overflow: visible;
