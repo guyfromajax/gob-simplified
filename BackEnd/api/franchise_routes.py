@@ -2839,6 +2839,19 @@ def _complete_week_process_user_game_block(
         eos_g_meta = ftp.find_user_eos_game_meta(
             franchise_doc, week_games_meta, user_team_id_str, req.week
         )
+        if not eos_g_meta:
+            eos_g_meta = ftp.find_eos_game_meta_for_team_pair(
+                week_games_meta, team1_id, team2_id
+            )
+            if eos_g_meta:
+                logger.warning(
+                    "[EOS-BRACKET-DEBUG] eos_meta_resolved_by_pair franchise_id=%s week=%s "
+                    "user_team_id_str=%s phase=%s",
+                    str(franchise_doc.get("_id")),
+                    req.week,
+                    user_team_id_str,
+                    eos_g_meta.get("phase"),
+                )
     if eos_g_meta:
         ftp.record_tournament_game_result(
             franchise_doc,

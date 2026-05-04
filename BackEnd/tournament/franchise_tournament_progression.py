@@ -87,6 +87,34 @@ def find_user_eos_game_meta(
     return found[1]
 
 
+def find_eos_game_meta_for_team_pair(
+    week_games_meta: list | None,
+    team1_id: Any,
+    team2_id: Any,
+) -> dict[str, Any] | None:
+    """
+    Resolve EOS schedule meta by the two team ids in the played result.
+
+    Used when ``find_user_eos_game_meta`` misses (e.g. ``user_team_id_str`` not aligned with
+    franchise meta) so we still record the bracket slot via ``record_tournament_game_result``.
+    """
+    if not week_games_meta:
+        return None
+    a = normalize_tournament_team_id(team1_id)
+    b = normalize_tournament_team_id(team2_id)
+    if not a or not b:
+        return None
+    want = frozenset({a, b})
+    for g in week_games_meta:
+        if not isinstance(g, dict) or not g.get("phase"):
+            continue
+        ga = normalize_tournament_team_id(g.get("away_id"))
+        gh = normalize_tournament_team_id(g.get("home_id"))
+        if ga and gh and frozenset({ga, gh}) == want:
+            return g
+    return None
+
+
 def _validate_players_match_meta(
     game_meta: dict[str, Any],
     team1_id: Any,

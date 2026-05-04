@@ -86,3 +86,20 @@ def test_find_user_eos_game_meta_empty_calendar_uses_playable():
     assert g["phase"] == "conference"
     assert g["round"] == 2
     assert g["matchup_index"] == 1
+
+
+def test_find_eos_game_meta_for_team_pair_order_insensitive():
+    away = str(ObjectId())
+    home = str(ObjectId())
+    meta = {
+        "away_id": away,
+        "home_id": home,
+        "phase": "conference",
+        "conference": 3,
+        "round": 2,
+        "matchup_index": 1,
+    }
+    week_meta = [meta]
+    assert ftp.find_eos_game_meta_for_team_pair(week_meta, away, home) == meta
+    assert ftp.find_eos_game_meta_for_team_pair(week_meta, home, away) == meta
+    assert ftp.find_eos_game_meta_for_team_pair(week_meta, away, str(ObjectId())) is None
