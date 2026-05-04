@@ -125,6 +125,9 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - **Implementation:** `build_eog_offensive_play_effectiveness_decay_ftd_updates()` in `BackEnd/models/training_execution_v2.py`; persistence in `BackEnd/api/franchise_routes.py` immediately after home/away attribute changes are computed.
   - **Not** applied when postseason EOG freezes team-attribute updates (weeks 27–34): that early return skips the whole `update_team_attributes_after_game` body, including this decay.
   - **Training:** Offensive play effectiveness is **no longer** reduced by random 5–15 at the start of training; see `Training_System.md`.
+- **Defensive scouting effectiveness decay — franchise FTD only (same EOG pass):**
+  - `update_team_attributes_after_game()` also applies updates to **`franchise_team_data.scouting_data.defense.<row>.effectiveness`** using each finished-game defense row’s **`game_stats.used`** (and **`T`** = sum of `used` over `teams[team_id].scouting.defense` for that team). Decay = **`int(100.0 * used / T)`** when **`T > 0`**, else **0**; new effectiveness = **`max(0, current - decay)`**.
+  - **Implementation:** `build_eog_defensive_effectiveness_decay_ftd_updates()` in `BackEnd/models/training_execution_v2.py`; persistence in `BackEnd/api/franchise_routes.py` alongside offensive play decay. Pre-training random defense decay was removed from `execute_training`.
 - **Data Sources:**
   - Team totals (F, TO, FG%, TREB) come from the canonical finished-game snapshot built for EOG and box score display.
   - Offensive play usage reads the completed game's `teams[team_id].plays[*].game_stats.times_run`.
@@ -300,7 +303,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
   - `team_totals` for box-score totals (`FGM/FGA`, `TO/STL`, `DREB/OREB`)
   - fallback to aggregated `box_score` only if `team_totals` is missing
 - **Distant-sim note:** Distant franchise games persist `simulation_engine="distant"` on the game doc. EOG uses this as an explicit branch signal so only the four FB/PT attrs switch to the simplified random rule; TBT games keep the normal scouting-based formulas.
-- **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()` (FTD `team_attributes` deltas **and** FTD offensive play **effectiveness** decay from playcall share; see **Offensive play CMD** under **Team Attributes Update System** above).
+- **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()` (FTD `team_attributes` deltas, FTD offensive **`plays.*.effectiveness`** decay from `times_run` share, and FTD **`scouting_data.defense.*.effectiveness`** decay from defensive `used` share; see **Offensive play CMD** / **Defensive scouting effectiveness** above).
 - **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
 - **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.
 - **Why this method:** Prevents source drift between `team_stats`, `teams.scouting`, and totals; keeps EOG deltas deterministic and aligned to final game state.

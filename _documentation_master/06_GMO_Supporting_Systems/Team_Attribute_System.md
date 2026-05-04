@@ -29,7 +29,7 @@
 2. **Missing Attributes**: Initialized from universal collection or generated randomly
 3. **Attribute Updates**: Training updates these team measures in Franchise/Tournament. In **franchise** mode, **end-of-game (EOG)** also adjusts the same FTD team fields from game output via `update_team_attributes_after_game` (see `End_Of_Game_System.md`).
 4. **Persistence**: Changes saved to the appropriate document for the game mode.
-5. **Play CMD (franchise):** The scalar list in this doc is not play effectiveness. That same EOG hook applies FTD **offensive** `plays.*.effectiveness` decay from each game’s `times_run` share; training only pre-decays **defense** scouting rows (`Training_System.md`).
+5. **Play CMD (franchise):** The scalar list in this doc is not play effectiveness. That same EOG hook applies FTD **offensive** `plays.*.effectiveness` decay from each game’s `times_run` share and FTD **`scouting_data.defense.*.effectiveness`** decay from each game’s defensive playcall **`used`** share (same percentage rule as offense). Training no longer applies random pre-training defense decay (`Training_System.md`).
 
 ## Long Form Documentation
 

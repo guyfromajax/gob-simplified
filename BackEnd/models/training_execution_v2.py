@@ -18,6 +18,7 @@ from BackEnd.utils.defense_identity import (
     DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
     PLAYBOOK_MAN_KEY_TO_DEFENSE_ID,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
+    _SCOUTING_DEFENSE_LEGACY_KEYS_BY_CANONICAL,
     canonical_scouting_defense_key,
     defense_display_name,
 )
@@ -114,13 +115,8 @@ def execute_training(
     logger.warning(f"📚 [TRAINING] Total plays tracked: {len(original_plays_effectiveness)}")
     logger.warning(f"📚 [TRAINING] Total defenses tracked: {len(original_defenses_effectiveness)}")
     
-    # Step 0: Pre-training defense effectiveness decay (offense play CMD decay runs at EOG; see build_eog_offensive_play_effectiveness_decay_ftd_updates).
-    # Skip for first training (training camp) in franchise mode
-    if not skip_pre_training_depreciation:
-        scouting_data = _apply_pre_training_defense_decay(scouting_data)
-    else:
-        logger.warning("⏭️ [TRAINING] Skipping pre-training depreciation (first training/training camp)")
-    
+    # Defense effectiveness share-decay runs at EOG (see build_eog_defensive_effectiveness_decay_ftd_updates); offense CMD at EOG separately.
+
     # Step 1: Apply pre-training conditions
     # Skip for first training (training camp) in franchise mode
     if not skip_pre_training_depreciation:
@@ -1908,28 +1904,109 @@ def build_eog_offensive_play_effectiveness_decay_ftd_updates(
     return set_doc
 
 
-def _apply_pre_training_defense_decay(scouting_data: Dict) -> Dict:
+def _defense_row_game_used(defense_row: Any) -> int:
+    """Defensive possessions in this call from persisted game scouting (parallel to plays.game_stats.times_run)."""
+    if not isinstance(defense_row, dict):
+        return 0
+    gs = defense_row.get("game_stats")
+    if isinstance(gs, dict):
+        raw = gs.get("used")
+        if raw is not None:
+            try:
+                return max(0, int(raw))
+            except (TypeError, ValueError):
+                pass
+    raw = defense_row.get("used")
+    try:
+        return max(0, int(raw or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _ftd_defense_storage_key(ftd_defense: Dict[str, Any], game_row_key: str) -> Optional[str]:
+    """Pick the FTD `scouting_data.defense` key that holds the row for this game's defense dict key."""
+    if not isinstance(ftd_defense, dict) or not game_row_key:
+        return None
+    candidates: List[str] = [str(game_row_key).strip()]
+    ck = canonical_scouting_defense_key(str(game_row_key))
+    if ck:
+        candidates.append(ck)
+        candidates.extend(list(_SCOUTING_DEFENSE_LEGACY_KEYS_BY_CANONICAL.get(ck, ())))
+    seen: set[str] = set()
+    for c in candidates:
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        row = ftd_defense.get(c)
+        if isinstance(row, dict):
+            return c
+    return None
+
+
+def build_eog_defensive_effectiveness_decay_ftd_updates(
+    game_team_scouting: Dict[str, Any],
+    ftd_scouting_data: Dict[str, Any],
+) -> Dict[str, Any]:
     """
-    Reduce all defenses' effectiveness scores by 5-15 before training.
-    Only applies to defenses with effectiveness > 0.
-    Minimum value is 0 (cannot be negative).
-    
-    Returns:
-        Updated scouting_data dict
+    End-of-game: reduce each defense row's effectiveness on FTD by the integer share of team
+    defensive playcalls (``game_stats.used``) for that game — same formula as offensive CMD decay
+    (``int(100 * used / total_used)`` when ``total_used > 0``).
     """
-    updated_scouting_data = scouting_data.copy() if scouting_data else {}
-    
-    if "defense" in updated_scouting_data:
-        for defense_name, defense_data in updated_scouting_data["defense"].items():
-            if isinstance(defense_data, dict):
-                current_effectiveness = defense_data.get("effectiveness", 0)
-                if current_effectiveness > 0:
-                    decay = random.randint(5, 15)
-                    new_effectiveness = max(0, current_effectiveness - decay)
-                    defense_data["effectiveness"] = new_effectiveness
-                    logger.warning(f"📉 [DEFENSE DECAY] {defense_name}: {current_effectiveness} → {new_effectiveness} (decay: -{decay})")
-    
-    return updated_scouting_data
+    if not isinstance(game_team_scouting, dict) or not isinstance(ftd_scouting_data, dict):
+        return {}
+    game_def = game_team_scouting.get("defense")
+    if not isinstance(game_def, dict):
+        return {}
+    ftd_def = ftd_scouting_data.get("defense")
+    if not isinstance(ftd_def, dict):
+        return {}
+
+    times_by_game_key: Dict[str, int] = {}
+    total_used = 0
+    for gk, grow in game_def.items():
+        if not isinstance(grow, dict):
+            continue
+        u = _defense_row_game_used(grow)
+        times_by_game_key[str(gk)] = u
+        if u > 0:
+            total_used += u
+
+    set_doc: Dict[str, Any] = {}
+    if total_used <= 0:
+        return set_doc
+
+    for gk, grow in game_def.items():
+        if not isinstance(grow, dict):
+            continue
+        u = times_by_game_key.get(str(gk), 0)
+        decay = int(100.0 * float(u) / float(total_used))
+        ftk = _ftd_defense_storage_key(ftd_def, str(gk))
+        if not ftk:
+            logger.warning(
+                "📉 [EOG-DEF-EFF] Skipping defense game_key=%s: no matching FTD scouting_data.defense row",
+                gk,
+            )
+            continue
+        frow = ftd_def.get(ftk)
+        if not isinstance(frow, dict):
+            continue
+        try:
+            current_eff = int(frow.get("effectiveness", 0) or 0)
+        except (TypeError, ValueError):
+            current_eff = 0
+        new_eff = max(0, current_eff - decay)
+        if new_eff != current_eff:
+            set_doc[f"scouting_data.defense.{ftk}.effectiveness"] = new_eff
+            logger.warning(
+                "📉 [EOG-DEF-EFF] %s: effectiveness %s → %s (used=%s total=%s decay=%s)",
+                ftk,
+                current_eff,
+                new_eff,
+                u,
+                total_used,
+                decay,
+            )
+    return set_doc
 
 
 def _playbook_row_id_to_canonical_defense(row_id: str) -> Optional[str]:

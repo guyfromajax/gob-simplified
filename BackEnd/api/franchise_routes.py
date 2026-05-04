@@ -41,6 +41,7 @@ from BackEnd.models.training_execution_v2 import (
     TEAM_ATTR_CLAMPS,
     PLAYER_ATTR_CLAMP,
     parse_coaching_focus,
+    build_eog_defensive_effectiveness_decay_ftd_updates,
     build_eog_offensive_play_effectiveness_decay_ftd_updates,
 )
 from BackEnd.models.distant_game_stats import build_distant_game_summary
@@ -1413,7 +1414,29 @@ def update_team_attributes_after_game(
 
     _persist_eog_offensive_play_effectiveness_decay(home_oid, home_team_obj.get("plays"))
     _persist_eog_offensive_play_effectiveness_decay(away_oid, away_team_obj.get("plays"))
-    
+
+    def _persist_eog_defensive_effectiveness_decay(team_oid: ObjectId | None, team_scouting: Any) -> None:
+        """Reduce FTD defense row effectiveness from this game's defensive playcall mix (EOG pass)."""
+        if not team_oid:
+            return
+        ts = team_scouting if isinstance(team_scouting, dict) else {}
+        ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": franchise_id, "team_id": team_oid},
+            {"scouting_data": 1},
+        )
+        if not ftd:
+            return
+        sd = ftd.get("scouting_data") or {}
+        set_doc = build_eog_defensive_effectiveness_decay_ftd_updates(ts, sd)
+        if set_doc:
+            franchise_team_data_collection.update_one(
+                {"franchise_id": franchise_id, "team_id": team_oid},
+                {"$set": set_doc},
+            )
+
+    _persist_eog_defensive_effectiveness_decay(home_oid, home_team_obj.get("scouting"))
+    _persist_eog_defensive_effectiveness_decay(away_oid, away_team_obj.get("scouting"))
+
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculated changes - home_changes keys: {list(home_changes.keys())}, away_changes keys: {list(away_changes.keys())}")
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Home changes sample: {dict(list(home_changes.items())[:3]) if home_changes else 'None'}")
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Away changes sample: {dict(list(away_changes.items())[:3]) if away_changes else 'None'}")

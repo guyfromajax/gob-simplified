@@ -1,6 +1,9 @@
-"""EOG offensive play CMD decay from playcall share (times_run)."""
+"""EOG offensive play CMD decay from playcall share (times_run); defense from used share."""
 
-from BackEnd.models.training_execution_v2 import build_eog_offensive_play_effectiveness_decay_ftd_updates
+from BackEnd.models.training_execution_v2 import (
+    build_eog_defensive_effectiveness_decay_ftd_updates,
+    build_eog_offensive_play_effectiveness_decay_ftd_updates,
+)
 
 
 def test_decay_truncates_percent_like_user_example():
@@ -43,3 +46,34 @@ def test_skips_missing_ftd_row():
     out = build_eog_offensive_play_effectiveness_decay_ftd_updates(game_plays, ftd_plays)
     assert "plays.p1.effectiveness" in out
     assert "plays.p2.effectiveness" not in out
+
+
+def test_defense_decay_matches_offense_math():
+    game_scouting = {
+        "defense": {
+            "man": {"game_stats": {"used": 25}},
+            "2-3-zone": {"game_stats": {"used": 75}},
+        }
+    }
+    ftd_sd = {
+        "defense": {
+            "man": {"effectiveness": 80},
+            "2-3-zone": {"effectiveness": 80},
+        }
+    }
+    out = build_eog_defensive_effectiveness_decay_ftd_updates(game_scouting, ftd_sd)
+    assert out["scouting_data.defense.man.effectiveness"] == 55  # 80 - int(25) = 55
+    assert out["scouting_data.defense.2-3-zone.effectiveness"] == 5  # 80 - int(75) = 5
+
+
+def test_defense_decay_zero_total_used_no_change():
+    game_scouting = {"defense": {"man": {"game_stats": {"used": 0}}}}
+    ftd_sd = {"defense": {"man": {"effectiveness": 50}}}
+    assert build_eog_defensive_effectiveness_decay_ftd_updates(game_scouting, ftd_sd) == {}
+
+
+def test_defense_decay_resolves_legacy_game_key_to_canonical_ftd():
+    game_scouting = {"defense": {"Man": {"game_stats": {"used": 100}}}}
+    ftd_sd = {"defense": {"man": {"effectiveness": 60}}}
+    out = build_eog_defensive_effectiveness_decay_ftd_updates(game_scouting, ftd_sd)
+    assert out["scouting_data.defense.man.effectiveness"] == 0  # 60 - 100 clamped
