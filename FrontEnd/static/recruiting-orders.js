@@ -40,6 +40,32 @@
       .replace(/'/g, '&#39;');
   }
 
+  /** Same behavior as training-playbooks.js: toast + auto-dismiss 3.2s; dismiss button ends early. */
+  function showToast(title, subtitle) {
+    var toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.innerHTML =
+      '<div class="toast-icon" aria-hidden="true"></div>' +
+      '<div class="toast-copy">' +
+      '<div class="toast-title">' + escapeHtml(title) + '</div>' +
+      (subtitle ? '<div class="toast-subline">' + escapeHtml(subtitle) + '</div>' : '') +
+      '</div>' +
+      '<button type="button" class="toast-dismiss" aria-label="Dismiss">×</button>';
+    toast.hidden = false;
+    requestAnimationFrame(function () {
+      toast.classList.add('visible');
+    });
+    var dismiss = function () {
+      toast.classList.remove('visible');
+      window.setTimeout(function () {
+        toast.hidden = true;
+      }, 220);
+    };
+    var dismissBtn = toast.querySelector('.toast-dismiss');
+    if (dismissBtn) dismissBtn.addEventListener('click', dismiss, { once: true });
+    window.setTimeout(dismiss, 3200);
+  }
+
   /** Invite list cards: "David Jones" → "D Jones" (first initial + last name). Single token unchanged. */
   function formatInviteListNameDisplay(name) {
     var s = String(name == null ? '' : name).trim();
@@ -975,19 +1001,13 @@
     if (!currentEntries.length) return;
     Recruiting.playSound('confirm-2.mp3');
     saveOrders(function () {
-      if (isWeek35Mode()) {
-        showModal({
-          title: 'Orders Saved',
-          message: 'Recruiting orders are saved. You can now run recruiting.',
-          actions: [{ label: 'Close', variant: 'secondary' }]
-        });
-      } else {
-        showModal({
-          title: 'Orders Saved',
-          message: 'Recruiting orders are saved.',
-          actions: [{ label: 'Close', variant: 'secondary' }]
-        });
-      }
+      var subtitle = isWeek35Mode()
+        ? 'Recruiting orders are saved. You can now run recruiting.'
+        : 'Recruiting orders are saved.';
+      showToast('Orders Saved', subtitle);
+      window.setTimeout(function () {
+        navigateAway(resolveBackUrl());
+      }, 400);
     }).catch(function () {
       showModal({
         title: 'Save Failed',

@@ -954,3 +954,56 @@ input[type="reset"] {
     width: 160px;
   }
 }
+
+/* Toast (aligned with training-playbooks.css / playbooks save flow) */
+.toast {
+  --toast-accent: #f79420;
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 12px;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 3px solid var(--toast-accent);
+  background: rgba(28, 33, 43, 0.97);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(120%);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+.toast.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.toast[hidden] {
+  display: none;
+}
+.toast-title {
+  color: #fff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+.toast-subline {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+}
+.toast-dismiss {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+}

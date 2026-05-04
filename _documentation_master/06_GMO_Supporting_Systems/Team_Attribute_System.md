@@ -126,6 +126,40 @@ When team objects are created in Single Game, Tournament, or Franchise modes, th
   - **Tournament**: `tournaments.{tournament_id}.teams.{team_id}`
   - **Franchise**: `franchises.{franchise_id}.franchise_teams.{team_id}`
 
+### EOG / Training Changes
+
+Franchise FTD team attributes update in two places: **EOG** (`update_team_attributes_after_game` in `franchise_routes.py`) and **training** (`training_execution_v2.apply_training_points`). Below, **up / down** mean the signed change added to the stored value (then clamped). Exception: **`shot_threshold` is a golf score** — **down** is *better* shooting discipline, **up** is *worse*.
+
+#### End of game (EOG)
+
+| Attribute | Direction | Rule (after clamp) |
+|-----------|-----------|---------------------|
+| **Offensive efficiency** | Always **down** | **−2…−1** if total offensive **`times_run`** **> 12**; **−3…−2** if **> 7** (i.e. **8–12**); **−4…−3** if **≤ 7**. |
+| **Defensive efficiency** | Always **down** | **−2…−1** if max HCO defense **`used`** share **≤ 39%**; **−3…−2** if **> 39%** and **≤ 49%**; **−4…−3** if **> 49%**. |
+| **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
+| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when own **`pt_total_attempts`** is **≤ 15** / **> 15** / **> 20**. |
+| **Fast break opp. modifier** | **Distant sim:** −2…+1. Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when opponent FB tries are **≤ 10** / **> 10** / **> 20**. |
+| **PT opp. modifier** | **Distant sim:** −2…+1. Else always **down** | Non-distant: **−2…−1** / **−3…−2** / **−4…−3** when opponent **`pt_total_attempts`** is **≤ 10** / **> 10** / **> 20**. |
+| **Fight** | **Up** if win (**0…+2**); **down** if lose (**−3…−1**) | Margin does not change fight; only W/L. |
+| **Discipline** | **Up** (**+1…+3**) if your **F + TO** is **lower** than opponent **F + TO + 8**. **Down** (**−3…−2**) if yours is **higher**. Else **down or flat** (**−1…0**) | “Lower fouls + turnovers (with buffer)” rewards discipline. |
+| **Team chemistry** | **Up** on win; **down** on loss | Win: **+1…+2** if margin **< 4**; **+1…+3** if **< 10**; **+2…+4** if blowout. Loss: **−2…−1** / **−4…−2** / **−6…−4** for the same margin bands. |
+| **Shot threshold** | See golf note | **FG% > 50%:** **down** (**−10…−5**) both teams. **FG% > 45% and ≤ 50%:** winner **down or flat** (**−5…0**), loser **up** (**0…+5**). **FG% ≤ 45%:** **up** (**+5…+10**) both. |
+| **Rebound modifier** | **Up** only with big edge; else **down** | **Up** (**+0.00…+0.05**) if your **DREB+OREB** **> opponent + 8**. **Down** (**−0.10…−0.05**) if **< opponent − 8**. Otherwise **down** (**−0.05…−0.01**). |
+
+#### Training
+
+**Install-driven attrs** (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `fb_opp_modifier`, `pt_efficiency`, `pt_opp_modifier`): each session uses that line’s **install points** (0–5). Random delta by bucket — **0 → down −2…−1**; **1 → up +1…+2**; **2 → up +2…+3**; **3 → up +3…+4**; **4 → up +3…+6**; **5 → up +3…+7**. Matching **Systems Coach** focus **multiplies positive deltas only** (×1.5–1.8 rounded down).
+
+| Attribute | Direction | Rule |
+|-----------|-----------|------|
+| **Fight** | **Up, down, or mixed** by bucket | Effective points = **0.5× strength + 0.5× conditioning** (half-up) → bucket **0…5** random delta: **0 → −4…−3**; **1 → −1…+1**; **2 → 0…+2**; **3 → +1…+3**; **4 → +2…+4**; **5 → +3…+5**. **Culture Builder:** **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** fight deltas. **Breaks 4:** fight **−2…0**; **breaks 5+:** **−3…−1**. |
+| **Discipline** | **Up, down, or mixed** by bucket | Effective points = **0.25×** (inside + outside defense + passing + ball handling), half-up → **same bucket table as Fight**. **Authoritarian** archetype: **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** discipline deltas. **Breaks 4:** discipline **−2…0**; **breaks 5+:** **−3…−1**. |
+| **Team chemistry** | **Down** at 0 pts mix; **up** at 1+ | Chemistry-weighted sum: **free throws ×0.25 + film ×0.25 + scrimmages ×0.5**, rounded half-up → bucket: **0 → down −3…−1**; **1 → up +1…+2**; **2 → +2…+3**; **3 → +3…+4**; **4 → +3…+6**; **5 → +3…+7**. **Team Building** focus: **+1…+3** once. **Culture Builder–Inspire:** multiplies **positive** chemistry deltas. **Breaks 3:** **±1**; **breaks 4:** **±2**; **breaks 5+:** **±3** (applied to chemistry after other training, then clamped). |
+| **Shot threshold** | Scrimmages only | **0 pts → up +5…+10** (worse). **1 → down or flat −5…0**. **2 → down −5…−15**; **3 → −10…−15**; **4 → −10…−20**; **5+ → −15…−20** (larger scrimmage = more **down** = better golf score). **Breaks** can scale how much of a **session “gain”** sticks (for shot threshold, a **decrease** counts as a gain). |
+| **Rebound modifier** | **Up** only (no install path) | **Rebounding drill:** half-up(**0.5 × rebounding points**), then by bucket: **1–2 → +0.01…+0.05**; **3–4 → +0.04…+0.08**; **5+ → +0.06…+0.10**. **Scrimmages slice** uses half-up(**0.5 × scrimmage points**): **1–2 → +0.00…+0.03**; **3–4 → +0.03…+0.05**; **5+ → +0.04…+0.07**. **Authoritarian–Rebounding** / focus match can **amplify positive** rebound bumps. |
+
+**Breaks (training, all attrs above):** **0–2** mostly changes a **multiplier** on **positive** session gains (player attrs + team attrs; for **shot_threshold**, a **decrease** is treated as a positive gain). **3+** adds the **team chemistry** random shifts in the table; **4–5** also applies the **discipline** and **fight** **down** ranges in the Fight/Discipline rows.
+
 ### Attribute Name Migration
 
 **Historical Note:**
