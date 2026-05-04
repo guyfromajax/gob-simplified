@@ -653,6 +653,43 @@ body.box-score-page {
   font-weight: 500;
 }
 
+/* Play usage (mirrors scouting report table layout; themed for dark box score shell) */
+.play-usage-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.box-score-shell .play-usage-table {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+}
+
+.box-score-shell .play-usage-table thead {
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.box-score-shell .play-usage-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+}
+
+.box-score-shell .play-usage-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(247, 249, 255, 0.92);
+}
+
+.box-score-shell .play-usage-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 @media (max-width: 900px) {
   body.box-score-page {
     padding: 20px 16px 36px;

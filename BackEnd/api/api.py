@@ -3923,6 +3923,11 @@ try:
             # Add tournament_id to game document when in tournament mode (matches Franchise mode pattern)
             if mode == "tournament" and body.tournament_id:
                 db_summary["tournament_id"] = str(body.tournament_id)
+
+            # Box score / analytics: distinguish turn-by-turn vs full-quarter sim (distant uses simulation_engine="distant" elsewhere)
+            db_summary["simulation_engine"] = (
+                "full_quarter_sim" if body.full_sim else "turn_by_turn"
+            )
             
             # ✅ FIX: Ensure game_id is converted to ObjectId for consistent database storage
             # This ensures the _id format matches when we try to find it later

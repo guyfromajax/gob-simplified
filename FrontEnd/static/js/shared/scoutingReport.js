@@ -274,38 +274,47 @@ function renderScoutingTeamReport(teamAttrs, createTeamAttrItem, gridId) {
 
 /**
  * Render play usage data in the scouting report table.
- * @param {Array} plays - Array of play objects with name, times_run, successes, total_playcalls
+ * @param {Array} plays - Array of play objects with name, times_run, successes, total_playcalls; optional topScorer for box score
  * @param {string} emptyMessage - Message to display when no plays are available (optional)
+ * @param {string} tbodyId - tbody element id
+ * @param {{ showTopScorer?: boolean }} [options] - When showTopScorer, expects each play.topScorer (string) for the Top Scorer column
  */
-function renderPlayUsage(plays, emptyMessage = 'No previous game data available. Opponent has not played a game yet.', tbodyId = 'play-usage-body') {
+function renderPlayUsage(plays, emptyMessage = 'No previous game data available. Opponent has not played a game yet.', tbodyId = 'play-usage-body', options = {}) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
-  
+
+  const showTopScorer = Boolean(options && options.showTopScorer);
+  const colspan = showTopScorer ? 5 : 4;
+
   tbody.innerHTML = '';
-  
+
   if (!plays || plays.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #666;">${emptyMessage}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: #666;">${emptyMessage}</td></tr>`;
     return;
   }
-  
+
   // Calculate total playcalls for usage %
   const totalPlaycalls = plays.reduce((sum, p) => sum + (p.times_run || 0), 0);
-  
+
   // Sort by times_run descending
   plays.sort((a, b) => (b.times_run || 0) - (a.times_run || 0));
-  
-  plays.forEach(play => {
+
+  plays.forEach((play) => {
     const timesRun = play.times_run || 0;
     const successes = play.successes || 0;
     const successRate = timesRun > 0 ? ((successes / timesRun) * 100).toFixed(1) : '0.0';
     const usagePct = totalPlaycalls > 0 ? ((timesRun / totalPlaycalls) * 100).toFixed(1) : '0.0';
-    
+    const topCell = showTopScorer
+      ? `<td>${play.topScorer != null && play.topScorer !== '' ? String(play.topScorer) : '—'}</td>`
+      : '';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${play.name || 'Unknown'}</td>
       <td>${timesRun}</td>
       <td>${successRate}%</td>
       <td>${usagePct}%</td>
+      ${topCell}
     `;
     tbody.appendChild(tr);
   });

@@ -2869,6 +2869,30 @@ function clearFranchiseLocalStorage() {
   localStorage.removeItem('game_away');
 }
 
+/**
+ * SS&S: Same box-score query hints as post-game completion (gameCompletionPopup) so
+ * `/api/game/{id}` plus URL stay aligned; game doc `user_team_side` remains primary when present.
+ */
+function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
+  if (!params || typeof params.set !== 'function') return;
+  const tid =
+    (userTeamId && String(userTeamId).trim()) ||
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('franchise_user_team_id') || '').trim()) ||
+    '';
+  const teamNameRaw =
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('franchise_user_team') || '').trim()) ||
+    (userTeamName || '').trim();
+  if (tid) params.set('team_id', tid);
+  const hn = (homeTeamName || '').trim();
+  const an = (awayTeamName || '').trim();
+  if (teamNameRaw && hn && teamNameRaw.toLowerCase() === hn.toLowerCase()) {
+    params.set('my_team', 'home');
+  } else if (teamNameRaw && an && teamNameRaw.toLowerCase() === an.toLowerCase()) {
+    params.set('my_team', 'away');
+  }
+  if (teamNameRaw) params.set('banner_team', teamNameRaw);
+}
+
 function getChampionshipSeenKey(franchiseIdValue, gameId) {
   if (!franchiseIdValue || !gameId) return null;
   return `fcc_championship_seen_${franchiseIdValue}_${gameId}`;
@@ -2920,6 +2944,7 @@ function showChampionshipCompleteModal(summary) {
     params.set('game_id', gameId);
     if (homeName) params.set('home', homeName);
     if (awayName) params.set('away', awayName);
+    appendFranchiseBoxScoreUserHints(params, homeName, awayName);
     window.location.href = `/box-score.html?${params.toString()}`;
   });
 

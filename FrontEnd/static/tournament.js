@@ -65,6 +65,22 @@ function isUserTeam(teamNameOrId) {
   return teamNameOrId === userTeamName || String(teamNameOrId) === String(userTeamId);
 }
 
+/** Align tournament box-score links with franchise/gameCompletionPopup hints when we know the user team. */
+function appendTournamentBoxScoreUserHints(params, homeName, awayName) {
+  if (!params || typeof params.set !== 'function') return;
+  const tid =
+    (userTeamId && String(userTeamId).trim()) ||
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('userTeamId') || '').trim()) ||
+    '';
+  const tname = (userTeamName || '').trim();
+  if (tid) params.set('team_id', tid);
+  const hn = (homeName || '').trim();
+  const an = (awayName || '').trim();
+  if (tname && hn && tname.toLowerCase() === hn.toLowerCase()) params.set('my_team', 'home');
+  else if (tname && an && tname.toLowerCase() === an.toLowerCase()) params.set('my_team', 'away');
+  if (tname) params.set('banner_team', tname);
+}
+
 // Map full team names to bracket logo filenames
 const logoMap = {
   "Bentley-Truman": "Bently-Horizontal.svg",
@@ -844,6 +860,7 @@ function renderSchedule() {
       boxScoreParams.set('game_id', gameId);
       if (homeName) boxScoreParams.set('home', homeName);
       if (awayName) boxScoreParams.set('away', awayName);
+      appendTournamentBoxScoreUserHints(boxScoreParams, homeName, awayName);
       boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';
@@ -911,6 +928,7 @@ function renderSchedule() {
         boxScoreParams.set('game_id', gameId);
         if (homeName) boxScoreParams.set('home', homeName);
         if (awayName) boxScoreParams.set('away', awayName);
+        appendTournamentBoxScoreUserHints(boxScoreParams, homeName, awayName);
         boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
         boxScoreLink.textContent = ' [Box Score]';
         boxScoreLink.className = 'box-score-link';
@@ -980,6 +998,7 @@ function renderSchedule() {
       boxScoreParams.set('game_id', gameId);
       if (homeName) boxScoreParams.set('home', homeName);
       if (awayName) boxScoreParams.set('away', awayName);
+      appendTournamentBoxScoreUserHints(boxScoreParams, homeName, awayName);
       boxScoreLink.href = `/box-score.html?${boxScoreParams.toString()}`;
       boxScoreLink.textContent = ' [Box Score]';
       boxScoreLink.className = 'box-score-link';

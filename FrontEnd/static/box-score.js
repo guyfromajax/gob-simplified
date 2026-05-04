@@ -418,6 +418,7 @@ function renderBoxScore() {
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
+  renderPlayUsageForBoxScore();
   renderTeamAttributeChangesForTab('home');
   renderTeamAttributeChangesForTab('away');
 }
@@ -1194,6 +1195,160 @@ function renderAttributeChangePills(container, attributeDeltas) {
       <div class="attr-change-delta" style="color: ${deltaColor}">${numDelta !== 0 ? displayDelta : '—'}</div>
     `;
     container.appendChild(row);
+  });
+}
+
+function getTeamPlayDisplayNameForUsage(storageKey, playData) {
+  if (playData && typeof playData === 'object' && typeof playData.name === 'string' && playData.name.trim()) {
+    return playData.name.trim();
+  }
+  return storageKey;
+}
+
+function buildPlayerNameLookupForTeam(teamId) {
+  const map = {};
+  const players = (gameData && gameData.players) || [];
+  const tid = String(teamId || '').trim();
+  for (const p of players) {
+    if (!p || typeof p !== 'object') continue;
+    if (String(p.team_id || '').trim() !== tid) continue;
+    const id = String(p.playerId || p.player_id || '').trim();
+    if (!id) continue;
+    const name = (p.name || '').trim();
+    map[id] = name || 'Player';
+  }
+  return map;
+}
+
+function topScorerLabelFromPlayerPoints(playerPoints, nameById) {
+  if (!playerPoints || typeof playerPoints !== 'object') return '';
+  let bestId = null;
+  let bestPts = -1;
+  for (const [pid, raw] of Object.entries(playerPoints)) {
+    const pts = Number(raw);
+    if (!Number.isFinite(pts)) continue;
+    if (pts > bestPts) {
+      bestPts = pts;
+      bestId = pid;
+    }
+  }
+  if (bestId == null || bestPts <= 0) return '';
+  return nameById[bestId] || 'Player';
+}
+
+function buildPlayUsageRowsForTeam(playsObj, teamIdForNames) {
+  const rows = [];
+  if (!playsObj || typeof playsObj !== 'object') return rows;
+  let totalPlaycalls = 0;
+  const entries = [];
+  for (const [storageKey, playData] of Object.entries(playsObj)) {
+    if (!playData || typeof playData !== 'object') continue;
+    const gameStats = playData.game_stats || {};
+    const timesRun = gameStats.times_run || 0;
+    totalPlaycalls += timesRun;
+    entries.push({
+      playData,
+      displayName: getTeamPlayDisplayNameForUsage(storageKey, playData),
+      gameStats,
+    });
+  }
+  const nameById = buildPlayerNameLookupForTeam(teamIdForNames);
+  for (const { playData, displayName, gameStats } of entries) {
+    const timesRun = gameStats.times_run || 0;
+    if (timesRun <= 0) continue;
+    const successes = gameStats.successes || 0;
+    const playerPoints = gameStats.player_points || {};
+    const topScorer = topScorerLabelFromPlayerPoints(playerPoints, nameById);
+    rows.push({
+      play_id: playData.play_id,
+      name: displayName,
+      times_run: timesRun,
+      successes,
+      total_playcalls: totalPlaycalls,
+      topScorer,
+    });
+  }
+  rows.sort((a, b) => (b.times_run || 0) - (a.times_run || 0));
+  return rows;
+}
+
+function isUserInvolvedInPlayUsageContext(data, urlParams) {
+  if (!data || !urlParams) return false;
+  // SS&S: persisted game document is primary; URL params supplement older saves / deep links.
+  const docSide = data.user_team_side;
+  if (docSide === 'home' || docSide === 'away') return true;
+
+  const my = urlParams.get('my_team');
+  if (my === 'home' || my === 'away') return true;
+
+  const teamIdParam = (urlParams.get('team_id') || urlParams.get('user_team_id') || '').trim();
+  if (teamIdParam) {
+    const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
+    const homeName = homeTeam.name || 'Home Team';
+    const awayName = awayTeam.name || 'Away Team';
+    const side = mapTeamIdToSide(teamIdParam, data, homeName, awayName, homeTeamId, awayTeamId);
+    if (side) return true;
+  }
+
+  const mode = (urlParams.get('mode') || '').trim();
+  if (mode === 'single') return true;
+  return false;
+}
+
+function teamSideHasPlayUsageRows(data, teamSide) {
+  const tid = teamSide === 'home' ? data.home_team_id : data.away_team_id;
+  const team = tid && data.teams ? data.teams[tid] : null;
+  const plays = team && team.plays;
+  if (!plays || typeof plays !== 'object') return false;
+  for (const playData of Object.values(plays)) {
+    const tr = (playData && playData.game_stats && playData.game_stats.times_run) || 0;
+    if (tr > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Play usage: exclude distant sim only. Show when (a) turn-by-turn save, (b) user-controlled game
+ * (`user_team_side` on game doc first, then URL hints — see isUserInvolvedInPlayUsageContext),
+ * (c) legacy engine games with playcall rows. Hide full_quarter_sim when neither doc nor URL
+ * indicates a user side (batch / non-UI sim).
+ */
+function shouldShowPlayUsageSectionForBoxScore(data, urlParams) {
+  if (!data || !urlParams) return false;
+  if (urlParams.get('pregame') === '1') return false;
+  if (data.simulation_engine === 'distant') return false;
+  if (isUserInvolvedInPlayUsageContext(data, urlParams)) return true;
+  if (data.simulation_engine === 'turn_by_turn') return true;
+  if (data.simulation_engine === 'full_quarter_sim') return false;
+  if (data.simulation_engine == null || data.simulation_engine === '') {
+    return teamSideHasPlayUsageRows(data, 'home') || teamSideHasPlayUsageRows(data, 'away');
+  }
+  return false;
+}
+
+function renderPlayUsageForBoxScore() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const show = gameData && shouldShowPlayUsageSectionForBoxScore(gameData, urlParams);
+  ['home', 'away'].forEach((side) => {
+    const sec = document.getElementById(`${side}-play-usage-section`);
+    if (!sec) return;
+    if (!show) {
+      sec.style.display = 'none';
+      return;
+    }
+    sec.style.display = '';
+    const teamId = side === 'home' ? gameData.home_team_id : gameData.away_team_id;
+    const team = teamId && gameData.teams ? gameData.teams[teamId] : null;
+    const rows = buildPlayUsageRowsForTeam(team && team.plays, teamId);
+    const tbodyId = `${side}-play-usage-body`;
+    if (typeof renderPlayUsage === 'function') {
+      renderPlayUsage(
+        rows,
+        'No offensive playcall usage recorded for this game.',
+        tbodyId,
+        { showTopScorer: true },
+      );
+    }
   });
 }
 

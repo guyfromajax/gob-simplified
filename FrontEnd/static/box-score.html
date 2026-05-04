@@ -186,9 +186,28 @@
           </div>
         </section>
 
-        <!-- Section 5: Attribute Changes (Home) -->
+        <!-- Section 4b: Play Usage (this game) — hidden for distant sim; see box-score.js -->
+        <section id="home-play-usage-section" class="stats-section" style="display: none;">
+          <h2>Play Usage (This Game)</h2>
+          <div class="play-usage-scroll">
+            <table class="play-usage-table" aria-label="Home team play usage">
+              <thead>
+                <tr>
+                  <th>Play Name</th>
+                  <th>Times Run</th>
+                  <th>Success Rate</th>
+                  <th>Usage %</th>
+                  <th>Top Scorer</th>
+                </tr>
+              </thead>
+              <tbody id="home-play-usage-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 5: Team Measures Changes (Home) -->
         <section id="home-attribute-changes-section" class="stats-section">
-          <h2>Attribute Changes</h2>
+          <h2>Team Measures Changes</h2>
           <div id="home-attribute-changes-content" class="attribute-changes-content">
             <!-- Populated by JavaScript -->
           </div>
@@ -288,9 +307,28 @@
           </div>
         </section>
 
-        <!-- Section 5: Attribute Changes (Away) -->
+        <!-- Section 4b: Play Usage (this game) — hidden for distant sim; see box-score.js -->
+        <section id="away-play-usage-section" class="stats-section" style="display: none;">
+          <h2>Play Usage (This Game)</h2>
+          <div class="play-usage-scroll">
+            <table class="play-usage-table" aria-label="Away team play usage">
+              <thead>
+                <tr>
+                  <th>Play Name</th>
+                  <th>Times Run</th>
+                  <th>Success Rate</th>
+                  <th>Usage %</th>
+                  <th>Top Scorer</th>
+                </tr>
+              </thead>
+              <tbody id="away-play-usage-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 5: Team Measures Changes (Away) -->
         <section id="away-attribute-changes-section" class="stats-section">
-          <h2>Attribute Changes</h2>
+          <h2>Team Measures Changes</h2>
           <div id="away-attribute-changes-content" class="attribute-changes-content">
             <!-- Populated by JavaScript -->
           </div>
@@ -305,6 +343,7 @@
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
   <script src="/defense-display.js"></script>
+  <script src="/js/shared/scoutingReport.js"></script>
   <script src="/box-score.js"></script>
 </body>
 </html>
