@@ -6,6 +6,47 @@ import pytest
 # Ensure the project root is on sys.path so 'import BackEnd' succeeds
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+
+# ---------------------------------------------------------------------------
+# DB safety guard — block-list of databases the test suite must NEVER touch.
+#
+# Several existing tests (notably tests/test_franchise_complete_week.py) call
+# ``db.games.delete_many({})`` / ``db.teams.delete_many({})`` /
+# ``db.franchises.delete_many({})`` at setup with no internal guard. If the
+# active environment (.env.local / .env / system env) points at a real DB,
+# those calls wipe production data. This has happened twice — see
+# memory/feedback_no_pytest.md and Tournament_Execution_System.md.
+#
+# This guard runs once at pytest session start (before test collection and
+# before any fixture). It imports the project ``db`` and aborts the entire
+# session with a non-zero exit code if ``db.name`` is on the block-list.
+# Tests literally cannot run against ``gob`` or ``gob-staging``.
+#
+# To run tests locally, point .env.local at a throwaway DB whose name is NOT
+# in _BLOCKED_DB_NAMES (e.g. a fresh Atlas M0 cluster named ``gob-test``).
+# ---------------------------------------------------------------------------
+_BLOCKED_DB_NAMES = frozenset({"gob", "gob-staging"})
+
+
+def pytest_configure(config):
+    try:
+        from BackEnd.db import db
+    except Exception:
+        # If we can't even import the db module, let the regular test run surface that.
+        return
+    name = getattr(db, "name", None)
+    if name in _BLOCKED_DB_NAMES:
+        pytest.exit(
+            f"\n❌ Refusing to run pytest: connected DB is {name!r}, which is on "
+            f"the safety block-list {set(_BLOCKED_DB_NAMES)}.\n\n"
+            f"The test suite contains destructive delete_many({{}}) calls that "
+            f"have wiped this database before. Point .env.local (or your active "
+            f"MONGO_URI) at a throwaway DB whose name is NOT on the block-list "
+            f"before running tests.\n",
+            returncode=2,
+        )
+
+
 from BackEnd.models.game_manager import GameManager
 from BackEnd.constants import POSITION_LIST
 
