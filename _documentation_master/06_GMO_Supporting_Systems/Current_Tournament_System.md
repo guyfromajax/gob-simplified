@@ -156,6 +156,16 @@ After recording a tournament result:
 - A round only advances when all required games in that round have winners.
 - Week progression only happens after the current tournament phase reaches a valid boundary.
 
+## Bracket slot idempotency and sim write locks
+
+These rules are implemented inside `record_tournament_game_result` (with `get_eos_bracket_slot_snapshot` in `franchise_tournament.py` to read the current cell before mutating):
+
+- **Idempotent replay:** If the bracket cell already has the same canonical `winner` and the same `score` (home/away), a repeat call does not change outcome (logged). A missing `game_id` may still be filled in. When `source=user`, an updated `game_id` may be written if winner and scores already match (e.g. phase-a fixing the id without re-simulating).
+- **`cpu_full` / `distant` lock:** Those sources do **not** overwrite a cell that already has a winner when the new call would imply a **different** winner or scores (avoids double-sim, double-finalize, or retry clobbering a settled slot). `user` and `existing_games` / `existing_results` may still repair or assert the authoritative outcome.
+- **Parallel full-sim dedupe:** `_complete_week_finish_cpu_and_persist` dedupes full-sim jobs by schedule index so the same EOS meta row cannot enqueue two full sims in one pass.
+
+Together, this keeps **`record_tournament_game_result` as the single write funnel** and reduces “last writer wins” between user completion, CPU sim, distant sim, and sync paths.
+
 ## Phase-Specific Rules
 
 ### Conference Tournaments
@@ -283,6 +293,8 @@ Allowed internal helpers:
 - `advance_national_bracket`
 
 External franchise routes should not call them directly.
+
+**Status:** Steps 1–6 are implemented in code: EOS recording and advances go through `franchise_tournament_progression.py` (`record_tournament_game_result`, `advance_*`); `franchise_routes` uses that module for EOS completion and finalize paths instead of calling `franchise_tournament.save_*` / `advance_*` directly.
 
 ## Testing Philosophy
 

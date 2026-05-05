@@ -284,6 +284,10 @@ def record_tournament_game_result(
 
     Idempotent for repeated calls with the same winner and scores; a later call may
     supply ``game_id`` when it was previously missing (legacy lookup path).
+
+    ``cpu_full`` / ``distant`` never overwrite a slot that already has a different
+    winner or scores (prevents double-sim / retry clobber). ``user`` and
+    ``existing_*`` may still repair or correct a populated slot.
     """
     _validate_players_match_meta(game_meta, team1_id, team2_id)
 
@@ -297,6 +301,118 @@ def record_tournament_game_result(
     winner_raw = team1_id if team1_score > team2_score else team2_id
     winner_id_str = normalize_tournament_team_id(winner_raw) or str(winner_raw)
     bracket_game_id = str(game_id or "")
+    incoming_gid = bracket_game_id.strip()
+
+    snap = ft.get_eos_bracket_slot_snapshot(franchise_doc, game_meta)
+    if snap is not None:
+        ew = (snap.get("winner_id") or "").strip()
+        esc = snap.get("score") or {"home": 0, "away": 0}
+        egid = (snap.get("game_id") or "").strip()
+        same_scores = int(esc.get("home", 0) or 0) == int(score["home"]) and int(
+            esc.get("away", 0) or 0
+        ) == int(score["away"])
+
+        if ew:
+            same_winner = ew == winner_id_str
+            if same_winner and same_scores:
+                need_gid_write = bool(
+                    incoming_gid
+                    and incoming_gid != egid
+                    and (not egid or source == "user")
+                )
+                if need_gid_write:
+                    _write_bracket_slot(
+                        franchise_doc,
+                        game_meta,
+                        game_id_str=incoming_gid,
+                        winner_id_str=winner_id_str,
+                        score=score,
+                    )
+                    if not skip_games_upsert and game_id:
+                        _upsert_franchise_game_document(
+                            team1_id,
+                            team2_id,
+                            team1_score,
+                            team2_score,
+                            week,
+                            franchise_id_str,
+                            game_id,
+                        )
+                    logger.warning(
+                        "[EOS-BRACKET-DEBUG] record_tournament_game_result_backfill_game_id "
+                        "franchise_id=%s phase=%s conf/region=%s round=%s idx=%s source=%s game_id=%s",
+                        str(franchise_doc.get("_id")),
+                        game_meta.get("phase"),
+                        game_meta.get("conference") or game_meta.get("region"),
+                        game_meta.get("round"),
+                        game_meta.get("matchup_index"),
+                        source,
+                        incoming_gid[:16],
+                    )
+                else:
+                    logger.warning(
+                        "[EOS-BRACKET-DEBUG] record_tournament_game_result_skip_duplicate "
+                        "franchise_id=%s phase=%s conf/region=%s round=%s idx=%s source=%s",
+                        str(franchise_doc.get("_id")),
+                        game_meta.get("phase"),
+                        game_meta.get("conference") or game_meta.get("region"),
+                        game_meta.get("round"),
+                        game_meta.get("matchup_index"),
+                        source,
+                    )
+                loser_id = normalize_tournament_team_id(
+                    team2_id if team1_score > team2_score else team1_id
+                )
+                return {
+                    "phase": game_meta.get("phase"),
+                    "week": week,
+                    "game_id": incoming_gid or egid,
+                    "winner_id": winner_id_str,
+                    "loser_id": loser_id,
+                    "bracket_slot_recorded": True,
+                    "results_row_recorded": False,
+                    "game_doc_recorded": bool(need_gid_write and not skip_games_upsert),
+                    "round_advanced": False,
+                    "phase_completed": False,
+                    "champion_id": None,
+                    "user_eliminated": None,
+                    "user_has_next_game": None,
+                    "duplicate_eos_record": not need_gid_write,
+                }
+
+            if source in ("cpu_full", "distant"):
+                logger.warning(
+                    "[EOS-BRACKET-DEBUG] record_tournament_game_result_skip_locked_slot "
+                    "franchise_id=%s source=%s phase=%s conf/region=%s round=%s idx=%s "
+                    "existing_w=%s new_w=%s",
+                    str(franchise_doc.get("_id")),
+                    source,
+                    game_meta.get("phase"),
+                    game_meta.get("conference") or game_meta.get("region"),
+                    game_meta.get("round"),
+                    game_meta.get("matchup_index"),
+                    (ew or "")[:16],
+                    (winner_id_str or "")[:16],
+                )
+                loser_id = normalize_tournament_team_id(
+                    team2_id if team1_score > team2_score else team1_id
+                )
+                return {
+                    "phase": game_meta.get("phase"),
+                    "week": week,
+                    "game_id": egid,
+                    "winner_id": ew or winner_id_str,
+                    "loser_id": loser_id,
+                    "bracket_slot_recorded": False,
+                    "results_row_recorded": False,
+                    "game_doc_recorded": False,
+                    "round_advanced": False,
+                    "phase_completed": False,
+                    "champion_id": None,
+                    "user_eliminated": None,
+                    "user_has_next_game": None,
+                    "skipped_non_idempotent_cpu": True,
+                }
 
     logger.warning(
         "[EOS-BRACKET-DEBUG] record_tournament_game_result franchise_id=%s phase=%s "

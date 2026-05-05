@@ -409,6 +409,93 @@ def eos_meta_bracket_slot_has_winner(franchise_doc: Dict[str, Any], g: Dict[str,
     return False
 
 
+def _eos_slot_score_dict(raw: Any) -> Dict[str, int]:
+    if not isinstance(raw, dict):
+        return {"home": 0, "away": 0}
+    return {
+        "home": int(raw.get("home", 0) or 0),
+        "away": int(raw.get("away", 0) or 0),
+    }
+
+
+def get_eos_bracket_slot_snapshot(
+    franchise_doc: Dict[str, Any],
+    g: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """
+    Read the current EOS bracket cell for meta ``g``.
+
+    Returns ``None`` if structure is missing or index is out of range. Otherwise returns
+    ``winner_id`` (canonical hex or empty string if no winner yet), ``score`` ``{home, away}``,
+    and ``game_id`` (string, possibly empty).
+    """
+    phase = g.get("phase")
+    if phase == "conference":
+        ct = _get_conference_tournament_ct(franchise_doc, int(g["conference"]))
+        if not ct:
+            return None
+        br = ct.get("bracket") or {}
+        rn = bracket_engine.get_round_name(int(g["round"]))
+        lst = br.get(rn) or []
+        i = int(g.get("matchup_index", 0))
+        if i < 0 or i >= len(lst):
+            return None
+        m = lst[i] or {}
+        w = m.get("winner")
+        wid = _eos_team_id_canonical(w) if w else ""
+        return {
+            "winner_id": wid,
+            "score": _eos_slot_score_dict(m.get("score")),
+            "game_id": str(m.get("game_id") or ""),
+        }
+    if phase == "region":
+        rt = (franchise_doc.get("region_tournaments") or {}).get(g["region"]) or {}
+        rnum = int(g["round"])
+        if rnum == 1:
+            lst = rt.get("round1") or []
+            i = int(g.get("matchup_index", 0))
+            if i < 0 or i >= len(lst):
+                return None
+            m = lst[i] or {}
+            w = m.get("winner")
+            wid = _eos_team_id_canonical(w) if w else ""
+            return {
+                "winner_id": wid,
+                "score": _eos_slot_score_dict(m.get("score")),
+                "game_id": str(m.get("game_id") or ""),
+            }
+        if rnum == 2:
+            fin = rt.get("final") or []
+            if not fin:
+                return None
+            m = fin[0] or {}
+            w = m.get("winner")
+            wid = _eos_team_id_canonical(w) if w else ""
+            return {
+                "winner_id": wid,
+                "score": _eos_slot_score_dict(m.get("score")),
+                "game_id": str(m.get("game_id") or ""),
+            }
+        return None
+    if phase == "national":
+        nat = franchise_doc.get("national_tournament", {}) or {}
+        br = nat.get("bracket") or {}
+        rn = bracket_engine.get_round_name(int(g["round"]))
+        lst = br.get(rn) or []
+        i = int(g.get("matchup_index", 0))
+        if i < 0 or i >= len(lst):
+            return None
+        m = lst[i] or {}
+        w = m.get("winner")
+        wid = _eos_team_id_canonical(w) if w else ""
+        return {
+            "winner_id": wid,
+            "score": _eos_slot_score_dict(m.get("score")),
+            "game_id": str(m.get("game_id") or ""),
+        }
+    return None
+
+
 def find_user_game_in_eos_week(
     week_games: List[Dict[str, Any]],
     user_team_id_str: Optional[str],

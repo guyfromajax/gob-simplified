@@ -4049,6 +4049,23 @@ def _complete_week_finish_cpu_and_persist(
         full_jobs.append((idx, away_id, home_id, away_name, home_name))
         continue
 
+    # Defensive: duplicate sched_idx would run two full sims for the same EOS meta slot.
+    _fj_seen: set[int] = set()
+    _fj_dedup: list[tuple[int, Any, Any, str, str]] = []
+    for job in full_jobs:
+        jidx = job[0]
+        if jidx in _fj_seen:
+            logger.warning(
+                "[EOS-BRACKET-DEBUG] full_jobs duplicate sched_idx=%s franchise_id=%s week=%s",
+                jidx,
+                franchise_id_str,
+                week,
+            )
+            continue
+        _fj_seen.add(jidx)
+        _fj_dedup.append(job)
+    full_jobs = _fj_dedup
+
     if full_jobs:
         max_workers = min(_franchise_cpu_full_sim_max_workers(), len(full_jobs))
         logger.info(
