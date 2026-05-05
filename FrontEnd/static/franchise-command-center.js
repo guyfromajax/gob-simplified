@@ -3222,41 +3222,7 @@ playNowBtn.addEventListener('click', async () => {
         body: JSON.stringify({ franchise_id: franchiseId })
       });
       if (!res.ok) throw new Error('Simulation failed');
-      const result = await res.json();
-      
-      // Check if championship needs to be simmed
-      const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-      const eosTournament = topData?.eos_tournament;
-      const currentRound = eosTournament?.current_round;
-      
-      if (currentRound === 2 && eosTournament?.bracket?.round2) {
-        // Semis done: run championship sim immediately (no intermediate modal).
-        try {
-          const champRes = await fetch(API_CONFIG.buildUrl('/franchise/sim-championship'), {
-            method: 'POST',
-            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ franchise_id: franchiseId }),
-          });
-          if (!champRes.ok) throw new Error('Championship simulation failed');
-          const champData = await champRes.json();
-          showChampionshipCompleteModal({
-            game_id: champData.game_id,
-            home_team_name: champData.home_team_name,
-            away_team_name: champData.away_team_name,
-            home_score: champData.home_score,
-            away_score: champData.away_score,
-            winner_team_name: champData.winner_name,
-          });
-        } catch (champErr) {
-          console.error(champErr);
-          alert('Unable to simulate championship');
-          location.reload();
-        }
-        playNowBtn.disabled = false;
-        playNowBtn.textContent = originalText;
-      } else {
-        location.reload(); // Reload to show updated bracket
-      }
+      location.reload();
     } catch (err) {
       console.error(err);
       alert('Unable to simulate tournament');
