@@ -115,6 +115,19 @@ def _postseason_training_disabled_for_week(week: Any) -> bool:
     return _week_in_policy_range(week, POSTSEASON_TRAINING_DISABLED_WEEKS)
 
 
+def _training_status_reset_after_advance_to_week(dest_week: Any) -> dict[str, Any] | None:
+    """
+    Weekly training applies when entering a normal franchise week.
+    EOS tournament weeks (27-34) do not use training; do not churn training_status there.
+    """
+    if _postseason_training_disabled_for_week(dest_week):
+        return None
+    return {
+        "training_status.training_completed": False,
+        "training_status.session_type": "in-season",
+    }
+
+
 def _postseason_eog_team_attrs_disabled_for_week(week: Any) -> bool:
     return _week_in_policy_range(week, POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS)
 
@@ -3359,6 +3372,91 @@ def _sync_eos_bracket_from_result_row(
     )
 
 
+def _eos_calendar_advance_update_fields(
+    franchise_doc: dict[str, Any],
+    franchise_id: ObjectId,
+    completed_week: int,
+    *,
+    franchise_id_str: str | None = None,
+    log_conference_bracket_snapshots: bool = False,
+) -> dict[str, Any]:
+    """
+    Single funnel for the EOS franchise calendar step after a completed EOS week (27-34):
+    mutates tournament state on ``franchise_doc`` and returns ``$set`` fragments
+    (``week``, bracket fields, ``eos_tournament_active``). Does not set ``results`` or training.
+
+    Used by ``_finalize_franchise_week_after_cpu_games`` and ``sim_rest_of_tournament``.
+
+    Other writers (heal, repair, ``sim-championship``) are listed in
+    ``_documentation_master/06_GMO_Supporting_Systems/EOS_Write_Path_Inventory.md``.
+    """
+    if completed_week not in ft.EOS_WEEKS:
+        return {}
+
+    out: dict[str, Any] = {}
+
+    if completed_week in ft.EOS_CONFERENCE_WEEKS:
+        if log_conference_bracket_snapshots and franchise_id_str:
+            ft.log_eos_conference_bracket_snapshot(
+                franchise_doc,
+                f"complete_week_pre_advance week={completed_week} fid={franchise_id_str}",
+            )
+        for c in range(1, 17):
+            ftp.advance_conference_bracket(franchise_doc, c)
+        if log_conference_bracket_snapshots and franchise_id_str:
+            ft.log_eos_conference_bracket_snapshot(
+                franchise_doc,
+                f"complete_week_post_advance week={completed_week} fid={franchise_id_str}",
+            )
+        next_w = completed_week + 1
+        if completed_week == ft.EOS_CONFERENCE_WEEKS[-1]:
+            eos_team_ids = [
+                d["team_id"]
+                for d in franchise_team_data_collection.find(
+                    {"franchise_id": franchise_id}, {"team_id": 1}
+                )
+                if d.get("team_id")
+            ]
+            region_tournaments = ft.initialize_region_tournaments(
+                franchise_doc, db.teams, team_ids=eos_team_ids
+            )
+            out["region_tournaments"] = region_tournaments
+            next_w = ft.EOS_REGION_WEEKS[0]
+        out["week"] = next_w
+        out["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
+    elif completed_week in ft.EOS_REGION_WEEKS:
+        if completed_week == ft.EOS_REGION_WEEKS[-1]:
+            region_champions = ft.get_region_champions(franchise_doc)
+            ftd_docs = list(
+                franchise_team_data_collection.find(
+                    {"franchise_id": franchise_id}, {"team_id": 1}
+                )
+            )
+            team_ids = [d["team_id"] for d in ftd_docs if d.get("team_id")]
+            national_tournament = ft.initialize_national_tournament(
+                franchise_doc,
+                db.teams,
+                region_champions,
+                franchise_doc.get("results", {}),
+                team_ids,
+            )
+            out["national_tournament"] = national_tournament
+            next_w = ft.EOS_NATIONAL_WEEKS[0]
+        else:
+            next_w = ft.EOS_REGION_WEEKS[1]
+        out["week"] = next_w
+        out["region_tournaments"] = franchise_doc.get("region_tournaments", {})
+    elif completed_week in ft.EOS_NATIONAL_WEEKS:
+        ftp.advance_national_bracket(franchise_doc)
+        out["national_tournament"] = franchise_doc.get("national_tournament", {})
+        if completed_week == ft.EOS_NATIONAL_WEEKS[-1]:
+            out["eos_tournament_active"] = False
+            out["week"] = 35
+        else:
+            out["week"] = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(completed_week) + 1]
+    return out
+
+
 def _finalize_franchise_week_after_cpu_games(
     franchise_doc: dict,
     franchise_id: ObjectId,
@@ -3394,8 +3492,6 @@ def _finalize_franchise_week_after_cpu_games(
         "results": existing_results,
         "week": next_week,
         "season_inbox": franchise_doc.get("season_inbox", []),
-        "training_status.training_completed": False,
-        "training_status.session_type": "in-season",
     }
 
     if week == ScheduleManager.REGULAR_SEASON_WEEKS:
@@ -3425,64 +3521,17 @@ def _finalize_franchise_week_after_cpu_games(
             conference_tournaments=conference_tournaments,
         )
     elif week in ft.EOS_WEEKS:
-        next_week = week + 1
-        if week in ft.EOS_CONFERENCE_WEEKS:
-            ft.log_eos_conference_bracket_snapshot(
-                franchise_doc,
-                f"complete_week_pre_advance week={week} fid={franchise_id_str}",
-            )
-            for c in range(1, 17):
-                advanced, champ = ftp.advance_conference_bracket(franchise_doc, c)
-            ft.log_eos_conference_bracket_snapshot(
-                franchise_doc,
-                f"complete_week_post_advance week={week} fid={franchise_id_str}",
-            )
-            if week == ft.EOS_CONFERENCE_WEEKS[-1]:
-                eos_team_ids = [
-                    d["team_id"]
-                    for d in franchise_team_data_collection.find(
-                        {"franchise_id": franchise_id}, {"team_id": 1}
-                    )
-                    if d.get("team_id")
-                ]
-                region_tournaments = ft.initialize_region_tournaments(
-                    franchise_doc, db.teams, team_ids=eos_team_ids
-                )
-                update_fields["region_tournaments"] = region_tournaments
-                next_week = ft.EOS_REGION_WEEKS[0]
-            update_fields["week"] = next_week
-            update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
-        elif week in ft.EOS_REGION_WEEKS:
-            if week == ft.EOS_REGION_WEEKS[-1]:
-                region_champions = ft.get_region_champions(franchise_doc)
-                ftd_docs = list(
-                    franchise_team_data_collection.find(
-                        {"franchise_id": franchise_id}, {"team_id": 1}
-                    )
-                )
-                team_ids = [d["team_id"] for d in ftd_docs if d.get("team_id")]
-                national_tournament = ft.initialize_national_tournament(
-                    franchise_doc,
-                    db.teams,
-                    region_champions,
-                    franchise_doc.get("results", {}),
-                    team_ids,
-                )
-                update_fields["national_tournament"] = national_tournament
-                next_week = ft.EOS_NATIONAL_WEEKS[0]
-            else:
-                next_week = ft.EOS_REGION_WEEKS[1]
-            update_fields["week"] = next_week
-            update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
-        elif week in ft.EOS_NATIONAL_WEEKS:
-            advanced, champion = ftp.advance_national_bracket(franchise_doc)
-            update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
-            if week == ft.EOS_NATIONAL_WEEKS[-1]:
-                update_fields["eos_tournament_active"] = False
-                next_week = 35
-            else:
-                next_week = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
-            update_fields["week"] = next_week
+        eos_updates = _eos_calendar_advance_update_fields(
+            franchise_doc,
+            franchise_id,
+            week,
+            franchise_id_str=franchise_id_str,
+            log_conference_bracket_snapshots=True,
+        )
+        update_fields.update(eos_updates)
+    ts_reset = _training_status_reset_after_advance_to_week(update_fields.get("week"))
+    if ts_reset:
+        update_fields.update(ts_reset)
     logger.warning(
         "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
         franchise_id_str,
@@ -10009,46 +10058,19 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     existing_results = franchise_doc.get("results", {})
     existing_results[str(week)] = results
     update_fields = {"results": existing_results}
-    # After advancing the round, cue user to run training for the new week (e.g. bye in week 30 → sim → week 31 → "Run Training")
-    update_fields["training_status.training_completed"] = False
-    update_fields["training_status.session_type"] = "in-season"
 
-    if week in ft.EOS_CONFERENCE_WEEKS:
-        for c in range(1, 17):
-            ftp.advance_conference_bracket(franchise_doc, c)
-        update_fields["conference_tournaments"] = franchise_doc.get("conference_tournaments", {})
-        if week == ft.EOS_CONFERENCE_WEEKS[-1]:
-            eos_team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
-                {"franchise_id": franchise_id}, {"team_id": 1}
-            ) if d.get("team_id")]
-            update_fields["region_tournaments"] = ft.initialize_region_tournaments(
-                franchise_doc, db.teams, team_ids=eos_team_ids
-            )
-            update_fields["week"] = ft.EOS_REGION_WEEKS[0]
-        else:
-            update_fields["week"] = week + 1
-    elif week in ft.EOS_REGION_WEEKS:
-        update_fields["region_tournaments"] = franchise_doc.get("region_tournaments", {})
-        if week == ft.EOS_REGION_WEEKS[-1]:
-            region_champions = ft.get_region_champions(franchise_doc)
-            team_ids = [d["team_id"] for d in franchise_team_data_collection.find(
-                {"franchise_id": franchise_id}, {"team_id": 1}
-            ) if d.get("team_id")]
-            update_fields["national_tournament"] = ft.initialize_national_tournament(
-                franchise_doc, db.teams, region_champions,
-                franchise_doc.get("results", {}), team_ids,
-            )
-            update_fields["week"] = ft.EOS_NATIONAL_WEEKS[0]
-        else:
-            update_fields["week"] = ft.EOS_REGION_WEEKS[1]
-    elif week in ft.EOS_NATIONAL_WEEKS:
-        ftp.advance_national_bracket(franchise_doc)
-        update_fields["national_tournament"] = franchise_doc.get("national_tournament", {})
-        if week == ft.EOS_NATIONAL_WEEKS[-1]:
-            update_fields["eos_tournament_active"] = False
-            update_fields["week"] = 35
-        else:
-            update_fields["week"] = ft.EOS_NATIONAL_WEEKS[ft.EOS_NATIONAL_WEEKS.index(week) + 1]
+    eos_updates = _eos_calendar_advance_update_fields(
+        franchise_doc,
+        franchise_id,
+        week,
+        franchise_id_str=str(franchise_id),
+        log_conference_bracket_snapshots=False,
+    )
+    update_fields.update(eos_updates)
+
+    ts_reset = _training_status_reset_after_advance_to_week(update_fields.get("week", week))
+    if ts_reset:
+        update_fields.update(ts_reset)
 
     db.franchises.update_one({"_id": franchise_id}, {"$set": update_fields})
     if update_fields.get("week") == 35:
@@ -10128,10 +10150,15 @@ def sim_championship(req: SimChampionshipRequest):
         )
         ftp.advance_national_bracket(franchise_doc)
         national_tournament = franchise_doc.get("national_tournament", {})
-        db.franchises.update_one(
-            {"_id": franchise_id},
-            {"$set": {"national_tournament": national_tournament, "eos_tournament_active": False, "week": 35}}
-        )
+        champ_patch: dict[str, Any] = {
+            "national_tournament": national_tournament,
+            "eos_tournament_active": False,
+            "week": 35,
+        }
+        ts_reset = _training_status_reset_after_advance_to_week(35)
+        if ts_reset:
+            champ_patch.update(ts_reset)
+        db.franchises.update_one({"_id": franchise_id}, {"$set": champ_patch})
         refreshed = db.franchises.find_one({"_id": franchise_id})
         if refreshed:
             _persist_week_35_awards_if_needed(refreshed)

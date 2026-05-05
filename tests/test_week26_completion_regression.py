@@ -167,8 +167,6 @@ def test_week26_builds_update_fields_week_27_and_16_conference_tournaments():
     update_fields = {
         "results": existing_results,
         "week": next_week,
-        "training_status.training_completed": False,
-        "training_status.session_type": "in-season",
     }
 
     if req_week == ScheduleManager.REGULAR_SEASON_WEEKS:
@@ -182,6 +180,9 @@ def test_week26_builds_update_fields_week_27_and_16_conference_tournaments():
         update_fields["week"] = ft.EOS_CONFERENCE_WEEKS[0]
 
     assert update_fields["week"] == 27, "Week 26 completion must set week to 27"
+    assert "training_status.training_completed" not in update_fields, (
+        "Entering EOS week 27 must not reset training_status (no weekly training in EOS)"
+    )
     assert update_fields.get("eos_tournament_active") is True
     assert "conference_tournaments" in update_fields
     ct = update_fields["conference_tournaments"]
