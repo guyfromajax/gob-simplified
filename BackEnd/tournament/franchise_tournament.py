@@ -141,6 +141,39 @@ def _build_region_bracket(
     }
 
 
+def _infer_rs1_team_id_from_conference_tournament(ct: Dict[str, Any]) -> Optional[str]:
+    """
+    RS#1 for region bye logic = conference #1 seed. Prefer ``seeds`` (lowest seed rank);
+    if missing (legacy / partial saves), infer from bracket round1[0] (1v8: home is seed 1).
+    """
+    seeds = ct.get("seeds") or {}
+    if seeds:
+        best_tid: Any = None
+        best_rank = 999
+        for tid, rank in seeds.items():
+            try:
+                r = int(rank)
+            except (TypeError, ValueError):
+                continue
+            if r < best_rank:
+                best_rank = r
+                best_tid = tid
+        if best_tid is not None:
+            return str(best_tid)
+    bracket = ct.get("bracket") or {}
+    r1 = bracket.get("round1") or []
+    if not r1 or not isinstance(r1[0], dict):
+        return None
+    m0 = r1[0]
+    ht = m0.get("home_team")
+    if ht:
+        return str(ht)
+    at = m0.get("away_team")
+    if at:
+        return str(at)
+    return None
+
+
 def _get_conf_champions_and_rs1(
     franchise_doc: Dict[str, Any],
     team_ids: List[Any],
@@ -160,6 +193,10 @@ def _get_conf_champions_and_rs1(
             seed_order = [tid for tid, _ in sorted(seeds.items(), key=lambda x: x[1])]
             if seed_order:
                 rs1[c] = str(seed_order[0])
+        if c not in rs1:
+            inferred = _infer_rs1_team_id_from_conference_tournament(ct)
+            if inferred:
+                rs1[c] = inferred
     return champions, rs1
 
 
@@ -176,6 +213,106 @@ def initialize_region_tournaments(
         conf1, conf2 = _region_to_conferences(r)
         out[r] = _build_region_bracket(conf1, conf2, champions, rs1)
     return out
+
+
+def _region_tournament_fully_unplayed(rt: Dict[str, Any]) -> bool:
+    for m in rt.get("round1") or []:
+        if isinstance(m, dict) and m.get("winner"):
+            return False
+    for m in rt.get("final") or []:
+        if isinstance(m, dict) and m.get("winner"):
+            return False
+    return True
+
+
+def _r1_matchup_incomplete(m: Any) -> bool:
+    if not isinstance(m, dict) or m.get("winner"):
+        return False
+    a, h = m.get("away_team"), m.get("home_team")
+    return not a or not h
+
+
+def _final_matchup_incomplete(m: Any) -> bool:
+    if not isinstance(m, dict) or m.get("winner"):
+        return False
+    a, h = m.get("away_team"), m.get("home_team")
+    return not a or not h
+
+
+def _merge_region_slots_from_canonical(existing: Dict[str, Any], canonical: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
+    """Fill missing away/home on unplayed slots from freshly computed bracket. Returns (merged, changed)."""
+    out = deepcopy(existing)
+    changed = False
+    r1e = out.setdefault("round1", [])
+    r1c = canonical.get("round1") or []
+    for i in range(len(r1e)):
+        if r1e[i].get("winner"):
+            continue
+        if i >= len(r1c):
+            continue
+        for side in ("away_team", "home_team"):
+            if not r1e[i].get(side) and r1c[i].get(side):
+                r1e[i][side] = r1c[i][side]
+                changed = True
+    fine = out.get("final") or []
+    finc = canonical.get("final") or []
+    if fine and finc and not fine[0].get("winner"):
+        for side in ("away_team", "home_team"):
+            if not fine[0].get(side) and finc[0].get(side):
+                fine[0][side] = finc[0][side]
+                changed = True
+    return out, changed
+
+
+def reconcile_region_tournaments_with_canonical(
+    franchise_doc: Dict[str, Any],
+    teams_collection,
+    team_ids: List[Any],
+) -> Optional[Dict[str, Any]]:
+    """
+    Rebuild region brackets from conference champions + RS#1 and merge into the saved doc.
+
+    - If a region has no decided games and has incomplete slots or wrong round1 length, replace
+      that region with the canonical bracket.
+    - Otherwise copy missing away/home from canonical onto unplayed slots only.
+
+    Returns a new ``region_tournaments`` dict if anything changed, else ``None``.
+    """
+    if not team_ids:
+        return None
+    existing = franchise_doc.get("region_tournaments") or {}
+    try:
+        fresh = initialize_region_tournaments(franchise_doc, teams_collection, team_ids)
+    except Exception as exc:
+        logger.warning("reconcile_region_tournaments_with_canonical: init failed: %s", exc)
+        return None
+    if not existing:
+        return fresh
+
+    out: Dict[str, Any] = {}
+    changed = False
+    for r in REGION_LETTERS:
+        ex_orig = existing.get(r)
+        fr = fresh.get(r) or {}
+        if not ex_orig:
+            out[r] = deepcopy(fr)
+            changed = True
+            continue
+        ex = deepcopy(ex_orig)
+        if _region_tournament_fully_unplayed(ex):
+            r1_inc = any(_r1_matchup_incomplete(m) for m in (ex.get("round1") or []))
+            fin_list = ex.get("final") or []
+            fin_inc = bool(fin_list) and _final_matchup_incomplete(fin_list[0])
+            len_mismatch = len(ex.get("round1") or []) != len(fr.get("round1") or [])
+            if r1_inc or fin_inc or len_mismatch:
+                out[r] = deepcopy(fr)
+                changed = True
+                continue
+        merged, slot_changed = _merge_region_slots_from_canonical(ex, fr)
+        out[r] = merged
+        if slot_changed:
+            changed = True
+    return out if changed else None
 
 
 def initialize_national_tournament(

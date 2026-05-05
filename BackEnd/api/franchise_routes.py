@@ -4993,6 +4993,42 @@ def command_center_data(
                     last_training_report_week = None
         response["last_training_report_week"] = last_training_report_week
         response["season_inbox"] = list(franchise_doc.get("season_inbox") or []) if franchise_doc else []
+        # Region EOS: ensure persisted brackets match conference champions + RS#1 (fixes legacy TBD / half rows).
+        if (
+            franchise_doc
+            and franchise_doc.get("_id")
+            and week in ft.EOS_REGION_WEEKS
+            and franchise_doc.get("region_tournaments")
+        ):
+            fid_obj = franchise_doc["_id"]
+            eos_team_ids = [
+                d["team_id"]
+                for d in franchise_team_data_collection.find({"franchise_id": fid_obj}, {"team_id": 1})
+                if d.get("team_id") is not None
+            ]
+            fcc_reconcile_persisted = False
+            if eos_team_ids:
+                updated_rt = ft.reconcile_region_tournaments_with_canonical(
+                    franchise_doc, db.teams, eos_team_ids
+                )
+                if updated_rt is not None:
+                    franchise_doc["region_tournaments"] = updated_rt
+                    db.franchises.update_one({"_id": fid_obj}, {"$set": {"region_tournaments": updated_rt}})
+                    fcc_reconcile_persisted = True
+                logger.warning(
+                    "[EOS-REGION-RECONCILE] context=fcc week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
+                    week,
+                    str(fid_obj),
+                    fcc_reconcile_persisted,
+                    len(eos_team_ids),
+                )
+            else:
+                logger.warning(
+                    "[EOS-REGION-RECONCILE] context=fcc week=%s franchise_id=%s persisted=%s ftd_team_count=0",
+                    week,
+                    str(fid_obj),
+                    False,
+                )
         post_eos_bracket_history_visible = bool(
             not eos_tournament_active
             and week in {35, 36}
@@ -5002,13 +5038,13 @@ def command_center_data(
                 or franchise_doc.get("national_tournament")
             )
         )
+        week_val = week if week is not None else 1
         if eos_tournament_active or post_eos_bracket_history_visible:
             response["eos_tournament_active"] = True
             response["conference_tournaments"] = franchise_doc.get("conference_tournaments")
             response["region_tournaments"] = franchise_doc.get("region_tournaments")
             response["national_tournament"] = national_tournament
             # Derive single eos_tournament (old shape) for FCC bracket display: pick current phase by week
-            week_val = week if week is not None else 1
             if week_val in ft.EOS_CONFERENCE_WEEKS:
                 user_conf = team_doc.get("conference") if team_doc else None
                 ct = (franchise_doc.get("conference_tournaments") or {}).get(str(user_conf), {}) if user_conf is not None else {}
@@ -5080,7 +5116,19 @@ def command_center_data(
         user_eliminated = training_disabled_for_eos
         tournament_complete = bool(national_tournament.get("champion")) if national_tournament else False
         user_has_bye = bool(eos_status.get("has_bye_this_week", False)) if eos_status else False
-        offer_sim_rest = (user_eliminated or user_has_bye) and eos_tournament_active and not tournament_complete
+        has_playable_eos_round = (
+            week_val not in ft.EOS_WEEKS
+            or (
+                franchise_doc
+                and len(ft.get_eos_week_games(franchise_doc, week_val, include_completed=False)) > 0
+            )
+        )
+        offer_sim_rest = (
+            (user_eliminated or user_has_bye)
+            and eos_tournament_active
+            and not tournament_complete
+            and has_playable_eos_round
+        )
         response["user_eliminated"] = user_eliminated
         response["offer_sim_rest"] = offer_sim_rest
         return response
@@ -9919,8 +9967,46 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     if not eos_active:
         raise HTTPException(status_code=400, detail="EOS tournaments not active")
 
+    sim_rest_reconcile_persisted = False
+    if week in ft.EOS_REGION_WEEKS and franchise_doc.get("region_tournaments"):
+        eos_team_ids = [
+            d["team_id"]
+            for d in franchise_team_data_collection.find({"franchise_id": franchise_id}, {"team_id": 1})
+            if d.get("team_id") is not None
+        ]
+        if eos_team_ids:
+            updated_rt = ft.reconcile_region_tournaments_with_canonical(
+                franchise_doc, db.teams, eos_team_ids
+            )
+            if updated_rt is not None:
+                franchise_doc["region_tournaments"] = updated_rt
+                db.franchises.update_one({"_id": franchise_id}, {"$set": {"region_tournaments": updated_rt}})
+                sim_rest_reconcile_persisted = True
+            logger.warning(
+                "[EOS-REGION-RECONCILE] context=sim_rest week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
+                week,
+                str(franchise_id),
+                sim_rest_reconcile_persisted,
+                len(eos_team_ids),
+            )
+        else:
+            logger.warning(
+                "[EOS-REGION-RECONCILE] context=sim_rest week=%s franchise_id=%s persisted=%s ftd_team_count=0",
+                week,
+                str(franchise_id),
+                False,
+            )
+
     week_games_meta = ft.get_eos_week_games(franchise_doc, week)
+    meta_count = len(week_games_meta)
     if not week_games_meta:
+        logger.warning(
+            "[EOS-SIM-REST] empty_meta week=%s franchise_id=%s meta_count=%s reconcile_persisted=%s",
+            week,
+            str(franchise_id),
+            meta_count,
+            sim_rest_reconcile_persisted,
+        )
         raise HTTPException(status_code=400, detail="No games in current EOS round (e.g. week 30 with all double-winners)")
 
     _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
