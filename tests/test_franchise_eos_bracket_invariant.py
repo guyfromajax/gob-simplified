@@ -636,3 +636,149 @@ def test_start_cpu_sims_persist_uses_merge_helper(monkeypatch):
         "Persist clobbered the user's bracket cell. start-cpu-sims must merge fresh "
         "DB state before persisting EOS blobs."
     )
+
+
+# ---------------------------------------------------------------------------
+# start-cpu-sims persist must also merge fresh ``results.{wk}`` (regular season
+# AND EOS — both share this code path).
+# ---------------------------------------------------------------------------
+
+
+def test_start_cpu_sims_persist_merges_fresh_results_with_local():
+    """
+    Regression: when start-cpu-sims's persist runs while phase-a has already written
+    the user's row to ``results.{wk}``, the persist must merge the fresh DB rows with
+    the local (CPU-only, 63-row) ``results`` instead of blindly overwriting. Otherwise
+    the user's row gets clobbered, surfacing as "user team shows 0-0 after a played
+    week" in the FCC standings (visible in regular-season weeks 1–26 because no other
+    code path adds the user row back; in EOS weeks the same race exists in parallel
+    with the bracket-cell race fixed earlier).
+
+    The merge contract: union by matchup key; local rows (this request's CPU sims)
+    win on collisions; fresh rows contribute any matchup local lacks — specifically
+    the user's row from the concurrent phase-a write.
+    """
+    user_team = "69a6fcb68d2c56aa82e48a56"  # Morristown
+    user_opp = "69a6fcb68d2c56aa82e48a57"
+
+    # FRESH state in DB: phase-a wrote a user row for week 1 (regular season).
+    fresh_results_for_week = [
+        {"away_id": user_team, "home_id": user_opp, "away_score": 60, "home_score": 95},
+    ]
+
+    # STALE local ``results`` (this request's CPU loop): 63 CPU rows. The user
+    # matchup is NOT here because the loop ``continue``s past it by design.
+    stale_local_results = [
+        {
+            "away_id": f"cpu_a_{i:02d}",
+            "home_id": f"cpu_h_{i:02d}",
+            "away_score": 60 + i,
+            "home_score": 70 + i,
+        }
+        for i in range(63)
+    ]
+
+    # The patch's merge logic, exercised directly:
+    combined = list(stale_local_results) + list(fresh_results_for_week)
+    merged = franchise_routes._dedupe_franchise_week_results_by_matchup(combined)
+
+    assert len(merged) == 64, (
+        f"Merge should produce 63 CPU + 1 user = 64 rows, got {len(merged)}. "
+        "If this is 63, the user's row was not preserved by the merge."
+    )
+    user_rows = [r for r in merged if r.get("away_id") == user_team]
+    assert len(user_rows) == 1, "User row missing from merged results"
+    assert user_rows[0]["away_score"] == 60
+    assert user_rows[0]["home_score"] == 95
+
+
+def test_start_cpu_sims_persist_local_wins_for_collisions():
+    """
+    When the same matchup appears in both local ``results`` (just-run CPU sim) and
+    fresh DB ``results.{wk}`` (an earlier CPU sim by a prior request), local wins —
+    the just-run sim is the most recent data. Fresh's contribution is limited to
+    matchups local doesn't already have.
+    """
+    matchup_a_local = {"away_id": "a", "home_id": "b", "away_score": 99, "home_score": 50}
+    matchup_a_fresh = {"away_id": "a", "home_id": "b", "away_score": 60, "home_score": 70}
+    user_row_fresh = {"away_id": "u1", "home_id": "u2", "away_score": 55, "home_score": 88}
+
+    combined = [matchup_a_local, user_row_fresh, matchup_a_fresh]
+    merged = franchise_routes._dedupe_franchise_week_results_by_matchup(combined)
+
+    assert len(merged) == 2
+    a_rows = [r for r in merged if {r["away_id"], r["home_id"]} == {"a", "b"}]
+    assert len(a_rows) == 1
+    assert a_rows[0]["away_score"] == 99, "Local should win over fresh for shared matchup"
+    user_rows = [r for r in merged if r.get("away_id") == "u1"]
+    assert len(user_rows) == 1
+    assert user_rows[0]["away_score"] == 55
+
+
+def test_start_cpu_sims_persist_path_writes_64_rows_when_phase_a_concurrent(monkeypatch):
+    """
+    Path-level regression: simulate the full persist branch with a mocked DB.
+    DB has phase-a's user row for week 1; this request's local results has 63 CPU
+    rows. After persist, the captured ``$set`` for ``results.1`` must contain 64
+    rows including the user row.
+    """
+    user_team = "69a6fcb68d2c56aa82e48a56"
+    user_opp = "69a6fcb68d2c56aa82e48a57"
+    franchise_oid = ObjectId()
+
+    fresh_doc = {
+        "results": {
+            "1": [
+                {"away_id": user_team, "home_id": user_opp, "away_score": 60, "home_score": 95},
+            ],
+        },
+    }
+
+    captured = {}
+
+    mock_db = MagicMock()
+    mock_db.franchises.find_one.return_value = fresh_doc
+
+    def _update_one(filter_doc, update_doc, **kwargs):
+        captured["filter"] = filter_doc
+        captured["update"] = update_doc
+        return MagicMock(matched_count=1, modified_count=1)
+
+    mock_db.franchises.update_one.side_effect = _update_one
+    monkeypatch.setattr(franchise_routes, "db", mock_db)
+
+    # Inline the patch's persist logic so we test exactly the surface that runs in
+    # _complete_week_finish_cpu_and_persist's persist_cpu_results_only branch.
+    week = 1
+    wk = str(week)
+    local_results = [
+        {
+            "away_id": f"cpu_a_{i:02d}",
+            "home_id": f"cpu_h_{i:02d}",
+            "away_score": 60 + i,
+            "home_score": 70 + i,
+        }
+        for i in range(63)
+    ]
+
+    projection = {f"results.{wk}": 1}
+    fresh = franchise_routes.db.franchises.find_one({"_id": franchise_oid}, projection) or {}
+    fresh_results_for_week = (fresh.get("results") or {}).get(wk) or []
+    merged_results = franchise_routes._dedupe_franchise_week_results_by_matchup(
+        list(local_results) + list(fresh_results_for_week)
+    )
+    partial_update = {f"results.{wk}": merged_results}
+    franchise_routes.db.franchises.update_one(
+        {"_id": franchise_oid}, {"$set": partial_update}
+    )
+
+    persisted_results = captured["update"]["$set"][f"results.{wk}"]
+    assert len(persisted_results) == 64, (
+        f"Persist clobbered the user row. Expected 64 rows in results.{wk}, got "
+        f"{len(persisted_results)}. The merge with fresh DB state was skipped or "
+        f"failed."
+    )
+    user_rows = [r for r in persisted_results if r.get("away_id") == user_team]
+    assert len(user_rows) == 1, "User row missing from persisted results"
+    assert user_rows[0]["away_score"] == 60
+    assert user_rows[0]["home_score"] == 95

@@ -4723,26 +4723,37 @@ def _complete_week_finish_cpu_and_persist(
 
     if persist_cpu_results_only:
         wk = str(week)
-        partial_update: dict[str, Any] = {f"results.{wk}": results}
+        # Re-read fresh state from DB so a concurrent phase-a write — which this path
+        # never produces locally because it skips the user matchup — is preserved on
+        # persist. Without this merge, both the blanket ``$set: {"results.{wk}":
+        # results}`` and the EOS-blob ``$set`` clobber any row / bracket cell that
+        # landed in the DB between when this request loaded ``franchise_doc`` and
+        # now. That race is the silent root cause of two related symptoms:
+        #   - "user team shows 0-0 after a played week" (regular season + EOS, due
+        #     to ``results.{wk}`` getting overwritten with the CPU-only set), and
+        #   - "EOS bracket cell stays null" (EOS only, due to ``conference_tournaments``
+        #     / ``region_tournaments`` / ``national_tournament`` getting overwritten).
+        # See ``Tournament_Execution_System.md`` §3b.
+        projection: dict[str, Any] = {f"results.{wk}": 1}
         if week in ft.EOS_WEEKS:
-            # Re-read fresh EOS blobs and merge so a concurrent phase-a write to the
-            # user's bracket cell — which this path never touches because it skips the
-            # user matchup — is preserved. Without this re-merge, persisting our
-            # (potentially stale) ``franchise_doc.conference_tournaments`` blob can
-            # clobber any winner that landed in the DB between when this request
-            # loaded ``franchise_doc`` and now. That was the silent root cause of the
-            # "calendar advanced, user bracket cell stays null" symptom — see
-            # ``Tournament_Execution_System.md`` §3a. Mirrors phase-a's own pattern.
-            fresh_eos = db.franchises.find_one(
-                {"_id": franchise_id},
-                {
-                    "conference_tournaments": 1,
-                    "region_tournaments": 1,
-                    "national_tournament": 1,
-                },
-            ) or {}
+            projection["conference_tournaments"] = 1
+            projection["region_tournaments"] = 1
+            projection["national_tournament"] = 1
+        fresh_doc = db.franchises.find_one({"_id": franchise_id}, projection) or {}
+        fresh_results_for_week = (fresh_doc.get("results") or {}).get(wk) or []
+        # Union by matchup key. Local ``results`` (this request's CPU sims) wins for
+        # any matchup it has data for; ``fresh_results_for_week`` contributes any
+        # matchup local lacks — specifically the user's row from a concurrent
+        # phase-a write. ``_dedupe_franchise_week_results_by_matchup`` keeps the
+        # first occurrence per matchup key, and we put local first.
+        merged_results = _dedupe_franchise_week_results_by_matchup(
+            list(results) + list(fresh_results_for_week)
+        )
+        merged_results = _order_franchise_week_results_like_schedule(merged_results, week_games)
+        partial_update: dict[str, Any] = {f"results.{wk}": merged_results}
+        if week in ft.EOS_WEEKS:
             merged_eos = ft.merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
-                fresh_eos,
+                fresh_doc,
                 franchise_doc,
             )
             for _eos_key, _eos_val in merged_eos.items():
