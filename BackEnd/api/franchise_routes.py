@@ -2400,6 +2400,15 @@ def play_next_game(
     matchup = None
 
     if eos_tournament_active and eos_has_state and manager.week in ft.EOS_WEEKS:
+        # Reconcile region brackets before reading the slate so a user who clicks
+        # Play without first hitting /franchise/command-center/data does not land on
+        # a half-built region bracket with placeholder TBD slots.
+        _maybe_reconcile_region_for_eos(
+            franchise_doc,
+            franchise_doc.get("_id"),
+            week=int(manager.week),
+            context_label="play_next_game",
+        )
         week_games_meta = ft.get_eos_week_games(franchise_doc, manager.week)
         found = ft.find_user_game_in_eos_week(week_games_meta, str(user_team_id))
         if found:
@@ -2408,12 +2417,27 @@ def play_next_game(
             away_id = g["away_id"]
             home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
             away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
+            # eos_meta locks the bracket slot at game-start time. When the FE plumbs
+            # this through to ``complete-week`` via ``req.game_document.eos_meta``,
+            # bracket resolution becomes immune to slate / week drift.
+            eos_meta = {
+                "phase": g.get("phase"),
+                "round": g.get("round"),
+                "matchup_index": g.get("matchup_index"),
+                "away_id": str(away_id),
+                "home_id": str(home_id),
+            }
+            if g.get("conference") is not None:
+                eos_meta["conference"] = g.get("conference")
+            if g.get("region") is not None:
+                eos_meta["region"] = g.get("region")
             matchup = {
                 "home": home_doc.get("name", "") if home_doc else "",
                 "away": away_doc.get("name", "") if away_doc else "",
                 "home_id": str(home_id),
                 "away_id": str(away_id),
                 "week": manager.week,
+                "eos_meta": eos_meta,
             }
     if matchup is None and manager.week <= ScheduleManager.REGULAR_SEASON_WEEKS:
         # Regular season (weeks 1–26)
@@ -2706,10 +2730,20 @@ def _harden_complete_week_request_week(
     franchise_doc: dict, req: CompleteWeekRequest
 ) -> CompleteWeekRequest:
     """
-    Use franchise.week when the client sends a future week (stale URL / localStorage),
-    and optionally prefer game_document.week when the EOS slate for req.week does not
-    contain this matchup but an earlier EOS week does (franchise.week already advanced
-    without a bracket write).
+    Bring ``req.week`` into agreement with the actual played EOS slot.
+
+    Two coalescing rules:
+
+    1. **Future-week guard.** When ``req.week > franchise.week`` (client one week ahead
+       from a stale URL / localStorage), coalesce to ``franchise.week``.
+
+    2. **Trust ``game_document.week`` when the slate disagrees.** When ``req.week`` and
+       ``game_document.week`` are both EOS weeks but disagree, and the team pair appears
+       in ``game_document.week``'s slate but not in ``req.week``'s, coalesce to
+       ``game_document.week``. Symmetric: applies in both directions (``gw < rw`` *and*
+       ``gw > rw``). The earlier asymmetric form caused silent bracket-cell misses when
+       the client posted a stale older week for a game that had actually been played in
+       a later EOS round.
     """
     try:
         fr_w = int(franchise_doc.get("week") or 0) or 1
@@ -2736,7 +2770,7 @@ def _harden_complete_week_request_week(
         gw is not None
         and gw in ft.EOS_WEEKS
         and rw in ft.EOS_WEEKS
-        and gw < rw
+        and gw != rw
     ):
         t1 = _normalize_team_id(req.result.team1_id)
         t2 = _normalize_team_id(req.result.team2_id)
@@ -2749,10 +2783,11 @@ def _harden_complete_week_request_week(
         has_gw = ftp.find_eos_game_meta_for_team_pair(meta_gw, t1, t2) is not None
         if not has_rw and has_gw:
             logger.warning(
-                "[COMPLETE-WEEK-WEEK-HARDEN] eos_trust_game_document week req=%s doc=%s franchise.week=%s",
+                "[COMPLETE-WEEK-WEEK-HARDEN] eos_trust_game_document week req=%s doc=%s franchise.week=%s direction=%s",
                 rw,
                 gw,
                 fr_w,
+                "doc_behind" if gw < rw else "doc_ahead",
             )
             return CompleteWeekRequest(
                 franchise_id=req.franchise_id,
@@ -2761,8 +2796,70 @@ def _harden_complete_week_request_week(
                 game_id=req.game_id,
                 game_document=req.game_document,
             )
+        if not has_rw and not has_gw:
+            logger.warning(
+                "[COMPLETE-WEEK-WEEK-HARDEN] no_slate_match_either_week req=%s doc=%s franchise.week=%s; "
+                "downstream invariant will raise if this is a user game",
+                rw,
+                gw,
+                fr_w,
+            )
 
     return req
+
+
+def _maybe_reconcile_region_for_eos(
+    franchise_doc: dict,
+    franchise_id: Any,
+    *,
+    week: int,
+    context_label: str,
+) -> bool:
+    """
+    Reconcile region brackets against canonical (conference champions + RS#1) when in
+    region weeks. Mutates ``franchise_doc`` in memory and persists the new
+    ``region_tournaments`` blob if anything changed. Returns ``True`` iff a write happened.
+
+    Runs on the play / complete-week entry points so a user who clicks Play (or whose
+    client posts complete-week) without first hitting ``/franchise/command-center/data``
+    cannot land on a half-built region bracket with placeholder TBD slots — the
+    placeholder rows would otherwise drop the user pair out of ``get_eos_week_games``,
+    causing the bracket-write invariant to fire.
+
+    Idempotent: ``reconcile_region_tournaments_with_canonical`` returns ``None`` when
+    nothing changed, in which case we skip the persist.
+    """
+    if week not in ft.EOS_REGION_WEEKS:
+        return False
+    if not franchise_doc.get("region_tournaments"):
+        return False
+    try:
+        franchise_oid = franchise_id if isinstance(franchise_id, ObjectId) else ObjectId(franchise_id)
+    except Exception:
+        return False
+    eos_team_ids = [
+        d["team_id"]
+        for d in franchise_team_data_collection.find({"franchise_id": franchise_oid}, {"team_id": 1})
+        if d.get("team_id") is not None
+    ]
+    if not eos_team_ids:
+        return False
+    updated_rt = ft.reconcile_region_tournaments_with_canonical(
+        franchise_doc, db.teams, eos_team_ids
+    )
+    if updated_rt is None:
+        return False
+    franchise_doc["region_tournaments"] = updated_rt
+    db.franchises.update_one({"_id": franchise_oid}, {"$set": {"region_tournaments": updated_rt}})
+    logger.warning(
+        "[EOS-REGION-RECONCILE] context=%s week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
+        context_label,
+        week,
+        str(franchise_oid),
+        True,
+        len(eos_team_ids),
+    )
+    return True
 
 
 def _resolve_complete_week_week_games(franchise_doc: dict, req: CompleteWeekRequest):
@@ -2778,6 +2875,16 @@ def _resolve_complete_week_week_games(franchise_doc: dict, req: CompleteWeekRequ
     eos_current_round = None
     week_games_meta = None
     if req.week in ft.EOS_WEEKS and eos_active:
+        # Reconcile region brackets before reading the slate so placeholder TBD slots
+        # cannot drop the user pair out of ``get_eos_week_games`` (which would trip
+        # the bracket-write invariant in ``_complete_week_process_user_game_block``).
+        # No-op outside region weeks; idempotent.
+        _maybe_reconcile_region_for_eos(
+            franchise_doc,
+            req.franchise_id,
+            week=int(req.week),
+            context_label="complete_week",
+        )
         # Full calendar slate for this EOS week (including matchups that already have a bracket winner).
         # Must match results[week] row count after phase A; omitting completed slots caused dedup vs
         # expected_matchups mismatch and phase-b HTTP 500.
@@ -2908,6 +3015,177 @@ def _save_user_eos_bracket_result(
     return g
 
 
+def _stamp_eos_meta_on_game_doc(
+    game_id: Any,
+    eos_g_meta: dict[str, Any],
+    franchise_id_str: str,
+) -> None:
+    """
+    Persist a copy of the resolved EOS bracket meta on the matching ``games`` document.
+
+    Once stamped, future ``complete-week`` retries, phase-b syncs, and repair tooling
+    can read the bracket slot directly off the game document via
+    ``_eos_meta_from_game_document`` without re-running slate matching against a
+    possibly-drifted ``franchise_doc``. No-op if ``game_id`` is empty.
+    """
+    if not game_id:
+        return
+    snapshot = {
+        "phase": eos_g_meta.get("phase"),
+        "round": eos_g_meta.get("round"),
+        "matchup_index": eos_g_meta.get("matchup_index"),
+        "away_id": str(eos_g_meta.get("away_id")) if eos_g_meta.get("away_id") is not None else None,
+        "home_id": str(eos_g_meta.get("home_id")) if eos_g_meta.get("home_id") is not None else None,
+        "franchise_id": franchise_id_str,
+    }
+    if eos_g_meta.get("conference") is not None:
+        snapshot["conference"] = eos_g_meta.get("conference")
+    if eos_g_meta.get("region") is not None:
+        snapshot["region"] = eos_g_meta.get("region")
+    try:
+        gid_str = str(game_id)
+        existing = db.games.find_one({"_id": gid_str})
+        if existing:
+            db.games.update_one({"_id": gid_str}, {"$set": {"eos_meta": snapshot}})
+            return
+        if ObjectId.is_valid(gid_str):
+            db.games.update_one({"_id": ObjectId(gid_str)}, {"$set": {"eos_meta": snapshot}})
+    except Exception as exc:
+        # Stamping is best-effort: failure must not block the user game from completing.
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] stamp_eos_meta_on_game_doc_failed game_id=%s err=%s",
+            game_id,
+            exc,
+        )
+
+
+def _eos_meta_from_game_document(req: CompleteWeekRequest) -> dict | None:
+    """
+    Read ``eos_meta`` off ``req.game_document`` if the game doc was stamped with one
+    at game-creation time (forward-compat with future ``play-next-game`` plumbing).
+
+    Required keys: ``phase``, ``round``, ``matchup_index``, plus ``conference`` (for
+    ``conference``) or ``region`` (for ``region``); plus ``away_id`` / ``home_id``.
+    """
+    gd = getattr(req, "game_document", None)
+    if not isinstance(gd, dict):
+        return None
+    raw = gd.get("eos_meta")
+    if not isinstance(raw, dict):
+        return None
+    phase = raw.get("phase")
+    if phase not in ("conference", "region", "national"):
+        return None
+    if "round" not in raw or "matchup_index" not in raw:
+        return None
+    if phase == "conference" and raw.get("conference") is None:
+        return None
+    if phase == "region" and raw.get("region") is None:
+        return None
+    if not raw.get("away_id") or not raw.get("home_id"):
+        return None
+    return dict(raw)
+
+
+def _resolve_user_eos_game_meta_or_raise(
+    *,
+    franchise_doc: dict,
+    req: CompleteWeekRequest,
+    week_games_meta: list | None,
+    user_team_id_str: Any,
+    team1_id: Any,
+    team2_id: Any,
+) -> dict | None:
+    """
+    Resolve the user's EOS bracket slot for this complete-week request.
+
+    Resolution order:
+      1. ``req.game_document.eos_meta`` (if a future writer stamped it at game start) —
+         single source of truth, immune to slate / week drift.
+      2. ``find_user_eos_game_meta`` against this week's slate (calendar + playable fallback).
+      3. ``find_eos_game_meta_for_team_pair`` against this week's slate (handles
+         ``user_team_id_str`` mismatches against bracket ids).
+
+    Hard invariant: when ``req.week`` is in ``EOS_WEEKS`` and the franchise has an
+    active EOS slate (``week_games_meta`` non-empty), one of the resolutions must
+    succeed. Otherwise we raise 409 instead of silently falling through to
+    ``_save_game_result`` (which would persist a score-only result and leave the
+    bracket cell empty). See ``Tournament_Execution_System.md`` §"User game bracket
+    write invariant".
+    """
+    eos_g_meta = _eos_meta_from_game_document(req)
+    if eos_g_meta is not None:
+        logger.warning(
+            "[EOS-BRACKET-DEBUG] eos_meta_from_game_document franchise_id=%s week=%s phase=%s",
+            str(franchise_doc.get("_id")),
+            req.week,
+            eos_g_meta.get("phase"),
+        )
+        return eos_g_meta
+
+    if not week_games_meta:
+        # EOS week but no slate: this should not happen during normal play; calendar
+        # finalize + sim-rest are responsible for keeping eos_tournament_active in sync
+        # with the bracket blobs. Refuse to persist score-only.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"EOS week {req.week} has no playable slate "
+                f"(eos_tournament_active=False or empty conference/region/national blobs). "
+                f"Reload the franchise command center to reconcile, then retry."
+            ),
+        )
+
+    eos_g_meta = ftp.find_user_eos_game_meta(
+        franchise_doc, week_games_meta, user_team_id_str, req.week
+    )
+    if not eos_g_meta:
+        eos_g_meta = ftp.find_eos_game_meta_for_team_pair(
+            week_games_meta, team1_id, team2_id
+        )
+        if eos_g_meta:
+            logger.warning(
+                "[EOS-BRACKET-DEBUG] eos_meta_resolved_by_pair franchise_id=%s week=%s "
+                "user_team_id_str=%s phase=%s",
+                str(franchise_doc.get("_id")),
+                req.week,
+                user_team_id_str,
+                eos_g_meta.get("phase"),
+            )
+
+    if not eos_g_meta:
+        try:
+            fr_w = int(franchise_doc.get("week") or 0)
+        except (TypeError, ValueError):
+            fr_w = 0
+        gw = _game_document_week_int(getattr(req, "game_document", None))
+        logger.error(
+            "[EOS-BRACKET-DEBUG] eos_meta_unresolved_in_eos_week franchise_id=%s "
+            "req_week=%s franchise_week=%s game_doc_week=%s user_team_id=%s "
+            "team1=%s team2=%s slate_n=%s",
+            str(franchise_doc.get("_id")),
+            req.week,
+            fr_w,
+            gw,
+            user_team_id_str,
+            team1_id,
+            team2_id,
+            len(week_games_meta),
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Could not resolve an EOS bracket slot for the user's game "
+                f"(franchise_id={req.franchise_id}, week={req.week}, "
+                f"team1={team1_id}, team2={team2_id}). Refusing to persist a "
+                f"score-only result that would leave the bracket cell empty. "
+                f"Reload the franchise command center to reconcile region brackets, "
+                f"or check that the franchise week matches the game being played."
+            ),
+        )
+    return eos_g_meta
+
+
 def _complete_week_process_user_game_block(
     franchise_doc: dict,
     req: CompleteWeekRequest,
@@ -2924,23 +3202,15 @@ def _complete_week_process_user_game_block(
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
     eos_g_meta = None
-    if req.week in ft.EOS_WEEKS and week_games_meta:
-        eos_g_meta = ftp.find_user_eos_game_meta(
-            franchise_doc, week_games_meta, user_team_id_str, req.week
+    if req.week in ft.EOS_WEEKS:
+        eos_g_meta = _resolve_user_eos_game_meta_or_raise(
+            franchise_doc=franchise_doc,
+            req=req,
+            week_games_meta=week_games_meta,
+            user_team_id_str=user_team_id_str,
+            team1_id=team1_id,
+            team2_id=team2_id,
         )
-        if not eos_g_meta:
-            eos_g_meta = ftp.find_eos_game_meta_for_team_pair(
-                week_games_meta, team1_id, team2_id
-            )
-            if eos_g_meta:
-                logger.warning(
-                    "[EOS-BRACKET-DEBUG] eos_meta_resolved_by_pair franchise_id=%s week=%s "
-                    "user_team_id_str=%s phase=%s",
-                    str(franchise_doc.get("_id")),
-                    req.week,
-                    user_team_id_str,
-                    eos_g_meta.get("phase"),
-                )
     if eos_g_meta:
         ftp.record_tournament_game_result(
             franchise_doc,
@@ -2954,6 +3224,10 @@ def _complete_week_process_user_game_block(
             team2_score=user.team2_score,
             source="user",
         )
+        # Stamp eos_meta on the games doc so future retries / phase-b syncs / repair
+        # tooling can read the bracket slot without re-running slate matching. Safe to
+        # do whether or not user_game_id is present — only persists when the doc exists.
+        _stamp_eos_meta_on_game_doc(user_game_id, eos_g_meta, str(req.franchise_id))
         user_res = {
             "team1_id": str(team1_id),
             "team2_id": str(team2_id),
@@ -3791,13 +4065,39 @@ def _eos_advance_all_conference_brackets_until_idle(franchise_doc: dict) -> int:
     return steps
 
 
-def _eos_heal_conference_eos_from_games(franchise_id: ObjectId, franchise_id_str: str) -> dict[str, Any]:
-    """
-    Backfill ``results`` + bracket from ``games`` for conference EOS weeks **≤ franchise.week**,
-    then advance all conference brackets as far as outcomes allow.
+def _eos_advance_national_bracket_until_idle(franchise_doc: dict) -> int:
+    """Repeatedly ``advance_national_bracket`` (R1→R2→final) until idle."""
+    steps = 0
+    for _ in range(4):
+        advanced, _ch = ftp.advance_national_bracket(franchise_doc)
+        if not advanced:
+            break
+        steps += 1
+    return steps
 
-    Runs at the start of ``complete_week_phase_b`` so a stuck **user semi** (week 28 meta) still
-    heals when ``franchise.week`` is already **29** (calendar ahead of bracket).
+
+# Region brackets do not have a separate "advance" step: ``save_region_game_result``
+# fills the final slot from R1 winners directly when each R1 cell is written, so
+# bracket-slot sync is sufficient to "advance" region. ``advance_region_bracket``
+# only reports the champion when the final has a winner.
+
+
+def _eos_heal_phase_from_games(
+    franchise_id: ObjectId,
+    franchise_id_str: str,
+    *,
+    weeks: tuple[int, ...],
+    bracket_field: str,
+    advance_until_idle,
+    log_label: str,
+) -> dict[str, Any]:
+    """
+    Generic EOS heal: backfill ``results`` rows + bracket slots from ``games`` for the
+    given ``weeks`` (filtered to ≤ franchise.week), then run ``advance_until_idle``.
+
+    Used by all three phases — conference, region, national. Persists ``results`` and
+    the relevant bracket field (``conference_tournaments`` / ``region_tournaments`` /
+    ``national_tournament``) only when something actually changed.
     """
     out: dict[str, Any] = {
         "did_work": False,
@@ -3811,28 +4111,31 @@ def _eos_heal_conference_eos_from_games(franchise_id: ObjectId, franchise_id_str
     cw = int(fresh.get("week") or 1)
     rows_total = 0
     slots_total = 0
-    for w in ft.EOS_CONFERENCE_WEEKS:
+    for w in weeks:
         if w > cw:
             continue
         rows_total += _eos_sync_missing_result_rows_from_games_for_week(franchise_id_str, fresh, int(w))
         slots_total += _eos_sync_bracket_slots_from_games_for_week(franchise_id_str, fresh, int(w))
-    ft.log_eos_conference_bracket_snapshot(fresh, f"eos_heal_pre_idle fid={franchise_id_str}")
-    adv_steps = _eos_advance_all_conference_brackets_until_idle(fresh)
-    ft.log_eos_conference_bracket_snapshot(fresh, f"eos_heal_post_idle fid={franchise_id_str}")
+    if log_label == "conference":
+        ft.log_eos_conference_bracket_snapshot(fresh, f"eos_heal_pre_idle fid={franchise_id_str}")
+    adv_steps = advance_until_idle(fresh) if advance_until_idle else 0
+    if log_label == "conference":
+        ft.log_eos_conference_bracket_snapshot(fresh, f"eos_heal_post_idle fid={franchise_id_str}")
     if rows_total == 0 and slots_total == 0 and adv_steps == 0:
         return out
     patch: dict[str, Any] = {}
     if rows_total:
         patch["results"] = fresh.get("results") or {}
     if slots_total or adv_steps:
-        patch["conference_tournaments"] = fresh.get("conference_tournaments") or {}
+        patch[bracket_field] = fresh.get(bracket_field) or ({} if bracket_field != "national_tournament" else {})
     db.franchises.update_one({"_id": franchise_id}, {"$set": patch})
     out["did_work"] = True
     out["results_rows_added"] = rows_total
     out["bracket_slots_synced"] = slots_total
     out["advance_steps"] = adv_steps
     logger.warning(
-        "🧭 [EOS-HEAL] franchise_id=%s calendar_week=%s results_rows_added=%s bracket_slots_synced=%s advance_steps=%s",
+        "🧭 [EOS-HEAL] phase=%s franchise_id=%s calendar_week=%s results_rows_added=%s bracket_slots_synced=%s advance_steps=%s",
+        log_label,
         franchise_id_str,
         cw,
         rows_total,
@@ -3840,6 +4143,81 @@ def _eos_heal_conference_eos_from_games(franchise_id: ObjectId, franchise_id_str
         adv_steps,
     )
     return out
+
+
+def _eos_heal_conference_eos_from_games(franchise_id: ObjectId, franchise_id_str: str) -> dict[str, Any]:
+    """
+    Backfill ``results`` + bracket from ``games`` for conference EOS weeks **≤ franchise.week**,
+    then advance all conference brackets as far as outcomes allow.
+
+    Runs at the start of ``complete_week_phase_b`` so a stuck **user semi** (week 28 meta) still
+    heals when ``franchise.week`` is already **29** (calendar ahead of bracket).
+    """
+    return _eos_heal_phase_from_games(
+        franchise_id,
+        franchise_id_str,
+        weeks=ft.EOS_CONFERENCE_WEEKS,
+        bracket_field="conference_tournaments",
+        advance_until_idle=_eos_advance_all_conference_brackets_until_idle,
+        log_label="conference",
+    )
+
+
+def _eos_heal_region_eos_from_games(franchise_id: ObjectId, franchise_id_str: str) -> dict[str, Any]:
+    """
+    Backfill ``results`` + bracket from ``games`` for region EOS weeks (30, 31).
+
+    Region final slots are filled in-line by ``save_region_game_result`` when R1 cells
+    are written, so the bracket-slot sync alone is enough to "advance" the bracket.
+    Mirrors ``_eos_heal_conference_eos_from_games`` so region/national user-game misses
+    self-heal at the start of the next phase-b instead of staying broken until manual
+    repair. Closes the heal-coverage gap that previously affected weeks 30–31.
+    """
+    return _eos_heal_phase_from_games(
+        franchise_id,
+        franchise_id_str,
+        weeks=ft.EOS_REGION_WEEKS,
+        bracket_field="region_tournaments",
+        advance_until_idle=None,
+        log_label="region",
+    )
+
+
+def _eos_heal_national_eos_from_games(franchise_id: ObjectId, franchise_id_str: str) -> dict[str, Any]:
+    """
+    Backfill ``results`` + bracket from ``games`` for national EOS weeks (32, 33, 34),
+    then advance the national bracket as far as outcomes allow.
+
+    Mirrors ``_eos_heal_conference_eos_from_games`` for national. Closes the
+    heal-coverage gap that previously affected weeks 32–34.
+    """
+    return _eos_heal_phase_from_games(
+        franchise_id,
+        franchise_id_str,
+        weeks=ft.EOS_NATIONAL_WEEKS,
+        bracket_field="national_tournament",
+        advance_until_idle=_eos_advance_national_bracket_until_idle,
+        log_label="national",
+    )
+
+
+def _eos_heal_all_eos_from_games(franchise_id: ObjectId, franchise_id_str: str) -> dict[str, Any]:
+    """
+    Run all three EOS heals (conference, region, national) and aggregate their summary.
+
+    Order matters: conference heal runs first because conference R1/R2/final winners
+    feed region brackets via ``initialize_region_tournaments``; region winners feed
+    national via ``initialize_national_tournament``. Heals are individually idempotent.
+    """
+    conf = _eos_heal_conference_eos_from_games(franchise_id, franchise_id_str)
+    region = _eos_heal_region_eos_from_games(franchise_id, franchise_id_str)
+    national = _eos_heal_national_eos_from_games(franchise_id, franchise_id_str)
+    return {
+        "did_work": bool(conf.get("did_work") or region.get("did_work") or national.get("did_work")),
+        "conference": conf,
+        "region": region,
+        "national": national,
+    }
 
 
 def _try_finalize_franchise_week_if_complete(
@@ -4694,7 +5072,7 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
         raise HTTPException(status_code=404, detail="Franchise not found")
 
     eos_heal_summary: dict[str, Any] | None = None
-    heal = _eos_heal_conference_eos_from_games(franchise_id, req.franchise_id)
+    heal = _eos_heal_all_eos_from_games(franchise_id, req.franchise_id)
     if heal.get("did_work"):
         franchise_doc = db.franchises.find_one({"_id": franchise_id}) or franchise_doc
         eos_heal_summary = heal

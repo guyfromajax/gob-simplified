@@ -53,6 +53,20 @@ Does **not** set franchise `week` by itself; records one matchup and may advance
 
 **Idempotency (summary):** same winner+scores replay → no-op (may fill `game_id`); `cpu_full` / `distant` won’t clobber a settled cell with a different outcome; user / existing_* can repair. CPU full-sim enqueue deduped per slot. Details: `get_eos_bracket_slot_snapshot`, `tests/test_franchise_tournament_progression.py`.
 
+### 3a. User game bracket write invariant
+
+`_complete_week_process_user_game_block` (in `franchise_routes.py`) **must** end up with a valid `eos_g_meta` whenever `req.week ∈ EOS_WEEKS` and the franchise has an active EOS slate. If it does not, the endpoint raises **HTTP 409** instead of falling through to `_save_game_result` (which would persist the score / `franchise.results` row but leave the bracket cell empty — the silent state that produced the historical "calendar advanced, bracket cell missing winner+game_id" symptom).
+
+Resolution order in `_resolve_user_eos_game_meta_or_raise`:
+
+1. **`req.game_document.eos_meta`** — single source of truth, locked at game start by `play-next-game` (forward-compat path; immune to slate / week drift).
+2. **`find_user_eos_game_meta`** — the calendar slate (`include_completed=True`) plus the playable fallback (per-tournament `current_round`, `include_completed=False`).
+3. **`find_eos_game_meta_for_team_pair`** — same slate, matched by team-id pair instead of user id (handles `user_team_id_str` mismatches against bracket ids).
+
+If all three miss, the helper logs `[EOS-BRACKET-DEBUG] eos_meta_unresolved_in_eos_week` with `req_week`, `franchise.week`, `game_doc.week`, `user_team_id`, `team1`, `team2`, and `slate_n`, then raises 409. This is intentional — losing the bracket write silently is worse than failing the request.
+
+**`eos_meta` on the game document.** Whenever a user game's bracket slot resolves successfully, `_stamp_eos_meta_on_game_doc` writes a snapshot (`phase`, `round`, `matchup_index`, `away_id`, `home_id`, plus `conference` / `region`) onto `db.games.{_id}.eos_meta`. Future retries, phase-b syncs, and repair tooling can read the bracket slot directly off the game document — no slate matching, no week-drift sensitivity. `play-next-game`'s response also surfaces `eos_meta` for FE plumbing into `req.game_document` (see step 1 above).
+
 ---
 
 ## 4. Calendar week advance (franchise EOS)
@@ -83,7 +97,7 @@ Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); m
 
 **Bye:** champion == RS #1 for a conference → that side can skip to **region final** (possibly **no R1** rows, **final** with two real teams).
 
-**Reconcile:** `reconcile_region_tournaments_with_canonical` — replace or patch incomplete unplayed slots from canonical; runs on **FCC load** and **sim-rest** in region weeks. Prevents empty `get_eos_week_games` when Mongo had half-filled “TBD” rows.
+**Reconcile:** `reconcile_region_tournaments_with_canonical` — replace or patch incomplete unplayed slots from canonical. Runs on **FCC load**, **sim-rest**, **`POST /franchise/play-next-game`** (region weeks), and **`_resolve_complete_week_week_games`** (region weeks). The play / complete-week entry-point reconciles were added so a user who clicks Play without first hitting `/franchise/command-center/data` cannot land on a half-built region bracket whose placeholder `R1_0`/`R1_1` slots would drop their pair out of `get_eos_week_games` and trip the bracket-write invariant. Helper: `_maybe_reconcile_region_for_eos(franchise_doc, franchise_id, week=, context_label=)` (idempotent: persists only when something actually changed; logs `[EOS-REGION-RECONCILE] context=<label>`).
 
 ---
 
@@ -103,16 +117,46 @@ Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); m
 |---------|------|
 | **`GET /franchise/command-center/data`** | Reconcile regions when needed; `offer_sim_rest`, `user_eliminated`, derived `eos_tournament` for **user’s region** display. |
 | **`offer_sim_rest`** | Requires non-empty **`get_eos_week_games(..., include_completed=False)`** for that `week` among other flags. |
+| **`POST /franchise/play-next-game`** | Reconcile region (region weeks) → `get_eos_week_games(..., include_completed=False)` → resolve user matchup. Returns `{home, away, week, home_id, away_id, eos_meta}`. `eos_meta` carries `{phase, round, matchup_index, away_id, home_id, conference|region}` so FE can plumb it through to `complete-week`. |
 | **`POST /franchise/sim-rest-of-tournament`** | Reconcile → meta list → sim → `_eos_calendar_advance_update_fields`. |
-| **`POST /franchise/complete-week`** | Finalize → `_eos_calendar_advance_update_fields` when in EOS. |
+| **`POST /franchise/complete-week`** & **`/complete-week/phase-a`** | Harden `req.week` (future-week guard + symmetric `game_document.week` trust) → reconcile region (region weeks) → resolve user EOS slot via `_resolve_user_eos_game_meta_or_raise` (raises 409 if EOS week and slot is unresolvable) → record bracket + `_eos_calendar_advance_update_fields` when finalizing. |
+| **`POST /franchise/complete-week/phase-b`** | `_eos_heal_all_eos_from_games` (conference + region + national) → resolve / sync → finalize → `_eos_calendar_advance_update_fields`. |
 | **`POST /franchise/sim-championship`** | National final only; do not double-advance national (see inventory). |
 
 ---
 
 ## 8. Operational logging
 
-- **`[EOS-REGION-RECONCILE]`** — `context=fcc` \| `sim_rest`, `week`, `franchise_id`, `persisted`, `ftd_team_count`.
+- **`[EOS-REGION-RECONCILE]`** — `context=fcc` \| `sim_rest` \| `play_next_game` \| `complete_week`, `week`, `franchise_id`, `persisted`, `ftd_team_count`.
 - **`[EOS-SIM-REST] empty_meta`** — right before sim-rest **400**.
+- **`[COMPLETE-WEEK-WEEK-HARDEN]`** — `req.week=<n> > franchise.week=<m>` (future-week coalesce); `eos_trust_game_document week req=<rw> doc=<gw> franchise.week=<fr_w> direction=<doc_behind|doc_ahead>` (symmetric); `no_slate_match_either_week` (downstream raise expected).
+- **`[EOS-BRACKET-DEBUG] eos_meta_from_game_document`** — bracket slot taken from `req.game_document.eos_meta` (slate matching skipped).
+- **`[EOS-BRACKET-DEBUG] eos_meta_resolved_by_pair`** — slate primary missed, team-pair fallback hit.
+- **`[EOS-BRACKET-DEBUG] eos_meta_unresolved_in_eos_week`** — emitted at `logger.error` immediately before the 409 raise; includes `req_week`, `franchise_week`, `game_doc_week`, `user_team_id`, `team1`, `team2`, `slate_n`. This is the first log to grep when a phase-a / complete-week request fails 409.
+- **`[EOS-HEAL] phase=<conference|region|national>`** — emitted by each per-phase heal at the start of phase-b when work was done; carries `results_rows_added`, `bracket_slots_synced`, `advance_steps`.
+
+---
+
+## 8a. EOS self-heal at phase-b (conference + region + national)
+
+`complete_week_phase_b` runs `_eos_heal_all_eos_from_games` *before* it touches `franchise_doc`, so the user-game / CPU-game cells that landed in `db.games` and `franchise.results` but never made it to the bracket get backfilled before phase-b advances anything. Three per-phase variants share the same generic `_eos_heal_phase_from_games` helper and sync the same way:
+
+| Phase | Helper | Bracket field | Advance step |
+|-------|--------|---------------|--------------|
+| Conference (27, 28, 29) | `_eos_heal_conference_eos_from_games` | `conference_tournaments` | `_eos_advance_all_conference_brackets_until_idle` |
+| Region (30, 31) | `_eos_heal_region_eos_from_games` | `region_tournaments` | none — `save_region_game_result` fills `final` from R1 winners in-line |
+| National (32, 33, 34) | `_eos_heal_national_eos_from_games` | `national_tournament` | `_eos_advance_national_bracket_until_idle` |
+
+For each EOS week ≤ `franchise.week`:
+
+1. `_eos_sync_missing_result_rows_from_games_for_week` — append a `franchise.results.{week}` row for any matchup with a `db.games` doc but no results row (fixes W/L display when the user game hit `games` + bracket but never landed in `franchise.results`).
+2. `_eos_sync_bracket_slots_from_games_for_week` — for any unwon bracket cell whose meta row matches a `db.games` doc, write `winner` / `score` / `game_id` from that doc via `_sync_eos_bracket_from_existing_game_doc` → `record_tournament_game_result(source="existing_games")`.
+3. Run the phase-specific advance until idle (conference / national); for region the bracket fills `final` slots automatically when the R1 cells are written.
+4. Persist `results` and the relevant bracket field only when something changed. Idempotent.
+
+The aggregate `_eos_heal_all_eos_from_games` runs all three in dependency order (conference → region → national) and returns `{did_work, conference, region, national}`. Phase-b uses `did_work` to decide whether to reload `franchise_doc` from Mongo before continuing.
+
+**Why all three.** A user game whose bracket write was missed during phase-a (e.g. 409 followed by a manual override, or a legacy run before the invariant landed) used to self-heal only for conference. Region (30–31) and national (32–34) misses stayed broken until manual repair. The heal-coverage extension closes that gap.
 
 ---
 
@@ -163,6 +207,7 @@ Used by: **Tournament mode**, franchise **conference** (×16), franchise **natio
 | Region week 30 meta | `tests/test_eos_region_week30_meta.py` |
 | Region reconcile | `tests/test_region_tournament_reconcile.py` |
 | FCC / sim policy | `tests/test_franchise_eos_sim_policy.py` |
+| User-game bracket-write invariant + symmetric harden + region/national heal + `eos_meta` on game doc | `tests/test_franchise_eos_bracket_invariant.py` |
 | Tournament mode | `tests/test_tournament_*` |
 
 ---
@@ -177,3 +222,5 @@ Used by: **Tournament mode**, franchise **conference** (×16), franchise **natio
 ## 14. Historical note
 
 Franchise EOS was once documented as a **single** embedded `eos_tournament` over weeks **15–17**; production is **multi-phase 27–34** on `conference_tournaments` / `region_tournaments` / `national_tournament`. This file is the **canonical** tournament doc under the name **`Tournament_Execution_System.md`** (content was consolidated from a short-lived **`Current_Tournament_System.md`** and obsolete material from an older doc generation was removed).
+
+Earlier iterations of `_complete_week_process_user_game_block` silently fell through to `_save_game_result` when the EOS slate did not contain the user pair, producing a calendar-advanced-but-bracket-empty state. That fall-through is now a hard 409 (§3a). A symmetric form of `_harden_complete_week_request_week` (§7 / §8) and three-phase `_eos_heal_all_eos_from_games` (§8a) close the same class of failure across all EOS phases. A snapshot `eos_meta` on the game document (§3a) is the forward-compat single source of truth for the bracket slot — `play-next-game` already returns it; the FE plumbing into `req.game_document.eos_meta` is the next step.
