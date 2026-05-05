@@ -115,6 +115,41 @@ def test_week30_all_eight_regions_mixed_double_bye_and_full():
     assert len(r1_week30) == 8
 
 
+def test_week30_round1_nonempty_but_no_playable_r1_still_surfaces_final():
+    """Legacy / odd shapes: round1 rows exist but none are real R1 games; final is ready."""
+    t1, t2 = _tid(), _tid()
+    franchise_doc = {
+        "region_tournaments": {
+            "E": {
+                "round1": [
+                    {
+                        "away_team": "R1_0",
+                        "home_team": "R1_1",
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                ],
+                "final": [
+                    {
+                        "away_team": t1,
+                        "home_team": t2,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    }
+                ],
+                "current_round": 1,
+            },
+        }
+    }
+    games = ft.get_eos_week_games(franchise_doc, 30, include_completed=False)
+    assert len(games) == 1
+    assert games[0]["round"] == 2
+    assert str(games[0]["away_id"]) == t1
+    assert str(games[0]["home_id"]) == t2
+
+
 def test_week30_include_completed_skips_won_final():
     t1, t2 = _tid(), _tid()
     franchise_doc = {

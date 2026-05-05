@@ -4,7 +4,7 @@ Living reference for **who mutates** franchise postseason state (`week` 27–35,
 
 ## Region week 30 (calendar) vs meta
 
-`get_eos_week_games(..., week=30)` lists **region R1** matchups from each region’s `round1`. When **both** feeder conferences are double-bye, `round1` is **empty** but `final[0]` already has two real teams — that final is **included** in week 30 meta as **round 2** (same shape as week 31) so `sim-rest` / `play-next` / status code never see an empty round.
+`get_eos_week_games(..., week=30)` lists **region R1** matchups from each region’s `round1`. When there is **no playable R1** for a region (empty `round1`, or only `R1_*` / invalid rows) but `final[0]` already has two real teams, that final is **included** in week 30 meta as **round 2** (same shape as week 31) so `sim-rest` / `play-next` / status code never see an empty round.
 
 ## Core primitives (intended single doors)
 
