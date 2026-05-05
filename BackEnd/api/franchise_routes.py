@@ -2689,6 +2689,82 @@ def _merge_phase_a_user_row_into_week_results(
     return merged
 
 
+def _game_document_week_int(game_document: dict | None) -> int | None:
+    if not isinstance(game_document, dict):
+        return None
+    raw = game_document.get("week")
+    if raw is None:
+        return None
+    try:
+        w = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return w if w >= 1 else None
+
+
+def _harden_complete_week_request_week(
+    franchise_doc: dict, req: CompleteWeekRequest
+) -> CompleteWeekRequest:
+    """
+    Use franchise.week when the client sends a future week (stale URL / localStorage),
+    and optionally prefer game_document.week when the EOS slate for req.week does not
+    contain this matchup but an earlier EOS week does (franchise.week already advanced
+    without a bracket write).
+    """
+    try:
+        fr_w = int(franchise_doc.get("week") or 0) or 1
+    except (TypeError, ValueError):
+        fr_w = 1
+    rw = int(req.week)
+
+    if rw > fr_w:
+        logger.warning(
+            "[COMPLETE-WEEK-WEEK-HARDEN] req.week=%s > franchise.week=%s; coalescing to franchise.week",
+            rw,
+            fr_w,
+        )
+        return CompleteWeekRequest(
+            franchise_id=req.franchise_id,
+            week=fr_w,
+            result=req.result,
+            game_id=req.game_id,
+            game_document=req.game_document,
+        )
+
+    gw = _game_document_week_int(req.game_document)
+    if (
+        gw is not None
+        and gw in ft.EOS_WEEKS
+        and rw in ft.EOS_WEEKS
+        and gw < rw
+    ):
+        t1 = _normalize_team_id(req.result.team1_id)
+        t2 = _normalize_team_id(req.result.team2_id)
+        try:
+            meta_rw = ft.get_eos_week_games(franchise_doc, rw, include_completed=True)
+            meta_gw = ft.get_eos_week_games(franchise_doc, gw, include_completed=True)
+        except Exception:
+            return req
+        has_rw = ftp.find_eos_game_meta_for_team_pair(meta_rw, t1, t2) is not None
+        has_gw = ftp.find_eos_game_meta_for_team_pair(meta_gw, t1, t2) is not None
+        if not has_rw and has_gw:
+            logger.warning(
+                "[COMPLETE-WEEK-WEEK-HARDEN] eos_trust_game_document week req=%s doc=%s franchise.week=%s",
+                rw,
+                gw,
+                fr_w,
+            )
+            return CompleteWeekRequest(
+                franchise_id=req.franchise_id,
+                week=gw,
+                result=req.result,
+                game_id=req.game_id,
+                game_document=req.game_document,
+            )
+
+    return req
+
+
 def _resolve_complete_week_week_games(franchise_doc: dict, req: CompleteWeekRequest):
     schedule = franchise_doc.get("schedule", [])
     eos_active = bool(
@@ -4340,6 +4416,8 @@ def complete_week(req: CompleteWeekRequest):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
+    req = _harden_complete_week_request_week(franchise_doc, req)
+
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
 
@@ -4436,6 +4514,8 @@ def complete_week_phase_a(req: CompleteWeekRequest):
     franchise_doc = db.franchises.find_one({"_id": franchise_id})
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
+
+    req = _harden_complete_week_request_week(franchise_doc, req)
 
     if _phase_a_user_week_done(franchise_doc, req.week):
         wk = str(req.week)

@@ -10,7 +10,7 @@
 - **Team names:** `teamIdNameMap` is populated from `/tournament/team-stats` (response `teams`: each has `team_id`, `team`). Used for schedule, bracket, and scouting. Bracket tab passes this map and options (results, getLogo, isUserTeam) into the shared renderer.
 - **Layout:** Container `#bracket` has class **`bracket`**; `tournament.css` provides grid (`.bracket`), round columns (`.round-1` … `.round-5`), matchup wrappers, team entries, logos.
 
-**Related:** `docs/To Do/Archive/tournament_eos_bracket_merge_plan.md` §9; `Tournament_Execution_System.md` (Tournament display).
+**Related:** `docs/To Do/Archive/tournament_eos_bracket_merge_plan.md` §9; `06_GMO_Supporting_Systems/Tournament_Execution_System.md` §11 (bracket UI).
 
 ---
 

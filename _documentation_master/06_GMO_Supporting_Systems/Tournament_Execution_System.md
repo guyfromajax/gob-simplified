@@ -1,116 +1,179 @@
 # Tournament Execution System
 
-**Location:** `BackEnd/tournament/bracket_engine.py`, `eos_tournament.py`, `bracket_logic.py`, `tournament_manager.py`  
-**Status:** ✅ Bracket engine added; **EOS** and **Tournament mode** both use it. ObjectId strings everywhere; name resolution at API edges.  
-**Scope:** 8-team single-elimination bracket flow for **Tournament mode** (standalone) and **Franchise EOS** (weeks 15–17).
+**Purpose:** Single handoff reference for (1) **franchise multi-phase EOS** (weeks **27–35**), (2) the **shared 8-team bracket engine** used by conference + national + **Tournament mode**, and (3) **bracket UI** (FCC / TCC). Pair with `EOS_Write_Path_Inventory.md` for “who writes what” during EOS.
+
+**Primary code — franchise EOS:**  
+`BackEnd/tournament/franchise_tournament.py`,  
+`BackEnd/tournament/franchise_tournament_progression.py`,  
+`BackEnd/api/franchise_routes.py`.
+
+**Primary code — shared engine + Tournament mode:**  
+`BackEnd/tournament/bracket_engine.py`,  
+`BackEnd/tournament/tournament_manager.py`,  
+`BackEnd/tournament/bracket_logic.py`,  
+`eos_tournament.py` (legacy / standalone EOS helpers where still referenced).
+
+**Companion:** `EOS_Write_Path_Inventory.md` — EOS write-path matrix; new paths should use **`record_tournament_game_result`** + **`_eos_calendar_advance_update_fields`** (except championship-only tails like `sim-championship`).
+
+**Team identifiers:** Bracket cells use **ObjectId strings** (hex). Resolve names at API / UI boundaries.
 
 ---
 
-## Overview
+## 1. Franchise EOS calendar (`week`)
 
-The Tournament Execution System runs the bracket lifecycle: **init** → **save result** → **advance** → **next game**. A shared **bracket engine** (`bracket_engine.py`) implements bracket generation, result recording, and round advancement. Tournament mode and Franchise EOS use the same logic; they differ only by **seeding** (random vs standings) and **persistence** (`tournaments` vs `franchise.eos_tournament`).
+| Franchise `week` | Phase | Bracket data on franchise doc |
+|------------------|--------|--------------------------------|
+| 1–26 | Regular season | (no EOS blobs) |
+| **27–29** | Conference EOS | `conference_tournaments` (16 keys `"1"`…`"16"`), each with `bracket`, `current_round`, `seeds`, `champion` |
+| **30–31** | Region EOS | `region_tournaments` (keys **`A`–`H`**; conferences 1–2 → `A`, … 15–16 → `H`) |
+| **32–34** | National EOS | `national_tournament` (`bracket`, `current_round`, `champion`) |
+| **35+** | Post-EOS / offseason | `eos_tournament_active` **false** after national champion |
 
-**Team identifiers:** All bracket logic uses **ObjectId strings** (hex). Use `ObjectId` only at DB boundaries.
+**Flag:** `eos_tournament_active` — set **true** when conference brackets initialize (end of week **26** closure); set **false** when national champion is decided.
+
+Constants: `EOS_CONFERENCE_WEEKS`, `EOS_REGION_WEEKS`, `EOS_NATIONAL_WEEKS`, `EOS_WEEKS` in `franchise_tournament.py`.
 
 ---
 
-## Shared Bracket Engine
+## 2. Franchise document fields (progression)
 
-**Module:** `BackEnd/tournament/bracket_engine.py`
+- **`week`** — Advanced only through finalize / sim-rest / sim-championship paths during EOS, not ad hoc.
+- **`results[str(w)]`** — Result rows for that calendar week (EOS included).
+- **`conference_tournaments`** — Per-conference **8-team** bracket (uses **`bracket_engine`**): `bracket` (`round1` / `round2` / `final`), `current_round`, `seeds`, `champion`.
+- **`region_tournaments`** — Custom 4-team region shape per letter; `R1_0` / `R1_1` placeholders in `final` until R1 resolves.
+- **`national_tournament`** — **8-team** bracket for region winners (`bracket_engine`).
+- **`eos_tournament_active`**, **`games`** — As in inventory; bracket + `results` + `games` should stay aligned (repair/heal when not).
 
-### Functions
+---
+
+## 3. Single game write funnel + idempotency (franchise EOS)
+
+**Entry:** `franchise_tournament_progression.record_tournament_game_result(...)`  
+Does **not** set franchise `week` by itself; records one matchup and may advance conference/national helpers in memory.
+
+**Idempotency (summary):** same winner+scores replay → no-op (may fill `game_id`); `cpu_full` / `distant` won’t clobber a settled cell with a different outcome; user / existing_* can repair. CPU full-sim enqueue deduped per slot. Details: `get_eos_bracket_slot_snapshot`, `tests/test_franchise_tournament_progression.py`.
+
+---
+
+## 4. Calendar week advance (franchise EOS)
+
+**Function:** `_eos_calendar_advance_update_fields` in `franchise_routes.py`.  
+**Called from:** `_finalize_franchise_week_after_cpu_games`, **`POST /franchise/sim-rest-of-tournament`**.
+
+Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); mutates `franchise_doc` in memory. Does not set `results` / training (caller merges).
+
+**By `completed_week` (read `franchise_routes._eos_calendar_advance_update_fields` for truth):**
+
+- **27, 28:** advance all 16 conference brackets; `week` → next conference week; persist `conference_tournaments`.
+- **29:** same advances, then **`initialize_region_tournaments`**, set **`region_tournaments`**, `week` → **30**.
+- **30:** `week` → **31**; persist `region_tournaments` from mutated doc.
+- **31:** **`initialize_national_tournament`**, set **`national_tournament`**, `week` → **32**.
+- **32, 33:** `advance_national_bracket`; bump `week` toward **34**.
+- **34:** advance national; on **final** completion set **`eos_tournament_active`: false**, **`week`: 35**.
+
+**Week 26 → 27:** `_finalize_franchise_week_after_cpu_games` initializes `conference_tournaments`, sets `eos_tournament_active`, `week` → **27** (not inside `_eos_calendar_advance_update_fields`).
+
+**Training:** `_training_status_reset_after_advance_to_week` merged into finalize/sim-rest `$set` when leaving EOS weeks.
+
+---
+
+## 5. Region brackets: build, bye, reconcile
+
+**Build:** `initialize_region_tournaments` → `_build_region_bracket` from conference **champion** + **RS #1** (#1 seed in `seeds`, or inferred from `bracket.round1[0].home_team` if `seeds` missing).
+
+**Bye:** champion == RS #1 for a conference → that side can skip to **region final** (possibly **no R1** rows, **final** with two real teams).
+
+**Reconcile:** `reconcile_region_tournaments_with_canonical` — replace or patch incomplete unplayed slots from canonical; runs on **FCC load** and **sim-rest** in region weeks. Prevents empty `get_eos_week_games` when Mongo had half-filled “TBD” rows.
+
+---
+
+## 6. `get_eos_week_games`
+
+`franchise_tournament.get_eos_week_games(franchise_doc, week, include_completed=False)`.
+
+- **Conference:** playable mode uses each conference’s **`current_round`** (not global week) so slow brackets still list R1 after calendar advances.
+- **Region week 30:** real R1 matchups; if **no** playable R1 but **`final[0]`** has two real teams, emit that final as **round 2** (double-bye path).
+- **Region week 31:** finals. **National:** same calendar vs `current_round` pattern as conference.
+
+---
+
+## 7. HTTP / UX (franchise EOS)
+
+| Surface | Role |
+|---------|------|
+| **`GET /franchise/command-center/data`** | Reconcile regions when needed; `offer_sim_rest`, `user_eliminated`, derived `eos_tournament` for **user’s region** display. |
+| **`offer_sim_rest`** | Requires non-empty **`get_eos_week_games(..., include_completed=False)`** for that `week` among other flags. |
+| **`POST /franchise/sim-rest-of-tournament`** | Reconcile → meta list → sim → `_eos_calendar_advance_update_fields`. |
+| **`POST /franchise/complete-week`** | Finalize → `_eos_calendar_advance_update_fields` when in EOS. |
+| **`POST /franchise/sim-championship`** | National final only; do not double-advance national (see inventory). |
+
+---
+
+## 8. Operational logging
+
+- **`[EOS-REGION-RECONCILE]`** — `context=fcc` \| `sim_rest`, `week`, `franchise_id`, `persisted`, `ftd_team_count`.
+- **`[EOS-SIM-REST] empty_meta`** — right before sim-rest **400**.
+
+---
+
+## 9. Shared 8-team bracket engine (`bracket_engine.py`)
+
+Used by: **Tournament mode**, franchise **conference** (×16), franchise **national** (×1). **Not** used for the custom **region** 4-team layout (`region_tournaments`).
 
 | Function | Purpose |
 |----------|---------|
-| `get_round_name(round_num)` | Maps 1 → `round1`, 2 → `round2`, 3 → `final`. |
-| `generate_bracket(seed_order)` | Builds round-1 bracket from an ordered list of 8 ObjectId strings (seeds 1–8). Matchups: 1v8, 4v5, 2v7, 3v6. Returns `{round1, round2, final}`; round2/final start empty. |
-| `save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score?)` | Updates one matchup in `bracket` (game_id, winner, score). Mutates in place; no DB. |
-| `advance_bracket(bracket, current_round, *, winners_from_matchups=True, results=None)` | Derives winners for the current round (from matchups or from `results`), builds the next round (0+1→semi 0, 2+3→semi 1; semis→final). Mutates `bracket`. Returns `(bracket, next_round, completed, champion)`. |
+| `get_round_name(round_num)` | 1 → `round1`, 2 → `round2`, 3 → `final`. |
+| `generate_bracket(seed_order)` | 8 ObjectId strings, seeds 1–8. Matchups: **1v8, 4v5, 2v7, 3v6**. Returns `{round1, round2, final}`; `round2` / `final` start empty. |
+| `save_game_result(...)` | Sets `game_id`, `winner`, `score` on one matchup; mutates bracket in place. |
+| `advance_bracket(...)` | Completes current round from winners, fills next round; returns `(bracket, next_round, completed, champion)`. |
 
-### Bracket Shape
+**Matchup shape:** `{home_team, away_team, game_id, winner, score}` — team fields as ObjectId strings.
 
-- **Keys:** `round1`, `round2`, `final`.
-- **Matchup:** `{home_team, away_team, game_id, winner, score}`. All team fields are ObjectId strings.
-
-### Round Progression
-
-1. **Round 1 (Quarterfinals):** 4 games → 4 winners.
-2. **Round 2 (Semifinals):** 2 games (winners 0+1, 2+3) → 2 winners.
-3. **Round 3 (Final):** 1 game → champion.
+**Rounds:** R1 (4 games) → R2 (2) → final (1) → champion.
 
 ---
 
-## Seeding
+## 10. Tournament mode (standalone)
 
-| Mode | Source | Output |
-|------|--------|--------|
-| **Tournament** | Random shuffle of 8 teams. | Ordered list of 8 ObjectId strings → `generate_bracket(seed_order)`. |
-| **Franchise EOS** | Standings from `franchise.results` (W, PF–PA, tiebreaker). Top 8. | Same → `generate_bracket(seed_order)`. |
-
-Seeding is mode-specific; bracket generation from `seed_order` is shared.
-
-**EOS results must include week 14.** `initialize_eos_tournament` uses `franchise_doc.get("results", {})` to compute standings. When `complete_week` runs for week 14, it builds `existing_results` (weeks 1–13 + week 14) and sets `franchise_doc["results"] = existing_results` **before** calling `initialize_eos_tournament`, so seeding uses full regular-season results. Without that, EOS would seed from weeks 1–13 only.
+| Topic | Detail |
+|-------|--------|
+| **Storage** | `tournaments` collection: `bracket`, `current_round`, seeds, etc. |
+| **Seeding** | Random shuffle of 8 teams → `generate_bracket(seed_order)`. |
+| **Flow** | Init bracket → `save_game_result` per finished game → `advance_bracket` when round complete → persist via routes / `TournamentManager`. |
+| **Code** | `tournament_manager.py`, `bracket_logic.update_bracket_from_results`, tournament routes. |
 
 ---
 
-## Persistence
+## 11. Bracket UI (FCC + TCC)
 
-| Mode | Storage | Load / Save |
-|------|---------|-------------|
-| **Tournament** | `tournaments` collection. Bracket in `bracket`, round in `current_round`, etc. | Routes load/save tournament doc; call engine; persist. |
-| **Franchise EOS** | `franchise.eos_tournament` (embedded). Same shape. | Franchise routes load/save franchise doc; call engine; persist. |
-
-The engine does not touch the DB. Callers read bracket/state → run engine → write back.
+- **Shared renderer:** `FrontEnd/static/bracket.js` — `renderBracketShared(container, bracketData, teamIdToNameMap, options)`. Same layout as `tournament.css` `.bracket` grid.
+- **FCC Tournament tab:** id→name from `/franchise/team-stats`; container `#tournament-bracket-container`; seeds from `eos_tournament` / bracket payload.
+- **TCC Bracket tab:** id→name from `/tournament/team-stats`; same `renderBracketShared` with TCC options.
+- **IDs in API**, names on client; schedule / scouting resolve ObjectIds via the same maps.
 
 ---
 
-## Flow (Same for Both Modes)
+## 12. Tests (non-exhaustive)
 
-1. **Init:** Produce `seed_order` (8 ObjectId strings). Call `generate_bracket(seed_order)` → initial `{round1, round2, final}`. Store in mode-specific doc with `current_round=1`, `completed=False`, `champion=None`.
-2. **Play game:** User (or sim) plays a matchup. On completion, call `save_game_result(bracket, round_num, matchup_index, game_id, winner_id, score)`. Persist updated bracket.
-3. **Advance:** After each result (or batch), call `advance_bracket(...)`. If the current round is complete, engine fills the next round and updates `current_round`. If final is complete, `completed=True`, `champion=winner`. Persist.
-4. **Next game:** Determine user’s matchup from bracket + `current_round`; return it for play. Repeat until `completed`.
-
-### EOS week transition (15 → 16 → 17)
-
-- **`complete_week`** allows weeks 15–17 when `eos_tournament_active` and `eos_tournament` exist. “Week games” come from the **bracket** (current round), not the schedule. Same flow as regular season: user’s game first, then **sim the other matchups** in that round, save each to the bracket via `save_tournament_game_result`, then advance. When the round advances, set `franchise.week = 14 + new_round`; otherwise keep `week` unchanged.
-- **`/franchise/sim-rest-of-tournament`** sims incomplete matchups in the current round, saves results, then advances. When the round advances, it also sets `franchise.week = 14 + new_round` in the same `$set` as `eos_tournament`.
-
-### User eliminated (EOS)
-
-When the user **loses** an EOS game (quarters, semis, or final):
-
-1. **Training disabled:** Set `training_status.training_disabled_for_eos = true` on the franchise. Training is disabled for all remaining EOS weeks. `POST /franchise/run-training` returns 400 when that flag is set and `week >= 15`. The FCC never shows “Run Training” when eliminated; it shows **“Sim Rest Of Tournament”** or **“Finish Current Season”**.
-2. **Sim Rest Of Tournament:** If there are rounds remaining (1 or 2), the UI shows a **“Sim Rest Of Tournament”** button (same pattern as Tournament mode “Sim Remaining”). Clicking it calls `POST /franchise/sim-rest-of-tournament` to sim remaining games and advance until the tournament is complete.
-3. **Finish Season:** When the tournament is complete (`eos_tournament.completed` and `week >= 17`), the UI shows **“Finish Current Season”** instead.
-
-`GET /franchise/command-center/data` returns `user_eliminated`, `offer_sim_rest`, and `training_disabled_for_eos` so the frontend can drive the Play button and hide training.
+| Area | Files |
+|------|--------|
+| Bracket engine | `tests/test_bracket_engine.py` |
+| EOS + engine integration | `tests/test_eos_bracket_engine_integration.py` |
+| Franchise EOS recording | `tests/test_franchise_tournament_progression.py` |
+| Region week 30 meta | `tests/test_eos_region_week30_meta.py` |
+| Region reconcile | `tests/test_region_tournament_reconcile.py` |
+| FCC / sim policy | `tests/test_franchise_eos_sim_policy.py` |
+| Tournament mode | `tests/test_tournament_*` |
 
 ---
 
-## Tests
+## 13. Related / archive
 
-| File | Coverage |
-|------|----------|
-| `tests/test_bracket_engine.py` | `get_round_name`, `generate_bracket` (shape, 1v8/4v5/2v7/3v6), `save_game_result`, `advance_bracket` (round1→2→3→completed, champion). |
-| `tests/test_eos_bracket_engine_integration.py` | EOS init → save result → advance (round1→2→3→champion) using shared engine; mock teams, no DB. |
-| `tests/test_tournament_*` | Tournament init, save-result, simulate-round, sim-rest, bracket update; use `seed_teams_ah` and ObjectId-aware assertions. |
+- `docs/To Do/Archive/tournament_eos_bracket_merge_plan.md` — historical merge plan.
+- `EOS_Write_Path_Inventory.md` — EOS writers.
 
 ---
 
-## Related
+## 14. Historical note
 
-- **Merge plan:** `docs/To Do/Archive/tournament_eos_bracket_merge_plan.md` — full refactor plan (engine, EOS swap, Tournament ObjectIds).
-- **EOS:** `eos_tournament.initialize_eos_tournament` (standings → seeds → `bracket_engine.generate_bracket`), `save_tournament_game_result` → `bracket_engine.save_game_result` + results append, `advance_tournament_round` → `bracket_engine.advance_bracket` (winners from matchups). **Refactor complete.** Caller sets `franchise_doc["results"] = existing_results` (including week 14) before init so seeding uses full results.
-- **Tournament init:** `TournamentManager.create_tournament` uses `bracket_engine.generate_bracket(seed_order)` with ObjectId strings. `bracket_logic.update_bracket_from_results` uses `advance_bracket` (results or matchups). Save-result and sim-round resolve winner/team names ↔ ObjectIds at API edges; `_bracket_for_aggregator` converts bracket to name-based for team-stats aggregator.
-
-### Tournament display (frontend)
-
-Tournament UI follows the Franchise pattern: **IDs in API**, **client-side resolution** for display.
-
-- **Shared bracket renderer:** FCC (Franchise EOS Tournament tab) and TCC (Tournament Bracket tab) both use **`FrontEnd/static/bracket.js`** — `renderBracketShared(container, bracketData, teamIdToNameMap, options)`. Same DOM (5-column grid, matchups, logos, seeds, scores) and same layout (`tournament.css` `.bracket` grid). Only the source of the id→name map and options differ.
-- **TCC Bracket tab:** `teamIdNameMap` built from `/tournament/team-stats` (each team has `team_id`, `team`). Cleared and repopulated when team-stats load; used for schedule, bracket, and scouting. Bracket tab calls `renderBracketShared` with that map and TCC options (results, getLogo, isUserTeam).
-- **FCC Tournament tab:** `teamIdToNameMap` built from `/franchise/team-stats` (one request; same `teams` shape: `team_id`, `team`). Container is `#tournament-bracket-container` with class `bracket` so it gets the same grid layout. Calls `renderBracketShared` with seeds from `eos_tournament.seeds`, getLogo, and isUserTeam.
-- **Schedule tab (TCC):** Resolve `home_team` / `away_team` (ObjectIds) → names via `teamIdNameMap` for labels and box-score params. Roster links use `team_id` + `team_name`.
-- **Score lookup:** TCC passes `results` into the shared renderer (name-keyed scores); FCC uses matchup.score/winner from bracket; shared renderer supports both.
-- **Play vs Sim Remaining:** User matchup detection uses `user_team_object_id` vs `match.home_team` / `match.away_team` (all IDs). Scouting upcoming-opponent logic uses `userTeamId` and resolves opponent ID → name for display and API `team_name`.
+Franchise EOS was once documented as a **single** embedded `eos_tournament` over weeks **15–17**; production is **multi-phase 27–34** on `conference_tournaments` / `region_tournaments` / `national_tournament`. This file is the **canonical** tournament doc under the name **`Tournament_Execution_System.md`** (content was consolidated from a short-lived **`Current_Tournament_System.md`** and obsolete material from an older doc generation was removed).

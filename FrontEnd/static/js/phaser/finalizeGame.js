@@ -108,23 +108,39 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   }
   const winner = homeScore > awayScore ? homeKey : awayKey;
   const params = new URLSearchParams(window.location.search);
-  let week = parseInt(params.get('week'), 10);
+  let week = NaN;
   const homeIdParam = params.get('home_id');
   const awayIdParam = params.get('away_id');
-  if (!week || Number.isNaN(week)) {
+
+  // Franchise: prefer sim payload week over URL/localStorage so EOS complete-week matches
+  // the slate the server simmed (stale ?week= or franchise_week can sit one week ahead).
+  if (franchiseId && !tournamentId) {
+    if (simData?.final_game_document?.week != null) {
+      week = parseInt(simData.final_game_document.week, 10);
+    }
+    if (!Number.isInteger(week) || week < 1) {
+      if (simData?.week != null && simData.week !== '') {
+        week = parseInt(simData.week, 10);
+      }
+    }
+  }
+  if (!Number.isInteger(week) || week < 1) {
+    week = parseInt(params.get('week'), 10);
+  }
+  if (!Number.isInteger(week) || week < 1) {
     if (typeof localStorage !== 'undefined') {
       week = parseInt(localStorage.getItem('franchise_week'), 10);
     }
   }
-  if (!week || Number.isNaN(week)) {
-    if (simData && simData.week) {
+  if (!Number.isInteger(week) || week < 1) {
+    if (simData?.week != null && simData.week !== '') {
       week = parseInt(simData.week, 10);
     }
   }
-  if ((!week || Number.isNaN(week)) && simData?.final_game_document?.week != null) {
+  if ((!Number.isInteger(week) || week < 1) && simData?.final_game_document?.week != null) {
     week = parseInt(simData.final_game_document.week, 10);
   }
-  if ((!week || Number.isNaN(week)) && franchiseId && !tournamentId) {
+  if ((!Number.isInteger(week) || week < 1) && franchiseId && !tournamentId) {
     week = await recoverFranchiseWeek(franchiseId);
     if (Number.isInteger(week) && week >= 1 && typeof localStorage !== 'undefined') {
       localStorage.setItem('franchise_week', String(week));

@@ -32,7 +32,7 @@ class TournamentManager:
     """Manage tournament creation and progression.
 
     Bracket and results use ObjectId strings for team IDs. Name resolution
-    happens at API/game boundaries (see Tournament_Execution_System.md).
+    happens at API/game boundaries (see _documentation_master/06_GMO_Supporting_Systems/Tournament_Execution_System.md).
     """
 
     def __init__(self, user_team_id: str | None = None, *,

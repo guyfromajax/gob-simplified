@@ -4,7 +4,7 @@ Shared bracket engine for 8-team single-elimination tournaments.
 Used by both Tournament mode (standalone) and Franchise EOS (end-of-season).
 All team identifiers are ObjectId strings (hex). No DB access; callers persist.
 
-See: docs/docs_1_systems/06_GMO_Supporting_Systems/Tournament_Execution_System.md
+See: _documentation_master/06_GMO_Supporting_Systems/Tournament_Execution_System.md (§9)
 """
 from __future__ import annotations
 
