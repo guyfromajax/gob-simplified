@@ -4725,10 +4725,28 @@ def _complete_week_finish_cpu_and_persist(
         wk = str(week)
         partial_update: dict[str, Any] = {f"results.{wk}": results}
         if week in ft.EOS_WEEKS:
-            for _eos_key in ("conference_tournaments", "region_tournaments", "national_tournament"):
-                _eos_val = franchise_doc.get(_eos_key)
-                if _eos_val is not None:
-                    partial_update[_eos_key] = _eos_val
+            # Re-read fresh EOS blobs and merge so a concurrent phase-a write to the
+            # user's bracket cell — which this path never touches because it skips the
+            # user matchup — is preserved. Without this re-merge, persisting our
+            # (potentially stale) ``franchise_doc.conference_tournaments`` blob can
+            # clobber any winner that landed in the DB between when this request
+            # loaded ``franchise_doc`` and now. That was the silent root cause of the
+            # "calendar advanced, user bracket cell stays null" symptom — see
+            # ``Tournament_Execution_System.md`` §3a. Mirrors phase-a's own pattern.
+            fresh_eos = db.franchises.find_one(
+                {"_id": franchise_id},
+                {
+                    "conference_tournaments": 1,
+                    "region_tournaments": 1,
+                    "national_tournament": 1,
+                },
+            ) or {}
+            merged_eos = ft.merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
+                fresh_eos,
+                franchise_doc,
+            )
+            for _eos_key, _eos_val in merged_eos.items():
+                partial_update[_eos_key] = _eos_val
         db.franchises.update_one(
             {"_id": franchise_id},
             {"$set": partial_update},

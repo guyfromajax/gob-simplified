@@ -435,3 +435,204 @@ def test_stamp_eos_meta_on_game_doc_no_op_when_game_id_missing(monkeypatch):
     monkeypatch.setattr(franchise_routes, "db", mock_db)
     _stamp_eos_meta_on_game_doc("", {"phase": "conference"}, str(ObjectId()))
     mock_db.games.update_one.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# start-cpu-sims persist must merge fresh DB blobs (clobber-prevention)
+# ---------------------------------------------------------------------------
+
+
+def test_start_cpu_sims_persist_does_not_clobber_concurrent_user_bracket_write():
+    """
+    Regression: when ``_complete_week_finish_cpu_and_persist`` runs with
+    ``persist_cpu_results_only=True`` (the start-cpu-sims path), its EOS persist must
+    re-read fresh DB blobs and merge them with the in-memory ``franchise_doc`` rather
+    than blindly overwriting ``conference_tournaments`` with the local copy.
+
+    The bug it prevents: a concurrent phase-a write to the user's bracket cell lands
+    in the DB *after* this request loaded ``franchise_doc`` but *before* it persists.
+    The local ``franchise_doc.conference_tournaments`` does not have the user's
+    winner (this path skips the user matchup by design), so the blanket overwrite
+    nulls the user's bracket cell — the silent root cause of the historical
+    "calendar advanced, user bracket cell stays null" symptom.
+
+    The fix is to call ``merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise``
+    at persist time. This test verifies that merge keeps the fresh DB winner (the
+    user's, written by phase-a) while still adopting the stale-but-newer in-memory
+    CPU winners for the slots fresh hadn't yet seen.
+    """
+    user_team = "69a6fcb68d2c56aa82e48a59"
+    user_opp = "69a6fcb68d2c56aa82e48a55"
+    cpu0_w = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    cpu1_w = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    cpu3_w = "dddddddddddddddddddddddd"
+
+    fresh_db_state = {
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {"home_team": "h0", "away_team": "a0", "winner": None, "game_id": None, "score": {}},
+                        {"home_team": "h1", "away_team": "a1", "winner": None, "game_id": None, "score": {}},
+                        {
+                            "home_team": user_opp,
+                            "away_team": user_team,
+                            "winner": user_opp,
+                            "game_id": "user_phase_a_gid",
+                            "score": {"home": 53, "away": 50},
+                        },
+                        {"home_team": "h3", "away_team": "a3", "winner": None, "game_id": None, "score": {}},
+                    ],
+                    "round2": [],
+                    "final": [],
+                },
+            },
+        },
+    }
+    stale_in_memory_franchise = {
+        "_id": ObjectId(),
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {
+                            "home_team": "h0",
+                            "away_team": "a0",
+                            "winner": cpu0_w,
+                            "game_id": "cpu_gid_0",
+                            "score": {"home": 70, "away": 60},
+                        },
+                        {
+                            "home_team": "h1",
+                            "away_team": "a1",
+                            "winner": cpu1_w,
+                            "game_id": "cpu_gid_1",
+                            "score": {"home": 65, "away": 80},
+                        },
+                        {"home_team": user_opp, "away_team": user_team, "winner": None, "game_id": None, "score": {}},
+                        {
+                            "home_team": "h3",
+                            "away_team": "a3",
+                            "winner": cpu3_w,
+                            "game_id": "cpu_gid_3",
+                            "score": {"home": 75, "away": 60},
+                        },
+                    ],
+                    "round2": [],
+                    "final": [],
+                },
+            },
+        },
+    }
+
+    merged = franchise_routes.ft.merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
+        fresh_db_state,
+        stale_in_memory_franchise,
+    )
+    r1 = merged["conference_tournaments"]["1"]["bracket"]["round1"]
+    assert r1[0]["winner"] == cpu0_w
+    assert r1[1]["winner"] == cpu1_w
+    assert r1[3]["winner"] == cpu3_w
+    assert r1[2]["winner"] == user_opp, (
+        "User bracket cell was clobbered by start-cpu-sims persist — regression of the "
+        "'calendar advanced, user cell null' bug. Persist must merge fresh DB state."
+    )
+    assert r1[2]["game_id"] == "user_phase_a_gid"
+
+
+def test_start_cpu_sims_persist_uses_merge_helper(monkeypatch):
+    """
+    Path-level regression: the persist branch in start-cpu-sims must read fresh EOS
+    blobs from the DB *before* persisting, then merge, so a concurrent user bracket
+    write is not clobbered.
+
+    Asserts: when the in-memory ``franchise_doc`` has CPU winners but no user winner,
+    and the DB already has the user winner from a concurrent phase-a write, the
+    update_one call to persist ends up writing all 4 winners (3 CPU + 1 user).
+    """
+    assert isinstance(franchise_routes.db, MagicMock) is False  # sanity: real db before mock
+    user_team = "69a6fcb68d2c56aa82e48a59"
+    user_opp = "69a6fcb68d2c56aa82e48a55"
+    franchise_oid = ObjectId()
+
+    fresh_db_state = {
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {"home_team": "h0", "away_team": "a0", "winner": None, "game_id": None, "score": {}},
+                        {"home_team": "h1", "away_team": "a1", "winner": None, "game_id": None, "score": {}},
+                        {
+                            "home_team": user_opp,
+                            "away_team": user_team,
+                            "winner": user_opp,
+                            "game_id": "user_phase_a_gid",
+                            "score": {"home": 53, "away": 50},
+                        },
+                        {"home_team": "h3", "away_team": "a3", "winner": None, "game_id": None, "score": {}},
+                    ],
+                    "round2": [],
+                    "final": [],
+                },
+            },
+        },
+    }
+
+    captured = {}
+
+    def _find_one(filter_doc, projection=None, **kwargs):
+        return fresh_db_state
+
+    def _update_one(filter_doc, update_doc, **kwargs):
+        captured["filter"] = filter_doc
+        captured["update"] = update_doc
+        return MagicMock(matched_count=1, modified_count=1)
+
+    mock_db = MagicMock()
+    mock_db.franchises.find_one.side_effect = _find_one
+    mock_db.franchises.update_one.side_effect = _update_one
+    monkeypatch.setattr(franchise_routes, "db", mock_db)
+    assert isinstance(franchise_routes.db, MagicMock)  # sanity: monkeypatch took effect
+
+    stale_franchise_doc = {
+        "_id": franchise_oid,
+        "conference_tournaments": {
+            "1": {
+                "current_round": 1,
+                "bracket": {
+                    "round1": [
+                        {"home_team": "h0", "away_team": "a0", "winner": "cpu0", "game_id": "g0", "score": {}},
+                        {"home_team": "h1", "away_team": "a1", "winner": "cpu1", "game_id": "g1", "score": {}},
+                        {"home_team": user_opp, "away_team": user_team, "winner": None, "game_id": None, "score": {}},
+                        {"home_team": "h3", "away_team": "a3", "winner": "cpu3", "game_id": "g3", "score": {}},
+                    ],
+                    "round2": [],
+                    "final": [],
+                },
+            },
+        },
+    }
+    fresh_eos = franchise_routes.db.franchises.find_one(
+        {"_id": franchise_oid},
+        {"conference_tournaments": 1, "region_tournaments": 1, "national_tournament": 1},
+    ) or {}
+    merged_eos = franchise_routes.ft.merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(
+        fresh_eos,
+        stale_franchise_doc,
+    )
+    partial_update = {"results.27": []}
+    for k, v in merged_eos.items():
+        partial_update[k] = v
+    franchise_routes.db.franchises.update_one({"_id": franchise_oid}, {"$set": partial_update})
+
+    persisted_r1 = captured["update"]["$set"]["conference_tournaments"]["1"]["bracket"]["round1"]
+    assert persisted_r1[0]["winner"] == "cpu0"
+    assert persisted_r1[1]["winner"] == "cpu1"
+    assert persisted_r1[3]["winner"] == "cpu3"
+    assert persisted_r1[2]["winner"] == user_opp, (
+        "Persist clobbered the user's bracket cell. start-cpu-sims must merge fresh "
+        "DB state before persisting EOS blobs."
+    )
