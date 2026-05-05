@@ -443,8 +443,10 @@ def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
     assert week_29_status["eliminated_from_current_phase"] is True
 
     week_30_status = _get_user_eos_phase_status(franchise_doc, user_team_id, 30)
+    # Week 30 meta now includes the region final when round1 is empty; user has a real game, not a bye-with-empty-meta.
     assert week_30_status["active_this_week"] is True
-    assert week_30_status["has_bye_this_week"] is True
+    assert week_30_status["has_game_this_week"] is True
+    assert week_30_status["has_bye_this_week"] is False
     assert week_30_status["eliminated_from_current_phase"] is False
 
 
