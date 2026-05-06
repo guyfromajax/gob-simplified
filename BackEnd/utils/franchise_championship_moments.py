@@ -50,17 +50,25 @@ CHAMPIONSHIP_MOMENT_TYPES = frozenset(
 
 
 def _team_view(team_id: Any) -> dict[str, Any] | None:
-    """Look up minimal display data for a team_id (ObjectId or 24-hex string)."""
+    """
+    Look up minimal display data for a team identifier. Accepts either an
+    ObjectId / 24-hex string OR a canonical team_id key (e.g. "HARVEST"); the
+    latter is what saved game documents store on ``home_team_id``/``away_team_id``.
+    """
     if team_id is None:
         return None
+    proj = {"name": 1, "primary_color": 1, "conference": 1, "region": 1, "team_id": 1}
+    team_doc = None
+    # Try ObjectId path first (used by EOS bracket meta + franchise docs).
     try:
         oid = team_id if isinstance(team_id, ObjectId) else ObjectId(str(team_id))
+        team_doc = db.teams.find_one({"_id": oid}, proj)
     except Exception:
-        return None
-    team_doc = db.teams.find_one(
-        {"_id": oid},
-        {"name": 1, "primary_color": 1, "conference": 1, "region": 1, "team_id": 1},
-    )
+        team_doc = None
+    # Fall back to canonical team_id key (used by saved game docs / unified
+    # ``teams`` object). Required for the live-game championship branch.
+    if not team_doc:
+        team_doc = db.teams.find_one({"team_id": str(team_id)}, proj)
     if not team_doc:
         return None
     return {
@@ -352,15 +360,33 @@ def championship_moment_from_game_doc(
     if not is_final:
         return None
 
+    # Saved franchise game docs store team identifiers as canonical team_id
+    # keys (e.g. "HARVEST"), not ObjectId hex strings. The unified ``teams``
+    # object is keyed by those same identifiers and carries name + score.
     home_id = game_doc.get("home_team_id") or game_doc.get("homeTeamId")
     away_id = game_doc.get("away_team_id") or game_doc.get("awayTeamId")
+    teams_obj = game_doc.get("teams") or {}
+    home_team_obj = teams_obj.get(home_id) or teams_obj.get(str(home_id)) if home_id is not None else None
+    away_team_obj = teams_obj.get(away_id) or teams_obj.get(str(away_id)) if away_id is not None else None
     score_map = game_doc.get("score") or game_doc.get("final_score") or {}
-    home_team = game_doc.get("homeTeam") or {}
-    away_team = game_doc.get("awayTeam") or {}
-    home_score = int(home_team.get("score") if isinstance(home_team, dict) and home_team.get("score") is not None
-                     else score_map.get(home_team.get("name") if isinstance(home_team, dict) else "", 0) or 0)
-    away_score = int(away_team.get("score") if isinstance(away_team, dict) and away_team.get("score") is not None
-                     else score_map.get(away_team.get("name") if isinstance(away_team, dict) else "", 0) or 0)
+
+    def _score_from(team_obj: Any, fallback_name: str | None) -> int:
+        if isinstance(team_obj, dict) and team_obj.get("score") is not None:
+            try:
+                return int(team_obj.get("score"))
+            except (TypeError, ValueError):
+                pass
+        if fallback_name and isinstance(score_map, dict):
+            try:
+                return int(score_map.get(fallback_name, 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+        return 0
+
+    home_name = home_team_obj.get("name") if isinstance(home_team_obj, dict) else None
+    away_name = away_team_obj.get("name") if isinstance(away_team_obj, dict) else None
+    home_score = _score_from(home_team_obj, home_name)
+    away_score = _score_from(away_team_obj, away_name)
 
     synthetic_meta = {
         "phase": phase,
