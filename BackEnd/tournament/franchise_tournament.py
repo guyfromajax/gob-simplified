@@ -540,6 +540,51 @@ def _eos_team_id_canonical(tid: Any) -> str:
     return s
 
 
+def user_has_region_round1_bye_waiting(
+    franchise_doc: Dict[str, Any],
+    user_team_id_str: str,
+    user_region_letter: str,
+) -> bool:
+    """
+    True during EOS region calendar week 30 when the user has no playable ``get_eos_week_games``
+    row yet but already occupies the region final slot opposite an ``R1_*`` placeholder (waiting
+    on the other conference's round-1 winner). FCC Coach's Office Next Game uses this for a
+    'Bye' label instead of 'N/A'.
+    """
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week != EOS_REGION_WEEKS[0]:
+        return False
+    letter = str(user_region_letter or "").strip().upper()
+    if letter not in REGION_LETTERS:
+        return False
+    if not franchise_doc.get("eos_tournament_active"):
+        return False
+    rts = franchise_doc.get("region_tournaments") or {}
+    if not rts:
+        return False
+    rt = rts.get(letter) or {}
+    final = rt.get("final") or []
+    if not final or not isinstance(final[0], dict):
+        return False
+    m = final[0]
+    away = m.get("away_team")
+    home = m.get("home_team")
+
+    def _slot_r1_placeholder(raw: Any) -> bool:
+        return isinstance(raw, str) and raw.strip().startswith("R1")
+
+    uid = _eos_team_id_canonical(user_team_id_str)
+    away_s = _eos_team_id_canonical(away)
+    home_s = _eos_team_id_canonical(home)
+    if not uid or (uid != away_s and uid != home_s):
+        return False
+    if away_s == uid and _slot_r1_placeholder(home):
+        return True
+    if home_s == uid and _slot_r1_placeholder(away):
+        return True
+    return False
+
+
 def eos_meta_bracket_slot_has_winner(franchise_doc: Dict[str, Any], g: Dict[str, Any]) -> bool:
     """True if the EOS meta row's bracket slot already records a ``winner`` (sync/advance can skip)."""
     phase = g.get("phase")

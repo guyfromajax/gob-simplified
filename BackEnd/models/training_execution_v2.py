@@ -1017,9 +1017,9 @@ def _training_camp_core_attrs_union_for_positions(positions: List[str]) -> List[
 
 
 TRAINING_CAMP_YEAR_BONUS_RANGES = {
-    "senior": (-1, 2),
-    "junior": (-3, 3),
-    "sophomore": (-5, 5),
+    "senior": (-5, 10),
+    "junior": (-5, 10),
+    "sophomore": (-8, 15),
     "freshman": (-10, 22),
 }
 

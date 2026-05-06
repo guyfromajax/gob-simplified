@@ -888,11 +888,12 @@ async function renderScheduleTab() {
   ].join('');
 }
 
-function renderHomeMatchupCard(bodyId, summary) {
+function renderHomeMatchupCard(bodyId, summary, options = {}) {
   const body = document.getElementById(bodyId);
   if (!body) return;
   if (!summary) {
-    body.innerHTML = createEmptyHomeState('N/A');
+    const emptyLabel = options.emptyMessage != null ? options.emptyMessage : 'N/A';
+    body.innerHTML = createEmptyHomeState(emptyLabel);
     return;
   }
   const opponentName = summary.opponent_team_name || 'Opponent';
@@ -1072,7 +1073,9 @@ async function renderHomeTab() {
   renderHomeTeamStatsCard();
   renderHomeRecruitingCard();
   renderHomeNewsCard();
-  renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null);
+  renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null, {
+    emptyMessage: commandCenterTopDataCache?.next_game_is_bye ? 'Bye' : 'N/A'
+  });
   renderHomeMatchupCard('home-last-game-body', commandCenterTopDataCache?.last_game_summary || null);
 }
 

@@ -5404,6 +5404,12 @@ def command_center_data(
                             }
                         else:
                             response["next_game_summary"] = None
+                            if ft.user_has_region_round1_bye_waiting(
+                                franchise_doc,
+                                str(team_id),
+                                str(response.get("user_region") or ""),
+                            ):
+                                response["next_game_is_bye"] = True
 
                         last_game = _find_user_last_completed_game(franchise_doc, str(team_id))
                         if last_game:

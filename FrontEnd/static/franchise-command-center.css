@@ -255,6 +255,25 @@ input[type="reset"] {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Schedule / Tournament tab: scroll tall postseason bracket stacks without clipping */
+#franchise-container #schedule-tab.tab-content.active {
+  padding: 0;
+  overflow: hidden;
+}
+
+#franchise-container #schedule-tab .fcc-schedule-tab-inner {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 /* Footnote: recruiting status; pinned below tab panel inside the FCC card */
 .fcc-recruiting-footnote {
   flex-shrink: 0;
