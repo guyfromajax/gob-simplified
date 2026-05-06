@@ -174,3 +174,42 @@ def test_week30_include_completed_skips_won_final():
     hist = ft.get_eos_week_games(franchise_doc, 30, include_completed=True)
     assert len(hist) == 1
     assert hist[0].get("winner") == t1
+
+
+def test_user_has_region_r1_bye_waiting_three_team_bracket():
+    """Champ in final vs R1_0 placeholder while other conf plays R1 — no playable row for bye team."""
+    b1, b2, b3 = _tid(), _tid(), _tid()
+    franchise_doc = {
+        "week": 30,
+        "eos_tournament_active": True,
+        "region_tournaments": {
+            "C": {
+                "round1": [
+                    {"away_team": b2, "home_team": b3, "winner": None, "game_id": None, "score": {}},
+                ],
+                "final": [{"away_team": "R1_0", "home_team": b1, "winner": None, "game_id": None, "score": {}}],
+                "current_round": 1,
+            },
+        },
+    }
+    assert ft.user_has_region_round1_bye_waiting(franchise_doc, b1, "C") is True
+    assert ft.user_has_region_round1_bye_waiting(franchise_doc, b2, "C") is False
+    assert ft.user_has_region_round1_bye_waiting(franchise_doc, b3, "C") is False
+
+
+def test_user_has_region_r1_bye_waiting_false_week31():
+    b1, b2, b3 = _tid(), _tid(), _tid()
+    franchise_doc = {
+        "week": 31,
+        "eos_tournament_active": True,
+        "region_tournaments": {
+            "C": {
+                "round1": [
+                    {"away_team": b2, "home_team": b3, "winner": None, "game_id": None, "score": {}},
+                ],
+                "final": [{"away_team": "R1_0", "home_team": b1, "winner": None, "game_id": None, "score": {}}],
+                "current_round": 1,
+            },
+        },
+    }
+    assert ft.user_has_region_round1_bye_waiting(franchise_doc, b1, "C") is False

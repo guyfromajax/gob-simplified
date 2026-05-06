@@ -344,9 +344,9 @@ Then apply a final **Training Camp bonus by year** (runs for every player with a
 - **Top two positions:** Sort `PG`–`C` by RT. If **two** positions tie for highest RT, those are the two. If **more than two** tie for highest, choose **two** at random. If **one** is uniquely first and **two or more** tie for second, use the first and choose **one** of the tied second-tier positions at random. (All five positions are expected to have RT values.)
 - **Attribute set:** Union of core attributes for each of those two positions (same mapping as above; SF still draws two random attrs per SF definition), then add **ND**, **IQ**, **FT**, and **CH** if not already present, then add **exactly one** random attribute from trainable player attrs not in the set, **excluding** EM, MO, NG, and RT.
 - **Rolls:** Each attribute in that final list gets its **own** `random.randint`:
-  - **senior:** `+= random.randint(-1, 2)`
-  - **junior:** `+= random.randint(-3, 3)`
-  - **sophomore:** `+= random.randint(-5, 5)`
+  - **senior:** `+= random.randint(-5, 10)`
+  - **junior:** `+= random.randint(-5, 10)`
+  - **sophomore:** `+= random.randint(-8, 15)`
   - **freshman:** `+= random.randint(-10, 22)`
 
 Traning Camp Height / Weight bonsuses
