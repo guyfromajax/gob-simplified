@@ -69,13 +69,23 @@ If all three miss, the helper logs `[EOS-BRACKET-DEBUG] eos_meta_unresolved_in_e
 
 ### 3b. start-cpu-sims persist must merge fresh DB state
 
-`_complete_week_finish_cpu_and_persist` is called from three entry points: monolithic `complete-week`, `complete-week/phase-b`, and `complete-week/start-cpu-sims` (the last one with `persist_cpu_results_only=True`). The first two finalize the week via `_eos_calendar_advance_update_fields`; the third only persists `results.{week}` plus the EOS bracket blobs.
+`_complete_week_finish_cpu_and_persist` is called from three entry points: monolithic `complete-week`, `complete-week/phase-b`, and `complete-week/start-cpu-sims` (the last one with `persist_cpu_results_only=True`). The first two finalize the week via `_eos_calendar_advance_update_fields`; the third only persists `results.{week}` plus, for EOS weeks, the EOS bracket blobs.
 
-**Invariant for the `persist_cpu_results_only=True` branch:** before writing `conference_tournaments` / `region_tournaments` / `national_tournament` to the DB, re-read those blobs from the DB and pass them through `merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(fresh_eos, franchise_doc)`. Persist the merge result, not the raw `franchise_doc` blob.
+**Invariant for the `persist_cpu_results_only=True` branch:** before writing **either** `results.{wk}` **or** the EOS blobs (`conference_tournaments` / `region_tournaments` / `national_tournament`) to the DB, re-read each from the DB into a `fresh_doc` projection and merge with the local in-memory state:
 
-**Why.** start-cpu-sims skips the user matchup by design (the `if {away,home} == {user_team1,user_team2}: continue` branch in the sim loop). If a phase-a user-bracket write lands in the DB *after* start-cpu-sims loaded `franchise_doc` but *before* it persists, the local `franchise_doc.conference_tournaments` blob — which never had the user's winner because this path skips the user — would clobber the user's slot back to `null` on the blanket overwrite. That race is the historical silent root cause of the "calendar advanced, user bracket cell stays null" symptom (§3a). The merge keeps fresh's winners and copies stale's winners only into slots fresh hadn't seen, so a concurrent user write survives intact while CPU writes that this request just produced are still added.
+- **`results.{wk}`** — union by matchup key via `_dedupe_franchise_week_results_by_matchup(local + fresh)`. Local rows (this request's CPU sims) win on collisions; fresh contributes any matchup local lacks (specifically the user's row from a concurrent phase-a write). Re-order the result via `_order_franchise_week_results_like_schedule` before persisting.
+- **EOS blobs** (EOS weeks only) — `merge_phase_a_eos_blobs_from_fresh_db_and_stale_franchise(fresh_doc, franchise_doc)`. Fresh wins for any slot that already has a `winner`; stale's winners fill empty slots.
 
-Phase-a's persist already uses this same merge helper for the same reason. start-cpu-sims now matches that pattern.
+Persist the merge results, not the raw `franchise_doc` blobs.
+
+**Why.** start-cpu-sims skips the user matchup by design (the `if {away,home} == {user_team1,user_team2}: continue` branch in the sim loop). If a phase-a write lands in the DB *after* start-cpu-sims loaded `franchise_doc` but *before* it persists, the local copy never had the user data because this path skips the user. A blanket `$set` would overwrite the just-landed phase-a write with the local set that's missing it.
+
+That race produces two related symptoms, both observed in production:
+
+- **Regular-season weeks (1–26)**: `results.{wk}` is overwritten with the 63-row CPU-only set. The user team appears as 0-0 in the FCC standings even after a played game. The user's `db.games` doc is intact; only the `franchise.results.{wk}` row is missing.
+- **EOS weeks (27–34)**: same `results.{wk}` clobber **plus** `conference_tournaments[X].bracket.roundN[idx]` for the user's slot getting reset to `null` (the "calendar advanced, user bracket cell stays null" symptom of §3a).
+
+The merge applies to **all weeks** the user plays (1–34), since the persist branch is shared. Phase-a's own persist already uses the EOS-blob merge helper; start-cpu-sims now matches that pattern for both `results.{wk}` and the EOS blobs.
 
 ---
 
@@ -236,4 +246,9 @@ Franchise EOS was once documented as a **single** embedded `eos_tournament` over
 
 Earlier iterations of `_complete_week_process_user_game_block` silently fell through to `_save_game_result` when the EOS slate did not contain the user pair, producing a calendar-advanced-but-bracket-empty state. That fall-through is now a hard 409 (§3a). A symmetric form of `_harden_complete_week_request_week` (§7 / §8) and three-phase `_eos_heal_all_eos_from_games` (§8a) close the same class of failure across all EOS phases. A snapshot `eos_meta` on the game document (§3a) is the forward-compat single source of truth for the bracket slot — `play-next-game` already returns it; the FE plumbing into `req.game_document.eos_meta` is the next step.
 
-A separate strain of the same symptom turned out to be a race between concurrent endpoints: `start-cpu-sims` running with stale in-memory `conference_tournaments` could persist after a phase-a user-bracket write had landed in the DB, blanket-overwriting the user's slot back to `null`. The fix is to merge fresh DB blobs before persisting in that path — see §3b.
+A separate strain of the same symptom turned out to be a race between concurrent endpoints: `start-cpu-sims` running with stale in-memory state could persist after a phase-a write had landed in the DB, blanket-overwriting the user's data. Two flavors:
+
+- The user's `conference_tournaments` bracket cell getting reset to `null` after an EOS game (the "calendar advanced, user bracket cell stays null" symptom).
+- The user's row in `franchise.results.{wk}` getting dropped, so `franchise.results.{wk}` ends up with 63 rows instead of 64. Visible as "user team shows 0-0 after a played week" in the FCC standings, and present for **both** regular-season weeks (1–26) **and** EOS weeks (27–34).
+
+The fix in both flavors is the same shape: merge fresh DB state with in-memory state before persisting. See §3b.
