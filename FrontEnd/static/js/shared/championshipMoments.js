@@ -562,12 +562,9 @@
     const team = moment.winner_team_name || '';
     const rank = moment.winner_natl_rank;
     const seed = moment.winner_seed != null ? moment.winner_seed : 1;
-    const recLine = recordLabel(moment.winner_record);
-    const recordParts = [];
-    if (recLine) recordParts.push(recLine);
-    if (rank != null) recordParts.push(`NO. ${rank} NATIONAL`);
-    recordParts.push(`NO. ${seed} SEED`);
-    const recordLine = recordParts.join(' · ');
+    const recLine = recordLabel(moment.winner_record) || '0-0';
+    const rankPart = rank != null ? `#${rank} ` : '';
+    const recordLine = `${rankPart}${recLine}  Conference Tourney Seed: ${seed}`;
     return `
       <div class="cm-variation cm-vc">
         <div class="cm-vc-eyebrow">SEASON ${escapeHtml(moment.season)}</div>

@@ -99,19 +99,21 @@ def _record_for_team(franchise_doc: dict, team_id_str: str) -> dict[str, int]:
         return {"W": 0, "L": 0}
     try:
         franchise_id = franchise_doc.get("_id")
-        ftd_team_ids = [
-            d["team_id"]
+        # calculate_franchise_standings expects ``team_ids_map`` to be a dict
+        # whose keys are str(team_id) — only ``.keys()`` is used to seed the
+        # standings dict for teams with zero rows in ``franchise.results``.
+        team_ids_map = {
+            str(d["team_id"]): {}
             for d in franchise_team_data_collection.find(
                 {"franchise_id": franchise_id}, {"team_id": 1}
             )
             if d.get("team_id") is not None
-        ]
-        team_list = [{"team_id": tid} for tid in ftd_team_ids]
+        }
         standings = calculate_franchise_standings(
             franchise_doc.get("results", {}) or {},
-            team_list,
+            team_ids_map,
         )
-        row = standings.get(team_id_str) or standings.get(str(team_id_str)) or {}
+        row = standings.get(str(team_id_str)) or {}
         return {"W": int(row.get("W", 0) or 0), "L": int(row.get("L", 0) or 0)}
     except Exception as exc:
         logger.warning("[CHAMP-MOMENT] record lookup failed team=%s err=%s", team_id_str, exc)
