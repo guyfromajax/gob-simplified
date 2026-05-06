@@ -12,6 +12,87 @@ import {
 export const FRANCHISE_PGPC_AT_EOG_ENABLED = false;
 
 /**
+ * Resolve championship-moments overlay for the live-game path. When the just-
+ * completed franchise game is the user's conference / region / national
+ * championship, render the matching Variation A/B overlay and return true to
+ * tell the caller to skip the standard EOG modal entirely.
+ */
+async function maybeShowChampionshipMomentForLiveGame({
+  franchiseId,
+  gameId,
+  homeTeam,
+  awayTeam,
+  finalScore,
+  teamId,
+  userTeamSide,
+}) {
+  if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl) return false;
+  let momentResp;
+  try {
+    const url = `${API_CONFIG.buildUrl('/franchise/championship-moments/context')}?franchise_id=${encodeURIComponent(franchiseId)}&game_id=${encodeURIComponent(gameId)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+    });
+    if (!res.ok) return false;
+    momentResp = await res.json();
+  } catch (err) {
+    console.warn('[gameCompletionPopup] championship-context fetch failed:', err);
+    return false;
+  }
+  if (!momentResp || !momentResp.is_championship || !momentResp.moment) return false;
+
+  // Lazy-load the moments module — it is only included on the FCC page by default.
+  if (typeof window === 'undefined' || !window.ChampionshipMoments) {
+    try {
+      const staticBase = (window.API_CONFIG && window.API_CONFIG.getStaticPath)
+        ? window.API_CONFIG.getStaticPath()
+        : '';
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = `${staticBase}/js/shared/championshipMoments.js`;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    } catch (err) {
+      console.warn('[gameCompletionPopup] failed to load championshipMoments.js:', err);
+      return false;
+    }
+  }
+  if (!window.ChampionshipMoments) return false;
+
+  const moment = momentResp.moment;
+
+  // Sync the background scoreboard so the page beneath the overlay reads FINAL.
+  syncBackgroundScoreboardFromFinalScore(finalScore);
+
+  // Build navigation targets that mirror the standard EOG buttons.
+  const lockerParams = new URLSearchParams();
+  lockerParams.set('franchise_id', franchiseId);
+  if (teamId) lockerParams.set('team_id', teamId);
+  const lockerRoomUrl = `/franchise-command-center.html?${lockerParams.toString()}`;
+
+  const boxScoreParams = new URLSearchParams();
+  if (gameId) boxScoreParams.set('game_id', gameId);
+  if (homeTeam) boxScoreParams.set('home', homeTeam);
+  if (awayTeam) boxScoreParams.set('away', awayTeam);
+  boxScoreParams.set('mode', 'franchise');
+  boxScoreParams.set('franchise_id', franchiseId);
+  if (teamId) boxScoreParams.set('team_id', teamId);
+  if (userTeamSide === 'home' || userTeamSide === 'away') {
+    boxScoreParams.set('my_team', userTeamSide);
+  }
+  const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
+
+  await window.ChampionshipMoments.showMoment(moment, {
+    lockerRoomUrl,
+    boxScoreUrl,
+  });
+  return true;
+}
+
+/**
  * Push final scores (and a simple FINAL clock readout) to the court scoreboard DOM
  * so the background behind the EOG modal matches the popup, not a stale Q1/0–0 state.
  */
@@ -104,6 +185,27 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       break;
     default:
       lockerRoomUrl = '/mode-select.html';
+  }
+
+  // Championship Announce Moments — for franchise EOS championship games we
+  // replace the standard EOG modal with the Variation A (conference/region) or
+  // Variation B (national) overlay before doing any of the standard EOG work.
+  if (mode === 'franchise' && franchiseId && gameId) {
+    try {
+      const handled = await maybeShowChampionshipMomentForLiveGame({
+        franchiseId,
+        gameId,
+        lockerRoomUrl: null, // built below
+        homeTeam,
+        awayTeam,
+        finalScore,
+        teamId,
+        userTeamSide,
+      });
+      if (handled) return;
+    } catch (err) {
+      console.warn('[gameCompletionPopup] championship-moments check failed:', err);
+    }
   }
 
   let potg = null;

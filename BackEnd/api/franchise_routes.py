@@ -3042,6 +3042,20 @@ def _stamp_eos_meta_on_game_doc(
         snapshot["conference"] = eos_g_meta.get("conference")
     if eos_g_meta.get("region") is not None:
         snapshot["region"] = eos_g_meta.get("region")
+    # Championship Announce Moments: front-end reads ``franchise_season`` off the
+    # stamped eos_meta to render the season number in the championship overlay
+    # that replaces the standard EOG modal for live championship games.
+    if eos_g_meta.get("franchise_season") is not None:
+        snapshot["franchise_season"] = eos_g_meta.get("franchise_season")
+    else:
+        try:
+            franchise_doc_local = db.franchises.find_one(
+                {"_id": ObjectId(franchise_id_str)},
+                {"current_season": 1},
+            ) or {}
+            snapshot["franchise_season"] = int(franchise_doc_local.get("current_season", 1) or 1)
+        except Exception:
+            pass
     try:
         gid_str = str(game_id)
         existing = db.games.find_one({"_id": gid_str})
@@ -3870,6 +3884,18 @@ def _finalize_franchise_week_after_cpu_games(
             user_team_id_str=user_team_id_str,
             conference_tournaments=conference_tournaments,
         )
+        try:
+            from BackEnd.utils.franchise_championship_moments import (
+                enqueue_trophy_spotlight_for_user_conference,
+            )
+
+            franchise_doc["conference_tournaments"] = conference_tournaments
+            enqueue_trophy_spotlight_for_user_conference(franchise_doc)
+        except Exception:
+            logger.exception(
+                "[CHAMP-MOMENT] trophy_spotlight enqueue failed franchise_id=%s",
+                franchise_id_str,
+            )
     elif week in ft.EOS_WEEKS:
         eos_updates = _eos_calendar_advance_update_fields(
             franchise_doc,
@@ -5480,6 +5506,18 @@ def command_center_data(
                     last_training_report_week = None
         response["last_training_report_week"] = last_training_report_week
         response["season_inbox"] = list(franchise_doc.get("season_inbox") or []) if franchise_doc else []
+        if franchise_doc:
+            try:
+                from BackEnd.utils.franchise_championship_moments import list_moments
+
+                response["pending_championship_moments"] = list_moments(franchise_doc)
+            except Exception:
+                logger.exception(
+                    "[CHAMP-MOMENT] list_moments failed franchise_id=%s", str(fid)
+                )
+                response["pending_championship_moments"] = []
+        else:
+            response["pending_championship_moments"] = []
         # Region EOS: ensure persisted brackets match conference champions + RS#1 (fixes legacy TBD / half rows).
         if (
             franchise_doc
@@ -10431,6 +10469,53 @@ class FinishSeasonRequest(BaseModel):
     franchise_id: str
 
 
+class DismissChampionshipMomentRequest(BaseModel):
+    franchise_id: str
+    moment_id: str
+
+
+@router.get("/franchise/championship-moments/context")
+def championship_moment_context(
+    franchise_id: str,
+    game_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Return a Variation A/B moment payload for a finalized game when it is the
+    user's conference / region / national championship. Used by the EOG modal
+    on the live-game path to render the moment in place of the standard EOG.
+    """
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    game_doc = db.games.find_one({"_id": game_id})
+    if not game_doc and ObjectId.is_valid(game_id):
+        game_doc = db.games.find_one({"_id": ObjectId(game_id)})
+    if not game_doc:
+        return {"is_championship": False}
+
+    from BackEnd.utils.franchise_championship_moments import (
+        championship_moment_from_game_doc,
+    )
+
+    moment = championship_moment_from_game_doc(franchise_doc, game_doc)
+    if not moment:
+        return {"is_championship": False}
+    return {"is_championship": True, "moment": moment}
+
+
+@router.post("/franchise/championship-moments/dismiss")
+def dismiss_championship_moment(
+    req: DismissChampionshipMomentRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Pop one championship-announce moment from the franchise queue once the FCC overlay has shown it."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    franchise_id = franchise_doc["_id"]
+    from BackEnd.utils.franchise_championship_moments import consume_moment
+
+    removed = consume_moment(franchise_id, req.moment_id)
+    return {"status": "ok", "removed": bool(removed)}
+
+
 @router.post("/franchise/sim-rest-of-tournament")
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
@@ -10801,7 +10886,19 @@ def finish_season(req: FinishSeasonRequest):
     )
     if consume_result.modified_count == 0:
         raise HTTPException(status_code=409, detail="Season transition has already been processed")
-    
+
+    try:
+        from BackEnd.utils.franchise_championship_moments import (
+            enqueue_banner_raise_if_user_won_national,
+        )
+
+        enqueue_banner_raise_if_user_won_national(franchise_doc)
+    except Exception:
+        logger.exception(
+            "[CHAMP-MOMENT] banner_raise enqueue failed franchise_id=%s",
+            str(franchise_id),
+        )
+
     # Get current season
     current_season = franchise_doc.get("current_season", 1)
     next_season = current_season + 1

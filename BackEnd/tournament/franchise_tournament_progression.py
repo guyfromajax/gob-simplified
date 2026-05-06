@@ -445,6 +445,33 @@ def record_tournament_game_result(
         score=score,
     )
 
+    # Championship Announce Moments: queue Variation A/B for the FCC overlay path
+    # (sim-rest, distant sim, sim-championship). The "user" source covers the
+    # live-game path; that flow renders the moment in place of the EOG modal,
+    # client-side, so we deliberately skip enqueue here to avoid double-show.
+    if source in ("cpu_full", "distant"):
+        try:
+            from BackEnd.utils.franchise_championship_moments import (
+                maybe_enqueue_championship_game_moment,
+            )
+
+            maybe_enqueue_championship_game_moment(
+                franchise_doc,
+                game_meta=game_meta,
+                away_id=team1_id,
+                home_id=team2_id,
+                away_score=team1_score,
+                home_score=team2_score,
+                game_id=bracket_game_id or None,
+            )
+        except Exception:
+            logger.exception(
+                "[CHAMP-MOMENT] enqueue failed franchise_id=%s phase=%s round=%s",
+                str(franchise_doc.get("_id")),
+                game_meta.get("phase"),
+                game_meta.get("round"),
+            )
+
     loser_id = normalize_tournament_team_id(team2_id if team1_score > team2_score else team1_id)
     return {
         "phase": game_meta.get("phase"),

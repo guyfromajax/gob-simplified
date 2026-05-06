@@ -2764,7 +2764,23 @@ async function init() {
     void renderFccPlaybooksSummary();
   }
   renderFccInbox(topData);
-  maybeShowChampionshipCompleteModal(topData);
+  // Championship Announce moments take precedence over the legacy
+  // championship_summary modal: when the new system has anything queued, render
+  // those overlays instead of the older one for the same game.
+  const pendingMoments = Array.isArray(topData?.pending_championship_moments)
+    ? topData.pending_championship_moments
+    : [];
+  if (pendingMoments.length && typeof window.ChampionshipMoments !== 'undefined') {
+    void window.ChampionshipMoments.processPendingMoments(
+      franchiseId,
+      pendingMoments,
+      {
+        boxScoreUrlBuilder: (moment) => buildFccBoxScoreUrlForMoment(moment),
+      }
+    );
+  } else {
+    maybeShowChampionshipCompleteModal(topData);
+  }
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
   }
@@ -2896,6 +2912,18 @@ function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
 function getChampionshipSeenKey(franchiseIdValue, gameId) {
   if (!franchiseIdValue || !gameId) return null;
   return `fcc_championship_seen_${franchiseIdValue}_${gameId}`;
+}
+
+function buildFccBoxScoreUrlForMoment(moment) {
+  if (!moment || !moment.game_id || !franchiseId) return '';
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  params.set('game_id', moment.game_id);
+  if (moment.winner_team_name) params.set('home', moment.winner_team_name);
+  if (moment.loser_team_name) params.set('away', moment.loser_team_name);
+  appendFranchiseBoxScoreUserHints(params, moment.winner_team_name, moment.loser_team_name);
+  return `/box-score.html?${params.toString()}`;
 }
 
 function maybeShowChampionshipCompleteModal(topData) {
