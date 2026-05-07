@@ -231,6 +231,29 @@ describe('BASELINE_INBOUND Animation Tests', () => {
       expect(runInboundSetupCallCount).toBe(0);
     });
 
+    test('PUTBACK_MAKE should skip runInboundSetup when next_play_type is FREE_THROW', async () => {
+      const { handleOrebTurn } = await import('../animateGameTurns.js');
+
+      const putbackAndOneTurnData = {
+        result_type: 'PUTBACK_MAKE',
+        next_play_type: 'FREE_THROW',
+        next_defensive_setup: null,
+        rebounderId: 'player1',
+        shooter: 'player1',
+        text: '',
+        possession_flips: false
+      };
+
+      await handleOrebTurn(scene, {
+        playerSprites,
+        ballSprite,
+        turnData: putbackAndOneTurnData,
+        onUpdate: () => {}
+      });
+
+      expect(runInboundSetupCallCount).toBe(0);
+    });
+
     test('Free Throw MAKE should skip runInboundSetup when next_play_type is BASELINE_INBOUND', async () => {
       const ftMakeTurnData = {
         result_type: 'MAKE',

@@ -383,10 +383,10 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
       
-      // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
-      // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
-      // Calling it here causes double inbound passes and double setup animations
-      if (turnData.next_play_type === "BASELINE_INBOUND") {
+      // ✅ FIX: Don't call runInboundSetup() here if next is BASELINE_INBOUND or FREE_THROW
+      // BASELINE_INBOUND: next turn runs handleBaselineInbound() (avoids double BIP).
+      // FREE_THROW: shooting foul / and-one after make — same as fastBreak.js; FT turn handles transition (no BIP between make and FT).
+      if (turnData.next_play_type === "BASELINE_INBOUND" || turnData.next_play_type === "FREE_THROW") {
         // ✅ FIX: Call onPutbackEnd() to clear putback state (still needed even if skipping inbound setup)
         const { getBallController } = await import('./BallControllerAdapter.js');
         const ballController = getBallController();
@@ -394,8 +394,7 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
           ballController.onPutbackEnd();
         }
         
-        // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
-        // This prevents double inbound passes and double setup animations
+        // ✅ REMOVED: runInboundSetup() — dedicated next turn handles inbound or free throws
         return;
       }
       
