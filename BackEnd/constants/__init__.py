@@ -263,10 +263,15 @@ FCP_SETUP_POSITIONS = {
     "C": "key"
 }
 
-# All HCT variants use the same starting positions
+# All HCT variants use the same starting positions.
+# PG and SG carry over from the prior turn (None sentinel) — see Dynamic_HCT_Turns.md
+# for rationale: pre-dynamic-HCT they were authored at deep-offensive spots ("lower bird"
+# / "upper highPost") that left them past the dynamic-HCT step-1 instigation point,
+# producing a backward-walk visual. Carrying over uses the player's natural defensive
+# positions from the made-shot instead, near the inbounder for HCT.
 HCT_SETUP_POSITIONS = {
-    "PG": "lower bird",
-    "SG": "upper highPost",
+    "PG": None,                  # carry over from prior turn
+    "SG": None,                  # carry over from prior turn
     "SF": "inbound_left",
     "PF": "deep upper wing",
     "C": "deep lower wing"

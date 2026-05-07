@@ -609,21 +609,40 @@ class TurnManager:
             setup_locations = None
 
         if setup_locations:
-            # Convert location strings to coordinates (home orientation)
+            # Convert location strings to coordinates (home orientation).
+            # Positions whose location is ``None`` are *carry-over*: the player keeps
+            # the coords they ended the prior turn with. Used today for HCT PG and SG
+            # so the BIP doesn't yank them across the court before dynamic HCT runs
+            # (see Dynamic_HCT_Turns.md).
             from BackEnd.constants import HCO_STRING_SPOTS
             o_dest_home = {}
+            carry_over_positions = []
             for pos, location in setup_locations.items():
+                if location is None:
+                    carry_over_positions.append(pos)
+                    self.logger.log(f"destCarryOver:{pos}")
+                    continue
                 coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
                 o_dest_home[pos] = coords.copy()
                 self.logger.log(f"destAssigned:{pos}")
-            
+
             # For FCP/HCT, ball spot should be at SF's inbound location (inbound_left or inbound_right)
             # SF is always the inbounder for FCP/HCT
             sf_location = setup_locations.get("SF", "inbound_left")
             inbound_spot_home = HCO_STRING_SPOTS.get(sf_location, {"x": 50, "y": 25})
-            
-            # Flip offensive coordinates if the away team has possession
+
+            # Flip offensive coordinates if the away team has possession.
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+
+            # Fill carry-over positions from each player's current coords (already in
+            # current orientation — no flip needed regardless of which team is on offense).
+            for pos in carry_over_positions:
+                player = offense_team.lineup.get(pos)
+                player_coords = (getattr(player, "coords", None) or {}) if player else {}
+                o_dest[pos] = {
+                    "x": int(player_coords.get("x", 50) or 50),
+                    "y": int(player_coords.get("y", 25) or 25),
+                }
         else:
             # HCO-only baseline inbound setup uses explicit BIP targets.
             offense_attrs = offense_team.team_attributes or {}

@@ -48,8 +48,12 @@ from BackEnd.utils.shared import (
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL
 
 
-# Animation timestamp granularity (matches skeleton convention).
-ANIM_STEP_MS = 800
+# Animation timestamp granularity. Each game-second is scaled to ``ANIM_MS_PER_GAME_SEC``
+# milliseconds in the animation array so visible duration tracks game time. Skeletons
+# use ~800ms per step at typical ~1 game-second pace, so this gives equivalent feel for
+# steady movement and lets longer holds (e.g. the BH 3-second hold at step-1 start)
+# get proportionally more anim time.
+ANIM_MS_PER_GAME_SEC = 800
 
 # 10-second violation gate (per Dynamic_HCT_Turns.md "Special Situations").
 # When the shot clock reaches this threshold and the ball handler has not yet
@@ -58,8 +62,10 @@ ANIM_STEP_MS = 800
 # so the next iteration can plug in the runtime check without churn.
 HCT_SHOT_CLOCK_VIOLATION_THRESHOLD = 20
 
-# Initial BH hold (per spec): 1 game second at the start of step 1.
-BH_HOLD_GAME_SECONDS = 1.0
+# Initial BH hold (per spec): 3 game seconds at the start of step 1 — the inbound
+# receiver pauses while teammates and defenders begin their move-up. Bumped from
+# 1s to 3s for visibility; reduce later if it feels too long.
+BH_HOLD_GAME_SECONDS = 3.0
 
 # Step 1 BH target: x = 44, y random in [21, 29].
 STEP_1_BH_TARGET_X = 44
@@ -361,10 +367,11 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     waypoints: Dict[str, List[Dict[str, Any]]] = {}
 
     # --- Step 1 ---
-    # t = 0 : everyone at start (BH and defender stationary; movers tagged as moving).
+    # Animation timestamps scale to game-seconds via ANIM_MS_PER_GAME_SEC so the
+    # 3-second hold reads as ~3x longer than a 1-second movement step.
     step_start_ms = 0
-    bh_hold_ms = step_start_ms + ANIM_STEP_MS  # 1 anim-step pause
-    bh_arrive_ms = bh_hold_ms + ANIM_STEP_MS  # second anim-step covers BH movement
+    bh_hold_ms = step_start_ms + int(round(BH_HOLD_GAME_SECONDS * ANIM_MS_PER_GAME_SEC))
+    bh_arrive_ms = step_start_ms + int(round(step_1_seconds * ANIM_MS_PER_GAME_SEC))
 
     # BH waypoints
     bh_pid = _player_id(ball_handler)
@@ -414,7 +421,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     )
     step_2_seconds = max(step_2_seconds, 0.4)  # floor — short visible converge
     step_2_start_ms = bh_arrive_ms
-    step_2_end_ms = step_2_start_ms + ANIM_STEP_MS
+    step_2_end_ms = step_2_start_ms + int(round(step_2_seconds * ANIM_MS_PER_GAME_SEC))
 
     # PG defender: converge.
     pg_def = def_lineup.get("PG")
@@ -461,7 +468,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
         )
         step_3_seconds = max(0.3, partial_distance / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND))
-        step_3_end_ms = step_2_end_ms + ANIM_STEP_MS
+        step_3_end_ms = step_2_end_ms + int(round(step_3_seconds * ANIM_MS_PER_GAME_SEC))
 
         # BH dribbles to partial point.
         _add_waypoint(waypoints, bh_pid, step_3_end_ms, partial_target, "dribble")
@@ -483,7 +490,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             target_for_dribble = _flip(target_for_dribble)
         path_distance = _euclid(bh_step_2_coords, target_for_dribble)
         step_3_seconds = max(0.3, path_distance / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND))
-        step_3_end_ms = step_2_end_ms + ANIM_STEP_MS
+        step_3_end_ms = step_2_end_ms + int(round(step_3_seconds * ANIM_MS_PER_GAME_SEC))
 
         _add_waypoint(waypoints, bh_pid, step_3_end_ms, target_for_dribble, "dribble")
         if pg_def is not None:
