@@ -65,10 +65,9 @@ ANIM_MS_PER_GAME_SEC = 800
 # so the next iteration can plug in the runtime check without churn.
 HCT_SHOT_CLOCK_VIOLATION_THRESHOLD = 20
 
-# Initial BH hold (per spec): 3 game seconds at the start of step 1 — the inbound
-# receiver pauses while teammates and defenders begin their move-up. Bumped from
-# 1s to 3s for visibility; reduce later if it feels too long.
-BH_HOLD_GAME_SECONDS = 3.0
+# Initial BH hold (per spec): 1 game second at the start of step 1 — the inbound
+# receiver pauses while teammates and defenders begin their move-up.
+BH_HOLD_GAME_SECONDS = 1.0
 
 # Step 1 BH target: x = 44, y random in [21, 29].
 STEP_1_BH_TARGET_X = 44

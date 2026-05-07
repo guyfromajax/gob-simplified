@@ -4836,7 +4836,28 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         scene.game.config.width,
         scene.game.config.height
       );
-      
+
+      // 🔍 [HCT-FE-DIAG] (TEMP) Compare sprite's actual pixel position vs the
+      // backend's start-coord pixel for HCT/FCP step 1. Diagnoses sprite/coord
+      // mismatch where a "hold" tween becomes a slow drift instead of a freeze.
+      // Remove once Dynamic_HCT_Turns.md hold-drift bug is confirmed fixed.
+      if (isPressureSkeletonTurn && stepIndex === 1) {
+        const { x: startPxX, y: startPxY } = gridToPixels(
+          prev.coords.x,
+          prev.coords.y,
+          scene.game.config.width,
+          scene.game.config.height
+        );
+        const deltaPx = Phaser.Math.Distance.Between(sprite.x, sprite.y, startPxX, startPxY);
+        const isBH = !!anim.hasBallAtStep?.[0];
+        console.log(
+          `🔍 [HCT-FE-DIAG] step1${isBH ? " [BH]" : ""} player=${String(anim.playerId).slice(0, 8)} ` +
+          `sprite_px=(${sprite.x.toFixed(1)}, ${sprite.y.toFixed(1)}) ` +
+          `expected_px=(${startPxX.toFixed(1)}, ${startPxY.toFixed(1)}) ` +
+          `start_grid=(${prev.coords.x}, ${prev.coords.y}) delta_px=${deltaPx.toFixed(1)}`
+        );
+      }
+
       // Use distance-based duration calculation (from current sprite position to target)
       // This ensures smooth transitions between turns and consistent speeds
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
