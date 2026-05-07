@@ -7,8 +7,8 @@
 ##Zone Definitions##
 Normal
 PG: center court, deep key, deep upper wing, deep lower wing, key
-SG: deep upper baseline, upper wing
-SF: deep lower baseline, lower wing
+SG: deep upper baseline, deep upper wing, upper wing
+SF: deep lower baseline, deep lower wing, lower wing
 PF: topLane, upper apex, lower apex, upper higPost, lower highPost
 C: midLane, upper midPost, lower midPost, basket spot, upper low post, lower low post
 

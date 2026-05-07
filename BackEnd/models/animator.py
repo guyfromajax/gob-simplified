@@ -1505,6 +1505,7 @@ class Animator:
             _get_hct_bh_guarders_for_shift,
             compute_hct_trap_formation,
             assign_zone_defender_coords,
+            resolve_hct_defender_collisions,
             _point_in_polygon,
         )
         from BackEnd.utils.shared import get_away_player_coords
@@ -1595,13 +1596,14 @@ class Animator:
                 else step_index * 800
             )
 
+            # Compute coords + action for every defender at this step, THEN run the
+            # collision pass so any exact (x, y) overlap is resolved before append.
+            step_coords = {}
+            step_actions = {}
             for def_pos in per_def_movement.keys():
                 if def_pos in bh_guarders and def_pos in trap_coords:
-                    def_coords = dict(trap_coords[def_pos])
-                    def_action = "guard_ball"
-                    per_def_movement[def_pos].append(
-                        {"timestamp": timestamp, "coords": def_coords, "action": def_action}
-                    )
+                    step_coords[def_pos] = dict(trap_coords[def_pos])
+                    step_actions[def_pos] = "guard_ball"
                     continue
 
                 zone_polygon = zone_boundaries.get(def_pos)
@@ -1646,8 +1648,16 @@ class Animator:
                     else:
                         def_coords = {"x": 50, "y": 25}
 
+                step_coords[def_pos] = def_coords
+                step_actions[def_pos] = def_action
+
+            # Collision pass: any defenders at the exact same (x, y) get split
+            # around the ball handler per resolve_hct_defender_collisions.
+            step_coords = resolve_hct_defender_collisions(step_coords, bh_coords)
+
+            for def_pos, coords in step_coords.items():
                 per_def_movement[def_pos].append(
-                    {"timestamp": timestamp, "coords": def_coords, "action": def_action}
+                    {"timestamp": timestamp, "coords": coords, "action": step_actions[def_pos]}
                 )
 
         for def_pos, def_movement in per_def_movement.items():

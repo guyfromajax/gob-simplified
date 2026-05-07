@@ -119,8 +119,8 @@ ZONE_131_UPPER_CORNER_SHIFT = {
 
 HCT_STANDARD_NORMAL = {
     "PG": ["center court", "deep key", "deep upper wing", "deep lower wing", "key"],
-    "SG": ["deep upper baseline", "upper wing"],
-    "SF": ["deep lower baseline", "lower wing"],
+    "SG": ["deep upper baseline", "deep upper wing", "upper wing"],
+    "SF": ["deep lower baseline", "deep lower wing", "lower wing"],
     "PF": ["topLane", "upper apex", "lower apex", "upper highPost", "lower highPost"],
     "C": ["midLane", "upper midPost", "lower midPost", "basketSpot", "upper lowPost", "lower lowPost"],
 }
@@ -226,6 +226,65 @@ def _get_hct_bh_guard_clamp_box(shift, is_away_offense=False):
     if is_away_offense:
         return (100 - x_max, 100 - x_min, y_min, y_max)
     return (x_min, x_max, y_min, y_max)
+
+
+def resolve_hct_defender_collisions(per_def_coords, bh_coords, rng=None):
+    """
+    HCT collision avoidance.
+
+    After all defenders have been placed for a single step, prevent any two from
+    occupying the **exact same** (x, y). When a collision is detected:
+
+    - If the ball handler is past either baseline (``bh_x < 9`` or ``bh_x > 91``):
+      use an X-offset around the ball handler — one mover at ``BH_x + 2``, the
+      other at ``BH_x - 2``, both at ``BH_y``.
+    - Otherwise: use a Y-offset — one mover at ``BH_y + 2``, the other at
+      ``BH_y - 2``, both at ``BH_x``.
+
+    Random pick of which mover takes +2 vs −2.
+
+    For a 3-defender pileup: pick one mover to keep its current spot at random;
+    the other two get the pair-resolution above. (4+ pileups: one stays, two are
+    repositioned, any remainder stays — extremely rare; not worth special-casing.)
+
+    HCT-specific because it forces both colliding defenders to converge on the
+    ball handler — that's fine in HCT (trap intent) but wrong for HCO.
+    """
+    if rng is None:
+        rng = random
+    if not per_def_coords or not bh_coords:
+        return per_def_coords
+
+    coord_to_positions = {}
+    for pos, coords in per_def_coords.items():
+        if not coords:
+            continue
+        key = (int(coords["x"]), int(coords["y"]))
+        coord_to_positions.setdefault(key, []).append(pos)
+
+    bh_x = int(round(bh_coords.get("x", 50)))
+    bh_y = int(round(bh_coords.get("y", 25)))
+    use_x_offset = bh_x < 9 or bh_x > 91
+
+    for _coord_key, positions in coord_to_positions.items():
+        if len(positions) < 2:
+            continue
+        shuffled = list(positions)
+        rng.shuffle(shuffled)
+        if len(positions) == 2:
+            mover_a, mover_b = shuffled[0], shuffled[1]
+        else:
+            # 3+: keep one at random, resolve the next two as a pair.
+            mover_a, mover_b = shuffled[1], shuffled[2]
+
+        if use_x_offset:
+            per_def_coords[mover_a] = {"x": bh_x + 2, "y": bh_y}
+            per_def_coords[mover_b] = {"x": bh_x - 2, "y": bh_y}
+        else:
+            per_def_coords[mover_a] = {"x": bh_x, "y": bh_y + 2}
+            per_def_coords[mover_b] = {"x": bh_x, "y": bh_y - 2}
+
+    return per_def_coords
 
 
 def compute_hct_trap_formation(
