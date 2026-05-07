@@ -592,29 +592,6 @@ class TurnManager:
 
         self.logger.log("baselineInbound:start")
 
-        # 🔍 BIP-COORDS-DIAG (TEMP): one logging.warning per line so multi-line
-        # messages don't get split by the log viewer. Filtered to HCT to cut noise.
-        # REMOVE once Dynamic_HCT_Turns.md bug #2 is resolved.
-        try:
-            if next_defensive_setup == "HCT":
-                logging.warning(
-                    "🔍 [BIP-COORDS-DIAG] BEGIN is_away_offense=%s next_setup=%s",
-                    is_away_offense,
-                    next_defensive_setup,
-                )
-                for _pos in ("PG", "SG", "SF", "PF", "C"):
-                    _player = offense_team.lineup.get(_pos)
-                    _coords = (getattr(_player, "coords", None) or {}) if _player else {}
-                    logging.warning(
-                        "🔍 [BIP-COORDS-DIAG]   %s: (%s, %s)",
-                        _pos,
-                        _coords.get("x", "?"),
-                        _coords.get("y", "?"),
-                    )
-                logging.warning("🔍 [BIP-COORDS-DIAG] END")
-        except Exception as _exc:
-            logging.warning("🔍 [BIP-COORDS-DIAG] failed: %s", _exc)
-
         # Define ball spot for inbounder (used in payload regardless of pressure type)
         # ✅ FIX: Inbound spot should be at edge of baseline, not center court
         # Home orientation uses left baseline (x=3), away uses right baseline (x=97 after flip)
@@ -632,19 +609,9 @@ class TurnManager:
             setup_locations = None
 
         if setup_locations:
-            # Convert location strings to coordinates (home orientation).
-            # Positions whose location is ``None`` are *carry-over*: the player keeps
-            # the coords they ended the prior turn with. Used today for HCT PG and SG
-            # so the BIP doesn't yank them across the court before dynamic HCT runs
-            # (see Dynamic_HCT_Turns.md).
             from BackEnd.constants import HCO_STRING_SPOTS
             o_dest_home = {}
-            carry_over_positions = []
             for pos, location in setup_locations.items():
-                if location is None:
-                    carry_over_positions.append(pos)
-                    self.logger.log(f"destCarryOver:{pos}")
-                    continue
                 coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
                 o_dest_home[pos] = coords.copy()
                 self.logger.log(f"destAssigned:{pos}")
@@ -656,16 +623,6 @@ class TurnManager:
 
             # Flip offensive coordinates if the away team has possession.
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
-
-            # Fill carry-over positions from each player's current coords (already in
-            # current orientation — no flip needed regardless of which team is on offense).
-            for pos in carry_over_positions:
-                player = offense_team.lineup.get(pos)
-                player_coords = (getattr(player, "coords", None) or {}) if player else {}
-                o_dest[pos] = {
-                    "x": int(player_coords.get("x", 50) or 50),
-                    "y": int(player_coords.get("y", 25) or 25),
-                }
         else:
             # HCO-only baseline inbound setup uses explicit BIP targets.
             offense_attrs = offense_team.team_attributes or {}

@@ -4842,7 +4842,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
       // which may be from the end of the previous turn or from a previous step
       const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
-      const duration = distanceDuration;
+      // For HCT/FCP, respect waypoint timestamp deltas as a duration floor so
+      // zero-distance "hold" frames (e.g. dynamic-HCT BH 3s hold at step-1 start)
+      // are visible. Distance-based duration alone collapses holds to 50ms.
+      const tsDelta = Number(curr?.timestamp) - Number(prev?.timestamp);
+      const duration = (isPressureSkeletonTurn && Number.isFinite(tsDelta) && tsDelta > 0)
+        ? Math.max(distanceDuration, tsDelta)
+        : distanceDuration;
       
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {

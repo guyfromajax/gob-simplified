@@ -249,7 +249,12 @@ HCO_STRING_SPOTS = {
     "lower center court baseline": {"x": 50, "y": 5},
     # Inbound positions (for FCP/HCT skeletons after made baskets)
     "inbound_left": {"x": 3, "y": 25},    # Left of center baseline
-    "inbound_right": {"x": 97, "y": 25}    # Right of center baseline
+    "inbound_right": {"x": 97, "y": 25},   # Right of center baseline
+    # HCT inbound-side setup spots for PG/SG (home orientation). Sit near the
+    # inbounder so dynamic-HCT step 1 always advances forward from a consistent
+    # low-x starting point (see Dynamic_HCT_Turns.md, bug #2).
+    "hct_inbound_pg": {"x": 10, "y": 25},
+    "hct_inbound_sg": {"x": 15, "y": 35},
 }
 
 # FCP/HCT setup positions (step 0 extracted from skeletons)
@@ -264,14 +269,12 @@ FCP_SETUP_POSITIONS = {
 }
 
 # All HCT variants use the same starting positions.
-# PG and SG carry over from the prior turn (None sentinel) — see Dynamic_HCT_Turns.md
-# for rationale: pre-dynamic-HCT they were authored at deep-offensive spots ("lower bird"
-# / "upper highPost") that left them past the dynamic-HCT step-1 instigation point,
-# producing a backward-walk visual. Carrying over uses the player's natural defensive
-# positions from the made-shot instead, near the inbounder for HCT.
+# PG/SG sit on the inbound side near the inbounder so dynamic-HCT step 1
+# always advances forward from a consistent low-x starting point. See
+# Dynamic_HCT_Turns.md (bug #2) for why we replaced prior-turn carry-over.
 HCT_SETUP_POSITIONS = {
-    "PG": None,                  # carry over from prior turn
-    "SG": None,                  # carry over from prior turn
+    "PG": "hct_inbound_pg",
+    "SG": "hct_inbound_sg",
     "SF": "inbound_left",
     "PF": "deep upper wing",
     "C": "deep lower wing"

@@ -22,6 +22,17 @@ from BackEnd.constants import (
 )
 
 
+def is_user_facing_game(game) -> bool:
+    """True if the user is on either team — i.e. this is the live game the user
+    is watching, not a parallel CPU sim. Use to gate diag logs so franchise
+    mode's parallel sims don't multiply log noise.
+    """
+    return bool(
+        getattr(getattr(game, "home_team", None), "is_user_team", False)
+        or getattr(getattr(game, "away_team", None), "is_user_team", False)
+    )
+
+
 def format_height(value) -> str:
     """Convert total inches to a feet'inches" string.
 
