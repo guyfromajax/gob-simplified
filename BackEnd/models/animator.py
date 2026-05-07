@@ -1339,11 +1339,14 @@ class Animator:
                 )
                 animations.extend(defensive_anims)
             elif is_hct:
-                # Use HCT-specific defensive positioning with dynamic tracking
-                defensive_anims = self._position_hct_defenders(
-                    offensive_animations,  # Pass offensive animations dict (like FCP)
+                # HCT now uses zone-based placement + trap formation (HCT_To_Zone.md /
+                # FCP_HCT_System.md). Trap defenders sit on the ball handler in upper /
+                # lower shifts; all other defenders run standard zone defender priority
+                # logic against the HCT polygon for their position.
+                defensive_anims = self._position_hct_zone_defenders(
+                    offensive_animations,
                     def_lineup,
-                    steps
+                    steps,
                 )
                 animations.extend(defensive_anims)
             else:
@@ -1478,194 +1481,191 @@ class Animator:
         
         return defensive_animations
 
-    def _position_hct_defenders(self, offensive_animations, def_lineup, skeleton_steps):
+    def _position_hct_zone_defenders(self, offensive_animations, def_lineup, skeleton_steps):
         """
-        Position defensive players for Half Court Trap scenarios.
-        
-        Strategy (parallel to FCP):
-        - Defenders start at initial trap positions (Step 0 only)
-        - Then use real-time tracking of offensive players (like FCP)
-        - Each defender tracks their matched offensive player step-by-step
-        - Never cross half court (x-boundary enforcement)
-        - Primary trap defender (PG) follows ball handler more closely
-        
-        Args:
-            offensive_animations: Dict mapping position → offensive player animation (same as FCP)
-            def_lineup: Dict of defensive players by position
-            skeleton_steps: List of skeleton steps for timing
-            
-        Returns:
-            List of defensive player animations
+        Position defensive players for HCT using zone-based placement + trap formation.
+
+        Per step:
+          1. Find current ball handler (per-timestamp; ball can change hands).
+          2. Pick shift via ball handler y: ``< 20`` → lower, ``> 30`` → upper, else normal.
+          3. Trap defenders (PG+SG upper / PG+SF lower / none normal) are placed via
+             trap formation: BH_x + random(1..4) toward basket, ±2 y-offset, paired
+             y-shift if either would leave the y-clamp box, distinct x-offsets.
+          4. Other defenders run standard zone defender priority logic against the
+             HCT polygon (BH-in-zone → 1-player-in-zone → multi-player-closest-to-basket).
+             Zones with fewer than 3 vertices fall back to "closest listed spot to BH".
+
+        Coordinate orientation matches the existing HCO zone helper: zone polygons
+        are flipped via ``_get_zone_coords`` when the away team is on offense; the
+        standard ``assign_zone_defender_coords`` return value is flipped back to
+        match offensive coords.
         """
+        from BackEnd.utils.shared_defense import (
+            _get_hct_standard_zone_boundaries,
+            _get_hct_bh_guarders_for_shift,
+            compute_hct_trap_formation,
+            assign_zone_defender_coords,
+            _point_in_polygon,
+        )
+        from BackEnd.utils.shared import get_away_player_coords
+
         defensive_animations = []
-        
-        # Determine court orientation
+        if not offensive_animations or not def_lineup:
+            return defensive_animations
+
         is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
-        
-        # Define initial HCT positions based on court orientation (for Step 0 setup only)
-        if is_away_offense:
-            # Home team defending (away team on offense)
-            initial_hct_positions = {
-                "PG": {"x": 44, "y": 25},   # Deep Key
-                "SG": {"x": 44, "y": 35},   # Deep Upper Wing
-                "SF": {"x": 44, "y": 15},   # Deep Lower Wing
-                "PF": {"x": 45, "y": 30},   # Opposite side upper (matches frontend)
-                "C": {"x": 45, "y": 20}     # Opposite side lower (matches frontend)
-            }
-            # Half-court boundary for away offense (home defending)
-            halfcourt_boundary = 53  # Max x coordinate defenders can reach
-            x_offset_toward_basket = -2  # Offset toward offensive basket (left side)
-        else:
-            # Away team defending (home team on offense)
-            initial_hct_positions = {
-                "PG": {"x": 57, "y": 25},   # Deep Key
-                "SG": {"x": 57, "y": 35},   # Deep Upper Wing
-                "SF": {"x": 57, "y": 15},   # Deep Lower Wing
-                "PF": {"x": 56, "y": 30},   # Opposite side upper (matches frontend flip: 101-45=56)
-                "C": {"x": 56, "y": 20}     # Opposite side lower (matches frontend flip: 101-45=56)
-            }
-            # Half-court boundary for home offense (away defending)
-            halfcourt_boundary = 47  # Min x coordinate defenders can reach
-            x_offset_toward_basket = 2  # Offset toward offensive basket (right side)
-        
-        # Find ball handler position for trap focus
-        ball_handler_pos = None
-        ball_handler_by_timestamp = {}
+        aggression = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
+
+        # Coords-by-step in current orientation (no flipping; mirrors HCO zone path).
+        offensive_positions_by_step = {}
         for pos, off_anim in offensive_animations.items():
-            has_ball_list = off_anim.get("hasBallAtStep", [])
-            for idx, off_step in enumerate(off_anim.get("movement", [])):
-                if idx < len(has_ball_list) and has_ball_list[idx]:
-                    ts = off_step.get("timestamp")
-                    if ts is not None:
-                        ball_handler_by_timestamp[ts] = pos
-                        if ball_handler_pos is None:
-                            ball_handler_pos = pos
-        if not ball_handler_pos:
-            ball_handler_pos = "PG"  # Fallback
-        
-        # Match each defensive position to offensive position (man-to-man, like FCP)
-        for position, off_anim in offensive_animations.items():
-            # Get the defensive player at this position
-            def_player = def_lineup.get(position)
-            if not def_player:
+            offensive_positions_by_step[pos] = [
+                step.get("coords", {"x": 50, "y": 25}) for step in off_anim.get("movement", [])
+            ]
+
+        max_steps = max(
+            (len(off_anim.get("movement", [])) for off_anim in offensive_animations.values()),
+            default=1,
+        )
+
+        # Initial fallback ball handler (step-0 carrier; rarely needed).
+        fallback_bh = "PG"
+        for pos, off_anim in offensive_animations.items():
+            if off_anim.get("hasBallAtStep", [False])[0]:
+                fallback_bh = pos
+                break
+
+        per_def_movement = {pos: [] for pos in ["PG", "SG", "SF", "PF", "C"] if def_lineup.get(pos)}
+
+        for step_index in range(max_steps):
+            current_bh_pos = None
+            for pos, off_anim in offensive_animations.items():
+                has_ball_list = off_anim.get("hasBallAtStep", [])
+                if step_index < len(has_ball_list) and has_ball_list[step_index]:
+                    current_bh_pos = pos
+                    break
+            if not current_bh_pos:
+                current_bh_pos = fallback_bh
+
+            bh_coords_list = offensive_positions_by_step.get(current_bh_pos, [])
+            bh_coords = (
+                bh_coords_list[step_index]
+                if step_index < len(bh_coords_list)
+                else (bh_coords_list[-1] if bh_coords_list else {"x": 50, "y": 25})
+            )
+
+            zone_boundaries, shift = _get_hct_standard_zone_boundaries(
+                bh_coords.get("y", 25), is_away_offense
+            )
+            bh_guarders = _get_hct_bh_guarders_for_shift(shift)
+            trap_coords = compute_hct_trap_formation(bh_coords, shift, is_away_offense)
+
+            # Skeleton-step ball spot for standard zone priority context.
+            ball_spot = "key"
+            if step_index < len(skeleton_steps):
+                step_data = skeleton_steps[step_index]
+                bh_action = step_data.get("pos_actions", {}).get(current_bh_pos, {})
+                ball_spot = bh_action.get("location") or bh_action.get("spot") or "key"
+
+            # Build offensive_players for the standard priority logic.
+            offensive_players = []
+            for off_pos in offensive_animations.keys():
+                coords_list = offensive_positions_by_step.get(off_pos, [])
+                coords = (
+                    coords_list[step_index]
+                    if step_index < len(coords_list)
+                    else (coords_list[-1] if coords_list else {"x": 50, "y": 25})
+                )
+                spot = "key"
+                if step_index < len(skeleton_steps):
+                    step_data = skeleton_steps[step_index]
+                    off_action_data = step_data.get("pos_actions", {}).get(off_pos, {})
+                    spot = off_action_data.get("location") or off_action_data.get("spot") or "key"
+                player_obj = self.game.offense_team.lineup.get(off_pos)
+                offensive_players.append({
+                    "player_id": getattr(player_obj, "player_id", None) if player_obj else None,
+                    "coords": coords,
+                    "is_ball_handler": off_pos == current_bh_pos,
+                    "spot": spot,
+                })
+
+            timestamp = (
+                skeleton_steps[step_index].get("timestamp", step_index * 800)
+                if step_index < len(skeleton_steps)
+                else step_index * 800
+            )
+
+            for def_pos in per_def_movement.keys():
+                if def_pos in bh_guarders and def_pos in trap_coords:
+                    def_coords = dict(trap_coords[def_pos])
+                    def_action = "guard_ball"
+                    per_def_movement[def_pos].append(
+                        {"timestamp": timestamp, "coords": def_coords, "action": def_action}
+                    )
+                    continue
+
+                zone_polygon = zone_boundaries.get(def_pos)
+                def_coords = None
+                def_action = "guard_offball"
+
+                if zone_polygon and len(zone_polygon) >= 3:
+                    coords = assign_zone_defender_coords(
+                        def_pos,
+                        zone_boundaries,
+                        offensive_players,
+                        bh_coords,
+                        ball_spot,
+                        aggression,
+                        is_away_offense,
+                    )
+                    if coords:
+                        # assign_zone_defender_coords returns HOME orientation; flip
+                        # back to current orientation when the away team is on offense.
+                        if is_away_offense:
+                            coords = get_away_player_coords(coords)
+                        def_coords = coords
+                        bh_in_zone = _point_in_polygon(
+                            bh_coords["x"], bh_coords["y"], zone_polygon
+                        )
+                        def_action = "guard_ball" if bh_in_zone else "guard_offball"
+                elif zone_polygon:
+                    # 2-vertex (or 1-vertex) zone: place at the listed spot closest to ball.
+                    closest = min(
+                        zone_polygon,
+                        key=lambda c: (c[0] - bh_coords["x"]) ** 2
+                        + (c[1] - bh_coords["y"]) ** 2,
+                    )
+                    def_coords = {"x": int(closest[0]), "y": int(closest[1])}
+
+                if def_coords is None:
+                    # Last-resort fallback: zone centroid, or court center if even that's missing.
+                    if zone_polygon:
+                        avg_x = sum(c[0] for c in zone_polygon) / len(zone_polygon)
+                        avg_y = sum(c[1] for c in zone_polygon) / len(zone_polygon)
+                        def_coords = {"x": int(avg_x), "y": int(avg_y)}
+                    else:
+                        def_coords = {"x": 50, "y": 25}
+
+                per_def_movement[def_pos].append(
+                    {"timestamp": timestamp, "coords": def_coords, "action": def_action}
+                )
+
+        for def_pos, def_movement in per_def_movement.items():
+            if not def_movement:
                 continue
-            
-            def_player_id = getattr(def_player, "player_id", None)
+            def_player = def_lineup.get(def_pos)
+            def_player_id = getattr(def_player, "player_id", None) if def_player else None
             if not def_player_id:
                 continue
-            
-            # Build defensive movement matching offensive player's path
-            def_movement = []
-            def_start = None
-            def_end = None
-            
-            # Step 0: Start at initial HCT position (setup/trap formation)
-            setup_coords = initial_hct_positions[position]
-            def_movement.append({
-                "timestamp": 0,
-                "coords": setup_coords,
-                "action": "STAND"
-            })
-            def_start = setup_coords
-            
-            # Step 1+: Real-time tracking of offensive player (like FCP)
-            for off_step in off_anim["movement"]:
-                timestamp = off_step["timestamp"]
-                off_coords = off_step["coords"]
-                
-                # Skip Step 0 since we already handled it above
-                if timestamp == 0:
-                    continue
-                
-                # Determine current ball handler at this timestamp
-                current_ball_handler_pos = ball_handler_by_timestamp.get(timestamp, ball_handler_pos)
-                
-                # Calculate defensive position based on offensive position
-                # For HCT: defenders are positioned closer with trap focus
-                if position == "PG" and position == current_ball_handler_pos:
-                    # Primary trap defender tracking ball handler - follow closely
-                    def_coords = {
-                        "x": off_coords["x"] + x_offset_toward_basket,
-                        "y": off_coords["y"]
-                    }
-                elif position == "PG":
-                    # PG tracks ball handler even if not guarding him
-                    ball_handler_anim = offensive_animations.get(current_ball_handler_pos)
-                    if ball_handler_anim and ball_handler_anim["movement"]:
-                        # Find ball handler's position at this timestamp
-                        bh_coords = off_coords  # Default to current offensive position
-                        for bh_step in ball_handler_anim["movement"]:
-                            if bh_step["timestamp"] == timestamp:
-                                bh_coords = bh_step["coords"]
-                                break
-                        def_coords = {
-                            "x": bh_coords["x"] + x_offset_toward_basket,
-                            "y": bh_coords["y"]
-                        }
-                    else:
-                        # Fallback: track assigned offensive player
-                        def_coords = {
-                            "x": off_coords["x"] + x_offset_toward_basket,
-                            "y": off_coords["y"]
-                        }
-                else:
-                    # Other defenders: track their assigned offensive player
-                    # Tighter spacing than FCP (smaller offset)
-                    tighter_offset = x_offset_toward_basket // 2 if abs(x_offset_toward_basket) > 1 else x_offset_toward_basket
-                    def_coords = {
-                        "x": off_coords["x"] + tighter_offset,
-                        "y": off_coords["y"]
-                    }
-                
-                # Enforce half-court boundary (defenders never cross x=50)
-                if is_away_offense:
-                    def_coords["x"] = min(halfcourt_boundary, def_coords["x"])
-                else:
-                    def_coords["x"] = max(halfcourt_boundary, def_coords["x"])
-                
-                # Clamp X to valid court bounds (0-100)
-                def_coords["x"] = max(0, min(100, def_coords["x"]))
-                
-                # Determine defensive action based on offensive action
-                if off_step.get("action") in ["handle_ball", "receive", "shoot", "pass"]:
-                    def_action = "guard_ball"  # Guarding ball handler
-                else:
-                    def_action = "guard_offball"  # Guarding off-ball player
-                
-                if def_start is None:
-                    def_start = def_coords
-                def_end = def_coords
-                
-                def_movement.append({
-                    "timestamp": timestamp,
-                    "coords": def_coords,
-                    "action": def_action
-                })
-            
-            if not def_movement or len(def_movement) == 1:
-                # Only setup position, no movement - extend with same position
-                def_end = setup_coords
-                if len(off_anim["movement"]) > 1:
-                    last_timestamp = off_anim["movement"][-1]["timestamp"]
-                    def_movement.append({
-                        "timestamp": last_timestamp,
-                        "coords": setup_coords,
-                        "action": "STAND"
-                    })
-            
-            # All defenders have ball at no steps
-            has_ball_steps = [False] * len(def_movement)
-            duration = def_movement[-1]["timestamp"] if def_movement else 0
-            
             defensive_animations.append({
                 "playerId": def_player_id,
-                "start": def_start or setup_coords,
-                "end": def_end or setup_coords,
+                "start": def_movement[0]["coords"],
+                "end": def_movement[-1]["coords"],
                 "movement": def_movement,
-                "hasBallAtStep": has_ball_steps,
-                "duration": duration
+                "hasBallAtStep": [False] * len(def_movement),
+                "duration": def_movement[-1]["timestamp"],
             })
-        
+
         return defensive_animations
 
     def _position_zone_defenders(self, offensive_animations, def_lineup, skeleton_steps):

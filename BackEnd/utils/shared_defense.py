@@ -111,6 +111,195 @@ ZONE_131_UPPER_CORNER_SHIFT = {
 }
 
 
+# ==================== HCT (Half Court Trap) Zone Defense ====================
+# Stored in home-defending orientation (right-half, x > 50). _get_zone_coords
+# flips when away team is on offense, mirroring the HCO zone constants above.
+# Two trap defenders per shift sit on the ball handler via trap formation; their
+# zone entry is None to signal "compute via trap rules, not polygon".
+
+HCT_STANDARD_NORMAL = {
+    "PG": ["center court", "deep key", "deep upper wing", "deep lower wing", "key"],
+    "SG": ["deep upper baseline", "upper wing"],
+    "SF": ["deep lower baseline", "lower wing"],
+    "PF": ["topLane", "upper apex", "lower apex", "upper highPost", "lower highPost"],
+    "C": ["midLane", "upper midPost", "lower midPost", "basketSpot", "upper lowPost", "lower lowPost"],
+}
+
+# Upper shift (ball handler y > 30): PG and SG trap the ball handler.
+HCT_STANDARD_UPPER_SHIFT = {
+    "PG": None,  # ball-handler trapper (trap formation)
+    "SG": None,  # ball-handler trapper (trap formation)
+    "SF": ["deep key", "key"],
+    "PF": ["upper apex", "upper highPost"],
+    "C": ["midLane", "upper midPost", "upper lowPost", "basketSpot", "lower lowPost", "lower midPost"],
+}
+
+# Lower shift (ball handler y < 20): PG and SF trap the ball handler.
+HCT_STANDARD_LOWER_SHIFT = {
+    "PG": None,  # ball-handler trapper (trap formation)
+    "SG": ["deep key", "key"],
+    "SF": None,  # ball-handler trapper (trap formation)
+    "PF": ["upper apex", "upper highPost"],
+    "C": ["midLane", "upper midPost", "upper lowPost", "basketSpot", "lower lowPost", "lower midPost"],
+}
+
+# BH-guarder rectangular clamp box (home-defending orientation; x flips when away offense).
+HCT_BH_GUARD_CLAMP_X = (54, 73)
+HCT_BH_GUARD_CLAMP_Y_UPPER = (31, 50)
+HCT_BH_GUARD_CLAMP_Y_LOWER = (1, 19)
+
+# Trap formation: each trapper at BH_x + (1..4 toward basket), one at BH_y+2, the other at BH_y-2.
+HCT_TRAP_X_OFFSET_MIN = 1
+HCT_TRAP_X_OFFSET_MAX = 4
+HCT_TRAP_Y_OFFSET = 2
+
+# Which trapper takes the +y vs -y slot in each shift.
+# +1 = sit at BH_y + offset (above), -1 = sit at BH_y - offset (below).
+HCT_BH_GUARDER_Y_OFFSET_SIGN = {
+    "upper": {"PG": -1, "SG": +1},
+    "lower": {"PG": +1, "SF": -1},
+}
+
+
+def _get_hct_standard_zone_boundaries(ball_y, is_away_offense=False):
+    """
+    HCT Standard: pick zone variant via ball-handler y, return per-position polygons.
+
+    Shift rules:
+        ball_y < 20 → lower shift
+        ball_y > 30 → upper shift
+        else        → normal (no trap formation)
+
+    Returns ``(zone_boundaries, shift_name)``. ``zone_boundaries`` maps position →
+    list of (x, y) tuples for non-trapping defenders, OR ``None`` for the trap
+    defenders in upper / lower shifts (caller must run the trap-formation rules
+    for those positions).
+    """
+    try:
+        by = float(ball_y)
+    except (TypeError, ValueError):
+        by = 25.0
+    if by < 20:
+        zone_def = HCT_STANDARD_LOWER_SHIFT
+        shift = "lower"
+    elif by > 30:
+        zone_def = HCT_STANDARD_UPPER_SHIFT
+        shift = "upper"
+    else:
+        zone_def = HCT_STANDARD_NORMAL
+        shift = "normal"
+
+    zone_boundaries = {}
+    for position, spot_list in zone_def.items():
+        if spot_list is None:
+            zone_boundaries[position] = None
+        else:
+            zone_boundaries[position] = _get_zone_coords(spot_list, is_away_offense)
+
+    return zone_boundaries, shift
+
+
+def _get_hct_bh_guarders_for_shift(shift):
+    """List of defender positions that play trap formation for the given shift."""
+    if shift == "upper":
+        return ["PG", "SG"]
+    if shift == "lower":
+        return ["PG", "SF"]
+    return []
+
+
+def _get_hct_bh_guard_clamp_box(shift, is_away_offense=False):
+    """
+    Return ``(x_min, x_max, y_min, y_max)`` clamp rectangle for trap defenders.
+
+    Stored in home-defending orientation (x ∈ [54, 73]); flipped to x ∈ [27, 46]
+    when away team is on offense. Y bands are absolute (no flip): upper shift
+    → 31–50, lower shift → 1–19.
+    """
+    if shift == "upper":
+        y_min, y_max = HCT_BH_GUARD_CLAMP_Y_UPPER
+    elif shift == "lower":
+        y_min, y_max = HCT_BH_GUARD_CLAMP_Y_LOWER
+    else:
+        return None
+    x_min, x_max = HCT_BH_GUARD_CLAMP_X
+    if is_away_offense:
+        return (100 - x_max, 100 - x_min, y_min, y_max)
+    return (x_min, x_max, y_min, y_max)
+
+
+def compute_hct_trap_formation(
+    bh_coords,
+    shift,
+    is_away_offense=False,
+    rng=None,
+):
+    """
+    Compute (x, y) for the two trap defenders given the ball handler's coords.
+
+    Each trapper sits at ``BH_x + offset * direction`` where ``offset`` is a random
+    integer in [1, 4] (the two trappers must use different offsets), and
+    ``direction`` is +1 toward the right basket (home offense) or -1 toward the
+    left basket (away offense).
+
+    One trapper takes y = BH_y + 2, the other y = BH_y - 2 — see
+    ``HCT_BH_GUARDER_Y_OFFSET_SIGN`` for which position takes which slot. If the
+    pair would push one defender past the y-clamp, the whole pair shifts as a
+    unit so both stay in bounds and the 4-unit y-spacing is preserved.
+
+    Returns ``{position: {"x": int, "y": int}}`` for the two trapper positions
+    of the shift, or ``{}`` for normal shift.
+    """
+    if rng is None:
+        rng = random
+    clamp = _get_hct_bh_guard_clamp_box(shift, is_away_offense)
+    if clamp is None:
+        return {}
+    x_min, x_max, y_min, y_max = clamp
+    direction = -1 if is_away_offense else 1
+
+    trappers = _get_hct_bh_guarders_for_shift(shift)
+    if len(trappers) != 2:
+        return {}
+
+    sign_map = HCT_BH_GUARDER_Y_OFFSET_SIGN.get(shift, {})
+
+    # Pick two distinct x-offsets in [HCT_TRAP_X_OFFSET_MIN, HCT_TRAP_X_OFFSET_MAX].
+    offsets = list(range(HCT_TRAP_X_OFFSET_MIN, HCT_TRAP_X_OFFSET_MAX + 1))
+    rng.shuffle(offsets)
+    offset_a, offset_b = offsets[0], offsets[1]
+
+    pos_a, pos_b = trappers[0], trappers[1]
+    sign_a = sign_map.get(pos_a, +1)
+    sign_b = sign_map.get(pos_b, -1)
+
+    bh_x = int(round(bh_coords.get("x", 50)))
+    bh_y = int(round(bh_coords.get("y", 25)))
+
+    a_y = bh_y + sign_a * HCT_TRAP_Y_OFFSET
+    b_y = bh_y + sign_b * HCT_TRAP_Y_OFFSET
+
+    # Pair-shift if either is outside the y-clamp; preserves the 4-unit spacing.
+    over_high = max(a_y, b_y) - y_max
+    if over_high > 0:
+        a_y -= over_high
+        b_y -= over_high
+    under_low = y_min - min(a_y, b_y)
+    if under_low > 0:
+        a_y += under_low
+        b_y += under_low
+    a_y = max(y_min, min(y_max, a_y))
+    b_y = max(y_min, min(y_max, b_y))
+
+    a_x = max(x_min, min(x_max, bh_x + offset_a * direction))
+    b_x = max(x_min, min(x_max, bh_x + offset_b * direction))
+
+    return {
+        pos_a: {"x": int(a_x), "y": int(a_y)},
+        pos_b: {"x": int(b_x), "y": int(b_y)},
+    }
+
+
 def _get_zone_coords(zone_definition, is_away_offense=False):
     """
     Convert zone definition (list of spot names) to list of coordinate tuples.

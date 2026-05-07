@@ -242,6 +242,11 @@ HCO_STRING_SPOTS = {
     "deep lower baseline": {"x": 57, "y": 5},
     "deep upper wing": {"x": 57, "y": 35},
     "deep upper baseline": {"x": 57, "y": 45},
+    "center court": {"x": 50, "y": 25},
+    "upper center court wing": {"x": 50, "y": 35},
+    "upper center court baseline": {"x": 50, "y": 45},
+    "lower center court wing": {"x": 50, "y": 15},
+    "lower center court baseline": {"x": 50, "y": 5},
     # Inbound positions (for FCP/HCT skeletons after made baskets)
     "inbound_left": {"x": 3, "y": 25},    # Left of center baseline
     "inbound_right": {"x": 97, "y": 25}    # Right of center baseline
