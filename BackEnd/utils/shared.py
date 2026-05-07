@@ -2180,8 +2180,29 @@ def calculate_defender_pressure_score(defender, defense_call):
     
     if is_zone_defense(defense_call):
         pressure *= 0.9
-    
+
     return int(pressure)
+
+
+def player_read(player):
+    """
+    Player decision-read score for situational reads (pass vs. drive, did the
+    trap form, is my teammate open, etc.).
+
+    Formula: ``((IQ * 0.8) + (CH * 0.2)) * random.randint(1, 6)``
+
+    Returns the raw integer score; callers compare against their own threshold
+    to decide whether the read was correct. Higher score → better read. CH
+    contributes a 20% confidence weight on top of the dominant IQ signal.
+
+    Mirrors the shape of ``calculate_ball_handling_score`` and
+    ``calculate_defender_pressure_score`` (also raw-score returns).
+    """
+    attrs = getattr(player, "attributes", {}) or {}
+    return int(
+        ((attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)) * random.randint(1, 6)
+    )
+
 
 def get_away_player_coords(playerCoords):
         

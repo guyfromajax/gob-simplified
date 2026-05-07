@@ -6772,20 +6772,122 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
     return modified_skeleton
 
 
+# Dynamic HCT feature flag (Dynamic_HCT_Turns.md). First-cut implementation
+# replaces the skeleton-driven offense path with step-by-step movement and
+# emergent outcomes (DEAD BALL or HCO). Flip to False to revert to skeleton.
+USE_DYNAMIC_HCT = True
+
+
+def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
+    """
+    Dynamic HCT entry point — first cut. Calls into ``dynamic_hct`` to compute
+    step 1 → 2 → 3 (attack branch only) animations and outcome, then assembles
+    the same return dict shape as the skeleton-driven path so downstream
+    consumers (frontend animator, turn manager, stat tracker) stay unchanged.
+
+    Deferred (post-first-cut): pass-to-side branch, x=64 transition / shoot,
+    foul / steal outcomes, 10-second-violation gate, post-stopper snapshots.
+    """
+    from BackEnd.engine.dynamic_hct import compute_dynamic_hct_turn
+
+    game_state = game.game_state
+    off_team = game.offense_team
+    def_team = game.defense_team
+    off_lineup = off_team.lineup
+    def_lineup = def_team.lineup
+
+    dyn = compute_dynamic_hct_turn(game)
+    animations = dyn["animations"]
+    result_type = dyn["result_type"]
+    ball_handler = dyn["ball_handler"]
+    defender = dyn["defender"]
+    text = text + dyn.get("text_suffix", "")
+
+    # Stat tracking parity with the skeleton path.
+    if result_type == "DEAD BALL":
+        if ball_handler is not None:
+            ball_handler.record_stat("TO")
+        def_scouting["defense"]["HCT"]["success"] += 1
+
+    # Apply final coords from the animation tail to player.coords.
+    if animations:
+        apply_coords_from_animations_list(game, animations)
+
+    # Possession flip + next play type per existing HCT conventions.
+    possession_flips = result_type in ("DEAD BALL", "STEAL")
+    if result_type == "HCO":
+        next_play_type = "HCO"
+        game_state["offensive_state"] = "HCO"
+    elif result_type == "DEAD BALL":
+        next_play_type = "SIDE_INBOUND"
+        if game_state.get("offensive_state") in ("FCP", "HCT"):
+            game_state["offensive_state"] = "HCO"
+    else:
+        next_play_type = None
+
+    roles = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+        "passer": "",
+        "screener": "",
+    }
+    hct_roles = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+    }
+    _record_hct_stats(hct_roles, {"result_type": result_type}, game, off_lineup, def_lineup)
+
+    return {
+        "result_type": result_type,
+        "text": text,
+        "current_turn": "HCT",
+        "next_play_type": next_play_type,
+        "next_turn": next_play_type,
+        "ball_handler": ball_handler,
+        "defender": defender,
+        "shooter": ball_handler,
+        "passer": "",
+        "screener": "",
+        "offense_team_id": off_team.team_id,
+        "possession_flips": possession_flips,
+        "time_elapsed": dyn["time_elapsed"],
+        "step_clock_seconds": dyn["step_clock_seconds"],
+        "resolution_step_index": max(0, len(dyn["step_clock_seconds"]) - 1),
+        "executed_step_count": len(dyn["step_clock_seconds"]),
+        "events": [],
+        "skeleton": {},
+        "animations": animations,
+        "roles": roles,
+        "foul_team": None,
+        "foul_player_id": None,
+        "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
+        "defender_id": getattr(defender, "player_id", None) if defender else None,
+        "fouled_out": False,
+        "foul_count": 0,
+    }
+
+
 def resolve_half_court_trap_logic(game: "GameManager"):
     """
     Resolve half court trap defensive pressure.
     Returns turn data with HCT result and potential progression to HCO.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    
+
     # ✅ Apply energy decay for active players during HCT
     # ✅ HCT DEFENSIVE PLAYERS: Omit zeros from depletion list for defensive players (they always lose some energy)
     apply_energy_decay(off_lineup, def_lineup, omit_zeros_for_defense=True)
-    
+
     # Track HCT attempt (defensive team)
     def_scouting = def_team.scouting_data
     def_scouting["defense"]["HCT"]["used"] += 1
+
+    if USE_DYNAMIC_HCT:
+        return _resolve_half_court_trap_dynamic_first_cut(
+            game, def_scouting, text="TRAP!"
+        )
 
     # Initialize variables to prevent UnboundLocalError
     shot_result = {}
