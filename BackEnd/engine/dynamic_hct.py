@@ -31,6 +31,7 @@ and stat-tracking expansions are deferred to subsequent cuts.
 """
 from __future__ import annotations
 
+import logging
 import math
 import random
 from typing import Any, Dict, List, Tuple
@@ -39,11 +40,13 @@ from BackEnd.constants import (
     ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
     CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
     HCO_STRING_SPOTS,
+    HCT_SETUP_POSITIONS,
 )
 from BackEnd.utils.shared import (
     calculate_ball_handling_score,
     calculate_defender_pressure_score,
     get_away_player_coords,
+    is_user_facing_game,
 )
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL
 
@@ -232,9 +235,28 @@ def _player_id(player) -> str:
 
 
 def _start_coords(player) -> Dict[str, int]:
-    """Read the player's current coords (post-BIP) for step-1 starting point."""
+    """Read the player's current coords for step-1 starting point. Used for
+    defenders (whose ``player.coords`` is correct post-made-shot). Offense uses
+    ``_hct_setup_start_coords`` instead — see that helper for why."""
     coords = getattr(player, "coords", None) or {}
     return {"x": int(coords.get("x", 50) or 50), "y": int(coords.get("y", 25) or 25)}
+
+
+def _hct_setup_start_coords(pos: str, is_away_offense: bool) -> Dict[str, int]:
+    """Offensive start coord for HCT step 1, sourced from HCT_SETUP_POSITIONS.
+
+    BIP places the SPRITE at the authored setup spot but does not write back to
+    ``player.coords``. Reading ``player.coords`` for offense here would yield a
+    stale value from the prior offensive possession, producing waypoints that
+    don't match the sprite's actual screen position — the frontend then tweens
+    forward into the wrong spot before snapping back. See Dynamic_HCT_Turns.md.
+    """
+    location = HCT_SETUP_POSITIONS.get(pos)
+    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+    out = {"x": int(coords["x"]), "y": int(coords["y"])}
+    if is_away_offense:
+        out = _flip(out)
+    return out
 
 
 def _step_1_arrival_time(start: Dict[str, Any], target: Dict[str, Any]) -> float:
@@ -355,8 +377,31 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         }
 
     off_targets, def_targets = _build_step_1_targets(bh_pos, is_away_offense)
-    bh_start = _start_coords(ball_handler)
+    bh_start = _hct_setup_start_coords(bh_pos, is_away_offense)
     bh_target = off_targets[bh_pos]
+
+    # 🔍 [HCT-DIAG] (TEMP) verify setup-spot starts vs stale player.coords.
+    # Gate on user-facing game so franchise-mode parallel CPU sims don't multiply
+    # log noise. Remove once Dynamic_HCT_Turns.md bug is confirmed fixed.
+    if is_user_facing_game(game):
+        logging.warning(
+            "🔍 [HCT-DIAG] is_away_offense=%s bh_pos=%s",
+            is_away_offense,
+            bh_pos,
+        )
+        for _pos in ("PG", "SG", "SF", "PF", "C"):
+            _player = off_lineup.get(_pos)
+            _stale = (getattr(_player, "coords", None) or {}) if _player else {}
+            _setup = _hct_setup_start_coords(_pos, is_away_offense)
+            logging.warning(
+                "🔍 [HCT-DIAG]   %s: setup=(%s,%s) stale_player_coords=(%s,%s)%s",
+                _pos,
+                _setup["x"],
+                _setup["y"],
+                _stale.get("x", "?"),
+                _stale.get("y", "?"),
+                " [BH]" if _pos == bh_pos else "",
+            )
 
     # ---- Step 1 timing: BH holds 1 sec, then moves at challenged-open-floor pace.
     bh_move_seconds = _step_1_arrival_time(bh_start, bh_target)
@@ -387,7 +432,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if player is None:
             continue
         pid = _player_id(player)
-        start = _start_coords(player)
+        start = _hct_setup_start_coords(pos, is_away_offense)
         target = off_targets[pos]
         # End coord at the moment BH arrives — may not have reached target.
         end_coords = _move_at_pace(start, target, step_1_seconds, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND)
