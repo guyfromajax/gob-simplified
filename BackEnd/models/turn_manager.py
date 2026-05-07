@@ -592,6 +592,24 @@ class TurnManager:
 
         self.logger.log("baselineInbound:start")
 
+        # 🔍 BIP-COORDS-DIAG (TEMP): one-shot dump of offensive player coords at BIP
+        # entry, to verify whether the HCT carry-over change places the BH at the
+        # expected low-x (defensive-carryover) side. REMOVE once Dynamic_HCT_Turns.md
+        # bug #2 is resolved.
+        try:
+            _diag_lines = [
+                f"🔍 [BIP-COORDS-DIAG] is_away_offense={is_away_offense} next_setup={next_defensive_setup}"
+            ]
+            for _pos in ("PG", "SG", "SF", "PF", "C"):
+                _player = offense_team.lineup.get(_pos)
+                _coords = (getattr(_player, "coords", None) or {}) if _player else {}
+                _diag_lines.append(
+                    f"  {_pos}: ({_coords.get('x', '?')}, {_coords.get('y', '?')})"
+                )
+            logging.warning("\n".join(_diag_lines))
+        except Exception as _exc:
+            logging.warning("🔍 [BIP-COORDS-DIAG] failed: %s", _exc)
+
         # Define ball spot for inbounder (used in payload regardless of pressure type)
         # ✅ FIX: Inbound spot should be at edge of baseline, not center court
         # Home orientation uses left baseline (x=3), away uses right baseline (x=97 after flip)
