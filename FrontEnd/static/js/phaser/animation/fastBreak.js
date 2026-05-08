@@ -3062,7 +3062,18 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
 
   // Charge / blocking foul: animate to shot spot only, then return. No shot; announcement in finalizeTurnAfterAnimation.
   if (options.foulOnly) {
-    await Promise.all(promises);
+    if (isCriticalEventPatternEnabled()) {
+      // Critical event: shooter reaches shot spot (foul called). Stop remaining
+      // parallel tweens so they don't continue to far destinations during the
+      // foul announcement window.
+      await shooterPromise;
+      for (const [id, sprite] of Object.entries(playerSprites)) {
+        if (id === shooterId) continue;
+        if (sprite && scene.tweens) scene.tweens.killTweensOf(sprite);
+      }
+    } else {
+      await Promise.all(promises);
+    }
     return;
   }
   
