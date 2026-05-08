@@ -34,7 +34,7 @@ from __future__ import annotations
 import logging
 import math
 import random
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
     ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
@@ -297,12 +297,20 @@ def _add_waypoint(
     timestamp: int,
     coords: Dict[str, int],
     action: str,
+    game_seconds: Optional[float] = None,
 ) -> None:
-    bucket.setdefault(player_id, []).append({
+    """Append a waypoint. ``game_seconds`` (Phase 3) is the segment game-time
+    from the previous waypoint to this one — frontend uses it as the
+    authoritative tween duration when present, scaled by clockSecondMs to wall
+    time. Omit on start waypoints (no previous segment)."""
+    wp: Dict[str, Any] = {
         "timestamp": int(timestamp),
         "coords": {"x": int(coords["x"]), "y": int(coords["y"])},
         "action": action,
-    })
+    }
+    if game_seconds is not None:
+        wp["game_seconds"] = float(game_seconds)
+    bucket.setdefault(player_id, []).append(wp)
 
 
 def _resolve_step_3_attack_outcome(
@@ -427,8 +435,14 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     # BH waypoints
     bh_pid = _player_id(ball_handler)
     _add_waypoint(waypoints, bh_pid, step_start_ms, bh_start, "handle_ball")
-    _add_waypoint(waypoints, bh_pid, bh_hold_ms, bh_start, "handle_ball")
-    _add_waypoint(waypoints, bh_pid, bh_arrive_ms, bh_target, "handle_ball")
+    _add_waypoint(
+        waypoints, bh_pid, bh_hold_ms, bh_start, "handle_ball",
+        game_seconds=BH_HOLD_GAME_SECONDS,
+    )
+    _add_waypoint(
+        waypoints, bh_pid, bh_arrive_ms, bh_target, "handle_ball",
+        game_seconds=bh_move_seconds,
+    )
 
     # Other 4 offensive teammates: move toward pos1-4 targets for the full duration of step 1.
     for pos in ("PG", "SG", "SF", "PF", "C"):
@@ -443,7 +457,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         # End coord at the moment BH arrives — may not have reached target.
         end_coords = _move_at_pace(start, target, step_1_seconds, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND)
         _add_waypoint(waypoints, pid, step_start_ms, start, "move")
-        _add_waypoint(waypoints, pid, bh_arrive_ms, end_coords, "move")
+        _add_waypoint(
+            waypoints, pid, bh_arrive_ms, end_coords, "move",
+            game_seconds=step_1_seconds,
+        )
 
     # 5 defenders: move toward zone-Normal centroids (PG → center court override).
     def_step_1_end: Dict[str, Dict[str, int]] = {}
@@ -457,7 +474,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         end_coords = _move_at_pace(start, target, step_1_seconds, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND)
         def_step_1_end[pos] = end_coords
         _add_waypoint(waypoints, pid, step_start_ms, start, "guard_offball")
-        _add_waypoint(waypoints, pid, bh_arrive_ms, end_coords, "guard_offball")
+        _add_waypoint(
+            waypoints, pid, bh_arrive_ms, end_coords, "guard_offball",
+            game_seconds=step_1_seconds,
+        )
 
     # --- Step 2: defensive PG converges to (BH_x + offset, BH_y); others hold.
     # Per spec D: only defensive PG moves in step 2 for the first cut.
@@ -478,11 +498,17 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     pg_def = def_lineup.get("PG")
     if pg_def is not None:
         pg_pid = _player_id(pg_def)
-        _add_waypoint(waypoints, pg_pid, step_2_end_ms, converge_target, "guard_ball")
+        _add_waypoint(
+            waypoints, pg_pid, step_2_end_ms, converge_target, "guard_ball",
+            game_seconds=step_2_seconds,
+        )
 
     # All other players hold at their step-1 end coords.
     bh_step_2_coords = bh_target
-    _add_waypoint(waypoints, bh_pid, step_2_end_ms, bh_step_2_coords, "handle_ball")
+    _add_waypoint(
+        waypoints, bh_pid, step_2_end_ms, bh_step_2_coords, "handle_ball",
+        game_seconds=step_2_seconds,
+    )
     for pos in ("PG", "SG", "SF", "PF", "C"):
         if pos == bh_pos:
             continue
@@ -490,7 +516,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if off_player is not None:
             pid = _player_id(off_player)
             last_wp = waypoints[pid][-1]["coords"]
-            _add_waypoint(waypoints, pid, step_2_end_ms, last_wp, "stand")
+            _add_waypoint(
+                waypoints, pid, step_2_end_ms, last_wp, "stand",
+                game_seconds=step_2_seconds,
+            )
     for pos in ("PG", "SG", "SF", "PF", "C"):
         if pos == "PG":
             continue
@@ -498,7 +527,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if def_player is not None:
             pid = _player_id(def_player)
             last_wp = waypoints[pid][-1]["coords"]
-            _add_waypoint(waypoints, pid, step_2_end_ms, last_wp, "stand")
+            _add_waypoint(
+                waypoints, pid, step_2_end_ms, last_wp, "stand",
+                game_seconds=step_2_seconds,
+            )
 
     # --- Step 3 (attack branch — read deferred for first cut).
     result_type, score_ratio = _resolve_step_3_attack_outcome(
@@ -522,7 +554,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         step_3_end_ms = step_2_end_ms + int(round(step_3_seconds * ANIM_MS_PER_GAME_SEC))
 
         # BH dribbles to partial point.
-        _add_waypoint(waypoints, bh_pid, step_3_end_ms, partial_target, "dribble")
+        _add_waypoint(
+            waypoints, bh_pid, step_3_end_ms, partial_target, "dribble",
+            game_seconds=step_3_seconds,
+        )
         # Defender follows BH.
         if pg_def is not None:
             pg_pid = _player_id(pg_def)
@@ -532,7 +567,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                 ),
                 "y": partial_target["y"],
             }
-            _add_waypoint(waypoints, pg_pid, step_3_end_ms, defender_partial, "guard_ball")
+            _add_waypoint(
+                waypoints, pg_pid, step_3_end_ms, defender_partial, "guard_ball",
+                game_seconds=step_3_seconds,
+            )
 
     else:
         # HCO transition: BH dribbles all the way to deep key.
@@ -543,7 +581,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         step_3_seconds = max(0.3, path_distance / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND))
         step_3_end_ms = step_2_end_ms + int(round(step_3_seconds * ANIM_MS_PER_GAME_SEC))
 
-        _add_waypoint(waypoints, bh_pid, step_3_end_ms, target_for_dribble, "dribble")
+        _add_waypoint(
+            waypoints, bh_pid, step_3_end_ms, target_for_dribble, "dribble",
+            game_seconds=step_3_seconds,
+        )
         if pg_def is not None:
             pg_pid = _player_id(pg_def)
             defender_follow = {
@@ -552,7 +593,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                 ),
                 "y": target_for_dribble["y"],
             }
-            _add_waypoint(waypoints, pg_pid, step_3_end_ms, defender_follow, "guard_ball")
+            _add_waypoint(
+                waypoints, pg_pid, step_3_end_ms, defender_follow, "guard_ball",
+                game_seconds=step_3_seconds,
+            )
 
     # All other players hold through step 3.
     for pos in ("PG", "SG", "SF", "PF", "C"):
@@ -562,7 +606,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if off_player is not None:
             pid = _player_id(off_player)
             last_wp = waypoints[pid][-1]["coords"]
-            _add_waypoint(waypoints, pid, step_3_end_ms, last_wp, "stand")
+            _add_waypoint(
+                waypoints, pid, step_3_end_ms, last_wp, "stand",
+                game_seconds=step_3_seconds,
+            )
     for pos in ("PG", "SG", "SF", "PF", "C"):
         if pos == "PG":
             continue
@@ -570,7 +617,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if def_player is not None:
             pid = _player_id(def_player)
             last_wp = waypoints[pid][-1]["coords"]
-            _add_waypoint(waypoints, pid, step_3_end_ms, last_wp, "stand")
+            _add_waypoint(
+                waypoints, pid, step_3_end_ms, last_wp, "stand",
+                game_seconds=step_3_seconds,
+            )
 
     # Compose animations list.
     animations: List[Dict[str, Any]] = []

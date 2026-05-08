@@ -4821,19 +4821,30 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
       // which may be from the end of the previous turn or from a previous step
       const distanceDuration = getPlayerDuration(sprite, targetX, targetY);
-      // For HCT/FCP, respect waypoint timestamp deltas as a duration floor only
-      // for zero-distance "hold" frames (e.g. dynamic-HCT BH 3s hold at step-1
-      // start). Non-zero-distance steps must keep distance-based duration so
-      // movers run at the frontend's normal pace, not stretched to the hold's
-      // game-second window.
-      const tsDelta = Number(curr?.timestamp) - Number(prev?.timestamp);
-      const gridDx = Number(curr?.coords?.x) - Number(prev?.coords?.x);
-      const gridDy = Number(curr?.coords?.y) - Number(prev?.coords?.y);
-      const isHoldFrame = Number.isFinite(gridDx) && Number.isFinite(gridDy)
-        && Math.hypot(gridDx, gridDy) < 1;
-      const duration = (isPressureSkeletonTurn && isHoldFrame && Number.isFinite(tsDelta) && tsDelta > 0)
-        ? Math.max(distanceDuration, tsDelta)
-        : distanceDuration;
+
+      // Phase 3a (Movement Rate Refactor): when the backend stamps an explicit
+      // ``game_seconds`` on the destination waypoint, treat it as authoritative
+      // for tween duration — visual time = game_seconds × clockSecondMs.
+      // This synchronizes the visual with the game clock for any turn type that
+      // populates the field (today: dynamic-HCT). Fall back to distance-based
+      // for legacy waypoints that don't carry it.
+      const waypointGameSeconds = Number(curr?.game_seconds);
+      let duration;
+      if (Number.isFinite(waypointGameSeconds) && waypointGameSeconds >= 0) {
+        duration = Math.max(50, Math.round(waypointGameSeconds * clockSecondMs));
+      } else {
+        // Legacy path: HCT/FCP zero-distance "hold" frames previously used the
+        // waypoint timestamp delta as a duration floor (pre-Phase 3 mechanism,
+        // kept for any turns that emit hold frames without game_seconds).
+        const tsDelta = Number(curr?.timestamp) - Number(prev?.timestamp);
+        const gridDx = Number(curr?.coords?.x) - Number(prev?.coords?.x);
+        const gridDy = Number(curr?.coords?.y) - Number(prev?.coords?.y);
+        const isHoldFrame = Number.isFinite(gridDx) && Number.isFinite(gridDy)
+          && Math.hypot(gridDx, gridDy) < 1;
+        duration = (isPressureSkeletonTurn && isHoldFrame && Number.isFinite(tsDelta) && tsDelta > 0)
+          ? Math.max(distanceDuration, tsDelta)
+          : distanceDuration;
+      }
       
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
