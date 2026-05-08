@@ -554,13 +554,23 @@ def ag_to_grid_per_game_sec(ag):
     Convert AG attribute (1-100, average 50, rare values above 100) to grid
     units per game second.
 
-    Phase 1 STUB: ignores AG, returns the legacy COF default (16). Acts as a
-    no-op so Phase 1 wiring would not change behavior at any AG-driven site.
+    Linear curve calibrated to:
+      AG=0   → 10  (slow)
+      AG=50  → 16  (average — matches legacy COF default)
+      AG=100 → 22  (fast)
+      AG>100 → extends linearly (rare; AG=120 → 24.4)
 
-    Phase 4 will install a linear curve (AG=0 → 10, AG=50 → 16, AG=100 → 22,
-    soft-capped at 30 for rare AG > 100).
+    Soft-capped at 30 grid/game-sec to bound runaway extrapolation. Floored at
+    0.5 to prevent zero/negative rates from unexpected inputs.
+
+    Defaults to AG=50 (average) when the input is None or non-numeric.
     """
-    return 16.0
+    try:
+        ag_val = float(ag) if ag is not None else 50.0
+    except (TypeError, ValueError):
+        ag_val = 50.0
+    rate = 10.0 + (ag_val / 100.0) * 12.0
+    return max(0.5, min(rate, 30.0))
 
 
 def calc_cruise_segment_seconds(start, end, *, role="default"):
@@ -601,31 +611,47 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
     Used for max-effort movement (drives, fast breaks, defensive close-outs,
     in-shot motion, HCO/HCT/FCP skeleton steps post-bring-up).
 
-    Phase 1 BEHAVIOR: routes to current per-archetype pace constants and
-    ignores ``player``. Preserves current behavior at any wired call site.
+    When ``player`` is provided (Phase 4-migrated call sites):
+        rate = ag_to_grid_per_game_sec(player.AG) × archetype_multiplier
+        - archetype="default"        → multiplier 1.0     (free-running AG rate)
+        - archetype="drive"          → DRIVE_MULTIPLIER (0.75 — drive contested)
+        - archetype="shot_motion"    → SHOT_MOTION_MULTIPLIER (0.625 — shot motion)
+        - archetype="compressed_hco" → SHOT_MOTION_MULTIPLIER (0.625 — folds into shot_motion;
+                                       Compressed-HCO=10 vs HCO Shot=10 in legacy were the
+                                       same numeric rate)
 
-      archetype="default"        → CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND (16)
-      archetype="drive"          → ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND (12)
-      archetype="shot_motion"    → HCO_SHOT_GRID_PER_GAME_SECOND (10)
-      archetype="compressed_hco" → COMPRESSED_HCO_GRID_PER_GAME_SECOND (10)
-
-    Phase 4 BEHAVIOR (planned): rate = ag_to_grid_per_game_sec(player.AG)
-    × archetype multiplier (1.0 default, DRIVE_MULTIPLIER for drive,
-    SHOT_MOTION_MULTIPLIER for shot_motion). compressed_hco folds into default.
+    When ``player`` is None (Phase 1/legacy call sites that haven't been
+    migrated yet): falls back to the legacy per-archetype pace constants.
+    Preserves Phase 1 behavior so partial migrations don't change behavior at
+    sites still passing player=None.
 
     Args:
         start, end: {"x": ..., "y": ...} grid coord dicts
-        player: Player object (Phase 4); ignored in Phase 1
+        player: Player object with player.attributes["AG"]. None for legacy path.
         archetype: movement type (see above)
     """
+    if player is None:
+        # Legacy path — preserves pre-Phase-4 behavior at unmigrated call sites.
+        if archetype == "drive":
+            rate = ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
+        elif archetype == "shot_motion":
+            rate = HCO_SHOT_GRID_PER_GAME_SECOND
+        elif archetype == "compressed_hco":
+            rate = COMPRESSED_HCO_GRID_PER_GAME_SECOND
+        else:
+            rate = CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+        return calc_isotropic_segment_seconds(start, end, rate)
+
+    # AG-driven path — Phase 4 behavior.
+    attrs = getattr(player, "attributes", None) or {}
+    ag = attrs.get("AG", 50)
+    base_rate = ag_to_grid_per_game_sec(ag)
     if archetype == "drive":
-        rate = ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
-    elif archetype == "shot_motion":
-        rate = HCO_SHOT_GRID_PER_GAME_SECOND
-    elif archetype == "compressed_hco":
-        rate = COMPRESSED_HCO_GRID_PER_GAME_SECOND
+        rate = base_rate * DRIVE_MULTIPLIER
+    elif archetype in ("shot_motion", "compressed_hco"):
+        rate = base_rate * SHOT_MOTION_MULTIPLIER
     else:
-        rate = CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+        rate = base_rate
     return calc_isotropic_segment_seconds(start, end, rate)
 
 
