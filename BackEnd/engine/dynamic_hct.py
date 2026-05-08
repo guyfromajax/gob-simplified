@@ -432,17 +432,31 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     bh_hold_ms = step_start_ms + int(round(BH_HOLD_GAME_SECONDS * ANIM_MS_PER_GAME_SEC))
     bh_arrive_ms = step_start_ms + int(round(step_1_seconds * ANIM_MS_PER_GAME_SEC))
 
-    # BH waypoints
+    # BH waypoints. When BH_HOLD_GAME_SECONDS > 0 we emit a hold waypoint so
+    # the BH visibly pauses at the inbound spot before advancing — that adds an
+    # extra stepIndex iteration to the step loop. When the hold is 0 we omit
+    # the hold waypoint entirely so BH has the same waypoint count as the other
+    # 9 movers (start + arrive). This avoids a stepIndex misalignment where BH
+    # would otherwise stand still during stepIndex=1 (zero-distance hold) while
+    # everyone else completes step 1, then BH does the actual move during
+    # stepIndex=2 — visually a ~1-second pause for BH in the no-hold path.
     bh_pid = _player_id(ball_handler)
     _add_waypoint(waypoints, bh_pid, step_start_ms, bh_start, "handle_ball")
-    _add_waypoint(
-        waypoints, bh_pid, bh_hold_ms, bh_start, "handle_ball",
-        game_seconds=BH_HOLD_GAME_SECONDS,
-    )
-    _add_waypoint(
-        waypoints, bh_pid, bh_arrive_ms, bh_target, "handle_ball",
-        game_seconds=bh_move_seconds,
-    )
+    if BH_HOLD_GAME_SECONDS > 0:
+        _add_waypoint(
+            waypoints, bh_pid, bh_hold_ms, bh_start, "handle_ball",
+            game_seconds=BH_HOLD_GAME_SECONDS,
+        )
+        _add_waypoint(
+            waypoints, bh_pid, bh_arrive_ms, bh_target, "handle_ball",
+            game_seconds=bh_move_seconds,
+        )
+    else:
+        # Single segment: start → arrive over the full step_1_seconds.
+        _add_waypoint(
+            waypoints, bh_pid, bh_arrive_ms, bh_target, "handle_ball",
+            game_seconds=step_1_seconds,
+        )
 
     # Other 4 offensive teammates: move toward pos1-4 targets for the full duration of step 1.
     for pos in ("PG", "SG", "SF", "PF", "C"):
