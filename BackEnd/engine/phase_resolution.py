@@ -24,6 +24,7 @@ from BackEnd.utils.shared import (
     get_time_elapsed,
     calc_skeleton_time_elapsed,
     calc_skeleton_step_timing_contract,
+    calc_ag_segment_seconds,
     calc_isotropic_segment_seconds,
     calc_pass_segment_seconds,
     clamp_turn_time_elapsed,
@@ -949,11 +950,15 @@ def apply_fast_break_cg_time(turn_result, shot_attempted=False):
         if isinstance(start.get("x"), (int, float)) and isinstance(start.get("y"), (int, float)) and end:
             path_points = [start, {"x": end.get("x", start["x"]), "y": end.get("y", start["y"])}]
 
+    # AG-driven (Phase 4b): fast-break BH cover-ground scales with the BH's AG
+    # attribute. At AG=50 the result equals the legacy COF=16 rate exactly, so
+    # average-AG ball handlers produce identical timing to pre-migration. Falls
+    # back to legacy when bh is missing.
     distance_seconds = 0.0
     if len(path_points) >= 2:
         for idx in range(1, len(path_points)):
-            distance_seconds += calc_isotropic_segment_seconds(
-                path_points[idx - 1], path_points[idx], CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+            distance_seconds += calc_ag_segment_seconds(
+                path_points[idx - 1], path_points[idx], bh, archetype="default"
             )
 
     overhead_seconds = 0.0

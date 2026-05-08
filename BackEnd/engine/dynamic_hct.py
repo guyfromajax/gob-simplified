@@ -39,10 +39,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from BackEnd.constants import (
     ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
     CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
+    DRIVE_MULTIPLIER,
     HCO_STRING_SPOTS,
     HCT_SETUP_POSITIONS,
 )
 from BackEnd.utils.shared import (
+    ag_to_grid_per_game_sec,
+    calc_ag_segment_seconds,
     calc_cruise_segment_seconds,
     calculate_ball_handling_score,
     calculate_defender_pressure_score,
@@ -495,21 +498,23 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
 
     # --- Step 2: defensive PG converges to (BH_x + offset, BH_y); others hold.
     # Per spec D: only defensive PG moves in step 2 for the first cut.
-    pg_def_start = def_step_1_end.get("PG", _start_coords(def_lineup.get("PG")))
+    pg_def = def_lineup.get("PG")
+    pg_def_start = def_step_1_end.get("PG", _start_coords(pg_def))
     converge_x = bh_target["x"] + STEP_2_DEFENDER_X_OFFSET
     if is_away_offense:
         # Defender is between BH and the away basket (lower x).
         converge_x = bh_target["x"] - STEP_2_DEFENDER_X_OFFSET
     converge_target = {"x": converge_x, "y": bh_target["y"]}
-    step_2_seconds = _euclid(pg_def_start, converge_target) / float(
-        CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+    # AG-driven: defender's AG sets the converge pace (Phase 4b). At AG=50 this
+    # matches the legacy COF=16 rate exactly, so average lineups are unchanged.
+    step_2_seconds = max(
+        0.4,  # floor — short visible converge
+        calc_ag_segment_seconds(pg_def_start, converge_target, pg_def, archetype="default"),
     )
-    step_2_seconds = max(step_2_seconds, 0.4)  # floor — short visible converge
     step_2_start_ms = bh_arrive_ms
     step_2_end_ms = step_2_start_ms + int(round(step_2_seconds * ANIM_MS_PER_GAME_SEC))
 
-    # PG defender: converge.
-    pg_def = def_lineup.get("PG")
+    # PG defender: converge. (pg_def already resolved above for converge timing.)
     if pg_def is not None:
         pg_pid = _player_id(pg_def)
         _add_waypoint(
@@ -551,6 +556,12 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         off_team, def_team, ball_handler, defender
     )
 
+    # AG-driven drive rate (Phase 4b). At AG=50 this resolves to 16×0.75 = 12,
+    # exactly matching the legacy ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND, so
+    # average-AG ball handlers produce identical timing to pre-migration.
+    bh_attrs = getattr(ball_handler, "attributes", None) or {}
+    bh_drive_rate = ag_to_grid_per_game_sec(bh_attrs.get("AG", 50)) * DRIVE_MULTIPLIER
+
     if result_type == "DEAD BALL":
         # BH animates partway along path to deep key; defender follows.
         target_for_dribble = DEEP_KEY_SPOT
@@ -558,13 +569,14 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             target_for_dribble = _flip(target_for_dribble)
         path_distance = _euclid(bh_step_2_coords, target_for_dribble)
         partial_distance = path_distance * score_ratio
+        partial_elapsed = partial_distance / bh_drive_rate
         partial_target = _move_at_pace(
             bh_step_2_coords,
             target_for_dribble,
-            partial_distance / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND),
-            ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
+            partial_elapsed,
+            bh_drive_rate,
         )
-        step_3_seconds = max(0.3, partial_distance / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND))
+        step_3_seconds = max(0.3, partial_elapsed)
         step_3_end_ms = step_2_end_ms + int(round(step_3_seconds * ANIM_MS_PER_GAME_SEC))
 
         # BH dribbles to partial point.
@@ -592,7 +604,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if is_away_offense:
             target_for_dribble = _flip(target_for_dribble)
         path_distance = _euclid(bh_step_2_coords, target_for_dribble)
-        step_3_seconds = max(0.3, path_distance / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND))
+        step_3_seconds = max(0.3, path_distance / bh_drive_rate)
         step_3_end_ms = step_2_end_ms + int(round(step_3_seconds * ANIM_MS_PER_GAME_SEC))
 
         _add_waypoint(
