@@ -1,19 +1,18 @@
 # AG → Movement Speed (implementation brief)
 
-**Location:** `docs/docs_1_systems/05_Animation_System/AG_Implementation.md` (moved from `docs/To Do/`).
+**Status:** ✅ **AG v2 in production** (Movement Rate Refactor, May 2026). AG affects both **game-clock burn** (backend) and **visual tween duration** (frontend) by construction, on every relevant turn type. Frontend AG-px-per-sec is now the **fallback** path when backend per-player timing isn't available.
 
-**Status:** AG v1 implemented (per-player speed in `getPlayerDuration`); tuning + HCO context scalars optional  
-**Scope:** Universal player movement duration/speed from **effective in-game Agility (AG)**, starting with fast-break–style coverage; applicable to all steps/turns that use shared duration helpers.
+**Scope:** Per-player movement duration/speed from **effective in-game Agility (AG)** for all max-effort movement (drives, fast-break runners, defensive close-outs, in-shot motion, HCO/HCT/FCP skeleton steps). Cruise-speed steps (HCO bring-up, HCT step 1) deliberately ignore AG — see "Cruise vs AG-driven" below.
 
 ---
 
 ## 1. Goals
 
-- Reflect **player speed differences** in animation (not one global px/s for everyone).
-- Use a **smooth linear** mapping from AG → speed (no tier buckets).
+- Reflect **player speed differences** in animation and game-clock pacing.
+- Use a **smooth linear** mapping from AG → rate (no tier buckets).
 - Use **real in-game attributes** (fatigue-aware), not raw anchors only.
-- Keep **one universal helper** so tuning happens in one place.
-- **Ball handler:** universal **5% slower** than the same AG would predict off-ball (BH-specific modifiers deferred).
+- Keep **one universal curve** so tuning happens in one place.
+- **Sync game-clock and visuals** so a slow player burns more shot-clock seconds AND visibly moves slower at the same rate.
 
 ---
 
@@ -32,48 +31,88 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 
 ---
 
-## 3. Linear speed curve (no upper clamp on AG)
+## 3. Backend AG curve (canonical)
 
-- Map **AG** (can exceed **100**; no cap for speed purposes) → **pixels per second** with a **linear** function:
-  - Example form: `speedPxPerSec = speedBase + speedSlope * AG`
-  - Constants **`speedBase`** and **`speedSlope`** are tuning knobs (prototype band discussed ~**400–500** px/s for “typical” AG values).
-- **No maximum clamp** on AG for the formula: AG **120** continues the same line (e.g. if `speed = 400 + 1.0 * AG`, then AG **120** → **520** px/s). If a different line is chosen, recompute; **525** px/s at AG **120** implies a slightly steeper slope or higher intercept — pick constants explicitly when implementing.
-- **Default AG** if missing: **50** (should not happen in production; assert/log in dev).
+The single source of truth for AG-driven timing is `ag_to_grid_per_game_sec(ag)` in `BackEnd/utils/shared.py`:
+
+```python
+rate = 10.0 + (ag / 100.0) * 12.0   # linear
+return max(0.5, min(rate, 30.0))    # floor 0.5, soft cap 30
+```
+
+| AG | grid/game-sec | Note |
+|---|---|---|
+| 0 | 10 | Slow |
+| 50 | 16 | Average — matches legacy COF rate exactly (critical invariant for safe migration) |
+| 100 | 22 | Fast |
+| 120 | 24.4 | Above-average rare; linear extrapolation |
+| 200+ | 30 | Soft cap |
+| None / junk | 16 | Safe default at AG=50 average |
+
+### Archetype multipliers (applied on top of the curve)
+
+In `calc_ag_segment_seconds(start, end, player, archetype=...)`:
+
+| Archetype | Multiplier | Notes |
+|---|---|---|
+| `default` | 1.0 | Free-running rate (skeleton steps, fast-break runners, defender close-outs) |
+| `drive` | 0.75 | Drive contested — at AG=50: 16 × 0.75 = 12 (matches legacy Drive rate exactly) |
+| `shot_motion` | 0.625 | Movement into a shot — at AG=50: 16 × 0.625 = 10 (matches legacy HCO Shot rate exactly) |
+| `compressed_hco` | 0.625 | Folded into shot_motion under the AG model (legacy Compressed-HCO and HCO-Shot were both 10) |
+
+### Critical invariant
+
+At AG=50, the curve produces the legacy COF rate (16). Combined with the multipliers, AG=50 + each archetype produces the EXACT legacy per-archetype rate. This means migrating any call site to AG-driven is safe — average lineups behave identically; only the spread between fast/slow players manifests.
 
 ---
 
-## 4. Ball handler penalty (v1)
+## 4. Cruise vs AG-driven (when AG matters)
 
-- **Universal 5% reduction** for the player who is the **ball handler for that movement** (explicit context from turn / ball owner, not guessed).
-- Later: optional BH attribute–based bonus/penalty **on top of** this universal rule.
+Two-tier movement model (Movement Rate Refactor):
 
----
+**AG-driven steps** — max-effort situations where attribute matters:
+- Drives to the basket (archetype `drive`)
+- Fast-break runners (archetype `default`, BH AG drives the cover-ground time)
+- Defender close-outs / converges (archetype `default`)
+- In-shot motion (archetype `shot_motion`)
+- HCO/HCT/FCP skeleton step movement (archetype `default` or `shot_motion` per phase)
 
-## 5. Relation to global animation speed
+**Cruise-speed steps** — comfortable jogs where AG doesn't apply:
+- HCO bring-up (post-BIP/SIP/DREB → HCO step 0)
+- HCT step 1 BH advance to engagement spot
+- HCT step 1 non-BH offense + defenders
 
-- **Current:** `getPlayerSpeed()` / `window.__GAME_SPEED` use a single default (**~450** px/s).
-- **Near term:** Implement AG-based speed using the **current baseline** as the reference (per prior discussion).
-- **Later:** User-facing animation speed presets should act as a **multiplier** (or rescale) **around** the universal helper so AG spread and “faster/slower game” compose cleanly, and stay compatible with the **game clock** (already tied to animation pacing — see existing clock sync when reintroducing options).
-
----
-
-## 6. Roll-out: universal first, HCO fine-tuning second
-
-- **Phase A — Implement once, use everywhere:** Wire the universal AG → speed helper through all code paths that already derive tween duration from **`getPlayerDuration`** (or equivalent). **No separate FB-only fork** at first; fast breaks will show the largest *perceived* spread because players cover more pixel distance, while half court will show the same *relative* speed differences on shorter steps.
-- **Phase B — Playtest HCO:** After ship, evaluate half-court *feel*: if movement is too subtle, too twitchy, or lost among dense step churn, add a **second tuning layer** rather than ripping up the AG curve.
-- **Phase C — Optional HCO / turn-mode tuning:** Examples of follow-up knobs (pick as needed after playtest):
-  - A **context or mode scalar** (e.g. `half_court` vs `open_court` / fast break) applied on top of the same AG-based speed.
-  - A **blend** toward a baseline speed for compressed sets so AG differences stay readable without overshooting.
-- **Principle:** One shared **AG → px/s** rule stays the source of truth; any HCO or press/trap adjustment is an **additive scalar or blend**, not a duplicate system.
+Cruise rate (`CRUISE_BASELINE_GRID_PER_GAME_SEC = 16`) is constant for non-BH movers; the BH gets a fresh `random.uniform(8, 16)` per turn for organic variation. See `calc_cruise_segment_seconds` in `BackEnd/utils/shared.py`.
 
 ---
 
-## 7. Universal helper (architecture)
+## 5. Frontend AG-px-per-sec helper (fallback path)
 
-- **Single entry** used by `getPlayerDuration` (and any parallel helpers): e.g. resolve **effective AG** from sprite + scene/sim payload, compute **px/s**, apply **BH 5%** when applicable, then `duration = distance / speed` (existing distance-in-pixels behavior).
-- **Data wiring:** Sprites may not expose `attributes` today; resolver should:
-  - Prefer **`sprite`-attached** `attributes` / `AG` if present after load, else
-  - **Lookup** `scene.simData.players` (or equivalent) by `playerId` for **current** `attributes.AG` and **NG** as needed.
+Frontend `playerMovementSpeed.js` defines `agToSpeedPxPerSec(ag, { isBallHandler })`:
+- Maps AG → px/sec (linear, with a 5% reduction for ball-handler tweens)
+- Used by `getPlayerDuration(sprite, targetX, targetY)` for tween durations
+- **Now a FALLBACK**: only consulted when backend doesn't provide per-player game-seconds for the segment
+
+The frontend fallback uses the same conceptual mapping but operates in pixel space. Synchronization with backend AG curve isn't strictly required since backend authority (`game_seconds × clockSecondMs`) takes precedence whenever it's populated.
+
+---
+
+## 6. Relation to global animation speed
+
+- `getGameSpeedPxPerSec()` / `window.__GAME_SPEED` apply a global multiplier on the **fallback** AG-px-per-sec path.
+- Game-speed presets (Slow/Normal/Fast/Super Fast) currently disabled — focus has been on perfecting the execution feel before reintroducing presets. When reintroduced, they will act as a **visual-only** multiplier on `clockSecondMs` so the AG curve and game-clock burn aren't affected (visual time accelerates without changing game time).
+
+---
+
+## 7. Backend authority (architecture)
+
+Phase 4 of the Movement Rate Refactor migrated 10 call sites of `calc_skeleton_step_timing_contract` to pass `off_lineup`, plus dedicated migrations in `dynamic_hct.py` (HCT step 2/3) and `phase_resolution.py` (fast-break BH cover-ground). Result:
+
+- `step_clock_seconds[]` per turn now reflects per-player AG via the curve and archetype multipliers
+- `bringup_per_player_seconds` per HCO turn reflects BH random cruise + others baseline
+- HCT waypoints carry `game_seconds` per segment (BH cruise time for step 1 advance, AG-derived drive time for step 3, etc.)
+
+Frontend reads these values and uses `× clockSecondMs` as the tween duration. AG spread is preserved across game-clock and visuals by construction.
 
 ---
 
@@ -99,27 +138,33 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 
 ## 9. Open items / follow-ups
 
-- Final numeric **`speedBase`** / **`speedSlope`** after playtest.
-- Whether to use **integer** engine AG only vs **float** `anchor_AG * NG` if exposed.
-- Extend BH modeling beyond flat **5%**.
-- Re-hook **global game speed** + clock to the helper.
-- Post–Phase A playtest: whether **Phase C** context scalars are needed for HCO / press.
-- **Skeleton step gating (§11.2):** **done** — HCO / FCP / HCT steps advance when **all offensive** step tweens finish; defensive tweens are **ambient** (started in parallel or with the pass) and **do not** block step progression. Pass choreography unchanged: await **passer**, then **pass animation**, then **`Promise.all` offense** so the passer is included after the ball moves.
-- **Shot gating (§11.2–11.3):** still optional — HCO shot keyed on **shooter-only** vs current “all offense finish before `shootBall`”; rebound / display SS&S if shot fires early.
+- **AG curve tuning** based on franchise-mode pacing data (slope/intercept may need adjustment once we have data on shot-clock-violation rates per lineup AG distribution).
+- **BH movement multiplier**: AG curve doesn't currently apply a separate BH penalty (the ball handler running at his AG-derived rate is the model). The frontend fallback path retains a 5% BH penalty for legacy reasons but it's not part of the backend canon. Could be unified (one direction or the other) in a future tuning pass.
+- **Game speed presets**: when reintroduced, multiply `clockSecondMs` only — don't touch the AG curve.
+- **Shot gating (§11.2–11.3):** still optional — HCO shot keyed on **shooter-only** vs current "all offense finish before `shootBall`"; rebound / display SS&S if shot fires early.
 
 ---
 
 ## 10. Reference files
 
-- Energy / scaling: `docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`
-- Turn structure / buckets: `docs/docs_1_systems/05_GP_Supporting_Systems/Turn_by_Turn_System.md`
-- Player coords sync (animation finals → sim): `BackEnd/utils/shared.py` (`sync_lineup_coords_from_turn`, `apply_coords_from_animations_list`)
-- Duration base: `FrontEnd/static/js/phaser/animation/turnAnimation.js` (`getPlayerDuration`, `getDurationFromDistance`, `DEFAULT_PLAYER_SPEED`; **offense-gated** skeleton steps — passer, pass only, `Promise.all` on offense; defense non-blocking)
-- Shot-turn skeleton steps (same gating): `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js` (mirrors `playTurnAnimation` step phases)
-- Fast break “everyone else” tweens: `FrontEnd/static/js/phaser/animation/fastBreak.js` (`animateRebounders` → `getPlayerDuration`)
-- Sprite load: `FrontEnd/static/js/phaser/setup/loadPhaserPlayers.js`, `createPhaserPlayer.js` (may need `attributes` attach for AG)
-- AG movement speed: `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js`, tests `utils/playerMovementSpeed.test.js`
-- Fatigue sync for sprites: `FrontEnd/static/js/phaser/utils/syncPlayerSpriteAttributes.js` (called from `prepareTurnForAnimation` + `applyPlayerStats`), test `utils/syncPlayerSpriteAttributes.test.js`
+**Backend (timing source of truth):**
+- `BackEnd/utils/shared.py` — `ag_to_grid_per_game_sec` (AG curve), `calc_ag_segment_seconds` (archetype-aware AG segment duration), `calc_cruise_segment_seconds` (cruise BH random + baseline), `calc_skeleton_step_timing_contract` (per-step game-clock with `off_lineup` plumbing), `_calc_hco_bringup_per_player_seconds` (per-player HCO bring-up dict)
+- `BackEnd/engine/dynamic_hct.py` — HCT step 1 (cruise), step 2 (defender AG converge), step 3 (BH AG drive)
+- `BackEnd/engine/phase_resolution.py` — `apply_fast_break_cg_time` (BH AG cover-ground); HCO turnover/foul/recalibration timing contract callers (all pass `off_lineup`)
+- `BackEnd/models/shot_manager.py` — HCO/FCP/HCT shot-attempt timing contract callers (all pass `off_lineup`)
+- `BackEnd/constants/__init__.py` — `CRUISE_BASELINE_GRID_PER_GAME_SEC`, `BH_CRUISE_MIN/MAX`, `DRIVE_MULTIPLIER`, `SHOT_MOTION_MULTIPLIER`, `PASS_GRID_SPOTS_PER_GAME_SECOND` (legacy pace constants retired in Phase 4d)
+
+**Frontend (visual rendering, fallback path):**
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` — `playTurnAnimation` step loop reads `curr.game_seconds × clockSecondMs` as authoritative duration; falls back to `getPlayerDuration`. `runSetupTween` reads `turnData.bringup_per_player_seconds[pos]` for HCO bring-up.
+- `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js` — `agToSpeedPxPerSec` fallback helper
+- `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` — `getPlayerMovementDurationMs` fallback helper
+
+**Energy / scaling:**
+- `docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`
+- `BackEnd/models/player.py` (`_rescale_attributes`)
+
+**Project history:**
+- `_documentation_master/projects/Movement_Rate_Refactor.md` — phase-by-phase implementation record
 
 ---
 
@@ -200,38 +245,10 @@ Per **`docs/docs_1_systems/05_GP_Supporting_Systems/Energy_System.md`**:
 
 ---
 
-## 12. Work plan — AG-based movement (implementation)
+## 12. Work history
 
-**Milestone name:** AG v1 — per-player movement speed from effective AG  
-**Explicitly out of scope** for this milestone: HCO **shooter-only** shot gating (§11.2–11.3), dynamic/non-skeleton movement, reintroducing user **animation-speed presets** (compose with helper in a later milestone).
+**AG v1 (frontend px/sec only):** Shipped Feb 2026. Frontend `getPlayerDuration` consumes `agToSpeedPxPerSec(ag, { isBallHandler })`; tween durations vary with AG. Game-clock burn unchanged (still using flat pace constants). Visual ≠ clock divergence remained.
 
-### 12.0 Success criteria
+**AG v2 / Movement Rate Refactor (May 2026):** Backend AG curve, archetype multipliers, per-player game-seconds plumbed through HCO/HCT/FCP main game flow + fast break + BH cruise random for bring-up. Frontend now reads backend per-player timing as authoritative. Legacy pace constants retired. Visual and game-clock synced by construction. AG=50 invariant verified (preserves legacy timing exactly for average-AG lineups).
 
-- Every tween that derives duration via **`getPlayerDuration`** (and **`getPlayerDurationUncapped`** if still used) uses **per-player** speed from **effective AG** + **BH 5%** rule when applicable.
-- **AG 50** at full energy feels close to **today’s ~450 px/s** global baseline (tune `speedBase` / `speedSlope` in one place—no accidental wholesale speed shift).
-- **`window.__GAME_SPEED`:** Document chosen rule in code comments—either **replace** the per-player px/s result, or **multiply** the AG-derived speed (align with eventual clock sync when presets return).
-
-### 12.1 Tasks (ordered)
-
-| Step | Task | Primary files / notes |
-|------|------|----------------------|
-| **1** | Add pure **`agToSpeedPxPerSec(ag, { isBallHandler })`**: linear map, no AG cap; apply **×0.95** when `isBallHandler`; missing AG → **50**. Export constants (`SPEED_BASE`, `SPEED_SLOPE` or equivalent) with comment: tune so median roster ≈ legacy feel. | New module e.g. `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js` (or `animation/movementSpeed.js`) |
-| **2** | Add **`getEffectiveAgilityForMovement(sprite, scene)`** (or similar): read `attributes.AG` from **`sprite.attributes`** if present; else find player in **`scene.simData?.players`** by `sprite.playerId` / `player_id`; normalize string ids. Optional dev **`console.warn`** if still missing. | Same module or `turnAnimation.js` adjacency; **optional:** attach `attributes` in `loadPhaserPlayers.js` / `createPhaserPlayer.js` from `player` object to reduce lookups |
-| **3** | Extend **`getPlayerDuration(sprite, targetX, targetY, isTransition, opts?)`**: compute `speedPxPerSec` via (1)(2); pass **`isBallHandler`** when caller knows ball-handler role for that tween (see 12.2). Feed speed into existing **`getDurationFromDistance`** (may need overload: `speed` argument already there). | `FrontEnd/static/js/phaser/animation/turnAnimation.js` |
-| **4** | Audit **call sites** that bypass **`getPlayerDuration`** but use hardcoded player speeds or duplicate duration math; route through helper where the movement is a **player jog** (not ball arc). Prioritize: `fastBreak.js`, other `animation/*.js` grep for `getPlayerDuration`, `DEFAULT_PLAYER_SPEED`, `getPlayerSpeed`. | Repo-wide grep; fix stragglers |
-| **5** | **Unit tests** for `agToSpeedPxPerSec`: monotone AG; AG 0 / 50 / 100 / 120 extrapolation; BH vs off-ball ~5%; default 50. Optional: one test that **duration** decreases when AG increases for fixed distance (mock distance fn). | e.g. `FrontEnd/static/js/phaser/utils/playerMovementSpeed.test.js` or existing test runner pattern in repo |
-| **6** | **Manual QA:** Fast break trailers, HCO multi-step (pass + cut), FCP/HCT step, DREB outlet. Note any step that should pass **`isBallHandler: true`** but doesn’t yet. | Playtest checklist in PR |
-| **7** | **Phase B/C (post-ship):** If HCO feels too noisy or too subtle, add optional **`movementContext`** scalar (§6) without forking the AG curve. | Same speed module + call sites |
-
-### 12.2 Ball-handler flag — when to set `isBallHandler: true`
-
-- **Default `false`** when unknown (off-ball cuts, most defense).
-- **`true`** for tweens where that sprite **has the ball** for that movement **or** is unambiguously the **designated ball-handler step** (bring-up, iso drive step) — align with `hasBallAtStep` / `currentBallOwnerRef` / turn roles where available.
-- **Passes / shots:** Pass flight uses **ball** duration, not player `getPlayerDuration` for the ball in air; apply BH penalty to **handler’s** movement tweens only.
-
-### 12.3 Follow-on tickets (not AG v1)
-
-- **Done (client):** **Offense-gated skeleton steps** — step advances on all offensive tweens (+ pass choreography); defensive completion does not block. Implemented in `turnAnimation.js` and `ShotAnimationSystem.js` (Feb 2026).
-- **§11.2 shot gating:** Shooter-only advance to `shootBall`; coordinate with rebound/display SS&S (still open).
-- **Animation speed presets:** Multiply vs baseline + game clock sync.
-- **BH attribute** modifier on top of flat 5%.
+For the full phase-by-phase record, see `_documentation_master/projects/Movement_Rate_Refactor.md`.

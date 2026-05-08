@@ -1,5 +1,7 @@
 # Movement Rate Refactor
 
+> **Status: ✅ Shipped (Phases 0–4d, May 2026).** Full retirement of legacy pace constants complete; AG-driven timing live across HCO/HCT/FCP/fast-break; visual and game-clock synchronized via per-waypoint `game_seconds`. This doc remains as the design record. For runtime behavior, see code in `BackEnd/utils/shared.py` (`calc_ag_segment_seconds`, `calc_cruise_segment_seconds`, `ag_to_grid_per_game_sec`) and `FrontEnd/static/js/phaser/animation/turnAnimation.js` (waypoint `game_seconds` consumption).
+
 ## Goal
 
 Replace the current "flat pace constants per movement archetype" model with a two-tier movement system that unifies game-clock timing and visual animation:
@@ -118,18 +120,17 @@ def ag_to_grid_per_game_sec(ag: int) -> float:
 ## Phased plan
 
 ### Phase 0 — This document
-**Status:** in progress. **Output:** the spec you're reading. **Risk:** zero (no code).
+**Status:** ✅ shipped. **Output:** the spec you're reading. **Risk:** zero (no code).
 
 ### Phase 1 — Introduce helpers, no behavior change
-- Add `calc_cruise_segment_seconds` and `calc_ag_segment_seconds` to `BackEnd/utils/shared.py`.
-- Initial implementations route to current pace constants behind the scenes (e.g., `calc_cruise_segment_seconds` returns `distance / OF=20` for now; `calc_ag_segment_seconds` returns `distance / COF=16` ignoring player AG for now).
-- Add `ag_to_grid_per_game_sec` stub that just returns 16 for any AG.
-- All existing call sites unchanged — system is identical to today.
-- **PR-able alone, easy to revert.** Diffs: new functions only, zero existing-code changes.
-- **Risk:** minimal.
+**Status:** ✅ shipped.
+- Added `calc_cruise_segment_seconds`, `calc_ag_segment_seconds`, `ag_to_grid_per_game_sec` to `BackEnd/utils/shared.py`.
+- Initial implementations routed to legacy pace constants. `ag_to_grid_per_game_sec` was a stub returning 16 (fully implemented in Phase 4a).
+- Zero behavior change at any existing call site.
 
 ### Phase 2 — Route HCO + HCT bring-up through cruise helper, with BH variation
-- Update `_calc_hco_bringup_overhead_seconds` to call `calc_cruise_segment_seconds(role="bh")` for the BH's leg of the max-distance computation, and `role="default"` for other players.
+**Status:** ✅ shipped.
+- Updated `_calc_hco_bringup_overhead_seconds` to call `calc_cruise_segment_seconds(role="bh")` for the BH's leg of the max-distance computation, and `role="default"` for other players.
 - Update `dynamic_hct.py` step 1 to call `calc_cruise_segment_seconds(role="bh")` for BH advance and `role="default"` for the other 9.
 - Implement BH random rate in the helper.
 - Visuals still AG-driven (frontend not yet inverted) — so this round is **clock-only**. The user will see clock burn variation but not visual variation in the BH.
@@ -137,24 +138,55 @@ def ag_to_grid_per_game_sec(ag: int) -> float:
 - **Risk:** low. Only HCO bring-up and HCT step 1 timing change. Easy to A/B by toggling the helper to fall back to the old constant.
 
 ### Phase 3 — Frontend authority shift
-- Generalize the existing zero-distance hold-floor logic in [turnAnimation.js:4844](FrontEnd/static/js/phaser/animation/turnAnimation.js#L4844) to use the backend's per-player timing whenever provided, not just for zero-distance frames.
-- Add per-player `game_seconds` field to each waypoint (or each step's per-player payload). Backend populates this.
-- Frontend tween duration = `game_seconds × ms_per_game_sec` (where ms_per_game_sec = 1000 with Normal preset, scaled by the user's playback preset for visual-only acceleration).
-- Retire or simplify the contract/tolerance system at [turnAnimation.js:4946-5070](FrontEnd/static/js/phaser/animation/turnAnimation.js#L4946-L5070) — it watches for clock vs visual divergence; once they're synchronized by construction, it's redundant (or becomes a sanity assertion).
-- **PR-able alone but bigger.** Touches frontend rendering for every turn type.
-- **Risk:** medium. Visual regressions across HCO/HCT/FCP/Fast Break/Putback/Free Throw need eyeball verification. Recommend staging behind a feature flag (`USE_BACKEND_DURATION_AUTHORITY`) so easy revert is possible.
+**Status:** ✅ shipped (split into 3a + 3b for safety).
+
+**3a — HCT visual sync via `waypoint.game_seconds`.**
+- Backend `dynamic_hct.py` stamps `game_seconds` on each waypoint (BH cruise time for step 1, step_2_seconds for step 2, step_3_seconds for step 3).
+- Frontend `playTurnAnimation` step loop now prefers `curr.game_seconds × clockSecondMs` as authoritative tween duration; falls back to distance-based AG when absent. Existing zero-distance hold floor preserved as fallback.
+- HCT BH visibly varies in pace (slow random rate → visibly slower drive); other 9 players move at constant cruise rate. Synced by construction.
+- Side-fix landed alongside: BIP `inboundHoldMs` 400ms holds removed; `runPass` duration 500→250ms; redundant BH hold waypoint dropped when `BH_HOLD_GAME_SECONDS = 0`.
+
+**3b — HCO bring-up visual sync via per-player `bringup_per_player_seconds`.**
+- Backend `_calc_hco_bringup_per_player_seconds` (split from overhead helper) returns dict of `{pos: game_seconds}`. Single random roll for BH; consistent with `step_clock_seconds[0]` overhead by construction.
+- `bringup_per_player_seconds` propagated through `calc_skeleton_step_timing_contract` return value to HCO turn payloads via `phase_resolution.py` (3 sites) and `shot_manager.py` (1 site).
+- Frontend `runSetupTween` reads `turnData.bringup_per_player_seconds[scene.playerInfo[playerId].pos]` and uses `× clockSecondMs` as authoritative duration; falls back to AG-based when absent.
+- BH visibly varies during HCO bring-up; other offense players at constant cruise rate.
 
 ### Phase 4 — Migrate remaining sites, retire constants
-- Switch each AG-driven call site (per the table above) to `calc_ag_segment_seconds`.
-- Implement real `ag_to_grid_per_game_sec` curve based on AG distribution.
-- Remove `OPEN_FLOOR_GRID_PER_GAME_SECOND`, `CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND`, `ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND`, `COMPRESSED_HCO_GRID_PER_GAME_SECOND`, `HCO_SHOT_GRID_PER_GAME_SECOND` from constants.
-- Keep `PASS_GRID_SPOTS_PER_GAME_SECOND`.
-- **PR-able as one or split per archetype.**
-- **Risk:** medium-high. Per-AG game-clock burn changes overall game pacing — fast lineups now play more possessions per quarter than slow lineups. Per the user, this is the desired behavior.
+**Status:** ✅ shipped (split into 4a → 4d).
 
-## Estimated total time
+**4a — Real AG curve + dual-path helper.**
+- `ag_to_grid_per_game_sec` linear curve: `10 + (AG/100)*12`, soft-capped at 30, defaults to 50 on None/junk.
+- `calc_ag_segment_seconds` dual-path: `player=None` falls back to legacy constants (preserves Phase 1 behavior); `player=<obj>` uses curve × archetype multiplier.
+- Critical invariant verified: AG=50 player produces *identical* timing to legacy at every archetype.
 
-4-7 days of focused work. Per phase: 0.5-1d (Phase 1), 0.5-1d (Phase 2), 1-2d (Phase 3), 1-2d (Phase 4) plus testing.
+**4b — Migrate AG sites with locally accessible Player.**
+- `dynamic_hct.py`: Step 2 PG defender converge → `calc_ag_segment_seconds(default)` with defender's AG. Step 3 BH drives (DEAD BALL + HCO branches) → `bh_drive_rate = ag_to_grid_per_game_sec(BH.AG) * DRIVE_MULTIPLIER`.
+- `phase_resolution.py:apply_fast_break_cg_time` → `calc_ag_segment_seconds(default)` with BH.
+
+**4c — `calc_skeleton_step_timing_contract` lineup plumbing.**
+- Function gained optional `off_lineup` parameter. Inner loop dual-paths between AG-driven (when provided) and legacy literal-rate fallback (when not).
+- 10 callers migrated: `shot_manager.py` (4) + `phase_resolution.py` (6, including HCO turnover/O_FOUL/D_FOUL/shot-clock-recalibration, FCP, HCT).
+- One unmigrated caller: `calc_skeleton_time_elapsed` (generic helper, no game/lineup context). Stays on legacy fallback.
+
+**4d — Retire legacy pace constants.**
+- `BackEnd/constants/__init__.py`: 5 legacy constants deleted (`OPEN_FLOOR_GRID_PER_GAME_SECOND`, `CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND`, `ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND`, `COMPRESSED_HCO_GRID_PER_GAME_SECOND`, `HCO_SHOT_GRID_PER_GAME_SECOND`). `PASS_GRID_SPOTS_PER_GAME_SECOND` kept (ball physics).
+- Internal legacy fallback paths in `shared.py` use private module-level constants (`_LEGACY_DRIVE_RATE = 12`, `_LEGACY_OF_RATE = 20`, etc.) — readable but no longer part of the public API.
+- `dynamic_hct.py` step 1 non-BH/defenders use `CRUISE_BASELINE_GRID_PER_GAME_SEC` (semantic clarity; same value).
+- Result: zero direct references to retired constants anywhere in `BackEnd/` or `FrontEnd/`.
+
+## Final state — what's where
+
+| Concern | Source of truth |
+|---|---|
+| AG curve (1-100 → grid/game-sec) | `BackEnd/utils/shared.py:ag_to_grid_per_game_sec` |
+| AG-driven segment timing (drives, fast breaks, HCO/HCT/FCP skeleton steps) | `BackEnd/utils/shared.py:calc_ag_segment_seconds` |
+| Cruise-speed segment timing (HCO bring-up, HCT step 1) | `BackEnd/utils/shared.py:calc_cruise_segment_seconds` |
+| Per-step game-clock budget | `calc_skeleton_step_timing_contract` (returns `step_clock_seconds[]` + `bringup_per_player_seconds`) |
+| Per-player visual tween duration (HCT) | Waypoint `game_seconds` field, populated in `dynamic_hct.py` |
+| Per-player visual tween duration (HCO bring-up) | Turn payload `bringup_per_player_seconds`, consumed in `runSetupTween` |
+| Cruise-rate constants | `BackEnd/constants/__init__.py:CRUISE_BASELINE_GRID_PER_GAME_SEC`, `BH_CRUISE_MIN/MAX`, `DRIVE_MULTIPLIER`, `SHOT_MOTION_MULTIPLIER` |
+| Pass speed | `BackEnd/constants/__init__.py:PASS_GRID_SPOTS_PER_GAME_SECOND` (unchanged; ball physics, not AG) |
 
 ## Rollback strategy
 

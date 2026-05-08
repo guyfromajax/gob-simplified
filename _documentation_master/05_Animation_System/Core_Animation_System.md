@@ -1,6 +1,6 @@
 # Core Animation System
 
-**Status:** ✅ **PRODUCTION** - Fully operational (January 2025)
+**Status:** ✅ **PRODUCTION** — fully operational (last major architectural change: Movement Rate Refactor, May 2026).
 
 The core animation system provides a unified, predictable architecture for all turn animations, following SS&S principles (Simple, Stable, Scalable).
 
@@ -108,6 +108,43 @@ Specialized Handlers (execution)
 - Universal pass animation handler
 - Consistent ball flight behavior
 - Proper receiver positioning
+
+## Tween Duration Authority (Movement Rate Refactor)
+
+**Status:** ✅ Production (Phase 3a/3b/4, May 2026). See `_documentation_master/projects/Movement_Rate_Refactor.md` for design history.
+
+Per-tween durations are now **backend-authoritative** for the synced turn types. Backend computes per-player game-seconds; frontend converts to wall-time via `clockSecondMs` (the gameClock tick rate). Visual and game-clock advance in lockstep by construction.
+
+### Authoritative source by turn type
+
+| Turn type | Authority | Field on payload |
+|---|---|---|
+| HCT (steps 1, 2, 3) | Per-waypoint `game_seconds` field | `turn.animations[i].movement[j].game_seconds` |
+| HCO bring-up | Per-player `bringup_per_player_seconds` dict | `turn.bringup_per_player_seconds[pos]` |
+| HCO step movement (post-bring-up) | `step_clock_seconds[stepIndex]` (per-step) | `turn.step_clock_seconds[]` |
+| FCP/HCT skeleton steps (post-step-1 for HCT) | Same as HCO step movement | `turn.step_clock_seconds[]` |
+| Fast break, free throw, putback, pass, etc. | Distance-based AG fallback | (frontend computes) |
+
+### Frontend resolution order
+
+In `playTurnAnimation`'s step loop ([turnAnimation.js](FrontEnd/static/js/phaser/animation/turnAnimation.js)):
+
+1. If `curr.game_seconds` is finite and ≥ 0 → `duration = max(50, round(game_seconds × clockSecondMs))`
+2. Else legacy fallback: distance-based AG-px-per-sec via `getPlayerDuration(sprite, targetX, targetY)`
+
+In `runSetupTween` (HCO bring-up, just before HCO step 0):
+
+1. If `turnData.bringup_per_player_seconds[playerInfo.pos]` is finite → `duration = max(50, round(× clockSecondMs))`
+2. Else legacy fallback: distance-based AG-px-per-sec
+
+### Why this matters
+
+Pre-refactor, backend computed `step_clock_seconds[]` from pace constants × grid distance, while frontend computed tween durations from sprite px-distance ÷ AG-px-per-sec. The two could (and often did) diverge — `step_clock_seconds[]` was used as a tolerance check, not a duration source. The Movement Rate Refactor inverted this so backend is the source of truth, eliminating the drift class of bugs.
+
+### See also
+
+- `AG_Implementation.md` — AG-driven backend timing curve and frontend px/sec helper.
+- `_documentation_master/projects/Movement_Rate_Refactor.md` — phase-by-phase implementation history.
 
 ## Coordinate Flipping (Court Side)
 
@@ -265,7 +302,10 @@ All turn types route through AnimationRouter:
 
 ## See Also
 
-- `Animation_Detection_Reference.md` - Detailed detection point catalog
-- `Animation_Handler_Reference.md` - Complete handler documentation
-- `docs/Animation_System/animation_system.md` - Complete animation system documentation
+- `Animation_Detection_Reference.md` — Detailed detection point catalog
+- `Animation_Handler_Reference.md` — Complete handler documentation
+- `AG_Implementation.md` — AG-driven timing curve (backend canon + frontend fallback)
+- `Transition_Systems.md` — Hold times and delay reference
+- `_documentation_master/projects/Movement_Rate_Refactor.md` — Phase-by-phase implementation history of the May 2026 backend-authority shift
+- `docs/Animation_System/animation_system.md` — Older comprehensive doc (may have stale claims; cross-reference against the docs above)
 

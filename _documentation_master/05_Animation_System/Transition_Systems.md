@@ -4,7 +4,9 @@
 
 The transition system controls every **hold and delay** at turn boundaries (shot→rim, rebound attach, inbound, fast break, free throw) so pauses feel consistent and tunable without touching call sites. All values are **centralized** in **`FrontEnd/static/js/phaser/animation/animation_config.js`** and read via `animationConfig.*`; optional overrides can be applied via `globalThis.animation_config`.
 
-**Announcement-related holds** are fixed at **1000 ms** so result text ("It's Good!", "Great Stop!", FT make, FB make, ballManager made shot) stays readable. In **ShotAnimationSystem** (HCO made shots), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with the ball at the rim and the announcement visible together, then cleanup. Other paths use a 1000 ms hold after the announcement. **Non-announcement** delays have been tuned for shorter perceived pauses: shot rim hold 1000 ms (putback/miss path), rebound attach **500 ms**, inbound **200 ms** (×2). Fast break rim hold is 1000 ms (makes); FB misses use the rebound flow.
+**Announcement-related holds** are fixed at **1000 ms** so result text ("It's Good!", "Great Stop!", FT make, FB make, ballManager made shot) stays readable. In **ShotAnimationSystem** (HCO made shots), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with the ball at the rim and the announcement visible together, then cleanup. Other paths use a 1000 ms hold after the announcement. **Non-announcement** delays have been tuned for shorter perceived pauses: shot rim hold 1000 ms (putback/miss path), rebound attach **500 ms**. Fast break rim hold is 1000 ms (makes); FB misses use the rebound flow.
+
+**BIP (baseline inbound) responsiveness update (May 2026):** `inboundHoldMs` 2 × 200 ms holds before the BIP pass are **removed** in `runInboundSetup`; the BIP pass itself runs at **250 ms** (down from 500 ms) for a snappy ball-place → fly → receive sequence. SIP path retains the single 200 ms `holdAfterPlaceMs` (sets the visual rhythm for non-time-pressured side inbounds).
 
 To change a value: edit the **`defaults`** object in `animation_config.js` (and optionally overrides). No call-site changes are needed. For the full list of keys, where they run, and which files use them, see the tables below.
 
@@ -22,7 +24,7 @@ To change a value: edit the **`defaults`** object in `animation_config.js` (and 
 | `fastBreak.defensiveStopHoldMs` | 1000 | After "Great Stop!" on FB defensive stop. |
 | `rebound.attachDelayMs` | 500 | After rebounder reaches spot, before ball attach (possession secured). **Miss/block.** |
 | `offensiveRebound.pauseMs` | 1000 | Pause before kickout or putback (OREB). |
-| `inbound.holdAfterPlaceMs` | 200 | Hold after ball placed with inbound passer (SIP/BIP); applied **twice** in sequence. |
+| `inbound.holdAfterPlaceMs` | 200 | Hold after ball placed with inbound passer. **SIP only** — single application. **BIP path no longer uses this hold** (removed in May 2026 BIP responsiveness update). |
 | `freeThrow.rimHoldMs` | 300 | Legacy free throw path (e.g. pre-shot hold). |
 | `freeThrow.makeRimHoldMs` | 1000 | Made FT at rim (non-final); announcement hold. **Make only.** |
 
@@ -44,8 +46,9 @@ To change a value: edit the **`defaults`** object in `animation_config.js` (and 
 - `rebound.attachDelayMs` (500 ms) — after rebounder reaches spot.  
 - OREB: `offensiveRebound.pauseMs` (1000 ms) before kickout/putback.
 
-**Inbound (SIP/BIP)**  
-- `inbound.holdAfterPlaceMs` (200 ms), applied twice after ball placed with passer.
+**Inbound**
+- **SIP** (side inbound): `inbound.holdAfterPlaceMs` (200 ms) once after ball placed with passer.
+- **BIP** (baseline inbound): no post-placement hold; BIP-pass duration hardcoded to 250 ms in `runInboundSetup` for snappy responsiveness leading into HCO/HCT/FCP.
 
 **Free throw**  
 - Legacy: `freeThrow.rimHoldMs` (300 ms).  
@@ -65,7 +68,7 @@ To change a value: edit the **`defaults`** object in `animation_config.js` (and 
 | `fastBreak.defensiveStopHoldMs` | `fastBreak.js` (after "Great Stop!") |
 | `rebound.attachDelayMs` | `ballManager.js` (animateRebound) |
 | `offensiveRebound.pauseMs` | `turnAnimation.js` (OREB pause before kickout/putback) |
-| `inbound.holdAfterPlaceMs` | `turnAnimation.js` (SIP and BIP, hold after ball placed) |
+| `inbound.holdAfterPlaceMs` | `turnAnimation.js` (SIP only — `runSideInboundSetup`, after SF receives ball) |
 | `freeThrow.rimHoldMs` | `freeThrow.js` (legacy path) |
 | `freeThrow.makeRimHoldMs` | `FreeThrowAnimationSystem.js` (made FT at rim) |
 

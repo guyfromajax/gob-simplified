@@ -1,8 +1,15 @@
 # Animation Handler Reference
 
-**Status:** ✅ **COMPLETE** (January 2025)
+**Status:** ✅ Architecture stable as of May 2026.
 
 This document catalogs every handler that executes turn animations after routing through `AnimationRouter` and `AnimationEngine`.
+
+> **Note on line numbers:** the `AnimationEngine.js` line numbers below were captured against an earlier snapshot and may have drifted (e.g. after the May 2026 cleanup pass that removed `if (false)` debug blocks and stale comments). Handler names and their behavior are the durable contract — search by handler name if a line number is off.
+
+> **Recent additions worth noting:**
+> - `handleBaselineInbound` removes the legacy 2 × 200 ms post-placement holds; BIP pass duration is 250 ms.
+> - `handleDefault` → `playTurnAnimation` step loop now reads `curr.game_seconds × clockSecondMs` as authoritative tween duration when populated (HCT primarily); falls back to AG-px-per-sec.
+> - `runSetupTween` (called from `playTurnAnimation` for HCO turns from inbound) reads per-player `bringup_per_player_seconds` from turn data for HCO bring-up sync.
 
 ## Handler Architecture
 
@@ -128,23 +135,22 @@ All handlers follow this pattern:
 - Fallback to legacy `runSideInboundSetup()`
 
 ### 3. `handleBaselineInbound()`
-**Registered for:** `BASELINE_INBOUND`  
-**Location:** `AnimationEngine.js` line 297
+**Registered for:** `BASELINE_INBOUND`
+**Location:** `AnimationEngine.js` (search by name; line drift expected)
 
 **What it does:**
 - **FCP/HCT State Tracking:** Sets `scene.currentPressureType` and `scene.pressureSequenceActive` when pressure setup detected
-- Animates all players to their positions using distance-based duration
+- Animates all players to their positions (distance-based AG fallback when `turnData.animations` lacks per-player `game_seconds` — typical for HCO BIP since BIP backend doesn't populate animations array)
+- Calls `passSystem.executeInboundSequence(...)` → `runInboundSetup` for the actual BIP pass + setup-tween orchestration
 - Transitions state machine to `HalfCourt`
 - Sets `scene._previousTurnWasInbound = true` for HCO pre-step setup
-- Executes inbound pass animation via `PassAnimationSystem`
 - Waits for pass animation to complete before proceeding
 
 **Key Features:**
 - FCP/HCT state initialization (single source of truth)
-- Player position animations (distance-based duration)
-- State machine transition
-- Scene flag for HCO setup
-- Pass completion wait logic
+- 2 × 200 ms post-placement holds **removed** (May 2026 BIP responsiveness)
+- BIP pass duration **250 ms** (down from 500 ms)
+- For HCO bring-up after BIP: `playTurnAnimation`'s `runSetupTween` reads per-player `bringup_per_player_seconds` from turn data so the BH visually moves at the random cruise rate while others stay constant
 
 ### 4. `handleTurnover()`
 **Registered for:** `TURNOVER`  

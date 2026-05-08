@@ -1,8 +1,10 @@
 # Animation Detection Reference
 
-**Status:** ✅ **COMPLETE** (January 2025)
+**Status:** ✅ Architecture stable as of May 2026.
 
 This document catalogs every detection point that initiates routing through `AnimationRouter` in the animation system.
+
+> **Note on line numbers:** the line references below were captured against an earlier snapshot of `animateGameTurns.js` and may have drifted as the file evolved. The detection patterns (`turn.result_type === ...`, `scene.pressureSequenceActive`, etc.) are the durable contract — search for those if a referenced line number doesn't land on the expected code.
 
 ## Detection Architecture
 
