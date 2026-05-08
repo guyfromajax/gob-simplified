@@ -3071,6 +3071,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         if (id === shooterId) continue;
         if (sprite && scene.tweens) scene.tweens.killTweensOf(sprite);
       }
+      // Absorb rejections from tweenPlayerTo promises that reject on tween.stop().
+      void Promise.allSettled(promises);
     } else {
       await Promise.all(promises);
     }
@@ -3531,8 +3533,14 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
             checkAndStopRebounders();
           }
           
-          // Wait for all animations to complete (rebounders will stop early)
-          await Promise.all(promises);
+          // Wait for all animations to complete (rebounders will stop early).
+          // Critical-event pattern kills non-BH/non-stopper tweens; tweenPlayerTo
+          // promises reject on stop, so use allSettled to absorb those rejections.
+          if (isCriticalEventPatternEnabled()) {
+            await Promise.allSettled(promises);
+          } else {
+            await Promise.all(promises);
+          }
           // Skip to announcement/state transition (avoid fallback logic)
           gotoStateTransition = true;
         } else {
@@ -3727,7 +3735,13 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   
   // Only wait for promises if we haven't already awaited them (manual positioning case)
   if (!gotoStateTransition) {
-    await Promise.all(promises);
+    // Critical-event pattern kills non-BH/non-stopper tweens; tweenPlayerTo
+    // promises reject on stop, so use allSettled to absorb those rejections.
+    if (isCriticalEventPatternEnabled()) {
+      await Promise.allSettled(promises);
+    } else {
+      await Promise.all(promises);
+    }
   }
   
   // ✅ "Great Stop!" after Fast Break defensive stops (stopper headshot; outlet denial = text only, no headshot)
