@@ -219,6 +219,12 @@ BH_CRUISE_MIN_GRID_PER_GAME_SEC   = 8   # BH random low end during bring-up
 BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 16  # BH random high end during bring-up
 DRIVE_MULTIPLIER                  = 0.75   # Drive = 0.75 × free-running AG rate
 SHOT_MOTION_MULTIPLIER            = 0.625  # Shot motion = 0.625 × free-running AG rate
+# Sprint = max-effort fast-break movement (RR burst, BH cover-ground in open
+# court, FB shot motion). Tentative starting value at 1.25×; calibrate against
+# today's visual pacing in Phase 3c when frontend tweens consume game_seconds.
+# At AG=50, 16 × 1.25 = 20 grid/sec — matches the retired OPEN_FLOOR_RATE that
+# was the closest legacy analog for max-effort movement.
+SPRINT_MULTIPLIER                 = 1.25
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},

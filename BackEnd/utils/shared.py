@@ -19,6 +19,7 @@ from BackEnd.constants import (
     BH_CRUISE_MAX_GRID_PER_GAME_SEC,
     DRIVE_MULTIPLIER,
     SHOT_MOTION_MULTIPLIER,
+    SPRINT_MULTIPLIER,
 )
 
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
@@ -654,6 +655,9 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
         - archetype="compressed_hco" → SHOT_MOTION_MULTIPLIER (0.625 — folds into shot_motion;
                                        Compressed-HCO=10 vs HCO Shot=10 in legacy were the
                                        same numeric rate)
+        - archetype="sprint"         → SPRINT_MULTIPLIER (1.25 — max-effort fast break:
+                                       RR burst, BH cover-ground in open court,
+                                       FB shot motion). See Fast_Break_Refactor.md.
 
     When ``player`` is None (Phase 1/legacy call sites that haven't been
     migrated yet): falls back to the legacy per-archetype pace constants.
@@ -673,6 +677,10 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
             rate = _LEGACY_HCO_SHOT_RATE
         elif archetype == "compressed_hco":
             rate = _LEGACY_COMPRESSED_HCO_RATE
+        elif archetype == "sprint":
+            # No legacy-equivalent constant — sprint is new in Phase 3.
+            # OPEN_FLOOR_RATE (20) is the closest analog for max-effort movement.
+            rate = _LEGACY_OF_RATE
         else:
             rate = _LEGACY_COF_RATE
         return calc_isotropic_segment_seconds(start, end, rate)
@@ -685,6 +693,8 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
         rate = base_rate * DRIVE_MULTIPLIER
     elif archetype in ("shot_motion", "compressed_hco"):
         rate = base_rate * SHOT_MOTION_MULTIPLIER
+    elif archetype == "sprint":
+        rate = base_rate * SPRINT_MULTIPLIER
     else:
         rate = base_rate
     return calc_isotropic_segment_seconds(start, end, rate)
