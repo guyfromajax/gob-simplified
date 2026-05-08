@@ -164,10 +164,10 @@ function isLocalDevFbContractDefault(scope) {
 function isCriticalEventPatternEnabled() {
   const scope = getFbContractGlobalScope();
   const raw = scope?.UESS_FB_CRITICAL_EVENT_PATTERN;
-  // Default on. Explicit opt-out only — `window.UESS_FB_CRITICAL_EVENT_PATTERN = false`
-  // (or "off") restores the legacy `await Promise.all` paths as a kill switch.
-  if (raw === false || raw === "off") return false;
-  return true;
+  // Default off — opt-in only — until the path 2 hang in animateDefensiveStop
+  // is diagnosed and fixed. Re-enable per-session via
+  // `window.UESS_FB_CRITICAL_EVENT_PATTERN = true` for testing/debugging.
+  return raw === true || raw === "on";
 }
 
 function resolveFbStrictContractMode() {
