@@ -3487,11 +3487,15 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
           
           const checkAndStopRebounders = () => {
             if (handlerComplete && stopperComplete) {
-              rebounderTweens.forEach(tween => {
-                if (tween && tween.isPlaying) {
-                  tween.stop();
-                }
-              });
+              if (isCriticalEventPatternEnabled()) {
+                stopAllNonBhStopperTweens(scene, playerSprites, ballHandlerId, turnData.stopper_id);
+              } else {
+                rebounderTweens.forEach(tween => {
+                  if (tween && tween.isPlaying) {
+                    tween.stop();
+                  }
+                });
+              }
             }
           };
           
@@ -3523,28 +3527,48 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         } else {
           // Backend animation looks correct (top of key or neutral) - use it
           // ✅ REMOVED: Defensive stop backend animations logging (cluttering console)
-          
+
+          let backendBhPromise = null;
+          let backendStopperPromise = null;
+          const backendStopperId = turnData.stopper_id;
           for (const anim of animations) {
             const sprite = playerSprites[anim.playerId];
             if (!sprite || !anim.movement || anim.movement.length < 2) continue;
-            
+
             const endStep = anim.movement[anim.movement.length - 1];
             if (!endStep || !endStep.coords) continue;
-            
+
             const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
             const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
-            
+
             const hasBall = anim.hasBallAtStep?.[anim.movement.length - 1] || false;
             if (hasBall) {
               attachBallToPlayer(scene, ballSprite, sprite);
             }
-            
-            promises.push(
-              tweenPlayerTo(scene, sprite, endPixels, {
-                duration,
-                easing: "Linear"
-              })
-            );
+
+            const tweenPromise = tweenPlayerTo(scene, sprite, endPixels, {
+              duration,
+              easing: "Linear"
+            });
+            promises.push(tweenPromise);
+            if (String(anim.playerId) === String(ballHandlerId)) backendBhPromise = tweenPromise;
+            if (backendStopperId && String(anim.playerId) === String(backendStopperId)) backendStopperPromise = tweenPromise;
+          }
+
+          // Critical-event cleanup: when BH (and stopper if present) reach their
+          // backend-given destinations, stop all remaining parallel tweens so far-end
+          // destinations on offensive teammates don't continue past the stop.
+          if (isCriticalEventPatternEnabled() && backendBhPromise) {
+            let bhDone = false;
+            let stopperDone = !backendStopperPromise;
+            const killOthers = () => {
+              if (!bhDone || !stopperDone) return;
+              stopAllNonBhStopperTweens(scene, playerSprites, ballHandlerId, backendStopperId);
+            };
+            backendBhPromise.then(() => { bhDone = true; killOthers(); });
+            if (backendStopperPromise) {
+              backendStopperPromise.then(() => { stopperDone = true; killOthers(); });
+            }
           }
         }
       } else {
@@ -3656,11 +3680,15 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     
     const checkAndStopRebounders = () => {
       if (handlerComplete && stopperComplete) {
-        rebounderTweens.forEach(tween => {
-          if (tween && tween.isPlaying) {
-            tween.stop();
-          }
-        });
+        if (isCriticalEventPatternEnabled()) {
+          stopAllNonBhStopperTweens(scene, playerSprites, ballHandlerId, stopperId);
+        } else {
+          rebounderTweens.forEach(tween => {
+            if (tween && tween.isPlaying) {
+              tween.stop();
+            }
+          });
+        }
       }
     };
     
@@ -3897,6 +3925,19 @@ function animateRebounders(
  */
 function getFastBreakAttackingBasket(isHomeOffense) {
   return isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+}
+
+// Critical-event cleanup helper. When the defensive-stop critical event fires
+// (BH at top-of-key, stopper at their spot), all other parallel tweens should
+// stop wherever they are — preventing far-end runaways like offensive teammates
+// continuing to the basket.
+function stopAllNonBhStopperTweens(scene, playerSprites, ballHandlerId, stopperId) {
+  if (!scene?.tweens) return;
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    if (id === String(ballHandlerId) || id === String(stopperId)) continue;
+    if (!sprite) continue;
+    scene.tweens.killTweensOf(sprite);
+  }
 }
 
 /**
