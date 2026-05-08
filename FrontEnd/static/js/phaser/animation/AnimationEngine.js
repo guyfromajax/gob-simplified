@@ -621,8 +621,6 @@ export class AnimationEngine {
   }
 
   async handleFastBreak(turnData, context) {
-    // ✅ REMOVED: Fast break handling logging (cluttering console)
-    
     // ✅ PHASE 2.6: Update active player display (moved from animateGameTurns.js)
     const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
     const ballHandlerId = getBallHandlerIdFromTurn(turnData, 0);
@@ -650,11 +648,6 @@ export class AnimationEngine {
   }
 
   async handlePutback(turnData, context) {
-    if (false) console.log('[Putback Handler]', {
-      result_type: turnData.result_type,
-      rebounderId: turnData.rebounderId
-    });
-    
     // ✅ PHASE 2.6: Use existing handleOrebTurn function (moved from animateGameTurns.js)
     // handleOrebTurn handles PUTBACK_MAKE, PUTBACK_MISS, and OREB_KICKOUT
     const { handleOrebTurn } = await import('./animateGameTurns.js');
@@ -1412,19 +1405,8 @@ export class AnimationEngine {
   }
 
   async handleShotAttempt(turnData, context) {
-    if (false) console.log('[Shot Handler]', {
-      hasShotSystem: !!this.shotSystem,
-      result_type: turnData.result_type,
-      turn_index: turnData.index
-    });
-    
     // Use new shot animation system if available
     if (this.shotSystem) {
-      if (false) console.log('[Calling Shot System]', {
-        result_type: turnData.result_type,
-        shooter_id: turnData.shooter_id,
-        turn_index: turnData.index
-      });
       await this.shotSystem.processShot(turnData);
       // Shot system completed (log removed)
     } else {
@@ -1500,15 +1482,6 @@ export class AnimationEngine {
   }
 
   async handleDefault(turnData, context) {
-    if (false) console.log('[Default Handler]', {
-      result_type: turnData.result_type,
-      has_animations: !!turnData.animations?.length,
-      animation_count: turnData.animations?.length || 0,
-      fcp_foul: turnData.fcp_foul,
-      hct_foul: turnData.hct_foul,
-      pressureSequenceActive: this.scene.pressureSequenceActive
-    });
-
     // ✅ Force Foul: animation (defender move) was already done during BIP/SIP turn
     if (turnData.result_type === 'FOUL' && turnData._quickFoulAnimatedDuringInbound) {
       return;
@@ -1541,10 +1514,6 @@ export class AnimationEngine {
       onAction: context.onAction,
       turnIndex: context.turnIndex, // ✅ PHASE 2.1: Pass turnIndex
       onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
-    });
-    
-    if (false) console.log('[Default Complete]', {
-      result_type: turnData.result_type
     });
   }
 

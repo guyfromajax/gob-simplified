@@ -2921,19 +2921,6 @@ async function runInboundSetup({
     ? skeletonPositions.SF
     : payloadOffenseTargets?.SF ?? ballSpot;
 
-  // 🔍 DEBUG: Log offensive player destinations (HCO only now - FCP/HCT returns above)
-  // COMMENTED OUT: Verbose log - uncomment if needed for debugging
-  // console.log('🔍 [HCO INBOUND] Offensive player destinations:', {
-  //   newOffenseSide,
-  //   positions: {
-  //     PG: { grid: pgDest, source: 'baseline' },
-  //     SG: { grid: sgDest, source: 'baseline' },
-  //     SF: { grid: sfDest, source: 'baseline' },
-  //     PF: { grid: pfDest, source: 'baseline' },
-  //     C: { grid: cDest, source: 'baseline' }
-  //   }
-  // });
-
   const pgDestPx = gridToPixels(pgDest.x, pgDest.y, width, height);
   animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
   const sgDestPx = gridToPixels(sgDest.x, sgDest.y, width, height);
@@ -3291,9 +3278,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ✅ SS&S: Use current_turn to detect FCP/HCT (replaces fragmented flags)
   const isFCPHCT = turnData?.current_turn === 'FCP' || turnData?.current_turn === 'HCT';
   const isHcoTurn = turnData?.current_turn === 'HCO';
-  
-  // ✅ REMOVED: Step-by-step animation logging (cluttering console)
-  
+
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
   if (turnData.result_type === "OPENING_TIP" || 
@@ -3347,8 +3332,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") &&
                                turnData.animations?.length > 0 &&
                                scene.stateMachine?.is(States.FastBreak);
-  
-  // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
+
   if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak) {
     return;
   }
@@ -3435,21 +3419,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
-  // AnimationRouter handles routing, so no special state checks needed here
   if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
   }
 
   // ✅ NEW: Lock ball ownership to correct player at step
   animationDebugLog("🟡 inside playTurnAnimation → ");
-  //print turnData here in the console logs
   animationDebugLog("turnData", turnData);
-  // animationDebugLog("turnData.animations", turnData.animations);
-  // animationDebugLog("turnData.possession_team_id", turnData.possession_team_id);
-  // animationDebugLog("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
-  // animationDebugLog("turnData.animations[0].playerId", turnData.animations[0].playerId);
-  // animationDebugLog("turnData.animations[0].movement", turnData.animations[0].movement);
   if (!requiresStep0EntryPass) {
     updateBallOwnership({
       scene,
@@ -3481,9 +3457,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   if (scene._previousTurnWasOpeningTip) {
     scene._previousTurnWasOpeningTip = false;
   }
-
-  // ✅ REMOVED: Special FCP/HCT setup tween - FCP/HCT now routes through ShotAnimationSystem (same as HCO)
-  // ShotAnimationSystem.runSetupTween() handles setup for all skeleton animations, including FCP/HCT
 
   let eventsProcessed = false;
   const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
@@ -4611,9 +4584,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // ✅ REMOVED: Special FCP/HCT tween cleanup - FCP/HCT now uses exact same path as HCO
-  // ShotAnimationSystem handles all skeleton animations identically
-
   if (isPressureSkeletonTurn) {
     validatePressureLeadInContract({ phase: "turn_entry" });
   }
@@ -4714,8 +4684,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Starting at 0 makes prev undefined and can short-circuit skeleton playback.
   const stepLoopStartIndex = 1;
   for (let stepIndex = stepLoopStartIndex; stepIndex < maxSteps; stepIndex++) {
-    
-    // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
+
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
     
     // ✅ CRITICAL FIX: Kill ball tweens at the start of EACH step iteration
@@ -5342,13 +5311,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           result: shootParams.result,
         });
       }
-      // console.log("🏀 HCO SHOT - About to call shootBall", {
-      //   currentState: scene.stateMachine?.state,
-      //   shooterId: shootParams.shooterId,
-      //   result: shootParams.result,
-      //   fromCoords: shootParams.fromCoords
-      // });
-      
+
       // Check if this is an audible/hot read (shooter different from intended)
       let isAudible = false;
       if (turnData.shooter_pos && 
@@ -5399,10 +5362,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites, null);
       }
       
-      // console.log("🏀 HCO SHOT - shootBall returned", shotResult);
       const ballSpot = shotResult?.grid;
-      // console.log("result_type", turnData.result_type);
-      
+
       // Check if this MAKE is from a putback
       // With new OREB turn architecture, putbacks are separate turns, not events
       // But keep this check for backward compatibility
@@ -5432,13 +5393,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
         // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
         // Calling it here causes double inbound passes and double setup animations
-        if (!hasPendingFreeThrow && !hasPutbackMake && turnData.next_play_type === "BASELINE_INBOUND") {
-          // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
-          // This prevents double inbound passes and double setup animations
-        }
-        
-        // ✅ REMOVED: Special FCP/HCT handling - FCP/HCT now routes through AnimationRouter (same as HCO)
-        // AnimationRouter handles announcements and updates via finalizeTurnAfterAnimation
       } else if (ballSpot) {
         if (turnData.result_type === 'BLOCK' || turnData.rebound_type === 'OREB') {
           console.log('🟡🟡🟡 [BLOCK/OREB BALL] playTurnAnimation calling animateRebound', {
