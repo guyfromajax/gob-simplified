@@ -3126,10 +3126,6 @@ async function runInboundSetup({
 
   animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
-  
-  const inboundHoldMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
-  await new Promise(resolve => setTimeout(resolve, inboundHoldMs));
-  await new Promise(resolve => setTimeout(resolve, inboundHoldMs));
 
   animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   // Removed 1000ms pause for smoother transitions
@@ -3174,7 +3170,7 @@ async function runInboundSetup({
   const passPromise = passInfo
     ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
        handlePassAnimation({ scene, passInfo, playerSprites }))
-    : runPass(scene, { fromId: sfId, toId: pgId, duration: 500, easing: "Sine.easeInOut" });
+    : runPass(scene, { fromId: sfId, toId: pgId, duration: 250, easing: "Sine.easeInOut" });
 
   let defenderPromise = Promise.resolve();
   if (isQuickFoulNext) {
