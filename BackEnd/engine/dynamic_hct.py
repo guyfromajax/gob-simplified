@@ -37,8 +37,7 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
-    ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
-    CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
+    CRUISE_BASELINE_GRID_PER_GAME_SEC,
     DRIVE_MULTIPLIER,
     HCO_STRING_SPOTS,
     HCT_SETUP_POSITIONS,
@@ -472,7 +471,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         start = _hct_setup_start_coords(pos, is_away_offense)
         target = off_targets[pos]
         # End coord at the moment BH arrives — may not have reached target.
-        end_coords = _move_at_pace(start, target, step_1_seconds, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND)
+        end_coords = _move_at_pace(start, target, step_1_seconds, CRUISE_BASELINE_GRID_PER_GAME_SEC)
         _add_waypoint(waypoints, pid, step_start_ms, start, "move")
         _add_waypoint(
             waypoints, pid, bh_arrive_ms, end_coords, "move",
@@ -488,7 +487,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         pid = _player_id(defender_obj)
         start = _start_coords(defender_obj)
         target = def_targets[pos]
-        end_coords = _move_at_pace(start, target, step_1_seconds, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND)
+        end_coords = _move_at_pace(start, target, step_1_seconds, CRUISE_BASELINE_GRID_PER_GAME_SEC)
         def_step_1_end[pos] = end_coords
         _add_waypoint(waypoints, pid, step_start_ms, start, "guard_offball")
         _add_waypoint(

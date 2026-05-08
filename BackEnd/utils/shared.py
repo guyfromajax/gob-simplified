@@ -13,18 +13,23 @@ from BackEnd.constants import (
     HCO_STRING_SPOTS,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
-    ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
-    OPEN_FLOOR_GRID_PER_GAME_SECOND,
-    CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
-    COMPRESSED_HCO_GRID_PER_GAME_SECOND,
-    HCO_SHOT_GRID_PER_GAME_SECOND,
     CRUISE_BASELINE_GRID_PER_GAME_SEC,
     BH_CRUISE_MIN_GRID_PER_GAME_SEC,
     BH_CRUISE_MAX_GRID_PER_GAME_SEC,
     DRIVE_MULTIPLIER,
     SHOT_MOTION_MULTIPLIER,
 )
+
+# Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
+# provide AG context (player= or off_lineup=) — preserves pre-Phase-4 timing
+# at unmigrated call sites. Once all callers route through the AG-driven
+# helpers these can be deleted entirely.
+_LEGACY_DRIVE_RATE = 12          # was ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
+_LEGACY_OF_RATE = 20             # was OPEN_FLOOR_GRID_PER_GAME_SECOND (fallback)
+_LEGACY_COF_RATE = 16            # was CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+_LEGACY_COMPRESSED_HCO_RATE = 10 # was COMPRESSED_HCO_GRID_PER_GAME_SECOND
+_LEGACY_HCO_SHOT_RATE = 10       # was HCO_SHOT_GRID_PER_GAME_SECOND
 
 
 def is_user_facing_game(game) -> bool:
@@ -447,14 +452,14 @@ def calc_skeleton_step_timing_contract(
                         # Legacy path — exact pre-Phase-4c behavior.
                         if phase_type == "HCO":
                             rate = (
-                                HCO_SHOT_GRID_PER_GAME_SECOND
+                                _LEGACY_HCO_SHOT_RATE
                                 if step_has_shoot
-                                else COMPRESSED_HCO_GRID_PER_GAME_SECOND
+                                else _LEGACY_COMPRESSED_HCO_RATE
                             )
                         elif phase_type in ("HCT", "FCP"):
-                            rate = CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+                            rate = _LEGACY_COF_RATE
                         else:
-                            rate = OPEN_FLOOR_GRID_PER_GAME_SECOND
+                            rate = _LEGACY_OF_RATE
                         sec = calc_isotropic_segment_seconds(start_coords, end_coords, rate)
                     if sec > 0:
                         mover_durations.append(sec)
@@ -544,15 +549,17 @@ def calc_cg_segment_seconds(start, end):
 
 def calc_drive_segment_seconds(start, end):
     """
-    Attack drive to basket: 1 game second per ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
-    grid spots (Euclidean distance). Used for motion HCO drive steps.
+    Attack drive to basket: legacy fallback rate (12 grid/game-sec). Used by
+    ``calc_skeleton_step_timing_contract``'s legacy path when no off_lineup is
+    provided. AG-driven callers should use ``calc_ag_segment_seconds(...,
+    archetype="drive")`` instead.
     """
     if not start or not end:
         return 0.0
     dx = abs((end.get("x", 0) or 0) - (start.get("x", 0) or 0))
     dy = abs((end.get("y", 0) or 0) - (start.get("y", 0) or 0))
     grid_dist = math.sqrt(dx * dx + dy * dy)
-    return grid_dist / float(ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND)
+    return grid_dist / float(_LEGACY_DRIVE_RATE)
 
 
 def calc_pass_segment_seconds(passer_coords, receiver_coords):
@@ -661,13 +668,13 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
     if player is None:
         # Legacy path — preserves pre-Phase-4 behavior at unmigrated call sites.
         if archetype == "drive":
-            rate = ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
+            rate = _LEGACY_DRIVE_RATE
         elif archetype == "shot_motion":
-            rate = HCO_SHOT_GRID_PER_GAME_SECOND
+            rate = _LEGACY_HCO_SHOT_RATE
         elif archetype == "compressed_hco":
-            rate = COMPRESSED_HCO_GRID_PER_GAME_SECOND
+            rate = _LEGACY_COMPRESSED_HCO_RATE
         else:
-            rate = CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+            rate = _LEGACY_COF_RATE
         return calc_isotropic_segment_seconds(start, end, rate)
 
     # AG-driven path — Phase 4 behavior.

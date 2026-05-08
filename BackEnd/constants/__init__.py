@@ -203,13 +203,11 @@ SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
 SITUATIONAL_BIP_RECEIVER_POS = "SG"
 SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
-# Movement rates (game seconds vs grid distance); see Real_Time_Clock_System.md
-# Doc lists rate as x/y; segment formula uses x rate: sqrt(dx^2+dy^2)/x
-OPEN_FLOOR_GRID_PER_GAME_SECOND = 20  # OF (20/15): bring-up, fallback
-CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND = 16  # COF (16/12): HCT/FCP steps, Fast Break
-ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12  # Drive (12/9): attack to basket
-COMPRESSED_HCO_GRID_PER_GAME_SECOND = 10  # Compressed HCO (10/7): non-drive non-shoot
-HCO_SHOT_GRID_PER_GAME_SECOND = 10  # HCO shot with movement (10/7); stationary = 1 sec
+# Movement rates. Legacy per-archetype pace constants were retired in Phase 4d
+# (see Movement_Rate_Refactor.md) — they're now derived per-player from AG via
+# ``calc_ag_segment_seconds`` and ``ag_to_grid_per_game_sec``, and the cruise
+# baseline lives in ``CRUISE_BASELINE_GRID_PER_GAME_SEC`` below. Pass speed
+# stays a constant — ball physics, not player AG.
 PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 
 # ---- Movement Rate Refactor (see Movement_Rate_Refactor.md) ---------------

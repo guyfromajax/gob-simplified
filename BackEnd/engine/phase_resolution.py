@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 from BackEnd.models.animator import Animator
 
-from BackEnd.constants import CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
 from BackEnd.utils.home_crowd import effective_ft_miss_to_make_second_chance
 from BackEnd.utils.shared import (
     get_name_safe,
