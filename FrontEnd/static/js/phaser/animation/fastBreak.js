@@ -2125,6 +2125,7 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   }
 
   const secondary = [];
+  const secondarySprites = [];
   const startTween = (sprite, grid) => {
     if (!sprite || grid == null || grid.x == null || grid.y == null) return;
     const px = gridToPixels(grid.x, grid.y, width, height);
@@ -2132,6 +2133,7 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     secondary.push(
       tweenPlayerTo(scene, sprite, px, { duration: dur, easing: "Linear" })
     );
+    secondarySprites.push(sprite);
   };
 
   startTween(rrSprite, phase.rr_to);
@@ -2165,6 +2167,11 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   if (outletDenied) {
     // RR burst only owns the fork into outlet-denied. Once receiver reaches the
     // fork point, the dedicated denied branch becomes the sole owner.
+    if (isCriticalEventPatternEnabled()) {
+      for (const sprite of secondarySprites) {
+        if (sprite && scene.tweens) scene.tweens.killTweensOf(sprite);
+      }
+    }
     logRrDenied(scene, "BURST FORK", {
       receiverLive: rimRunnerLiveSpriteGrid(recvSprite, width, height),
       rrLive: rimRunnerLiveSpriteGrid(rrSprite, width, height),
@@ -2227,33 +2234,44 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     }
   }
 
-  if (secondary.length) {
-    await Promise.all(secondary);
-  }
-
-  // Commit burst endpoints into logical grid state before branch-specific follow-up
-  // uses `rimRunnerSpriteGrid(...)`. Without this, stale gridX/gridY from a prior
-  // sequence can skew RR lane-pass, interception, or bat-OOB geometry.
-  if (phase.rr_to && rrSprite) {
-    setRimRunnerSpriteGrid(rrSprite, phase.rr_to.x, phase.rr_to.y);
-  }
-  if (phase.receiver_to && recvSprite) {
-    setRimRunnerSpriteGrid(recvSprite, phase.receiver_to.x, phase.receiver_to.y);
-  }
-  if (phase.outlet_defender_id != null && phase.outlet_defender_to) {
-    const outletDefenderSprite = playerSprites[sid(phase.outlet_defender_id)];
-    if (outletDefenderSprite) {
-      setRimRunnerSpriteGrid(
-        outletDefenderSprite,
-        phase.outlet_defender_to.x,
-        phase.outlet_defender_to.y
-      );
+  if (isCriticalEventPatternEnabled()) {
+    // Critical event has fired (receiver has the ball). Stop parallel secondary
+    // tweens so they don't continue running into the next phase. Sprites hold at
+    // their interrupted positions; downstream phases spawn fresh tweens if needed.
+    for (const sprite of secondarySprites) {
+      if (sprite && scene.tweens) scene.tweens.killTweensOf(sprite);
     }
-  }
-  for (const row of phase.other_players || []) {
-    const sprite = playerSprites[sid(row.player_id)];
-    if (!sprite) continue;
-    setRimRunnerSpriteGrid(sprite, row.to_x, row.to_y);
+    // Logical grid = live position for all sprites. Destination-based commits
+    // would diverge from visual positions when secondary tweens are killed mid-flight.
+    commitRrLiveSpriteGrid(playerSprites, width, height);
+  } else {
+    if (secondary.length) {
+      await Promise.all(secondary);
+    }
+    // Commit burst endpoints into logical grid state before branch-specific follow-up
+    // uses `rimRunnerSpriteGrid(...)`. Without this, stale gridX/gridY from a prior
+    // sequence can skew RR lane-pass, interception, or bat-OOB geometry.
+    if (phase.rr_to && rrSprite) {
+      setRimRunnerSpriteGrid(rrSprite, phase.rr_to.x, phase.rr_to.y);
+    }
+    if (phase.receiver_to && recvSprite) {
+      setRimRunnerSpriteGrid(recvSprite, phase.receiver_to.x, phase.receiver_to.y);
+    }
+    if (phase.outlet_defender_id != null && phase.outlet_defender_to) {
+      const outletDefenderSprite = playerSprites[sid(phase.outlet_defender_id)];
+      if (outletDefenderSprite) {
+        setRimRunnerSpriteGrid(
+          outletDefenderSprite,
+          phase.outlet_defender_to.x,
+          phase.outlet_defender_to.y
+        );
+      }
+    }
+    for (const row of phase.other_players || []) {
+      const sprite = playerSprites[sid(row.player_id)];
+      if (!sprite) continue;
+      setRimRunnerSpriteGrid(sprite, row.to_x, row.to_y);
+    }
   }
   return {
     branch: "outlet_completed",
