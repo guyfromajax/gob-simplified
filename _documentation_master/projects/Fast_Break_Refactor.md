@@ -198,7 +198,8 @@ The pattern (template: [`startRebounderCatchMonitor:257`](FrontEnd/static/js/pha
 | **2b — Burst phase** | Convert [`animateRimRunnerBurstPhase`](FrontEnd/static/js/phaser/animation/fastBreak.js#L2095) from `await Promise.all(secondary)` ([2210](FrontEnd/static/js/phaser/animation/fastBreak.js#L2210)) to critical-event-then-stop pattern, gated on the new flag. Validates the pattern on the smallest meaningful sub-flow. Eyeball-test in prototype. | Medium — pattern validation |
 | **2c — Defensive stop** | Apply pattern to [`animateDefensiveStop`](FrontEnd/static/js/phaser/animation/fastBreak.js#L3329) and [`moveOtherPlayersToStandardPositions`](FrontEnd/static/js/phaser/animation/fastBreak.js#L3905). Symptom #3 should resolve here. | Medium |
 | **2d — Remaining sub-flows** | Outlet, shot phases, lane pass, interception, bat OOB, steal entry, RR hold-up / outlet-denied. Pattern is mechanical at this point. | Low |
-| **2e — Flip flag default + retire** | Once 2a–d ship and stabilize in dev, flip `UESS_FB_CRITICAL_EVENT_PATTERN` default to on. After a few days of dev usage, delete the flag and the legacy `await Promise.all` paths. | Low |
+| **2e step 1 — Flip flag default to on** | `isCriticalEventPatternEnabled()` defaults to `true`. Explicit `window.UESS_FB_CRITICAL_EVENT_PATTERN = false` (or `"off"`) acts as kill switch — restores legacy `await Promise.all` paths if a regression surfaces. | Low |
+| **2e step 2 — Retire flag + legacy paths** | After a few days of stable dev use on the flag-on default. Delete `isCriticalEventPatternEnabled` calls, remove the legacy `await Promise.all` branches, delete the helper function. Flag becomes a no-op. | Low |
 
 **Risk:** medium-high overall. Largest single behavior shift in the refactor. Mitigated by the flag (toggle off if regressions surface) and by 2b validating the pattern on a single sub-flow before fanning out.
 
