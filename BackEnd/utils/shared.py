@@ -19,6 +19,11 @@ from BackEnd.constants import (
     CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND,
     COMPRESSED_HCO_GRID_PER_GAME_SECOND,
     HCO_SHOT_GRID_PER_GAME_SECOND,
+    CRUISE_BASELINE_GRID_PER_GAME_SEC,
+    BH_CRUISE_MIN_GRID_PER_GAME_SEC,
+    BH_CRUISE_MAX_GRID_PER_GAME_SEC,
+    DRIVE_MULTIPLIER,
+    SHOT_MOTION_MULTIPLIER,
 )
 
 
@@ -484,6 +489,84 @@ def calc_pass_segment_seconds(passer_coords, receiver_coords):
     dy = abs((receiver_coords.get("y", 0) or 0) - (passer_coords.get("y", 0) or 0))
     grid_dist = math.sqrt(dx * dx + dy * dy)
     return grid_dist / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
+
+
+# ---- Movement Rate Refactor (Phase 1 scaffolding) -----------------------------
+# See _documentation_master/projects/Movement_Rate_Refactor.md
+#
+# Phase 1 ships the new helper API surface but routes everything to the legacy
+# pace constants — so callers wired in Phase 2/4 can be A/B'd safely. Phase 2
+# will replace cruise internals (BH random + CRUISE_BASELINE). Phase 4 will
+# replace AG internals with the real ag_to_grid_per_game_sec curve and remove
+# the legacy constants.
+
+def ag_to_grid_per_game_sec(ag):
+    """
+    Convert AG attribute (1-100, average 50, rare values above 100) to grid
+    units per game second.
+
+    Phase 1 STUB: ignores AG, returns the legacy COF default (16). Acts as a
+    no-op so Phase 1 wiring would not change behavior at any AG-driven site.
+
+    Phase 4 will install a linear curve (AG=0 → 10, AG=50 → 16, AG=100 → 22,
+    soft-capped at 30 for rare AG > 100).
+    """
+    return 16.0
+
+
+def calc_cruise_segment_seconds(start, end, *, role="default"):
+    """
+    Cruise-speed segment timing — AG-independent, lineup-independent. Used for
+    HCO bring-up and HCT step 1 (the bring-the-ball-up moments where players
+    are not pushing max effort).
+
+    Phase 1 BEHAVIOR: routes to OPEN_FLOOR_GRID_PER_GAME_SECOND (20) for both
+    roles. No randomness yet. Preserves current behavior if any caller wires
+    this in early.
+
+    Phase 2 BEHAVIOR (planned): role="bh" picks a fresh
+    random.uniform(BH_CRUISE_MIN, BH_CRUISE_MAX) per call; role="default" uses
+    CRUISE_BASELINE_GRID_PER_GAME_SEC.
+
+    Args:
+        start, end: {"x": ..., "y": ...} grid coord dicts
+        role: "default" for non-BH cruisers, "bh" for the ball handler
+    """
+    return calc_isotropic_segment_seconds(start, end, OPEN_FLOOR_GRID_PER_GAME_SECOND)
+
+
+def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
+    """
+    AG-driven segment timing — speed scales with the player's AG attribute.
+    Used for max-effort movement (drives, fast breaks, defensive close-outs,
+    in-shot motion, HCO/HCT/FCP skeleton steps post-bring-up).
+
+    Phase 1 BEHAVIOR: routes to current per-archetype pace constants and
+    ignores ``player``. Preserves current behavior at any wired call site.
+
+      archetype="default"        → CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND (16)
+      archetype="drive"          → ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND (12)
+      archetype="shot_motion"    → HCO_SHOT_GRID_PER_GAME_SECOND (10)
+      archetype="compressed_hco" → COMPRESSED_HCO_GRID_PER_GAME_SECOND (10)
+
+    Phase 4 BEHAVIOR (planned): rate = ag_to_grid_per_game_sec(player.AG)
+    × archetype multiplier (1.0 default, DRIVE_MULTIPLIER for drive,
+    SHOT_MOTION_MULTIPLIER for shot_motion). compressed_hco folds into default.
+
+    Args:
+        start, end: {"x": ..., "y": ...} grid coord dicts
+        player: Player object (Phase 4); ignored in Phase 1
+        archetype: movement type (see above)
+    """
+    if archetype == "drive":
+        rate = ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND
+    elif archetype == "shot_motion":
+        rate = HCO_SHOT_GRID_PER_GAME_SECOND
+    elif archetype == "compressed_hco":
+        rate = COMPRESSED_HCO_GRID_PER_GAME_SECOND
+    else:
+        rate = CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+    return calc_isotropic_segment_seconds(start, end, rate)
 
 
 def calc_cg_time_elapsed_from_movement_points(points, cap=30):

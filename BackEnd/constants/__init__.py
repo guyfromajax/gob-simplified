@@ -212,6 +212,16 @@ COMPRESSED_HCO_GRID_PER_GAME_SECOND = 10  # Compressed HCO (10/7): non-drive non
 HCO_SHOT_GRID_PER_GAME_SECOND = 10  # HCO shot with movement (10/7); stationary = 1 sec
 PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 
+# ---- Movement Rate Refactor (see Movement_Rate_Refactor.md) ---------------
+# New two-tier model: cruise-speed steps (HCO/HCT bring-up) vs AG-driven steps.
+# Phase 1 ships these constants without wiring them; helpers in shared.py
+# accept them but route to the legacy pace constants until Phase 2/4 land.
+CRUISE_BASELINE_GRID_PER_GAME_SEC = 16  # Cruise baseline for non-BH movers
+BH_CRUISE_MIN_GRID_PER_GAME_SEC   = 8   # BH random low end during bring-up
+BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 16  # BH random high end during bring-up
+DRIVE_MULTIPLIER                  = 0.75   # Drive = 0.75 × free-running AG rate
+SHOT_MOTION_MULTIPLIER            = 0.625  # Shot motion = 0.625 × free-running AG rate
+
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
     "upper midWing": {"x": 68, "y": 36}, 
