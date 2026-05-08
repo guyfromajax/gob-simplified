@@ -3549,16 +3549,34 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         } else {
           // Backend animation looks correct (top of key or neutral) - use it
           // ✅ REMOVED: Defensive stop backend animations logging (cluttering console)
+          console.warn("[FB 2c DIAG] path 2 entry", {
+            ballHandlerId,
+            stopperId: turnData.stopper_id,
+            animationsCount: animations.length,
+            animationPlayerIds: animations.map(a => a.playerId),
+            flagOn: isCriticalEventPatternEnabled(),
+          });
 
           let backendBhPromise = null;
           let backendStopperPromise = null;
           const backendStopperId = turnData.stopper_id;
+          let tweensSpawned = 0;
+          let tweensSkippedNoSprite = 0;
+          let tweensSkippedNoMovement = 0;
+          let tweensSkippedNoCoords = 0;
           for (const anim of animations) {
             const sprite = playerSprites[anim.playerId];
-            if (!sprite || !anim.movement || anim.movement.length < 2) continue;
+            if (!sprite || !anim.movement || anim.movement.length < 2) {
+              if (!sprite) tweensSkippedNoSprite++;
+              else tweensSkippedNoMovement++;
+              continue;
+            }
 
             const endStep = anim.movement[anim.movement.length - 1];
-            if (!endStep || !endStep.coords) continue;
+            if (!endStep || !endStep.coords) {
+              tweensSkippedNoCoords++;
+              continue;
+            }
 
             const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
             const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
@@ -3573,24 +3591,58 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
               easing: "Linear"
             });
             promises.push(tweenPromise);
+            tweensSpawned++;
             if (String(anim.playerId) === String(ballHandlerId)) backendBhPromise = tweenPromise;
             if (backendStopperId && String(anim.playerId) === String(backendStopperId)) backendStopperPromise = tweenPromise;
+            console.warn("[FB 2c DIAG] tween spawned", {
+              playerId: anim.playerId,
+              isBh: String(anim.playerId) === String(ballHandlerId),
+              isStopper: backendStopperId && String(anim.playerId) === String(backendStopperId),
+              endCoords: endStep.coords,
+              endPixels,
+              duration,
+              durationIsFinite: Number.isFinite(duration),
+            });
           }
+          console.warn("[FB 2c DIAG] path 2 after tween-spawn loop", {
+            promisesLength: promises.length,
+            tweensSpawned,
+            tweensSkippedNoSprite,
+            tweensSkippedNoMovement,
+            tweensSkippedNoCoords,
+            backendBhPromiseCaptured: backendBhPromise !== null,
+            backendStopperPromiseCaptured: backendStopperPromise !== null,
+          });
 
           // Critical-event cleanup: when BH (and stopper if present) reach their
           // backend-given destinations, stop all remaining parallel tweens so far-end
           // destinations on offensive teammates don't continue past the stop.
           if (isCriticalEventPatternEnabled() && backendBhPromise) {
+            console.warn("[FB 2c DIAG] critical-event monitor block entered");
             let bhDone = false;
             let stopperDone = !backendStopperPromise;
             const killOthers = () => {
+              console.warn("[FB 2c DIAG] killOthers called", { bhDone, stopperDone });
               if (!bhDone || !stopperDone) return;
+              console.warn("[FB 2c DIAG] killOthers firing stopAllNonBhStopperTweens");
               stopAllNonBhStopperTweens(scene, playerSprites, ballHandlerId, backendStopperId);
+              console.warn("[FB 2c DIAG] stopAllNonBhStopperTweens returned");
             };
-            backendBhPromise.then(() => { bhDone = true; killOthers(); });
+            backendBhPromise.then(
+              () => { console.warn("[FB 2c DIAG] BH .then resolved"); bhDone = true; killOthers(); },
+              (err) => { console.warn("[FB 2c DIAG] BH .then REJECTED", err); }
+            );
             if (backendStopperPromise) {
-              backendStopperPromise.then(() => { stopperDone = true; killOthers(); });
+              backendStopperPromise.then(
+                () => { console.warn("[FB 2c DIAG] stopper .then resolved"); stopperDone = true; killOthers(); },
+                (err) => { console.warn("[FB 2c DIAG] stopper .then REJECTED", err); }
+              );
             }
+          } else {
+            console.warn("[FB 2c DIAG] critical-event monitor block SKIPPED", {
+              flagOn: isCriticalEventPatternEnabled(),
+              backendBhPromise: backendBhPromise !== null,
+            });
           }
         }
       } else {
@@ -3740,11 +3792,16 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   if (!gotoStateTransition) {
     // Critical-event pattern kills non-BH/non-stopper tweens; tweenPlayerTo
     // promises reject on stop, so use allSettled to absorb those rejections.
+    console.warn("[FB 2c DIAG] before final await", {
+      flagOn: isCriticalEventPatternEnabled(),
+      promisesLength: promises.length,
+    });
     if (isCriticalEventPatternEnabled()) {
       await Promise.allSettled(promises);
     } else {
       await Promise.all(promises);
     }
+    console.warn("[FB 2c DIAG] after final await");
   }
   
   // ✅ "Great Stop!" after Fast Break defensive stops (stopper headshot; outlet denial = text only, no headshot)
