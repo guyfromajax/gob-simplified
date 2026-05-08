@@ -15,10 +15,10 @@ import {
   animateKickoutReset
 } from "./ballManager.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
+import { runPass, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
-import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
+import { deriveOffenseContext } from "./outletUtils.js";
 import { clampGridCoords } from "./courtClamp.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import * as unitCompletionContract from "./unitCompletionContract.js";
@@ -28,21 +28,11 @@ import {
   DebugFlags,
   animationDebugLog,
   animationDebugWarn,
-  isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import {
   States,
-  getDebugTransitions,
   safeTransition,
-  createTransitionGuard,
-  transitionWithDebug,
 } from "../state/gameStateMachine.js";
-import {
-  ENABLE_TIMEOUT_BUTTON,
-  initTimeoutButton,
-  resetTimeoutQueue,
-  checkTimeoutEligibility,
-} from "../utils/timeoutButtonManager.js";
 import {
   getPendingOwner,
   clearPendingOwner,
@@ -56,7 +46,6 @@ import {
   initializeBallHolderState,
   setBallHolderId,
   clearBallHolder,
-  animateBallToPosition,
 } from "./ballAnimationSimple.js";
 import {
   resolveMovementSpeedPxPerSec,
