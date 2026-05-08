@@ -745,6 +745,7 @@ class ShotManager:
                             include_hco_step1_bringup=is_hco,
                             prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                             phase_type="HCO" if is_hco else None,
+                            off_lineup=off_lineup,
                         )
                         time_elapsed_ft = timing_contract["time_elapsed"]
                         ft_remaining = 1 if made_from_foul else 2
@@ -816,6 +817,7 @@ class ShotManager:
                         include_hco_step1_bringup=is_hco,
                         prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                         phase_type="HCO" if is_hco else None,
+                        off_lineup=off_lineup,
                     )
                     time_elapsed = timing_contract["time_elapsed"]
 
@@ -910,6 +912,7 @@ class ShotManager:
                             include_hco_step1_bringup=is_hco,
                             prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                             phase_type="HCO" if is_hco else None,
+                            off_lineup=off_lineup,
                         )
                         time_elapsed = timing_contract["time_elapsed"]
                         intended_shooter_pos = roles.get("intended_shooter_pos")
@@ -1879,6 +1882,7 @@ class ShotManager:
                 include_hco_step1_bringup=is_hco,
                 prev_offense_positions=self.game_state.pop("_prev_offense_positions_for_hco", None) if is_hco else None,
                 phase_type="HCO" if is_hco else None,
+                off_lineup=off_lineup,
             )
             time_elapsed = timing_contract["time_elapsed"]
 

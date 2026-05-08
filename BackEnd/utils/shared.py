@@ -357,11 +357,20 @@ def calc_skeleton_step_timing_contract(
     include_hco_step1_bringup=False,
     prev_offense_positions=None,
     phase_type=None,
+    off_lineup=None,
 ):
     """
     Build per-step clock timing per Real_Time_Clock_System.md movement rates.
     phase_type: 'HCO' | 'HCT' | 'FCP' | None. Drive→16, HCO non-drive→16, HCO shoot stationary→1,
     HCT/FCP non-drive→20, fallback→24. Pass in-air added per step. Bring-up uses OF 24 when enabled.
+
+    Phase 4c: when ``off_lineup`` (dict of pos → Player) is provided, per-player
+    movement timing scales with each player's AG attribute via
+    ``calc_ag_segment_seconds``. When omitted (legacy callers), falls back to
+    the per-archetype legacy pace constants. The dual-path preserves Phase 1
+    behavior at unmigrated call sites — at AG=50 the AG-driven path produces
+    identical timing to the legacy path, so migrating one caller at a time is
+    safe.
     """
     if not steps:
         one_step = FALLBACK_STEP_SECONDS
@@ -409,25 +418,44 @@ def calc_skeleton_step_timing_contract(
                 dy = abs((end_coords.get("y", 0) or 0) - (start_coords.get("y", 0) or 0))
                 has_movement = (dx * dx + dy * dy) > 0
 
+                # Phase 4c dual-path. When off_lineup is provided we route
+                # through the AG-driven helper (archetype × AG curve). When it
+                # isn't, we preserve the EXACT legacy pace constants per
+                # phase_type, including the OF=20 fallback for phase_type=None
+                # — the AG-driven helper at AG=50 doesn't match OF=20 (it gives
+                # 16), so legacy callers must stay on the legacy constants
+                # until migrated.
+                mover = off_lineup.get(pos) if off_lineup else None
                 if action == "drive":
-                    sec = calc_drive_segment_seconds(start_coords, end_coords)
-                    mover_durations.append(sec)
-                elif has_movement:
-                    if phase_type == "HCO":
-                        rate = (
-                            HCO_SHOT_GRID_PER_GAME_SECOND
-                            if step_has_shoot
-                            else COMPRESSED_HCO_GRID_PER_GAME_SECOND
-                        )
-                        sec = calc_isotropic_segment_seconds(start_coords, end_coords, rate)
-                    elif phase_type in ("HCT", "FCP"):
-                        sec = calc_isotropic_segment_seconds(
-                            start_coords, end_coords, CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+                    if mover is not None:
+                        sec = calc_ag_segment_seconds(
+                            start_coords, end_coords, mover, archetype="drive"
                         )
                     else:
-                        sec = calc_isotropic_segment_seconds(
-                            start_coords, end_coords, OPEN_FLOOR_GRID_PER_GAME_SECOND
+                        sec = calc_drive_segment_seconds(start_coords, end_coords)
+                    mover_durations.append(sec)
+                elif has_movement:
+                    if mover is not None:
+                        if phase_type == "HCO":
+                            archetype = "shot_motion" if step_has_shoot else "compressed_hco"
+                        else:
+                            archetype = "default"
+                        sec = calc_ag_segment_seconds(
+                            start_coords, end_coords, mover, archetype=archetype
                         )
+                    else:
+                        # Legacy path — exact pre-Phase-4c behavior.
+                        if phase_type == "HCO":
+                            rate = (
+                                HCO_SHOT_GRID_PER_GAME_SECOND
+                                if step_has_shoot
+                                else COMPRESSED_HCO_GRID_PER_GAME_SECOND
+                            )
+                        elif phase_type in ("HCT", "FCP"):
+                            rate = CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND
+                        else:
+                            rate = OPEN_FLOOR_GRID_PER_GAME_SECOND
+                        sec = calc_isotropic_segment_seconds(start_coords, end_coords, rate)
                     if sec > 0:
                         mover_durations.append(sec)
 

@@ -4286,6 +4286,7 @@ def resolve_half_court_offense_logic(game):
                 include_hco_step1_bringup=True,
                 prev_offense_positions=game_state.get("_prev_offense_positions_for_hco"),
                 phase_type="HCO",
+                off_lineup=game.offense_team.lineup,
             )
             step_clock_seconds = timing.get("step_clock_seconds") or []
             shot_remaining = game_state.get("shot_clock_remaining", 30)
@@ -4882,6 +4883,7 @@ def resolve_half_court_offense_logic(game):
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
                 phase_type="HCO",
+                off_lineup=game.offense_team.lineup,
             )
             turn_result["time_elapsed"] = timing_contract["time_elapsed"]
             turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4940,6 +4942,7 @@ def resolve_half_court_offense_logic(game):
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
                 phase_type="HCO",
+                off_lineup=game.offense_team.lineup,
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -4998,6 +5001,7 @@ def resolve_half_court_offense_logic(game):
                 resolution_step_index=roles.get("event_step"),
                 include_hco_step1_bringup=True,
                 phase_type="HCO",
+                off_lineup=game.offense_team.lineup,
             )
             foul_result["time_elapsed"] = timing_contract["time_elapsed"]
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
@@ -5979,6 +5983,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
         include_hco_step1_bringup=False,
         phase_type="FCP",
+        off_lineup=game.offense_team.lineup,
     )
     fcp_time_elapsed = fcp_timing_contract["time_elapsed"]
     
@@ -7364,6 +7369,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         resolution_step_index=(len(roles.get("steps", [])) - 1 if roles.get("steps") else None),
         include_hco_step1_bringup=False,
         phase_type="HCT",
+        off_lineup=game.offense_team.lineup,
     )
     hct_time_elapsed = hct_timing_contract["time_elapsed"]
     
