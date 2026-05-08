@@ -93,14 +93,27 @@ def ag_to_grid_per_game_sec(ag: int) -> float:
 **Constants to define:**
 
 ```python
-CRUISE_BASELINE_GRID_PER_GAME_SEC = 16   # all cruise movers (non-BH)
-BH_CRUISE_MIN_GRID_PER_GAME_SEC   = 8    # BH random low end
-BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 16   # BH random high end
-DRIVE_MULTIPLIER                  = 0.75 # drive is 75% of free-running AG rate
-SHOT_MOTION_MULTIPLIER            = 0.6  # shooting motion is 60% of free-running
+CRUISE_BASELINE_GRID_PER_GAME_SEC = 16    # all cruise movers (non-BH)
+BH_CRUISE_MIN_GRID_PER_GAME_SEC   = 8     # BH random low end
+BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 16    # BH random high end
+DRIVE_MULTIPLIER                  = 0.75  # drive is 75% of free-running AG rate (preserves current Drive=12 vs COF=16 ratio)
+SHOT_MOTION_MULTIPLIER            = 0.625 # shooting motion (preserves current HCO Shot=10 vs COF=16 ratio exactly)
 ```
 
-(Numbers above are starting suggestions matched to current behavior. Final values will be tuned during Phase 4.)
+**AG curve (resolved, AG attribute is 1-100 with 50 average; rare values above 100):**
+
+```python
+def ag_to_grid_per_game_sec(ag: int) -> float:
+    """Linear curve calibrated to:
+      AG=0   → 10  (slow)
+      AG=50  → 16  (average — matches current COF default)
+      AG=100 → 22  (fast)
+      AG>100 → extends linearly (rare; AG=120 → 24.4)
+    Soft cap at 30 grid/game-sec to bound runaway extrapolation.
+    """
+    rate = 10.0 + (ag / 100.0) * 12.0
+    return min(rate, 30.0)
+```
 
 ## Phased plan
 
@@ -166,13 +179,13 @@ git reset --hard pre-movement-refactor
 git push --force-with-lease         # ONLY with explicit user approval
 ```
 
-## Open questions for the user
+## Open questions — resolved
 
-1. **Pass speed treatment** — confirmed out of scope (it's ball physics, AG doesn't apply). Just confirming no surprise change here.
-2. **AG curve calibration** — Phase 4 needs an AG-to-rate curve. Recommend: AG=5 (avg) → ~16 grid/game-sec (matches current COF default); AG=0 → ~10; AG=10 → ~22. Tunable. Sound right?
-3. **Phase 3 feature flag** — yes/no on shipping the frontend-authority-shift behind a runtime toggle. Slows release but lets us A/B and revert per-game without a code rollback.
-4. **Drive multiplier** — current Drive=12 is 75% of COF=16. Keeping that ratio (drive at 0.75× free-running AG rate) — sound right?
-5. **Shot-motion multiplier** — current HCO Shot=10 is 62.5% of COF. Round to 0.6× free-running? Or is HCO Shot intentionally 0.625× for a reason worth preserving?
+1. **Pass speed treatment** — out of scope. Ball physics, AG doesn't apply. No change.
+2. **AG curve calibration** — linear, AG=50 average → 16 grid/game-sec (matches current COF), AG=0 → 10, AG=100 → 22, soft-capped at 30 for rare AG>100 cases. See `ag_to_grid_per_game_sec` above.
+3. **Phase 3 feature flag** — none. Direct cutover; revert via PR if needed. Phased PRs already provide revert granularity.
+4. **Drive multiplier** — 0.75× free-running (preserves current Drive=12 vs COF=16 ratio).
+5. **Shot-motion multiplier** — 0.625× free-running exactly (preserves current HCO Shot=10 vs COF=16 ratio; zero complexity to keep the precise value).
 
 ## Cross-references
 
