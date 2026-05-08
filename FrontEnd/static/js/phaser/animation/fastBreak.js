@@ -132,6 +132,7 @@ function initFbTelemetryContext(scene, { turnData, turnIndex, branchKind }) {
       fbRequiredRoleCount: 0,
       fbClampCount: 0,
       fbSnapCount: 0,
+      fbAwaitTimeoutCount: 0,
     },
   };
 }
@@ -158,6 +159,12 @@ const FB_STRICT_DEFAULT_BRANCHES = [
 function isLocalDevFbContractDefault(scope) {
   const host = scope?.location?.hostname;
   return host === "localhost" || host === "127.0.0.1";
+}
+
+function isCriticalEventPatternEnabled() {
+  const scope = getFbContractGlobalScope();
+  const raw = scope?.UESS_FB_CRITICAL_EVENT_PATTERN;
+  return raw === true || raw === "on";
 }
 
 function resolveFbStrictContractMode() {
@@ -1328,11 +1335,18 @@ async function animateRimRunnerOutletDeniedBeat(
     debugTag: "rr_denied_receiver_cutback",
   });
 
-  await awaitWithTimeout(
+  const recvCutbackCompleted = await awaitWithTimeout(
     recvPromise,
     phaseDurationMs + 2000,
     "rim_runner_outlet_denied_receiver_cutback"
   );
+  if (!recvCutbackCompleted) {
+    incrementFbCounter(scene, "fbAwaitTimeoutCount", 1);
+    emitFbTelemetry(scene, "fb_await_timeout", {
+      label: "rim_runner_outlet_denied_receiver_cutback",
+      timeoutMs: phaseDurationMs + 2000,
+    });
+  }
   logRrDenied(scene, "TRIGGER", {
     trigger: "receiver_cutback_reached",
     receiverTarget: recvTarget,
@@ -1467,11 +1481,18 @@ async function animateRimRunnerHoldUpLeadIn(
     easing: "Linear",
   });
 
-  await awaitWithTimeout(
+  const bhSettleCompleted = await awaitWithTimeout(
     bhPromise,
     phaseDurationMs + 2000,
     "rim_runner_hold_up_ball_handler_settle"
   );
+  if (!bhSettleCompleted) {
+    incrementFbCounter(scene, "fbAwaitTimeoutCount", 1);
+    emitFbTelemetry(scene, "fb_await_timeout", {
+      label: "rim_runner_hold_up_ball_handler_settle",
+      timeoutMs: phaseDurationMs + 2000,
+    });
+  }
 
   for (const [pid, sprite] of Object.entries(playerSprites)) {
     if (sid(pid) === bhId || !sprite || !scene.tweens) continue;
