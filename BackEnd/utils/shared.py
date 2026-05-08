@@ -269,14 +269,25 @@ def _get_step_ball_handler_pos(step):
 
 def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     """
-    Pre-HCO bring-up time: Open Floor (OF) rate 24 grid/game sec (Real_Time_Clock_System.md).
-    When prev_offense_positions is provided (e.g. BIP/SIP oDestinations): max over offense
-    players' distance to step 0. When not provided (e.g. DREB→HCO): step0→step1 ball-handler.
+    Pre-HCO bring-up time. Cruise-speed step (all 10 players move at cruise
+    rate, AG-independent). The BH gets a random rate per call for organic
+    pacing; everyone else uses the cruise baseline. Step duration = max time
+    across the offense (advance trigger = last offensive player to arrive).
+
+    When prev_offense_positions is provided (BIP/SIP→HCO): max over offense
+    players' distance to step 0, BH at random rate, others at baseline.
+    When not provided (DREB→HCO): step0→step1 ball-handler distance at the
+    BH's random cruise rate.
     """
     if not steps:
         return 0
     step0 = steps[0]
     pos_actions0 = (step0.get("pos_actions") or {})
+
+    # Identify ball handler position from step 0 (preferred) or step 1.
+    bh_pos = _get_step_ball_handler_pos(step0)
+    if not bh_pos and len(steps) > 1:
+        bh_pos = _get_step_ball_handler_pos(steps[1])
 
     if prev_offense_positions:
         max_seconds = 0.0
@@ -289,7 +300,8 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
             step0_coords = _extract_step_location_coords(action_info)
             if not step0_coords:
                 continue
-            seg = calc_isotropic_segment_seconds(prev_coords, step0_coords, OPEN_FLOOR_GRID_PER_GAME_SECOND)
+            role = "bh" if pos == bh_pos else "default"
+            seg = calc_cruise_segment_seconds(prev_coords, step0_coords, role=role)
             if seg > max_seconds:
                 max_seconds = seg
         return int(round(max_seconds)) if max_seconds > 0 else 0
@@ -297,16 +309,15 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
     if len(steps) < 2:
         return 0
     step1 = steps[1]
-    ball_handler_pos = _get_step_ball_handler_pos(step1) or _get_step_ball_handler_pos(step0)
-    if not ball_handler_pos:
+    if not bh_pos:
         return 0
-    step0_action = pos_actions0.get(ball_handler_pos, {})
-    step1_action = (step1.get("pos_actions", {}) or {}).get(ball_handler_pos, {})
+    step0_action = pos_actions0.get(bh_pos, {})
+    step1_action = (step1.get("pos_actions", {}) or {}).get(bh_pos, {})
     start = _extract_step_location_coords(step0_action)
     end = _extract_step_location_coords(step1_action)
     if not start or not end:
         return 0
-    return int(round(calc_isotropic_segment_seconds(start, end, OPEN_FLOOR_GRID_PER_GAME_SECOND)))
+    return int(round(calc_cruise_segment_seconds(start, end, role="bh")))
 
 
 # Minimum game seconds per step when movement cannot be computed (no blanket per-step default).
@@ -520,19 +531,30 @@ def calc_cruise_segment_seconds(start, end, *, role="default"):
     HCO bring-up and HCT step 1 (the bring-the-ball-up moments where players
     are not pushing max effort).
 
-    Phase 1 BEHAVIOR: routes to OPEN_FLOOR_GRID_PER_GAME_SECOND (20) for both
-    roles. No randomness yet. Preserves current behavior if any caller wires
-    this in early.
+    role="bh"      → fresh random.uniform(BH_CRUISE_MIN, BH_CRUISE_MAX) per call,
+                     giving each BH bring-up an organic pace (8-16 grid/game-sec).
+                     Slow random rate → more game-clock burn for that step.
+    role="default" → CRUISE_BASELINE_GRID_PER_GAME_SEC (16). Used by the other
+                     four offense players and all five defenders during a
+                     cruise step.
 
-    Phase 2 BEHAVIOR (planned): role="bh" picks a fresh
-    random.uniform(BH_CRUISE_MIN, BH_CRUISE_MAX) per call; role="default" uses
-    CRUISE_BASELINE_GRID_PER_GAME_SEC.
+    Visual sync: this helper produces the game-clock cost. Visual tween
+    duration is wired to match this value once Phase 3 lands (frontend reads
+    step_clock_seconds as authoritative). Until Phase 3, visual is still
+    AG-driven and may diverge from the game-clock for cruise steps.
 
     Args:
         start, end: {"x": ..., "y": ...} grid coord dicts
         role: "default" for non-BH cruisers, "bh" for the ball handler
     """
-    return calc_isotropic_segment_seconds(start, end, OPEN_FLOOR_GRID_PER_GAME_SECOND)
+    if role == "bh":
+        rate = random.uniform(
+            BH_CRUISE_MIN_GRID_PER_GAME_SEC,
+            BH_CRUISE_MAX_GRID_PER_GAME_SEC,
+        )
+    else:
+        rate = CRUISE_BASELINE_GRID_PER_GAME_SEC
+    return calc_isotropic_segment_seconds(start, end, rate)
 
 
 def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):

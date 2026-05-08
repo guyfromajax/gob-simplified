@@ -43,6 +43,7 @@ from BackEnd.constants import (
     HCT_SETUP_POSITIONS,
 )
 from BackEnd.utils.shared import (
+    calc_cruise_segment_seconds,
     calculate_ball_handling_score,
     calculate_defender_pressure_score,
     get_away_player_coords,
@@ -260,11 +261,16 @@ def _hct_setup_start_coords(pos: str, is_away_offense: bool) -> Dict[str, int]:
 
 
 def _step_1_arrival_time(start: Dict[str, Any], target: Dict[str, Any]) -> float:
-    """Game seconds for a player at challenged-open-floor pace to reach target."""
-    distance = _euclid(start, target)
-    if distance <= 0:
+    """Game seconds for the BH to reach the step-1 engagement target.
+
+    HCT step 1 is a cruise step (the BH is bringing the ball up, not maxing
+    speed). The BH gets a fresh random rate in [BH_CRUISE_MIN, BH_CRUISE_MAX]
+    per call, giving each turn organic variation. Other 9 players run at the
+    cruise baseline rate in their own waypoint emission below.
+    """
+    if _euclid(start, target) <= 0:
         return 0.0
-    return distance / float(CHALLENGED_OPEN_FLOOR_GRID_PER_GAME_SECOND)
+    return calc_cruise_segment_seconds(start, target, role="bh")
 
 
 def _emit_animation(
