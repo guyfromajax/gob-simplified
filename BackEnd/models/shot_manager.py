@@ -1926,6 +1926,7 @@ class ShotManager:
             result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
             result["resolution_step_index"] = timing_contract["resolution_step_index"]
             result["executed_step_count"] = timing_contract["executed_step_count"]
+            result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
         if is_block_outcome:
             result["blocker_id"] = getattr(self._block_defender, "player_id", None) if getattr(self, "_block_defender", None) else None
             if hasattr(self, "_block_spot"):

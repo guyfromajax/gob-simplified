@@ -583,6 +583,14 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
+
+  // Phase 3b: HCO bring-up cruise sync. When the backend supplies per-player
+  // bring-up game-seconds (BH at random cruise rate, others at baseline),
+  // use them as authoritative tween durations so visual matches game-clock.
+  // Falls back to AG-based duration when absent (other turn types unchanged).
+  const bringupPerPlayer = turnData?.bringup_per_player_seconds || null;
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+
   for (const anim of animations) {
     if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
@@ -605,9 +613,15 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
       scene.game.config.height
     );
 
-    // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
-    // This ensures smooth transitions between turns and consistent speeds
-    const duration = getPlayerDuration(sprite, x, y);
+    // Resolve duration: backend per-player game_seconds takes precedence;
+    // fall back to AG-based distance duration for legacy turn payloads.
+    const playerPos = scene?.playerInfo?.[anim.playerId]?.pos;
+    const playerGameSeconds = bringupPerPlayer && playerPos
+      ? Number(bringupPerPlayer[playerPos])
+      : NaN;
+    const duration = (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0)
+      ? Math.max(50, Math.round(playerGameSeconds * clockSecondMs))
+      : getPlayerDuration(sprite, x, y);
 
     promises.push(new Promise((resolve) => {
       const tween = scene.tweens.add({

@@ -267,30 +267,37 @@ def _get_step_ball_handler_pos(step):
     return None
 
 
-def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
+def _calc_hco_bringup_per_player_seconds(steps, prev_offense_positions=None):
     """
-    Pre-HCO bring-up time. Cruise-speed step (all 10 players move at cruise
-    rate, AG-independent). The BH gets a random rate per call for organic
-    pacing; everyone else uses the cruise baseline. Step duration = max time
-    across the offense (advance trigger = last offensive player to arrive).
+    Per-player HCO bring-up game-seconds. Returns dict {pos: float}.
 
-    When prev_offense_positions is provided (BIP/SIP→HCO): max over offense
-    players' distance to step 0, BH at random rate, others at baseline.
-    When not provided (DREB→HCO): step0→step1 ball-handler distance at the
-    BH's random cruise rate.
+    Single source of truth for both:
+      - the bring-up overhead (max across players, used as game-clock burn)
+      - per-player visual tween durations (frontend ``runSetupTween``)
+
+    When prev_offense_positions is provided (BIP/SIP→HCO): each offense
+    player's distance from inbound spot to step-0 spot, BH at random cruise
+    rate, others at cruise baseline.
+
+    When not provided (DREB→HCO): BH only — step0→step1 ball-handler distance
+    at the BH's random cruise rate.
+
+    Callers needing BOTH overhead and per-player MUST call this once and
+    derive max from the returned dict. Calling this and
+    ``_calc_hco_bringup_overhead_seconds`` separately re-rolls the BH random
+    rate and the two will disagree.
     """
+    result: Dict[str, float] = {}
     if not steps:
-        return 0
+        return result
     step0 = steps[0]
     pos_actions0 = (step0.get("pos_actions") or {})
 
-    # Identify ball handler position from step 0 (preferred) or step 1.
     bh_pos = _get_step_ball_handler_pos(step0)
     if not bh_pos and len(steps) > 1:
         bh_pos = _get_step_ball_handler_pos(steps[1])
 
     if prev_offense_positions:
-        max_seconds = 0.0
         for pos, prev_coords in prev_offense_positions.items():
             if not prev_coords or not isinstance(prev_coords, dict):
                 continue
@@ -302,22 +309,41 @@ def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
                 continue
             role = "bh" if pos == bh_pos else "default"
             seg = calc_cruise_segment_seconds(prev_coords, step0_coords, role=role)
-            if seg > max_seconds:
-                max_seconds = seg
-        return int(round(max_seconds)) if max_seconds > 0 else 0
+            if seg > 0:
+                result[pos] = seg
+        return result
 
-    if len(steps) < 2:
-        return 0
+    # DREB→HCO branch: BH only
+    if len(steps) < 2 or not bh_pos:
+        return result
     step1 = steps[1]
-    if not bh_pos:
-        return 0
     step0_action = pos_actions0.get(bh_pos, {})
     step1_action = (step1.get("pos_actions", {}) or {}).get(bh_pos, {})
     start = _extract_step_location_coords(step0_action)
     end = _extract_step_location_coords(step1_action)
     if not start or not end:
+        return result
+    seg = calc_cruise_segment_seconds(start, end, role="bh")
+    if seg > 0:
+        result[bh_pos] = seg
+    return result
+
+
+def _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions=None):
+    """
+    Pre-HCO bring-up time as a single int (max across players).
+    Thin wrapper around _calc_hco_bringup_per_player_seconds. See that helper
+    for cruise-mode rationale and BH random behavior.
+
+    Note: callers needing BOTH overhead and per-player should call the
+    per-player helper directly and derive max — calling both re-rolls the BH
+    random rate.
+    """
+    per_player = _calc_hco_bringup_per_player_seconds(steps, prev_offense_positions)
+    if not per_player:
         return 0
-    return int(round(calc_cruise_segment_seconds(start, end, role="bh")))
+    max_seconds = max(per_player.values())
+    return int(round(max_seconds)) if max_seconds > 0 else 0
 
 
 # Minimum game seconds per step when movement cannot be computed (no blanket per-step default).
@@ -428,8 +454,17 @@ def calc_skeleton_step_timing_contract(
 
         step_clock_seconds.append(int(step_sec))
 
+    # Bring-up overhead + per-player times (Phase 3b). Compute per-player ONCE
+    # so the overhead (max) and the per-player visual durations agree on the
+    # same BH random roll. Calling _calc_hco_bringup_overhead_seconds on its
+    # own would re-roll the BH random and de-sync clock from visual.
+    bringup_per_player: Dict[str, float] = {}
     if include_hco_step1_bringup and len(step_clock_seconds) > 0:
-        step_clock_seconds[0] += _calc_hco_bringup_overhead_seconds(steps, prev_offense_positions)
+        bringup_per_player = _calc_hco_bringup_per_player_seconds(steps, prev_offense_positions)
+        if bringup_per_player:
+            max_seconds = max(bringup_per_player.values())
+            if max_seconds > 0:
+                step_clock_seconds[0] += int(round(max_seconds))
 
     total = sum(step_clock_seconds)
     if total > cap:
@@ -450,6 +485,9 @@ def calc_skeleton_step_timing_contract(
         "time_elapsed": final_total,
         "resolution_step_index": resolution_step_index,
         "executed_step_count": len(step_clock_seconds),
+        # Phase 3b: per-player bring-up game-seconds for frontend visual sync.
+        # Empty dict when bring-up is not in scope (FCP/HCT/Fast Break paths).
+        "bringup_per_player_seconds": bringup_per_player,
     }
 
 

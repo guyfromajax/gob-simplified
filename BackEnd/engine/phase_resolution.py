@@ -4882,6 +4882,7 @@ def resolve_half_court_offense_logic(game):
             turn_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
             turn_result["resolution_step_index"] = timing_contract["resolution_step_index"]
             turn_result["executed_step_count"] = timing_contract["executed_step_count"]
+            turn_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
             # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
@@ -4939,6 +4940,7 @@ def resolve_half_court_offense_logic(game):
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
             foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
             foul_result["executed_step_count"] = timing_contract["executed_step_count"]
+            foul_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
             logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
@@ -4996,6 +4998,7 @@ def resolve_half_court_offense_logic(game):
             foul_result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
             foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
             foul_result["executed_step_count"] = timing_contract["executed_step_count"]
+            foul_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
