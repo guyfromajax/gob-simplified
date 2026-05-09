@@ -1116,7 +1116,6 @@ export class ShotAnimationSystem {
     // Show announcement and flash immediately so they run in unison with rim hold (single 1000ms period)
     if (!isPutbackMake) {
       const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-      const { triggerMadeShotFlash } = await import('./negativeActionEffects.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
       const shooterSprite = this.playerSprites[turnData.shooter_id];
       const shooterTeamId = shooterSprite?.team_id;
@@ -1135,7 +1134,6 @@ export class ShotAnimationSystem {
       const teamStyle = isHomeOffense ? 'home' : 'away';
       const isAndOne = turnData.next_play_type === "FREE_THROW" &&
                        (turnData.foul_player_id || turnData.foul_player?.player_id);
-      triggerMadeShotFlash(this.scene, isAndOne);
       if (isAndOne) {
         const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
         if (foulPlayerId && shooterPlayerData) {
@@ -1238,19 +1236,7 @@ export class ShotAnimationSystem {
       // Get foul player data from turnData (same pattern as AND-1)
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && this.scene) {
-        const foulPlayerSprite = this.playerSprites?.[foulPlayerId];
-        if (foulPlayerSprite) {
-          // Trigger foul effect
-          const { triggerFoulEffect } = await import('./negativeActionEffects.js');
-          triggerFoulEffect(this.scene, foulPlayerId);
-          
-          announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
-        } else {
-          // Fallback if sprite not found (matches AND-1 pattern)
-          const { triggerFoulEffect } = await import('./negativeActionEffects.js');
-          triggerFoulEffect(this.scene, foulPlayerId);
-          announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
-        }
+        announceGameEvent('FOUL_SHOOTING', turnData, this.scene, { foulerId: foulPlayerId });
       } else {
         // Fallback if foulPlayerId not found (matches AND-1 pattern)
         announceGameEvent('FOUL_SHOOTING', turnData, this.scene, {});

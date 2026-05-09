@@ -2300,13 +2300,6 @@ export function createGameScene(Phaser) {
           : rawFoulOutPlayer;
 
         if (shouldShowFoulOutPopup && foulOutPlayer && !document.querySelector('.foul-out-popup')) {
-          // Clear red tint on fouled-out player's sprite so it doesn't stay "dead"
-          const foulOutIdForTint = foulOutPlayer.player_id ?? foulOutPlayer.playerId;
-          if (foulOutIdForTint) {
-            import('./animation/negativeActionEffects.js').then(({ clearFoulTintForPlayer }) => {
-              clearFoulTintForPlayer(this, foulOutIdForTint);
-            }).catch(() => {});
-          }
           // Dynamically import foul out popup
           import('./utils/foulOutPopup.js').then(({ showFoulOutPopup }) => {
             // Get game context from scene

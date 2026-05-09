@@ -10,6 +10,7 @@
 10. Block bug, away team had ball, away team was teh blocker in Announcment System and teh ball bounced to a location on the hoem side of the court
 11. More action in recruiting
 12. Better player progression between seasons
+13. Announce + Computer Timeout design -- don't hide the announce
 
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting

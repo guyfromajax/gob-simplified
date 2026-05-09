@@ -804,15 +804,6 @@ export class AnimationEngine {
       const player = (foulOutPlayerId && this.scene.simData?.players)
         ? (this.scene.simData.players.find(p => (p.playerId ?? p.player_id) === foulOutPlayerId) || rawPlayer)
         : rawPlayer;
-      // Clear red tint on fouled-out player's sprite so it doesn't stay "dead" when we navigate
-      if (foulOutPlayerId && this.scene) {
-        try {
-          const { clearFoulTintForPlayer } = await import('./negativeActionEffects.js');
-          clearFoulTintForPlayer(this.scene, foulOutPlayerId);
-        } catch (e) {
-          console.warn('⚠️ [FOUL OUT] Could not clear sprite tint:', e);
-        }
-      }
       if (gameId) {
         let foulOutPopupAttempted = false;
         try {

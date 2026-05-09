@@ -8,8 +8,6 @@ import {
   getCurrentOwner,
   getPendingOwner,
 } from "./BallControllerAdapter.js";
-import { triggerTurnoverEffect } from "./negativeActionEffects.js";
-
 /**
  * Map backend TURNOVER events to appropriate animation sequences.
  * Live-ball turnovers trigger a fast break; dead-ball turnovers reset to inbound.
@@ -40,16 +38,6 @@ export async function handleTurnover(scene, { playerSprites, ballSprite, turnDat
     turnData?.turnover_type === "STEAL" ||
     turnData?.result_type === "STEAL";
   
-  // Trigger turnover effect on player who lost the ball
-  const victimId = turnData?.victim_id || turnData?.ball_handler_id || turnData?.ball_handler?.player_id;
-  console.log(`🔄 TURNOVER detected:`, { victimId, turnData_type: turnData?.result_type });
-  if (victimId) {
-    console.log(`🔄 Calling triggerTurnoverEffect for player:`, victimId);
-    triggerTurnoverEffect(scene, victimId);
-  } else {
-    console.warn(`🔄 No victim_id found in turnData:`, turnData);
-  }
-
   // ✅ FIX: Use offense_team_id (SS&S possession system) instead of possession_team_id
   const offenseId = turnData?.offense_team_id;
   if (offenseId != null) {

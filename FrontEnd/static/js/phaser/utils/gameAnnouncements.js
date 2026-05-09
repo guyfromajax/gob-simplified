@@ -11,7 +11,6 @@
  */
 
 import { showAnnouncement, showAndOneAnnouncement, playAnnouncementSfx } from './announcements.js';
-import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
@@ -330,10 +329,6 @@ function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) 
   playAnnouncementSfx('foul');
   showAnnouncement(foulText, defenseTeam, playerData);
 
-  // Trigger visual effect
-  if (scene && foulerId) {
-    triggerFoulEffect(scene, foulerId);
-  }
 }
 
 function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) {
@@ -358,10 +353,6 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
   playAnnouncementSfx('foul');
   showAnnouncement(foulText, offenseTeam, playerData);
 
-  // Trigger visual effect
-  if (scene && foulerId) {
-    triggerFoulEffect(scene, foulerId);
-  }
 }
 
 function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
@@ -383,10 +374,6 @@ function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
   playAnnouncementSfx('foul');
   showAnnouncement("CHARGE!", defenseTeam, playerData);
 
-  // Trigger visual effect
-  if (scene && foulerId) {
-    triggerFoulEffect(scene, foulerId);
-  }
 }
 
 function handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam) {
@@ -408,10 +395,6 @@ function handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam) {
   playAnnouncementSfx('foul');
   showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
 
-  // Trigger visual effect
-  if (scene && foulerId) {
-    triggerFoulEffect(scene, foulerId);
-  }
 }
 
 function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
@@ -432,11 +415,6 @@ function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
 
   showAnnouncement("STEAL!", defenseTeam, playerData);
 
-  // Trigger visual effect on victim
-  const victimId = context.victimId || turnData.victim_id;
-  if (scene && victimId) {
-    triggerTurnoverEffect(scene, victimId);
-  }
 }
 
 function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
@@ -495,9 +473,4 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
   
   playAnnouncementSfx(turnoverText === 'Shot Clock Violation!' ? 'shot_clock_violation' : 'foul');
   showAnnouncement(turnoverText, offenseTeam, playerData);
-
-  // Trigger visual effect
-  if (scene && victimId) {
-    triggerTurnoverEffect(scene, victimId);
-  }
 }

@@ -1,10 +1,8 @@
 /**
  * Announcement system for significant game events
  * Shows animated text that pops from scoreboard to center screen
- * Optionally triggers legacy effect hooks (no-ops; feedback is via announcement styling)
  */
 
-import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 import gameStore from '../../state/gameStore.js';
 import { isFastBreakEntryAnnouncementsEnabled } from '../constants/fastBreakConstants.js';
 import { isBonusFreeThrowFoulTurn } from './foulAnnouncementClassifier.js';
@@ -147,20 +145,6 @@ export function getSecondaryColorForTeam(scene, teamId) {
  * @param {string} playerId - Player ID to apply effect to
  * @param {string} effectType - 'foul' or 'turnover'
  */
-function triggerVisualEffect(scene, playerId, effectType) {
-  if (!scene || !playerId) return;
-  
-  const sprite = scene.playerSprites?.[playerId];
-  if (!sprite) return;
-  
-  // Call the appropriate effect function
-  if (effectType === 'foul') {
-    triggerFoulEffect(scene, playerId);
-  } else if (effectType === 'turnover') {
-    triggerTurnoverEffect(scene, playerId);
-  }
-}
-
 /**
  * Show AND-1 announcement with two rows (made shot + foul) — uses new announcement strip.
  * @param {string} team - Team that made the shot
@@ -307,9 +291,6 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         }
       }
       showAnnouncement("CHARGE!", defenseTeam, playerData);
-      if (scene && foulerId && typeof triggerVisualEffect === 'function') {
-        triggerVisualEffect(scene, foulerId, 'foul');
-      }
       return;
     }
     
@@ -363,10 +344,6 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         showAnnouncement(defensiveFoulText, offenseTeam, playerData);
       }
       
-      // Trigger visual effect on fouling player
-      if (scene && turnData.foul_player_id) {
-        triggerVisualEffect(scene, turnData.foul_player_id, 'foul');
-      }
       return;
     }
     
@@ -395,11 +372,6 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       }
 
       showAnnouncement("STEAL!", defenseTeam, playerData);
-      
-      // Trigger visual effect on turnover victim (ball handler who got stolen from)
-      if (scene && turnData.victim_id) {
-        triggerVisualEffect(scene, turnData.victim_id, 'turnover');
-      }
       return;
     }
     
@@ -477,11 +449,6 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       const turnoverSfxKind = turnoverText === 'Shot Clock Violation!' ? 'shot_clock_violation' : 'foul';
       playAnnouncementSfx(turnoverSfxKind);
       showAnnouncement(turnoverText, offenseTeam, playerData);
-      
-      // Trigger visual effect on turnover victim
-      if (scene && turnData.victim_id) {
-        triggerVisualEffect(scene, turnData.victim_id, 'turnover');
-      }
       return;
     }
   }

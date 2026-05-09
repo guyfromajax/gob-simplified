@@ -2904,21 +2904,11 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
       const isShootingFoulOnMiss = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
       if (isShootingFoulOnMiss) {
-        const { triggerFoulEffect } = await import('./negativeActionEffects.js');
         const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+        const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
         if (foulPlayerId && scene) {
-          const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
-          if (foulPlayerSprite) {
-            triggerFoulEffect(scene, foulPlayerId);
-            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
-            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-          } else {
-            triggerFoulEffect(scene, foulPlayerId);
-            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
-            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-          }
+          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
         } else {
-          const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
           announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
         }
       }
@@ -3317,18 +3307,10 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const nextPlayTypeIsFreeThrow = turnData?.next_play_type === 'FREE_THROW';
     const isShootingFoulOnMiss = hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow;
     if (isShootingFoulOnMiss) {
-      const { triggerFoulEffect } = await import('./negativeActionEffects.js');
       const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
       const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
       if (foulPlayerId && scene) {
-        const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
-        if (foulPlayerSprite) {
-          triggerFoulEffect(scene, foulPlayerId);
-          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-        } else {
-          triggerFoulEffect(scene, foulPlayerId);
-          announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-        }
+        announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
       } else {
         announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
       }

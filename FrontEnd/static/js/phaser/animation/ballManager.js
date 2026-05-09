@@ -474,7 +474,6 @@ export async function shootBall({
         
         // Announce shot result when ball reaches rim
         const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-        const { triggerFoulEffect, triggerMadeShotFlash } = await import('./negativeActionEffects.js');
         const teamStyle = isHomeTeam ? 'home' : 'away';
         
         // Check if this is a shooting foul (AND-1 or foul on shot)
@@ -524,9 +523,6 @@ export async function shootBall({
         } : null;
         
         if (result === "MAKE") {
-          // Trigger flash - diagonal split for AND-1, full green for regular makes
-          triggerMadeShotFlash(scene, isShootingFoul);
-          
           if (isShootingFoul) {
             // AND-1 - Use special two-row announcement
             const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
@@ -558,25 +554,10 @@ export async function shootBall({
           // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow)
           // Get foul player data from turnData (same pattern as AND-1)
           const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+          const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
           if (foulPlayerId && scene) {
-            const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
-            if (foulPlayerSprite) {
-              // Trigger foul effect
-              const { triggerFoulEffect } = await import('./negativeActionEffects.js');
-              triggerFoulEffect(scene, foulPlayerId);
-
-              const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
-              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-            } else {
-              // Fallback if sprite not found (matches AND-1 pattern)
-              const { triggerFoulEffect } = await import('./negativeActionEffects.js');
-              triggerFoulEffect(scene, foulPlayerId);
-              const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
-              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-            }
+            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
           } else {
-            // Fallback if foulPlayerId not found (matches AND-1 pattern)
-            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
             announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
           }
         }
