@@ -2152,12 +2152,24 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     return { branch: "none", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   }
 
+  // Phase 4b: read backend per-segment game_seconds when stamped on the grid
+  // target (rr_to / outlet_defender_to / other_players[i] / receiver_to). Falls
+  // back to distance-based getPlayerDuration when absent.
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const resolveBurstDurationMs = (sprite, px, grid) => {
+    const wpGs = Number(grid?.game_seconds);
+    if (Number.isFinite(wpGs) && wpGs >= 0) {
+      return Math.max(50, Math.round(wpGs * clockSecondMs));
+    }
+    return getPlayerDuration(sprite, px.x, px.y, true);
+  };
+
   const secondary = [];
   const secondarySprites = [];
   const startTween = (sprite, grid) => {
     if (!sprite || grid == null || grid.x == null || grid.y == null) return;
     const px = gridToPixels(grid.x, grid.y, width, height);
-    const dur = getPlayerDuration(sprite, px.x, px.y, true);
+    const dur = resolveBurstDurationMs(sprite, px, grid);
     secondary.push(
       tweenPlayerTo(scene, sprite, px, { duration: dur, easing: "Linear" })
     );
@@ -2169,14 +2181,18 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     startTween(playerSprites[sid(phase.outlet_defender_id)], phase.outlet_defender_to);
   }
   for (const row of phase.other_players || []) {
-    startTween(playerSprites[sid(row.player_id)], { x: row.to_x, y: row.to_y });
+    startTween(playerSprites[sid(row.player_id)], {
+      x: row.to_x,
+      y: row.to_y,
+      game_seconds: row.game_seconds,
+    });
   }
   // These movers can be stopped by downstream branch handoff logic; consume their
   // eventual outcomes to avoid unhandled promise rejections on expected stop().
   void Promise.allSettled(secondary);
 
   const recvTargetPx = gridToPixels(phase.receiver_to.x, phase.receiver_to.y, width, height);
-  const recvDur = getPlayerDuration(recvSprite, recvTargetPx.x, recvTargetPx.y, true);
+  const recvDur = resolveBurstDurationMs(recvSprite, recvTargetPx, phase.receiver_to);
   const receiverPromise = tweenPlayerTo(scene, recvSprite, recvTargetPx, {
     duration: recvDur,
     easing: "Linear",
@@ -2190,6 +2206,16 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
   }
 
   await receiverPromise;
+
+  // Phase 4b sequencing fix (gated on flag): receiver landed → critical event
+  // for the burst phase. Stop secondary tweens NOW (before outlet pass animates),
+  // so RR doesn't continue sprinting toward the rim during the pass flight.
+  // Lane pass spawns a fresh tween for RR's catch movement after this.
+  if (isCriticalEventPatternEnabled()) {
+    for (const sprite of secondarySprites) {
+      if (sprite && scene.tweens) scene.tweens.killTweensOf(sprite);
+    }
+  }
 
   const outletDenied = Boolean(turnData.rim_runner_outlet_failed);
   if (outletDenied) {

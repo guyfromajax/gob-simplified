@@ -15,6 +15,7 @@ from BackEnd.constants.fast_break_play_types import RIM_RUNNER, TRIANGLE
 from BackEnd.models.animator import Animator
 from BackEnd.utils.shared import (
     apply_coords_from_animations_list,
+    calc_ag_segment_seconds,
     calculate_outlet_pass_score,
     get_away_player_coords,
     unpack_game_context,
@@ -817,6 +818,11 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         py_passer = _player_y(rebounder)
         od_tx = float(max(4, min(97, int(round(px_passer + (2 if not is_away_offense else -2))))))
         od_to = {"x": od_tx, "y": py_passer}
+        # Phase 4b: per-segment game_seconds for the outlet defender's contest tween.
+        od_start = {"x": float(_player_x(outlet_defender)), "y": float(_player_y(outlet_defender))}
+        od_to["game_seconds"] = calc_ag_segment_seconds(
+            od_start, od_to, outlet_defender, archetype="default"
+        )
 
     off_ids = {str(getattr(p, "player_id", None)) for p in off_lineup.values() if p}
     passer_id = str(rid) if rid is not None else None
@@ -859,22 +865,53 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
                 dx = random.randint(8, 12)
             nx = _defender_x_toward_basket(px, x_dir, dx, basket_x)
             ny = float(_y_toward_25(py))
+        # Phase 4b: per-segment game_seconds for the secondary movers' burst tweens.
+        # AG-driven via Movement Rate Refactor helper (default archetype).
+        # Frontend reads `other_players[i].game_seconds × clockSecondMs`.
+        other_gs = calc_ag_segment_seconds(
+            {"x": float(px), "y": float(py)},
+            {"x": float(nx), "y": float(ny)},
+            pl,
+            archetype="default",
+        )
         other_moves.append(
-            {"player_id": getattr(pl, "player_id", None), "to_x": float(nx), "to_y": float(ny)}
+            {
+                "player_id": getattr(pl, "player_id", None),
+                "to_x": float(nx),
+                "to_y": float(ny),
+                "game_seconds": other_gs,
+            }
         )
 
     recv_id_val = getattr(ball_handler, "player_id", None)
+    # Phase 4b: per-segment game_seconds for RR sprint and outlet receiver settle.
+    rr_from = {"x": float(rr_x0), "y": float(rr_y0)}
+    rr_to = {
+        "x": float(rr_new_x),
+        "y": float(rr_new_y),
+        "game_seconds": calc_ag_segment_seconds(rr_from, {"x": float(rr_new_x), "y": float(rr_new_y)}, rr, archetype="default"),
+    }
+    recv_start = {
+        "x": float(_player_x(ball_handler)),
+        "y": float(_player_y(ball_handler)),
+    } if ball_handler else None
+    recv_end = {"x": float(best_tx), "y": float(receive_ty)}
+    if ball_handler and recv_start is not None:
+        recv_end["game_seconds"] = calc_ag_segment_seconds(
+            recv_start, {"x": float(best_tx), "y": float(receive_ty)}, ball_handler, archetype="default",
+        )
+
     fb_roles["rim_runner_burst_phase"] = {
         "rr_id": rr_id,
-        "rr_from": {"x": rr_x0, "y": rr_y0},
-        "rr_to": {"x": rr_new_x, "y": rr_new_y},
+        "rr_from": rr_from,
+        "rr_to": rr_to,
         "burst_success": burst_anim_success,
         "movement_factor": movement_factor,
         "burst_threshold": burst_threshold_anim,
         "skip_outlet_pass": skip_outlet_pass,
         "outlet_passer_id": None if skip_outlet_pass else rid,
         "outlet_receiver_id": recv_id_val,
-        "receiver_to": {"x": best_tx, "y": receive_ty},
+        "receiver_to": recv_end,
         "outlet_defender_id": od_id,
         "outlet_defender_to": od_to,
         "other_players": other_moves,
