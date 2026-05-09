@@ -90,37 +90,39 @@ def _player_id_at_pos(lineup: Dict[str, Any], pos: str) -> Optional[str]:
     return str(pid) if pid is not None else None
 
 
-def _ball_owner_at_step_start(
+def _walk_ball_owners(
     skeleton_steps: List[Dict[str, Any]],
-    step_index: int,
-    off_lineup: Dict[str, Any],
-) -> Optional[str]:
-    """Walk skeleton.steps[0..step_index] and return the player_id of whoever
-    is holding the ball at the START of `step_index`. Continuity rule: if a
-    prior step's pos_actions assigned `pass` to player A and `receive` to
-    player B, the ball transfers to B at that step's end (= step+1 start)."""
-    if not skeleton_steps:
-        return None
-    # Find initial owner: first pos with handle_ball action.
-    current_owner_pos: Optional[str] = None
-    for step in skeleton_steps[: step_index + 1]:
+) -> List[tuple]:
+    """Walk the skeleton once and produce a list of (start_owner_pos,
+    end_owner_pos) pairs — one per step. Continuity rules:
+      - A pos with `handle_ball` or `pass` action holds the ball at step start.
+      - A `pass` + `receive` pair within a step transfers ownership at step end.
+      - Otherwise end owner = start owner.
+
+    Avoids the off-by-one issues of computing each step boundary independently
+    by maintaining a single running owner pointer across the walk.
+    """
+    walks: List[tuple] = []
+    current_owner: Optional[str] = None
+    for step in skeleton_steps:
         pos_actions = step.get("pos_actions") or {}
-        # Resolve transfer: if any pos has `pass` with a corresponding
-        # `receive`, the ball moves to the receive pos at end of THIS step.
-        # Until the transfer fires, owner = whichever pos has handle_ball.
+        # Step start: holder = pos with handle_ball or pass (both indicate
+        # the holder at step start; the pass action means "starts with ball,
+        # passes during step").
         for pos in _OFFENSE_POSITIONS:
-            action_entry = pos_actions.get(pos) or {}
-            action = action_entry.get("action")
-            if action == "handle_ball":
-                current_owner_pos = pos
-        # Apply transfer at step end if pass+receive pair present.
+            action = (pos_actions.get(pos) or {}).get("action")
+            if action in ("handle_ball", "pass"):
+                current_owner = pos
+                break
+        start_owner = current_owner
+        # Step end: transfer to receiver if pass+receive pair present.
         passers = [p for p in _OFFENSE_POSITIONS if (pos_actions.get(p) or {}).get("action") == "pass"]
         receivers = [p for p in _OFFENSE_POSITIONS if (pos_actions.get(p) or {}).get("action") == "receive"]
         if passers and receivers:
-            current_owner_pos = receivers[0]
-    if current_owner_pos is None:
-        return None
-    return _player_id_at_pos(off_lineup, current_owner_pos)
+            current_owner = receivers[0]
+        end_owner = current_owner
+        walks.append((start_owner, end_owner))
+    return walks
 
 
 # --- Coord extraction from existing animations[] payload --------------------
@@ -282,6 +284,11 @@ def build_hct_animation_steps(
         game_state.get("shot_clock_remaining", 0) or 0
     )
 
+    # Walk ball owners once across the skeleton — produces (start_owner,
+    # end_owner) pos pairs per step. Avoids the off-by-one of computing each
+    # boundary independently.
+    ball_walks = _walk_ball_owners(skeleton_steps)
+
     steps: List[AnimationStep] = []
     elapsed_so_far = 0.0
 
@@ -299,8 +306,9 @@ def build_hct_animation_steps(
         )
         archetype = _build_archetype_map(off_lineup, def_lineup, i, ball_handler_id)
 
-        owner_id_start = _ball_owner_at_step_start(skeleton_steps, i, off_lineup)
-        owner_id_end = _ball_owner_at_step_start(skeleton_steps, i + 1, off_lineup) if (i + 1) < len(skeleton_steps) else owner_id_start
+        start_owner_pos, end_owner_pos = ball_walks[i] if i < len(ball_walks) else (None, None)
+        owner_id_start = _player_id_at_pos(off_lineup, start_owner_pos) if start_owner_pos else None
+        owner_id_end = _player_id_at_pos(off_lineup, end_owner_pos) if end_owner_pos else None
 
         ball_start: BallState = (
             {"owner_player_id": owner_id_start} if owner_id_start
