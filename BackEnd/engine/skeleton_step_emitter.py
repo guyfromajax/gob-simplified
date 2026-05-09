@@ -167,6 +167,18 @@ def _walk_ball_owners(
 # --- Per-step builders -----------------------------------------------------
 
 
+def _shooter_pos_in_step(step: Dict[str, Any]) -> Optional[str]:
+    """Return the offense position (e.g. ``"PG"``) whose action on this step
+    is ``shoot``, or None if no player is shooting. First-match wins.
+    """
+    pos_actions = step.get("pos_actions") or {}
+    for pos in _OFFENSE_POSITIONS:
+        action = (pos_actions.get(pos) or {}).get("action")
+        if action == "shoot":
+            return pos
+    return None
+
+
 def _slowest_mover_id(
     start_coords: Dict[str, GridCoord],
     end_coords: Dict[str, GridCoord],
@@ -438,8 +450,16 @@ def build_skeleton_animation_steps(
             "shot_clock_remaining": shot_clock_remaining_at_turn_start - elapsed_so_far - t,
         }
 
-        # Per-step trigger: gating player = slowest mover for the step.
-        gate_id = _slowest_mover_id(start_coords, end_coords)
+        # Per-step trigger: final step gates on the shooter (if any) so the
+        # shot motion is the canonical end-of-step event. Other steps and
+        # final steps without a shoot action gate on the slowest mover.
+        gate_id: Optional[str] = None
+        if i == num_steps - 1:
+            shooter_pos = _shooter_pos_in_step(skeleton_steps[i])
+            if shooter_pos:
+                gate_id = _player_id_at_pos(off_lineup, shooter_pos)
+        if gate_id is None:
+            gate_id = _slowest_mover_id(start_coords, end_coords)
         gate_coord = end_coords.get(gate_id) if gate_id else None
         if gate_id and gate_coord:
             advance_trigger = _build_advance_trigger_player_reaches(gate_id, gate_coord, t)
