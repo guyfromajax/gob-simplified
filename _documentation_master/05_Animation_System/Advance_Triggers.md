@@ -36,7 +36,23 @@ Sections below are placeholders. Populated as each turn type migrates to the new
 
 ## HCO
 
-_TBD_
+HCO is skeleton-driven. The emitter walks `skeleton.steps[i]` + `step_clock_seconds[i]` and emits one AnimationStep per skeleton step. The number of steps varies by playcall / variant — typically 4–10 after inbound trim.
+
+Per-step trigger uniformly = `player_reaches_position`, gated on the **slowest mover** for that step (player with the largest start→end distance). T = `step_clock_seconds[i]`. Faster movers reach their destinations earlier and idle until T.
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
+| 0..N−2 | Skeleton step i | `player_reaches_position` | slowest mover for step i | `step_clock_seconds[i]` |
+| N−1 | Final step (outcome) | `player_reaches_position` | slowest mover for final step | `step_clock_seconds[N−1]` |
+
+Final step branches on `result_type` (same outcome map as HCT step 3):
+- `MAKE`/`MISS`/`BLOCK` → `turn_stop: SHOT_ATTEMPT`
+- `D_FOUL`/`O_FOUL`/`FOUL` → `turn_stop: FOUL`
+- `STEAL` → `turn_stop: STEAL`
+- `DEAD_BALL` / `DEAD_BALL_TURNOVER` / `TURNOVER` → `turn_stop: DEAD_BALL_TURNOVER`
+- `SHOT_CLOCK_EXPIRED` → `turn_stop: SHOT_CLOCK_EXPIRED`
+
+After HCO MISS with defensive rebound, a discrete DREB turn is generated (parallel to OREB). See DREB section above.
 
 ## FCP
 

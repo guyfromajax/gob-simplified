@@ -2743,7 +2743,28 @@ class TurnManager:
     
     def resolve_half_court_offense(self):
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
-        return resolve_half_court_offense_logic(self.game)
+        result = resolve_half_court_offense_logic(self.game)
+
+        # Parallel-build: emit unified AnimationStep[] alongside legacy
+        # animations[]. Single injection point for all HCO return paths
+        # (shot, fouls, steals, dead-ball turnovers). See
+        # _documentation_master/projects/Animation_System_Updated.md.
+        # Defensive: emitter failure must not block the existing payload.
+        if isinstance(result, dict):
+            try:
+                from BackEnd.engine.skeleton_step_emitter import (
+                    build_skeleton_animation_steps,
+                )
+                anim_steps = build_skeleton_animation_steps(result, self.game)
+                if anim_steps is not None:
+                    result["animation_steps"] = anim_steps
+            except Exception as e:
+                import logging
+                logging.warning(
+                    "build_skeleton_animation_steps (HCO) failed: %s", e
+                )
+
+        return result
 
     def resolve_final_turn_shot(self):
         """Final Turn shot (≤30s): alignment (Phase 2) + shot execution (Phase 3)."""

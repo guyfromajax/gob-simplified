@@ -21,7 +21,7 @@
 /**
  * @typedef {(
  *   "handle_ball" | "pass" | "receive" | "cut" | "screen" | "shoot"
- *   | "stationary" | "sprint" | "guard_ball" | "guard_offball"
+ *   | "stationary" | "sprint" | "guard_ball" | "guard_offball" | "post_up"
  * )} PlayerAction
  *   Semantic role a player performs during the step. Drives renderer
  *   behavior (sprite frames, ball events). Orthogonal to archetype.

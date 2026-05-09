@@ -476,7 +476,7 @@ class GameManager:
         - _documentation_master/projects/Animation_System_Updated.md
         - BackEnd/engine/dreb_step_emitter.py
 
-        Currently scoped to HCT MISS only; HCO/FCP/FB MISS still bundle DREB
+        Currently scoped to HCT and HCO MISS. FCP/FB MISS still bundle DREB
         info into the MISS turn the legacy way until those turn types
         migrate.
 
@@ -813,12 +813,14 @@ class GameManager:
                 break
         _perf["oreb_loop"] = (_time.time() - _t0) * 1000
 
-        # SS&S animation refactor: HCT MISS with defensive rebound generates a
-        # discrete DREB turn (parallels the OREB pattern above). Scoped to HCT
-        # only for now — HCO/FCP/FB MISS still bundle DREB info into the MISS
-        # turn the legacy way. See _documentation_master/projects/Animation_System_Updated.md.
+        # SS&S animation refactor: MISS with defensive rebound generates a
+        # discrete DREB turn (parallels the OREB pattern above). Scoped to
+        # turn types whose migration has landed — HCT and HCO. FCP/FB MISS
+        # still bundle DREB info into the MISS turn the legacy way until
+        # those migrations land. See
+        # _documentation_master/projects/Animation_System_Updated.md.
         if (
-            result.get("current_turn") == "HCT"
+            result.get("current_turn") in ("HCT", "HCO")
             and result.get("result_type") in ("MISS", "BLOCK")
             and result.get("rebound_type") == "DREB"
             and result.get("next_play_type") in ("HCO", "FAST_BREAK")

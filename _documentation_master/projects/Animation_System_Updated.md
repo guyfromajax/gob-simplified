@@ -294,7 +294,7 @@ Files touched: `shot_manager.py`, `game_manager.py`, `turn_manager.py`, `phase_r
 
 ## Resolved
 
-- **Action vocabulary (working):** `handle_ball`, `pass`, `receive`, `cut`, `screen`, `shoot`, `stationary`, `sprint`, `guard_ball`, `guard_offball`. May extend during audits; no `cover_ground` or `drift` (collapsed into `cut`).
+- **Action vocabulary (working):** `handle_ball`, `pass`, `receive`, `cut`, `screen`, `shoot`, `stationary`, `sprint`, `guard_ball`, `guard_offball`, `post_up`. `post_up` added during HCO migration (distinct interior-positioning semantics warranted first-class). `get_open` collapses into `cut` (movement to space — same precedent as `cover_ground`/`drift` → `cut`). May extend further during audits.
 - **Archetype vocabulary (working):** `default`, `sprint`, `drive`, `shot_motion`, `cruise`, `stationary`. Drives per-player rate; orthogonal to action.
 - **Trigger condition vocabulary (working):** `fixed_duration`, `ball_reaches_player`, `player_reaches_position`, `shot_resolved`, `stopper_action` (covers foul / steal / dead-ball turnover — backend resolves which on fire).
 - **Branching: pre-resolved.** Backend rolls dice + emits only the actual path. Frontend has no branch logic. No alternate-history replay capability — accepted trade.

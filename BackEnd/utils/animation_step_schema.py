@@ -31,6 +31,7 @@ PlayerAction = Literal[
     "sprint",
     "guard_ball",
     "guard_offball",
+    "post_up",
 ]
 """Semantic role a player performs during the step. Drives renderer
 behavior (sprite frames, ball events). Orthogonal to archetype."""
