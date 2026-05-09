@@ -155,12 +155,45 @@ def _coords_at_movement_index(
 # --- Per-step builders -----------------------------------------------------
 
 
-def _build_advance_trigger_fixed(t_game_seconds: float) -> AdvanceTrigger:
+def _build_advance_trigger_player_reaches(
+    player_id: str,
+    target_coords: GridCoord,
+    t_game_seconds: float,
+) -> AdvanceTrigger:
     return {
-        "condition": "fixed_duration",
+        "condition": "player_reaches_position",
         "T_game_seconds": float(t_game_seconds),
-        "metadata": {},
+        "metadata": {
+            "target_player_id": str(player_id),
+            "target_coords": {
+                "x": float(target_coords["x"]),
+                "y": float(target_coords["y"]),
+            },
+        },
     }
+
+
+def _slowest_setup_player_id(
+    start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+) -> Optional[str]:
+    """Identify the slowest mover for step 0 (setup) — the player with the
+    largest start→end traversal distance. All players use the `cruise`
+    archetype during setup, so distance is a reasonable proxy for gating.
+    """
+    longest: Optional[str] = None
+    max_dist_sq = -1.0
+    for pid, start in start_coords.items():
+        end = end_coords.get(pid)
+        if end is None:
+            continue
+        dx = end["x"] - start["x"]
+        dy = end["y"] - start["y"]
+        dist_sq = dx * dx + dy * dy
+        if dist_sq > max_dist_sq:
+            max_dist_sq = dist_sq
+            longest = pid
+    return longest
 
 
 def _build_step_destinations_and_actions(
@@ -277,6 +310,11 @@ def build_hct_animation_steps(
         str(getattr(ball_handler, "player_id", "")) if ball_handler else None
     ) or None
 
+    defender = roles.get("defender")
+    defender_id = (
+        str(getattr(defender, "player_id", "")) if defender else None
+    ) or None
+
     # Game-clock state at turn start. Subsequent steps decrement by step T.
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining_at_turn_start = float(game_state.get("time_remaining", 0) or 0)
@@ -336,6 +374,28 @@ def build_hct_animation_steps(
         else:
             next_step = _resolve_step_3_next(turn_result)
 
+        # Advance trigger: per step, identify the gating player (whose arrival
+        # at their target coord ends the step). Per HCT scoping in
+        # Animation_System_Updated.md → Advance_Triggers.md.
+        if i == 0:
+            gate_id = _slowest_setup_player_id(start_coords, end_coords) or ball_handler_id
+        elif i == 1:
+            gate_id = ball_handler_id
+        elif i == 2:
+            gate_id = defender_id or ball_handler_id
+        else:  # i == 3 outcome
+            gate_id = ball_handler_id
+        gate_coord = end_coords.get(gate_id) if gate_id else None
+        if gate_id and gate_coord:
+            advance_trigger = _build_advance_trigger_player_reaches(gate_id, gate_coord, t)
+        else:
+            # Defensive fallback — if no gate could be resolved, anchor on
+            # the ball handler's end coord (or court center as last resort).
+            fallback_coord = end_coords.get(ball_handler_id) or {"x": 50.0, "y": 25.0}
+            advance_trigger = _build_advance_trigger_player_reaches(
+                ball_handler_id or "unknown", fallback_coord, t,
+            )
+
         step: AnimationStep = {
             "start": {
                 "coords": start_coords,
@@ -344,7 +404,7 @@ def build_hct_animation_steps(
                 "archetype": archetype,
                 "ball": ball_start,
                 "clock": clock_start,
-                "advance_trigger": _build_advance_trigger_fixed(t),
+                "advance_trigger": advance_trigger,
             },
             "end": {
                 "coords": end_coords,
