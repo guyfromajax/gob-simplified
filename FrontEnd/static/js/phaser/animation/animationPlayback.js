@@ -298,10 +298,60 @@ export async function dispatchTurnStop(scene, turnStop, context = {}) {
 // (ShotAnimationSystem, FreeThrowAnimationSystem, ReboundAnimationSystem,
 // announcement utils, etc.). For now they log and no-op.
 
-async function runShotAttempt(_scene, payload, _context) {
-  // Wire to: existing shot animation (ball arc to rim) + outcome handling
-  // (MAKE/MISS/BLOCK → announce, score, rebound, BIP setup).
-  console.warn("dispatchTurnStop: SHOT_ATTEMPT handler not yet implemented", payload);
+async function runShotAttempt(scene, payload, context) {
+  // Render ball arc to rim, then ball-on-rim bounce for misses. Rebound is
+  // a separate turn (DREB or OREB) — this handler does NOT animate the
+  // rebound capture itself. See Animation_System_Updated.md.
+  const { result, ball_bounce_coords, shooter_id } = payload || {};
+  const { ballSprite, sprites } = context || {};
+  if (!scene || !ballSprite) return;
+
+  const width = scene.game?.config?.width;
+  const height = scene.game?.config?.height;
+
+  // Determine the basket the shooter was attacking.
+  const { HOME_RIM_COORDS, AWAY_RIM_COORDS } = await import("./courtConstants.js");
+  const shooterSprite = (sprites || {})[shooter_id] || null;
+  const isHomeOffense = shooterSprite?.team === "home";
+  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const { gridToPixels } = await import("../utils/gridToPixels.js");
+  const rimPx = gridToPixels(basket.x, basket.y, width, height);
+
+  // Phase 1: ball arcs to rim.
+  const ballAnim = await import("./ballAnimationSimple.js");
+  if (typeof ballAnim.animateShotToRim === "function") {
+    await ballAnim.animateShotToRim(scene, rimPx, {
+      duration: 350,
+      easing: "Sine.easeInOut",
+      arc: { height: 50 },
+    });
+  }
+
+  // Phase 2: for MISS / BLOCK, bounce to backend-provided bounce coords.
+  // Rebounder pickup happens in the next DREB / OREB turn.
+  if (result !== "MAKE" && ball_bounce_coords) {
+    const bouncePx = gridToPixels(
+      ball_bounce_coords.x,
+      ball_bounce_coords.y,
+      width,
+      height,
+    );
+    await new Promise((resolve) => {
+      scene.tweens.add({
+        targets: ballSprite,
+        x: bouncePx.x,
+        y: bouncePx.y,
+        duration: 300,
+        ease: "Quad.easeOut",
+        onComplete: resolve,
+      });
+    });
+  }
+
+  // Announcement is intentionally skipped for the first HCT cutover — the
+  // existing announcement system fires from the legacy turn-completion
+  // pipeline, and we want to validate the core animation flow first
+  // before wiring announcements through here. Followup task.
 }
 
 async function runFoul(_scene, payload, _context) {

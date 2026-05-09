@@ -291,10 +291,41 @@ export class AnimationEngine {
     try {
       // Processing (log removed)
 
+      // SS&S animation refactor: HCT and DREB turns route through the
+      // unified step-based playback engine when their backend payload
+      // carries `animation_steps`. Other turn types fall through to the
+      // legacy handler dispatch below. See:
+      // _documentation_master/projects/Animation_System_Updated.md
+      const newPlaybackTurnTypes = new Set(["HCT", "DREB"]);
+      const hasAnimationSteps = Array.isArray(turnData?.animation_steps)
+        && turnData.animation_steps.length > 0;
+      if (hasAnimationSteps && newPlaybackTurnTypes.has(turnData?.current_turn)) {
+        const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js");
+        const sprites = context.playerSprites
+          || this.playerSprites
+          || this.scene?.playerSprites
+          || {};
+        const ballSprite = context.ballSprite || this.scene?.ballSprite;
+        const turnStop = await playTurn(
+          this.scene,
+          turnData.animation_steps,
+          sprites,
+          ballSprite,
+        );
+        if (turnStop) {
+          await dispatchTurnStop(this.scene, turnStop, {
+            sprites,
+            ballSprite,
+            turnData,
+          });
+        }
+        return;
+      }
+
       // Determine the appropriate handler
       const handler = this.determineHandler(turnData);
       // Handler routing (log removed)
-      
+
       // Execute the animation
       await handler(turnData, context);
       // Completed (log removed)

@@ -466,6 +466,122 @@ class GameManager:
         if turn_result.get("fouled_out"):
             self._handle_foul_out_timeout(turn_result)
 
+    def _build_dreb_turn_from_miss(self, miss_turn):
+        """Construct a discrete DREB turn from a just-finished MISS turn.
+
+        Part of the SS&S animation refactor — DREB is promoted to its own
+        turn type (parallel to OREB) so the rebound capture animates through
+        the unified step-based playback engine instead of bundled inside the
+        SHOT_ATTEMPT handler. See:
+        - _documentation_master/projects/Animation_System_Updated.md
+        - BackEnd/engine/dreb_step_emitter.py
+
+        Currently scoped to HCT MISS only; HCO/FCP/FB MISS still bundle DREB
+        info into the MISS turn the legacy way until those turn types
+        migrate.
+
+        Returns the DREB turn dict, or None if required data is missing.
+        """
+        from BackEnd.engine.dreb_step_emitter import build_dreb_animation_steps
+
+        rebounder_id = miss_turn.get("rebounderId")
+        bx = miss_turn.get("ball_bounce_x")
+        by = miss_turn.get("ball_bounce_y")
+        if rebounder_id is None or bx is None or by is None:
+            return None
+
+        # Player coords at DREB start = each player's end coord on the MISS
+        # turn (the position they ended up in after the shot animation).
+        # Read from miss_turn["animations"][i].movement[-1].coords.
+        start_coords = {}
+        for anim in (miss_turn.get("animations") or []):
+            movement = anim.get("movement") or []
+            if not movement:
+                continue
+            last_coord = (movement[-1] or {}).get("coords") or {}
+            x = last_coord.get("x")
+            y = last_coord.get("y")
+            pid = anim.get("playerId")
+            if pid is None or x is None or y is None:
+                continue
+            start_coords[str(pid)] = {"x": float(x), "y": float(y)}
+
+        if not start_coords:
+            # Fall back to player.coords if animations[] didn't carry end positions.
+            for player in (
+                list(self.offense_team.lineup.values())
+                + list(self.defense_team.lineup.values())
+            ):
+                pid = getattr(player, "player_id", None)
+                coords = getattr(player, "coords", None) or {}
+                if pid is not None and "x" in coords and "y" in coords:
+                    start_coords[str(pid)] = {
+                        "x": float(coords["x"]),
+                        "y": float(coords["y"]),
+                    }
+
+        # Offense team during the MISS turn = the team that took the shot.
+        # is_away_offense is determined relative to that.
+        miss_offense_team_id = miss_turn.get("offense_team_id")
+        is_away_offense = (
+            miss_offense_team_id is not None
+            and getattr(self, "away_team", None) is not None
+            and miss_offense_team_id == self.away_team.team_id
+        )
+
+        clock_remaining = float(self.game_state.get("time_remaining", 0) or 0)
+        shot_clock_remaining = float(
+            self.game_state.get("shot_clock_remaining", 0) or 0
+        )
+
+        # OTB foul on MISS rebounds is currently resolved during shot_manager
+        # (turn becomes a FOUL turn rather than MISS+OTB). DREB-as-own-turn
+        # may revisit this; for now, no OTB.
+        otb_foul = None
+
+        animation_steps = build_dreb_animation_steps(
+            rebounder_id=str(rebounder_id),
+            bounce_coords={"x": float(bx), "y": float(by)},
+            start_coords=start_coords,
+            off_lineup=self.offense_team.lineup,
+            def_lineup=self.defense_team.lineup,
+            is_away_offense=is_away_offense,
+            clock_remaining=clock_remaining,
+            shot_clock_remaining=shot_clock_remaining,
+            otb_foul=otb_foul,
+        )
+
+        if not animation_steps:
+            return None
+
+        # Step's time_elapsed = canonical DREB turn duration.
+        time_elapsed = float(animation_steps[0]["end"]["time_elapsed"])
+
+        # Possession flips after DREB if the next play (HCO/FAST_BREAK) is
+        # for the rebounding team. Because rebounder is on defense (DREB),
+        # possession flips for HCO; for FAST_BREAK it depends on FB direction
+        # (FB is initiated by the rebounding team, so flip).
+        possession_flips = True
+
+        dreb_turn = {
+            "result_type": "DREB",
+            "current_turn": "DREB",
+            "text": "Defensive rebound.",
+            "rebounderId": str(rebounder_id),
+            "ball_bounce_x": float(bx),
+            "ball_bounce_y": float(by),
+            "time_elapsed": int(round(time_elapsed)) if time_elapsed >= 1 else 1,
+            "animation_steps": animation_steps,
+            "possession_flips": possession_flips,
+            # offense_team_id at the time of the DREB turn is still the
+            # MISS-shooting team; backend flips it via switch_possession()
+            # after this turn is processed.
+            "offense_team_id": miss_offense_team_id,
+            "events": [],
+        }
+
+        return dreb_turn
+
     def _handle_foul_out_timeout(self, result):
         """Create foul-out timeout turn using the unified timeout path, then save."""
 
@@ -696,6 +812,38 @@ class GameManager:
                 self.game_state["pending_oreb"] = None
                 break
         _perf["oreb_loop"] = (_time.time() - _t0) * 1000
+
+        # SS&S animation refactor: HCT MISS with defensive rebound generates a
+        # discrete DREB turn (parallels the OREB pattern above). Scoped to HCT
+        # only for now — HCO/FCP/FB MISS still bundle DREB info into the MISS
+        # turn the legacy way. See _documentation_master/projects/Animation_System_Updated.md.
+        if (
+            result.get("current_turn") == "HCT"
+            and result.get("result_type") in ("MISS", "BLOCK")
+            and result.get("rebound_type") == "DREB"
+            and result.get("next_play_type") in ("HCO", "FAST_BREAK")
+        ):
+            dreb_turn = self._build_dreb_turn_from_miss(result)
+            if dreb_turn:
+                # MISS turn now leads to DREB; DREB carries forward the
+                # original next_play_type (HCO or FAST_BREAK).
+                original_next = result["next_play_type"]
+                result["next_play_type"] = "DREB"
+                result["next_turn"] = "DREB"
+                dreb_turn["next_play_type"] = original_next
+                dreb_turn["next_turn"] = original_next
+
+                self._append_turn(dreb_turn)
+                self.turn_manager.update_clock_and_possession(dreb_turn)
+
+                if dreb_turn.get("possession_flips"):
+                    old_offense = self.offense_team.name
+                    self.switch_possession()
+                    dreb_turn["possession_flips"] = False
+                    logging.warning(
+                        "🔄 [DREB] Flipped possession after defensive rebound: %s → %s",
+                        old_offense, self.offense_team.name,
+                    )
 
         # OTB foul from resolve_offensive_rebound() means no putback/kickout was resolved on the
         # OREB turn. The MISS (or BLOCK) turn still carries embedded OREB; the client otherwise
