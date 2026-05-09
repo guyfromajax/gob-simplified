@@ -443,6 +443,31 @@ function getPlayerAnimationRecord(turnData, playerId) {
   return turnData.animations.find((a) => String(a?.playerId) === want) ?? null;
 }
 
+// Phase 3c: read backend-stamped per-segment game_seconds off the player's
+// animation record (final waypoint). Returns null if absent — callers fall
+// back to distance-based `getPlayerDuration`. See Fast_Break_Refactor.md.
+function getAnimationGameSecondsForPlayer(turnData, playerId) {
+  const rec = getPlayerAnimationRecord(turnData, playerId);
+  const movement = rec?.movement;
+  if (!Array.isArray(movement) || movement.length === 0) return null;
+  const last = movement[movement.length - 1];
+  const gs = Number(last?.game_seconds);
+  return Number.isFinite(gs) && gs >= 0 ? gs : null;
+}
+
+// Phase 3c: resolve tween duration with backend authority preference.
+// If `game_seconds` is stamped on the player's animation record, visual
+// time = game_seconds × clockSecondMs (50ms floor). Otherwise fall back to
+// the legacy distance-based `getPlayerDuration`. Mirrors HCT/HCO patterns.
+function resolveFbTweenDurationMs({ scene, turnData, playerId, sprite, targetPx, burst = false }) {
+  const animGs = getAnimationGameSecondsForPlayer(turnData, playerId);
+  if (animGs != null) {
+    const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+    return Math.max(50, Math.round(animGs * clockSecondMs));
+  }
+  return getPlayerDuration(sprite, targetPx.x, targetPx.y, burst);
+}
+
 function reportMissingEndpoint(scene, turnData, {
   playerId,
   role,
@@ -2673,14 +2698,16 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       });
     }
     const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
-    const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
+    const stopperDuration = resolveFbTweenDurationMs({
+      scene, turnData, playerId: stopperId, sprite: stopperSprite, targetPx: stopperPx,
+    });
     stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
       duration: stopperDuration,
       easing: "Linear"
     });
     promises.push(stopperPromise);
   }
-  
+
   // Move primary defender (if different from stopper/shooter)
   const defenderRef = resolveFastBreakDefenderSprite(playerSprites, turnData, {
     excludeIds: [stopperId, shooterId],
@@ -2729,7 +2756,9 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
       }
     }
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
-    const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
+    const defenderDuration = resolveFbTweenDurationMs({
+      scene, turnData, playerId: defenderId, sprite: defenderSprite, targetPx: defenderPx,
+    });
     promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
         duration: defenderDuration,
@@ -3033,7 +3062,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     }
 
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
-    const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
+    const defenderDuration = resolveFbTweenDurationMs({
+      scene, turnData, playerId: defenderId, sprite: defenderSprite, targetPx: defenderPx,
+    });
     promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
         duration: defenderDuration,
@@ -3438,10 +3469,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
             
             const endStep = anim.movement[anim.movement.length - 1];
             if (!endStep || !endStep.coords) continue;
-            
+
             const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
-            const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
-            
+            const duration = resolveFbTweenDurationMs({
+              scene, turnData, playerId: anim.playerId, sprite, targetPx: endPixels,
+            });
+
             promises.push(
               tweenPlayerTo(scene, sprite, endPixels, {
                 duration,
@@ -3449,7 +3482,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
               })
             );
           }
-          
+
           // Manually position ball handler to top of key (override incorrect backend animation)
           attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
           const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
@@ -3579,7 +3612,9 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
             }
 
             const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
-            const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
+            const duration = resolveFbTweenDurationMs({
+              scene, turnData, playerId: anim.playerId, sprite, targetPx: endPixels,
+            });
 
             const hasBall = anim.hasBallAtStep?.[anim.movement.length - 1] || false;
             if (hasBall) {
@@ -3662,10 +3697,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       
       const endStep = anim.movement[anim.movement.length - 1];
       if (!endStep || !endStep.coords) continue;
-      
+
       const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
-      const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
-      
+      const duration = resolveFbTweenDurationMs({
+        scene, turnData, playerId: anim.playerId, sprite, targetPx: endPixels,
+      });
+
       const hasBall = anim.hasBallAtStep?.[anim.movement.length - 1] || false;
       if (hasBall) {
         attachBallToPlayer(scene, ballSprite, sprite);
@@ -3983,10 +4020,13 @@ function animateRebounders(
     }
 
     const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
-    // ✅ Use distance-based duration for consistent speed
+    // Phase 3c: backend per-segment game_seconds (when stamped on the rebounder's
+    // animation record) wins; otherwise distance-based duration as before.
     // Players will stop at their current position if shot happens before they reach their spot
     // (Made shot: stops when ball hits rim; Missed shot: stops when rebounder grabs ball)
-    const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
+    const playerDuration = resolveFbTweenDurationMs({
+      scene, turnData, playerId: id, sprite, targetPx,
+    });
     
     // ✅ Create tween directly (not using tweenPlayerTo) so we can store reference for early termination
     const tween = scene.tweens.add({
@@ -4144,8 +4184,10 @@ async function moveOtherPlayersToStandardPositions(
       }
 
       const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
-      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
-      
+      const playerDuration = resolveFbTweenDurationMs({
+        scene, turnData, playerId: id, sprite, targetPx,
+      });
+
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
           duration: playerDuration,

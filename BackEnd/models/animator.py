@@ -1,7 +1,8 @@
 from BackEnd.utils.shared import (
-    get_player_by_pos, 
+    get_player_by_pos,
     get_player_position,
     get_away_player_coords,
+    calc_ag_segment_seconds,
 )
 from BackEnd.utils.shared_defense import (
     get_defender_coords
@@ -102,7 +103,7 @@ class Animator:
         animations = []
         duration = 800
 
-        def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"]):
+        def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"], archetype="default"):
             # ✅ FIX: For ball handler, use outlet position from fb_roles as start (guaranteed HOME orientation)
             # This ensures we're starting from the correct position after the outlet pass
             if has_ball:
@@ -139,9 +140,16 @@ class Animator:
             # Use end_coords as-is (no coordinate flipping)
             end = end_coords
 
+            # Per-player game_seconds for the start→end segment, AG-driven via the
+            # Movement Rate Refactor helper. Stamped on the end waypoint (HCT
+            # pattern). Frontend authority shift comes in Phase 3c — until then
+            # this is a payload-only addition; legacy `getPlayerDuration` still
+            # drives visual durations on the frontend.
+            game_seconds = calc_ag_segment_seconds(start, end, player, archetype=archetype)
+
             movement = [
                 {"timestamp": 0, "coords": start, "action": action if not has_ball else ACTIONS["HANDLE"]},
-                {"timestamp": duration, "coords": end, "action": action if not has_ball else ACTIONS["HANDLE"]},
+                {"timestamp": duration, "coords": end, "action": action if not has_ball else ACTIONS["HANDLE"], "game_seconds": game_seconds},
             ]
 
             animations.append({
