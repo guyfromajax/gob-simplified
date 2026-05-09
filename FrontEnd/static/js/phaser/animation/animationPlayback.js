@@ -1,0 +1,340 @@
+/**
+ * Animation Playback Engine — pure renderer for the unified animation
+ * step schema. See:
+ *   - Schema (Python):  BackEnd/utils/animation_step_schema.py
+ *   - Schema (JSDoc):   FrontEnd/static/js/phaser/animation/animationStepSchema.js
+ *   - Design rationale: _documentation_master/projects/Animation_System_Updated.md
+ *
+ * Backend is the source of truth — it pre-computes start coords, end coords
+ * (interrupted positions when applicable), and the step duration. This engine
+ * just renders the linear tween from start → end at the prescribed duration.
+ * No advance-trigger detection, no destination math, no per-player rate
+ * calculation.
+ *
+ * SCOPE (this iteration): player tweens only. Ball-state-diff rendering and
+ * action-specific side effects (shot animation, pass animation, foul flash,
+ * etc.) are layered in subsequent iterations.
+ */
+
+import { gridToPixels } from "../utils/gridToPixels.js";
+import { attachBallToPlayer, detachBall } from "./ballManager.js";
+
+// --- Ball-state helpers ----------------------------------------------------
+
+function isBallAttached(ballState) {
+  return Boolean(
+    ballState &&
+      Object.prototype.hasOwnProperty.call(ballState, "owner_player_id"),
+  );
+}
+
+/**
+ * Resolve the ball's grid coord from its state at a given step boundary:
+ *   - attached(A) → that player's coord at the same boundary
+ *   - in_flight   → ball.current_coords
+ *   - loose       → ball.coords
+ *
+ * @param {import("./animationStepSchema.js").BallState} ballState
+ * @param {Object<string, import("./animationStepSchema.js").GridCoord>} playerCoords
+ * @returns {import("./animationStepSchema.js").GridCoord | null}
+ */
+function ballCoordFromState(ballState, playerCoords) {
+  if (!ballState) return null;
+  if (isBallAttached(ballState)) {
+    return playerCoords[ballState.owner_player_id] || null;
+  }
+  // BallInFlight uses `current_coords`; BallLoose uses `coords`.
+  return ballState.current_coords || ballState.coords || null;
+}
+
+/**
+ * Spawn the ball's own linear tween from its computed start coord to its
+ * computed end coord over the step duration. This single dispatch handles
+ * every diff case from the schema:
+ *   - attached(A) → attached(A): tween parallel to A's player tween (same path).
+ *   - attached(A) → attached(B): pass A→B over duration T.
+ *   - attached(A) → in_flight: pass started, ends at interrupted position.
+ *   - in_flight → attached(B): in-flight ball lands on B.
+ *   - in_flight → in_flight: ball continues toward receiver, doesn't complete.
+ *
+ * Ownership state changes are applied at step end via snapBallToEndState.
+ */
+function renderBallTransition(scene, step, sprites, ballSprite, durationMs, width, height) {
+  if (!ballSprite) return;
+  const startCoord = ballCoordFromState(step.start.ball, step.start.coords);
+  const endCoord = ballCoordFromState(step.end.ball, step.end.coords);
+  if (!startCoord || !endCoord) return;
+
+  // Snap-to-start. If previous step ended at the same coord, this is a no-op.
+  const startPx = gridToPixels(startCoord.x, startCoord.y, width, height);
+  ballSprite.setPosition(startPx.x, startPx.y);
+
+  if (
+    Math.abs(startCoord.x - endCoord.x) < 1e-6 &&
+    Math.abs(startCoord.y - endCoord.y) < 1e-6
+  ) {
+    return;
+  }
+
+  const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+  scene.tweens.add({
+    targets: ballSprite,
+    x: endPx.x,
+    y: endPx.y,
+    duration: durationMs,
+    ease: "Linear",
+  });
+}
+
+/**
+ * At step end: snap ball to exact end coord and reconcile ownership state
+ * with `step.end.ball`. Called after the wall-clock wait, alongside the
+ * player snap.
+ */
+function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
+  if (!ballSprite) return;
+  const endBall = step.end.ball;
+  if (!endBall) return;
+  const endCoord = ballCoordFromState(endBall, step.end.coords);
+  if (!endCoord) return;
+
+  const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+  ballSprite.setPosition(endPx.x, endPx.y);
+
+  if (isBallAttached(endBall)) {
+    const ownerSprite = sprites[endBall.owner_player_id];
+    if (ownerSprite) {
+      attachBallToPlayer(scene, ballSprite, ownerSprite);
+    }
+  } else {
+    detachBall(scene, ballSprite);
+  }
+}
+
+
+/**
+ * Play a single animation step. Spawns linear tweens for each player whose
+ * coords change between start and end, waits the prescribed duration, snaps
+ * sprites to the exact end coords, and returns the next-step pointer.
+ *
+ * Contract: caller ensures sprites are at `step.start.coords` when this is
+ * invoked. Engine does not snap-to-start; sprite drift between steps is the
+ * caller's bug to fix.
+ *
+ * @param {Phaser.Scene} scene
+ * @param {import("./animationStepSchema.js").AnimationStep} step
+ * @param {Object<string, Phaser.GameObjects.Sprite>} sprites  Keyed by stringified player_id.
+ * @param {Phaser.GameObjects.Sprite} [ballSprite]  Required for ball-state-diff rendering.
+ * @returns {Promise<import("./animationStepSchema.js").NextStep>}
+ */
+export async function playAnimationStep(scene, step, sprites, ballSprite) {
+  if (!scene || !step || !sprites) {
+    throw new Error("playAnimationStep: scene, step, and sprites are required");
+  }
+
+  const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const durationMs = Math.max(
+    50,
+    Math.round(step.end.time_elapsed * clockSecondMs),
+  );
+
+  const width = scene.game?.config?.width;
+  const height = scene.game?.config?.height;
+
+  // Spawn one linear tween per player whose start coord differs from end coord.
+  // Tweens run in parallel — backend has guaranteed they all arrive at their
+  // end coords at exactly the step's duration.
+  for (const [playerId, startCoord] of Object.entries(step.start.coords)) {
+    const sprite = sprites[playerId];
+    const endCoord = step.end.coords[playerId];
+    if (!sprite || !endCoord) continue;
+
+    // No-op when start and end match (within float epsilon).
+    const dx = endCoord.x - startCoord.x;
+    const dy = endCoord.y - startCoord.y;
+    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) continue;
+
+    const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+    scene.tweens.add({
+      targets: sprite,
+      x: endPx.x,
+      y: endPx.y,
+      duration: durationMs,
+      ease: "Linear",
+    });
+  }
+
+  // Spawn the ball tween in parallel with player tweens.
+  renderBallTransition(scene, step, sprites, ballSprite, durationMs, width, height);
+
+  // Wait the prescribed wall-clock duration. We don't await each tween's
+  // completion individually — Phaser drives them in parallel and we trust the
+  // wall-clock timer. Avoids the hang patterns we hit when chaining promises
+  // through tweenPlayerTo's reject-on-stop wrapper.
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(durationMs, resolve);
+    } else {
+      setTimeout(resolve, durationMs);
+    }
+  });
+
+  // Snap sprites to exact end coords. Eliminates float-precision drift from
+  // tween interpolation and guarantees the next step's start coords match
+  // the rendered positions.
+  for (const [playerId, endCoord] of Object.entries(step.end.coords)) {
+    const sprite = sprites[playerId];
+    if (!sprite) continue;
+    const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+    sprite.setPosition(endPx.x, endPx.y);
+    sprite.gridX = endCoord.x;
+    sprite.gridY = endCoord.y;
+  }
+
+  // Snap ball to its end coord and reconcile ownership state.
+  snapBallToEndState(scene, step, sprites, ballSprite, width, height);
+
+  return step.end.next;
+}
+
+/**
+ * Multi-step orchestrator. Walks a sequence of animation steps, following
+ * `step.end.next` to determine the next step. Stops at the first `turn_stop`
+ * or when `next` points past the array. The caller dispatches turn-stop
+ * events (shot resolution, foul flash, etc.) — this engine just reports.
+ *
+ * @param {Phaser.Scene} scene
+ * @param {import("./animationStepSchema.js").AnimationStep[]} steps
+ * @param {Object<string, Phaser.GameObjects.Sprite>} sprites
+ * @param {Phaser.GameObjects.Sprite} [ballSprite]
+ * @param {Object} [options]
+ * @param {number} [options.startIndex=0]
+ * @param {number} [options.maxStepsGuard=200]  Cycle/loop safety bound.
+ * @returns {Promise<{event: import("./animationStepSchema.js").TurnStopEvent, payload: Object} | null>}
+ *   Turn-stop event when the turn ends with one; null when steps complete
+ *   without one (implicit end of turn).
+ */
+export async function playTurn(scene, steps, sprites, ballSprite, options = {}) {
+  if (!Array.isArray(steps) || steps.length === 0) return null;
+
+  const startIndex = options.startIndex ?? 0;
+  const maxStepsGuard = options.maxStepsGuard ?? 200;
+
+  let currentIndex = startIndex;
+  let stepsExecuted = 0;
+
+  while (currentIndex >= 0 && currentIndex < steps.length) {
+    if (scene?.skipToEnd) return null;
+    if (stepsExecuted++ >= maxStepsGuard) {
+      throw new Error(
+        `playTurn: exceeded ${maxStepsGuard} steps — likely a cycle in next pointers`,
+      );
+    }
+
+    const step = steps[currentIndex];
+    if (!step) {
+      throw new Error(`playTurn: missing step at index ${currentIndex}`);
+    }
+
+    const next = await playAnimationStep(scene, step, sprites, ballSprite);
+    if (!next) return null;
+
+    if (next.kind === "turn_stop") {
+      return { event: next.event, payload: next.payload };
+    }
+    if (next.kind === "next_step") {
+      currentIndex = next.index;
+      continue;
+    }
+    if (next.kind === "branch") {
+      currentIndex = next.next_step_index;
+      continue;
+    }
+    throw new Error(`playTurn: unknown next.kind: ${next.kind}`);
+  }
+
+  // Index ran past the array — implicit end of turn.
+  return null;
+}
+
+// --- Turn-stop dispatcher --------------------------------------------------
+
+/**
+ * Route a turn-stop event (returned from playTurn) to the appropriate side
+ * animation. Caller passes the non-null result of playTurn through here.
+ *
+ * SCOPE NOTE: handler bodies are stubbed. Each turn-type migration fills in
+ * the handlers it needs, until every event is implemented. Stubs `console.warn`
+ * and resolve with `null` rather than throwing — keeps partial integrations
+ * runnable while making missing implementations visible.
+ *
+ * @param {Phaser.Scene} scene
+ * @param {{event: import("./animationStepSchema.js").TurnStopEvent, payload: Object}} turnStop
+ * @param {Object} [context]  Passes through anything handlers need (sprites,
+ *                            ballSprite, turnData, callbacks). Each handler
+ *                            documents the keys it consumes.
+ * @returns {Promise<void>}
+ */
+export async function dispatchTurnStop(scene, turnStop, context = {}) {
+  if (!turnStop) return;
+  const { event, payload } = turnStop;
+  switch (event) {
+    case "SHOT_ATTEMPT":         return runShotAttempt(scene, payload, context);
+    case "FOUL":                 return runFoul(scene, payload, context);
+    case "STEAL":                return runSteal(scene, payload, context);
+    case "DEAD_BALL_TURNOVER":   return runDeadBallTurnover(scene, payload, context);
+    case "SHOT_CLOCK_EXPIRED":   return runShotClockExpired(scene, payload, context);
+    case "GAME_CLOCK_EXPIRED":   return runGameClockExpired(scene, payload, context);
+    case "TIMEOUT":              return runTimeout(scene, payload, context);
+    case "JUMP_BALL":            return runJumpBall(scene, payload, context);
+    default:
+      console.warn(`dispatchTurnStop: unknown event "${event}"`, payload);
+      return;
+  }
+}
+
+// Each handler stub takes (scene, payload, context). Migrations replace these
+// with real implementations that integrate with the existing helpers
+// (ShotAnimationSystem, FreeThrowAnimationSystem, ReboundAnimationSystem,
+// announcement utils, etc.). For now they log and no-op.
+
+async function runShotAttempt(_scene, payload, _context) {
+  // Wire to: existing shot animation (ball arc to rim) + outcome handling
+  // (MAKE/MISS/BLOCK → announce, score, rebound, BIP setup).
+  console.warn("dispatchTurnStop: SHOT_ATTEMPT handler not yet implemented", payload);
+}
+
+async function runFoul(_scene, payload, _context) {
+  // Wire to: foul flash effect + announcement + (if shooting foul) FT setup.
+  console.warn("dispatchTurnStop: FOUL handler not yet implemented", payload);
+}
+
+async function runSteal(_scene, payload, _context) {
+  // Wire to: steal visual + possession flip (or transition to FAST_BREAK).
+  console.warn("dispatchTurnStop: STEAL handler not yet implemented", payload);
+}
+
+async function runDeadBallTurnover(_scene, payload, _context) {
+  // Wire to: dead-ball animation + SIDE_INBOUND setup.
+  console.warn("dispatchTurnStop: DEAD_BALL_TURNOVER handler not yet implemented", payload);
+}
+
+async function runShotClockExpired(_scene, payload, _context) {
+  // Wire to: buzzer + possession flip + SIDE_INBOUND setup.
+  console.warn("dispatchTurnStop: SHOT_CLOCK_EXPIRED handler not yet implemented", payload);
+}
+
+async function runGameClockExpired(_scene, payload, _context) {
+  // Wire to: end-of-quarter banner + transition to next quarter / end of game.
+  console.warn("dispatchTurnStop: GAME_CLOCK_EXPIRED handler not yet implemented", payload);
+}
+
+async function runTimeout(_scene, payload, _context) {
+  // Wire to: timeout overlay + game-state pause.
+  console.warn("dispatchTurnStop: TIMEOUT handler not yet implemented", payload);
+}
+
+async function runJumpBall(_scene, payload, _context) {
+  // Wire to: jump-ball animation + possession assignment (Opening Tip path).
+  console.warn("dispatchTurnStop: JUMP_BALL handler not yet implemented", payload);
+}

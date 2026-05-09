@@ -7155,10 +7155,21 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         else:
             logging.warning(f"⚠️ [HCT SHOT] Skeleton has no steps!")
             animations = []
-        
+
         shot_result["skeleton"] = skeleton
         shot_result["roles"] = shot_roles
-        
+
+        # Parallel-build: emit unified AnimationStep[] alongside legacy
+        # animations[]. See _documentation_master/projects/Animation_System_Updated.md.
+        # Defensive: emitter failure must not block the existing payload.
+        try:
+            from BackEnd.engine.hct_step_emitter import build_hct_animation_steps
+            anim_steps = build_hct_animation_steps(shot_result, game)
+            if anim_steps is not None:
+                shot_result["animation_steps"] = anim_steps
+        except Exception as e:
+            logging.warning("build_hct_animation_steps (shot path) failed: %s", e)
+
         return shot_result
     
     # ✅ HCT NON-SHOT: Get HCT "base" variant skeleton and apply stopper system
@@ -7464,4 +7475,16 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         )
 
     # logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
+
+    # Parallel-build: emit unified AnimationStep[] alongside legacy
+    # animations[]. See _documentation_master/projects/Animation_System_Updated.md.
+    # Defensive: emitter failure must not block the existing payload.
+    try:
+        from BackEnd.engine.hct_step_emitter import build_hct_animation_steps
+        anim_steps = build_hct_animation_steps(result, game)
+        if anim_steps is not None:
+            result["animation_steps"] = anim_steps
+    except Exception as e:
+        logging.warning("build_hct_animation_steps (non-shot path) failed: %s", e)
+
     return result

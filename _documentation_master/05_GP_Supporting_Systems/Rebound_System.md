@@ -119,3 +119,27 @@ otb_foul = random.randint(1,100)
 
 -if there is an over the back foul called on the offense or the defense, it will end the turn there and negate any Putback attempt or kickout pass that would have been executed. We will process each like a standard non shooting d foul or non shooting o foul.
 -Announcement copy: "Over The Back!" with the fouling player's image through the announcement system
+
+---
+
+## Rebounder selection per turn type (target state)
+
+Source-of-truth grid for which prefilter and rebounder-selection function each turn type uses. Updated as part of the SS&S animation refactor (see `_documentation_master/projects/Animation_System_Updated.md`).
+
+| Turn type | Prefilter | Rebounder selection |
+|---|---|---|
+| **HCO MISS** | Existing (`offense_rebounders` + `defense_rebounders` — excludes get-back / release) | `choose_rebounder` |
+| **HCT MISS** | Frontcourt-half x-eligibility filter (home offense → x ≥ 50, away offense → x ≤ 50) | `choose_rebounder` |
+| **FCP MISS** | Frontcourt-half x-eligibility filter (home offense → x ≥ 50, away offense → x ≤ 50) | `choose_rebounder` |
+| **Fast Break MISS** | Frontcourt-half x-eligibility filter (home offense → x ≥ 50, away offense → x ≤ 50) | `choose_rebounder` |
+| **Free Throw MISS** | `max_x_delta_from_bounce` (FREE_THROW_REBOUND_MAX_X_DELTA) | `determine_rebounder` |
+| **OREB chained rebound** | `max_x_delta_from_bounce` (note: previously attempted but had stale-coord issues; revisited as part of this refactor) | `determine_rebounder` |
+| **defender_count == 0 edge case** | None (existing behavior preserved) | `determine_rebounder` |
+
+Notes:
+- HCT / FCP previously inherited HCO mechanics (get-back / release). The refactor drops those for HCT / FCP / Fast Break and aligns them on the frontcourt-half x-eligibility filter.
+- HCO retains its existing prefilter — the get-back / release mechanic is HCO-specific.
+- `choose_rebounder` is the per-team primitive. `determine_rebounder` is the whole-game wrapper that calls `choose_rebounder` once per team and then runs the weighted off-vs-def selection. See section above for algorithmic detail.
+
+
+
