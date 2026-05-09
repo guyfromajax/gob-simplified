@@ -1044,8 +1044,13 @@ class ShotManager:
         # `_shot_dreb_fb_play_key` → `pending_dreb_fb_play_key` on DREB miss.
         from BackEnd.engine import covert_release as cr
 
+        # HCT (and Fast Break) shots skip the defense_release / Covert Release
+        # mechanic — those are HCO-specific. Per the SS&S animation refactor,
+        # HCT is treated the same as Fast Break here. See
+        # _documentation_master/projects/Animation_System_Updated.md.
+        is_hct_shot = self.game_state.get("offensive_state") == "HCT"
         defense_release_list = []
-        if roles.get("is_fast_break"):
+        if roles.get("is_fast_break") or is_hct_shot:
             defense_rebounders = list(def_team.lineup.keys())
             self.game_state.pop("_shot_dreb_fb_play_key", None)
         else:
@@ -1095,43 +1100,49 @@ class ShotManager:
         )
         release_player_name = get_name_safe(release_player) if release_player else "NONE"
         
-        # Determine offensive players getting back on defense
-        offense_getback_chances = {
-            0: {"none": 1.0, "one": 0.0, "two": 0.0},
-            1: {"none": 0.5, "one": 0.5, "two": 0.0},
-            2: {"none": 0.25, "one": 0.75, "two": 0.0},
-            3: {"none": 0.1, "one": 0.8, "two": 0.1},
-            4: {"none": 0.0, "one": 0.5, "two": 0.5}
-        }
-        
-        chances = offense_getback_chances[offense_reb_value]
-        rand = random.random()
-        
-        if rand < chances["none"]:
-            num_getback = 0
-        elif rand < chances["none"] + chances["one"]:
-            num_getback = 1
+        # Determine offensive players getting back on defense.
+        # HCT shots skip this — treated the same as Fast Break: no get-back mechanic.
+        # See _documentation_master/projects/Animation_System_Updated.md.
+        if is_hct_shot:
+            offense_getback_list = []
+            offense_rebounders = list(off_team.lineup.keys())
         else:
-            num_getback = 2
-        
-        # Note: 0 get-back defenders with a release player is still a valid Fast Break
-        # It's just an easy layup opportunity for the outlet receiver
-        # No minimum enforcement needed
-        
-        offense_getback_list = []
-        if num_getback >= 1:
-            if shooter_pos != "PG":
-                offense_getback_list.append("PG")
+            offense_getback_chances = {
+                0: {"none": 1.0, "one": 0.0, "two": 0.0},
+                1: {"none": 0.5, "one": 0.5, "two": 0.0},
+                2: {"none": 0.25, "one": 0.75, "two": 0.0},
+                3: {"none": 0.1, "one": 0.8, "two": 0.1},
+                4: {"none": 0.0, "one": 0.5, "two": 0.5}
+            }
+
+            chances = offense_getback_chances[offense_reb_value]
+            rand = random.random()
+
+            if rand < chances["none"]:
+                num_getback = 0
+            elif rand < chances["none"] + chances["one"]:
+                num_getback = 1
             else:
-                offense_getback_list.append("SG")
-        
-        if num_getback >= 2:
-            if shooter_pos != "SG" and "SG" not in offense_getback_list:
-                offense_getback_list.append("SG")
-            else:
-                offense_getback_list.append("SF")
-        
-        offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
+                num_getback = 2
+
+            # Note: 0 get-back defenders with a release player is still a valid Fast Break
+            # It's just an easy layup opportunity for the outlet receiver
+            # No minimum enforcement needed
+
+            offense_getback_list = []
+            if num_getback >= 1:
+                if shooter_pos != "PG":
+                    offense_getback_list.append("PG")
+                else:
+                    offense_getback_list.append("SG")
+
+            if num_getback >= 2:
+                if shooter_pos != "SG" and "SG" not in offense_getback_list:
+                    offense_getback_list.append("SG")
+                else:
+                    offense_getback_list.append("SF")
+
+            offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
         
         # Get names for debug logging
         getback_player_names = [get_name_safe(off_team.lineup.get(pos)) for pos in offense_getback_list if off_team.lineup.get(pos)]
