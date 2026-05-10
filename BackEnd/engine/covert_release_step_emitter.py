@@ -37,10 +37,12 @@ import random
 from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import (
+    AWAY_RIM_COORDS,
     HCO_SETUP_HCO_BH_RADIUS,
     HCO_SETUP_OFFENSE_BH_DEEP_SPOTS,
     HCO_SETUP_OFFENSE_POS_SPOTS,
     HCO_STRING_SPOTS,
+    HOME_RIM_COORDS,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -220,28 +222,116 @@ def _build_outlet_pass_step(
     passer_coord: GridCoord,
     receiver_coord: GridCoord,
     all_start_coords: Dict[str, GridCoord],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     is_first_step: bool,
     next_step_index: int,
 ) -> AnimationStep:
-    """Step 0: ball flies passer → receiver. No players move
-    (current ``animateOutletPhase`` only animates the ball).
+    """Step 0: outlet pass with parallel transition movement.
 
-    T = euclidean(passer, receiver) ÷ pass speed.
+    Step duration is set by outlet pass quality (the ``outlet_score`` on
+    ``fb_roles``):
+      - ``outlet_score >= 50`` → T = 1 game-sec (snappy, decisive pass)
+      - else / missing       → T = 2 game-sec (sloppier pass, more hang time)
+
+    Per-player movement during the step:
+      - Outlet passer / receiver: stationary.
+      - Get-back defenders (from prior shot's ``offense_getback`` list):
+        - Player 1: target = (receiver.x ± 2 toward attacking basket, receiver.y).
+        - Player 2 (if present): target = same-side ``lowPost`` from
+          ``HCO_STRING_SPOTS`` based on receiver.y > 24.
+        Move at ``sprint`` archetype (cutting off the receiver).
+      - All other players (non-passer, non-receiver, non-getback): destination
+        = attacking basket coord (HOME_RIM_COORDS or AWAY_RIM_COORDS). Move at
+        ``default`` archetype (= cruise, AG-driven). Schema interrupted-coord
+        semantics handle the case where they don't reach the rim — they end at
+        whatever fraction of the path their (rate × T) covers.
+
+    Ball tweens passer → receiver over the full step T (350ms or 700ms
+    wall-clock at 350ms-per-game-sec).
     """
-    distance = _euclid(passer_coord, receiver_coord)
-    t = distance / float(PASS_GRID_SPOTS_PER_GAME_SECOND) if distance > 0 else 0.0
+    outlet_score = fb_roles.get("outlet_score")
+    if outlet_score is not None and outlet_score >= 50:
+        t = 1.0
+    else:
+        # Includes None case (no outlet score available — shouldn't happen
+        # in normal CR flow but defensive default).
+        t = 2.0
+
+    x_dir = -1 if is_away_offense else 1
+    attacking_basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+    attacking_basket_coord: GridCoord = {
+        "x": float(attacking_basket["x"]),
+        "y": float(attacking_basket["y"]),
+    }
+
+    # Get-back defender IDs, normalized to strings.
+    getback_ids = [str(pid) for pid in (fb_roles.get("getback_player_ids") or []) if pid is not None]
 
     actions: Dict[str, PlayerAction] = {}
     archetype: Dict[str, PlayerArchetype] = {}
     destinations: Dict[str, Optional[GridCoord]] = {}
+    end_coords: Dict[str, GridCoord] = {}
     for pid, coord in all_start_coords.items():
         actions[pid] = "stationary"
         archetype[pid] = "stationary"
-        destinations[pid] = coord  # No movement during outlet pass.
+        destinations[pid] = coord
+        end_coords[pid] = dict(coord)  # Default: no movement.
     actions[passer_id] = "pass"
     actions[receiver_id] = "receive"
+
+    # Targets per role: (player_id, target_coord, archetype).
+    targets: List[tuple] = []
+
+    # Get-back Defender 1: cut off the receiver (2 spots ahead in attacking dir, same y).
+    if len(getback_ids) >= 1:
+        gb1_id = getback_ids[0]
+        if gb1_id in all_start_coords and gb1_id not in (passer_id, receiver_id):
+            gb1_x = max(4.0, min(97.0, receiver_coord["x"] + (2.0 * x_dir)))
+            gb1_target: GridCoord = {"x": gb1_x, "y": float(receiver_coord["y"])}
+            targets.append((gb1_id, gb1_target, "sprint"))
+
+    # Get-back Defender 2 (if present): lowPost on the same vertical half as receiver.
+    if len(getback_ids) >= 2:
+        gb2_id = getback_ids[1]
+        if gb2_id in all_start_coords and gb2_id not in (passer_id, receiver_id):
+            spot_name = "upper lowPost" if receiver_coord["y"] > 24 else "lower lowPost"
+            spot_home = HCO_STRING_SPOTS[spot_name]
+            if is_away_offense:
+                gb2_target = {"x": float(100 - spot_home["x"]), "y": float(spot_home["y"])}
+            else:
+                gb2_target = {"x": float(spot_home["x"]), "y": float(spot_home["y"])}
+            targets.append((gb2_id, gb2_target, "sprint"))
+
+    # All others: destination = attacking basket; move at default (AG-driven) rate.
+    excluded = {passer_id, receiver_id, *getback_ids}
+    for pid in all_start_coords:
+        if pid in excluded:
+            continue
+        targets.append((pid, attacking_basket_coord, "default"))
+
+    # Compute interrupted end coords: start + (rate × T) along start→target.
+    for pid, target, arch in targets:
+        start = all_start_coords[pid]
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        max_traversal = rate * t
+        dist = _euclid(start, target)
+        if dist <= max_traversal or dist == 0.0:
+            end_coords[pid] = {"x": float(target["x"]), "y": float(target["y"])}
+        else:
+            ratio = max_traversal / dist
+            end_coords[pid] = {
+                "x": start["x"] + (target["x"] - start["x"]) * ratio,
+                "y": start["y"] + (target["y"] - start["y"]) * ratio,
+            }
+        destinations[pid] = {"x": float(target["x"]), "y": float(target["y"])}
+        actions[pid] = "cut"
+        archetype[pid] = arch
 
     advance_trigger: AdvanceTrigger = {
         "condition": "ball_reaches_player",
@@ -255,8 +345,6 @@ def _build_outlet_pass_step(
 
     ball_start: BallState = {"owner_player_id": passer_id}
     ball_end: BallState = {"owner_player_id": receiver_id}
-    # Note: schema supports BallInFlight mid-step, but legacy parity treats
-    # the pass as instant transfer at step end (same as HCT emitter).
 
     clock_start: ClockState = {
         "clock_remaining": clock_remaining_at_start,
@@ -277,7 +365,7 @@ def _build_outlet_pass_step(
         "advance_trigger": advance_trigger,
     }
     end: StepEnd = {
-        "coords": dict(all_start_coords),
+        "coords": end_coords,
         "ball": ball_end,
         "time_elapsed": t,
         "clock": clock_end,
@@ -783,6 +871,10 @@ def build_covert_release_animation_steps(
             passer_coord=passer_coord,
             receiver_coord=receiver_coord,
             all_start_coords=all_start_coords,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=bool(fb_roles.get("is_away_offense")),
             clock_remaining_at_start=clock_remaining,
             shot_clock_remaining_at_start=shot_clock_remaining,
             is_first_step=True,
