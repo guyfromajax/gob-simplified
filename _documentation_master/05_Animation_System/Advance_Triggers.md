@@ -70,71 +70,143 @@ After Steal sub-variant is intentionally out of scope here.
 
 ### Covert Release
 
-Single lead-in step (outlet pass). Then the FB resolves to either a shot or a defensive stop.
+Two steps. Step 0 = outlet pass (ball flies passer → receiver, no players move). Step 1 = outcome — shot motion ending in `turn_stop: SHOT_ATTEMPT` (HCT pattern, no separate shot-resolution step), or defensive stop ending in implicit end-of-turn → next turn (HCO).
+
+Edge case: when rebounder == release player (no distinct outlet passer), step 0 is skipped and the turn is single-step.
 
 #### Branch: Outlet → Shot Attempt
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Outlet pass | `ball_reaches_player` | outlet receiver (passer → receiver) | pass flight time |
-| 1 | Shot motion | `player_reaches_position` | shooter (reaches shot spot) | shooter traversal time |
-| 2 | Shot resolution | `shot_resolved` | — | instantaneous |
+| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | euclidean(passer, receiver) ÷ `PASS_GRID_SPOTS_PER_GAME_SECOND` |
+| 1 | Shot motion (→ `turn_stop: SHOT_ATTEMPT`) | `player_reaches_position` | shooter (BH; reaches shot spot) | BH traversal time at `sprint` archetype |
 
 #### Branch: Outlet → Defensive Stop
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | pass flight time |
-| 1 | Defensive stop | _TBD_ — `animateDefensiveStop` has no clean per-step gate exposed in current code | _TBD_ | _TBD_ |
+| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | euclidean(passer, receiver) ÷ `PASS_GRID_SPOTS_PER_GAME_SECOND` |
+| 1 | Defensive stop (→ implicit end-of-turn) | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `sprint` archetype |
 
-Note: per current `animateOutletPhase`, only the ball moves during step 0 — players hold position. (Parallel non-getback advancement is commented out.)
+Notes:
+- Per current `animateOutletPhase`, only the ball moves during step 0 — players hold position. The schema reflects this (all players' destinations on step 0 = their starts).
+- Defensive Stop step 1 has no schema-vocab `turn_stop` event for "defensive stop" — modeled as `next_step` past the array (implicit end of turn), matching how HCT's "continue to HCO" path works. Caller transitions to HCO.
+- Other outcome variants (FOUL / STEAL / DEAD_BALL_TURNOVER) reuse step 1 with `gating_player = BH` and the appropriate `turn_stop` event on `next`.
 
 ### Rim Runner
 
-Five terminal branches. All share steps 0–1 (burst + outlet pass) except outlet-denied, which forks at step 1.
+Five terminal branches. Steps 0–1 (Burst, Outlet pass) are shared across 4 of the 5 branches; outlet-denied forks at step 1. T column = step duration in game-seconds.
+
+#### Common lead-in (steps 0–1, shared by all branches except outlet-denied)
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
+| 0 | Burst | `player_reaches_position` | outlet receiver (reaches `receiver_to`) | receiver traversal at default archetype |
+
+- **Rim Runner**: 9–14 or 20–25 x spots toward basket (skill check: roll d100 < `0.6×AG + 0.2×IQ + 0.2×CH` → 20–25, else 9–14); y to a wing band on the same side as start (15–20 or 30–35).
+- **Outlet Receiver**: ~8 x spots toward basket (or `rebound_x ± 12` in dynamic-placement mode); y snaps to the opposite wing band from RR (15 or 35).
+- **Outlet Passer (rebounder)**: stationary at rebound spot; ball attaches to them at burst start.
+- **Outlet Defender**: tweens to passer.x ± 2 (toward basket), same y as passer.
+- **Get Back Players** (defenders flagged in prior shot's `offense_getback`):
+  - Defender 1: targets 2 x spots ahead of RR's burst-end position (`RR.x + 2` home offense, `RR.x − 2` away offense), same y as RR.
+  - Defender 2 (if present): targets the same-side `lowPost` near the basket — `upper lowPost` if RR's burst-end y > 24, else `lower lowPost` (coords from `HCO_STRING_SPOTS`).
+- **Other O players** (2 non-RR, non-receiver): drift forward 1–4 x spots toward the offense's attacking basket; y unchanged.
+- **Other D players** (non-getback): drift forward 1–4 x spots in the same direction as the offense (i.e., toward the offense's attacking basket, trailing the play); y unchanged.
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
+| 1 | Outlet pass | `ball_reaches_player` | outlet receiver | passer→receiver distance ÷ pass speed |
+
+- **Rim Runner**: continues sprinting toward `rr_to` (tween started in step 0).
+- **Outlet Receiver**: stationary at `receiver_to`, awaits ball.
+- **Outlet Passer**: stationary, releases ball at step start.
+- **Outlet Defender**: continues toward contest spot.
+- **Get Back Players**: continue retreating toward own basket.
+- **Other O players**: continue drifting forward.
+- **Other D players**: continue retreating per their step 0 destinations.
+
+(All non-passer/non-receiver tweens keep running through step 1 by default. The opt-in `UESS_FB_CRITICAL_EVENT_PATTERN` flag would freeze them at the step 0 boundary instead.)
 
 #### Branch: Burst → Outlet → Lane Pass → Shot
 
+Steps 0–1: see Common lead-in.
+
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Burst | `player_reaches_position` | outlet receiver (reaches `receiver_to`) | receiver traversal at sprint |
-| 1 | Outlet pass | `ball_reaches_player` | outlet receiver | pass flight time |
 | 2 | Lane pass | `ball_reaches_player` | rim runner (ball + RR co-arrive at catch grid) | RR traversal at sprint |
+
+- **Rim Runner**: tweens 6 x spots further toward basket from `rr_to`, same y; arrives at catch grid same instant ball arrives.
+- **Outlet Receiver / Ball Handler**: stationary, releases lane pass.
+- **Outlet Passer (rebounder)**: stationary.
+- **Outlet Defender**: stationary at contest spot.
+- **Get Back / Other O / Other D**: stationary at their step 0 endpoints.
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
 | 3 | Shot motion | `player_reaches_position` | shooter (reaches shot spot) | shooter traversal time |
+
+- **Rim Runner / Shooter**: tweens from catch grid to FB shot spot near rim.
+- **Shot Defender**: tweens to `defender_spot` (between shooter and basket, contest position).
+- **Outlet Receiver / Outlet Passer**: stationary.
+- **Other 6 players**: reposition to standard FB shot positions in parallel (`moveOtherPlayersToStandardPositions`).
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
 | 4 | Shot resolution | `shot_resolved` | — | instantaneous |
+
+- All players: stationary. Ball + shooter renders the shot release; result already pre-resolved by backend.
 
 #### Branch: Burst → Outlet Denied → Defensive Stop
 
+Step 0: see Common lead-in. (This branch forks at step 1 — no outlet pass fires.)
+
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Burst | `player_reaches_position` | outlet receiver (reaches `receiver_to`) | receiver traversal at sprint |
 | 1 | Outlet denied beat | _TBD_ — `animateRimRunnerOutletDeniedBeat` runs receiver cut + announcement + outlet defender pursuit; no single clean gate | _TBD_ | _TBD_ |
 | 2 | Defensive stop | _TBD_ — see Covert Release defensive stop | _TBD_ | _TBD_ |
 
 #### Branch: Burst → Outlet → Lane Pass Intercepted (STEAL)
 
+Steps 0–1: see Common lead-in.
+
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Burst | `player_reaches_position` | outlet receiver | receiver traversal at sprint |
-| 1 | Outlet pass | `ball_reaches_player` | outlet receiver | pass flight time |
-| 2 | Lane pass intercepted | `ball_reaches_player` | interceptor (ball reaches interception contact grid) | partial pass flight time |
+| 2 | Lane pass intercepted | `ball_reaches_player` | interceptor (ball reaches interception contact grid) | partial pass flight |
+
+- **Rim Runner**: tweens to a partial position (`rr_to.x + 3` toward basket, same y) — not the full catch spot, halfway in.
+- **Stealer / Interceptor**: tweens to interception contact grid at sprint pace.
+- **Outlet Receiver / Ball Handler**: stationary, released lane pass.
+- **Outlet Passer**: stationary.
+- **Outlet Defender / Get Back / Other O / Other D**: stationary at step 0 endpoints.
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
 | 3 | `turn_stop: STEAL` | — | — | — |
 
 #### Branch: Burst → Outlet → Lane Pass Batted OOB
 
+Steps 0–1: see Common lead-in.
+
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Burst | `player_reaches_position` | outlet receiver | receiver traversal at sprint |
-| 1 | Outlet pass | `ball_reaches_player` | outlet receiver | pass flight time |
 | 2 | Lane pass batted OOB | `ball_reaches_player` | OOB destination (ball reaches OOB grid post-deflection) | partial pass flight + OOB drift |
+
+- **Rim Runner**: tweens to `rr_to.x + 4` toward basket, same y (less far than the full catch spot).
+- **Defender (batter)**: tweens to interception contact grid; deflects ball after ball arrives there.
+- **Ball**: flies from BH to contact grid, then drifts to nearest OOB grid spot.
+- **Outlet Receiver / Ball Handler**: stationary, released lane pass.
+- **Outlet Passer / Get Back / Other O / Other D**: stationary at step 0 endpoints.
+
+| # | Step | Trigger | Gating player | T |
+|---|---|---|---|---|
 | 3 | `turn_stop: DEAD_BALL_TURNOVER` | — | — | — |
 
 #### Branch: Burst → Outlet → Hold-up → HCO Settle
 
+Steps 0–1: see Common lead-in.
+
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Burst | `player_reaches_position` | outlet receiver | receiver traversal at sprint |
-| 1 | Outlet pass | `ball_reaches_player` | outlet receiver | pass flight time |
 | 2 | Hold-up lead-in | _TBD_ — `animateRimRunnerHoldUpLeadIn` has no exposed per-step gate | _TBD_ | _TBD_ |
 | 3 | HCO settle | _TBD_ — `finalizeRimRunnerNonShotTurn` | _TBD_ | _TBD_ |
 

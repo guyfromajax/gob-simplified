@@ -1629,7 +1629,24 @@ def resolve_fast_break_logic(game: "GameManager"):
         _record_fast_break_stats(fb_roles, result, game)
         # ==================== END FAST BREAK STAT TRACKING ====================
         apply_fast_break_cg_time(result, shot_attempted=False)
-        
+
+        # Parallel-build: emit unified AnimationStep[] for Covert Release.
+        # Other FB variants (RR / Triangle / After Steal) still use legacy
+        # rendering until their own migrations land. See
+        # _documentation_master/projects/Animation_System_Updated.md.
+        if fb_play_key == "covert_release":
+            try:
+                from BackEnd.engine.covert_release_step_emitter import (
+                    build_covert_release_animation_steps,
+                )
+                anim_steps = build_covert_release_animation_steps(result, game)
+                if anim_steps is not None:
+                    result["animation_steps"] = anim_steps
+            except Exception as e:
+                logging.warning(
+                    "build_covert_release_animation_steps (defensive stop) failed: %s", e
+                )
+
         return result
 
     #get shooter and passer (if applicable)
@@ -1859,6 +1876,23 @@ def resolve_fast_break_logic(game: "GameManager"):
     turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
 
     turn_result["fast_break_play"] = fb_play_key
+
+    # Parallel-build: emit unified AnimationStep[] for Covert Release.
+    # Other FB variants still use legacy rendering until their own
+    # migrations land. See
+    # _documentation_master/projects/Animation_System_Updated.md.
+    if fb_play_key == "covert_release":
+        try:
+            from BackEnd.engine.covert_release_step_emitter import (
+                build_covert_release_animation_steps,
+            )
+            anim_steps = build_covert_release_animation_steps(turn_result, game)
+            if anim_steps is not None:
+                turn_result["animation_steps"] = anim_steps
+        except Exception as e:
+            logging.warning(
+                "build_covert_release_animation_steps (outcome) failed: %s", e
+            )
 
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"

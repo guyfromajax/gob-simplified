@@ -293,13 +293,22 @@ export class AnimationEngine {
 
       // SS&S animation refactor: HCO, HCT, and DREB turns route through
       // the unified step-based playback engine when their backend payload
-      // carries `animation_steps`. Other turn types fall through to the
-      // legacy handler dispatch below. See:
+      // carries `animation_steps`. FAST_BREAK is gated per-variant to avoid
+      // routing un-migrated variants (RR / Triangle / After Steal) through
+      // the new engine prematurely — currently only Covert Release is
+      // migrated. Other turn types fall through to the legacy handler
+      // dispatch below. See:
       // _documentation_master/projects/Animation_System_Updated.md
       const newPlaybackTurnTypes = new Set(["HCO", "HCT", "DREB"]);
+      const isMigratedFbVariant =
+        turnData?.current_turn === "FAST_BREAK"
+        && turnData?.fast_break_play === "covert_release";
       const hasAnimationSteps = Array.isArray(turnData?.animation_steps)
         && turnData.animation_steps.length > 0;
-      if (hasAnimationSteps && newPlaybackTurnTypes.has(turnData?.current_turn)) {
+      if (
+        hasAnimationSteps
+        && (newPlaybackTurnTypes.has(turnData?.current_turn) || isMigratedFbVariant)
+      ) {
         const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js");
         const sprites = context.playerSprites
           || this.playerSprites
