@@ -506,6 +506,34 @@ def _build_outcome_step(
         gate_coord = bh_coord_end or bh_coord_start or {"x": 50.0, "y": 25.0}
         t = max(t, 0.0)
 
+    # Schema-compliant interrupted-coord clamp: any player whose intended
+    # destination (read from legacy animator's animations[].movement[-1])
+    # exceeds what they could traverse at drive rate × T gets clamped to
+    # start + (rate × T) along the path. Without this, non-gate players in
+    # step 1 (especially the FB shot path, where multiple players have
+    # full destinations near the rim) would appear to teleport because
+    # the legacy animator pre-computes full destinations regardless of T.
+    # Rebinds end_coords[pid] (does NOT mutate the dict in place) so
+    # destinations[pid] retains the original target reference.
+    for pid, start_coord in step_start_coords.items():
+        target = end_coords.get(pid)
+        if target is None or start_coord is None:
+            continue
+        dx = target["x"] - start_coord["x"]
+        dy = target["y"] - start_coord["y"]
+        dist = (dx * dx + dy * dy) ** 0.5
+        if dist == 0.0:
+            continue
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "drive") if player else 12.0
+        max_traversal = rate * t
+        if dist > max_traversal:
+            ratio = max_traversal / dist
+            end_coords[pid] = {
+                "x": start_coord["x"] + dx * ratio,
+                "y": start_coord["y"] + dy * ratio,
+            }
+
     advance_trigger: AdvanceTrigger = {
         "condition": "player_reaches_position",
         "T_game_seconds": float(t),
