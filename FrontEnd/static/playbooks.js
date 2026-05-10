@@ -991,7 +991,6 @@
         const weightsContainer = document.getElementById('save-confirm-weights');
         if (weightsContainer) renderShotWeights(weightsContainer, shotWeights);
 
-        await this.saveConfirmModal.open(shotWeights);
         this.state.playbookMeta.user_saved = true;
         this.clearDraftState();
         if (this.context.mode === "franchise" && this.context.franchiseId && this.context.teamId && !this.context.gameId) {
@@ -1004,6 +1003,10 @@
             console.warn("Unable to store playbook save refresh flag:", storageError);
           }
         }
+
+        await this.saveConfirmModal.open(shotWeights);
+        this.handleBack();
+        return;
       } catch (error) {
         console.error("Failed to save playbooks:", error);
         this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });

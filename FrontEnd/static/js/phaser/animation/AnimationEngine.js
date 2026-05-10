@@ -305,6 +305,24 @@ export class AnimationEngine {
         && turnData?.fast_break_play === "covert_release";
       const hasAnimationSteps = Array.isArray(turnData?.animation_steps)
         && turnData.animation_steps.length > 0;
+
+      // FB diagnostic: log every Fast Break turn at the dispatch point so we
+      // can confirm which variant fired and which rendering path it took.
+      if (turnData?.current_turn === "FAST_BREAK") {
+        const willUseNewEngine = hasAnimationSteps && isMigratedFbVariant;
+        console.warn(
+          "🏀 [FB DISPATCH]",
+          {
+            fast_break_play: turnData?.fast_break_play ?? "(none)",
+            result_type: turnData?.result_type,
+            fast_break_flag: turnData?.fast_break,
+            has_animation_steps: hasAnimationSteps,
+            steps_count: hasAnimationSteps ? turnData.animation_steps.length : 0,
+            path: willUseNewEngine ? "NEW_PLAYBACK_ENGINE" : "LEGACY_HANDLER",
+          }
+        );
+      }
+
       if (
         hasAnimationSteps
         && (newPlaybackTurnTypes.has(turnData?.current_turn) || isMigratedFbVariant)
