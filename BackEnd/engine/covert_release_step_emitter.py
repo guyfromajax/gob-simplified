@@ -619,12 +619,19 @@ def _build_step_back_step(
     """Build the step-back / HCO-setup step (step 2 in the DEFENSIVE_STOP
     branch). See module docstring + Advance_Triggers.md for the spec.
     """
+    import logging
     fb_bh = fb_roles.get("ball_handler")
     if fb_bh is None:
+        logging.warning("🏀 [CR STEP-BACK] returning None: fb_bh is None")
         return None
     fb_bh_id = _safe_id(fb_bh)
     fb_bh_pos = (getattr(fb_bh, "position", None) or "").upper()
     if fb_bh_pos not in _LINEUP_ORDER:
+        logging.warning(
+            "🏀 [CR STEP-BACK] returning None: fb_bh_pos=%r not in %s "
+            "(fb_bh_id=%s, fb_bh type=%s)",
+            fb_bh_pos, _LINEUP_ORDER, fb_bh_id, type(fb_bh).__name__,
+        )
         return None
 
     is_away_offense = bool(fb_roles.get("is_away_offense"))
@@ -906,6 +913,11 @@ def build_covert_release_animation_steps(
     # DEFENSIVE_STOP only: append step-back step. Other outcomes terminate
     # via their `turn_stop` next pointer set by `_resolve_outcome_next`.
     result_type = (turn_result.get("result_type") or "").upper()
+    import logging
+    logging.warning(
+        "🏀 [CR EMITTER] result_type=%s, has_outlet_pass=%s, steps_so_far=%d",
+        result_type, has_outlet_pass, len(steps),
+    )
     if result_type == "DEFENSIVE_STOP":
         # Override the outcome step's `next` pointer to point at step 2
         # (was implicit-end via index 999; now linear continuation).
@@ -920,6 +932,13 @@ def build_covert_release_animation_steps(
 
         # Build step 2: step-back / HCO setup.
         step_back_start_coords = dict(outcome_step["end"]["coords"])
+        logging.warning(
+            "🏀 [CR EMITTER] DEFENSIVE_STOP — calling _build_step_back_step. "
+            "fb_bh=%s, fb_bh_pos=%s, off_lineup_keys=%s",
+            getattr(fb_roles.get("ball_handler"), "player_id", None),
+            getattr(fb_roles.get("ball_handler"), "position", None),
+            list(off_lineup.keys()) if off_lineup else None,
+        )
         step_back = _build_step_back_step(
             turn_result=turn_result,
             fb_roles=fb_roles,
@@ -931,5 +950,71 @@ def build_covert_release_animation_steps(
         )
         if step_back is not None:
             steps.append(step_back)
+            logging.warning(
+                "🏀 [CR EMITTER] step-back appended; total_steps=%d, T=%.3f",
+                len(steps), step_back["end"]["time_elapsed"],
+            )
+        else:
+            logging.warning(
+                "🏀 [CR EMITTER] _build_step_back_step returned None — "
+                "step 1 next pointer still references missing index %d",
+                next_index,
+            )
 
+    _log_steps_coords(steps, off_lineup, def_lineup)
     return steps
+
+
+def _log_steps_coords(
+    steps: List[AnimationStep],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Per-step, per-player start/end coord log for debugging FB animations.
+    Groups by team (OFFENSE first, then DEFENSE) and orders by lineup position
+    within each team. One log line per player per step.
+    """
+    import logging
+
+    # pid → (team_label, position) lookup
+    pid_to_role: Dict[str, tuple] = {}
+    for pos in _LINEUP_ORDER:
+        op = off_lineup.get(pos) if off_lineup else None
+        if op is not None:
+            pid = _safe_id(op)
+            if pid:
+                pid_to_role[pid] = ("OFFENSE", pos)
+        dp = def_lineup.get(pos) if def_lineup else None
+        if dp is not None:
+            pid = _safe_id(dp)
+            if pid:
+                pid_to_role[pid] = ("DEFENSE", pos)
+
+    def _fmt(coord: Any) -> str:
+        if not coord or "x" not in coord or "y" not in coord:
+            return "?"
+        return f"({coord['x']:.1f}, {coord['y']:.1f})"
+
+    for i, step in enumerate(steps):
+        t = step.get("end", {}).get("time_elapsed")
+        logging.warning(
+            "🏀 [CR STEPS] step %d (T=%s game-sec) coords:",
+            i, f"{t:.3f}" if isinstance(t, (int, float)) else "?",
+        )
+        start_coords = step.get("start", {}).get("coords") or {}
+        end_coords = step.get("end", {}).get("coords") or {}
+        for team_label in ("OFFENSE", "DEFENSE"):
+            for pos in _LINEUP_ORDER:
+                pid = next(
+                    (p for p, (t_, ps) in pid_to_role.items()
+                     if t_ == team_label and ps == pos),
+                    None,
+                )
+                if pid is None:
+                    continue
+                logging.warning(
+                    "  %s %s (%s): %s → %s",
+                    team_label, pos, pid,
+                    _fmt(start_coords.get(pid)),
+                    _fmt(end_coords.get(pid)),
+                )
