@@ -893,6 +893,7 @@ def build_covert_release_animation_steps(
 
     outlet_passer_id = fb_roles.get("outlet_passer")
     outlet_receiver_id = fb_roles.get("outlet_receiver")
+    is_away_offense = bool(fb_roles.get("is_away_offense"))
 
     # All-player start coords (every player in both lineups).
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
@@ -906,6 +907,25 @@ def build_covert_release_animation_steps(
     op_y = fb_roles.get("outlet_passer_y")
     if outlet_passer_id and op_x is not None and op_y is not None:
         all_start_coords[str(outlet_passer_id)] = {"x": float(op_x), "y": float(op_y)}
+
+    # ORIENTATION FIX: `player.coords` (and `outlet_passer_x/y` from
+    # rebounder.coords) are stored in CANONICAL HOME orientation per the
+    # codebase convention. animation_steps[] must be emitted in DISPLAY
+    # orientation (matching legacy `animations[]`), so the frontend renders
+    # correctly and `sync_lineup_coords_from_turn` can flip-back-to-home
+    # via `_normalize_animation_coords_to_runtime_home` at end of turn.
+    # When away team is on offense, flip every start coord around x=50.
+    # All subsequent emitter computations (drift targets at AWAY_RIM,
+    # outcome step end coords from animator's already-display-oriented
+    # animations[], step-back targets via `_flip_x_for_offense`) are
+    # already in display orientation — this flip aligns the starts.
+    if is_away_offense:
+        from BackEnd.utils.shared import get_away_player_coords
+        for pid, coord in list(all_start_coords.items()):
+            flipped = get_away_player_coords(
+                {"x": float(coord["x"]), "y": float(coord["y"])}
+            )
+            all_start_coords[pid] = {"x": float(flipped["x"]), "y": float(flipped["y"])}
 
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
