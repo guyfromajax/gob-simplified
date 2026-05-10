@@ -554,6 +554,27 @@ def _build_outcome_step(
 _LINEUP_ORDER = ["PG", "SG", "SF", "PF", "C"]
 
 
+def _resolve_position_from_lineup(
+    player_id: Optional[str],
+    lineup: Dict[str, Any],
+) -> Optional[str]:
+    """Find a player's position by matching their player_id against the
+    lineup dict's keys. Authoritative — does NOT rely on the Player object's
+    `.position` attribute, which is not always populated in real-game
+    contexts.
+    """
+    if not player_id or not lineup:
+        return None
+    target = str(player_id)
+    for pos, player in lineup.items():
+        if player is None:
+            continue
+        pid = getattr(player, "player_id", None)
+        if pid is not None and str(pid) == target:
+            return pos
+    return None
+
+
 def _flip_x_for_offense(coord: GridCoord, is_away_offense: bool) -> GridCoord:
     """Mirror x around 50 when offense is away (HCO_STRING_SPOTS are stored in
     home orientation)."""
@@ -625,12 +646,20 @@ def _build_step_back_step(
         logging.warning("🏀 [CR STEP-BACK] returning None: fb_bh is None")
         return None
     fb_bh_id = _safe_id(fb_bh)
-    fb_bh_pos = (getattr(fb_bh, "position", None) or "").upper()
+    # Resolve position from lineup (authoritative), not from Player.position
+    # (which is not always set on real-game Player objects).
+    fb_bh_pos = _resolve_position_from_lineup(fb_bh_id, off_lineup)
+    if fb_bh_pos is None:
+        # Fallback: try Player.position attribute as a last resort.
+        attr_pos = (getattr(fb_bh, "position", None) or "").upper()
+        if attr_pos in _LINEUP_ORDER:
+            fb_bh_pos = attr_pos
     if fb_bh_pos not in _LINEUP_ORDER:
         logging.warning(
-            "🏀 [CR STEP-BACK] returning None: fb_bh_pos=%r not in %s "
-            "(fb_bh_id=%s, fb_bh type=%s)",
-            fb_bh_pos, _LINEUP_ORDER, fb_bh_id, type(fb_bh).__name__,
+            "🏀 [CR STEP-BACK] returning None: could not resolve fb_bh_pos "
+            "(fb_bh_id=%s, off_lineup_player_ids=%s)",
+            fb_bh_id,
+            {k: getattr(v, "player_id", None) for k, v in (off_lineup or {}).items()},
         )
         return None
 
@@ -971,50 +1000,62 @@ def _log_steps_coords(
     def_lineup: Dict[str, Any],
 ) -> None:
     """Per-step, per-player start/end coord log for debugging FB animations.
-    Groups by team (OFFENSE first, then DEFENSE) and orders by lineup position
-    within each team. One log line per player per step.
+
+    Iterates over ``step.start.coords`` (authoritative for which players the
+    emitter actually populated). For each player_id, attempts to resolve
+    team + position via lineup lookup; falls back to ``?`` placeholders so we
+    see SOMETHING per player even when lineup state is unreliable.
     """
     import logging
 
-    # pid → (team_label, position) lookup
     pid_to_role: Dict[str, tuple] = {}
     for pos in _LINEUP_ORDER:
-        op = off_lineup.get(pos) if off_lineup else None
-        if op is not None:
-            pid = _safe_id(op)
-            if pid:
-                pid_to_role[pid] = ("OFFENSE", pos)
-        dp = def_lineup.get(pos) if def_lineup else None
-        if dp is not None:
-            pid = _safe_id(dp)
-            if pid:
-                pid_to_role[pid] = ("DEFENSE", pos)
+        for team_label, lineup in (("OFFENSE", off_lineup), ("DEFENSE", def_lineup)):
+            player = lineup.get(pos) if lineup else None
+            if player is None:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid is None:
+                continue
+            pid_to_role[str(pid)] = (team_label, pos)
 
     def _fmt(coord: Any) -> str:
-        if not coord or "x" not in coord or "y" not in coord:
+        if not isinstance(coord, dict) or "x" not in coord or "y" not in coord:
             return "?"
-        return f"({coord['x']:.1f}, {coord['y']:.1f})"
+        try:
+            return f"({float(coord['x']):.1f}, {float(coord['y']):.1f})"
+        except (TypeError, ValueError):
+            return "?"
 
     for i, step in enumerate(steps):
         t = step.get("end", {}).get("time_elapsed")
         logging.warning(
-            "🏀 [CR STEPS] step %d (T=%s game-sec) coords:",
-            i, f"{t:.3f}" if isinstance(t, (int, float)) else "?",
+            "🏀 [CR STEPS] step %d (T=%s game-sec, %d players in coords)",
+            i,
+            f"{t:.3f}" if isinstance(t, (int, float)) else "?",
+            len((step.get("start", {}).get("coords") or {})),
         )
         start_coords = step.get("start", {}).get("coords") or {}
         end_coords = step.get("end", {}).get("coords") or {}
-        for team_label in ("OFFENSE", "DEFENSE"):
-            for pos in _LINEUP_ORDER:
-                pid = next(
-                    (p for p, (t_, ps) in pid_to_role.items()
-                     if t_ == team_label and ps == pos),
-                    None,
-                )
-                if pid is None:
-                    continue
-                logging.warning(
-                    "  %s %s (%s): %s → %s",
-                    team_label, pos, pid,
-                    _fmt(start_coords.get(pid)),
-                    _fmt(end_coords.get(pid)),
-                )
+
+        # Sort player_ids by (team, position) when known; unresolved goes last.
+        def _sort_key(pid: str) -> tuple:
+            role = pid_to_role.get(pid)
+            if role is None:
+                return (2, 0, str(pid))
+            team_label, pos = role
+            team_idx = 0 if team_label == "OFFENSE" else 1
+            try:
+                pos_idx = _LINEUP_ORDER.index(pos)
+            except ValueError:
+                pos_idx = 99
+            return (team_idx, pos_idx, str(pid))
+
+        for pid in sorted(start_coords.keys(), key=_sort_key):
+            team_label, pos = pid_to_role.get(pid, ("?", "?"))
+            logging.warning(
+                "  %s %s (%s): %s → %s",
+                team_label, pos, pid,
+                _fmt(start_coords.get(pid)),
+                _fmt(end_coords.get(pid)),
+            )
