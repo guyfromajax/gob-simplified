@@ -79,15 +79,15 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
 | 0 | Outlet pass | `ball_reaches_player` | outlet receiver | euclidean(passer, receiver) ÷ `PASS_GRID_SPOTS_PER_GAME_SECOND` |
-| 1 | Shot motion (→ `turn_stop: SHOT_ATTEMPT`) | `player_reaches_position` | shooter (BH; reaches shot spot) | BH traversal time at `sprint` archetype |
+| 1 | Shot motion (→ `turn_stop: SHOT_ATTEMPT`) | `player_reaches_position` | shooter (BH; reaches shot spot) | BH traversal time at `drive` archetype |
 
 #### Branch: Outlet → Defensive Stop
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
 | 0 | Outlet pass | `ball_reaches_player` | outlet receiver | euclidean(passer, receiver) ÷ `PASS_GRID_SPOTS_PER_GAME_SECOND` |
-| 1 | Defensive stop motion | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `sprint` archetype |
-| 2 | Step-back / HCO setup (→ implicit end-of-turn) | `player_reaches_position` | slowest mover (max traversal at sprint) | slowest mover's traversal time at `sprint` archetype |
+| 1 | Defensive stop motion | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `drive` archetype |
+| 2 | Step-back / HCO setup (→ implicit end-of-turn) | `player_reaches_position` | slowest mover (max traversal at drive) | slowest mover's traversal time at `drive` archetype |
 
 **Step 1 end announcement:** `step.end.announcement = "Nice Stop!"` (team: defense, headshot: defensive stopper). Playback engine pauses clocks, shows announcement for `hold_ms = 1000`, resumes, then proceeds to step 2.
 
@@ -177,8 +177,8 @@ Step 0: see Common lead-in. (This branch forks at step 1 — no outlet pass fire
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
 *Note we need to add a gate to this, the outlet defender must be within 10 euclidin grid spots of the outlet passer, otherwsie there is not denied outlet pass
-| 1 | Outlet denied beat |`player_reaches_position` | outlet pass defender reaches outlet pass defense spot | _TBD_ |
-| 2 | Defensive stop | _TBD_ — see Covert Release defensive stop | _TBD_ | _TBD_ |
+| 1 | Outlet denied beat |`player_reaches_position` | outlet pass defender reaches outlet pass defense spot | oulet pass defender sprints to location|
+| 2 | Defensive stop | _TBD_ — see Covert Release defensive stop | _TBD_ | _TBD_ | **Do we need this step? I think we enter the pass to offense PG step after this, right?**
 
 #### Branch: Burst → Outlet → Lane Pass Intercepted (STEAL)
 

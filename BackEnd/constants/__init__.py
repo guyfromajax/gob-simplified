@@ -214,17 +214,17 @@ PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean
 # New two-tier model: cruise-speed steps (HCO/HCT bring-up) vs AG-driven steps.
 # Phase 1 ships these constants without wiring them; helpers in shared.py
 # accept them but route to the legacy pace constants until Phase 2/4 land.
-CRUISE_BASELINE_GRID_PER_GAME_SEC = 16  # Cruise baseline for non-BH movers
+CRUISE_BASELINE_GRID_PER_GAME_SEC = 12  # Cruise baseline for non-BH movers (AG=50 rate)
 BH_CRUISE_MIN_GRID_PER_GAME_SEC   = 8   # BH random low end during bring-up
-BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 16  # BH random high end during bring-up
-DRIVE_MULTIPLIER                  = 0.75   # Drive = 0.75 × free-running AG rate
-SHOT_MOTION_MULTIPLIER            = 0.625  # Shot motion = 0.625 × free-running AG rate
+BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 12  # BH random high end during bring-up (= cruise baseline; BH walking ball up never exceeds default cruise)
+# Multipliers below are sized so absolute rates at AG=50 are: drive=12, shot_motion=10.
+# When CRUISE_BASELINE changes, these multipliers must be re-derived to preserve
+# the absolute rates (otherwise you're changing more than one speed at a time).
+DRIVE_MULTIPLIER                  = 1.0    # Drive = 1.0 × cruise (12 × 1.0 = 12 grid/sec at AG=50)
+SHOT_MOTION_MULTIPLIER            = 10.0 / 12.0  # Shot motion → 10 grid/sec at AG=50
 # Sprint = max-effort fast-break movement (RR burst, BH cover-ground in open
-# court, FB shot motion). Tentative starting value at 1.25×; calibrate against
-# today's visual pacing in Phase 3c when frontend tweens consume game_seconds.
-# At AG=50, 16 × 1.25 = 20 grid/sec — matches the retired OPEN_FLOOR_RATE that
-# was the closest legacy analog for max-effort movement.
-SPRINT_MULTIPLIER                 = 1.25
+# court, FB shot motion). Multiplier sized so AG=50 rate = 14 grid/sec.
+SPRINT_MULTIPLIER                 = 14.0 / 12.0  # → 14 grid/sec at AG=50
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},

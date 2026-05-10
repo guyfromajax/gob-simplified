@@ -296,8 +296,9 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
         return float(ag_to_grid_per_game_sec(player, archetype=archetype))
     except Exception:
-        # Test-context fallback: AG=50, sprint baseline ~20 grid/sec.
-        return 20.0
+        # Test-context fallback: AG=50, drive baseline ~12 grid/sec
+        # (cruise 16 × 0.75 drive multiplier).
+        return 12.0
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
@@ -349,20 +350,20 @@ def _build_outcome_step(
     if bh_id:
         if is_defensive_stop:
             actions[bh_id] = "handle_ball"
-            archetype[bh_id] = "sprint"
+            archetype[bh_id] = "drive"
         elif result_type in ("MAKE", "MISS", "BLOCK"):
             actions[bh_id] = "shoot"
-            archetype[bh_id] = "sprint"  # FB run-up dominates the wind-up.
+            archetype[bh_id] = "drive"  # FB run-up dominates the wind-up.
         else:
             # FOUL / STEAL / DEAD_BALL — BH still drives toward outcome spot.
             actions[bh_id] = "handle_ball"
-            archetype[bh_id] = "sprint"
+            archetype[bh_id] = "drive"
 
     if stopper_id:
         sid = str(stopper_id)
         if sid in actions:
             actions[sid] = "guard_ball"
-            archetype[sid] = "sprint"
+            archetype[sid] = "drive"
 
     # Defenders default to guard_offball (overrides "stationary" only when
     # they have a movement end recorded by the animator).
@@ -378,13 +379,13 @@ def _build_outcome_step(
             continue
         if _movement_end_coord(animations, pid) is not None:
             actions[pid] = "guard_offball"
-            archetype[pid] = "sprint"
+            archetype[pid] = "drive"
 
     # Gating player + T.
     bh_coord_start = step_start_coords.get(bh_id) if bh_id else None
     bh_coord_end = end_coords.get(bh_id) if bh_id else None
     bh_traversal = (
-        _traversal_seconds(bh_coord_start, bh_coord_end, _ag_grid_per_game_sec(bh, "sprint"))
+        _traversal_seconds(bh_coord_start, bh_coord_end, _ag_grid_per_game_sec(bh, "drive"))
         if bh_coord_start and bh_coord_end and bh
         else 0.0
     )
@@ -394,7 +395,7 @@ def _build_outcome_step(
         st_start = step_start_coords.get(stopper_pid)
         st_end = end_coords.get(stopper_pid)
         st_traversal = (
-            _traversal_seconds(st_start, st_end, _ag_grid_per_game_sec(stopper, "sprint"))
+            _traversal_seconds(st_start, st_end, _ag_grid_per_game_sec(stopper, "drive"))
             if st_start and st_end
             else 0.0
         )
@@ -613,7 +614,7 @@ def _build_step_back_step(
         dy = end["y"] - start["y"]
         dist = (dx * dx + dy * dy) ** 0.5
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "sprint") if player else 20.0
+        rate = _ag_grid_per_game_sec(player, "drive") if player else 12.0
         traversal = dist / rate if rate > 0 else 0.0
         if traversal > t:
             t = traversal
@@ -649,7 +650,7 @@ def _build_step_back_step(
             actions[pid] = "handle_ball"
         else:
             actions[pid] = "cut"
-        archetype[pid] = "sprint"
+        archetype[pid] = "drive"
 
     ball_state: BallState = (
         {"owner_player_id": fb_bh_id} if fb_bh_id else {"owner_player_id": ""}
