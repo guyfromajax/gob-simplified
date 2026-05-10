@@ -2773,6 +2773,38 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
             if ns:
                 positions[ns] = dict(final)
 
+    # SS&S animation refactor: also sync from the new schema's `animation_steps`.
+    # Migrated turn types (HCT, HCO, DREB, Covert Release FB, etc.) emit
+    # `animation_steps[]` instead of (or alongside) the legacy `animations[]`.
+    # Without this block, those turns leak stale `player.coords` forward —
+    # `sync_lineup_coords_from_turn` is the single end-of-turn coord-sync
+    # entry point on the backend and must honor both schemas.
+    #
+    # Reads the LAST step's `end.coords` map (which represents per-player
+    # interrupted positions at step end). Runs after the legacy block so the
+    # new schema takes precedence when a turn carries both.
+    animation_steps = turn_result.get("animation_steps")
+    if isinstance(animation_steps, list) and animation_steps:
+        last_step = animation_steps[-1] if animation_steps[-1] else None
+        if isinstance(last_step, dict):
+            last_end_coords = (last_step.get("end") or {}).get("coords") or {}
+            if isinstance(last_end_coords, dict):
+                for pid, coord in last_end_coords.items():
+                    if not isinstance(coord, dict):
+                        continue
+                    if coord.get("x") is None or coord.get("y") is None:
+                        continue
+                    normalized = _normalize_animation_coords_to_runtime_home(
+                        game,
+                        {"x": float(coord["x"]), "y": float(coord["y"])},
+                        offense_team_id=turn_result.get("offense_team_id"),
+                    )
+                    if normalized is None:
+                        continue
+                    ns = _norm_player_id(pid)
+                    if ns:
+                        positions[ns] = dict(normalized)
+
     for key in TURN_COORDS_OVERLAY_KEYS:
         block = turn_result.get(key)
         if not isinstance(block, dict):

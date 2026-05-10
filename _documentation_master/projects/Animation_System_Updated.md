@@ -298,3 +298,47 @@ Files touched: `shot_manager.py`, `game_manager.py`, `turn_manager.py`, `phase_r
 - **Archetype vocabulary (working):** `default`, `sprint`, `drive`, `shot_motion`, `cruise`, `stationary`. Drives per-player rate; orthogonal to action.
 - **Trigger condition vocabulary (working):** `fixed_duration`, `ball_reaches_player`, `player_reaches_position`, `shot_resolved`, `stopper_action` (covers foul / steal / dead-ball turnover — backend resolves which on fire).
 - **Branching: pre-resolved.** Backend rolls dice + emits only the actual path. Frontend has no branch logic. No alternate-history replay capability — accepted trade.
+
+---
+
+## Coords Tracking System
+
+Player coordinates are tracked at two levels: **within a turn** (step-to-step) and **across turns** (turn-to-turn transitions). Both must stay consistent for the animation system to work correctly.
+
+### Within a turn (step-to-step)
+
+**Backend (during emit):** Each step emitter walks the steps in order. Step N+1's `start.coords` is set from step N's `end.coords` (the schema's interrupted-coord output). The chain is internal to the emitter — it doesn't write to `player.coords` mid-emit. See `hct_step_emitter.py`, `skeleton_step_emitter.py`, `covert_release_step_emitter.py` for examples.
+
+**Frontend (during playback):** `playAnimationStep` in `animationPlayback.js` snaps each sprite to `step.end.coords` at the end of every step (sets `sprite.gridX/gridY` and pixel position). So sprite state stays in sync with the schema step-by-step. The next step's tween starts from the snapped position.
+
+### Turn-to-turn transitions
+
+**Backend:** `sync_lineup_coords_from_turn` (in `BackEnd/utils/shared.py`) is the single end-of-turn coord-sync entry point on the backend. It reads from BOTH:
+1. **Legacy `animations[]`** field — used for un-migrated turn types (FCP, Free Throw, OREB, BIP/SIP, Opening Tip, Timeout, Fast Break Rim Runner / Triangle / After Steal). Reads each animation row's final coord via `_final_xy_from_animation_row` and applies via `_normalize_animation_coords_to_runtime_home`.
+2. **New schema `animation_steps[]`** field — used for migrated turn types (HCT, HCO, DREB, Covert Release FB). Reads the LAST step's `end.coords` map and applies the same `_normalize_animation_coords_to_runtime_home` normalization.
+
+The `animation_steps[]` block runs AFTER the `animations[]` block, so when a turn carries both (parallel-build during migration), the new schema takes precedence. If a turn carries neither, `player.coords` carries forward unchanged from before the turn.
+
+**Frontend:** Sprite `gridX`/`gridY` persist across turns naturally — no reset between turns. The next turn's first step reads sprite state directly. Backend-set `player.coords` are passed to the next turn's emitter as the starting coords, so backend and frontend stay in sync at the seam.
+
+### Why this matters
+
+When `sync_lineup_coords_from_turn` ignored `animation_steps[]` (the bug we fixed during CR FB migration), every turn-to-turn transition AFTER a migrated turn used stale `player.coords` from before the migrated turn. Symptoms:
+- After a DREB turn, the subsequent FB turn would read pre-DREB coords (rebound never registered on the backend).
+- After an HCT turn, the subsequent BIP/HCO would read pre-HCT coords.
+
+The fix made `sync_lineup_coords_from_turn` schema-aware. Now both legacy and migrated turns properly update `player.coords` at end-of-turn.
+
+### Contract for new emitter migrations
+
+When migrating a turn type to the new schema:
+1. Emit `animation_steps[]` with each step's `end.coords` populated for every active player (10 in standard 5v5).
+2. Trust that `sync_lineup_coords_from_turn` will pick up the LAST step's `end.coords` and apply to `player.coords`.
+3. Do NOT manually write to `player.coords` during the emit — let the sync handle it.
+4. Within the emitter, ensure step N+1's `start.coords` matches step N's `end.coords` for every player. The schema relies on this contract; the playback engine does not snap sprites to `step.start.coords` between steps (snap happens only at step end).
+
+### Files
+
+- Sync function: [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py) — `sync_lineup_coords_from_turn` (around line 2731)
+- Coord normalization: same file — `_normalize_animation_coords_to_runtime_home`
+- Frontend sprite snap: [FrontEnd/static/js/phaser/animation/animationPlayback.js](../../FrontEnd/static/js/phaser/animation/animationPlayback.js) — `playAnimationStep` end-of-step snap loop

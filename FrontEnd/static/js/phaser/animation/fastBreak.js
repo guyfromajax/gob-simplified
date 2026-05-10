@@ -1778,10 +1778,55 @@ export async function runFastBreakSequence({
     return;
   }
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
-  
+
   const width = scene.game.config.width;
   const height = scene.game.config.height;
   const debugEnabled = isAnimationDebugEnabled();
+
+  // FB diagnostic: dump every sprite's actual gridX/gridY at FB entry. Covers
+  // all 4 FB variants (Covert Release, Rim Runner, Triangle, After Steal).
+  // Catches upstream stale-coord bugs (the x=80 vs x=33 mismatch we hit on
+  // After Steal originated from sprite state being stale before this function
+  // ran). Logs in browser console; filter on `🏀 [FB ENTRY SPRITES]`.
+  try {
+    const sortedEntries = Object.entries(playerSprites || {})
+      .map(([id, sprite]) => {
+        const team = sprite?.team || "?";
+        const gridX = typeof sprite?.gridX === "number" ? sprite.gridX : null;
+        const gridY = typeof sprite?.gridY === "number" ? sprite.gridY : null;
+        const info = scene.playerInfo?.[id] || {};
+        const pos = info.position || info.pos || "?";
+        return { id, team, pos, gridX, gridY };
+      })
+      .sort((a, b) => {
+        const teamOrder = { home: 0, away: 1 };
+        const ta = teamOrder[a.team] ?? 2;
+        const tb = teamOrder[b.team] ?? 2;
+        if (ta !== tb) return ta - tb;
+        const posOrder = { PG: 0, SG: 1, SF: 2, PF: 3, C: 4 };
+        return (posOrder[a.pos] ?? 99) - (posOrder[b.pos] ?? 99);
+      });
+    console.warn(
+      "🏀 [FB ENTRY SPRITES] fast_break_play=%s, result_type=%s, current_turn=%s, turn_index=%s",
+      turnData.fast_break_play ?? "(none)",
+      turnData.result_type ?? "(none)",
+      turnData.current_turn ?? "(none)",
+      turnIndex,
+    );
+    for (const e of sortedEntries) {
+      const fmt = (v) => (typeof v === "number" ? v.toFixed(1) : "?");
+      console.warn(
+        "  %s %s (%s): gridX=%s, gridY=%s",
+        e.team.toUpperCase(),
+        e.pos,
+        e.id,
+        fmt(e.gridX),
+        fmt(e.gridY),
+      );
+    }
+  } catch (err) {
+    console.warn("🏀 [FB ENTRY SPRITES] log failed", err);
+  }
   
   // Stop any existing timeline/tweens
   if (scene.__activeTimeline) {
