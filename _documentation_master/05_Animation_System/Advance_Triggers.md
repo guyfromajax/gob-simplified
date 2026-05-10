@@ -70,9 +70,9 @@ After Steal sub-variant is intentionally out of scope here.
 
 ### Covert Release
 
-Two steps. Step 0 = outlet pass (ball flies passer → receiver, no players move). Step 1 = outcome — shot motion ending in `turn_stop: SHOT_ATTEMPT` (HCT pattern, no separate shot-resolution step), or defensive stop ending in implicit end-of-turn → next turn (HCO).
+Step 0 = outlet pass. Step 1 = outcome (shot motion / defensive stop motion / foul / steal / DBT). DEFENSIVE_STOP adds a step 2 = step-back / HCO setup. Other outcomes terminate at step 1 via the appropriate `turn_stop` event.
 
-Edge case: when rebounder == release player (no distinct outlet passer), step 0 is skipped and the turn is single-step.
+Edge case: when rebounder == release player (no distinct outlet passer), step 0 is skipped.
 
 #### Branch: Outlet → Shot Attempt
 
@@ -86,12 +86,26 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
 | 0 | Outlet pass | `ball_reaches_player` | outlet receiver | euclidean(passer, receiver) ÷ `PASS_GRID_SPOTS_PER_GAME_SECOND` |
-| 1 | Defensive stop (→ implicit end-of-turn) | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `sprint` archetype |
+| 1 | Defensive stop motion | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `sprint` archetype |
+| 2 | Step-back / HCO setup (→ implicit end-of-turn) | `player_reaches_position` | slowest mover (max traversal at sprint) | slowest mover's traversal time at `sprint` archetype |
+
+**Step 1 end announcement:** `step.end.announcement = "Nice Stop!"` (team: defense, headshot: defensive stopper). Playback engine pauses clocks, shows announcement for `hold_ms = 1000`, resumes, then proceeds to step 2.
+
+**Step 2 (step-back) per-player movement:**
+- **FB BH**: tweens to a random one of `{deep key, deep upper wing, deep lower wing}` (`HCO_SETUP_OFFENSE_BH_DEEP_SPOTS`).
+- **HCO step-0 BH** (default = team's PG; only moves if different from FB BH): tweens to a position within `HCO_SETUP_HCO_BH_RADIUS = 10` grid units of FB BH AND on the same horizontal half (home offense → x ≥ 50; away → x ≤ 50, to avoid over-and-back).
+- **Supporting offensive players (3 if FB BH != HCO BH; 4 if same)**: tween to `HCO_SETUP_OFFENSE_POS_SPOTS[posN]` per the standard `_alias_map` excluding both BH positions:
+  - pos1 → `upper wing`
+  - pos2 → `lower wing`
+  - pos3 → `upper lowPost`
+  - pos4 → `lower lowPost` (dropped when 2 BHs)
+- **All 5 defenders**: mirror with same-lineup-position matchup (def_PG → off_PG's spot, def_SG → off_SG's spot, etc.). The 5 spots form a 2-3 zone footprint by construction.
 
 Notes:
 - Per current `animateOutletPhase`, only the ball moves during step 0 — players hold position. The schema reflects this (all players' destinations on step 0 = their starts).
-- Defensive Stop step 1 has no schema-vocab `turn_stop` event for "defensive stop" — modeled as `next_step` past the array (implicit end of turn), matching how HCT's "continue to HCO" path works. Caller transitions to HCO.
-- Other outcome variants (FOUL / STEAL / DEAD_BALL_TURNOVER) reuse step 1 with `gating_player = BH` and the appropriate `turn_stop` event on `next`.
+- DEFENSIVE_STOP has no schema-vocab `turn_stop` event for "defensive stop" — step 2 ends with `next: next_step` past the array (implicit end of turn). Caller transitions to HCO.
+- Other outcome variants (FOUL / STEAL / DEAD_BALL_TURNOVER) reuse step 1 with `gating_player = BH` and the appropriate `turn_stop` event on `next` — no step 2.
+- HCO BH default = PG. Set-play-specific BH detection (e.g., for plays where the BH is SG or SF) is a future enhancement.
 
 ### Rim Runner
 
@@ -162,7 +176,8 @@ Step 0: see Common lead-in. (This branch forks at step 1 — no outlet pass fire
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 1 | Outlet denied beat | _TBD_ — `animateRimRunnerOutletDeniedBeat` runs receiver cut + announcement + outlet defender pursuit; no single clean gate | _TBD_ | _TBD_ |
+*Note we need to add a gate to this, the outlet defender must be within 10 euclidin grid spots of the outlet passer, otherwsie there is not denied outlet pass
+| 1 | Outlet denied beat |`player_reaches_position` | outlet pass defender reaches outlet pass defense spot | _TBD_ |
 | 2 | Defensive stop | _TBD_ — see Covert Release defensive stop | _TBD_ | _TBD_ |
 
 #### Branch: Burst → Outlet → Lane Pass Intercepted (STEAL)

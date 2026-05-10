@@ -98,6 +98,20 @@
  */
 
 /**
+ * @typedef {Object} Announcement
+ *   In-step announcement with mandatory pause-the-world behavior. Optional
+ *   field on StepStart (plays before step tweens fire) or StepEnd (plays
+ *   after step tweens complete and sprites snap). Playback engine pauses
+ *   `gameClock` and `shotClock`, calls `showAnnouncement`, awaits the
+ *   hold duration, then resumes clocks.
+ * @property {string} text                Announcement copy (e.g. "Nice Stop!").
+ * @property {("home"|"away"|"defense"|"neutral")} team
+ * @property {Object<string,*>|null} [player_data]  Optional headshot card payload.
+ * @property {Object<string,*>|null} [meta]         Optional { decision_pill_text?, decision_pill_tone?, sfx? }.
+ * @property {number} [hold_ms]                     Wall-clock pause duration (default 1000).
+ */
+
+/**
  * @typedef {Object} StepStart
  * @property {Object<PlayerId, GridCoord>}        coords
  * @property {Object<PlayerId, (GridCoord|null)>} destination
@@ -106,6 +120,9 @@
  * @property {BallState}                          ball
  * @property {ClockState}                         clock
  * @property {AdvanceTrigger}                     advance_trigger
+ * @property {Announcement} [announcement]
+ *   Optional. Plays BEFORE step tweens fire. Used for entry-of-turn
+ *   announcements like "Trap!" / "Fast Break!".
  */
 
 /**
@@ -143,6 +160,9 @@
  *   = AdvanceTrigger.T_game_seconds. Canonical step duration.
  * @property {ClockState} clock
  * @property {NextStep}   next
+ * @property {Announcement} [announcement]
+ *   Optional. Plays AFTER step tweens complete and sprites snap, BEFORE
+ *   returning `next`. Used for mid-turn announcements like "Nice Stop!".
  */
 
 /**

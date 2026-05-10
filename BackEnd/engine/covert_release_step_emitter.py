@@ -13,25 +13,40 @@ Covert Release shape:
     `next: turn_stop SHOT_ATTEMPT`. HCT pattern — no separate shot
     resolution step.
   - Defensive Stop: BH and defensive stopper both run to their stop
-    spots. Slower of the two is the gate; `next: next_step` past array
-    (implicit end of turn).
+    spots. Slower of the two is the gate. ``step.end.announcement`` =
+    "Nice Stop!" plays after the move; ``next`` points to step 2.
   - FOUL / STEAL / DEAD_BALL_TURNOVER: BH runs to outcome spot,
     `next: turn_stop` for the corresponding event.
+- Step 2 (DEFENSIVE_STOP only): step-back / HCO setup. FB BH retreats to
+  a deep frontcourt spot; HCO BH (default = team's PG) takes a position
+  near FB BH on the same horizontal half (avoiding over-and-back); the
+  remaining players take HCO setup positions per the standard pos1..pos4
+  alias mapping. Defenders mirror with same-lineup-position matchup,
+  forming a 2-3 zone footprint by construction. Ends with
+  `next: next_step` past the array (implicit end → next turn is HCO).
 
 Edge case: when the rebounder == release player (no distinct outlet passer),
-the outlet pass step is skipped and the emitter produces only the outcome
-step.
+the outlet pass step is skipped.
 
 See ``_documentation_master/05_Animation_System/Advance_Triggers.md`` —
 "Fast Break / Covert Release" — for the per-step trigger spec.
 """
 
+import math
+import random
 from typing import Any, Dict, List, Optional
 
-from BackEnd.constants import PASS_GRID_SPOTS_PER_GAME_SECOND
+from BackEnd.constants import (
+    HCO_SETUP_HCO_BH_RADIUS,
+    HCO_SETUP_OFFENSE_BH_DEEP_SPOTS,
+    HCO_SETUP_OFFENSE_POS_SPOTS,
+    HCO_STRING_SPOTS,
+    PASS_GRID_SPOTS_PER_GAME_SECOND,
+)
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
+    Announcement,
     BallInFlight,
     BallState,
     ClockState,
@@ -444,6 +459,257 @@ def _build_outcome_step(
     return {"start": start, "end": end}
 
 
+# --- Step-back step (DEFENSIVE_STOP only) ----------------------------------
+
+
+_LINEUP_ORDER = ["PG", "SG", "SF", "PF", "C"]
+
+
+def _flip_x_for_offense(coord: GridCoord, is_away_offense: bool) -> GridCoord:
+    """Mirror x around 50 when offense is away (HCO_STRING_SPOTS are stored in
+    home orientation)."""
+    if not is_away_offense:
+        return {"x": float(coord["x"]), "y": float(coord["y"])}
+    return {"x": float(100 - coord["x"]), "y": float(coord["y"])}
+
+
+def _alias_map_excluding(excluded_positions: List[str]) -> Dict[str, str]:
+    """Mirror of ``_alias_map`` in dynamic_hct.py / `_build_set_play_alias_map`,
+    extended to exclude multiple positions (for the 2-BHs case where both FB
+    BH and HCO BH are excluded from the pos slots).
+    """
+    excluded = {p.upper() for p in excluded_positions if p}
+    remaining = [p for p in _LINEUP_ORDER if p not in excluded]
+    return {f"pos{i + 1}": pos for i, pos in enumerate(remaining)}
+
+
+def _hco_bh_position(off_lineup: Dict[str, Any]) -> str:
+    """Default HCO BH = team's PG (canonical for the vast majority of HCO
+    playcalls). Set-play-specific BH detection is a future enhancement.
+    """
+    return "PG"
+
+
+def _pick_hco_bh_target_near_fb_bh(
+    fb_bh_coord: GridCoord,
+    is_away_offense: bool,
+) -> GridCoord:
+    """Place the HCO BH within ``HCO_SETUP_HCO_BH_RADIUS`` of the FB BH AND
+    on the same horizontal half (home offense → x ≥ 50; away → x ≤ 50). Tries
+    a few random offsets, falls back to a deterministic offset if none fit.
+    """
+    radius = float(HCO_SETUP_HCO_BH_RADIUS)
+    for _ in range(20):
+        angle = random.uniform(0.0, 2.0 * math.pi)
+        dist = random.uniform(0.0, radius)
+        tx = fb_bh_coord["x"] + dist * math.cos(angle)
+        ty = fb_bh_coord["y"] + dist * math.sin(angle)
+        tx = max(4.0, min(97.0, tx))
+        ty = max(1.0, min(49.0, ty))
+        if (not is_away_offense and tx >= 50.0) or (is_away_offense and tx <= 50.0):
+            return {"x": tx, "y": ty}
+    # Deterministic fallback: 5 grid units away from the FB BH on the same
+    # horizontal half, slight y offset.
+    fallback_x = fb_bh_coord["x"] - 5.0 if not is_away_offense else fb_bh_coord["x"] + 5.0
+    fallback_x = max(50.0, fallback_x) if not is_away_offense else min(50.0, fallback_x)
+    fallback_x = max(4.0, min(97.0, fallback_x))
+    fallback_y = max(1.0, min(49.0, fb_bh_coord["y"] + 3.0))
+    return {"x": fallback_x, "y": fallback_y}
+
+
+def _build_step_back_step(
+    *,
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> Optional[AnimationStep]:
+    """Build the step-back / HCO-setup step (step 2 in the DEFENSIVE_STOP
+    branch). See module docstring + Advance_Triggers.md for the spec.
+    """
+    fb_bh = fb_roles.get("ball_handler")
+    if fb_bh is None:
+        return None
+    fb_bh_id = _safe_id(fb_bh)
+    fb_bh_pos = (getattr(fb_bh, "position", None) or "").upper()
+    if fb_bh_pos not in _LINEUP_ORDER:
+        return None
+
+    is_away_offense = bool(fb_roles.get("is_away_offense"))
+
+    # Determine HCO BH (default = PG) and whether they're the same as FB BH.
+    hco_bh_pos = _hco_bh_position(off_lineup)
+    same_bh = fb_bh_pos == hco_bh_pos
+    hco_bh = off_lineup.get(hco_bh_pos) if not same_bh else fb_bh
+    hco_bh_id = _safe_id(hco_bh) if hco_bh is not None else None
+
+    # FB BH → random deep frontcourt spot.
+    deep_spot_name = random.choice(HCO_SETUP_OFFENSE_BH_DEEP_SPOTS)
+    deep_coord_home = HCO_STRING_SPOTS.get(deep_spot_name)
+    if deep_coord_home is None:
+        return None
+    fb_bh_target = _flip_x_for_offense(deep_coord_home, is_away_offense)
+
+    # Per-offense-position end coords.
+    off_pos_to_target: Dict[str, GridCoord] = {fb_bh_pos: fb_bh_target}
+
+    # HCO BH (when different): within HCO_SETUP_HCO_BH_RADIUS of FB BH, same
+    # horizontal half.
+    if not same_bh and hco_bh is not None:
+        off_pos_to_target[hco_bh_pos] = _pick_hco_bh_target_near_fb_bh(
+            fb_bh_target, is_away_offense
+        )
+
+    # alias_map excludes FB BH's position; also excludes HCO BH's when different.
+    excluded = [fb_bh_pos]
+    if not same_bh:
+        excluded.append(hco_bh_pos)
+    alias_map = _alias_map_excluding(excluded)
+
+    for pos_key, off_pos in alias_map.items():
+        spot_name = HCO_SETUP_OFFENSE_POS_SPOTS.get(pos_key)
+        if spot_name is None:
+            # In the 2-BHs case, alias map has only pos1..pos3; pos4 dropped.
+            # In the 1-BH case, all 4 should be present. If not, skip.
+            continue
+        spot_coord_home = HCO_STRING_SPOTS.get(spot_name)
+        if spot_coord_home is None:
+            continue
+        off_pos_to_target[off_pos] = _flip_x_for_offense(spot_coord_home, is_away_offense)
+
+    # Build per-player end coords. Defenders mirror with same-lineup-position
+    # matchup (def at pos X goes to where off at pos X goes).
+    end_coords: Dict[str, GridCoord] = {}
+    for pos in _LINEUP_ORDER:
+        target = off_pos_to_target.get(pos)
+        if target is None:
+            continue
+        off_player = off_lineup.get(pos)
+        if off_player is not None:
+            off_pid = _safe_id(off_player)
+            if off_pid:
+                end_coords[off_pid] = dict(target)
+        def_player = def_lineup.get(pos)
+        if def_player is not None:
+            def_pid = _safe_id(def_player)
+            if def_pid:
+                end_coords[def_pid] = dict(target)
+
+    # Players whose target wasn't computed (shouldn't happen in 5v5) hold their
+    # step-1 end position.
+    for pid, start in step_start_coords.items():
+        end_coords.setdefault(pid, dict(start))
+
+    # T = max traversal time at sprint rate, AG-driven where possible.
+    t = 0.0
+    gate_id: Optional[str] = None
+    gate_coord: Optional[GridCoord] = None
+    for pid, start in step_start_coords.items():
+        end = end_coords.get(pid, start)
+        dx = end["x"] - start["x"]
+        dy = end["y"] - start["y"]
+        dist = (dx * dx + dy * dy) ** 0.5
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "sprint") if player else 20.0
+        traversal = dist / rate if rate > 0 else 0.0
+        if traversal > t:
+            t = traversal
+            gate_id = pid
+            gate_coord = end
+
+    # Floor to 0.4 game-seconds so the visual beat is perceptible even if every
+    # player happens to barely move (degenerate cases / mocks).
+    t = max(t, 0.4)
+
+    if gate_id is None or gate_coord is None:
+        gate_id = fb_bh_id or "unknown"
+        gate_coord = fb_bh_target
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": str(gate_id),
+            "target_coords": dict(gate_coord),
+        },
+    }
+
+    # Per-player action + archetype: FB BH retains ball (handle_ball);
+    # everyone else cuts at sprint pace.
+    actions: Dict[str, PlayerAction] = {}
+    archetype: Dict[str, PlayerArchetype] = {}
+    destinations: Dict[str, Optional[GridCoord]] = {}
+    for pid, start in step_start_coords.items():
+        end = end_coords.get(pid, start)
+        destinations[pid] = end
+        if fb_bh_id and pid == fb_bh_id:
+            actions[pid] = "handle_ball"
+        else:
+            actions[pid] = "cut"
+        archetype[pid] = "sprint"
+
+    ball_state: BallState = (
+        {"owner_player_id": fb_bh_id} if fb_bh_id else {"owner_player_id": ""}
+    )
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_state,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_state,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": 999},
+    }
+    return {"start": start, "end": end}
+
+
+def _build_nice_stop_announcement(
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> Announcement:
+    """``"Nice Stop by <stopper>!"`` announcement payload for the end of the
+    defensive-stop motion step. Mirrors the legacy phrasing.
+    """
+    stopper_id = turn_result.get("stopper_id") or fb_roles.get("stopper_id")
+    stopper = _player_lookup_by_id({}, def_lineup, stopper_id) if stopper_id else None
+    text = "Nice Stop!"
+    player_data: Optional[Dict[str, Any]] = None
+    if stopper is not None:
+        player_data = {
+            "playerId": _safe_id(stopper),
+            "photo": getattr(stopper, "photo", None),
+            "teamName": None,  # populated client-side from team lookup
+        }
+    return {
+        "text": text,
+        "team": "defense",
+        "player_data": player_data,
+        "meta": None,
+        "hold_ms": 1000,
+    }
+
+
 # --- Top-level emitter -----------------------------------------------------
 
 
@@ -542,5 +808,35 @@ def build_covert_release_animation_steps(
         shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
     )
     steps.append(outcome_step)
+    elapsed += float(outcome_step["end"]["time_elapsed"])
+
+    # DEFENSIVE_STOP only: append step-back step. Other outcomes terminate
+    # via their `turn_stop` next pointer set by `_resolve_outcome_next`.
+    result_type = (turn_result.get("result_type") or "").upper()
+    if result_type == "DEFENSIVE_STOP":
+        # Override the outcome step's `next` pointer to point at step 2
+        # (was implicit-end via index 999; now linear continuation).
+        next_index = len(steps)  # the index step 2 will occupy after append
+        outcome_step["end"]["next"] = {"kind": "next_step", "index": next_index}
+
+        # Attach "Nice Stop!" announcement to step 1's end (plays after the
+        # confrontation move, before step 2 fires).
+        outcome_step["end"]["announcement"] = _build_nice_stop_announcement(
+            turn_result, fb_roles, def_lineup
+        )
+
+        # Build step 2: step-back / HCO setup.
+        step_back_start_coords = dict(outcome_step["end"]["coords"])
+        step_back = _build_step_back_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=step_back_start_coords,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        )
+        if step_back is not None:
+            steps.append(step_back)
 
     return steps

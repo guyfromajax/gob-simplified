@@ -113,6 +113,45 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
 
 
 /**
+ * Run an in-step announcement: pause clocks, show announcement, await hold,
+ * resume clocks. Used by both `step.start.announcement` and
+ * `step.end.announcement` hooks.
+ *
+ * @param {Phaser.Scene} scene
+ * @param {import("./animationStepSchema.js").Announcement} announcement
+ */
+async function runStepAnnouncement(scene, announcement) {
+  if (!scene || !announcement?.text) return;
+  const reason = "step_announcement";
+  scene.gameClock?.pause?.(reason);
+  scene.shotClock?.pause?.(reason);
+  try {
+    const { showAnnouncement } = await import("../utils/announcements.js");
+    showAnnouncement(
+      announcement.text,
+      announcement.team || "neutral",
+      announcement.player_data || null,
+      announcement.meta || null,
+    );
+  } catch (err) {
+    console.warn("runStepAnnouncement: showAnnouncement failed", err);
+  }
+  const holdMs = Number.isFinite(announcement.hold_ms) && announcement.hold_ms > 0
+    ? announcement.hold_ms
+    : 1000;
+  await new Promise((resolve) => {
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(holdMs, resolve);
+    } else {
+      setTimeout(resolve, holdMs);
+    }
+  });
+  scene.gameClock?.resume?.(reason);
+  scene.shotClock?.resume?.(reason);
+}
+
+
+/**
  * Play a single animation step. Spawns linear tweens for each player whose
  * coords change between start and end, waits the prescribed duration, snaps
  * sprites to the exact end coords, and returns the next-step pointer.
@@ -120,6 +159,11 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
  * Contract: caller ensures sprites are at `step.start.coords` when this is
  * invoked. Engine does not snap-to-start; sprite drift between steps is the
  * caller's bug to fix.
+ *
+ * Announcement hooks: optional `step.start.announcement` plays BEFORE the
+ * step's tweens fire. Optional `step.end.announcement` plays AFTER tweens
+ * complete and sprites snap, BEFORE returning the `next` pointer. Both pause
+ * `gameClock` + `shotClock` for the announcement's `hold_ms`.
  *
  * @param {Phaser.Scene} scene
  * @param {import("./animationStepSchema.js").AnimationStep} step
@@ -140,6 +184,11 @@ export async function playAnimationStep(scene, step, sprites, ballSprite) {
 
   const width = scene.game?.config?.width;
   const height = scene.game?.config?.height;
+
+  // step.start.announcement: play before tweens fire.
+  if (step.start?.announcement) {
+    await runStepAnnouncement(scene, step.start.announcement);
+  }
 
   // Spawn one linear tween per player whose start coord differs from end coord.
   // Tweens run in parallel — backend has guaranteed they all arrive at their
@@ -193,6 +242,11 @@ export async function playAnimationStep(scene, step, sprites, ballSprite) {
 
   // Snap ball to its end coord and reconcile ownership state.
   snapBallToEndState(scene, step, sprites, ballSprite, width, height);
+
+  // step.end.announcement: play after tweens + snap, before returning next.
+  if (step.end?.announcement) {
+    await runStepAnnouncement(scene, step.end.announcement);
+  }
 
   return step.end.next;
 }

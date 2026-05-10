@@ -116,10 +116,34 @@ class AdvanceTrigger(TypedDict):
     type system. Tighten later if useful."""
 
 
+class Announcement(TypedDict, total=False):
+    """In-step announcement with mandatory pause-the-world behavior. Optional
+    field on StepStart (plays before step tweens fire) or StepEnd (plays
+    after step tweens complete and sprites snap). Playback engine pauses
+    `gameClock` and `shotClock`, calls the announcement system, awaits the
+    hold duration, then resumes clocks.
+    """
+
+    text: str
+    """Announcement copy (e.g. ``"Nice Stop!"``, ``"Trap!"``)."""
+
+    team: str
+    """``"home"`` / ``"away"`` / ``"defense"`` / ``"neutral"``."""
+
+    player_data: Optional[Dict[str, object]]
+    """Optional headshot card payload: ``{player_id, photo, team_name, ...}``."""
+
+    meta: Optional[Dict[str, object]]
+    """Optional extras: ``{decision_pill_text?, decision_pill_tone?, sfx?}``."""
+
+    hold_ms: float
+    """Wall-clock duration to keep the world paused (default 1000)."""
+
+
 # --- Step start / end -------------------------------------------------------
 
 
-class StepStart(TypedDict):
+class StepStart(TypedDict, total=False):
     coords: Dict[PlayerId, GridCoord]
     destination: Dict[PlayerId, Optional[GridCoord]]
     action: Dict[PlayerId, PlayerAction]
@@ -127,6 +151,11 @@ class StepStart(TypedDict):
     ball: BallState
     clock: ClockState
     advance_trigger: AdvanceTrigger
+    announcement: Announcement
+    """Optional. When present, playback engine pauses clocks, shows the
+    announcement, awaits ``hold_ms``, then resumes clocks BEFORE spawning
+    the step's tweens. Used for entry-of-turn announcements like
+    ``"Trap!"`` / ``"Fast Break!"``."""
 
 
 class NextLinear(TypedDict):
@@ -149,7 +178,7 @@ class NextTurnStop(TypedDict):
 NextStep = Union[NextLinear, NextBranch, NextTurnStop]
 
 
-class StepEnd(TypedDict):
+class StepEnd(TypedDict, total=False):
     coords: Dict[PlayerId, GridCoord]
     """Interrupted positions at T. For each player:
     `start.coords + min(rate × T, full_distance)` along start→destination,
@@ -160,6 +189,11 @@ class StepEnd(TypedDict):
     """= advance_trigger.T_game_seconds. Canonical step duration."""
     clock: ClockState
     next: NextStep
+    announcement: Announcement
+    """Optional. When present, playback engine snaps sprites to end coords,
+    pauses clocks, shows the announcement, awaits ``hold_ms``, then resumes
+    clocks BEFORE returning ``next``. Used for mid-turn announcements like
+    ``"Nice Stop!"`` that play after a movement beat completes."""
 
 
 class AnimationStep(TypedDict):

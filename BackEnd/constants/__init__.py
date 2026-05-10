@@ -271,6 +271,38 @@ HCO_STRING_SPOTS = {
     "hct_inbound_sg": {"x": 15, "y": 35},
 }
 
+# ---- HCO Setup Positions ---------------------------------------------------
+# Used by Fast Break Defensive Stop step-back step (and any future pre-HCO
+# transition setup). See:
+#   _documentation_master/05_Animation_System/Advance_Triggers.md
+#   (Covert Release → Defensive Stop branch).
+#
+# Convention: BH(s) excluded from pos slots via the standard alias mapping
+# (`_alias_map` in dynamic_hct.py / `_build_set_play_alias_map` in
+# playbook_weights_utils.py).
+#
+#   - Single-BH case (FB BH == HCO BH): the BH goes to a randomly chosen
+#     deep frontcourt spot (HCO_SETUP_OFFENSE_BH_DEEP_SPOTS); the other 4
+#     supporting players fill pos1..pos4.
+#   - Two-BHs case (FB BH != HCO BH): the FB BH goes to a deep frontcourt
+#     spot; the HCO BH goes within HCO_SETUP_HCO_BH_RADIUS grid units of
+#     the FB BH AND on the same horizontal half (home offense → x ≥ 50;
+#     away offense → x ≤ 50, to avoid an over-and-back violation). The
+#     remaining 3 supporting players fill pos1..pos3 (pos4 is dropped).
+#
+# Defenders mirror the offensive setup with same-lineup-position matchup
+# (def_PG → off_PG's spot, etc.). The 5 spots form a 2-3 zone footprint
+# by construction.
+HCO_SETUP_OFFENSE_BH_DEEP_SPOTS = ("deep key", "deep upper wing", "deep lower wing")
+HCO_SETUP_OFFENSE_POS_SPOTS = {
+    "pos1": "upper wing",
+    "pos2": "lower wing",
+    "pos3": "upper lowPost",
+    "pos4": "lower lowPost",  # dropped when FB BH != HCO BH
+}
+HCO_SETUP_HCO_BH_RADIUS = 10  # max grid units from FB BH for HCO BH placement
+
+
 # FCP/HCT setup positions (step 0 extracted from skeletons)
 # These positions are used during BASELINE_INBOUND setup before skeleton animation
 # All FCP variants use the same starting positions
