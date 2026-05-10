@@ -1198,15 +1198,15 @@ def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
         x_variance_max = 8
         y_variance = 8
     
-    # X variance: only outward from basket (not inward)
-    # Home team attacking away basket (x=91): bounce goes right (x > 91)
-    # Away team attacking home basket (x=9): bounce goes left (x < 9)
-    if basket_x == 91:  # Home team attacking away basket
-        x_offset = random.randint(2, x_variance_max)  # Positive offset (right)
-        bounce_x = basket_x + x_offset
-    else:  # Away team attacking home basket (x=9)
-        x_offset = random.randint(2, x_variance_max)  # Negative offset (left)
+    # X variance: inward from basket toward midcourt (where rebounders gather).
+    # Home team shooting at home rim (x=91): bounce goes left, into the paint (x < 91)
+    # Away team shooting at away rim (x=9): bounce goes right, into the paint (x > 9)
+    if basket_x == 91:
+        x_offset = random.randint(2, x_variance_max)
         bounce_x = basket_x - x_offset
+    else:
+        x_offset = random.randint(2, x_variance_max)
+        bounce_x = basket_x + x_offset
     
     # Y variance: ±variance from basket
     bounce_y = basket_y + random.randint(-y_variance, y_variance)
