@@ -2683,18 +2683,27 @@ def _normalize_animation_coords_to_runtime_home(
     offense_team_id: Any = None,
 ) -> Optional[Dict[str, float]]:
     """
-    Convert animation/display-oriented coords into canonical HOME-oriented runtime coords.
+    Pass through animation coords to runtime ``player.coords`` without flipping.
+
+    Previously this function flipped display-oriented animation coords to a
+    "canonical HOME orientation" for runtime storage — meaning ``player.coords``
+    always read as if home were on offense regardless of which team actually
+    was. That dual-orientation convention caused cross-court tween bugs at
+    possession-flip boundaries and confused multiple code paths
+    (`_eligible_fb_lineup`, `_use_dynamic_rr_outlet_placement`) that already
+    expected display orientation.
+
+    Now ``player.coords`` stores coords in the same orientation animations
+    are emitted (display orientation = real visual position). The function
+    is preserved as a pass-through to avoid churn at every callsite; future
+    cleanup can inline its single remaining responsibility (None-safety).
     """
     if not isinstance(coords, dict):
         return None
     x, y = coords.get("x"), coords.get("y")
     if x is None or y is None:
         return None
-
-    normalized = {"x": float(x), "y": float(y)}
-    if _is_away_offense_for_runtime_sync(game, offense_team_id=offense_team_id):
-        normalized = get_away_player_coords(normalized)
-    return normalized
+    return {"x": float(x), "y": float(y)}
 
 
 def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]) -> None:
