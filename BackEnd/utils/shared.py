@@ -2461,47 +2461,21 @@ def temp_lineup_court_absolute_for_away_rebound_math(
     game: Any,
     is_away_offense: bool,
 ):
-    """Align lineup coords with court-absolute bounce geometry for rebound selection (away offense only).
+    """No-op context manager (legacy shim).
 
-    ``apply_coords_from_animations_list`` / turn sync writes away-offense animation finals into
-    runtime-home orientation (x flipped via ``get_away_player_coords``). ``calculate_bounce_spot``
-    uses the fixed rim grid in court-absolute space. For ``determine_rebounder`` and similar,
-    temporarily undo that flip for all active lineup players, then restore prior ``coords``.
+    Previously flipped away-offense lineup coords from runtime-home orientation
+    to court-absolute (display) orientation for rebound selection, then restored
+    them. Now that ``player.coords`` is stored directly in display orientation
+    (the HOME-orientation convention was sunset by neutralizing
+    ``_normalize_animation_coords_to_runtime_home``), the flip would push every
+    player to the wrong side of the court — making ``determine_rebounder``'s
+    geographic gate exclude all players and pick whoever's closest to midcourt
+    in the flipped frame (typically backcourt non-rebounders).
 
-    No-op when ``not is_away_offense`` or ``game`` is None.
+    Kept as a no-op so the ``with`` wrapper at the callsite stays valid until
+    a follow-up cleanup deletes both this and the wrapper.
     """
-    if not is_away_offense or game is None:
-        yield
-        return
-
-    snapshot: Dict[str, Dict[str, Any]] = {}
-    for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
-        if team is None:
-            continue
-        for pl in (team.lineup or {}).values():
-            if not pl or getattr(pl, "player_id", None) is None:
-                continue
-            pid = str(pl.player_id)
-            c = getattr(pl, "coords", None) or {}
-            snapshot[pid] = dict(c) if isinstance(c, dict) else {}
-            try:
-                pl.coords = get_away_player_coords(
-                    {"x": float(c.get("x", 50)), "y": float(c.get("y", 25))}
-                )
-            except (TypeError, ValueError):
-                pl.coords = {"x": 50.0, "y": 25.0}
-    try:
-        yield
-    finally:
-        for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
-            if team is None:
-                continue
-            for pl in (team.lineup or {}).values():
-                if not pl or getattr(pl, "player_id", None) is None:
-                    continue
-                pid = str(pl.player_id)
-                if pid in snapshot:
-                    pl.coords = snapshot[pid]
+    yield
 
 
 ANIMATION_CLAMP_BOUNDS: Dict[str, float] = {
