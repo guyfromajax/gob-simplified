@@ -611,6 +611,15 @@ class GameManager:
         # may revisit this; for now, no OTB.
         otb_foul = None
 
+        # Get-back (offensive) and release (defensive) players already took
+        # their post-shot positions on the shot step. Exempt them from the
+        # DREB sprint-to-bounce filter so they hold their positions through
+        # the rebound capture (per cross-turn coord contract in
+        # `_documentation_master/projects/Animation_System_Updated.md`).
+        getback_ids = set((miss_turn.get("offense_getback_coords") or {}).keys())
+        release_ids = set((miss_turn.get("defense_release_coords") or {}).keys())
+        exempt_player_ids = getback_ids | release_ids
+
         animation_steps = build_dreb_animation_steps(
             rebounder_id=str(rebounder_id),
             bounce_coords={"x": float(bx), "y": float(by)},
@@ -621,6 +630,7 @@ class GameManager:
             clock_remaining=clock_remaining,
             shot_clock_remaining=shot_clock_remaining,
             otb_foul=otb_foul,
+            exempt_player_ids=exempt_player_ids,
         )
 
         if not animation_steps:

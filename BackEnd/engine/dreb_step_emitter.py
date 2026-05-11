@@ -137,6 +137,7 @@ def build_dreb_animation_steps(
     clock_remaining: float,
     shot_clock_remaining: float,
     otb_foul: Optional[Dict[str, Any]] = None,
+    exempt_player_ids: Optional[set] = None,
 ) -> Optional[List[AnimationStep]]:
     """Build the DREB turn's single AnimationStep.
 
@@ -154,6 +155,11 @@ def build_dreb_animation_steps(
         clock_remaining, shot_clock_remaining: game-seconds at DREB start.
         otb_foul: if an over-the-back foul fired, dict with `fouler_id`,
             `victim_id`, `foul_team`. None for clean capture.
+        exempt_player_ids: player IDs to keep stationary regardless of the
+            frontcourt eligibility filter. Get-back (offensive) and release
+            (defensive) players have already taken their post-shot positions
+            on the shot step and should NOT participate in the rebound
+            sprint; they hold their post-shot spots through the DREB step.
 
     Returns:
         [AnimationStep] (single-element list for interface uniformity with
@@ -161,6 +167,8 @@ def build_dreb_animation_steps(
     """
     if not rebounder_id or not bounce_coords or not start_coords:
         return None
+
+    exempt_ids: set = {str(pid) for pid in (exempt_player_ids or set()) if pid is not None}
 
     rebounder = _find_player_by_id(rebounder_id, off_lineup, def_lineup)
     if rebounder is None:
@@ -197,6 +205,14 @@ def build_dreb_animation_steps(
             destinations[pid] = {"x": float(bounce_coords["x"]), "y": float(bounce_coords["y"])}
             actions[pid] = "cut"
             archetypes[pid] = "sprint"
+        elif pid in exempt_ids:
+            # Get-back / release players already took their post-shot
+            # positions on the prior shot step. They do NOT participate
+            # in the rebound sprint regardless of geographic eligibility.
+            coords_end[pid] = coords_start[pid]
+            destinations[pid] = None
+            actions[pid] = "stationary"
+            archetypes[pid] = "stationary"
         elif _is_in_frontcourt(coords_start[pid], is_away_offense):
             # Eligible non-rebounder: cut + sprint to a random near-bounce
             # spot. End coord interpolated at time T.
