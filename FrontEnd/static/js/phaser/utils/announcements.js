@@ -183,6 +183,63 @@ function createHeadshotElement(playerData, scale = 1.0) {
 }
 
 /**
+ * Resolve the team primary color used for the secondary ribbon's left stripe / gradient.
+ * Mirrors the existing convention (gameStore.getColors().{home|away}.primary_color)
+ * already used across the app (bootGame.js, createPhaserPlayer.js, etc.).
+ * @param {string} team 'home' | 'away' | anything else (defaults to orange accent)
+ * @returns {string} hex color
+ */
+function resolveSecondaryStripeColor(team) {
+  const colors = gameStore.getColors() || {};
+  if (team === 'home') return colors.home?.primary_color || '#F79420';
+  if (team === 'away') return colors.away?.primary_color || '#F79420';
+  return '#F79420';
+}
+
+/**
+ * Show a SECONDARY announcement — top-edge ribbon under the scoreboard.
+ *
+ * Used for non-critical context announcements that should not block sprite action
+ * in the center of the court: Press, Trap, Fast Break (start), Slow It Down,
+ * Quick Shot, Final Shot, FB Outlet Pass Denied, Fast Break / No Fast Break
+ * (RR decision), and the FB defensive stop ("Great Stop!").
+ *
+ * Callers should pass 'home' or 'away' (NOT 'defense' / 'neutral') so the
+ * left-edge stripe and gradient can resolve to the initiating team's primary
+ * color. Dispatchers that currently track which side is defending should pass
+ * that resolved side (e.g. defenseTeam) rather than the abstract 'defense'.
+ *
+ * @param {string} text Headline text (e.g., "Fast Break!"). Rendered upper-case.
+ * @param {string} team 'home' | 'away'. Drives the left stripe + gradient color.
+ * @param {Object|null} playerData Optional { playerId, photo, teamName } — when
+ *   present, the ribbon shows the player's headshot + #jersey lastName chip.
+ * @param {Object|null} meta Optional { decisionPillText, decisionPillTone:'good'|'bad' }.
+ *   Renders in the lower-right corner of the ribbon using the existing pill design.
+ */
+export function showSecondaryAnnouncement(text, team = 'home', playerData = null, meta = null) {
+  const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
+  const player = rosterPlayer || playerData;
+  const photoUrl = playerData && (playerData.photo || playerData.playerId)
+    ? getPlayerImageUrl(playerData.photo, playerData.playerId)
+    : '';
+  const jerseyVal = getPlayerJerseyValue(player);
+  const data = {
+    tier: 'secondary',
+    type: 'standard',
+    eventText: text || '',
+    photoUrl,
+    jersey: jerseyVal ? `#${jerseyVal}` : '',
+    lastName: getPlayerLastName(player) || '',
+    teamColor: resolveSecondaryStripeColor(team),
+    decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
+    decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
+  };
+  if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
+    window.showAnnouncementOverlay(data);
+  }
+}
+
+/**
  * Show an announcement — uses new announcement strip (standard variant).
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
  * @param {string} team - 'home', 'away', 'defense', or 'neutral' (unused by strip; kept for API)
@@ -239,31 +296,20 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
   const defenseTeam = isHomeTeamEvent ? 'away' : 'home';
   
   if (timing === 'start') {
-    // Announcements at turn start
+    // NOTE: This branch is currently unreachable — turnPreparation.js dispatches
+    // start announcements via gameAnnouncements.announceGameEvent() and
+    // animateGameTurns.js only calls announceFromTurnData with timing: 'end'.
+    // Kept routed to the secondary tier so the contract is consistent if revived.
     if (turnData.fast_break && isFastBreakEntryAnnouncementsEnabled()) {
-      showAnnouncement("Fast Break!", offenseTeam);
-      // Don't return - may have more announcements at end
+      showSecondaryAnnouncement("Fast Break!", offenseTeam);
     }
-    
-    // Check multiple ways FCP/HCT can be indicated
-    // Note: Don't return after these - shots from Press/Trap should also announce results
-    // ✅ FIX: Only announce when pressure is actually active, not when it's just being set up
-    // next_defensive_setup indicates what will happen NEXT, not what's happening NOW
-    // Only check next_defensive_setup for BASELINE_INBOUND turns (inbound passes that set up pressure)
-    // For all other turns (HCO, MAKE, MISS, etc.), only check actual pressure flags (fcp_shot, hct_shot, fcp_foul, hct_foul)
+
     const isInboundSettingUpPressure = turnData.result_type === 'BASELINE_INBOUND';
-    
-    // ✅ SS&S: Only announce pressure context ONCE when it's first applied (BASELINE_INBOUND)
-    // Don't re-announce for every subsequent turn in the pressure sequence
-    // Removed text.includes('PRESS!') and text.includes('TRAP!') checks to prevent duplicates
     if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'FCP') {
-      showAnnouncement("Press!", 'defense');
-      // Don't return - may have shot result to announce later
+      showSecondaryAnnouncement("Press!", defenseTeam);
     }
-    
     if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'HCT') {
-      showAnnouncement("Trap!", 'defense');
-      // Don't return - may have shot result to announce later
+      showSecondaryAnnouncement("Trap!", defenseTeam);
     }
   } else if (timing === 'end') {
     // Announcements at turn end (after animation)

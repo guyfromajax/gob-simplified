@@ -10,7 +10,12 @@
  *   announceGameEvent('PRESSURE_FCP', turnData, scene);
  */
 
-import { showAnnouncement, showAndOneAnnouncement, playAnnouncementSfx } from './announcements.js';
+import {
+  showAnnouncement,
+  showAndOneAnnouncement,
+  showSecondaryAnnouncement,
+  playAnnouncementSfx,
+} from './announcements.js';
 import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
@@ -106,19 +111,19 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       handleTurnoverAnnouncement(turnData, scene, context, offenseTeam);
       break;
 
-    // ========== PRESSURE SYSTEMS ==========
+    // ========== PRESSURE SYSTEMS (secondary tier) ==========
     case 'PRESSURE_FCP':
-      showAnnouncement("Press!", 'defense');
+      showSecondaryAnnouncement("Press!", defenseTeam);
       break;
 
     case 'PRESSURE_HCT':
-      showAnnouncement("Trap!", 'defense');
+      showSecondaryAnnouncement("Trap!", defenseTeam);
       break;
 
-    // ========== FAST BREAK ==========
+    // ========== FAST BREAK (secondary tier) ==========
     case 'FAST_BREAK':
       if (isFastBreakEntryAnnouncementsEnabled()) {
-        showAnnouncement("Fast Break!", offenseTeam);
+        showSecondaryAnnouncement("Fast Break!", offenseTeam);
       }
       break;
 
@@ -126,24 +131,24 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
       break;
 
-    // ========== SITUATIONAL LOGIC (Q4/OT) ==========
+    // ========== SITUATIONAL LOGIC (Q4/OT) — secondary tier ==========
     case 'SLOW_IT_DOWN':
-      showAnnouncement("Slow It Down", offenseTeam);
+      showSecondaryAnnouncement("Slow It Down", offenseTeam);
       break;
 
     case 'QUICK_SHOT':
-      showAnnouncement("Quick Shot", offenseTeam);
+      showSecondaryAnnouncement("Quick Shot", offenseTeam);
       break;
 
-    // ========== FINAL TURN (end of quarter/game) ==========
+    // ========== FINAL TURN (end of quarter/game) — secondary tier ==========
     case 'FINAL_SHOT':
-      showAnnouncement("Final Shot", offenseTeam);
+      showSecondaryAnnouncement("Final Shot", offenseTeam);
       break;
 
     case 'DEFENSIVE_STOP':
       // Outlet denial / team stop: optional no headshot (e.g. Rim Runner outlet denied)
       if (context.noPlayerImage) {
-        showAnnouncement('Great Stop!', defenseTeam, null);
+        showSecondaryAnnouncement('Great Stop!', defenseTeam, null);
         break;
       }
       // Get stopper data if available
@@ -160,7 +165,7 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
           };
         }
       }
-      showAnnouncement("Great Stop!", defenseTeam, stopperData);
+      showSecondaryAnnouncement("Great Stop!", defenseTeam, stopperData);
       break;
 
     // ========== SPECIAL EVENTS ==========

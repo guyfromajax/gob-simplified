@@ -6,15 +6,61 @@
    - `timing='start'` - Context announcements (situation being entered)
    - `timing='end'` - Result announcements (outcome of turn)
 
-2. **Display Layer (Center-Court Overlay)**:
+2. **Display Layer — two tiers**
+
+   The system has **two independent display tiers** that may be on screen at the same time. Callers select the tier via the payload field `tier: 'primary' | 'secondary'`. Default is `primary`.
+
+   **Primary — Center-Court Overlay** (`#announcement-overlay`):
    - **Location:** `#announcement-overlay` inside `#phaser-container` (position: absolute, centered). HTML, CSS, and controller live in `FrontEnd/static/court.html`.
-   - **API:** All announcement display is routed through `window.showAnnouncementOverlay(data)`. The modules in `announcements.js` build the payload and call this; no other display API is used.
    - **Variants:**
-     - **Standard** — Single player portrait (left), caption bar (#jersey lastName + position), and event text (right). Used for all single-player events (made shot, rebound, block, steal, fouls, turnovers, etc.).
+     - **Standard** — Single player portrait (left), caption bar (#jersey lastName + position), and event text (right). Used for all single-player result events (made shot, rebound, block, steal, fouls, turnovers, etc.).
      - **Foul (AND-1)** — Shooter portrait (left), center panel ("It's Good!" + "+ Free Throw" + "And one"), fouler portrait (right). Used only for made shot with shooting foul.
-   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **Trap!**, **Press!**, **Fast Break!**, **Slow It Down**, **Quick Shot**, **Final Shot**, **DOUBLE TEAM!**
+   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **DOUBLE TEAM!**, **Batted Ball Out Of Bounds!**, and other rare neutral cases. (Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot now route to the secondary tier — see below.)
    - **Data shapes:** Standard `{ type: 'standard', eventText, photoUrl, jersey, lastName, position }`. Foul `{ type: 'foul', foulEventText, shooterPhotoUrl, shooterJersey, shooterLastName, foulerPhotoUrl, foulerJersey, foulerLastName }`.
-   - **Duration:** Overlay is shown for 2200 ms then hidden.
+
+   **Secondary — Top-Edge Ribbon** (`#announcement-overlay-secondary`):
+   - **Purpose:** Non-critical context announcements that should not block sprite action in the center of the court.
+   - **Location:** `#announcement-overlay-secondary`, sibling of `#announcement-overlay` inside `#phaser-container`. Mounted at the top edge of the court canvas (`top: 4px; left: 16px; right: 16px; height: 64px`).
+   - **z-index:** `940` (primary is `950`); always sits above court sprites and below the foul card / modals.
+   - **Variants:**
+     - **With player** — 48×48 headshot + chip (#jersey above last name), italic headline centered, optional Good/Bad Read pill in the lower-right corner.
+     - **No player** — Headline only, centered horizontally and vertically.
+   - **Team color:** The left-edge stripe (6px) and the surface gradient resolve from the **initiating team's `primary_color`** via `gameStore.getColors()`. Defense-initiated events (Press, Trap, Great Stop!, FB Outlet Pass Denied) use the defense side; offense-initiated events use the offense side.
+   - **Data shape:** `{ tier: 'secondary', type: 'standard', eventText, photoUrl, jersey, lastName, teamColor, decisionPillText, decisionPillTone }`.
+   - **Motion:** Entry slides DOWN from `translateY(-110%)` to `0` with fade-in (`260ms cubic-bezier(.22,1,.36,1)` transform, `220ms ease` opacity). Exit reverses. Headline plays a `secPulse` (scale 0.96 → 1.02 → 1.00) at 60 ms delay. Reduced-motion: fade only, no transforms.
+   - **SFX:** **No SFX** for any secondary announcement in v1. Whistles remain primary-only.
+
+   **Routing API:** All display is routed through `window.showAnnouncementOverlay(data)`. The function dispatches on `data.tier` — `secondary` → `window.showSecondaryAnnouncementOverlay(data)`, otherwise the primary path. The JS helpers in `announcements.js` (`showAnnouncement`, `showAndOneAnnouncement`, **`showSecondaryAnnouncement`**) build the payload and call the dispatcher.
+
+   **Duration:** Each tier overlay is shown for **2200 ms** then hidden. Each tier owns an independent timer — there is **no cross-tier queueing**; primary and secondary can coexist on screen. Within a single tier, a new announcement preempts the prior one (the existing single-overlay-per-tier behavior).
+
+   **Typography:** Both primary and secondary announcement **headlines** use **Bebas Neue** (Google Fonts, already loaded). Smaller text (jersey caption, position, foul subtext, decision pill) continues to use Barlow Condensed.
+
+3. **Idempotent Flags**:
+   - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
+
+4. **Announcement hold time**:
+   - **1000 ms** — Uniform delay for result announcements before the next animation. In **ShotAnimationSystem** (HCO/regular makes), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with ball at rim and announcement both visible. Other paths (ballManager made shot, FT make, FB make, "Great Stop!") use a 1000 ms hold after the announcement. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
+
+5. **Tier routing (canonical list)**
+
+   The following announcements route to the **secondary** tier (top-edge ribbon):
+
+   | Announcement | Initiating team | Player headshot? | Where it fires |
+   |---|---|---|---|
+   | **Press!** | defense | no | `gameAnnouncements.js` → `PRESSURE_FCP` |
+   | **Trap!** | defense | no | `gameAnnouncements.js` → `PRESSURE_HCT` |
+   | **Fast Break!** (start) | offense | no (dispatcher) / yes (RR lane-pass with passer) | `gameAnnouncements.js` → `FAST_BREAK`; `fastBreak.js` `animateRimRunnerLanePass` |
+   | **No Fast Break** (RR decision) | offense | yes (ball handler) | `fastBreak.js` `animateRimRunnerHoldUpLeadIn` |
+   | **FB Outlet Pass Denied!** | defense | yes (stopper) when available | `fastBreak.js` `animateRimRunnerOutletDeniedBeat` |
+   | **Great Stop!** (FB defensive stop) | defense | yes (stopper) | `fastBreak.js` defensive-stop block; `gameAnnouncements.js` → `DEFENSIVE_STOP` |
+   | **Slow It Down** | offense | no | `gameAnnouncements.js` → `SLOW_IT_DOWN` |
+   | **Quick Shot** | offense | no | `gameAnnouncements.js` → `QUICK_SHOT` |
+   | **Final Shot** | offense | no | `gameAnnouncements.js` → `FINAL_SHOT` |
+
+   Everything else stays on the **primary** center-court overlay. **AND-1 and the foul card stay primary.**
+
+   The Good Read / Bad Read decision pill (gold/red) ships on the secondary tier for the Fast Break! / No Fast Break RR decision. It uses the same visual vocabulary as the existing primary `.ann-decision-pill` and is anchored to the lower-right corner of the secondary ribbon.
 
 3. **Idempotent Flags**:
    - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
@@ -178,16 +224,18 @@ When a steal leads to a fast break:
 
 **Frontend:**
 - `FrontEnd/static/court.html`
-  - `#announcement-overlay` — HTML for standard and foul overlay cards (last child inside `#phaser-container`)
-  - CSS for `.ann-card`, `.ann-portrait-zone`, `.ann-event-zone`, `.ann-foul-event-zone`, `.no-player` state, etc.
-  - `window.showAnnouncementOverlay(data)` — Inline IIFE; receives payload and shows/hides overlay for 2200 ms
+  - `#announcement-overlay` — HTML for standard and foul **primary** overlay cards (inside `#phaser-container`)
+  - `#announcement-overlay-secondary` — HTML for the **secondary** top-edge ribbon (sibling of `#announcement-overlay`)
+  - CSS for `.ann-card`, `.ann-portrait-zone`, `.ann-event-zone`, `.ann-foul-event-zone`, `.no-player` state, plus the secondary `.sec-*` classes (`.sec-stripe`, `.sec-surface`, `.sec-player`, `.sec-headshot`, `.sec-chip`, `.sec-headline`, `.sec-decision-pill`)
+  - `window.showAnnouncementOverlay(data)` — Inline IIFE; dispatches on `data.tier` to `window.showSecondaryAnnouncementOverlay(data)` (secondary) or the primary path (default). Each tier owns an independent timer; 2200 ms display.
 - `FrontEnd/static/js/phaser/animation/turnPreparation.js`
   - `prepareTurnForAnimation()` - Start announcements (lines 89-112)
   - `finalizeTurnAfterAnimation()` - End announcements (if needed)
 - `FrontEnd/static/js/phaser/utils/announcements.js`
   - `announceFromTurnData()` - Main announcement dispatcher (lines 290-493)
-  - `showAnnouncement(text, team, playerData)` - Builds standard payload, calls `window.showAnnouncementOverlay(data)`
-  - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` - Builds foul payload, calls `window.showAnnouncementOverlay(data)`
+  - `showAnnouncement(text, team, playerData, meta)` - Builds standard **primary** payload, calls `window.showAnnouncementOverlay(data)`
+  - `showSecondaryAnnouncement(text, team, playerData, meta)` - Builds **secondary** payload with `tier: 'secondary'`, resolves the team primary color via `gameStore.getColors()`, calls `window.showAnnouncementOverlay(data)`
+  - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` - Builds foul (primary) payload, calls `window.showAnnouncementOverlay(data)`
   - `getPlayerImageUrl(photo, playerId)` - Uses explicit portrait paths when available; otherwise falls back to `generic_headshot.png`
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent()` - Event-based announcement router (lines 24-125)

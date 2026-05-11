@@ -613,7 +613,7 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
   const rrSprite = playerSprites[rrId];
   if (!passerSprite || !rrSprite) return;
 
-  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const { showSecondaryAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
   const offenseSide = passerSprite.team === "home" ? "home" : "away";
   const passerTeamId = passerSprite.team_id;
   const homeTeamField = scene.simData?.home_team;
@@ -630,7 +630,7 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
         secondaryColor: getSecondaryColorForTeam(scene, passerTeamId),
       }
     : null;
-  showAnnouncement("Fast Break!", offenseSide, passerPlayerData, getRimRunnerDecisionPillMeta(turnData));
+  showSecondaryAnnouncement("Fast Break!", offenseSide, passerPlayerData, getRimRunnerDecisionPillMeta(turnData));
 
   const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
   const towardBasket = away ? -1 : 1;
@@ -1298,7 +1298,7 @@ async function animateRimRunnerOutletDeniedBeat(
   }
 
   const defenseTeam = passerSprite.team === "home" ? "away" : "home";
-  const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const { showSecondaryAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
   // Freeze ongoing burst tweens (RR, other_players, etc.) during callout + hold — same universal px/s, no motion on screen.
   pauseTweensOfPlayerSprites(scene, playerSprites);
   if (defSprite) {
@@ -1317,9 +1317,9 @@ async function animateRimRunnerOutletDeniedBeat(
           secondaryColor: getSecondaryColorForTeam(scene, defSprite.team_id),
         }
       : null;
-    showAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData);
+    showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData);
   } else {
-    showAnnouncement("FB Outlet Pass Denied!", defenseTeam, null);
+    showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, null);
   }
 
   const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
@@ -1458,7 +1458,7 @@ async function animateRimRunnerHoldUpLeadIn(
   }
 
   if (turnData.rim_runner_no_lane_pass && !isTriangleSequence(turnData)) {
-    const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+    const { showSecondaryAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
     const offenseSide = bh.team === "home" ? "home" : "away";
     const bhTeamId = bh.team_id;
     const homeTeamField = scene.simData?.home_team;
@@ -1476,7 +1476,7 @@ async function animateRimRunnerHoldUpLeadIn(
         }
       : null;
     const decisionMeta = getRimRunnerDecisionPillMeta(turnData);
-    showAnnouncement("No Fast Break", offenseSide, bhPlayerData, decisionMeta);
+    showSecondaryAnnouncement("No Fast Break", offenseSide, bhPlayerData, decisionMeta);
   }
 
   attachBallToPlayer(scene, ballSprite, bh);
@@ -3908,7 +3908,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     const stopperSprite = playerSprites[stopperId];
     
     if (stopperSprite) {
-      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+      const { showSecondaryAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const stopperInfo = scene.playerInfo?.[stopperId];
       const stopperTeamId = stopperSprite?.team_id;
       
@@ -3926,7 +3926,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         secondaryColor: getSecondaryColorForTeam(scene, stopperSprite?.team_id)
       } : null;
 
-      showAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData);
+      showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData);
       
       const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
       await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));

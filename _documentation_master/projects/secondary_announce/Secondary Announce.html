@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Secondary Announce — GOB</title>
+<style>
+  @font-face {
+    font-family: 'Bebas Neue Pro';
+    src: url('fonts/BebasNeuePro-Regular.otf') format('opentype');
+    font-weight: 400; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Bebas Neue Pro';
+    src: url('fonts/BebasNeuePro-Bold.otf') format('opentype');
+    font-weight: 700; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Barlow Condensed';
+    src: local('Barlow Condensed');
+    font-weight: 400 700; font-display: swap;
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #000;
+    --panel: rgba(11, 13, 20, 0.96);
+    --panel-2: #0e1018;
+    --border: rgba(255,255,255,0.10);
+    --border-soft: rgba(255,255,255,0.06);
+    --text: #ffffff;
+    --text-mute: rgba(255,255,255,0.55);
+    --orange: #F79420;
+    --green: #34EC27;
+    --yellow: #FFD700;
+    --teal: #2BA39A;
+    --purple: #6A37A6;
+    /* current play team color (defender on FB Outlet Pass Denied = Ocean City teal) */
+    --team: var(--teal);
+    --team-deep: #145a55;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ============ App shell (faux) ============ */
+  .stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    min-height: 720px;
+    display: grid;
+    grid-template-rows: 88px 1fr;
+  }
+
+  /* ----- Scoreboard strip ----- */
+  .scoreboard {
+    position: relative;
+    display: grid;
+    grid-template-columns: 360px 1fr 360px;
+    align-items: stretch;
+    background: #000;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .team-card {
+    position: relative;
+    height: 88px;
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    overflow: hidden;
+  }
+  .team-card.home {
+    background:
+      linear-gradient(90deg, rgba(43,163,154,0.55), rgba(43,163,154,0.18) 70%, transparent),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+    border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  .team-card.away {
+    background:
+      linear-gradient(270deg, rgba(106,55,166,0.55), rgba(106,55,166,0.18) 70%, transparent),
+      repeating-linear-gradient(-45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+    border-left: 1px solid rgba(255,255,255,0.05);
+    justify-content: flex-end;
+    text-align: right;
+  }
+  .team-logo {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: grid; place-items: center;
+    font-family: 'Bebas Neue Pro';
+    font-size: 22px;
+    color: #fff;
+    flex-shrink: 0;
+    margin-right: 12px;
+  }
+  .team-card.away .team-logo { margin-right: 0; margin-left: 12px; order: 2; }
+  .team-card.away .team-meta { order: 1; }
+  .team-name {
+    font-family: 'Bebas Neue Pro';
+    font-size: 22px;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .team-sub {
+    font-family: 'Bebas Neue Pro';
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1.5px;
+    margin-top: 4px;
+  }
+  .center-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    padding: 0 24px;
+    background: #000;
+  }
+  .score {
+    font-family: 'Bebas Neue Pro';
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    min-width: 64px;
+    text-align: center;
+  }
+  .tol-block {
+    font-family: 'Bebas Neue Pro';
+    font-size: 12px;
+    line-height: 1.4;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 1px;
+  }
+  .clock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .clock-time {
+    font-family: 'Bebas Neue Pro';
+    font-size: 36px;
+    line-height: 1;
+  }
+  .clock-meta {
+    font-family: 'Bebas Neue Pro';
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    display: flex; gap: 12px;
+  }
+  .clock-q { color: var(--purple); }
+  .clock-shot { color: var(--yellow); }
+
+  /* ----- Court area (3-column layout) ----- */
+  .court-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    height: 100%;
+    overflow: hidden;
+  }
+  .side-panel {
+    background: var(--panel);
+    border-top: 1px solid rgba(255,255,255,0.04);
+    padding: 14px 14px 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .side-panel.left { border-right: 1px solid var(--teal); }
+  .side-panel.right { border-left: 1px solid var(--purple); }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'Bebas Neue Pro';
+    letter-spacing: 1.2px;
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  .seg {
+    display: inline-flex;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .seg span {
+    padding: 4px 10px;
+    font-size: 12px;
+    background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.55);
+  }
+  .seg span.active { background: rgba(43,163,154,0.25); color: #fff; }
+  .right .seg span.active { background: rgba(106,55,166,0.30); }
+  .momentum {
+    font-family: 'Bebas Neue Pro';
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+  .momentum-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .momentum-bar::after {
+    content: '';
+    position: absolute;
+    left: 12%; top: 0; bottom: 0;
+    width: 2px;
+    background: rgba(255,255,255,0.4);
+  }
+  .roster, .stats {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+  }
+  .roster th, .stats th {
+    text-align: left;
+    color: rgba(255,255,255,0.4);
+    font-weight: 500;
+    padding: 5px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+  }
+  .roster th + th, .roster td + td { text-align: right; }
+  .roster td {
+    padding: 7px 6px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    font-family: 'Bebas Neue Pro';
+    letter-spacing: 0.5px;
+    font-size: 13px;
+  }
+  .row-green td { color: var(--green); }
+  .row-yellow td { color: var(--yellow); }
+  .row-red td { color: #ff6d6d; }
+  .row-orange td { color: var(--orange); }
+
+  .stats-block {
+    margin-top: 14px;
+  }
+  .stats th { padding: 6px 4px; }
+  .stats td {
+    padding: 7px 4px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    font-family: 'Bebas Neue Pro';
+    letter-spacing: 0.6px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+  }
+  .stats td + td { text-align: right; color: #fff; }
+  .stats td.label { color: rgba(255,255,255,0.55); }
+
+  /* ----- Court canvas ----- */
+  .court {
+    position: relative;
+    overflow: hidden;
+    background: #14171f;
+    display: grid;
+    grid-template-rows: 1fr 168px;
+  }
+  .court-canvas {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.20), transparent 12%, transparent 88%, rgba(0,0,0,0.40)),
+      linear-gradient(90deg, #b07b3e 0%, #d4a168 25%, #e6b878 50%, #d4a168 75%, #b07b3e 100%);
+    overflow: hidden;
+  }
+  .court-canvas::before {
+    content: '';
+    position: absolute;
+    inset: 8% 4% 12%;
+    border: 2px solid rgba(0,0,0,0.6);
+    border-radius: 6px;
+  }
+  .court-canvas::after {
+    /* center line + circle */
+    content: '';
+    position: absolute;
+    inset: 8% calc(50% - 1px) 12%;
+    border-left: 2px solid rgba(0,0,0,0.6);
+  }
+  .center-circle {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 18%;
+    aspect-ratio: 1;
+    border: 2px solid rgba(0,0,0,0.55);
+    border-radius: 50%;
+  }
+  .hoop {
+    position: absolute;
+    top: 50%;
+    width: 9%;
+    aspect-ratio: 1.3 / 1;
+    transform: translateY(-50%);
+    border: 2px solid rgba(0,0,0,0.55);
+    background: rgba(106,55,166,0.55);
+  }
+  .hoop.left { left: 6%; border-top-right-radius: 60%; border-bottom-right-radius: 60%; }
+  .hoop.right { right: 6%; border-top-left-radius: 60%; border-bottom-left-radius: 60%; }
+  /* sprite dots */
+  .sprite {
+    position: absolute;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: 'Bebas Neue Pro';
+    font-size: 12px;
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    background: var(--teal);
+  }
+  .sprite.away { background: var(--purple); }
+  .sprite .label {
+    position: absolute;
+    bottom: -14px;
+    font-size: 9px;
+    background: rgba(0,0,0,0.7);
+    padding: 1px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .ball {
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #f6a04a, #8a4a0e);
+    border: 1px solid #2a1300;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    z-index: 2;
+  }
+
+  /* ----- Playcall strip (bottom) ----- */
+  .playcall {
+    border-top: 1px solid var(--border-soft);
+    background: var(--panel-2);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 14px 18px;
+    gap: 18px;
+    align-items: center;
+    height: 168px;
+  }
+  .pc-left, .pc-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pc-card {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .pc-thumb {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #444, #222);
+    flex-shrink: 0;
+  }
+  .pc-meta {
+    font-family: 'Bebas Neue Pro';
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 1.2px;
+  }
+  .pc-value {
+    font-family: 'Bebas Neue Pro';
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+
+  /* ============================================================
+     PRIMARY (center-court) announcement — for compare only
+     ============================================================ */
+  .primary-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .primary-overlay.is-visible { opacity: 1; }
+  .primary-card {
+    display: flex;
+    align-items: stretch;
+    background: rgba(10, 10, 10, 0.85);
+    border-left: 4px solid var(--orange);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transform: scale(0.94);
+    transition: transform 220ms cubic-bezier(.22,1,.36,1);
+    min-width: 560px;
+  }
+  .primary-overlay.is-visible .primary-card { transform: scale(1); }
+  .primary-portrait {
+    width: 100px; height: 130px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--teal);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .primary-portrait .cap {
+    font-family: 'Barlow Condensed', 'Bebas Neue Pro';
+    font-size: 11px;
+    background: rgba(0,0,0,0.8);
+    padding: 2px 8px 3px;
+    margin-bottom: 6px;
+    margin-right: 14px;
+    color: #fff;
+    letter-spacing: 0.8px;
+  }
+  .primary-event {
+    display: grid; place-items: center;
+    padding: 0 36px;
+    font-family: 'Bebas Neue Pro';
+    font-style: italic;
+    font-weight: 700;
+    font-size: 44px;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+  .primary-event .bang { color: var(--orange); }
+  .primary-event.no-player { padding: 18px 60px; }
+
+  /* ============================================================
+     SECONDARY (top-edge ribbon) announcement
+     ------------------------------------------------------------
+     Sits just under the scoreboard, above the court canvas.
+     Spans the full court column. ~64px tall. Doesn't cover sprites.
+     Two states: with player (headshot + chip) and without (centered).
+     Team color is a sharp left-edge stripe; orange accent on bang.
+     ============================================================ */
+  .ribbon-rail {
+    position: absolute;
+    left: 0; right: 0;
+    top: 0;
+    height: 0; /* anchor only — ribbon is absolutely positioned inside court */
+    pointer-events: none;
+  }
+  .secondary {
+    position: absolute;
+    top: 10px;          /* breathing room from scoreboard */
+    left: 16px;
+    right: 16px;
+    height: 64px;
+    z-index: 25;
+    pointer-events: none;
+    display: flex;
+    align-items: stretch;
+    transform: translateY(-110%);
+    opacity: 0;
+    transition:
+      transform 260ms cubic-bezier(.22,1,.36,1),
+      opacity 220ms ease;
+  }
+  .secondary.is-visible {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .secondary.is-visible .sec-headline {
+    animation: secPulse 380ms ease-out 60ms 1 both;
+  }
+
+  /* team-color sharp stripe */
+  .sec-stripe {
+    width: 6px;
+    background: var(--team);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.5),
+      0 0 18px color-mix(in oklab, var(--team), transparent 55%);
+    flex-shrink: 0;
+  }
+
+  /* main surface */
+  .sec-surface {
+    flex: 1;
+    background:
+      linear-gradient(90deg,
+        color-mix(in oklab, var(--team), #000 70%) 0%,
+        rgba(10, 10, 10, 0.92) 32%,
+        rgba(10, 10, 10, 0.92) 68%,
+        color-mix(in oklab, var(--team), #000 78%) 100%),
+      rgba(10, 10, 10, 0.92);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-left: none;
+    box-shadow:
+      0 10px 28px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: 0 0 0 18px;
+    gap: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .sec-surface::before {
+    /* subtle diagonal texture, matches primary card vocab */
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(115deg,
+      transparent 0 12px,
+      rgba(255,255,255,0.025) 12px 13px);
+    pointer-events: none;
+  }
+  /* ----- right: verdict slot (decision indicator) -----
+     Mirrors the left team-stripe vocabulary: a thin colored
+     bar on the right edge tells the player whether the play was
+     a good or bad decision. Gold = good, red = bad.
+     This is the elegant alternative to the pill — same semantic
+     payload, half the visual weight, premium symmetry. */
+  .sec-verdict {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .sec-verdict-label {
+    align-self: center;
+    padding: 0 12px 0 14px;
+    font-family: 'Bebas Neue Pro';
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1.6px;
+    color: var(--verdict, transparent);
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-shadow: 0 0 12px color-mix(in oklab, var(--verdict, #000), transparent 60%);
+  }
+  .sec-verdict-stripe {
+    width: 6px;
+    background: var(--verdict, transparent);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.5),
+      0 0 18px color-mix(in oklab, var(--verdict, #000), transparent 55%);
+  }
+  .secondary:not(.has-verdict) .sec-verdict { display: none; }
+  .secondary:not(.has-verdict) .sec-surface { padding-right: 18px; }
+
+  /* Metallic gold for GOOD reads */
+  .secondary.verdict-good .sec-verdict-stripe {
+    background: linear-gradient(180deg,
+      #FFF1B8 0%,
+      #FFD24A 22%,
+      #C2932B 52%,
+      #8C6418 70%,
+      #E4B85A 88%,
+      #FFF1B8 100%);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.55),
+      0 0 22px rgba(255, 200, 60, 0.45),
+      inset 0 0 0 1px rgba(255, 240, 180, 0.35);
+  }
+  .secondary.verdict-good .sec-verdict-label {
+    background: linear-gradient(180deg,
+      #FFF4C2 0%,
+      #FFD55A 28%,
+      #B4862A 55%,
+      #E8C25E 78%,
+      #FFF4C2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.45);
+    filter: drop-shadow(0 0 8px rgba(255, 200, 60, 0.35));
+  }
+
+  /* Sleek red for BAD reads */
+  .secondary.verdict-bad .sec-verdict-stripe {
+    background: linear-gradient(180deg,
+      #FF7878 0%,
+      #E63838 40%,
+      #B81E1E 75%,
+      #6E0F0F 100%);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.55),
+      0 0 22px rgba(230, 50, 50, 0.45),
+      inset 0 0 0 1px rgba(255, 120, 120, 0.30);
+  }
+  .secondary.verdict-bad .sec-verdict-label {
+    color: #FF5A5A;
+    text-shadow:
+      0 0 12px rgba(230, 40, 40, 0.55),
+      0 1px 0 rgba(0,0,0,0.5);
+  }
+
+  /* Optional alt: classic pill (kept as a tweak option to compare) */
+  .sec-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-family: 'Bebas Neue Pro';
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1.4px;
+    color: #0a0a0a;
+    text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    margin-right: 18px;
+    align-self: center;
+  }
+  .secondary.verdict-good .sec-pill {
+    background: linear-gradient(180deg,
+      #FFF1B8 0%,
+      #F4C84A 35%,
+      #B0832A 80%,
+      #E8C25E 100%);
+    color: #2A1C00;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.45);
+    box-shadow:
+      0 4px 12px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.45),
+      inset 0 -1px 0 rgba(0,0,0,0.25);
+  }
+  .secondary.verdict-bad .sec-pill {
+    background: linear-gradient(180deg,
+      #FF6B6B 0%,
+      #D62E2E 55%,
+      #8C1414 100%);
+    color: #fff;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.55);
+    box-shadow:
+      0 4px 12px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.30),
+      inset 0 -1px 0 rgba(0,0,0,0.4);
+  }
+  .secondary[data-verdict-style="stripe"] .sec-pill { display: none; }
+  .secondary[data-verdict-style="pill"]   .sec-verdict { display: none; }
+  .secondary[data-verdict-style="pill"]   .sec-surface { padding-right: 0; }
+
+  /* ----- left: player block (optional) ----- */
+  .sec-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .sec-headshot {
+    width: 48px; height: 48px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--team);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .sec-headshot img {
+    width: 100%; height: 100%; object-fit: cover;
+    display: block;
+  }
+  .sec-headshot.placeholder::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 35%;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    transform: translateX(-50%);
+  }
+  .sec-headshot.placeholder::after {
+    content: '';
+    position: absolute;
+    left: 50%; top: 68%;
+    width: 38px; height: 28px;
+    border-radius: 50% 50% 0 0;
+    background: rgba(255,255,255,0.25);
+    transform: translateX(-50%);
+  }
+  .sec-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1;
+  }
+  .sec-chip .jersey {
+    font-family: 'Bebas Neue Pro';
+    font-size: 11px;
+    letter-spacing: 1.2px;
+    color: var(--team);
+    filter: brightness(1.35);
+  }
+  .sec-chip .name {
+    font-family: 'Bebas Neue Pro';
+    font-size: 18px;
+    letter-spacing: 0.6px;
+    color: #fff;
+  }
+
+  /* ----- center: headline ----- */
+  .sec-headline {
+    font-family: 'Bebas Neue Pro';
+    font-style: italic;
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: 1.5px;
+    color: #fff;
+    text-transform: uppercase;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+    text-align: center;
+    white-space: nowrap;
+    position: relative;
+    z-index: 1;
+    align-self: center;
+    justify-self: center;
+    margin: 0;
+    padding: 0;
+    display: block;
+  }
+  .sec-headline .bang { color: var(--orange); }
+  /* no-player state: collapse left column, center text fully */
+  .secondary.no-player .sec-player { display: none; }
+  .secondary.no-player .sec-surface {
+    grid-template-columns: 1fr;
+  }
+  .secondary.no-player .sec-headline { font-size: 40px; }
+
+  /* ----- right: small event tag (event type label) ----- */
+  .sec-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Bebas Neue Pro';
+    letter-spacing: 1.5px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    z-index: 1;
+    text-transform: uppercase;
+  }
+  .sec-tag .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--team);
+    box-shadow: 0 0 8px var(--team);
+  }
+  .secondary.no-player .sec-tag {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  @keyframes secPulse {
+    0%   { transform: scale(0.96); opacity: 0.85; }
+    60%  { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(1.00); opacity: 1; }
+  }
+
+  /* ============ Controls (mock app) ============ */
+  .tweaks-host { position: fixed; right: 16px; bottom: 16px; z-index: 200; }
+
+  /* Spec callout */
+  .spec {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 200;
+    background: rgba(10,10,12,0.92);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 3px solid var(--orange);
+    border-radius: 10px;
+    padding: 14px 16px;
+    width: 320px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.75);
+    font-family: 'Inter';
+    box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+  }
+  .spec h3 {
+    margin: 0 0 6px;
+    font-family: 'Bebas Neue Pro';
+    letter-spacing: 1.4px;
+    font-size: 16px;
+    color: #fff;
+  }
+  .spec ul { margin: 6px 0 0; padding-left: 16px; }
+  .spec li { margin: 3px 0; }
+  .spec code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <!-- ============== Scoreboard (matches current product) ============== -->
+  <div class="scoreboard">
+    <div class="team-card home">
+      <div class="team-logo">OC</div>
+      <div class="team-meta">
+        <div class="team-name">Ocean City Admirals</div>
+        <div class="team-sub">#54 · 0-0</div>
+      </div>
+    </div>
+    <div class="center-bar">
+      <div class="score">6</div>
+      <div class="tol-block">TOL: 4<br/>F: 1</div>
+      <div class="clock">
+        <div class="clock-time">5:03</div>
+        <div class="clock-meta">
+          <span class="clock-q">Q1</span>
+          <span class="clock-shot">29</span>
+        </div>
+      </div>
+      <div class="tol-block" style="text-align:right">TOL: 4<br/>F: 0</div>
+      <div class="score">5</div>
+    </div>
+    <div class="team-card away">
+      <div class="team-meta">
+        <div class="team-name">Little York Minute Men</div>
+        <div class="team-sub">#47 · 0-0</div>
+      </div>
+      <div class="team-logo">LY</div>
+    </div>
+  </div>
+
+  <!-- ============== Court row ============== -->
+  <div class="court-row">
+
+    <!-- LEFT panel -->
+    <div class="side-panel left">
+      <div class="panel-head">
+        OCEAN CITY
+        <span class="seg"><span class="active">S1</span><span>S2</span><span>S3</span></span>
+      </div>
+      <div class="momentum">MOMENTUM</div>
+      <div class="momentum-bar"></div>
+      <table class="roster">
+        <thead><tr><th>PLAYER</th><th>PTS</th><th>REB</th><th>AST</th><th>F</th></tr></thead>
+        <tbody>
+          <tr class="row-green"><td>#11 LA</td><td>2</td><td>0</td><td>1</td><td>1</td></tr>
+          <tr class="row-orange"><td>#40 D'AMORE</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+          <tr class="row-yellow"><td>#30 WELKE</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>
+          <tr class="row-yellow"><td>#32 MINGUS</td><td>2</td><td>2</td><td>1</td><td>0</td></tr>
+          <tr class="row-red"><td>#52 QUINTO</td><td>2</td><td>0</td><td>0</td><td>0</td></tr>
+        </tbody>
+      </table>
+      <div class="stats-block">
+        <div class="panel-head">TEAM STATS
+          <span class="seg"><span class="active">S1</span><span>S2</span><span>S3</span></span>
+        </div>
+        <table class="stats">
+          <tr><td class="label">FG</td><td>3-3</td></tr>
+          <tr><td class="label">FG%</td><td>100%</td></tr>
+          <tr><td class="label">3PT</td><td>0-0</td></tr>
+          <tr><td class="label">FT</td><td>0-0</td></tr>
+          <tr><td class="label">REBOUNDS</td><td>4</td></tr>
+          <tr><td class="label">ASSISTS</td><td>3</td></tr>
+          <tr><td class="label">TURNOVERS</td><td>2</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- COURT center -->
+    <div class="court">
+      <div class="court-canvas" id="courtCanvas">
+        <div class="hoop left"></div>
+        <div class="hoop right"></div>
+        <div class="center-circle"></div>
+
+        <!-- a few sprites so we can see the ribbon doesn't cover the action -->
+        <div class="sprite away" style="left: 30%; top: 26%;">PF<div class="label">#32</div></div>
+        <div class="sprite away" style="left: 60%; top: 42%;">PG<div class="label">#11</div></div>
+        <div class="sprite" style="left: 22%; top: 64%;">SF<div class="label">#30</div></div>
+        <div class="sprite" style="left: 44%; top: 56%;">SG<div class="label">#40</div></div>
+        <div class="sprite" style="left: 70%; top: 70%;">C<div class="label">#52</div></div>
+        <div class="ball" style="left: 28%; top: 64%;"></div>
+
+        <!-- ============= SECONDARY ANNOUNCEMENT ============= -->
+        <div class="secondary" id="secondary">
+          <div class="sec-stripe"></div>
+          <div class="sec-surface">
+            <div class="sec-player">
+              <div class="sec-headshot placeholder" id="secHead"></div>
+              <div class="sec-chip">
+                <div class="jersey" id="secJersey">#40</div>
+                <div class="name" id="secName">D'AMORE</div>
+              </div>
+            </div>
+            <div class="sec-headline" id="secHeadline">
+              FB OUTLET PASS DENIED<span class="bang">!</span>
+            </div>
+            <div class="sec-pill" id="secPill">BAD READ</div>
+            <div class="sec-verdict" id="secVerdict">
+              <div class="sec-verdict-label" id="secVerdictLabel">BAD READ</div>
+              <div class="sec-verdict-stripe"></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ============= PRIMARY (compare-only) ============= -->
+        <div class="primary-overlay" id="primaryOverlay">
+          <div class="primary-card">
+            <div class="primary-portrait">
+              <div class="cap">#40 D'AMORE</div>
+            </div>
+            <div class="primary-event" id="primaryEvent">
+              FB OUTLET PASS DENIED<span class="bang">!</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- playcall strip -->
+      <div class="playcall">
+        <div class="pc-left">
+          <div class="pc-card">
+            <div class="pc-meta" style="width:30px">OFF</div>
+            <div class="pc-thumb"></div>
+            <div class="pc-value">3-2 MOTION</div>
+          </div>
+          <div class="pc-card">
+            <div class="pc-meta" style="width:30px">DEF</div>
+            <div class="pc-thumb" style="background: linear-gradient(135deg,#5b3f12,#2a1c06)"></div>
+            <div class="pc-value">MAN NORMAL</div>
+          </div>
+        </div>
+        <div class="pc-right">
+          <div class="pc-card">
+            <div class="pc-meta" style="width:80px">TEMPO</div>
+            <div class="pc-value" style="color:rgba(255,255,255,0.4)">○──●──○</div>
+            <div class="pc-meta" style="margin-left:auto">NORMAL</div>
+          </div>
+          <div class="pc-card">
+            <div class="pc-meta" style="width:80px">PRESS/TRAP</div>
+            <div class="pc-value" style="color:rgba(255,255,255,0.4)">○──○──●</div>
+            <div class="pc-meta" style="margin-left:auto">NONE</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT panel -->
+    <div class="side-panel right">
+      <div class="panel-head">
+        LITTLE YORK
+        <span class="seg"><span class="active">S1</span><span>S2</span><span>S3</span></span>
+      </div>
+      <div class="momentum">MOMENTUM</div>
+      <div class="momentum-bar"></div>
+      <table class="roster">
+        <thead><tr><th>PLAYER</th><th>PTS</th><th>REB</th><th>AST</th><th>F</th></tr></thead>
+        <tbody>
+          <tr class="row-orange"><td>#7 LARGEFOOT</td><td>3</td><td>0</td><td>1</td><td>0</td></tr>
+          <tr class="row-yellow"><td>#10 SMITH</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+          <tr class="row-red"><td>#5 SPIELMAN</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+          <tr class="row-green"><td>#1 BUFORD</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+          <tr class="row-yellow"><td>#88 LANDRANEAU</td><td>2</td><td>0</td><td>0</td><td>0</td></tr>
+        </tbody>
+      </table>
+      <div class="stats-block">
+        <div class="panel-head">TEAM STATS
+          <span class="seg"><span class="active">S1</span><span>S2</span><span>S3</span></span>
+        </div>
+        <table class="stats">
+          <tr><td class="label">FG</td><td>2-6</td></tr>
+          <tr><td class="label">FG%</td><td>33%</td></tr>
+          <tr><td class="label">3PT</td><td>0-1</td></tr>
+          <tr><td class="label">FT</td><td>1-1</td></tr>
+          <tr><td class="label">REBOUNDS</td><td>0</td></tr>
+          <tr><td class="label">ASSISTS</td><td>2</td></tr>
+          <tr><td class="label">TURNOVERS</td><td>1</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Spec callout (bottom-left, doesn't intrude on the design) -->
+<div class="spec">
+  <h3>Secondary Announce — Spec</h3>
+  <ul>
+    <li>Mounts just under scoreboard, above court canvas. Never overlaps sprite zone.</li>
+    <li>Height <code>64px</code>, full width of court column with 16px gutter.</li>
+    <li>Team-color stripe on left (initiating team), orange <code>!</code> accent on bang.</li>
+    <li>Two states: <strong>with player</strong> (headshot + #jersey/last name) and <strong>no-player</strong> (Press / Trap / Fast Break — centered headline).</li>
+    <li>Headline: Bebas Neue Pro italic 700, 36–40px — matches primary type voice.</li>
+    <li>Motion: drops down from scoreboard (260ms overshoot), <code>secPulse</code> on headline. Exits up + fade.</li>
+    <li>On screen <code>2200ms</code>, then <code>1000ms</code> engine hold — same timing contract as primary.</li>
+    <li>Toggle via <code>.is-visible</code>. New payload field <code>tier: 'secondary'</code> routes here; primary overlay stays untouched.</li>
+  </ul>
+</div>
+
+<!-- Tweaks panel host -->
+<div class="tweaks-host" id="tweaksHost"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script>
+  // -----------------------------------------------------------------
+  // Animation controller — drives secondary + primary overlays
+  // Timing matches doc: 2200ms display + 1000ms post-hold.
+  // -----------------------------------------------------------------
+  const TEAMS = {
+    ocean:  { name: 'OCEAN CITY',  color: '#2BA39A', deep: '#145a55' },
+    little: { name: 'LITTLE YORK', color: '#6A37A6', deep: '#3a1c63' },
+  };
+
+  // Sample announcements aligned to the docs' set
+  const EVENTS = {
+    fb_outlet_denied: {
+      label: 'FB Outlet Pass Denied',
+      headline: 'FB OUTLET PASS DENIED',
+      tier: 'secondary',
+      withPlayer: true,
+      jersey: '#40', name: "D'AMORE",
+      team: 'ocean',
+    },
+    fb_decision_go: {
+      label: 'Fast Break Decision — Go',
+      headline: 'FAST BREAK',
+      tier: 'secondary',
+      withPlayer: true,
+      jersey: '#11', name: 'LA',
+      team: 'ocean',
+    },
+    nice_stop: {
+      label: 'Nice Stop',
+      headline: 'NICE STOP',
+      tier: 'secondary',
+      withPlayer: true,
+      jersey: '#30', name: 'WELKE',
+      team: 'ocean',
+    },
+    slow_it_down: {
+      label: 'Slow It Down',
+      headline: 'SLOW IT DOWN',
+      tier: 'secondary',
+      withPlayer: false,
+      team: 'little',
+    },
+    quick_shot: {
+      label: 'Quick Shot',
+      headline: 'QUICK SHOT',
+      tier: 'secondary',
+      withPlayer: false,
+      team: 'little',
+    },
+    final_shot: {
+      label: 'Final Shot',
+      headline: 'FINAL SHOT',
+      tier: 'secondary',
+      withPlayer: false,
+      team: 'ocean',
+    },
+    press: {
+      label: 'Press!',
+      headline: 'PRESS',
+      tier: 'secondary',
+      withPlayer: false,
+      team: 'ocean',
+    },
+    trap: {
+      label: 'Trap!',
+      headline: 'TRAP',
+      tier: 'secondary',
+      withPlayer: false,
+      team: 'little',
+    },
+    fast_break: {
+      label: 'Fast Break!',
+      headline: 'FAST BREAK',
+      tier: 'secondary',
+      withPlayer: false,
+      team: 'little',
+    },
+    its_good: {
+      label: "It's Good! (primary, for compare)",
+      headline: "IT'S GOOD",
+      tier: 'primary',
+      withPlayer: true,
+      jersey: '#32', name: 'MINGUS',
+      team: 'ocean',
+    },
+  };
+
+  const els = {
+    secondary:   document.getElementById('secondary'),
+    primary:     document.getElementById('primaryOverlay'),
+    head:        document.getElementById('secHead'),
+    jersey:      document.getElementById('secJersey'),
+    name:        document.getElementById('secName'),
+    headline:    document.getElementById('secHeadline'),
+    pill:        document.getElementById('secPill'),
+    verdictLabel:document.getElementById('secVerdictLabel'),
+    primEvent:   document.getElementById('primaryEvent'),
+  };
+
+  function applyTeamColor(teamKey) {
+    const t = TEAMS[teamKey] || TEAMS.ocean;
+    document.documentElement.style.setProperty('--team', t.color);
+    document.documentElement.style.setProperty('--team-deep', t.deep);
+  }
+
+  function paintEvent(evKey) {
+    const ev = EVENTS[evKey];
+    if (!ev) return;
+    applyTeamColor(ev.team);
+
+    if (ev.tier === 'primary') {
+      els.primEvent.innerHTML = ev.headline + '<span class="bang">!</span>';
+      els.secondary.classList.remove('is-visible');
+      els.primary.classList.add('is-visible');
+      return;
+    }
+
+    // secondary
+    els.primary.classList.remove('is-visible');
+    els.headline.innerHTML = ev.headline + '<span class="bang">!</span>';
+
+    if (ev.withPlayer) {
+      els.secondary.classList.remove('no-player');
+      els.jersey.textContent = ev.jersey;
+      els.name.textContent = ev.name;
+    } else {
+      els.secondary.classList.add('no-player');
+    }
+
+    // verdict treatment (gold/red right-edge stripe + label)
+    els.secondary.classList.remove('verdict-good', 'verdict-bad', 'has-verdict');
+    if (ev.verdict) {
+      els.secondary.classList.add('has-verdict', 'verdict-' + ev.verdict);
+      const label = ev.verdictLabel || (ev.verdict === 'good' ? 'GOOD READ' : 'BAD READ');
+      els.verdictLabel.textContent = label;
+      els.pill.textContent = label;
+    }
+
+    els.secondary.classList.add('is-visible');
+  }
+
+  function hideAll() {
+    els.secondary.classList.remove('is-visible');
+    els.primary.classList.remove('is-visible');
+  }
+
+  // Auto play — loops through events using the real 2200 / 1000 cadence
+  let playToken = 0;
+  async function play(sequence, { loop = true } = {}) {
+    const token = ++playToken;
+    while (token === playToken) {
+      for (const key of sequence) {
+        if (token !== playToken) return;
+        paintEvent(key);
+        await wait(2200);                       // overlay visible
+        if (token !== playToken) return;
+        hideAll();
+        await wait(1000);                       // engine hold
+      }
+      if (!loop) return;
+    }
+  }
+  function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // initial paint (no autoplay until user picks)
+  paintEvent('fb_outlet_denied');
+  els.secondary.classList.add('is-visible');
+
+  // Expose so tweaks panel can drive
+  window.__secAnnounce = { paintEvent, hideAll, play, EVENTS, TEAMS };
+</script>
+
+<script type="text/babel">
+  const { useEffect, useState } = React;
+
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "autoplay": true,
+    "showPrimary": false,
+    "stripeWidth": 8,
+    "ribbonHeight": 64,
+    "topOffset": 4,
+    "headlineSize": 36,
+    "team": "little"
+  }/*EDITMODE-END*/;
+
+  function App() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+    const [current, setCurrent] = useState('fb_outlet_denied');
+
+    // Apply CSS-controlled tweaks
+    useEffect(() => {
+      const sec = document.getElementById('secondary');
+      const stripe = sec.querySelector('.sec-stripe');
+      const headline = document.getElementById('secHeadline');
+      sec.style.height = t.ribbonHeight + 'px';
+      sec.style.top = t.topOffset + 'px';
+      stripe.style.width = t.stripeWidth + 'px';
+      headline.style.fontSize = t.headlineSize + 'px';
+    }, [t.ribbonHeight, t.topOffset, t.stripeWidth, t.headlineSize]);
+
+    // Apply team override
+    useEffect(() => {
+      const T = window.__secAnnounce.TEAMS[t.team];
+      if (!T) return;
+      document.documentElement.style.setProperty('--team', T.color);
+      document.documentElement.style.setProperty('--team-deep', T.deep);
+    }, [t.team]);
+
+    // Apply verdict style attribute (stripe vs pill)
+    useEffect(() => {
+      document.getElementById('secondary').setAttribute('data-verdict-style', t.verdictStyle);
+    }, [t.verdictStyle]);
+
+    // Autoplay sequence
+    useEffect(() => {
+      if (t.autoplay) {
+        const seq = t.showPrimary
+          ? ['fb_outlet_denied', 'fb_decision_go', 'nice_stop', 'slow_it_down', 'quick_shot', 'final_shot', 'press', 'trap', 'fast_break', 'its_good']
+          : ['fb_outlet_denied', 'fb_decision_go', 'nice_stop', 'slow_it_down', 'quick_shot', 'final_shot', 'press', 'trap', 'fast_break'];
+        window.__secAnnounce.play(seq, { loop: true });
+      } else {
+        window.__secAnnounce.hideAll();
+        window.__secAnnounce.paintEvent(current);
+        document.getElementById('secondary').classList.add('is-visible');
+        // ensure no looping
+        window.__secAnnounce.play([], { loop: false });
+      }
+    }, [t.autoplay, t.showPrimary, current]);
+
+    const events = Object.entries(window.__secAnnounce.EVENTS);
+
+    return (
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Demo">
+          <TweakToggle
+            label="Autoplay sequence"
+            value={t.autoplay}
+            onChange={(v) => setTweak('autoplay', v)}
+          />
+          {!t.autoplay && (
+            <TweakSelect
+              label="Event"
+              value={current}
+              options={events.map(([key, ev]) => ({ value: key, label: ev.label }))}
+              onChange={(v) => setCurrent(v)}
+            />
+          )}
+          <TweakToggle
+            label="Include primary in sequence (compare)"
+            value={t.showPrimary}
+            onChange={(v) => setTweak('showPrimary', v)}
+          />
+        </TweakSection>
+
+        <TweakSection title="Decision indicator">
+          <TweakRadio
+            label="Style"
+            value={t.verdictStyle}
+            options={[
+              { value: 'stripe', label: 'Right stripe' },
+              { value: 'pill',   label: 'Classic pill' },
+            ]}
+            onChange={(v) => setTweak('verdictStyle', v)}
+          />
+        </TweakSection>
+
+        <TweakSection title="Team color">
+          <TweakRadio
+            label="Initiating team"
+            value={t.team}
+            options={[
+              { value: 'ocean',  label: 'Ocean City' },
+              { value: 'little', label: 'Little York' },
+            ]}
+            onChange={(v) => setTweak('team', v)}
+          />
+        </TweakSection>
+
+        <TweakSection title="Ribbon shape">
+          <TweakSlider
+            label="Height"
+            value={t.ribbonHeight}
+            min={48} max={88} step={2}
+            onChange={(v) => setTweak('ribbonHeight', v)}
+            unit="px"
+          />
+          <TweakSlider
+            label="Top offset from scoreboard"
+            value={t.topOffset}
+            min={0} max={28} step={1}
+            onChange={(v) => setTweak('topOffset', v)}
+            unit="px"
+          />
+          <TweakSlider
+            label="Team stripe width"
+            value={t.stripeWidth}
+            min={3} max={14} step={1}
+            onChange={(v) => setTweak('stripeWidth', v)}
+            unit="px"
+          />
+          <TweakSlider
+            label="Headline size"
+            value={t.headlineSize}
+            min={26} max={52} step={1}
+            onChange={(v) => setTweak('headlineSize', v)}
+            unit="px"
+          />
+        </TweakSection>
+      </TweaksPanel>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('tweaksHost')).render(<App />);
+</script>
+
+</body>
+</html>

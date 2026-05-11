@@ -2678,8 +2678,8 @@
     }
     .ann-event-zone .ann-text,
     .ann-event-text {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 900;
+      font-family: 'Bebas Neue', sans-serif;
+      font-weight: 400;
       font-style: italic;
       font-size: 64px;
       color: #fff;
@@ -2731,8 +2731,8 @@
       padding: 14px 20px 14px 22px;
     }
     .ann-foul-primary {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 900;
+      font-family: 'Bebas Neue', sans-serif;
+      font-weight: 400;
       font-style: italic;
       font-size: 40px;
       color: #fff;
@@ -2762,6 +2762,193 @@
       color: rgba(255,255,255,0.45);
       text-transform: uppercase;
       letter-spacing: 1.5px;
+    }
+
+    /* ==================== SECONDARY ANNOUNCEMENT (top-edge ribbon) ==================== */
+    /* Mounts at the top of #phaser-container, just under the scoreboard. 64px tall,
+       full width with 16px side gutters. Coexists with the center-court primary overlay. */
+    #announcement-overlay-secondary {
+      position: absolute;
+      top: 4px;
+      left: 16px;
+      right: 16px;
+      height: 64px;
+      z-index: 940; /* above court sprites, below primary (#announcement-overlay z=950) */
+      pointer-events: none;
+      display: flex;
+      align-items: stretch;
+      transform: translateY(-110%);
+      opacity: 0;
+      transition:
+        transform 260ms cubic-bezier(.22,1,.36,1),
+        opacity 220ms ease;
+      /* Default team color; overridden inline by showSecondaryAnnouncementOverlay */
+      --sec-team: #F79420;
+    }
+    #announcement-overlay-secondary.is-visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    #announcement-overlay-secondary.is-visible .sec-headline {
+      animation: secPulse 380ms ease-out 60ms 1 both;
+    }
+    #announcement-overlay-secondary.hidden { display: none; }
+    @keyframes secPulse {
+      0%   { transform: scale(0.96); opacity: 0.85; }
+      60%  { transform: scale(1.02); opacity: 1; }
+      100% { transform: scale(1.00); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #announcement-overlay-secondary {
+        transition: opacity 220ms ease;
+        transform: none;
+      }
+      #announcement-overlay-secondary.is-visible { transform: none; }
+      #announcement-overlay-secondary.is-visible .sec-headline { animation: none; }
+    }
+
+    .sec-stripe {
+      width: 6px;
+      flex-shrink: 0;
+      background: var(--sec-team);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.5),
+        0 0 18px color-mix(in oklab, var(--sec-team), transparent 55%);
+    }
+    .sec-surface {
+      flex: 1;
+      position: relative;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 18px;
+      padding: 0 18px;
+      background:
+        linear-gradient(90deg,
+          color-mix(in oklab, var(--sec-team), #000 70%) 0%,
+          rgba(10, 10, 10, 0.92) 32%,
+          rgba(10, 10, 10, 0.92) 68%,
+          color-mix(in oklab, var(--sec-team), #000 78%) 100%),
+        rgba(10, 10, 10, 0.92);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-left: none;
+      box-shadow:
+        0 10px 28px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+    .sec-surface::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(115deg,
+        transparent 0 12px,
+        rgba(255,255,255,0.025) 12px 13px);
+      pointer-events: none;
+    }
+    .sec-player {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+    .sec-headshot {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--sec-team);
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+      flex-shrink: 0;
+    }
+    .sec-headshot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+    }
+    .sec-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      line-height: 1;
+    }
+    .sec-chip .sec-jersey {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 11px;
+      letter-spacing: 1.2px;
+      color: var(--sec-team);
+      filter: brightness(1.35);
+    }
+    .sec-chip .sec-last-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.6px;
+      color: #fff;
+    }
+    .sec-headline {
+      font-family: 'Bebas Neue', sans-serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 36px;
+      line-height: 1;
+      letter-spacing: 1.5px;
+      color: #fff;
+      text-transform: uppercase;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+      text-align: center;
+      white-space: nowrap;
+      position: relative;
+      z-index: 1;
+      align-self: center;
+      justify-self: center;
+      margin: 0;
+      padding: 0;
+      display: block;
+    }
+    .sec-headline .ann-accent { color: #F79420; }
+    #announcement-overlay-secondary.no-player .sec-player { display: none; }
+    #announcement-overlay-secondary.no-player .sec-surface {
+      grid-template-columns: 1fr;
+    }
+    #announcement-overlay-secondary.no-player .sec-headline { font-size: 40px; }
+
+    /* Decision pill (Good Read / Bad Read) — same visual vocabulary as primary,
+       positioned in the lower-right corner of the secondary ribbon. */
+    .sec-decision-pill {
+      position: absolute;
+      right: 14px;
+      bottom: 6px;
+      height: 22px;
+      padding: 0 10px;
+      border-radius: 16px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-sizing: border-box;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid #c0c6cf;
+      color: #c0c6cf;
+      z-index: 2;
+      white-space: nowrap;
+    }
+    .sec-decision-pill.good {
+      color: #c0c6cf;
+      border-color: #c0c6cf;
+      background: linear-gradient(135deg, #8f6b16 0%, #c89b2a 45%, #e1bc5a 100%);
+    }
+    .sec-decision-pill.bad {
+      color: #c0c6cf;
+      border-color: #c0c6cf;
+      background: #a32020;
     }
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
@@ -3888,6 +4075,24 @@
               <div class="ann-pos-label fouler-role">Foul</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Secondary announcement (top-edge ribbon under scoreboard) -->
+      <div id="announcement-overlay-secondary" class="hidden">
+        <div class="sec-stripe"></div>
+        <div class="sec-surface">
+          <div class="sec-player">
+            <div class="sec-headshot">
+              <img class="sec-headshot-img" src="" alt="Player" />
+            </div>
+            <div class="sec-chip">
+              <div class="sec-jersey"></div>
+              <div class="sec-last-name"></div>
+            </div>
+          </div>
+          <div class="sec-headline"></div>
+          <span class="sec-decision-pill"></span>
         </div>
       </div>
 
@@ -5910,18 +6115,91 @@
         if (t.indexOf('TURNOVER') >= 0 || t.indexOf('TRAVEL') >= 0 || t.indexOf('DOUBLE DRIBBLE') >= 0) return 'ann-accent--turnover';
         return 'ann-accent--neutral';
       }
+      var _secAnnTimer = null;
+      var genericHeadshotPath = function() {
+        return API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
+      };
+      var applyHeadshotFallback = function(imgEl, src) {
+        if (!imgEl) return;
+        var generic = genericHeadshotPath();
+        imgEl.onerror = function() {
+          this.onerror = null;
+          this.src = generic;
+        };
+        imgEl.src = src || generic;
+      };
+      window.showSecondaryAnnouncementOverlay = function(data) {
+        var overlay = document.getElementById('announcement-overlay-secondary');
+        if (!overlay) return;
+        if (_secAnnTimer) { clearTimeout(_secAnnTimer); _secAnnTimer = null; }
+
+        if (data && data.teamColor) {
+          overlay.style.setProperty('--sec-team', data.teamColor);
+        } else {
+          overlay.style.removeProperty('--sec-team');
+        }
+
+        var headlineEl = overlay.querySelector('.sec-headline');
+        var raw = (data && data.eventText) ? String(data.eventText) : '';
+        var hasExclaim = raw.endsWith('!');
+        var base = hasExclaim ? raw.slice(0, -1) : raw;
+        var upper = base.toUpperCase();
+        if (headlineEl) {
+          headlineEl.innerHTML = hasExclaim
+            ? upper + '<span class="ann-accent">!</span>'
+            : upper;
+        }
+
+        var hasPlayer = !!((data && data.photoUrl) || (data && data.lastName));
+        if (hasPlayer) {
+          overlay.classList.remove('no-player');
+          applyHeadshotFallback(overlay.querySelector('.sec-headshot-img'), data && data.photoUrl);
+          var jerseyEl = overlay.querySelector('.sec-jersey');
+          var lastNameEl = overlay.querySelector('.sec-last-name');
+          if (jerseyEl) jerseyEl.textContent = (data && data.jersey) ? String(data.jersey) : '';
+          if (lastNameEl) lastNameEl.textContent = (data && data.lastName) ? String(data.lastName) : '';
+        } else {
+          overlay.classList.add('no-player');
+        }
+
+        var pill = overlay.querySelector('.sec-decision-pill');
+        var decisionText = (data && data.decisionPillText) ? String(data.decisionPillText).trim() : '';
+        var decisionTone = (data && data.decisionPillTone === 'bad')
+          ? 'bad'
+          : (data && data.decisionPillTone === 'good' ? 'good' : '');
+        if (pill) {
+          pill.classList.remove('good', 'bad');
+          if (decisionText && decisionTone) {
+            pill.textContent = decisionText;
+            pill.classList.add(decisionTone);
+            pill.style.display = 'flex';
+          } else {
+            pill.textContent = '';
+            pill.style.display = 'none';
+          }
+        }
+
+        // Force reflow so the entry transition fires every time
+        overlay.classList.remove('is-visible');
+        void overlay.offsetWidth;
+        overlay.classList.remove('hidden');
+        overlay.classList.add('is-visible');
+
+        _secAnnTimer = setTimeout(function() {
+          overlay.classList.remove('is-visible');
+          // Hide after the exit transition completes (~260ms) so the slide-up plays.
+          setTimeout(function() {
+            overlay.classList.add('hidden');
+          }, 280);
+          _secAnnTimer = null;
+        }, 2200);
+      };
       window.showAnnouncementOverlay = function(data) {
+        if (data && data.tier === 'secondary') {
+          return window.showSecondaryAnnouncementOverlay(data);
+        }
         var overlay = document.getElementById('announcement-overlay');
         if (!overlay) return;
-        var genericHeadshot = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
-        var applyHeadshotFallback = function(imgEl, src) {
-          if (!imgEl) return;
-          imgEl.onerror = function() {
-            this.onerror = null;
-            this.src = genericHeadshot;
-          };
-          imgEl.src = src || genericHeadshot;
-        };
         if (_annTimer) { clearTimeout(_annTimer); _annTimer = null; }
         var standardCard = overlay.querySelector('.standard-card');
         var foulCard = overlay.querySelector('.foul-card');
