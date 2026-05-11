@@ -1335,7 +1335,21 @@ class TurnManager:
         
         # Create debug string for frontend display
         offense_team_id = result.get("offense_team_id", "None")
-        debug_turn_result = f"Turn {turn_num} RESULT: {result_type} | Offense: {offense_team_id} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}"
+        # When the next play is a Fast Break, also surface the FB play key
+        # (covert_release / rim_runner / triangle / etc.) so logs explicitly
+        # show which FB variant fired. Pulls from the current turn's
+        # `fast_break_play` (set on the FB-producing turn) AND the upcoming
+        # turn's `pending_dreb_fb_play_key` (set during shot resolution for
+        # DREB → FB transitions, popped when the FB turn resolves).
+        next_play_type_str = str(next_play_type) if next_play_type else "None"
+        if next_play_type == "FAST_BREAK":
+            fb_play = (
+                result.get("fast_break_play")
+                or self.game.game_state.get("pending_dreb_fb_play_key")
+                or "?"
+            )
+            next_play_type_str = f"{next_play_type} ({fb_play})"
+        debug_turn_result = f"Turn {turn_num} RESULT: {result_type} | Offense: {offense_team_id} | Next: {next_play_type_str} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}"
         
         if DEBUG:
             print(debug_turn_result)

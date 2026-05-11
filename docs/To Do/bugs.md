@@ -115,6 +115,26 @@ To Do
 
 ## Current Investigation (January 2025)
 
+### ⏸️ Deferred: HCO MISS → DREB Outlet Step Missing (Animation Migration In-Flight)
+- **Issue**: On HCO MISS → DREB → HCO sequences, the outlet pass step (rebounder dribble + pass to PG + other players running toward the new offense basket) does not animate. Players visibly jump from the rebound area to HCO formation, and the next HCO turn raises `[HCO step contract] tolerance breach (step=2, maxDeltaPx=~200, tolerancePx=18)`. Affects all rebounder positions (PG, PF, C all confirmed) and both home/away DREBs.
+- **Location**:
+  - Backend: `BackEnd/models/game_manager.py` (`_perform_post_turn_oreb_loop` — the `(HCT, HCO)` gate that creates the discrete DREB turn) and `BackEnd/engine/dreb_step_emitter.py` (emits the single rebound-capture step).
+  - Frontend: `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js` (`handleDefensiveRebound` silent-skips because `next_play_type === "DREB"` is not a recognized branch) and `FrontEnd/static/js/phaser/animation/turnAnimation.js` (`runDefensiveReboundSetup` is no longer reached for HCO MISS).
+- **Root Cause**: Commit `a6bed04a0` ("feat: HCO vertical slice — … DREB-as-its-own-turn for HCO MISS") added HCO to the migrated set in `game_manager.py`, so HCO MISS now emits a discrete DREB turn whose `dreb_step_emitter` only produces a single rebound-capture step. The legacy outlet pass choreography (rebounder dribbles 6 spots toward new basket → passes to PG → all 8 other players run alongside), which previously executed during the shot turn via `handleEmbeddedRebound` → `runDefensiveReboundSetup`, was not migrated into the new step system. Per `_documentation_master/projects/Animation_System_Updated.md`, the outlet beat is intended to be subsumed by the DREB rebound-capture step + the following HCO turn's bring-up — but the next HCO turn's bring-up doesn't currently reconcile from "players scattered around the rebound area" to "players in new HCO formation 200+ px away".
+- **Why Deferred**: The proper fix lives within the broader animation/coords-tracking migration where everything moves to the new step-based playback engine on the backend. Patching either pipeline mid-migration creates throwaway code and divergence from the architecture roadmap.
+- **Symptoms While Deferred**:
+  - `[HCO step contract] tolerance breach` errors in the console on every HCO MISS → DREB → HCO sequence (caught and continues; doesn't crash gameplay).
+  - Visible "teleport" of players from rebound area to HCO formation rather than a smooth outlet transition.
+  - Possible duplicate rebounder-collapse animation (legacy `handleEmbeddedRebound` still runs on the shot turn, then the new DREB turn re-asserts the same position).
+  - PG-rebounder self-dribble fix from commit `7f67c937` does not apply (`runDefensiveReboundSetup` is no longer reached).
+- **Diagnostic Logs Already In Place** (added during this investigation, will keep firing on the legacy HCT/FB DREB paths):
+  - `🏀 [DREB ROUTING] handleDefensiveRebound branch decision` — shows which routing branch the shot turn took (and confirms the "skipped: unhandled nextPlayType=\"DREB\"" case).
+  - `🏀 [DREB SUMMARY]` — single-line summary at the end of `runDefensiveReboundSetup` covering rebounder/receiver/flags/fired-animations/skip-reason/final-ball-owner.
+  - Tightened "Outlet pass skipped" warn — replaced `'Unknown reason'` fallback with explicit branch reasons.
+- **Hotfix Option (if needed before migration completes)**: Drop "HCO" from the `(HCT, HCO)` set in `game_manager.py._perform_post_turn_oreb_loop`. Restores the legacy embedded-rebound + outlet-pass path for HCO MISS while keeping HCT migrated. One-line, low risk.
+- **Resolution Gate**: Resolve as part of the full DREB-into-new-system migration. At that point: (a) `dreb_step_emitter` either gains outlet-pass step(s), or (b) the next HCO turn's bring-up is taught to reconcile from arbitrary DREB-end positions to HCO formation. Either path needs the related "duplicate rebounder collapse" cleanup (suppress the legacy `handleEmbeddedRebound` rebounder-collapse animation when `next_play_type === "DREB"`).
+- **Priority**: Deferred (waiting on broader animation migration).
+
 ### ✅ Fixed: Duplicate Teams Bug
 - **Root Cause**: When `team_id_str` was not a valid ObjectId (e.g., "BENTLEY_TRUMAN"), the code still added it to output, creating duplicates
 - **Fix**: Updated `BackEnd/utils/team_stats_aggregator.py` to resolve non-ObjectId team IDs to ObjectIds before adding to output, or skip them if they can't be resolved
