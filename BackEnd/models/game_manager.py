@@ -996,6 +996,30 @@ class GameManager:
             # Keep result turn's offense_team_id = old team so frontend classifies correctly for step animation.
             logging.debug(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name} (result keeps offense_team_id=old team for animation)")
 
+        # FB DEFENSIVE_STOP → HCO bring-up: when a CR FB ends in a defensive
+        # stop, possession stays with the same team and the next turn is HCO.
+        # The CR emitter no longer embeds an HCO-setup step-back step inside
+        # the FB; instead, populate the same bring-up state used for DREB→HCO
+        # so the next HCO turn animates each player from their FB end position
+        # to their HCO step-0 setup spot via `runSetupTween`.
+        if (
+            result.get("current_turn") == "FAST_BREAK"
+            and result.get("result_type") == "DEFENSIVE_STOP"
+            and result.get("next_play_type") == "HCO"
+        ):
+            prev_positions = {}
+            for pos, player in (self.offense_team.lineup or {}).items():
+                if player is None:
+                    continue
+                c = getattr(player, "coords", None) or {}
+                x = c.get("x")
+                y = c.get("y")
+                if x is None or y is None:
+                    continue
+                prev_positions[pos] = {"x": float(x), "y": float(y)}
+            if prev_positions:
+                self.game_state["_prev_offense_positions_for_hco"] = prev_positions
+
         # ✅ Situational Logic: Force Foul after DREB — inject FOUL turn and forgo outlet/FB/HCO
         if result.get("force_foul_after_dreb"):
             from BackEnd.utils import situational_logic as sl

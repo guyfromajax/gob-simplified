@@ -974,8 +974,13 @@ def build_covert_release_animation_steps(
     steps.append(outcome_step)
     elapsed += float(outcome_step["end"]["time_elapsed"])
 
-    # DEFENSIVE_STOP only: append step-back step. Other outcomes terminate
-    # via their `turn_stop` next pointer set by `_resolve_outcome_next`.
+    # DEFENSIVE_STOP: attach "Nice Stop!" announcement to step 1's end.
+    # The FB turn terminates at step 1 via the implicit-end pointer set by
+    # `_resolve_outcome_next`. Cross-court HCO setup is handled by the
+    # FOLLOWING HCO turn's bring-up tween (populated by game_manager from
+    # post-FB `player.coords`), so no step 2 step-back is built here.
+    # Other outcomes (MAKE/MISS/BLOCK/FOUL/etc.) terminate via their
+    # `turn_stop` next pointer set by `_resolve_outcome_next`.
     result_type = (turn_result.get("result_type") or "").upper()
     import logging
     logging.warning(
@@ -983,47 +988,9 @@ def build_covert_release_animation_steps(
         result_type, has_outlet_pass, len(steps),
     )
     if result_type == "DEFENSIVE_STOP":
-        # Override the outcome step's `next` pointer to point at step 2
-        # (was implicit-end via index 999; now linear continuation).
-        next_index = len(steps)  # the index step 2 will occupy after append
-        outcome_step["end"]["next"] = {"kind": "next_step", "index": next_index}
-
-        # Attach "Nice Stop!" announcement to step 1's end (plays after the
-        # confrontation move, before step 2 fires).
         outcome_step["end"]["announcement"] = _build_nice_stop_announcement(
             turn_result, fb_roles, def_lineup
         )
-
-        # Build step 2: step-back / HCO setup.
-        step_back_start_coords = dict(outcome_step["end"]["coords"])
-        logging.warning(
-            "🏀 [CR EMITTER] DEFENSIVE_STOP — calling _build_step_back_step. "
-            "fb_bh=%s, fb_bh_pos=%s, off_lineup_keys=%s",
-            getattr(fb_roles.get("ball_handler"), "player_id", None),
-            getattr(fb_roles.get("ball_handler"), "position", None),
-            list(off_lineup.keys()) if off_lineup else None,
-        )
-        step_back = _build_step_back_step(
-            turn_result=turn_result,
-            fb_roles=fb_roles,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            step_start_coords=step_back_start_coords,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-        )
-        if step_back is not None:
-            steps.append(step_back)
-            logging.warning(
-                "🏀 [CR EMITTER] step-back appended; total_steps=%d, T=%.3f",
-                len(steps), step_back["end"]["time_elapsed"],
-            )
-        else:
-            logging.warning(
-                "🏀 [CR EMITTER] _build_step_back_step returned None — "
-                "step 1 next pointer still references missing index %d",
-                next_index,
-            )
 
     _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
     return steps
