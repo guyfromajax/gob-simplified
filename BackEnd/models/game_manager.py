@@ -922,6 +922,19 @@ class GameManager:
                         "🔄 [DREB] Flipped possession after defensive rebound: %s → %s",
                         old_offense, self.offense_team.name,
                     )
+                    if dreb_turn.get("next_play_type") == "HCO":
+                        prev_positions = {}
+                        for pos, player in (self.offense_team.lineup or {}).items():
+                            if player is None:
+                                continue
+                            c = getattr(player, "coords", None) or {}
+                            x = c.get("x")
+                            y = c.get("y")
+                            if x is None or y is None:
+                                continue
+                            prev_positions[pos] = {"x": float(x), "y": float(y)}
+                        if prev_positions:
+                            self.game_state["_prev_offense_positions_for_hco"] = prev_positions
 
         # OTB foul from resolve_offensive_rebound() means no putback/kickout was resolved on the
         # OREB turn. The MISS (or BLOCK) turn still carries embedded OREB; the client otherwise
