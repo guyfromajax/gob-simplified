@@ -1039,11 +1039,14 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
     start_archetype = step.get("start", {}).get("archetype")
     if not isinstance(end_coords, dict):
         return
+    # Order is load-bearing — see TURN_COORDS_OVERLAY_KEYS in shared.py.
+    # Rebounder overlays apply FIRST (default), then get-back / release
+    # override for designated non-rebounders.
     for overlay_key in (
-        "offense_getback_coords",
-        "defense_release_coords",
         "offense_rebounder_coords",
         "defense_rebounder_coords",
+        "offense_getback_coords",
+        "defense_release_coords",
     ):
         overlay = turn_result.get(overlay_key) or {}
         if not isinstance(overlay, dict):

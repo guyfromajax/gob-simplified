@@ -2609,11 +2609,18 @@ def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]]
 # Migrated turn emitters (HCO, HCT, CR FB) absorb them into the final step's
 # `end.coords` directly. Legacy un-migrated turns rely on this sync-time overlay
 # pass to propagate post-shot positions to `player.coords`.
+#
+# Order is load-bearing: rebounder overlays apply FIRST (default — every
+# eligible player is a rebounder candidate); get-back / release overlays apply
+# LAST so they override the rebound position for the specific player roles that
+# shot_manager designated as non-rebounders (off get-back retreaters / def
+# release-runners). Reversing this order pulls release players back to the
+# rim cluster on the next turn.
 TURN_COORDS_OVERLAY_KEYS: Tuple[str, ...] = (
-    "defense_release_coords",
-    "offense_getback_coords",
     "offense_rebounder_coords",
     "defense_rebounder_coords",
+    "offense_getback_coords",
+    "defense_release_coords",
 )
 
 
