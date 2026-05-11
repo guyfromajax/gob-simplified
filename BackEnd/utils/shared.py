@@ -1164,19 +1164,30 @@ def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
         # Determine basket based on which team is on offense
         off_team = game.offense_team
         is_away_offense = off_team.team_id == game.away_team.team_id
-        
-        # Home team attacks away basket (x=91), away team attacks home basket (x=9)
-        # Using standard coordinates: home basket x=91, away basket x=9
+
+        # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9)
         basket_x = 9 if is_away_offense else 91
-    
+    else:
+        # Caller passed basket_x explicitly; infer orientation from its value
+        # so shooter_coords below can be flipped to match.
+        is_away_offense = basket_x < 50
+
     # Determine variance ranges based on shot distance
     if shooter_spot and shooter_spot in HCO_STRING_SPOTS:
-        # Get shooter's coordinates
-        shooter_coords = HCO_STRING_SPOTS[shooter_spot]
-        
+        # `HCO_STRING_SPOTS` is keyed in HOME orientation (e.g., upper wing at
+        # x=76). For away-offense distance math we must flip to display
+        # orientation so shooter and basket are in the same frame — otherwise
+        # the distance is computed across the entire court and the shot is
+        # always classified "long," over-inflating bounce variance.
+        spot_home = HCO_STRING_SPOTS[shooter_spot]
+        if is_away_offense:
+            shooter_coords = {"x": 100 - spot_home["x"], "y": spot_home["y"]}
+        else:
+            shooter_coords = dict(spot_home)
+
         # Calculate distance from shooter to basket (using actual basket coordinates)
         distance = math.sqrt(
-            (shooter_coords["x"] - basket_x) ** 2 + 
+            (shooter_coords["x"] - basket_x) ** 2 +
             (shooter_coords["y"] - basket_y) ** 2
         )
         
