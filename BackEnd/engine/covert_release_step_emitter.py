@@ -255,12 +255,16 @@ def _build_outlet_pass_step(
     wall-clock at 350ms-per-game-sec).
     """
     outlet_score = fb_roles.get("outlet_score")
+    # T=1 game-sec rendered as 350ms wall-clock — too fast for the outlet
+    # pass and supporting drifts to register visually. Raised both branches:
+    # snappy outlet still gets a smaller T than sloppy, but both leave room
+    # for the pass + get-back-defender + parallel cruise drifts to play.
     if outlet_score is not None and outlet_score >= 50:
-        t = 1.0
+        t = 2.0
     else:
         # Includes None case (no outlet score available — shouldn't happen
         # in normal CR flow but defensive default).
-        t = 2.0
+        t = 3.0
 
     x_dir = -1 if is_away_offense else 1
     attacking_basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
@@ -468,6 +472,23 @@ def _build_outcome_step(
         if _movement_end_coord(animations, pid) is not None:
             actions[pid] = "guard_offball"
             archetype[pid] = "drive"
+
+    # Non-BH offensive players: when the animator gives them a movement end
+    # (i.e. they're not actually stationary), tag them as `cut` / `cruise`
+    # so the FE renders them running with the play instead of treating them
+    # as stationary and snap-rendering to the end position. Without this,
+    # offensive supporters in the FB outcome step appear to teleport.
+    for player in off_lineup.values():
+        if player is None:
+            continue
+        pid = _safe_id(player)
+        if pid is None or pid not in actions:
+            continue
+        if pid == bh_id:
+            continue
+        if _movement_end_coord(animations, pid) is not None:
+            actions[pid] = "cut"
+            archetype[pid] = "cruise"
 
     # Gating player + T.
     bh_coord_start = step_start_coords.get(bh_id) if bh_id else None
@@ -1158,14 +1179,23 @@ def _log_steps_coords(
         )
         announcement_end = (end.get("announcement") or {}).get("text") if end.get("announcement") else None
 
+        # Outlet-pass step's advance_trigger uses `to_player_id` (ball
+        # reaching receiver); other step kinds use `target_player_id`
+        # (player reaching position). Try both so the log isn't blank.
+        gate_id_for_log = (
+            trigger_meta.get("target_player_id")
+            or trigger_meta.get("to_player_id")
+            or "?"
+        )
+        gate_coord_for_log = trigger_meta.get("target_coords")
         logging.warning(
             "🏀 [CR STEP %d] kind=%s T=%s gate=%s gate_coord=%s "
             "ball=%s→%s next=%s%s announcement=%s players=%d",
             i,
             kind,
             f"{t:.3f}" if isinstance(t, (int, float)) else "?",
-            trigger_meta.get("target_player_id", "?"),
-            _fmt(trigger_meta.get("target_coords")),
+            gate_id_for_log,
+            _fmt(gate_coord_for_log),
             ball_start,
             ball_end,
             next_kind,
