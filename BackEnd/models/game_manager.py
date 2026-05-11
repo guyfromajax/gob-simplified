@@ -563,23 +563,48 @@ class GameManager:
             return None
 
         # Player coords at DREB start = each player's end coord on the MISS
-        # turn (the position they ended up in after the shot animation).
-        # Read from miss_turn["animations"][i].movement[-1].coords.
+        # turn. Source priority (per the cross-turn coord contract in
+        # `_documentation_master/projects/Animation_System_Updated.md`):
+        #   1. `miss_turn.animation_steps[-1].end.coords` — the schema's
+        #      authoritative post-shot positions, including overlay
+        #      corrections (defense_release_coords, offense_getback_coords,
+        #      offense_rebounder_coords) applied by the emitter.
+        #   2. `miss_turn.animations[i].movement[-1].coords` — legacy animator
+        #      output (used by un-migrated turn types). Stale relative to the
+        #      overlay corrections; only used when the schema isn't available.
+        #   3. `player.coords` — current live state (fallback when neither
+        #      schema nor legacy animations carried end positions).
         start_coords = {}
-        for anim in (miss_turn.get("animations") or []):
-            movement = anim.get("movement") or []
-            if not movement:
-                continue
-            last_coord = (movement[-1] or {}).get("coords") or {}
-            x = last_coord.get("x")
-            y = last_coord.get("y")
-            pid = anim.get("playerId")
-            if pid is None or x is None or y is None:
-                continue
-            start_coords[str(pid)] = {"x": float(x), "y": float(y)}
+        animation_steps = miss_turn.get("animation_steps") or []
+        if animation_steps:
+            last_step = animation_steps[-1] if isinstance(animation_steps[-1], dict) else None
+            end_coords = (last_step.get("end") or {}).get("coords") if last_step else None
+            if isinstance(end_coords, dict):
+                for pid, coord in end_coords.items():
+                    if not isinstance(coord, dict):
+                        continue
+                    x = coord.get("x")
+                    y = coord.get("y")
+                    if x is None or y is None:
+                        continue
+                    start_coords[str(pid)] = {"x": float(x), "y": float(y)}
 
         if not start_coords:
-            # Fall back to player.coords if animations[] didn't carry end positions.
+            for anim in (miss_turn.get("animations") or []):
+                movement = anim.get("movement") or []
+                if not movement:
+                    continue
+                last_coord = (movement[-1] or {}).get("coords") or {}
+                x = last_coord.get("x")
+                y = last_coord.get("y")
+                pid = anim.get("playerId")
+                if pid is None or x is None or y is None:
+                    continue
+                start_coords[str(pid)] = {"x": float(x), "y": float(y)}
+
+        if not start_coords:
+            # Final fallback: live `player.coords` (which sync_lineup_coords_from_turn
+            # has already populated from animation_steps + overlay keys).
             for player in (
                 list(self.offense_team.lineup.values())
                 + list(self.defense_team.lineup.values())
