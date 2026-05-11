@@ -20,7 +20,7 @@ This document provides an overview of the front-end animation stack for **GOB**,
 ### Universal Movement and Speed Authority
 
 - **Player locomotion duration**: `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` (`getPlayerMovementDurationMs`) is the shared duration authority.
-- **Speed model**: AG-based base speed from `playerMovementSpeed.js` (`400 + AG`, ball-handler multiplier `0.95`), then scaled by game-speed preset via `window.__GAME_SPEED / 450`.
+- **Speed model**: AG-based base speed from `playerMovementSpeed.js` (`400 + AG`, ball-handler multiplier `1.0` — no BH penalty), then scaled by game-speed preset via `window.__GAME_SPEED / 450`.
 - **Default player tween behavior**: `ballTween.tweenPlayerTo()` uses `getPlayerMovementDurationMs` when duration is omitted.
 - **Game speed presets in production UI**: `Normal=450`, `Fast=550`, `Super Fast=1000` (`gameSpeedManager.js` + `court.html`).
 
@@ -2755,12 +2755,12 @@ The animation system uses a **universal speed management** model: player tween t
 | Module | Role |
 |--------|------|
 | `FrontEnd/static/js/phaser/utils/playerMovementDuration.js` | **Single entry point** for player tween duration: `getGameSpeedPxPerSec()`, `resolveMovementSpeedPxPerSec()`, `getPlayerMovementDurationMs()`. |
-| `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js` | AG → base px/s before global scale: `agToSpeedPxPerSec()`, `getEffectiveAgilityForMovement()`, constants `MOVEMENT_SPEED_BASE` (400), `MOVEMENT_SPEED_SLOPE` (1), `BALL_HANDLER_SPEED_MULTIPLIER` (0.95). |
+| `FrontEnd/static/js/phaser/utils/playerMovementSpeed.js` | AG → base px/s before global scale: `agToSpeedPxPerSec()`, `getEffectiveAgilityForMovement()`, constants `MOVEMENT_SPEED_BASE` (400), `MOVEMENT_SPEED_SLOPE` (1), `BALL_HANDLER_SPEED_MULTIPLIER` (1.0 — BH speed parity; v1 penalty removed). |
 
 **Player effective speed**
 
-1. **Base (before global game-speed scale):** `400 + AG` px/s (`agToSpeedPxPerSec`). If the sprite is the current ball handler (see below), multiply by **0.95**. Missing AG falls back to **50** (`DEFAULT_AG_WHEN_MISSING`).
-2. **Global scale:** multiply by `getGameSpeedPxPerSec() / 450`. `getGameSpeedPxPerSec()` reads `window.__GAME_SPEED` when set; otherwise **450** (Normal). The divisor **450** is the reference preset so “Normal” keeps AG 50 ≈ **450** px/s before BH penalty.
+1. **Base (before global game-speed scale):** `400 + AG` px/s (`agToSpeedPxPerSec`). The ball-handler multiplier is **1.0** today, so ball-handlers and off-ball players share the same AG-derived speed (the v1 0.95 BH penalty has been removed). Missing AG falls back to **50** (`DEFAULT_AG_WHEN_MISSING`).
+2. **Global scale:** multiply by `getGameSpeedPxPerSec() / 450`. `getGameSpeedPxPerSec()` reads `window.__GAME_SPEED` when set; otherwise **450** (Normal). The divisor **450** is the reference preset so “Normal” keeps AG 50 ≈ **450** px/s.
 3. **Duration:** `duration = (distance / effectiveSpeed) * 1000` ms, **minimum 50** ms (`MIN_DURATION_MS`).
 
 **Ball-handler detection for movement speed**

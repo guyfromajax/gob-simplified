@@ -80,6 +80,20 @@ export const REBOUNDER_Y_RANGE = 6; // ±6 y-coords from starting position (defe
 // Shot Attempt Rebounder Positioning
 export const SHOT_ATTEMPT_REBOUNDER_Y_RANGE = 10; // ±10 y-coords from rim (shot attempt)
 
+/**
+ * Minimum grid-x distance from the offense's attacking basket that any
+ * non-shooter offense player and any non-shot-defender defense player must
+ * keep on Fast Breaks. Applied as a one-sided clamp toward midcourt:
+ *   - Home offense (basket at x≈91): target x must be ≤ basket.x − 6 (so ≤ 85).
+ *   - Away offense (basket at x≈9):  target x must be ≥ basket.x + 6 (so ≥ 15).
+ *
+ * Keeps the shot-area visually uncluttered: only the shooter and the primary
+ * shot defender(s) (stopper / shot defender) can encroach inside the keep-out
+ * zone. Get-back defenders, rebounder-band offense, outlet passer, etc. are
+ * all held outside this radius.
+ */
+export const NON_SHOT_PARTICIPANT_BASKET_KEEPOUT = 6;
+
 // Outlet Passer Movement
 export const OUTLET_PASSER_MOVE_X = 7; // Moves forward 7 x-coords toward basket (+7 for home, -7 for away)
 

@@ -139,7 +139,7 @@ Frontend reads these values and uses `× clockSecondMs` as the tween duration. A
 ## 9. Open items / follow-ups
 
 - **AG curve tuning** based on franchise-mode pacing data (slope/intercept may need adjustment once we have data on shot-clock-violation rates per lineup AG distribution).
-- **BH movement multiplier**: AG curve doesn't currently apply a separate BH penalty (the ball handler running at his AG-derived rate is the model). The frontend fallback path retains a 5% BH penalty for legacy reasons but it's not part of the backend canon. Could be unified (one direction or the other) in a future tuning pass.
+- **BH movement multiplier**: No BH penalty — ball-handlers move at their full AG-derived rate, matching off-ball players at equal AG. The frontend `BALL_HANDLER_SPEED_MULTIPLIER` constant in `playerMovementSpeed.js` is `1.0` (the v1 0.95 penalty was removed); the `isBallHandler` plumbing through `getPlayerMovementDurationMs` → `resolveMovementSpeedPxPerSec` → `agToSpeedPxPerSec` is preserved as a no-op lever for re-introducing or retuning a BH-specific factor without touching callers.
 - **Game speed presets**: when reintroduced, multiply `clockSecondMs` only — don't touch the AG curve.
 - **Shot gating (§11.2–11.3):** still optional — HCO shot keyed on **shooter-only** vs current "all offense finish before `shootBall`"; rebound / display SS&S if shot fires early.
 

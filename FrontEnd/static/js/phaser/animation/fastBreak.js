@@ -32,6 +32,7 @@ const {
   STEAL_ENTRY_MOVE_Y_RANGE,
   STEAL_ENTRY_Y_MIN,
   STEAL_ENTRY_Y_MAX,
+  NON_SHOT_PARTICIPANT_BASKET_KEEPOUT,
   fastBreakShotDefenderGridVsShooter,
 } = fastBreakConstants;
 const fastBreakSecondaryShotDefenderGrid =
@@ -4039,10 +4040,12 @@ function animateRebounders(
         y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), GRID_MIN_Y, GRID_MAX_Y)
       };
     } else {
-      // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
-      // Home basket (x=91): 5-20 spots less = 71-86
-      // Away basket (x=9): 5-20 spots more = 14-29
-      const distanceFromBasket = Phaser.Math.Between(5, 20);
+      // ✅ Shot Attempt: x=random KEEPOUT-20 spots out from basket, y=rim_y ± 10
+      // (clamped to court bounds). Random floor matches NON_SHOT_PARTICIPANT_BASKET_KEEPOUT
+      // so the band sits entirely outside the basket keep-out zone.
+      // Home basket (x=91), KEEPOUT=6: 6-20 spots less = 71-85.
+      // Away basket (x=9),  KEEPOUT=6: 6-20 spots more = 15-29.
+      const distanceFromBasket = Phaser.Math.Between(NON_SHOT_PARTICIPANT_BASKET_KEEPOUT, 20);
       const targetX = isHomeOffense
         ? basket.x - distanceFromBasket // Home: move left (toward center court)
         : basket.x + distanceFromBasket; // Away: move right (toward center court)
@@ -4056,6 +4059,16 @@ function animateRebounders(
         ),
       };
     }
+
+    // Enforce the basket keep-out for non-shot participants regardless of how
+    // targetSpot was determined. Catches backend-stamped `animations_end` coords
+    // that violate the keep-out; no-op for the defensive-stop band (already
+    // sitting at x=40-60) and the shot-attempt random branch (already ≥ KEEPOUT
+    // out from the basket).
+    targetSpot = {
+      ...targetSpot,
+      x: clampFbNonShotParticipantX(targetSpot.x, isHomeOffense, basket.x),
+    };
     if (!animEnd) {
       const source = rimRunnerSpriteGrid(sprite, width, height);
       reportMissingEndpoint(scene, turnData, {
@@ -4108,6 +4121,24 @@ function getFastBreakAttackingBasket(isHomeOffense) {
   return isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
 }
 
+/**
+ * One-sided clamp pushing `x` outside the basket keep-out zone for non-shot
+ * participants (everyone except the shooter and shot defender / stopper).
+ *
+ *   - Home offense (basket at high x): returned x ≤ `basketX − KEEPOUT`.
+ *   - Away offense (basket at low x):  returned x ≥ `basketX + KEEPOUT`.
+ *
+ * Only adjusts in the toward-basket direction; values already further from the
+ * basket are returned unchanged. Result is also clamped to court bounds.
+ */
+function clampFbNonShotParticipantX(x, isHomeOffense, basketX) {
+  const keepoutX = isHomeOffense
+    ? basketX - NON_SHOT_PARTICIPANT_BASKET_KEEPOUT
+    : basketX + NON_SHOT_PARTICIPANT_BASKET_KEEPOUT;
+  const enforced = isHomeOffense ? Math.min(x, keepoutX) : Math.max(x, keepoutX);
+  return Phaser.Math.Clamp(enforced, GRID_MIN_X, GRID_MAX_X);
+}
+
 // Critical-event cleanup helper. When the defensive-stop critical event fires
 // (BH at top-of-key, stopper at their spot), all other parallel tweens should
 // stop wherever they are — preventing far-end runaways like offensive teammates
@@ -4124,17 +4155,20 @@ function stopAllNonBhStopperTweens(scene, playerSprites, ballHandlerId, stopperI
 /**
  * X band for get-back defenders to sprint toward the hoop the fast-break offense is attacking.
  * Must match offense direction used for shot spots — do not hardcode one rim; away FB attacks low x.
+ *
+ * Get-back defenders are non-shot-defending defense players, so the toward-basket
+ * edge is held at NON_SHOT_PARTICIPANT_BASKET_KEEPOUT from the offense's basket.
  */
 function getGetBackRetreatXRange(isHomeOffense) {
   const basket = getFastBreakAttackingBasket(isHomeOffense);
   if (isHomeOffense) {
     return {
       minX: 50,
-      maxX: Phaser.Math.Clamp(basket.x - 2, GRID_MIN_X, GRID_MAX_X),
+      maxX: Phaser.Math.Clamp(basket.x - NON_SHOT_PARTICIPANT_BASKET_KEEPOUT, GRID_MIN_X, GRID_MAX_X),
     };
   }
   return {
-    minX: Phaser.Math.Clamp(basket.x + 2, GRID_MIN_X, GRID_MAX_X),
+    minX: Phaser.Math.Clamp(basket.x + NON_SHOT_PARTICIPANT_BASKET_KEEPOUT, GRID_MIN_X, GRID_MAX_X),
     maxX: 50,
   };
 }

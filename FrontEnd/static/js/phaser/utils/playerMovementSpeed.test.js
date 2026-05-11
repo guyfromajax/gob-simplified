@@ -27,9 +27,11 @@ test("agToSpeedPxPerSec extrapolates above 100 with no cap", () => {
   assert.equal(agToSpeedPxPerSec(200), MOVEMENT_SPEED_BASE + 200);
 });
 
-test("ball handler applies 5% reduction", () => {
+test("ball handler speed has parity with off-ball at equal AG", () => {
   const off = agToSpeedPxPerSec(80, { isBallHandler: false });
   const bh = agToSpeedPxPerSec(80, { isBallHandler: true });
+  assert.equal(BALL_HANDLER_SPEED_MULTIPLIER, 1.0);
+  assert.equal(bh, off);
   assert.ok(Math.abs(bh - off * BALL_HANDLER_SPEED_MULTIPLIER) < 1e-9);
 });
 

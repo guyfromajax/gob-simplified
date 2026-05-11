@@ -11,8 +11,13 @@ export const MOVEMENT_SPEED_SLOPE = 1;
 
 export const DEFAULT_AG_WHEN_MISSING = 50;
 
-/** v1 ball-handler movement penalty */
-export const BALL_HANDLER_SPEED_MULTIPLIER = 0.95;
+/**
+ * Ball-handler movement multiplier. Currently 1.0 — ball-handlers move at the
+ * same AG-derived speed as off-ball players. The v1 penalty (0.95) was removed;
+ * the plumbing is kept so re-introducing or retuning a BH-specific factor only
+ * requires changing this constant (no caller changes).
+ */
+export const BALL_HANDLER_SPEED_MULTIPLIER = 1.0;
 
 function normId(id) {
   return id != null ? String(id) : null;
