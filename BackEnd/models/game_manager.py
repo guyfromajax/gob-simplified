@@ -562,60 +562,34 @@ class GameManager:
         if rebounder_id is None or bx is None or by is None:
             return None
 
-        # Player coords at DREB start = each player's end coord on the MISS
-        # turn. Source priority (per the cross-turn coord contract in
-        # `_documentation_master/projects/Animation_System_Updated.md`):
-        #   1. `miss_turn.animation_steps[-1].end.coords` — the schema's
-        #      authoritative post-shot positions, including overlay
-        #      corrections (defense_release_coords, offense_getback_coords,
-        #      offense_rebounder_coords) applied by the emitter.
-        #   2. `miss_turn.animations[i].movement[-1].coords` — legacy animator
-        #      output (used by un-migrated turn types). Stale relative to the
-        #      overlay corrections; only used when the schema isn't available.
-        #   3. `player.coords` — current live state (fallback when neither
-        #      schema nor legacy animations carried end positions).
+        # Player coords at DREB start = `player.coords` post-HCO-sync.
+        #
+        # Why player.coords and not the MISS turn's animation_steps[-1].end.coords?
+        # `sync_lineup_coords_from_turn` is the only place that applies the FULL
+        # post-shot picture: schema end coords + every overlay map
+        # (offense_rebounder_coords / defense_rebounder_coords /
+        # offense_getback_coords / defense_release_coords) in the correct
+        # precedence. The schema's `end.coords` only reflects overlays that
+        # the MISS-turn emitter's `_apply_post_shot_overlay` happened to write —
+        # if the emitter returned None (graceful degradation), or if a given
+        # overlay map didn't include a player's id, the schema's value is
+        # the pre-overlay legacy animation end (stale relative to player.coords).
+        #
+        # By reading player.coords, DREB always sees what shot_manager actually
+        # decided for every player post-shot. This is the single-placement-
+        # authority contract in `Rebound_System.md` / `Animation_System_Updated.md`.
         start_coords = {}
-        animation_steps = miss_turn.get("animation_steps") or []
-        if animation_steps:
-            last_step = animation_steps[-1] if isinstance(animation_steps[-1], dict) else None
-            end_coords = (last_step.get("end") or {}).get("coords") if last_step else None
-            if isinstance(end_coords, dict):
-                for pid, coord in end_coords.items():
-                    if not isinstance(coord, dict):
-                        continue
-                    x = coord.get("x")
-                    y = coord.get("y")
-                    if x is None or y is None:
-                        continue
-                    start_coords[str(pid)] = {"x": float(x), "y": float(y)}
-
-        if not start_coords:
-            for anim in (miss_turn.get("animations") or []):
-                movement = anim.get("movement") or []
-                if not movement:
-                    continue
-                last_coord = (movement[-1] or {}).get("coords") or {}
-                x = last_coord.get("x")
-                y = last_coord.get("y")
-                pid = anim.get("playerId")
-                if pid is None or x is None or y is None:
-                    continue
-                start_coords[str(pid)] = {"x": float(x), "y": float(y)}
-
-        if not start_coords:
-            # Final fallback: live `player.coords` (which sync_lineup_coords_from_turn
-            # has already populated from animation_steps + overlay keys).
-            for player in (
-                list(self.offense_team.lineup.values())
-                + list(self.defense_team.lineup.values())
-            ):
-                pid = getattr(player, "player_id", None)
-                coords = getattr(player, "coords", None) or {}
-                if pid is not None and "x" in coords and "y" in coords:
-                    start_coords[str(pid)] = {
-                        "x": float(coords["x"]),
-                        "y": float(coords["y"]),
-                    }
+        for player in (
+            list(self.offense_team.lineup.values())
+            + list(self.defense_team.lineup.values())
+        ):
+            pid = getattr(player, "player_id", None)
+            coords = getattr(player, "coords", None) or {}
+            if pid is not None and "x" in coords and "y" in coords:
+                start_coords[str(pid)] = {
+                    "x": float(coords["x"]),
+                    "y": float(coords["y"]),
+                }
 
         # Offense team during the MISS turn = the team that took the shot.
         # Carried onto the DREB turn dict below so downstream possession/

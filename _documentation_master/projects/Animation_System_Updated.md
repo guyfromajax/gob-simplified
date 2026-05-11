@@ -278,7 +278,7 @@ No frontcourt filter, no random near-bounce spots, no `exempt_player_ids` plumbi
 
 | Player | Source of start coord |
 |---|---|
-| All 10 players | The previous MISS turn's `animation_steps[-1].end.coords` — i.e., where shot_manager's overlay maps placed them. `_build_dreb_turn_from_miss` reads this directly; `player.coords` is the fallback if the schema isn't present. |
+| All 10 players | `player.coords` (live state, post-MISS-sync). `sync_lineup_coords_from_turn` is the only place that applies the **full** post-shot picture — schema `animation_steps[-1].end.coords` + every overlay map in the correct precedence. The schema's own `end.coords` only reflects overlays the MISS-turn emitter's `_apply_post_shot_overlay` happened to write; if that emitter returned None or didn't cover a player, the schema value is the pre-overlay legacy animation end and is stale relative to `player.coords`. Reading `player.coords` guarantees DREB sees what shot_manager actually decided. |
 
 ### Outcome → next pointer mapping
 
