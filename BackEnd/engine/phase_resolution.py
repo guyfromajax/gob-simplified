@@ -1727,7 +1727,14 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Capture Fast Break animation first so fb_roles gets _bh_final_x/y (shot spot); set shooter coords for block reconciliation
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, hold_up, stopper_id)
-        apply_coords_from_animations_list(game, fb_animations)
+        # SS&S migration: migrated FB variants (CR) build their own start coords
+        # from `player.coords`, so applying the legacy animator's pre-staged
+        # positions here would create a discontinuity between the prior turn's
+        # end coords and step 0 start coords (visible as players "jetting" down
+        # the court at the FB→step-0 boundary). Skip apply_coords for migrated
+        # variants; legacy variants (RR, Triangle) still need it.
+        if fb_play_key != "covert_release":
+            apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             shooter.coords = shot_spot
