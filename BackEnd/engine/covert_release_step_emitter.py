@@ -916,41 +916,14 @@ def build_covert_release_animation_steps(
     outlet_receiver_id = fb_roles.get("outlet_receiver")
     is_away_offense = bool(fb_roles.get("is_away_offense"))
 
-    # All-player start coords. Prefer `fb_roles["pre_shot_player_coords"]`
-    # (snapshot captured in `phase_resolution.resolve_fast_break_logic`
-    # BEFORE `resolve_shot` mutated `player.coords` with post-shot get-back
-    # and rebounder placements). Without this, step 0 START would reflect
-    # post-MAKE/MISS positions — players teleporting to the rim or to
-    # backcourt get-back spots BEFORE the outlet pass even fires. Fall back
-    # to live `player.coords` for callers / tests that don't populate the
-    # snapshot.
-    snapshot = fb_roles.get("pre_shot_player_coords")
-    if isinstance(snapshot, dict) and snapshot:
-        all_start_coords = {
-            str(pid): {"x": float(c["x"]), "y": float(c["y"])}
-            for pid, c in snapshot.items()
-            if isinstance(c, dict)
-            and c.get("x") is not None
-            and c.get("y") is not None
-        }
-    else:
-        all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
+    # All-player start coords. Per the cross-turn coord contract in
+    # `_documentation_master/projects/Animation_System_Updated.md`, step 0
+    # START reads `player.coords` (= prior turn's last step end.coords as
+    # written by `sync_lineup_coords_from_turn`). `shot_manager` no longer
+    # mutates `player.coords` mid-resolution, so live coords are trustworthy.
+    all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
         return None
-
-    # Override outlet passer's start coord with fb_roles outlet_passer_x/y
-    # when present — the animator stores the canonical pre-pass position
-    # there (rebounder coords at the moment of outlet).
-    op_x = fb_roles.get("outlet_passer_x")
-    op_y = fb_roles.get("outlet_passer_y")
-    if outlet_passer_id and op_x is not None and op_y is not None:
-        all_start_coords[str(outlet_passer_id)] = {"x": float(op_x), "y": float(op_y)}
-
-    # NOTE: `player.coords` now stores in DISPLAY orientation (real visual
-    # coords) — the prior dual-orientation convention was removed by
-    # neutralizing `_normalize_animation_coords_to_runtime_home`. So no
-    # flip is needed here; `all_start_coords` is already in display
-    # orientation matching the rest of the chain.
 
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
@@ -1030,8 +1003,50 @@ def build_covert_release_animation_steps(
             turn_result, fb_roles, def_lineup
         )
 
+    # Movement #1 (post-shot positioning): override outcome step's end.coords
+    # for players in shot_manager's overlay maps (get-back, release,
+    # offense rebounders, defense rebounders for FB). Skips for DEFENSIVE_STOP
+    # since the FB ended without a shot resolving — no rebounder placement.
+    if result_type != "DEFENSIVE_STOP":
+        _apply_post_shot_overlay(outcome_step, turn_result)
+
     _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
     return steps
+
+
+def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -> None:
+    """Override the outcome step's `end.coords` for players in shot_manager's
+    post-shot overlay maps. See
+    `_documentation_master/projects/Animation_System_Updated.md` cross-turn
+    coord contract.
+    """
+    end_coords = step.get("end", {}).get("coords")
+    start_actions = step.get("start", {}).get("action")
+    start_archetype = step.get("start", {}).get("archetype")
+    if not isinstance(end_coords, dict):
+        return
+    for overlay_key in (
+        "offense_getback_coords",
+        "defense_release_coords",
+        "offense_rebounder_coords",
+        "defense_rebounder_coords",
+    ):
+        overlay = turn_result.get(overlay_key) or {}
+        if not isinstance(overlay, dict):
+            continue
+        for pid, coord in overlay.items():
+            if not isinstance(coord, dict):
+                continue
+            x = coord.get("x")
+            y = coord.get("y")
+            if x is None or y is None:
+                continue
+            pid_str = str(pid)
+            end_coords[pid_str] = {"x": float(x), "y": float(y)}
+            if isinstance(start_actions, dict):
+                start_actions[pid_str] = "cut"
+            if isinstance(start_archetype, dict):
+                start_archetype[pid_str] = "cruise"
 
 
 def _log_fb_roles(

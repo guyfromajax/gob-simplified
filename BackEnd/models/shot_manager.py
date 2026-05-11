@@ -1274,7 +1274,12 @@ class ShotManager:
             result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
             result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
             
-            # ✅ SS&S: Calculate and store get-back player coordinates (backend as source of truth)
+            # Compute post-shot positions and expose on the turn result so the
+            # emitter can write them into the final shot step's `end.coords`.
+            # Do NOT mutate `player.coords` here — let `sync_lineup_coords_from_turn`
+            # apply via the schema's normal channel. See
+            # `_documentation_master/projects/Animation_System_Updated.md` for
+            # the cross-turn coord contract.
             offense_getback_coords = {}
             for pos in offense_getback_list:
                 getback_player = off_team.lineup.get(pos)
@@ -1285,32 +1290,34 @@ class ShotManager:
                         getback_player, off_team, def_team, good_d=good_d
                     )
                     offense_getback_coords[getback_player.player_id] = coords
-                    # Update player.coords so fast break logic uses correct starting position
-                    getback_player.coords = coords.copy()
             result["offense_getback_coords"] = offense_getback_coords
-            
-            # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
-            # These players should be near the basket they were attacking (where the shot was taken)
-            # off_team was on offense during shot, so they were attacking their target basket.
-            # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
-            # Non-get-back rebounders cluster near the basket they just shot at.
-            from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
-            min_x = AWAY_RIM_COORDS["x"]  # 9 (left side)
-            max_x = HOME_RIM_COORDS["x"]  # 91 (right side)
 
+            # Non-get-back offensive players cluster near the basket they shot at.
+            # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
+            from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+            min_x = AWAY_RIM_COORDS["x"]  # 9
+            max_x = HOME_RIM_COORDS["x"]  # 91
             is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+            shooter_id_excl = getattr(shooter, "player_id", None)
+            offense_rebounder_coords = {}
             for pos in offense_rebounders:
                 rebounder_player = off_team.lineup.get(pos)
-                if rebounder_player:
-                    if is_home_team_shooting:
-                        rebounder_x = random.randint(85, 92)
-                    else:
-                        rebounder_x = random.randint(8, 15)
-                    rebounder_x = max(min_x, min(max_x, rebounder_x))
-                    rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
-                    rebounder_player.coords = rebounder_coords.copy()
-            
-            # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+                if rebounder_player is None:
+                    continue
+                # Shooter stays at shot spot — does NOT get into rebound position
+                # (still eligible for the rebound via geo-based selection, but
+                # their step.end.coords stays at the skeleton's shot spot).
+                if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
+                    continue
+                if is_home_team_shooting:
+                    rebounder_x = random.randint(85, 92)
+                else:
+                    rebounder_x = random.randint(8, 15)
+                rebounder_x = max(min_x, min(max_x, rebounder_x))
+                rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
+                offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+            result["offense_rebounder_coords"] = offense_rebounder_coords
+
             defense_release_coords = {}
             for pos in defense_release_list:
                 release_player = def_team.lineup.get(pos)
@@ -1319,8 +1326,6 @@ class ShotManager:
                         release_player, off_team, def_team, good_release=good_release_flag
                     )
                     defense_release_coords[release_player.player_id] = coords
-                    # Update player.coords so fast break logic uses correct starting position
-                    release_player.coords = coords.copy()
             result["defense_release_coords"] = defense_release_coords
 
         # ------------------------
@@ -1411,23 +1416,24 @@ class ShotManager:
                             getback_player, off_team, def_team, good_d=good_d
                         )
                         offense_getback_coords[getback_player.player_id] = coords
-                        # Update player.coords so fast break logic uses correct starting position
-                        getback_player.coords = coords.copy()
                 result["offense_getback_coords"] = offense_getback_coords
-                
-                # Non-get-back rebounders cluster near the basket they just shot at.
-                # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
+
                 is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+                shooter_id_excl = getattr(shooter, "player_id", None)
+                offense_rebounder_coords = {}
                 for pos in offense_rebounders:
                     rebounder_player = off_team.lineup.get(pos)
-                    if rebounder_player:
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                        rebounder_player.coords = rebounder_coords.copy()
-                
-                # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+                    if rebounder_player is None:
+                        continue
+                    if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
+                        continue
+                    if is_home_team_shooting:
+                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                    else:
+                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                result["offense_rebounder_coords"] = offense_rebounder_coords
+
                 defense_release_coords = {}
                 for pos in defense_release_list:
                     release_player = def_team.lineup.get(pos)
@@ -1436,8 +1442,6 @@ class ShotManager:
                             release_player, off_team, def_team, good_release=good_release_flag
                         )
                         defense_release_coords[release_player.player_id] = coords
-                        # Update player.coords so fast break logic uses correct starting position
-                        release_player.coords = coords.copy()
                 result["defense_release_coords"] = defense_release_coords
             else:
                 # Regular miss → rebound logic (or block outcome using block spot from reconciliation only)
@@ -1576,21 +1580,31 @@ class ShotManager:
 
                     # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
                     # Both off and def rebounders cluster near the basket where the shot was taken.
+                    # Expose on turn result; emitter writes into final step's `end.coords`.
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+                    shooter_id_excl = getattr(shooter, "player_id", None)
+                    offense_rebounder_coords = {}
                     for pos, rebounder_player in o_rebounder_lineup.items():
-                        if rebounder_player:
-                            if is_home_team_shooting:
-                                rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                            else:
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                            rebounder_player.coords = rebounder_coords.copy()
+                        if rebounder_player is None:
+                            continue
+                        if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
+                            continue
+                        if is_home_team_shooting:
+                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                        else:
+                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                    result["offense_rebounder_coords"] = offense_rebounder_coords
+
+                    defense_rebounder_coords = {}
                     for pos, rebounder_player in d_rebounder_lineup.items():
                         if rebounder_player:
                             if is_home_team_shooting:
                                 rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
                             else:
                                 rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                            rebounder_player.coords = rebounder_coords.copy()
+                            defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                    result["defense_rebounder_coords"] = defense_rebounder_coords
                 else:
                     # ==================== UNIFIED GEOGRAPHY-BASED REBOUND SYSTEM (HCO) ====================
                     # Step 1: Calculate bounce spot (with distance-based variance) or use block spot
@@ -1719,7 +1733,6 @@ class ShotManager:
                         result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
                         result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
                     
-                    # ✅ SS&S: Calculate and store get-back player coordinates (backend as source of truth)
                     offense_getback_coords = {}
                     for pos in offense_getback_list:
                         getback_player = off_team.lineup.get(pos)
@@ -1730,11 +1743,8 @@ class ShotManager:
                                 getback_player, off_team, def_team, good_d=good_d
                             )
                             offense_getback_coords[getback_player.player_id] = coords
-                            # Update player.coords so fast break logic uses correct starting position
-                            getback_player.coords = coords.copy()
                     result["offense_getback_coords"] = offense_getback_coords
-                    
-                    # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+
                     defense_release_coords = {}
                     for pos in defense_release_list:
                         release_player = def_team.lineup.get(pos)
@@ -1743,26 +1753,25 @@ class ShotManager:
                                 release_player, off_team, def_team, good_release=good_release_flag
                             )
                             defense_release_coords[release_player.player_id] = coords
-                            # Update player.coords so fast break logic uses correct starting position
-                            release_player.coords = coords.copy()
                     result["defense_release_coords"] = defense_release_coords
-                    
-                    # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
-                    # These players should be near the basket they were attacking (where the shot was taken)
-                    # off_team was on offense during shot, so they were attacking their target basket
-                    # For home team shooting: attacking away basket (x=10)
-                    # For away team shooting: attacking home basket (x=90)
+
                     # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
                     # Non-get-back rebounders cluster near the basket they just shot at.
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+                    shooter_id_excl = getattr(shooter, "player_id", None)
+                    offense_rebounder_coords = {}
                     for pos in offense_rebounders:
                         rebounder_player = off_team.lineup.get(pos)
-                        if rebounder_player:
-                            if is_home_team_shooting:
-                                rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                            else:
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                            rebounder_player.coords = rebounder_coords.copy()
+                        if rebounder_player is None:
+                            continue
+                        if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
+                            continue
+                        if is_home_team_shooting:
+                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                        else:
+                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                    result["offense_rebounder_coords"] = offense_rebounder_coords
                 
                 # Debug log to verify offense_getback is populated
                 # print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {

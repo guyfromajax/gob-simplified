@@ -499,4 +499,54 @@ def build_skeleton_animation_steps(
         steps.append(step)
         elapsed_so_far += t
 
+    # Movement #1 (post-shot positioning): on the final shot step, override
+    # `end.coords` for get-back / release / rebounder players using overlay
+    # maps produced by `shot_manager.resolve_shot`. This is how the schema
+    # tracks the players' actual post-shot positions (get-back players
+    # pulled back to defend, release players ahead toward outlet, rebound
+    # attemptors clustered near the rim) — without this, the legacy mid-turn
+    # `player.coords` writes (now removed) would leave the schema with stale
+    # end positions and the next turn would seed from wrong coords. See
+    # `_documentation_master/projects/Animation_System_Updated.md`.
+    if steps:
+        _apply_post_shot_overlay(steps[-1], turn_result)
+
     return steps
+
+
+def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -> None:
+    """Override the final shot step's `end.coords` (and start action/archetype)
+    for players in shot_manager's post-shot overlay maps.
+
+    Overlay maps:
+    - `offense_getback_coords` — offensive players pulled back to defend
+    - `defense_release_coords` — defensive players released ahead for outlet
+    - `offense_rebounder_coords` — offensive non-get-back players at rebound spots
+    """
+    end_coords = step.get("end", {}).get("coords")
+    start_actions = step.get("start", {}).get("action")
+    start_archetype = step.get("start", {}).get("archetype")
+    if not isinstance(end_coords, dict):
+        return
+
+    for overlay_key in (
+        "offense_getback_coords",
+        "defense_release_coords",
+        "offense_rebounder_coords",
+    ):
+        overlay = turn_result.get(overlay_key) or {}
+        if not isinstance(overlay, dict):
+            continue
+        for pid, coord in overlay.items():
+            if not isinstance(coord, dict):
+                continue
+            x = coord.get("x")
+            y = coord.get("y")
+            if x is None or y is None:
+                continue
+            pid_str = str(pid)
+            end_coords[pid_str] = {"x": float(x), "y": float(y)}
+            if isinstance(start_actions, dict):
+                start_actions[pid_str] = "cut"
+            if isinstance(start_archetype, dict):
+                start_archetype[pid_str] = "cruise"

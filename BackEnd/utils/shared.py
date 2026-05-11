@@ -2604,10 +2604,16 @@ def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]]
     return payload
 
 
-# Turn payload keys: player_id -> {x, y} in HOME grid. Later keys override earlier for same id.
+# Turn payload keys: player_id -> {x, y}. Later keys override earlier for same id.
+# These overlay maps carry post-shot positions written by `shot_manager.resolve_shot`.
+# Migrated turn emitters (HCO, HCT, CR FB) absorb them into the final step's
+# `end.coords` directly. Legacy un-migrated turns rely on this sync-time overlay
+# pass to propagate post-shot positions to `player.coords`.
 TURN_COORDS_OVERLAY_KEYS: Tuple[str, ...] = (
     "defense_release_coords",
     "offense_getback_coords",
+    "offense_rebounder_coords",
+    "defense_rebounder_coords",
 )
 
 

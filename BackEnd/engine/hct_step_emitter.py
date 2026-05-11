@@ -417,7 +417,46 @@ def build_hct_animation_steps(
         steps.append(step)
         elapsed_so_far += t
 
+    # Post-shot positioning overlay (Movement #1) — mirrors skeleton_step_emitter.
+    # Override final step's end.coords for players in shot_manager's overlay
+    # maps so the schema's last step.end.coords reflects actual post-shot
+    # positions for get-back / release / rebounder players.
+    if steps:
+        _apply_post_shot_overlay(steps[-1], turn_result)
+
     return steps
+
+
+def _apply_post_shot_overlay(step, turn_result):
+    """Override final step's `end.coords` for players in shot_manager's
+    post-shot overlay maps. See skeleton_step_emitter._apply_post_shot_overlay
+    for full design notes — same contract here."""
+    end_coords = step.get("end", {}).get("coords")
+    start_actions = step.get("start", {}).get("action")
+    start_archetype = step.get("start", {}).get("archetype")
+    if not isinstance(end_coords, dict):
+        return
+    for overlay_key in (
+        "offense_getback_coords",
+        "defense_release_coords",
+        "offense_rebounder_coords",
+    ):
+        overlay = turn_result.get(overlay_key) or {}
+        if not isinstance(overlay, dict):
+            continue
+        for pid, coord in overlay.items():
+            if not isinstance(coord, dict):
+                continue
+            x = coord.get("x")
+            y = coord.get("y")
+            if x is None or y is None:
+                continue
+            pid_str = str(pid)
+            end_coords[pid_str] = {"x": float(x), "y": float(y)}
+            if isinstance(start_actions, dict):
+                start_actions[pid_str] = "cut"
+            if isinstance(start_archetype, dict):
+                start_archetype[pid_str] = "cruise"
 
 
 # --- Step 3 branching ------------------------------------------------------
