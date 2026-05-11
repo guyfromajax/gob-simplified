@@ -1291,26 +1291,21 @@ class ShotManager:
             
             # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
             # These players should be near the basket they were attacking (where the shot was taken)
-            # off_team was on offense during shot, so they were attacking their target basket
-            # For home team shooting: attacking away basket (x=10)
-            # For away team shooting: attacking home basket (x=90)
-            # ✅ CLAMP: Clamp all rebound positions to rim coordinates (x between 10 and 90)
+            # off_team was on offense during shot, so they were attacking their target basket.
+            # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
+            # Non-get-back rebounders cluster near the basket they just shot at.
             from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
-            min_x = AWAY_RIM_COORDS["x"]  # 10 (left side)
-            max_x = HOME_RIM_COORDS["x"]  # 90 (right side)
-            
+            min_x = AWAY_RIM_COORDS["x"]  # 9 (left side)
+            max_x = HOME_RIM_COORDS["x"]  # 91 (right side)
+
             is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
             for pos in offense_rebounders:
                 rebounder_player = off_team.lineup.get(pos)
                 if rebounder_player:
-                    # Non-get-back players are near the basket after shot attempt
                     if is_home_team_shooting:
-                        # Home team was shooting, so rebounders near away basket (x=10)
-                        rebounder_x = random.randint(8, 15)
-                    else:
-                        # Away team was shooting, so rebounders near home basket (x=90)
                         rebounder_x = random.randint(85, 92)
-                    # ✅ CLAMP: Ensure x is between rim coordinates
+                    else:
+                        rebounder_x = random.randint(8, 15)
                     rebounder_x = max(min_x, min(max_x, rebounder_x))
                     rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
                     rebounder_player.coords = rebounder_coords.copy()
@@ -1420,22 +1415,16 @@ class ShotManager:
                         getback_player.coords = coords.copy()
                 result["offense_getback_coords"] = offense_getback_coords
                 
-                # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
-                # These players should be near the basket they were attacking (where the shot was taken)
-                # off_team was on offense during shot, so they were attacking their target basket
-                # For home team shooting: attacking away basket (x=10)
-                # For away team shooting: attacking home basket (x=90)
+                # Non-get-back rebounders cluster near the basket they just shot at.
+                # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
                 is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
                 for pos in offense_rebounders:
                     rebounder_player = off_team.lineup.get(pos)
                     if rebounder_player:
-                        # Non-get-back players are near the basket after shot attempt
                         if is_home_team_shooting:
-                            # Home team was shooting, so rebounders near away basket (x=10)
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                        else:
-                            # Away team was shooting, so rebounders near home basket (x=90)
                             rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                        else:
+                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
                         rebounder_player.coords = rebounder_coords.copy()
                 
                 # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
@@ -1585,20 +1574,22 @@ class ShotManager:
                                 self.game_state["last_rebounder"] = rebounder
                                 result["next_play_type"] = "HCO"
 
+                    # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
+                    # Both off and def rebounders cluster near the basket where the shot was taken.
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
                     for pos, rebounder_player in o_rebounder_lineup.items():
                         if rebounder_player:
                             if is_home_team_shooting:
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                            else:
                                 rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                            else:
+                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
                             rebounder_player.coords = rebounder_coords.copy()
                     for pos, rebounder_player in d_rebounder_lineup.items():
                         if rebounder_player:
                             if is_home_team_shooting:
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                            else:
                                 rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                            else:
+                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
                             rebounder_player.coords = rebounder_coords.copy()
                 else:
                     # ==================== UNIFIED GEOGRAPHY-BASED REBOUND SYSTEM (HCO) ====================
@@ -1761,17 +1752,16 @@ class ShotManager:
                     # off_team was on offense during shot, so they were attacking their target basket
                     # For home team shooting: attacking away basket (x=10)
                     # For away team shooting: attacking home basket (x=90)
+                    # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
+                    # Non-get-back rebounders cluster near the basket they just shot at.
                     is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
                     for pos in offense_rebounders:
                         rebounder_player = off_team.lineup.get(pos)
                         if rebounder_player:
-                            # Non-get-back players are near the basket after shot attempt
                             if is_home_team_shooting:
-                                # Home team was shooting, so rebounders near away basket (x=10)
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
-                            else:
-                                # Away team was shooting, so rebounders near home basket (x=90)
                                 rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                            else:
+                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
                             rebounder_player.coords = rebounder_coords.copy()
                 
                 # Debug log to verify offense_getback is populated

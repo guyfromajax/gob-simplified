@@ -1025,14 +1025,93 @@ def build_covert_release_animation_steps(
                 next_index,
             )
 
-    _log_steps_coords(steps, off_lineup, def_lineup)
+    _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
     return steps
+
+
+def _log_fb_roles(
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Log get-back / release / outlet-passer roster as name+position+coords.
+
+    Helps diagnose CR FB issues where the wrong players are being treated as
+    get-back defenders or where release/outlet positions look stale.
+    """
+    import logging
+
+    def _resolve(pid: Any) -> tuple:
+        """Return (team_label, pos, name, coords_str) for a player_id."""
+        if pid is None:
+            return ("?", "?", "?", "?")
+        target = str(pid)
+        for team_label, lineup in (("OFFENSE", off_lineup), ("DEFENSE", def_lineup)):
+            for pos, player in (lineup or {}).items():
+                if player is None:
+                    continue
+                player_pid = getattr(player, "player_id", None)
+                if player_pid is not None and str(player_pid) == target:
+                    name = (
+                        getattr(player, "name", None)
+                        or getattr(player, "first_last", None)
+                        or "?"
+                    )
+                    c = getattr(player, "coords", None) or {}
+                    if isinstance(c, dict) and c.get("x") is not None:
+                        try:
+                            coords_str = f"({float(c['x']):.1f}, {float(c['y']):.1f})"
+                        except (TypeError, ValueError):
+                            coords_str = "?"
+                    else:
+                        coords_str = "?"
+                    return (team_label, pos, str(name), coords_str)
+        return ("?", "?", "?", "?")
+
+    getback_ids = list(fb_roles.get("getback_player_ids") or [])
+    outlet_passer = fb_roles.get("outlet_passer")
+    outlet_receiver = fb_roles.get("outlet_receiver")
+    bh = fb_roles.get("ball_handler")
+    bh_pid = getattr(bh, "player_id", None) if bh is not None else None
+
+    if getback_ids:
+        for i, pid in enumerate(getback_ids, start=1):
+            team_label, pos, name, coords_str = _resolve(pid)
+            logging.warning(
+                "🏀 [CR FB ROSTER] get-back #%d: %s %s %s @ %s",
+                i, team_label, pos, name, coords_str,
+            )
+    else:
+        logging.warning("🏀 [CR FB ROSTER] get-back: NONE")
+
+    if outlet_passer is not None:
+        team_label, pos, name, coords_str = _resolve(outlet_passer)
+        logging.warning(
+            "🏀 [CR FB ROSTER] outlet passer (rebounder): %s %s %s @ %s",
+            team_label, pos, name, coords_str,
+        )
+    else:
+        logging.warning("🏀 [CR FB ROSTER] outlet passer: NONE (rebounder == release player)")
+
+    if outlet_receiver is not None:
+        team_label, pos, name, coords_str = _resolve(outlet_receiver)
+        logging.warning(
+            "🏀 [CR FB ROSTER] outlet receiver (release player / BH): %s %s %s @ %s",
+            team_label, pos, name, coords_str,
+        )
+    elif bh_pid is not None:
+        team_label, pos, name, coords_str = _resolve(bh_pid)
+        logging.warning(
+            "🏀 [CR FB ROSTER] ball handler (no outlet receiver): %s %s %s @ %s",
+            team_label, pos, name, coords_str,
+        )
 
 
 def _log_steps_coords(
     steps: List[AnimationStep],
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
+    fb_roles: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Per-step, per-player start/end coord log for debugging FB animations.
 
@@ -1061,6 +1140,9 @@ def _log_steps_coords(
             return f"({float(coord['x']):.1f}, {float(coord['y']):.1f})"
         except (TypeError, ValueError):
             return "?"
+
+    if fb_roles:
+        _log_fb_roles(fb_roles, off_lineup, def_lineup)
 
     for i, step in enumerate(steps):
         t = step.get("end", {}).get("time_elapsed")
