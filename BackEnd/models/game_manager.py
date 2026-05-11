@@ -617,6 +617,11 @@ class GameManager:
                         "y": float(coords["y"]),
                     }
 
+        # Offense team during the MISS turn = the team that took the shot.
+        # Carried onto the DREB turn dict below so downstream possession/
+        # offense classification stays consistent.
+        miss_offense_team_id = miss_turn.get("offense_team_id")
+
         clock_remaining = float(self.game_state.get("time_remaining", 0) or 0)
         shot_clock_remaining = float(
             self.game_state.get("shot_clock_remaining", 0) or 0
