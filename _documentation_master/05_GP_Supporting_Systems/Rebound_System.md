@@ -5,7 +5,22 @@ A unified system that handles rebound logic for all missed shot instances.
 -OREB Putback Shots
 -Free Throw Shots
 
-**Note - we need to animate rebounders into position during shot attempt**
+## Post-shot placement authority (single source of truth)
+
+`shot_manager` is the **sole authority** for where every player ends up after a missed shot. On any MISS turn it populates four overlay maps on the turn result dict:
+
+- `offense_rebounder_coords` — non-get-back offensive players, clustered near the rim of the basket just attacked.
+- `defense_rebounder_coords` — non-release defensive players, clustered near the rim of the basket just attacked.
+- `offense_getback_coords` — offensive get-back retreaters (HCO only; HCT / FCP / Fast Break skip the get-back mechanic).
+- `defense_release_coords` — defensive release players running for the outlet on a Covert Release fast break.
+
+The MISS turn emitter absorbs these into the final step's `end.coords` via its `_apply_post_shot_overlay` helper. `sync_lineup_coords_from_turn` then writes them to `player.coords`. Overlay precedence is set in `TURN_COORDS_OVERLAY_KEYS` (rebounder maps applied first, get-back / release applied last — get-back / release win for the specific role-players they designate).
+
+### DREB animates rebound capture only, not placement
+
+The DREB turn (when DREB is the rebound outcome) is purely an animation of the rebound capture: the rebounder moves from his post-shot position to the bounce coords. **DREB does not re-decide where any non-rebounder ends up.** All 9 non-rebounders are `stationary` at the position shot_manager assigned them.
+
+This replaces the earlier two-authorities-via-player-id-matching design, where the DREB step ran its own frontcourt-filter / random-near-bounce placement logic and tried to honor shot_manager's get-back / release maps via an exempt list. That coupling was brittle — any mismatch in the exempt set yanked role-players to the rim cluster. See [`Animation_System_Updated.md`](../projects/Animation_System_Updated.md) "DREB emitter — scoping" for the current model.
 
 ## Free Throw Miss Rebounds
 

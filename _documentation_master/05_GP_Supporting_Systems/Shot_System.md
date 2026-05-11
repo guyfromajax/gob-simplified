@@ -145,9 +145,11 @@
     - If miss: Determine rebound (geography-based system)
 
 13. Player Positioning (for all shots)
-    - Determine offense get-back players (based on rebounding strategy setting)
-    - Determine defense release players (based on fast_breaks strategy setting)
-    - Calculate coordinates for animation
+    - Determine offense get-back players (based on rebounding strategy setting; HCO only — HCT / FCP / Fast Break skip get-back)
+    - Determine defense release players (based on fast_breaks strategy setting + Covert Release eligibility)
+    - Calculate post-shot coordinates for **every** player and populate the four overlay maps on the turn result:
+      `offense_rebounder_coords`, `defense_rebounder_coords`, `offense_getback_coords`, `defense_release_coords`.
+    - `shot_manager` is the **sole authority** for post-shot placement. The MISS turn emitter absorbs these maps into its final step's `end.coords` via `_apply_post_shot_overlay`. Downstream turns (DREB / OREB / Fast Break / HCO / etc.) read those positions as their starting coords and do **not** re-decide post-shot placement. See [`Rebound_System.md`](Rebound_System.md) "Post-shot placement authority" and [`Animation_System_Updated.md`](../projects/Animation_System_Updated.md) "DREB emitter — scoping".
 
 **Charge and Blocking Foul (attack shots only; requires contest)**
 - Before make/miss: if shot_type is **attack** and a defender is in **contest range** (`has_contest`), run charge/block check (`calculate_charge()`). If **CHARGE**: return early with result_type "CHARGE", possession_flips True, next_play_type SIP; no shot attempted. If **BLOCKING_FOUL**: return early with result_type "FOUL", text "Blocking foul on X!", next_play_type SIP or FREE_THROW (if bonus); no shot attempted. With **no** contest, `calculate_charge` is not called (no charge/blocking foul from this path).

@@ -617,15 +617,6 @@ class GameManager:
                         "y": float(coords["y"]),
                     }
 
-        # Offense team during the MISS turn = the team that took the shot.
-        # is_away_offense is determined relative to that.
-        miss_offense_team_id = miss_turn.get("offense_team_id")
-        is_away_offense = (
-            miss_offense_team_id is not None
-            and getattr(self, "away_team", None) is not None
-            and miss_offense_team_id == self.away_team.team_id
-        )
-
         clock_remaining = float(self.game_state.get("time_remaining", 0) or 0)
         shot_clock_remaining = float(
             self.game_state.get("shot_clock_remaining", 0) or 0
@@ -636,26 +627,20 @@ class GameManager:
         # may revisit this; for now, no OTB.
         otb_foul = None
 
-        # Get-back (offensive) and release (defensive) players already took
-        # their post-shot positions on the shot step. Exempt them from the
-        # DREB sprint-to-bounce filter so they hold their positions through
-        # the rebound capture (per cross-turn coord contract in
-        # `_documentation_master/projects/Animation_System_Updated.md`).
-        getback_ids = set((miss_turn.get("offense_getback_coords") or {}).keys())
-        release_ids = set((miss_turn.get("defense_release_coords") or {}).keys())
-        exempt_player_ids = getback_ids | release_ids
-
+        # Single-placement-authority model: shot_manager has already placed
+        # every player post-shot (rebound cluster / get-back / release) via
+        # the overlay maps absorbed into miss_turn.animation_steps[-1].
+        # DREB animates only the rebound capture; non-rebounders hold the
+        # positions shot_manager assigned. No exempt set needed.
         animation_steps = build_dreb_animation_steps(
             rebounder_id=str(rebounder_id),
             bounce_coords={"x": float(bx), "y": float(by)},
             start_coords=start_coords,
             off_lineup=self.offense_team.lineup,
             def_lineup=self.defense_team.lineup,
-            is_away_offense=is_away_offense,
             clock_remaining=clock_remaining,
             shot_clock_remaining=shot_clock_remaining,
             otb_foul=otb_foul,
-            exempt_player_ids=exempt_player_ids,
         )
 
         if not animation_steps:
