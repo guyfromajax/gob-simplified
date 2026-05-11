@@ -1251,6 +1251,22 @@ export function createGameScene(Phaser) {
         
         return !isBall && hasPosition;
       });
+
+      const openingTipTurn = Array.isArray(simData.turns)
+        ? simData.turns.find(turn => turn?.result_type === "OPENING_TIP")
+        : null;
+      const openingTipEntranceByPlayerId = new Map(
+        (openingTipTurn?.animations || [])
+          .filter(anim => anim?.playerId && anim?.entrance)
+          .map(anim => [String(anim.playerId), anim.entrance])
+      );
+      if (openingTipEntranceByPlayerId.size > 0) {
+        actualPlayers.forEach(player => {
+          const playerId = String(player.playerId ?? player.player_id);
+          const entranceCoords = openingTipEntranceByPlayerId.get(playerId);
+          if (entranceCoords) player.startingCoords = { ...entranceCoords };
+        });
+      }
       
       // Filtered active players from roster
       

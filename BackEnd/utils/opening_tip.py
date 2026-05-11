@@ -24,6 +24,23 @@ OPENING_TIP_POSITIONS = {
     }
 }
 
+OPENING_TIP_ENTRANCE_POSITIONS = {
+    "home": {
+        "PG": {"x": 74, "y": 46},
+        "SG": {"x": 71, "y": 48},
+        "SF": {"x": 77, "y": 48},
+        "PF": {"x": 80, "y": 50},
+        "C": {"x": 68, "y": 50},
+    },
+    "away": {
+        "PG": {"x": 26, "y": 46},
+        "SG": {"x": 29, "y": 48},
+        "SF": {"x": 23, "y": 48},
+        "PF": {"x": 20, "y": 50},
+        "C": {"x": 32, "y": 50},
+    },
+}
+
 def get_height_scale_value(height):
     """Convert player height to tip-off scale value"""
     if height > 83:
@@ -105,19 +122,26 @@ def execute_opening_tip(game):
     
     # Build animations for all players
     animations = []
+    include_entrance = getattr(game, "quarter", 1) == 1
     
     # Add home team players
     for pos, player in home_lineup.items():
+        entrance_coords = OPENING_TIP_ENTRANCE_POSITIONS["home"][pos].copy()
         start_coords = OPENING_TIP_POSITIONS["home"][pos].copy()
         
         if pos == "C":
             # Center jumps up - ball bounces at peak, no coming down
-            animations.append({
+            jump_coords = {"x": start_coords["x"], "y": start_coords["y"] + 4}
+            animation = {
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
-                "jumpCoords": {"x": start_coords["x"], "y": start_coords["y"] + 4},
+                "jumpCoords": jump_coords,
+                "end": jump_coords,
                 "action": "TIP_JUMP"
-            })
+            }
+            if include_entrance:
+                animation["entrance"] = entrance_coords
+            animations.append(animation)
         else:
             # Other players move slightly toward ball spot (1-3 spots)
             if home_wins and is_closest_to_ball(pos, ball_landing_coords, home_lineup, "home"):
@@ -127,25 +151,34 @@ def execute_opening_tip(game):
                 # Other players move slightly toward ball (1-3 spots)
                 end_coords = get_slight_movement_toward_ball(start_coords, ball_landing_coords)
             
-            animations.append({
+            animation = {
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
                 "end": end_coords,
                 "action": "CONVERGE_ON_BALL"
-            })
+            }
+            if include_entrance:
+                animation["entrance"] = entrance_coords
+            animations.append(animation)
     
     # Add away team players
     for pos, player in away_lineup.items():
+        entrance_coords = OPENING_TIP_ENTRANCE_POSITIONS["away"][pos].copy()
         start_coords = OPENING_TIP_POSITIONS["away"][pos].copy()
         
         if pos == "C":
             # Center jumps up - ball bounces at peak, no coming down
-            animations.append({
+            jump_coords = {"x": start_coords["x"], "y": start_coords["y"] + 4}
+            animation = {
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
-                "jumpCoords": {"x": start_coords["x"], "y": start_coords["y"] + 4},
+                "jumpCoords": jump_coords,
+                "end": jump_coords,
                 "action": "TIP_JUMP"
-            })
+            }
+            if include_entrance:
+                animation["entrance"] = entrance_coords
+            animations.append(animation)
         else:
             # Other players move slightly toward ball spot (1-3 spots)
             if not home_wins and is_closest_to_ball(pos, ball_landing_coords, away_lineup, "away"):
@@ -155,12 +188,15 @@ def execute_opening_tip(game):
                 # Other players move slightly toward ball (1-3 spots)
                 end_coords = get_slight_movement_toward_ball(start_coords, ball_landing_coords)
             
-            animations.append({
+            animation = {
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
                 "end": end_coords,
                 "action": "CONVERGE_ON_BALL"
-            })
+            }
+            if include_entrance:
+                animation["entrance"] = entrance_coords
+            animations.append(animation)
     
     # Tip possession 1-5 game s; +1 for apex+pass (400ms real, pass 300/350 rounds up to 1 game s)
     time_elapsed = random.randint(1, 5) + 1

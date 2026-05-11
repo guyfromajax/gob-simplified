@@ -11,6 +11,7 @@ import { getPlayerDuration } from "./turnAnimation.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
 
 const INITIAL_HOLD_DURATION = 2000; // Hold starting positions for 2 seconds (reduced from 4 seconds)
+const ENTRANCE_HOLD_DURATION = 300;
 const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
 
 /**
@@ -32,36 +33,42 @@ export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnDa
     const animations = turnData.animations || [];
     const ballLandingCoords = turnData.ball_landing_coords || { x: 50, y: 25 };
     
-    // Step 0: Position all players at their starting positions
-    positionPlayersAtStart(scene, playerSprites, animations, ballSprite);
-    
-    // Step 1: Hold for 4 seconds to show starting positions
-    scene.time.delayedCall(INITIAL_HOLD_DURATION, () => {
-        // Step 2: Jump ball animation
-        animateJumpBall(scene, playerSprites, animations, ballSprite, () => {
-            // Step 3: Ball and players converge
-            animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, () => {
-                // Opening tip sequence complete
-                if (onComplete) onComplete();
+    // Step 0: Position all players at their pre-tip entrance spots
+    positionPlayersAtEntrance(scene, playerSprites, animations, ballSprite);
+
+    // Step 1: Animate players into their opening-tip starting positions
+    scene.time.delayedCall(ENTRANCE_HOLD_DURATION, () => {
+        animatePlayersToTipStart(scene, playerSprites, animations, () => {
+            // Step 2: Hold to show starting positions
+            scene.time.delayedCall(INITIAL_HOLD_DURATION, () => {
+                // Step 3: Jump ball animation
+                animateJumpBall(scene, playerSprites, animations, ballSprite, () => {
+                    // Step 4: Ball and players converge
+                    animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, () => {
+                        // Opening tip sequence complete
+                        if (onComplete) onComplete();
+                    });
+                });
             });
         });
     });
 }
 
 /**
- * Step 0: Position all players at their starting positions
+ * Step 0: Position all players at their pre-tip entrance spots.
  */
-function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
+function positionPlayersAtEntrance(scene, playerSprites, animations, ballSprite) {
     
     const canvasWidth = scene.game.config.width;
     const canvasHeight = scene.game.config.height;
     
-    // Position all players at their starting spots
     animations.forEach(anim => {
         const playerSprite = playerSprites[anim.playerId];
-        if (!playerSprite || !anim.start) return;
+        if (!playerSprite) return;
         
-        const startCoords = anim.start;
+        const startCoords = anim.entrance || anim.start;
+        if (!startCoords) return;
+
         const pixelCoords = gridToPixels(startCoords.x, startCoords.y, canvasWidth, canvasHeight);
         playerSprite.x = pixelCoords.x;
         playerSprite.y = pixelCoords.y;
@@ -74,6 +81,46 @@ function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
     ballSprite.y = ballPixelCoords.y;
     ballSprite.setVisible(true);
     
+}
+
+/**
+ * Step 1: Animate all players from entrance spots into their jump-ball start spots.
+ */
+function animatePlayersToTipStart(scene, playerSprites, animations, onComplete) {
+    const startTweens = [];
+    const canvasWidth = scene.game.config.width;
+    const canvasHeight = scene.game.config.height;
+
+    animations.forEach(anim => {
+        const playerSprite = playerSprites[anim.playerId];
+        if (!playerSprite || !anim.start) return;
+
+        const tipStartPixels = gridToPixels(anim.start.x, anim.start.y, canvasWidth, canvasHeight);
+        const entranceDuration = getPlayerDuration(playerSprite, tipStartPixels.x, tipStartPixels.y);
+
+        const tween = tweenPlayerTo(
+            scene,
+            playerSprite,
+            tipStartPixels,
+            {
+                duration: entranceDuration,
+                easing: 'Linear'
+            }
+        );
+
+        startTweens.push(tween);
+    });
+
+    if (startTweens.length === 0 && onComplete) {
+        onComplete();
+        return startTweens;
+    }
+
+    Promise.allSettled(startTweens).then(() => {
+        if (onComplete) onComplete();
+    });
+
+    return startTweens;
 }
 
 /**
