@@ -1735,14 +1735,17 @@ def resolve_fast_break_logic(game: "GameManager"):
         # variants; legacy variants (RR, Triangle) still need it.
         if fb_play_key != "covert_release":
             apply_coords_from_animations_list(game, fb_animations)
-        # NOTE: previously snapshotted `player.coords` here as a band-aid for
-        # `shot_manager` mid-mutating player.coords during `resolve_shot`.
-        # `shot_manager` no longer mid-mutates (see Animation_System_Updated.md);
-        # snapshot removed. CR emitter reads `player.coords` directly.
+        # Pass the shot spot to `resolve_shot` via `roles["shot_spot"]` ONLY.
+        # Do NOT mutate `shooter.coords` here — that would overwrite the BH's
+        # release-position `player.coords` (the prior turn's end coord, which
+        # the CR emitter needs for step 0 START). Block reconciliation in
+        # shot_manager reads from `roles["shot_spot"]` (line ~790) with
+        # shooter.coords only as a fallback when roles is missing — which
+        # doesn't happen here. See Animation_System_Updated.md cross-turn
+        # coord contract.
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
-            shooter.coords = shot_spot
-            roles["shot_spot"] = shot_spot  # Same data for block reconciliation (explicit = animation location)
+            roles["shot_spot"] = shot_spot
         snap_roles = {**roles, "ball_handler": fb_roles.get("ball_handler")}
         fb_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, snap_roles, "fb_logic_pre_shot"

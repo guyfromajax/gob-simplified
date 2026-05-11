@@ -1019,7 +1019,21 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
     post-shot overlay maps. See
     `_documentation_master/projects/Animation_System_Updated.md` cross-turn
     coord contract.
+
+    Exempts the outlet passer (rebounder) from the rebounder-position overlay:
+    `shot_manager.offense_rebounders` includes every non-get-back offensive
+    player (including the rebounder for FB MAKE/MISS, since shot_manager has
+    no concept of "outlet passer"), but per the CR design the rebounder/outlet
+    passer stays at their rebound-site / outlet position rather than crashing
+    the rim. Without this exemption, the rebounder teleports ~80 grid units
+    to (HOME_RIM) on the outcome step.
     """
+    fb_roles = turn_result.get("roles") or {}
+    outlet_passer_id = fb_roles.get("outlet_passer")
+    outlet_passer_id_str = (
+        str(outlet_passer_id) if outlet_passer_id is not None else None
+    )
+
     end_coords = step.get("end", {}).get("coords")
     start_actions = step.get("start", {}).get("action")
     start_archetype = step.get("start", {}).get("archetype")
@@ -1042,6 +1056,9 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
             if x is None or y is None:
                 continue
             pid_str = str(pid)
+            # Outlet passer exempt — they hold their CR step 0 end position.
+            if outlet_passer_id_str and pid_str == outlet_passer_id_str:
+                continue
             end_coords[pid_str] = {"x": float(x), "y": float(y)}
             if isinstance(start_actions, dict):
                 start_actions[pid_str] = "cut"
