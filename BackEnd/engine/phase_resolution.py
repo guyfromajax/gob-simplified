@@ -1735,6 +1735,27 @@ def resolve_fast_break_logic(game: "GameManager"):
         # variants; legacy variants (RR, Triangle) still need it.
         if fb_play_key != "covert_release":
             apply_coords_from_animations_list(game, fb_animations)
+        # Snapshot pre-shot player.coords for migrated FB emitters that build
+        # step 0 START from current positions. `resolve_shot` below mutates
+        # `player.coords` for post-shot positioning (get-back placements on
+        # MAKE, rebounder placements on MAKE/MISS, etc.) — if the CR emitter
+        # were to read those mutated coords, step 0 START would teleport
+        # players to post-shot positions before the FB animation even begins.
+        pre_shot_coords = {}
+        for team in (off_team, def_team):
+            for player in (team.lineup or {}).values():
+                if player is None:
+                    continue
+                pid = getattr(player, "player_id", None)
+                if pid is None:
+                    continue
+                c = getattr(player, "coords", None) or {}
+                x = c.get("x")
+                y = c.get("y")
+                if x is None or y is None:
+                    continue
+                pre_shot_coords[str(pid)] = {"x": float(x), "y": float(y)}
+        fb_roles["pre_shot_player_coords"] = pre_shot_coords
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             shooter.coords = shot_spot

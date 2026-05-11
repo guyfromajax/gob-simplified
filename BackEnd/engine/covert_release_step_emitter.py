@@ -895,8 +895,25 @@ def build_covert_release_animation_steps(
     outlet_receiver_id = fb_roles.get("outlet_receiver")
     is_away_offense = bool(fb_roles.get("is_away_offense"))
 
-    # All-player start coords (every player in both lineups).
-    all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
+    # All-player start coords. Prefer `fb_roles["pre_shot_player_coords"]`
+    # (snapshot captured in `phase_resolution.resolve_fast_break_logic`
+    # BEFORE `resolve_shot` mutated `player.coords` with post-shot get-back
+    # and rebounder placements). Without this, step 0 START would reflect
+    # post-MAKE/MISS positions — players teleporting to the rim or to
+    # backcourt get-back spots BEFORE the outlet pass even fires. Fall back
+    # to live `player.coords` for callers / tests that don't populate the
+    # snapshot.
+    snapshot = fb_roles.get("pre_shot_player_coords")
+    if isinstance(snapshot, dict) and snapshot:
+        all_start_coords = {
+            str(pid): {"x": float(c["x"]), "y": float(c["y"])}
+            for pid, c in snapshot.items()
+            if isinstance(c, dict)
+            and c.get("x") is not None
+            and c.get("y") is not None
+        }
+    else:
+        all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
         return None
 
@@ -1111,16 +1128,56 @@ def _log_steps_coords(
     if fb_roles:
         _log_fb_roles(fb_roles, off_lineup, def_lineup)
 
+    def _step_kind(idx: int, step: AnimationStep, total_steps: int) -> str:
+        """Human-readable label for what this step represents (for diagnosis)."""
+        actions = (step.get("start", {}).get("action") or {})
+        if "pass" in actions.values() and "receive" in actions.values():
+            return "outlet_pass"
+        # Last step in a 2-step sequence is the outcome (shot/stop/foul/etc.).
+        # In a 3-step sequence (DEFENSIVE_STOP), step 2 is the step-back.
+        if idx == total_steps - 1 and total_steps == 3:
+            return "step_back"
+        return "outcome"
+
+    prev_step_end_coords: Dict[str, GridCoord] = {}
     for i, step in enumerate(steps):
         t = step.get("end", {}).get("time_elapsed")
-        logging.warning(
-            "🏀 [CR STEPS] step %d (T=%s game-sec, %d players in coords)",
-            i,
-            f"{t:.3f}" if isinstance(t, (int, float)) else "?",
-            len((step.get("start", {}).get("coords") or {})),
+        kind = _step_kind(i, step, len(steps))
+        start = step.get("start", {}) or {}
+        end = step.get("end", {}) or {}
+        trigger = start.get("advance_trigger") or {}
+        trigger_meta = trigger.get("metadata") or {}
+        ball_start = (start.get("ball") or {}).get("owner_player_id") or "?"
+        ball_end = (end.get("ball") or {}).get("owner_player_id") or "?"
+        next_ptr = end.get("next") or {}
+        next_kind = next_ptr.get("kind", "?")
+        next_extra = (
+            next_ptr.get("index") if next_kind == "next_step"
+            else next_ptr.get("event") if next_kind == "turn_stop"
+            else None
         )
-        start_coords = step.get("start", {}).get("coords") or {}
-        end_coords = step.get("end", {}).get("coords") or {}
+        announcement_end = (end.get("announcement") or {}).get("text") if end.get("announcement") else None
+
+        logging.warning(
+            "🏀 [CR STEP %d] kind=%s T=%s gate=%s gate_coord=%s "
+            "ball=%s→%s next=%s%s announcement=%s players=%d",
+            i,
+            kind,
+            f"{t:.3f}" if isinstance(t, (int, float)) else "?",
+            trigger_meta.get("target_player_id", "?"),
+            _fmt(trigger_meta.get("target_coords")),
+            ball_start,
+            ball_end,
+            next_kind,
+            f"({next_extra})" if next_extra is not None else "",
+            f'"{announcement_end}"' if announcement_end else "—",
+            len((start.get("coords") or {})),
+        )
+
+        start_coords = start.get("coords") or {}
+        end_coords = end.get("coords") or {}
+        actions = start.get("action") or {}
+        archetypes = start.get("archetype") or {}
 
         # Sort player_ids by (team, position) when known; unresolved goes last.
         def _sort_key(pid: str) -> tuple:
@@ -1135,11 +1192,55 @@ def _log_steps_coords(
                 pos_idx = 99
             return (team_idx, pos_idx, str(pid))
 
+        # Cross-step continuity check: flag any player whose step N start
+        # doesn't match step N-1 end (within 0.5 grid units). Such gaps cause
+        # visible teleports between steps.
+        if i > 0 and prev_step_end_coords:
+            for pid in sorted(start_coords.keys(), key=_sort_key):
+                cur = start_coords.get(pid)
+                prev = prev_step_end_coords.get(pid)
+                if not isinstance(cur, dict) or not isinstance(prev, dict):
+                    continue
+                dx = float(cur.get("x", 0)) - float(prev.get("x", 0))
+                dy = float(cur.get("y", 0)) - float(prev.get("y", 0))
+                gap = (dx * dx + dy * dy) ** 0.5
+                if gap > 0.5:
+                    team_label, pos = pid_to_role.get(pid, ("?", "?"))
+                    logging.warning(
+                        "  ⚠️ [CR CONTINUITY] step %d %s %s (%s): "
+                        "prev step end %s ≠ this step start %s (gap=%.2f)",
+                        i, team_label, pos, pid,
+                        _fmt(prev), _fmt(cur), gap,
+                    )
+
+        t_seconds = float(t) if isinstance(t, (int, float)) else 0.0
         for pid in sorted(start_coords.keys(), key=_sort_key):
             team_label, pos = pid_to_role.get(pid, ("?", "?"))
+            sc = start_coords.get(pid)
+            ec = end_coords.get(pid)
+            action = actions.get(pid, "?")
+            archetype = archetypes.get(pid, "?")
+            dist_str = "?"
+            rate_str = "?"
+            if isinstance(sc, dict) and isinstance(ec, dict):
+                try:
+                    dx = float(ec["x"]) - float(sc["x"])
+                    dy = float(ec["y"]) - float(sc["y"])
+                    dist = (dx * dx + dy * dy) ** 0.5
+                    dist_str = f"{dist:.1f}"
+                    if t_seconds > 0:
+                        rate_str = f"{dist / t_seconds:.1f}"
+                except (TypeError, ValueError):
+                    pass
             logging.warning(
-                "  %s %s (%s): %s → %s",
+                "  %s %s (%s): %s → %s | d=%s units, rate=%s grid/s | %s/%s",
                 team_label, pos, pid,
-                _fmt(start_coords.get(pid)),
-                _fmt(end_coords.get(pid)),
+                _fmt(sc),
+                _fmt(ec),
+                dist_str,
+                rate_str,
+                action,
+                archetype,
             )
+
+        prev_step_end_coords = dict(end_coords)

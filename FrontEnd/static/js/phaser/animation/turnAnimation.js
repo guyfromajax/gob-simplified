@@ -1605,6 +1605,11 @@ async function runDefensiveReboundSetup({
   let outletTarget = null;
   let outletTargetSource = "unset";
   let outletContext = null;
+  // DREB outlet pipeline tracking (read at function exit for a single summary log).
+  let pgSelfDribbleFired = false;
+  let receiverMovementFired = false;
+  let outletPassFired = false;
+  let outletPassSkippedReason = null;
 
   if (suppressHalfCourtOutletPass) {
     outletReceiverId = null;
@@ -1652,6 +1657,7 @@ async function runDefensiveReboundSetup({
         easing: "Linear",
       })
     );
+    pgSelfDribbleFired = true;
   }
 
   // Set up outlet receiver movement and outlet pass for HCO ONLY
@@ -1826,7 +1832,8 @@ async function runDefensiveReboundSetup({
         easing: 'Linear', // Match HCO step movements for consistent feel
       })
     );
-    
+    receiverMovementFired = true;
+
     if (DebugFlags?.BALL) {
       animationDebugLog('outletTarget', {
         outletReceiverId,
@@ -2176,6 +2183,7 @@ async function runDefensiveReboundSetup({
         playerSprites
       });
       drebOutletObserved.authorizingEventReceived = true;
+      outletPassFired = true;
     } finally {
       activeInterrupts.delete("pass_in_flight");
       scene.__drebOutletWindowActive = false;
@@ -2226,26 +2234,33 @@ async function runDefensiveReboundSetup({
     if (DebugFlags?.OUTLET) animationDebugLog('Outlet pass completed!');
   } else {
     // Always log when outlet pass is skipped (not just when DebugFlags?.OUTLET is enabled)
-    console.warn('🏀 runDefensiveReboundSetup: Outlet pass skipped', { 
-      outletReceiverId, 
+    const skipReason =
+      suppressHalfCourtOutletPass
+        ? `PG-rebounder suppression (rebounderPos="${rebounderPos}", self-dribble path used)` :
+      !outletReceiverId ? 'No outlet receiver found (PG/contract lookup failed)' :
+      String(outletReceiverId) === String(rebounderId) ? 'Outlet receiver is rebounder (PG===rebounder collision)' :
+      nextPlayType === "FAST_BREAK" ? 'FAST_BREAK - outlet pass handled in fast break sequence (fastBreak.js)' :
+      !isHalfCourtSetup ? `nextPlayType is "${nextPlayType}" (only half-court transitions execute outlet pass here)` :
+      'Unknown reason (all gate conditions appeared satisfied)';
+    outletPassSkippedReason = skipReason;
+    console.warn('🏀 runDefensiveReboundSetup: Outlet pass skipped', {
+      outletReceiverId,
       rebounderId,
+      rebounderPos,
       nextPlayType,
-      reason: !outletReceiverId ? 'No outlet receiver found' : 
-              outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' : 
-              nextPlayType === "FAST_BREAK" ? 'FAST_BREAK - outlet pass handled in fast break sequence (fastBreak.js)' :
-              !isHalfCourtSetup ? `nextPlayType is "${nextPlayType}" (only half-court transitions execute outlet pass here)` :
-              'Unknown reason'
+      isHalfCourtSetup,
+      suppressHalfCourtOutletPass,
+      reason: skipReason,
     });
     if (DebugFlags?.OUTLET) {
-      animationDebugLog('Outlet pass skipped:', { 
-        outletReceiverId, 
+      animationDebugLog('Outlet pass skipped:', {
+        outletReceiverId,
         rebounderId,
+        rebounderPos,
         nextPlayType,
-        reason: !outletReceiverId ? 'No outlet receiver found' : 
-                outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' : 
-                nextPlayType === "FAST_BREAK" ? 'FAST_BREAK - outlet pass handled in fast break sequence' :
-                !isHalfCourtSetup ? `nextPlayType is "${nextPlayType}"` : 
-                'Unknown reason'
+        isHalfCourtSetup,
+        suppressHalfCourtOutletPass,
+        reason: skipReason,
       });
     }
   }
@@ -2277,6 +2292,42 @@ async function runDefensiveReboundSetup({
       logger: console,
     });
   }
+
+  // Single, greppable summary of the entire DREB outlet decision tree.
+  // Filter the console on "DREB SUMMARY" when reproducing skipped-outlet bugs.
+  console.log("🏀 [DREB SUMMARY]", {
+    turnId: authorityTurn?.turn_count ?? authorityTurn?.id ?? null,
+    nextPlayType,
+    rebounder: {
+      id: rebounderId,
+      pos: rebounderPos,
+      team: rebounderSprite?.team ?? null,
+      infoPos: scene.playerInfo?.[String(rebounderId)]?.pos ?? null,
+    },
+    outletReceiver: {
+      id: outletReceiverId,
+      pos: scene.playerInfo?.[String(outletReceiverId)]?.pos ?? null,
+      team: outletReceiverSprite?.team ?? null,
+      hasSprite: !!outletReceiverSprite,
+      sameAsRebounder: outletReceiverId != null && String(outletReceiverId) === String(rebounderId),
+    },
+    flags: {
+      isHalfCourtSetup,
+      isFastBreakMissDrebToHco,
+      requiresDrebOutletPassContract,
+      suppressHalfCourtOutletPass,
+      hasContract: !!drebOutletPassContract,
+      contractPasserId: contractPasserId ?? null,
+      contractReceiverId: contractReceiverId ?? null,
+    },
+    fired: {
+      pgSelfDribble: pgSelfDribbleFired,
+      receiverMovement: receiverMovementFired,
+      outletPass: outletPassFired,
+    },
+    skipReason: outletPassSkippedReason,
+    finalBallOwner: getCurrentOwner(scene),
+  });
 
   if (scene.stateMachine?.is(States.OutletSetup)) {
     if (DebugFlags?.FSM) animationDebugLog('FSM: OutletSetup -> HalfCourt');
