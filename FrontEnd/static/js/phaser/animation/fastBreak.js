@@ -613,7 +613,7 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
   const rrSprite = playerSprites[rrId];
   if (!passerSprite || !rrSprite) return;
 
-  const { showSecondaryAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const { showSecondaryAnnouncement, getSecondaryColorForTeam, getFastBreakPlayLabel } = await import("../utils/announcements.js");
   const offenseSide = passerSprite.team === "home" ? "home" : "away";
   const passerTeamId = passerSprite.team_id;
   const homeTeamField = scene.simData?.home_team;
@@ -630,7 +630,10 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
         secondaryColor: getSecondaryColorForTeam(scene, passerTeamId),
       }
     : null;
-  showSecondaryAnnouncement("Fast Break!", offenseSide, passerPlayerData, getRimRunnerDecisionPillMeta(turnData));
+  showSecondaryAnnouncement("Fast Break!", offenseSide, passerPlayerData, {
+    ...getRimRunnerDecisionPillMeta(turnData),
+    eventSubtitle: getFastBreakPlayLabel(turnData?.fast_break_play),
+  });
 
   const away = Boolean(phase?.is_away_offense ?? roles.is_away_offense);
   const towardBasket = away ? -1 : 1;

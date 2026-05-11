@@ -213,8 +213,11 @@ function resolveSecondaryStripeColor(team) {
  * @param {string} team 'home' | 'away'. Drives the left stripe + gradient color.
  * @param {Object|null} playerData Optional { playerId, photo, teamName } — when
  *   present, the ribbon shows the player's headshot + #jersey lastName chip.
- * @param {Object|null} meta Optional { decisionPillText, decisionPillTone:'good'|'bad' }.
- *   Renders in the lower-right corner of the ribbon using the existing pill design.
+ * @param {Object|null} meta Optional metadata:
+ *   - `decisionPillText`, `decisionPillTone: 'good'|'bad'` — renders the decision pill
+ *     in the lower-right corner of the ribbon using the existing pill design.
+ *   - `eventSubtitle` — small-caps secondary label rendered to the right of the
+ *     headline at 50% font-size (e.g. play name "Rim Runner" after "Fast Break!").
  */
 export function showSecondaryAnnouncement(text, team = 'home', playerData = null, meta = null) {
   const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
@@ -227,6 +230,7 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     tier: 'secondary',
     type: 'standard',
     eventText: text || '',
+    eventSubtitle: typeof meta?.eventSubtitle === 'string' ? meta.eventSubtitle : '',
     photoUrl,
     jersey: jerseyVal ? `#${jerseyVal}` : '',
     lastName: getPlayerLastName(player) || '',
@@ -236,6 +240,26 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
   };
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
+  }
+}
+
+/**
+ * Map a backend `fast_break_play` key to its display label for the secondary
+ * announcement subtitle ("Fast Break!  Rim Runner"). Returns '' for unknown
+ * keys and for `after_steal` (the preceding "Steal!" already conveys context,
+ * so an additional subtitle would be redundant).
+ *
+ * Canonical keys mirror BackEnd/constants/fast_break_play_types.py.
+ *
+ * @param {string|null|undefined} playKey
+ * @returns {string}
+ */
+export function getFastBreakPlayLabel(playKey) {
+  switch (playKey) {
+    case 'rim_runner': return 'Rim Runner';
+    case 'triangle': return 'Triangle';
+    case 'covert_release': return 'Covert Release';
+    default: return '';
   }
 }
 
@@ -301,7 +325,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // animateGameTurns.js only calls announceFromTurnData with timing: 'end'.
     // Kept routed to the secondary tier so the contract is consistent if revived.
     if (turnData.fast_break && isFastBreakEntryAnnouncementsEnabled()) {
-      showSecondaryAnnouncement("Fast Break!", offenseTeam);
+      showSecondaryAnnouncement("Fast Break!", offenseTeam, null, {
+        eventSubtitle: getFastBreakPlayLabel(turnData.fast_break_play),
+      });
     }
 
     const isInboundSettingUpPressure = turnData.result_type === 'BASELINE_INBOUND';

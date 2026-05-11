@@ -2930,6 +2930,18 @@
       display: block;
     }
     .sec-headline .ann-accent { color: #F79420; }
+    /* Smaller play-name subtitle rendered to the right of the headline
+       (e.g. "Fast Break!  Rim Runner"). 0.5em so it scales from the parent
+       (.sec-headline is 36px → subtitle 18px; 40px no-player → 20px). */
+    .sec-headline .sec-subtitle {
+      display: inline;
+      margin-left: 14px;
+      font-size: 0.5em;
+      font-style: italic;
+      font-weight: 400;
+      letter-spacing: 1.5px;
+      color: rgba(255, 255, 255, 0.85);
+    }
     /* No-player state: hide the player column. The 1fr/auto/1fr grid keeps the
        headline geometrically centered because the two empty 1fr columns balance. */
     #announcement-overlay-secondary.no-player .sec-player { display: none; }
@@ -6194,10 +6206,14 @@
         var hasExclaim = raw.endsWith('!');
         var base = hasExclaim ? raw.slice(0, -1) : raw;
         var upper = base.toUpperCase();
+        var subtitleRaw = (data && data.eventSubtitle) ? String(data.eventSubtitle).trim() : '';
+        var subtitleHtml = subtitleRaw
+          ? '<span class="sec-subtitle">' + subtitleRaw.toUpperCase() + '</span>'
+          : '';
         if (headlineEl) {
-          headlineEl.innerHTML = hasExclaim
+          headlineEl.innerHTML = (hasExclaim
             ? upper + '<span class="ann-accent">!</span>'
-            : upper;
+            : upper) + subtitleHtml;
         }
 
         var hasPlayer = !!((data && data.photoUrl) || (data && data.lastName));

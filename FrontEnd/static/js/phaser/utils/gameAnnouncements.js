@@ -15,6 +15,7 @@ import {
   showAndOneAnnouncement,
   showSecondaryAnnouncement,
   playAnnouncementSfx,
+  getFastBreakPlayLabel,
 } from './announcements.js';
 import {
   pickOffensiveFoulAnnouncementText,
@@ -123,7 +124,9 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
     // ========== FAST BREAK (secondary tier) ==========
     case 'FAST_BREAK':
       if (isFastBreakEntryAnnouncementsEnabled()) {
-        showSecondaryAnnouncement("Fast Break!", offenseTeam);
+        showSecondaryAnnouncement("Fast Break!", offenseTeam, null, {
+          eventSubtitle: getFastBreakPlayLabel(turnData?.fast_break_play),
+        });
       }
       break;
 

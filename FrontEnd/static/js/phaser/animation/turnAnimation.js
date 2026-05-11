@@ -1614,6 +1614,44 @@ async function runDefensiveReboundSetup({
       rebounderPos,
       nextPlayType,
     });
+
+    // PG keeps the ball after the DREB; replace the (skipped) outlet pass with a
+    // short self-dribble so the user sees a discrete handoff beat before BBC.
+    // x: 6 spots toward the new offense basket. y: 10 spots toward floor center (y=25).
+    const dribbleSign = newOffenseBasket.x > rebGridX ? 1 : -1;
+    const dribbleTargetGrid = {
+      x: Phaser.Math.Clamp(rebGridX + dribbleSign * 6, 9, 91),
+      y: Phaser.Math.Clamp(rebGridY + (rebGridY < 25 ? 10 : -10), 10, 40),
+    };
+    const dribbleTargetPx = gridToPixels(
+      dribbleTargetGrid.x,
+      dribbleTargetGrid.y,
+      width,
+      height
+    );
+    registerRequiredMoverTarget(rebounderId, dribbleTargetPx);
+    const dribbleDuration = getPlayerDuration(
+      rebounderSprite,
+      dribbleTargetPx.x,
+      dribbleTargetPx.y,
+      true
+    );
+    console.log("🏀 [DREB OUTLET DEBUG] PG self-dribble plan", {
+      rebounderId,
+      rebounderStartGrid: {
+        x: Number(rebGridX.toFixed(2)),
+        y: Number(rebGridY.toFixed(2)),
+      },
+      dribbleTargetGrid,
+      dribbleDirectionSign: dribbleSign,
+      dribbleDurationMs: Math.round(dribbleDuration),
+    });
+    promises.push(
+      tweenPlayerTo(scene, rebounderSprite, dribbleTargetPx, {
+        duration: dribbleDuration,
+        easing: "Linear",
+      })
+    );
   }
 
   // Set up outlet receiver movement and outlet pass for HCO ONLY
@@ -1971,6 +2009,19 @@ async function runDefensiveReboundSetup({
   await Promise.all(promises);
   activeInterrupts.delete("rebound_secure");
   drebOutletObserved.visualSettled = true;
+
+  // PG-rebounder branch: no outlet pass runs below, so the dribble settling is
+  // itself the authorizing event for the unit-completion contract, and ball
+  // ownership must remain with the rebounder.
+  if (suppressHalfCourtOutletPass) {
+    drebOutletObserved.authorizingEventReceived = true;
+    setPendingOwner(scene, rebounderId);
+    setCurrentOwner(scene, rebounderId);
+    console.log("🏀 [DREB OUTLET DEBUG] PG self-dribble settled", {
+      rebounderId,
+      ballOwner: getCurrentOwner(scene),
+    });
+  }
 
   // Do outlet pass for HCO ONLY
   // FAST_BREAK outlet pass is handled separately in fastBreak.js (animateOutletPhase)
