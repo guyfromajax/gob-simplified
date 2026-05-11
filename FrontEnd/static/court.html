@@ -2674,7 +2674,11 @@
       display: flex;
       align-items: center;
       position: relative;
-      padding: 18px 32px 42px 24px;
+      /* Symmetric top/bottom (18/18) so align-items: center lands the headline on
+         the geometric center of the 144px portrait-driven card height. The decision
+         pill is position: absolute (bottom: 8px), so it carves its own space and
+         doesn't need padding reservation here. */
+      padding: 18px 32px 18px 24px;
     }
     .ann-event-zone .ann-text,
     .ann-event-text {
@@ -2782,8 +2786,13 @@
       transition:
         transform 260ms cubic-bezier(.22,1,.36,1),
         opacity 220ms ease;
-      /* Default team color; overridden inline by showSecondaryAnnouncementOverlay */
+      /* Default team colors; overridden inline by showSecondaryAnnouncementOverlay.
+         --sec-team is the team's brand primary (stripe + chip jersey color).
+         --sec-team-deep is the darkened team tone used for the surface wash;
+         derived from --sec-team by darkenHex(color, 0.55) — same recipe as
+         Championship Announce's --cm-team-deep. */
       --sec-team: #F79420;
+      --sec-team-deep: #6f4209;
     }
     #announcement-overlay-secondary.is-visible {
       transform: translateY(0);
@@ -2819,34 +2828,41 @@
       flex: 1;
       position: relative;
       display: grid;
-      grid-template-columns: auto 1fr;
+      /* 3-column grid: 1fr | auto | 1fr — guarantees the headline (column 2, auto)
+         sits at the surface's geometric center regardless of whether a player block
+         is in column 1 or a decision pill is in column 3. */
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
       gap: 18px;
       padding: 0 18px;
+      /* Team wash — replaces the prior charcoal gradient. */
       background:
         linear-gradient(90deg,
-          color-mix(in oklab, var(--sec-team), #000 70%) 0%,
-          rgba(10, 10, 10, 0.92) 32%,
-          rgba(10, 10, 10, 0.92) 68%,
-          color-mix(in oklab, var(--sec-team), #000 78%) 100%),
-        rgba(10, 10, 10, 0.92);
+          color-mix(in oklab, var(--sec-team-deep), #000 10%) 0%,
+          color-mix(in oklab, var(--sec-team-deep), #000 25%) 60%,
+          color-mix(in oklab, var(--sec-team-deep), #000 40%) 100%),
+        var(--sec-team-deep);
       border: 1px solid rgba(255,255,255,0.10);
       border-left: none;
       box-shadow:
         0 10px 28px rgba(0,0,0,0.55),
-        inset 0 1px 0 rgba(255,255,255,0.06);
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        inset 0 -1px 0 rgba(0,0,0,0.35);
       overflow: hidden;
     }
     .sec-surface::before {
       content: '';
       position: absolute;
       inset: 0;
+      /* Slight bump from 0.025 → 0.045 for readability over the team wash. */
       background: repeating-linear-gradient(115deg,
         transparent 0 12px,
-        rgba(255,255,255,0.025) 12px 13px);
+        rgba(255,255,255,0.045) 12px 13px);
       pointer-events: none;
     }
     .sec-player {
+      grid-column: 1;
+      justify-self: start;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -2890,6 +2906,9 @@
       color: #fff;
     }
     .sec-headline {
+      grid-column: 2;
+      justify-self: center;
+      align-self: center;
       font-family: 'Bebas Neue', sans-serif;
       font-style: italic;
       font-weight: 400;
@@ -2898,30 +2917,32 @@
       letter-spacing: 1.5px;
       color: #fff;
       text-transform: uppercase;
-      text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+      /* Crisp display type on the team wash. */
+      text-shadow:
+        0 1px 0 rgba(0,0,0,0.55),
+        0 0 18px rgba(0,0,0,0.35);
       text-align: center;
       white-space: nowrap;
       position: relative;
       z-index: 1;
-      align-self: center;
-      justify-self: center;
       margin: 0;
       padding: 0;
       display: block;
     }
     .sec-headline .ann-accent { color: #F79420; }
+    /* No-player state: hide the player column. The 1fr/auto/1fr grid keeps the
+       headline geometrically centered because the two empty 1fr columns balance. */
     #announcement-overlay-secondary.no-player .sec-player { display: none; }
-    #announcement-overlay-secondary.no-player .sec-surface {
-      grid-template-columns: 1fr;
-    }
     #announcement-overlay-secondary.no-player .sec-headline { font-size: 40px; }
 
     /* Decision pill (Good Read / Bad Read) — same visual vocabulary as primary,
-       positioned in the lower-right corner of the secondary ribbon. */
+       anchored to the lower-right corner via 3-column grid (column 3, end/end).
+       Grid placement is what guarantees the headline (column 2) stays centered. */
     .sec-decision-pill {
-      position: absolute;
-      right: 14px;
-      bottom: 6px;
+      grid-column: 3;
+      justify-self: end;
+      align-self: end;
+      margin: 0 4px 6px 0;
       height: 22px;
       padding: 0 10px;
       border-radius: 16px;
@@ -6128,6 +6149,28 @@
         };
         imgEl.src = src || generic;
       };
+      // Darken a hex color (e.g. team primary) toward black by `pct` (0..1).
+      // Mirrors championshipMoments.js's darkenHex(); used here to derive the
+      // secondary ribbon's --sec-team-deep wash from the team's brand primary.
+      function secDarkenHex(hex, pct) {
+        if (!hex || typeof hex !== 'string') return null;
+        var h = hex.trim().replace(/^#/, '');
+        if (h.length === 3) {
+          h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+        }
+        if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+        var r = parseInt(h.slice(0, 2), 16);
+        var g = parseInt(h.slice(2, 4), 16);
+        var b = parseInt(h.slice(4, 6), 16);
+        var f = 1 - pct;
+        var toHex = function(n) {
+          var v = Math.max(0, Math.min(255, Math.round(n)));
+          var s = v.toString(16);
+          return s.length === 1 ? '0' + s : s;
+        };
+        return '#' + toHex(r * f) + toHex(g * f) + toHex(b * f);
+      }
+
       window.showSecondaryAnnouncementOverlay = function(data) {
         var overlay = document.getElementById('announcement-overlay-secondary');
         if (!overlay) return;
@@ -6135,8 +6178,15 @@
 
         if (data && data.teamColor) {
           overlay.style.setProperty('--sec-team', data.teamColor);
+          var deep = secDarkenHex(data.teamColor, 0.55);
+          if (deep) {
+            overlay.style.setProperty('--sec-team-deep', deep);
+          } else {
+            overlay.style.removeProperty('--sec-team-deep');
+          }
         } else {
           overlay.style.removeProperty('--sec-team');
+          overlay.style.removeProperty('--sec-team-deep');
         }
 
         var headlineEl = overlay.querySelector('.sec-headline');
