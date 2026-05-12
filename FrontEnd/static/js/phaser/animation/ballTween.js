@@ -115,14 +115,19 @@ function resolveBallController(scene) {
  */
 
 /**
- * Detach ball from any player and optionally hide it.
- * Currently just clears active tweens and ownership reference.
+ * Tween-level ball cleanup: cancels the active ball tween and clears the
+ * `getCurrentOwner` reference. Does **NOT** unsubscribe `BallController`'s
+ * per-frame follow callback — for that, use `detachBall` from
+ * `BallControllerAdapter.js` (which calls `ballController.detachFromPlayer`).
+ *
+ * Previously named `detachBall`, which collided with the controller-level
+ * `detachBall` in `BallControllerAdapter.js` and caused at least one bug
+ * where schema-driven ball tweens were silently overridden every frame by
+ * a still-active follow callback. Renamed to make the distinction explicit.
  */
-export function detachBall(scene, ballSprite) {
+export function cancelBallTweenAndClearOwner(scene, ballSprite) {
   if (!scene || !ballSprite) return;
-  
-  // ✅ PHASE 4: Removed old ball following system - BallController handles following internally
-  // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
+
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
 }
@@ -412,7 +417,7 @@ export async function runPass(scene, cfg = {}) {
       const ballStartX = ballSprite.x;
       const ballStartY = ballSprite.y;
 
-      detachBall(scene, ballSprite);
+      cancelBallTweenAndClearOwner(scene, ballSprite);
       // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
       scene.events?.emit('ballDetached');
       if (PASS_DEBUG) animationDebugLog('detach(A)', { fromId });
@@ -548,7 +553,7 @@ export async function runPass(scene, cfg = {}) {
 // Legacy functions removed (Phase 5 cleanup)
 // Now using BallControllerAdapter and animateBallToPosition from ballAnimationSimple.js
 export default {
-  detachBall,
+  cancelBallTweenAndClearOwner,
   tweenPlayerTo,
   runPass
 };

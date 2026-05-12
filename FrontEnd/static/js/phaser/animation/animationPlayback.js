@@ -17,7 +17,14 @@
  */
 
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { attachBallToPlayer, detachBall } from "./ballManager.js";
+import { attachBallToPlayer } from "./ballManager.js";
+// IMPORTANT: import `detachBall` from BallControllerAdapter — not from
+// ballManager / ballTween — because the latter only cancels tweens, while
+// the BallController's per-frame `followCallback` keeps the ball snapped
+// to the passer until properly detached via `ballController.detachFromPlayer`.
+// Without this, schema-driven ball tweens get overwritten every frame by
+// the follow callback and the pass renders as a teleport at step end.
+import { detachBall } from "./BallControllerAdapter.js";
 
 // --- Ball-state helpers ----------------------------------------------------
 

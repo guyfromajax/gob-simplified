@@ -5,7 +5,7 @@ import { runInboundSetup as baseRunInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, getMadeShotSweetSpotGrid } from "./courtConstants.js";
 import {
-  detachBall,
+  cancelBallTweenAndClearOwner,
   runPass as baseRunPass,
   tweenPlayerTo,
 } from "./ballTween.js";
@@ -79,7 +79,7 @@ function runPass(scene, cfg = {}) {
 }
 
 // ✅ STEP 3 MIGRATION: Removed tweenBallTo from exports (now using animateBallToPosition/animateShotToRim)
-export { attachBallToPlayer, detachBall, runPass, runInboundSetup };
+export { attachBallToPlayer, cancelBallTweenAndClearOwner, runPass, runInboundSetup };
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
@@ -1107,7 +1107,7 @@ export function animateKickoutReset(
   }
 
   const ownerBefore = getCurrentOwner(scene);
-  detachBall(scene, ballSprite);
+  cancelBallTweenAndClearOwner(scene, ballSprite);
 
   if (debugEnabled) {
     animationDebugLog('animateKickoutReset: Starting pass', { rebounderId, pgId, opts });

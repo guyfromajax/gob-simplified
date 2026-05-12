@@ -1,7 +1,7 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenPlayerTo, runPass, detachBall, getBallDuration } from "./ballTween.js";
+import { tweenPlayerTo, runPass, cancelBallTweenAndClearOwner, getBallDuration } from "./ballTween.js";
 import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import {
@@ -1737,7 +1737,7 @@ async function animateRimRunnerBatOob(
     setRimRunnerSpriteGrid(defSp, contactGrid.x, contactGrid.y);
   }
   const contactPx = gridToPixels(contactGrid.x, contactGrid.y, width, height);
-  detachBall(scene, ballSprite);
+  cancelBallTweenAndClearOwner(scene, ballSprite);
   await animateBallToPosition(scene, contactPx, {
     duration: getBallDuration(ballSprite, contactPx.x, contactPx.y),
     easing: "Sine.easeInOut",

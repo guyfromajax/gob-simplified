@@ -18,7 +18,7 @@
  */
 
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js';
-// Lazy import detachBall to avoid circular dependency (imported dynamically in animateShotToRim)
+// Lazy import cancelBallTweenAndClearOwner to avoid circular dependency (imported dynamically in animateShotToRim)
 // Import BallController adapter for delegation
 import { getBallController } from './BallControllerAdapter.js';
 
@@ -477,11 +477,11 @@ export async function animateShotToRim(scene, rimPosition, options = {}) {
   // Similar to shootBall() in ballManager.js - prevents ball from following player during shot
   // This ensures the ball animates to the rim instead of staying with the player
   // Use dynamic import to avoid circular dependency with ballTween.js
-  let detachBall;
+  let cancelBallTweenAndClearOwner;
   try {
     const ballTweenModule = await import('./ballTween.js');
-    detachBall = ballTweenModule.detachBall;
-    detachBall(scene, ballSprite);
+    cancelBallTweenAndClearOwner = ballTweenModule.cancelBallTweenAndClearOwner;
+    cancelBallTweenAndClearOwner(scene, ballSprite);
   } catch (err) {
     // Fallback: manual detachment if import fails (shouldn't happen, but defensive)
     if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
