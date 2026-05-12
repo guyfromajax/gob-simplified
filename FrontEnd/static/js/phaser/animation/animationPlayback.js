@@ -91,8 +91,17 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     ? step.end.ball.owner_player_id
     : null;
   if (startOwner && startOwner !== endOwner) {
+    console.log(
+      "🐛 [BALL DETACH] firing detach: startOwner=%s endOwner=%s startCoord=%o endCoord=%o duration=%dms",
+      startOwner, endOwner, startCoord, endCoord, durationMs,
+    );
     detachBall(scene, ballSprite);
     ballSprite.setPosition(startPx.x, startPx.y);
+  } else {
+    console.log(
+      "🐛 [BALL DETACH] skipping detach: startOwner=%s endOwner=%s (same or unattached)",
+      startOwner, endOwner,
+    );
   }
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);

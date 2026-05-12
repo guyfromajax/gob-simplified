@@ -209,13 +209,13 @@ SITUATIONAL_SIP_RECEIVER_POS = "SG"
 # baseline lives in ``CRUISE_BASELINE_GRID_PER_GAME_SEC`` below. Pass speed
 # stays a constant — ball physics, not player AG.
 PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean — HCO / clock-burn accounting.
-# Fast-break-specific pass rate. Slower than the canonical pass rate so the
-# outlet pass + BH catch reads visually on screen during a FB turn (where
-# multiple players are also moving simultaneously). Tuned to ~24 grid/game-sec
-# so a typical 30-grid outlet takes ~1.25 game-sec (~440 ms wall at 350ms/game-sec).
-# Used by `calc_fb_pass_segment_seconds`; keep `PASS_GRID_SPOTS_PER_GAME_SECOND`
+# Fast-break-specific pass rate (schema-based emitters: CR FB). Calibrated so a
+# typical 33-grid outlet takes ~2.4 game-sec ≈ 825 ms wall (350 ms/game-sec) —
+# close to RR / Triangle's frontend ball speed (~450 px/sec → ~12.8 grid/game-sec
+# equivalent) so the visual pass feel matches across FB variants. Used by
+# `calc_fb_pass_segment_seconds`; keep `PASS_GRID_SPOTS_PER_GAME_SECOND`
 # untouched for HCO so half-court pass timing is unaffected.
-FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 24
+FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 14
 
 # ---- Movement Rate Refactor (see Movement_Rate_Refactor.md) ---------------
 # New two-tier model: cruise-speed steps (HCO/HCT bring-up) vs AG-driven steps.
