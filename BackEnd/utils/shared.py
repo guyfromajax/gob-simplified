@@ -612,13 +612,13 @@ def ag_to_grid_per_game_sec(ag):
     `CRUISE_BASELINE_GRID_PER_GAME_SEC`), with archetype multipliers
     (SPRINT 14/12, etc.) producing their documented absolute rates at AG=50:
 
-      AG=0   → 10    (slow; sprint ≈ 11.7)
+      AG=0   → 9     (slow; sprint = 10.5)
       AG=50  → 12    (average; sprint = 14)
-      AG=100 → 14    (fast; sprint ≈ 16.3)
-      AG=150 → 16    (sprint ≈ 18.7)
+      AG=100 → 15    (fast; sprint = 17.5)
+      AG=150 → 18    (sprint = 21)
 
-    Tight slope (×4): each AG point ≈ +0.04 grid/game-sec base.
-    Capped at 30 grid/game-sec (hardly reachable at this slope), floored at 0.5.
+    Slope ×6: each AG point = +0.06 grid/game-sec base, +0.07 sprint.
+    Capped at 30 grid/game-sec, floored at 0.5.
 
     Defaults to AG=50 when input is None / non-numeric.
     """
@@ -626,7 +626,7 @@ def ag_to_grid_per_game_sec(ag):
         ag_val = float(ag) if ag is not None else 50.0
     except (TypeError, ValueError):
         ag_val = 50.0
-    rate = 10.0 + (ag_val / 100.0) * 4.0
+    rate = 9.0 + (ag_val / 100.0) * 6.0
     return max(0.5, min(rate, 30.0))
 
 
