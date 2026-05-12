@@ -1057,24 +1057,14 @@ def build_covert_release_animation_steps(
             turn_result, fb_roles, def_lineup
         )
 
-    # Per CR design, the outlet passer (rebounder) holds at the rebound site
-    # instead of crashing the rim. shot_manager populates `offense_rebounder_coords`
-    # for every non-shooter offensive player — including the rebounder. Strip
-    # the passer's entry out of the turn-level overlay map BEFORE the emitter
-    # or `sync_lineup_coords_from_turn` apply it, so neither path teleports
-    # them to the rim cluster.
-    outlet_passer_id_for_strip = fb_roles.get("outlet_passer")
-    if outlet_passer_id_for_strip is not None:
-        passer_key = str(outlet_passer_id_for_strip)
-        for overlay_key in (
-            "offense_rebounder_coords",
-            "defense_rebounder_coords",
-            "offense_getback_coords",
-            "defense_release_coords",
-        ):
-            overlay = turn_result.get(overlay_key)
-            if isinstance(overlay, dict):
-                overlay.pop(passer_key, None)
+    # Re-canonicalize the post-shot overlay maps now that `fb_roles` (which
+    # includes `outlet_passer`) is attached to turn_result. shot_manager
+    # already canonicalized at its return point, but it didn't know about
+    # the outlet_passer role yet — that comes from the FB caller. See
+    # `canonicalize_post_shot_overlays` in shared.py for the role priority
+    # rules. Idempotent.
+    from BackEnd.utils.shared import canonicalize_post_shot_overlays
+    canonicalize_post_shot_overlays(turn_result)
 
     # 🔍 Bug B diagnostic: dump overlay maps and BH overlay entries.
     import logging as _bug_b_log_3
@@ -1191,12 +1181,11 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
     the rim. Without this exemption, the rebounder teleports ~80 grid units
     to (HOME_RIM) on the outcome step.
     """
-    fb_roles = turn_result.get("roles") or {}
-    outlet_passer_id = fb_roles.get("outlet_passer")
-    outlet_passer_id_str = (
-        str(outlet_passer_id) if outlet_passer_id is not None else None
-    )
-
+    # Role-exclusivity is enforced upstream by `canonicalize_post_shot_overlays`
+    # (called from shot_manager and again from this emitter before _build_outcome_step).
+    # By the time we read the overlay maps here, the shooter / outlet passer /
+    # release / get-back players are already in their canonical maps only —
+    # no need for per-overlay exemption logic.
     end_coords = step.get("end", {}).get("coords")
     start_actions = step.get("start", {}).get("action")
     start_archetype = step.get("start", {}).get("archetype")
@@ -1222,9 +1211,6 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
             if x is None or y is None:
                 continue
             pid_str = str(pid)
-            # Outlet passer exempt — they hold their CR step 0 end position.
-            if outlet_passer_id_str and pid_str == outlet_passer_id_str:
-                continue
             end_coords[pid_str] = {"x": float(x), "y": float(y)}
             if isinstance(start_actions, dict):
                 # Promote stationary → cut now that the player has a real

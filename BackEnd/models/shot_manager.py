@@ -2010,9 +2010,14 @@ class ShotManager:
                     next_play_type,
                 )
 
+        # Enforce role-exclusivity invariant on the post-shot overlay maps
+        # before returning. Single source of truth for "which player belongs
+        # in which overlay map" — see canonicalize_post_shot_overlays docstring.
+        from BackEnd.utils.shared import canonicalize_post_shot_overlays
+        canonicalize_post_shot_overlays(result)
         return result
 
-    
+
     def calculate_shot_score(
         self,
         shooter,
@@ -2544,6 +2549,11 @@ class ShotManager:
             result["points"] = points
             result["scoring_team"] = off_team.name
 
+        # Enforce role-exclusivity invariant on the post-shot overlay maps
+        # before returning. Single source of truth for "which player belongs
+        # in which overlay map" — see canonicalize_post_shot_overlays docstring.
+        from BackEnd.utils.shared import canonicalize_post_shot_overlays
+        canonicalize_post_shot_overlays(result)
         return result
 
     def print_defense_score_stats(self):

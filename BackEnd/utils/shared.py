@@ -2648,6 +2648,89 @@ def _norm_player_id(pid: Any) -> Optional[str]:
     return str(pid)
 
 
+def canonicalize_post_shot_overlays(turn_result: Dict[str, Any]) -> None:
+    """Enforce the role-exclusivity invariant on `shot_manager`'s post-shot
+    overlay maps. Each player ends up in **at most one** of the four overlay
+    maps, per the role priority below. Mutates `turn_result` in place.
+
+    Role priority (highest wins; higher-priority players are removed from
+    lower-priority maps):
+
+      1. **Shooter** — stays at the shot spot. Removed from all 4 overlay maps.
+      2. **Outlet passer / rebounder** (FB only, ``roles.outlet_passer``) —
+         holds at the rebound site. Removed from rebounder cluster maps.
+      3. **Release player** (in ``defense_release_coords``) — runs to the
+         outlet receiver coord. Removed from rebounder cluster maps.
+      4. **Get-back player** (in ``offense_getback_coords``) — retreats to
+         defend the FB. Removed from rebounder cluster maps.
+      5. **Rebound cluster** (in ``offense_rebounder_coords`` /
+         ``defense_rebounder_coords``) — catch-all for everyone else.
+
+    Without this canonicalization, a single player_id can leak into multiple
+    overlay maps (e.g., the shooter accidentally appears in
+    `offense_getback_coords`, or the rebounder in `offense_rebounder_coords`).
+    Every downstream consumer — schema emitters' `_apply_post_shot_overlay`,
+    `sync_lineup_coords_from_turn`'s overlay-pass loop — applies the maps
+    blindly and the latter-applied overlay wins, putting that player at the
+    wrong post-shot position. This function is the single source of truth
+    for overlay-map role-exclusivity; downstream consumers don't need their
+    own exemption logic.
+
+    Idempotent: safe to call multiple times.
+    """
+    if not isinstance(turn_result, dict):
+        return
+
+    roles = turn_result.get("roles") if isinstance(turn_result.get("roles"), dict) else {}
+
+    def _id_from(obj: Any) -> Optional[str]:
+        if obj is None:
+            return None
+        if hasattr(obj, "player_id"):
+            pid = getattr(obj, "player_id", None)
+            return str(pid) if pid is not None else None
+        return str(obj) if obj else None
+
+    shooter_id = _id_from(roles.get("shooter")) or _id_from(
+        turn_result.get("shooter_id")
+    )
+    outlet_passer_id = _id_from(roles.get("outlet_passer"))
+
+    all_overlay_keys = (
+        "offense_rebounder_coords",
+        "defense_rebounder_coords",
+        "offense_getback_coords",
+        "defense_release_coords",
+    )
+    rebounder_keys = ("offense_rebounder_coords", "defense_rebounder_coords")
+
+    def _pop_from(keys: Tuple[str, ...], pid_str: Optional[str]) -> None:
+        if not pid_str:
+            return
+        for k in keys:
+            m = turn_result.get(k)
+            if isinstance(m, dict):
+                m.pop(pid_str, None)
+
+    # 1. Shooter — exempt from all overlay maps.
+    _pop_from(all_overlay_keys, shooter_id)
+
+    # 2. Outlet passer / rebounder (FB only) — exempt from rebounder maps.
+    _pop_from(rebounder_keys, outlet_passer_id)
+
+    # 3. Get-back players — exempt from rebounder maps.
+    getback = turn_result.get("offense_getback_coords")
+    if isinstance(getback, dict):
+        for pid in list(getback.keys()):
+            _pop_from(rebounder_keys, str(pid))
+
+    # 4. Release players — exempt from rebounder maps.
+    release = turn_result.get("defense_release_coords")
+    if isinstance(release, dict):
+        for pid in list(release.keys()):
+            _pop_from(rebounder_keys, str(pid))
+
+
 def _final_xy_from_animation_row(anim: Dict[str, Any]) -> Optional[Dict[str, float]]:
     """Resolve final grid position from one animation row (matches FE last-step / end usage)."""
     if not isinstance(anim, dict):
@@ -2829,6 +2912,13 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
                     ns = _norm_player_id(pid)
                     if ns:
                         positions[ns] = dict(normalized)
+
+    # Belt-and-suspenders: enforce role-exclusivity on the overlay maps before
+    # applying them. shot_manager already calls this at its return points, but
+    # callers that mutate `turn_result["roles"]` post-shot (e.g., attaching
+    # `outlet_passer` to a FB result) need a re-canonicalize so the role
+    # invariant accounts for those late-attached roles. Idempotent.
+    canonicalize_post_shot_overlays(turn_result)
 
     for key in TURN_COORDS_OVERLAY_KEYS:
         block = turn_result.get(key)
