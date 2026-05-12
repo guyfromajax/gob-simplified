@@ -233,10 +233,10 @@ def _build_outlet_pass_step(
 ) -> AnimationStep:
     """Step 0: outlet pass with parallel transition movement.
 
-    Step duration is set by outlet pass quality (the ``outlet_score`` on
-    ``fb_roles``):
-      - ``outlet_score >= 50`` → T = 1 game-sec (snappy, decisive pass)
-      - else / missing       → T = 2 game-sec (sloppier pass, more hang time)
+    Step duration is the Euclidean ball-flight time at
+    ``FB_PASS_GRID_SPOTS_PER_GAME_SECOND`` (slower than HCO's canonical pass
+    rate so the outlet pass reads visually alongside the parallel cutters).
+    Floored at 0.5 game-sec so the beat registers for very short passes.
 
     Per-player movement during the step:
       - Outlet passer / receiver: stationary.
@@ -245,26 +245,21 @@ def _build_outlet_pass_step(
         - Player 2 (if present): target = same-side ``lowPost`` from
           ``HCO_STRING_SPOTS`` based on receiver.y > 24.
         Move at ``sprint`` archetype (cutting off the receiver).
-      - All other players (non-passer, non-receiver, non-getback): destination
-        = attacking basket coord (HOME_RIM_COORDS or AWAY_RIM_COORDS). Move at
-        ``default`` archetype (= cruise, AG-driven). Schema interrupted-coord
-        semantics handle the case where they don't reach the rim — they end at
-        whatever fraction of the path their (rate × T) covers.
+      - All other players (non-passer, non-receiver, non-getback): drift a
+        random 1–6 grid spots toward the attacking basket along x (y held).
+        Archetype = ``cruise`` (casual transition pace). They sprint with
+        the play on subsequent steps; the drift here keeps step 0 visually
+        focused on the pass rather than 6+ sprinters racing the BH.
 
-    Ball tweens passer → receiver over the full step T (350ms or 700ms
-    wall-clock at 350ms-per-game-sec).
+    Ball tweens passer → receiver over the full step T.
     """
-    outlet_score = fb_roles.get("outlet_score")
-    # T=1 game-sec rendered as 350ms wall-clock — too fast for the outlet
-    # pass and supporting drifts to register visually. Raised both branches:
-    # snappy outlet still gets a smaller T than sloppy, but both leave room
-    # for the pass + get-back-defender + parallel cruise drifts to play.
-    if outlet_score is not None and outlet_score >= 50:
-        t = 2.0
-    else:
-        # Includes None case (no outlet score available — shouldn't happen
-        # in normal CR flow but defensive default).
-        t = 3.0
+    # Outlet pass T: Euclidean ball-flight time at FB pass rate.
+    # `calc_fb_pass_segment_seconds` uses `FB_PASS_GRID_SPOTS_PER_GAME_SECOND`
+    # (24 grid/game-sec) — slower than HCO's canonical pass rate so the pass
+    # is visible on screen alongside the parallel get-back / cutter motion.
+    # Floor at 0.5 game-sec so the visual beat is perceptible for short passes.
+    from BackEnd.utils.shared import calc_fb_pass_segment_seconds
+    t = max(0.5, calc_fb_pass_segment_seconds(passer_coord, receiver_coord))
 
     x_dir = -1 if is_away_offense else 1
     attacking_basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
@@ -311,12 +306,20 @@ def _build_outlet_pass_step(
                 gb2_target = {"x": float(spot_home["x"]), "y": float(spot_home["y"])}
             targets.append((gb2_id, gb2_target, "sprint"))
 
-    # All others: destination = attacking basket; move at default (AG-driven) rate.
+    # All others (non-passer, non-receiver, non-getback): drift a random 1–6
+    # grid spots toward the attacking basket along x, holding y. Archetype
+    # `cruise` (= casual transition pace, not full sprint). On subsequent
+    # steps these players sprint with the play — but during the outlet pass
+    # they only drift, so the BH catch isn't visually crowded by 6+ sprinters.
     excluded = {passer_id, receiver_id, *getback_ids}
     for pid in all_start_coords:
         if pid in excluded:
             continue
-        targets.append((pid, attacking_basket_coord, "default"))
+        start = all_start_coords[pid]
+        drift = random.randint(1, 6)
+        drift_x = max(4.0, min(97.0, float(start["x"]) + drift * x_dir))
+        drift_target: GridCoord = {"x": drift_x, "y": float(start["y"])}
+        targets.append((pid, drift_target, "cruise"))
 
     # Compute interrupted end coords: start + (rate × T) along start→target.
     for pid, target, arch in targets:
@@ -440,16 +443,19 @@ def _build_outcome_step(
         destinations[pid] = end_coords.get(pid, coord)
 
     if bh_id:
+        # FB BH is sprinting up the floor; the FB run-up dominates the wind-up
+        # even for shot outcomes. AG-scaled via `sprint` multiplier to match
+        # RR/Triangle FB pacing.
         if is_defensive_stop:
             actions[bh_id] = "handle_ball"
-            archetype[bh_id] = "drive"
+            archetype[bh_id] = "sprint"
         elif result_type in ("MAKE", "MISS", "BLOCK"):
             actions[bh_id] = "shoot"
-            archetype[bh_id] = "drive"  # FB run-up dominates the wind-up.
+            archetype[bh_id] = "sprint"
         else:
-            # FOUL / STEAL / DEAD_BALL — BH still drives toward outcome spot.
+            # FOUL / STEAL / DEAD_BALL — BH still sprints toward outcome spot.
             actions[bh_id] = "handle_ball"
-            archetype[bh_id] = "drive"
+            archetype[bh_id] = "sprint"
 
     if stopper_id:
         sid = str(stopper_id)
@@ -474,10 +480,10 @@ def _build_outcome_step(
             archetype[pid] = "drive"
 
     # Non-BH offensive players: when the animator gives them a movement end
-    # (i.e. they're not actually stationary), tag them as `cut` / `cruise`
+    # (i.e. they're not actually stationary), tag them as `cut` / `sprint`
     # so the FE renders them running with the play instead of treating them
-    # as stationary and snap-rendering to the end position. Without this,
-    # offensive supporters in the FB outcome step appear to teleport.
+    # as stationary and snap-rendering to the end position. Sprint pace
+    # matches the BH and RR/Triangle FB offensive runners.
     for player in off_lineup.values():
         if player is None:
             continue
@@ -488,13 +494,13 @@ def _build_outcome_step(
             continue
         if _movement_end_coord(animations, pid) is not None:
             actions[pid] = "cut"
-            archetype[pid] = "cruise"
+            archetype[pid] = "sprint"
 
-    # Gating player + T.
+    # Gating player + T. BH runs at sprint pace (AG-scaled) for the FB attack.
     bh_coord_start = step_start_coords.get(bh_id) if bh_id else None
     bh_coord_end = end_coords.get(bh_id) if bh_id else None
     bh_traversal = (
-        _traversal_seconds(bh_coord_start, bh_coord_end, _ag_grid_per_game_sec(bh, "drive"))
+        _traversal_seconds(bh_coord_start, bh_coord_end, _ag_grid_per_game_sec(bh, "sprint"))
         if bh_coord_start and bh_coord_end and bh
         else 0.0
     )

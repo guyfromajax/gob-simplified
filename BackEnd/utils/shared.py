@@ -576,6 +576,24 @@ def calc_pass_segment_seconds(passer_coords, receiver_coords):
     return grid_dist / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
 
 
+def calc_fb_pass_segment_seconds(passer_coords, receiver_coords):
+    """
+    Fast-break pass timing. Uses FB_PASS_GRID_SPOTS_PER_GAME_SECOND (slower than
+    the canonical HCO pass rate) so the outlet pass reads visually on screen
+    when multiple players are running the break simultaneously.
+
+    Used by Covert Release / Rim Runner / Triangle FB emitters. Keep
+    `calc_pass_segment_seconds` for HCO so half-court timing is unaffected.
+    """
+    from BackEnd.constants import FB_PASS_GRID_SPOTS_PER_GAME_SECOND
+    if not passer_coords or not receiver_coords:
+        return 0.0
+    dx = abs((receiver_coords.get("x", 0) or 0) - (passer_coords.get("x", 0) or 0))
+    dy = abs((receiver_coords.get("y", 0) or 0) - (passer_coords.get("y", 0) or 0))
+    grid_dist = math.sqrt(dx * dx + dy * dy)
+    return grid_dist / float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
+
+
 # ---- Movement Rate Refactor (Phase 1 scaffolding) -----------------------------
 # See _documentation_master/projects/Movement_Rate_Refactor.md
 #

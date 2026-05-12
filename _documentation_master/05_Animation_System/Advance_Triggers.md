@@ -78,15 +78,15 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | **1 game-sec if `outlet_score >= 50`, else 2 game-sec** (quality-driven, fixed durations) |
-| 1 | Shot motion (→ `turn_stop: SHOT_ATTEMPT`) | `player_reaches_position` | shooter (BH; reaches shot spot) | BH traversal time at `drive` archetype |
+| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | distance ÷ `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (=24); floored at 0.5 game-sec |
+| 1 | Shot motion (→ `turn_stop: SHOT_ATTEMPT`) | `player_reaches_position` | shooter (BH; reaches shot spot) | BH traversal time at `sprint` archetype |
 
 #### Branch: Outlet → Defensive Stop
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | **1 game-sec if `outlet_score >= 50`, else 2 game-sec** (quality-driven, fixed durations) |
-| 1 | Defensive stop motion | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `drive` archetype |
+| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | distance ÷ `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (=24); floored at 0.5 game-sec |
+| 1 | Defensive stop motion | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `sprint` archetype (BH) / `drive` archetype (stopper) |
 | 2 | Step-back / HCO setup (→ implicit end-of-turn) | `player_reaches_position` | slowest mover (max traversal at drive) | slowest mover's traversal time at `drive` archetype |
 
 **Step 0 (outlet pass) per-player movement:**
@@ -96,7 +96,7 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
   - Player 1: tweens to `(receiver.x ± 2 toward attacking basket, receiver.y)` — cuts off the receiver.
   - Player 2 (if present): tweens to same-side `lowPost` from `HCO_STRING_SPOTS` (`upper lowPost` if `receiver.y > 24`, else `lower lowPost`).
   - Archetype = `sprint` (14 grid/sec at AG=50; aggressive cut-off pace).
-- **All other players** (non-passer, non-receiver, non-getback — typically 5–7 of them): destination = attacking basket coord (`HOME_RIM_COORDS` or `AWAY_RIM_COORDS`). Move at `default` archetype (= cruise = 12 grid/sec at AG=50). Schema's interrupted-coord semantics handle the case where they don't reach the rim — they end at `start + (rate × T)` along the path.
+- **All other players** (non-passer, non-receiver, non-getback — typically 5–7 of them): drift a random **1–6 grid spots toward the attacking basket along x** (y held). Archetype = `cruise` (casual transition pace, not full sprint). They sprint with the play on step 1+; the small drift on step 0 keeps the outlet pass visually focused on the ball + receiver instead of crowding the BH with 6+ sprinters.
 
 **Step 1 end announcement:** `step.end.announcement = "Nice Stop!"` (team: defense, headshot: defensive stopper). Playback engine pauses clocks, shows announcement for `hold_ms = 1000`, resumes, then proceeds to step 2.
 
@@ -111,7 +111,7 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
 - **All 5 defenders**: mirror with same-lineup-position matchup (def_PG → off_PG's spot, def_SG → off_SG's spot, etc.). The 5 spots form a 2-3 zone footprint by construction.
 
 Notes:
-- Step 0 T is **quality-driven, not distance-driven**: a strong outlet (`outlet_score >= 50`) → 1 game-sec snappy pass; a sloppy outlet → 2 game-sec hangtime. Replaces earlier `distance / PASS_GRID_SPOTS_PER_GAME_SECOND` formula. Pass-speed constant unchanged for HCO/OREB.
+- Step 0 T is **distance-driven**: `distance ÷ FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (= 24 grid/game-sec; FB-specific so HCO's canonical `PASS_GRID_SPOTS_PER_GAME_SECOND = 36` is unaffected). Floored at 0.5 game-sec so very short passes still register visually. Replaces the earlier `outlet_score`-gated 1.0 / 2.0 fixed-T branches.
 - DEFENSIVE_STOP has no schema-vocab `turn_stop` event for "defensive stop" — step 2 ends with `next: next_step` past the array (implicit end of turn). Caller transitions to HCO.
 - Other outcome variants (FOUL / STEAL / DEAD_BALL_TURNOVER) reuse step 1 with `gating_player = BH` and the appropriate `turn_stop` event on `next` — no step 2.
 - HCO BH default = PG. Set-play-specific BH detection (e.g., for plays where the BH is SG or SF) is a future enhancement.
