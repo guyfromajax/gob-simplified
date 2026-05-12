@@ -1060,7 +1060,7 @@ class ShotManager:
             if dreb_fb_eligible:
                 shot_fb_pk = play_key_for_fast_break_entry(
                     True,
-                    getattr(off_team, "playbook_settings", None),
+                    getattr(def_team, "playbook_settings", None),
                 )
                 if shot_fb_pk == COVERT_RELEASE:
                     rp = cr.select_covert_release_position(

@@ -43,6 +43,37 @@ def test_dreb_fast_break_entry_uses_playbook_weights(monkeypatch):
     assert captured["k"] == 1
 
 
+def test_dreb_fast_break_entry_uses_canonical_fast_breaks_key(monkeypatch):
+    captured = {}
+
+    def fake_choices(population, weights, k):
+        captured["population"] = population
+        captured["weights"] = weights
+        captured["k"] = k
+        return [fb_types.COVERT_RELEASE]
+
+    monkeypatch.setattr(fb_types.random, "choices", fake_choices)
+    key = fb_types.play_key_for_fast_break_entry(
+        True,
+        {
+            "fast_breaks": {
+                "covert_release": 100,
+                "rim_runner": 0,
+                "triangle": 0,
+            }
+        },
+    )
+
+    assert key == fb_types.COVERT_RELEASE
+    assert captured["population"] == [
+        fb_types.COVERT_RELEASE,
+        fb_types.RIM_RUNNER,
+        fb_types.TRIANGLE,
+    ]
+    assert captured["weights"] == [100, 0, 0]
+    assert captured["k"] == 1
+
+
 def test_dreb_fast_break_entry_falls_back_to_default_weights(monkeypatch):
     captured = {}
 

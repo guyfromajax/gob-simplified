@@ -75,7 +75,7 @@ def _resolve_dreb_fast_break_weights(
 ) -> Dict[str, int]:
     raw = None
     if isinstance(playbook_settings, dict):
-        raw = playbook_settings.get("fast_break")
+        raw = playbook_settings.get("fast_breaks", playbook_settings.get("fast_break"))
     if not isinstance(raw, dict):
         return dict(DEFAULT_DREB_FAST_BREAK_WEIGHTS)
 
