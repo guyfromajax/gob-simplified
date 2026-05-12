@@ -384,16 +384,35 @@ def _build_outlet_pass_step(
 def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     """Look up grid/game-sec rate for the given player + archetype.
 
-    Defers to ``BackEnd.utils.shared.ag_to_grid_per_game_sec`` when available;
-    falls back to a baseline if shared.py is unreachable in test contexts.
+    ``ag_to_grid_per_game_sec`` is the base AG curve (AG=50 → 16). Archetype
+    multipliers come from constants (sprint=14/12, drive=1.0, shot_motion=10/12).
+    Matches the rate calculation in ``calc_ag_segment_seconds``.
     """
     try:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
-        return float(ag_to_grid_per_game_sec(player, archetype=archetype))
+        from BackEnd.constants import (
+            DRIVE_MULTIPLIER,
+            SHOT_MOTION_MULTIPLIER,
+            SPRINT_MULTIPLIER,
+        )
     except Exception:
-        # Test-context fallback: AG=50, drive baseline ~12 grid/sec
-        # (cruise 16 × 0.75 drive multiplier).
-        return 12.0
+        # Test-context fallback: AG=50 sprint ≈ 18.67 grid/sec.
+        return 18.67
+
+    if player is None:
+        ag = 50
+    else:
+        attrs = getattr(player, "attributes", None) or {}
+        ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
+    base_rate = float(ag_to_grid_per_game_sec(ag))
+    if archetype == "drive":
+        return base_rate * DRIVE_MULTIPLIER
+    if archetype in ("shot_motion", "compressed_hco"):
+        return base_rate * SHOT_MOTION_MULTIPLIER
+    if archetype == "sprint":
+        return base_rate * SPRINT_MULTIPLIER
+    # default / cruise / stationary / unknown → base AG rate.
+    return base_rate
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
@@ -432,6 +451,15 @@ def _build_outcome_step(
     for pid, start_coord in step_start_coords.items():
         anim_end = _movement_end_coord(animations, pid)
         end_coords[pid] = anim_end if anim_end is not None else start_coord
+
+    # 🔍 Bug B diagnostic: BH end coord after legacy-animator read.
+    if bh_id:
+        _bh_after_anim = end_coords.get(bh_id)
+        import logging as _bug_b_log
+        _bug_b_log.warning(
+            "🐛 [BUG B] BH=%s step1 end after _movement_end_coord: %s",
+            bh_id, _bh_after_anim,
+        )
 
     # Per-player action + archetype.
     actions: Dict[str, PlayerAction] = {}
@@ -560,6 +588,15 @@ def _build_outcome_step(
                 "x": start_coord["x"] + dx * ratio,
                 "y": start_coord["y"] + dy * ratio,
             }
+
+    # 🔍 Bug B diagnostic: BH end coord after the in-_build_outcome_step clamp.
+    if bh_id:
+        _bh_after_old_clamp = end_coords.get(bh_id)
+        import logging as _bug_b_log_2
+        _bug_b_log_2.warning(
+            "🐛 [BUG B] BH=%s step1 end after old clamp loop: %s",
+            bh_id, _bh_after_old_clamp,
+        )
 
     advance_trigger: AdvanceTrigger = {
         "condition": "player_reaches_position",
@@ -1009,12 +1046,56 @@ def build_covert_release_animation_steps(
             turn_result, fb_roles, def_lineup
         )
 
+    # Per CR design, the outlet passer (rebounder) holds at the rebound site
+    # instead of crashing the rim. shot_manager populates `offense_rebounder_coords`
+    # for every non-shooter offensive player — including the rebounder. Strip
+    # the passer's entry out of the turn-level overlay map BEFORE the emitter
+    # or `sync_lineup_coords_from_turn` apply it, so neither path teleports
+    # them to the rim cluster.
+    outlet_passer_id_for_strip = fb_roles.get("outlet_passer")
+    if outlet_passer_id_for_strip is not None:
+        passer_key = str(outlet_passer_id_for_strip)
+        for overlay_key in (
+            "offense_rebounder_coords",
+            "defense_rebounder_coords",
+            "offense_getback_coords",
+            "defense_release_coords",
+        ):
+            overlay = turn_result.get(overlay_key)
+            if isinstance(overlay, dict):
+                overlay.pop(passer_key, None)
+
+    # 🔍 Bug B diagnostic: dump overlay maps and BH overlay entries.
+    import logging as _bug_b_log_3
+    _bh_id_str = str(bh_id) if bh_id else None
+    for _ok in (
+        "offense_rebounder_coords",
+        "defense_rebounder_coords",
+        "offense_getback_coords",
+        "defense_release_coords",
+    ):
+        _ov = turn_result.get(_ok) or {}
+        _bh_in_ov = _ov.get(_bh_id_str) if _bh_id_str else None
+        _bug_b_log_3.warning(
+            "🐛 [BUG B] overlay %s len=%d bh_entry=%s",
+            _ok, len(_ov) if isinstance(_ov, dict) else 0, _bh_in_ov,
+        )
+
     # Movement #1 (post-shot positioning): override outcome step's end.coords
     # for players in shot_manager's overlay maps (get-back, release,
     # offense rebounders, defense rebounders for FB). Skips for DEFENSIVE_STOP
     # since the FB ended without a shot resolving — no rebounder placement.
     if result_type != "DEFENSIVE_STOP":
         _apply_post_shot_overlay(outcome_step, turn_result)
+        # 🔍 Bug B diagnostic: BH end coord after overlay pass.
+        if _bh_id_str:
+            _bh_after_overlay = (
+                outcome_step.get("end", {}).get("coords", {}).get(_bh_id_str)
+            )
+            _bug_b_log_3.warning(
+                "🐛 [BUG B] BH=%s step1 end after _apply_post_shot_overlay: %s",
+                _bh_id_str, _bh_after_overlay,
+            )
         # Clamp the overlay-derived end coords to each player's archetype
         # rate × step T so non-gate movers don't appear to teleport from
         # their step 0 drift positions to the rim cluster. Without this,
@@ -1027,6 +1108,15 @@ def build_covert_release_animation_steps(
         _clamp_step_end_coords_to_archetype(
             outcome_step, off_lineup, def_lineup
         )
+        # 🔍 Bug B diagnostic: BH end coord after archetype clamp.
+        if _bh_id_str:
+            _bh_after_clamp = (
+                outcome_step.get("end", {}).get("coords", {}).get(_bh_id_str)
+            )
+            _bug_b_log_3.warning(
+                "🐛 [BUG B] BH=%s step1 end after archetype clamp: %s",
+                _bh_id_str, _bh_after_clamp,
+            )
 
     _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
     return steps
