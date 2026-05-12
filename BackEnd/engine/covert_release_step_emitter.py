@@ -245,21 +245,34 @@ def _build_outlet_pass_step(
         - Player 2 (if present): target = same-side ``lowPost`` from
           ``HCO_STRING_SPOTS`` based on receiver.y > 24.
         Move at ``sprint`` archetype (cutting off the receiver).
-      - All other players (non-passer, non-receiver, non-getback): drift a
-        random 1–6 grid spots toward the attacking basket along x (y held).
-        Archetype = ``cruise`` (casual transition pace). They sprint with
-        the play on subsequent steps; the drift here keeps step 0 visually
-        focused on the pass rather than 6+ sprinters racing the BH.
+      - All other players (non-passer, non-receiver, non-getback): sprint
+        toward the attacking basket (HOME_RIM / AWAY_RIM). Schema's
+        interrupted-coord logic clamps each player's end coord to
+        ``sprint rate × step T`` along the start→basket path. At the
+        current FB pass speed (36 grid/game-sec), a typical 40-grid outlet
+        completes in ~1.1 game-sec, so sprinters get a ~15-grid head start
+        without surpassing the stationary receiver at midcourt.
 
     Ball tweens passer → receiver over the full step T.
     """
-    # Outlet pass T: Euclidean ball-flight time at FB pass rate.
-    # `calc_fb_pass_segment_seconds` uses `FB_PASS_GRID_SPOTS_PER_GAME_SECOND`
-    # (24 grid/game-sec) — slower than HCO's canonical pass rate so the pass
-    # is visible on screen alongside the parallel get-back / cutter motion.
+    # Outlet pass T: Euclidean ball-flight time at FB pass rate, varied by
+    # outlet quality. Good outlets (`outlet_score >= 50`) zip at the canonical
+    # FB pass rate; poor outlets are noticeably slower (2/3 the rate) so the
+    # ball hangs in the air and the play feels sloppier.
+    #   - good: 36 grid/game-sec (= FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
+    #   - poor: 24 grid/game-sec
     # Floor at 0.5 game-sec so the visual beat is perceptible for short passes.
-    from BackEnd.utils.shared import calc_fb_pass_segment_seconds
-    t = max(0.5, calc_fb_pass_segment_seconds(passer_coord, receiver_coord))
+    from BackEnd.constants import FB_PASS_GRID_SPOTS_PER_GAME_SECOND
+    _outlet_score = fb_roles.get("outlet_score")
+    _pass_rate = (
+        float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
+        if _outlet_score is not None and _outlet_score >= 50
+        else 24.0
+    )
+    _dx = float(receiver_coord.get("x", 0)) - float(passer_coord.get("x", 0))
+    _dy = float(receiver_coord.get("y", 0)) - float(passer_coord.get("y", 0))
+    _grid_dist = (_dx * _dx + _dy * _dy) ** 0.5
+    t = max(0.5, _grid_dist / _pass_rate)
 
     x_dir = -1 if is_away_offense else 1
     attacking_basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
@@ -306,20 +319,18 @@ def _build_outlet_pass_step(
                 gb2_target = {"x": float(spot_home["x"]), "y": float(spot_home["y"])}
             targets.append((gb2_id, gb2_target, "sprint"))
 
-    # All others (non-passer, non-receiver, non-getback): drift a random 1–6
-    # grid spots toward the attacking basket along x, holding y. Archetype
-    # `cruise` (= casual transition pace, not full sprint). On subsequent
-    # steps these players sprint with the play — but during the outlet pass
-    # they only drift, so the BH catch isn't visually crowded by 6+ sprinters.
+    # All others (non-passer, non-receiver, non-getback): sprint toward the
+    # attacking basket. Schema interrupted-coord logic clamps each player's
+    # end coord to (sprint rate × step T) along the start→basket path. At
+    # the current FB pass speed (36 grid/game-sec), the outlet completes in
+    # ~1-1.5 game-sec, so sprinters cover ~15-20 grid units before the
+    # receiver catches the ball — head start, but not enough to surpass
+    # him at midcourt. Subsequent steps continue the sprint.
     excluded = {passer_id, receiver_id, *getback_ids}
     for pid in all_start_coords:
         if pid in excluded:
             continue
-        start = all_start_coords[pid]
-        drift = random.randint(1, 6)
-        drift_x = max(4.0, min(97.0, float(start["x"]) + drift * x_dir))
-        drift_target: GridCoord = {"x": drift_x, "y": float(start["y"])}
-        targets.append((pid, drift_target, "cruise"))
+        targets.append((pid, attacking_basket_coord, "sprint"))
 
     # Compute interrupted end coords: start + (rate × T) along start→target.
     for pid, target, arch in targets:
