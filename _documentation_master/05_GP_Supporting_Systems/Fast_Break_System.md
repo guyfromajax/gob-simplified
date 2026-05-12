@@ -116,6 +116,42 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 - **What**: Release defender selection, IQ/AG bands, outlet receiver coords, then **defensive stop vs shot** per Steps 4–8 (geography + AG/BH vs AG/OD skill check, shot via `resolve_shot`).
 - **Code**: `BackEnd/engine/covert_release.py`, `resolve_fast_break_logic()` (Covert branch), `shot_manager` for Covert-only release/get-back coords on the prior shot turn.
 
+##### Get-back defender read on outlet pass (step 0)
+
+On the outlet pass step (CR FB step 0), how each get-back defender positions themselves depends on the outlet pass quality:
+
+- **Sloppy outlet (`outlet_score < 50`)** — legacy/default behavior. Get-back defender 1 takes the cut-off spot near the receiver; get-back defender 2 (if present) takes the same-side `lowPost` spot from `HCO_STRING_SPOTS`. No read required.
+
+- **Sharp outlet (`outlet_score >= 50`)** — defenders must make a read to attempt the stop. Only **one** defender can take the cut-off; the other defends the basket.
+
+**Eligibility filter.** A defender is eligible to attempt the stop only if their x is at or past the receiver's x in the attacking direction:
+- Home offense (attacks `HOME_RIM` at x=91): eligible iff `defender.x >= receiver.x`.
+- Away offense (attacks `AWAY_RIM` at x=9):  eligible iff `defender.x <= receiver.x`.
+
+Defenders behind the receiver (in the attacking direction) are ineligible and **auto-retreat to basket defense** without attempting a read.
+
+**Order of attempts.** Among eligible defenders, the **closest to the receiver** (Euclidean) attempts the read first. Exact ties → random choice.
+
+**The read.** `player_read(defender)` (from `BackEnd/utils/shared.py`):
+```
+score = ((IQ * 0.8) + (CH * 0.2)) * random.randint(1, 6)
+```
+Threshold: **`outlet_score * 3`**. Pass iff `score >= threshold`.
+
+**Outcomes:**
+1. **First defender's read passes** → they take the cut-off stop position; the second defender (if any) **skips their read** and retreats to basket defense.
+2. **First defender's read fails** → they retreat to basket defense; the second eligible defender (if any) attempts their own read. If passes → cut-off; if fails → basket defense.
+
+**Cut-off stop position** (unchanged): `(receiver.x ± 2 toward attacking basket, receiver.y)`.
+
+**Basket defense spot**: random within a box near the rim being attacked.
+- Home offense: x ∈ [87, 91], y ∈ [20, 30].
+- Away offense: x ∈ [9, 13], y ∈ [20, 30].
+
+When two defenders both retreat to basket defense, the second defender's spot is enforced to be **≥2 grid units offset on both axes** from the first so they don't stack at the same point. Up to 5 random retries; deterministic offset fallback if the box can't accommodate.
+
+**Implemented in**: `_build_outlet_pass_step` in `BackEnd/engine/covert_release_step_emitter.py`, with helpers `_order_defenders_for_stop` and `_basket_defense_spot` in the same file.
+
 #### Rim Runner (`rim_runner`)
 
 - **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** is **`rim_runner`**.

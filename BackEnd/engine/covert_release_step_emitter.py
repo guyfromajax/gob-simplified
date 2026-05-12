@@ -152,6 +152,91 @@ def _euclid(a: GridCoord, b: GridCoord) -> float:
     return (dx * dx + dy * dy) ** 0.5
 
 
+def _order_defenders_for_stop(
+    defender_ids: List[str],
+    all_start_coords: Dict[str, GridCoord],
+    receiver_coord: GridCoord,
+    is_away_offense: bool,
+) -> tuple:
+    """Order get-back defenders for the read-to-stop attempt sequence.
+
+    A defender is **eligible** to attempt the stop if their x is at-or-past
+    the receiver's x in the attacking direction:
+      - Home offense (attacks x=91): eligible iff defender.x >= receiver.x
+      - Away offense (attacks x=9):  eligible iff defender.x <= receiver.x
+
+    Defenders behind the receiver auto-retreat to basket defense (ineligible).
+
+    Among eligible defenders, the closest to the receiver (Euclidean) goes
+    first. Exact ties → random choice. Returns
+    ``(ordered_eligible_ids, ineligible_ids)``.
+    """
+    eligible: List[tuple] = []
+    ineligible: List[str] = []
+    for d_id in defender_ids:
+        start = all_start_coords.get(d_id)
+        if start is None:
+            ineligible.append(d_id)
+            continue
+        if is_away_offense:
+            is_eligible = float(start["x"]) <= float(receiver_coord["x"])
+        else:
+            is_eligible = float(start["x"]) >= float(receiver_coord["x"])
+        if is_eligible:
+            eligible.append((d_id, _euclid(start, receiver_coord)))
+        else:
+            ineligible.append(d_id)
+
+    if len(eligible) == 2 and abs(eligible[0][1] - eligible[1][1]) < 1e-3:
+        random.shuffle(eligible)
+    else:
+        eligible.sort(key=lambda x: x[1])
+    return [d[0] for d in eligible], ineligible
+
+
+def _basket_defense_spot(
+    is_away_offense: bool,
+    exclude_spot: Optional[GridCoord] = None,
+) -> GridCoord:
+    """Pick a random spot in front of the attacking team's rim for a defender
+    protecting the basket on a CR FB.
+
+    - Home offense (attacks x=91): defender box (87, 91) × (20, 30).
+    - Away offense (attacks x=9):  defender box (9, 13) × (20, 30).
+
+    When two defenders both retreat to the basket, pass the first defender's
+    spot as ``exclude_spot`` to enforce a ≥2 grid offset on BOTH axes so the
+    two defenders don't stack at the same spot. Falls back to a deterministic
+    nearby offset after a few retries if the random box is too small.
+    """
+    if is_away_offense:
+        x_lo, x_hi = 9, 13
+    else:
+        x_lo, x_hi = 87, 91
+    y_lo, y_hi = 20, 30
+
+    for _ in range(5):
+        x = float(random.randint(x_lo, x_hi))
+        y = float(random.randint(y_lo, y_hi))
+        if exclude_spot is None:
+            return {"x": x, "y": y}
+        if (
+            abs(x - float(exclude_spot["x"])) >= 2.0
+            and abs(y - float(exclude_spot["y"])) >= 2.0
+        ):
+            return {"x": x, "y": y}
+
+    # Fallback: deterministic offset from the excluded spot, clamped to box.
+    ex_x = float(exclude_spot["x"]) if exclude_spot else float(x_lo)
+    ex_y = float(exclude_spot["y"]) if exclude_spot else float(y_lo)
+    nx = ex_x + 2.0 if ex_x + 2.0 <= x_hi else ex_x - 2.0
+    ny = ex_y + 2.0 if ex_y + 2.0 <= y_hi else ex_y - 2.0
+    return {
+        "x": float(max(x_lo, min(x_hi, nx))),
+        "y": float(max(y_lo, min(y_hi, ny))),
+    }
+
+
 # --- Outcome → next pointer ------------------------------------------------
 
 
@@ -240,11 +325,20 @@ def _build_outlet_pass_step(
 
     Per-player movement during the step:
       - Outlet passer / receiver: stationary.
-      - Get-back defenders (from prior shot's ``offense_getback`` list):
-        - Player 1: target = (receiver.x ± 2 toward attacking basket, receiver.y).
-        - Player 2 (if present): target = same-side ``lowPost`` from
-          ``HCO_STRING_SPOTS`` based on receiver.y > 24.
-        Move at ``sprint`` archetype (cutting off the receiver).
+      - Get-back defenders (from prior shot's ``offense_getback`` list) —
+        behavior depends on outlet pass quality:
+          * **Sharp outlet** (``outlet_score >= 50``): defenders must make a
+            read (``player_read``: IQ × 0.8 + CH × 0.2 × 1d6) vs threshold
+            ``outlet_score × 3`` to attempt the stop. Closest eligible
+            defender goes first; if their read passes, they take the cut-off
+            stop position and the other defender retreats to defend the
+            basket. If they fail, the second eligible defender attempts the
+            read. Defenders behind the receiver in the attacking direction
+            are ineligible and auto-retreat to basket defense.
+          * **Sloppy outlet** (``outlet_score < 50``): legacy behavior —
+            defender 1 takes the cut-off, defender 2 takes the same-side
+            lowPost spot.
+        See ``Fast_Break_System.md`` — Covert Release — for full spec.
       - All other players (non-passer, non-receiver, non-getback): sprint
         toward the attacking basket (HOME_RIM / AWAY_RIM). Schema's
         interrupted-coord logic clamps each player's end coord to
@@ -299,18 +393,70 @@ def _build_outlet_pass_step(
     # Targets per role: (player_id, target_coord, archetype).
     targets: List[tuple] = []
 
-    # Get-back Defender 1: cut off the receiver (2 spots ahead in attacking dir, same y).
-    if len(getback_ids) >= 1:
-        gb1_id = getback_ids[0]
-        if gb1_id in all_start_coords and gb1_id not in (passer_id, receiver_id):
-            gb1_x = max(4.0, min(97.0, receiver_coord["x"] + (2.0 * x_dir)))
-            gb1_target: GridCoord = {"x": gb1_x, "y": float(receiver_coord["y"])}
-            targets.append((gb1_id, gb1_target, "sprint"))
+    # Get-back defenders: on a SHARP outlet (`outlet_score >= 50`), defenders
+    # must make a read (`player_read`) to attempt the stop. On a SLOPPY outlet
+    # they automatically get into position. See `Fast_Break_System.md`
+    # — Covert Release — for the full design spec.
+    cutoff_x_for_stop = max(4.0, min(97.0, receiver_coord["x"] + (2.0 * x_dir)))
+    cutoff_target_for_stop: GridCoord = {
+        "x": cutoff_x_for_stop,
+        "y": float(receiver_coord["y"]),
+    }
+    outlet_score = fb_roles.get("outlet_score")
+    valid_getback_ids = [
+        d_id for d_id in getback_ids
+        if d_id in all_start_coords and d_id not in (passer_id, receiver_id)
+    ]
+    use_read_system = (
+        outlet_score is not None
+        and outlet_score >= 50
+        and 1 <= len(valid_getback_ids) <= 2
+    )
 
-    # Get-back Defender 2 (if present): lowPost on the same vertical half as receiver.
-    if len(getback_ids) >= 2:
-        gb2_id = getback_ids[1]
-        if gb2_id in all_start_coords and gb2_id not in (passer_id, receiver_id):
+    if use_read_system:
+        # Sharp outlet → defenders read to attempt the stop. Only the FIRST
+        # eligible defender (closest to receiver, on the basket-side of the
+        # receiver's x) attempts the read; if they pass, they take the stop
+        # and the other defender retreats to defend the basket. If they
+        # fail, the second eligible defender gets a read attempt.
+        ordered_eligible, ineligible_ids = _order_defenders_for_stop(
+            valid_getback_ids, all_start_coords, receiver_coord, is_away_offense
+        )
+        threshold = int(outlet_score) * 3
+        stop_claimed = False
+        basket_spots_taken: List[GridCoord] = []
+
+        for d_id in ordered_eligible:
+            if not stop_claimed:
+                defender = _player_lookup_by_id(off_lineup, def_lineup, d_id)
+                from BackEnd.utils.shared import player_read as _player_read_score
+                score = _player_read_score(defender) if defender else 0
+                if score >= threshold:
+                    targets.append((d_id, cutoff_target_for_stop, "sprint"))
+                    stop_claimed = True
+                    continue
+            # Read failed OR stop already claimed → retreat to basket.
+            exclude = basket_spots_taken[0] if basket_spots_taken else None
+            bd_spot = _basket_defense_spot(is_away_offense, exclude)
+            basket_spots_taken.append(bd_spot)
+            targets.append((d_id, bd_spot, "sprint"))
+
+        # Ineligible defenders (behind the receiver in the attacking dir)
+        # auto-retreat to basket without attempting a read.
+        for d_id in ineligible_ids:
+            exclude = basket_spots_taken[0] if basket_spots_taken else None
+            bd_spot = _basket_defense_spot(is_away_offense, exclude)
+            basket_spots_taken.append(bd_spot)
+            targets.append((d_id, bd_spot, "sprint"))
+    else:
+        # Sloppy outlet (or no defenders): legacy behavior — gb1 takes the
+        # cut-off near the receiver, gb2 (if present) takes the lowPost
+        # spot on the same vertical half.
+        if len(valid_getback_ids) >= 1:
+            gb1_id = valid_getback_ids[0]
+            targets.append((gb1_id, cutoff_target_for_stop, "sprint"))
+        if len(valid_getback_ids) >= 2:
+            gb2_id = valid_getback_ids[1]
             spot_name = "upper lowPost" if receiver_coord["y"] > 24 else "lower lowPost"
             spot_home = HCO_STRING_SPOTS[spot_name]
             if is_away_offense:
