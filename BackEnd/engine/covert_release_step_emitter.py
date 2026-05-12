@@ -497,6 +497,10 @@ def _build_outlet_pass_step(
         actions[pid] = "cut"
         archetype[pid] = arch
 
+    # `outlet_score` is exposed on the step's advance_trigger metadata so the
+    # frontend can render quality-gated visual effects (e.g., the high-score
+    # ball-trail in `createBallTrail.js`) without needing a separate channel.
+    _outlet_score_for_meta = fb_roles.get("outlet_score")
     advance_trigger: AdvanceTrigger = {
         "condition": "ball_reaches_player",
         "T_game_seconds": float(t),
@@ -504,6 +508,11 @@ def _build_outlet_pass_step(
             "from_player_id": passer_id,
             "to_player_id": receiver_id,
             "target_coords": dict(receiver_coord),
+            "outlet_score": (
+                int(_outlet_score_for_meta)
+                if _outlet_score_for_meta is not None
+                else None
+            ),
         },
     }
 

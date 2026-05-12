@@ -25,6 +25,7 @@ import { attachBallToPlayer } from "./ballManager.js";
 // Without this, schema-driven ball tweens get overwritten every frame by
 // the follow callback and the pass renders as a teleport at step end.
 import { detachBall } from "./BallControllerAdapter.js";
+import { createBallTrail } from "./createBallTrail.js";
 
 // --- Ball-state helpers ----------------------------------------------------
 
@@ -119,6 +120,18 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
   }
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+
+  // Sharp-outlet ball trail: emitted by the backend in
+  // `_build_outlet_pass_step` (covert_release_step_emitter.py) as
+  // `step.start.advance_trigger.metadata.outlet_score`. Trail fires when the
+  // outlet pass is high-quality. Self-cleans after `durationMs`.
+  // TEMP: threshold lowered to > 1 so every outlet pass renders the trail
+  //       for visual QA. Restore to > 70 before shipping.
+  const outletScore = step.start?.advance_trigger?.metadata?.outlet_score;
+  if (typeof outletScore === "number" && outletScore > 1) {
+    createBallTrail(scene, ballSprite, durationMs);
+  }
+
   scene.tweens.add({
     targets: ballSprite,
     x: endPx.x,
