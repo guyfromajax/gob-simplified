@@ -719,13 +719,15 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
     const popup = document.createElement('div');
     popup.className = 'computer-timeout-popup';
     popup.innerHTML = `
-        <div class="computer-timeout-content">
-            <div class="timeout-modal-accent"></div>
-            <div class="timeout-modal-body">
-                <h2>${callingTeamName} Called Timeout</h2>
-            </div>
-            <div class="button-container timeout-modal-actions">
-                <button class="timeout-button go-to-timeout-button">Go To Timeout</button>
+        <div class="computer-timeout-stack">
+            <div class="computer-timeout-content">
+                <div class="timeout-modal-accent"></div>
+                <div class="timeout-modal-body">
+                    <h2>${callingTeamName} Called Timeout</h2>
+                </div>
+                <div class="button-container timeout-modal-actions">
+                    <button class="timeout-button go-to-timeout-button">Enter Timeout</button>
+                </div>
             </div>
         </div>
     `;
@@ -736,13 +738,30 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
         style.id = 'computer-timeout-popup-styles';
         style.textContent = `
             .computer-timeout-popup {
-                position: fixed;
+                position: absolute;
                 inset: 0;
                 background: rgba(0, 0, 0, 0.72);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
+            }
+
+            .computer-timeout-stack {
+                width: min(860px, calc(100% - 40px));
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 22px;
+            }
+
+            .computer-timeout-stack > #announcement-overlay.timeout-held-announcement {
+                position: static;
+                inset: auto;
+                transform: none;
+                z-index: auto;
+                max-width: 100%;
             }
 
             .computer-timeout-content {
@@ -783,19 +802,44 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
             .timeout-modal-actions {
                 padding: 0 28px 24px;
             }
+
+            @media (max-width: 760px) {
+                .computer-timeout-stack {
+                    width: calc(100% - 28px);
+                    gap: 16px;
+                }
+
+                .computer-timeout-content {
+                    width: min(420px, 100%);
+                }
+            }
         `;
         document.head.appendChild(style);
+    }
+
+    const stack = popup.querySelector('.computer-timeout-stack');
+    const heldAnnouncement =
+        typeof window.holdPrimaryAnnouncementOverlayForTimeout === 'function'
+            ? window.holdPrimaryAnnouncementOverlayForTimeout()
+            : null;
+    if (stack && heldAnnouncement) {
+        heldAnnouncement.classList.add('timeout-held-announcement');
+        stack.prepend(heldAnnouncement);
     }
 
     // Navigate only on explicit user click
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
         if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+        if (typeof window.dismissPrimaryAnnouncementOverlayForTimeout === 'function') {
+            window.dismissPrimaryAnnouncementOverlayForTimeout();
+        }
         popup.remove();
         await showTimeoutPopup(timeoutResult, gameId, scene, true, computerTeamName);
     });
 
-    document.body.appendChild(popup);
+    const popupHost = document.getElementById('phaser-container') || document.body;
+    popupHost.appendChild(popup);
 }
 
 /**

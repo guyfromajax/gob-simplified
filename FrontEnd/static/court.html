@@ -6323,6 +6323,26 @@
           _annTimer = null;
         }, 2200);
       };
+      window.holdPrimaryAnnouncementOverlayForTimeout = function() {
+        var overlay = document.getElementById('announcement-overlay');
+        if (!overlay || overlay.classList.contains('hidden')) return null;
+        if (_annTimer) {
+          clearTimeout(_annTimer);
+          _annTimer = null;
+        }
+        overlay.dataset.timeoutHeld = 'true';
+        return overlay;
+      };
+      window.dismissPrimaryAnnouncementOverlayForTimeout = function() {
+        var overlay = document.getElementById('announcement-overlay');
+        if (!overlay) return;
+        if (_annTimer) {
+          clearTimeout(_annTimer);
+          _annTimer = null;
+        }
+        overlay.classList.add('hidden');
+        delete overlay.dataset.timeoutHeld;
+      };
     })();
   </script>
   <script type="module">
