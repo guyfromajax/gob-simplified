@@ -1255,15 +1255,18 @@ export function createGameScene(Phaser) {
       const openingTipTurn = Array.isArray(simData.turns)
         ? simData.turns.find(turn => turn?.result_type === "OPENING_TIP")
         : null;
-      const openingTipEntranceByPlayerId = new Map(
-        (openingTipTurn?.animations || [])
+      const authoredEntryAnimations = Array.isArray(simData.entry_animation?.animations)
+        ? simData.entry_animation.animations
+        : (openingTipTurn?.animations || []);
+      const authoredEntranceByPlayerId = new Map(
+        authoredEntryAnimations
           .filter(anim => anim?.playerId && anim?.entrance)
           .map(anim => [String(anim.playerId), anim.entrance])
       );
-      if (openingTipEntranceByPlayerId.size > 0) {
+      if (authoredEntranceByPlayerId.size > 0) {
         actualPlayers.forEach(player => {
           const playerId = String(player.playerId ?? player.player_id);
-          const entranceCoords = openingTipEntranceByPlayerId.get(playerId);
+          const entranceCoords = authoredEntranceByPlayerId.get(playerId);
           if (entranceCoords) player.startingCoords = { ...entranceCoords };
         });
       }
@@ -3197,6 +3200,13 @@ export function createGameScene(Phaser) {
 
       // Animate initial turns first (opening tip, quarter start inbound, etc.)
       if (initialTurns.length > 0) {
+        if (initialSimData.entry_animation?.kind === "BENCH_ENTRY") {
+          const { runBenchEntrySequence } = await import('./animation/benchEntry.js');
+          await runBenchEntrySequence(this, {
+            playerSprites: this.playerSprites,
+            entryAnimation: initialSimData.entry_animation,
+          });
+        }
         // Part 2: Preload first HCO while opening tip (and any quarter-start inbound) animates.
         if (ENABLE_TURN_PRELOAD) {
           preloadedTurnPromise = fetchTurnData(null, null);

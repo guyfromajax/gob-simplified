@@ -318,6 +318,7 @@ def simulate_quarter(
 
     q = gm.quarter
     gm.game_state["quarter"] = q
+    gm.game_state.pop("entry_animation", None)
 
     # ✅ FIX: ALWAYS reset time_remaining for new quarters (not timeout resumes)
     # This ensures time_remaining starts at 480 (Q1-Q4) or 240 (OT) when starting a new quarter
@@ -334,6 +335,7 @@ def simulate_quarter(
     # Reuse the same pattern as quarter breaks - preserve all game state
     # Create the appropriate initial turn based on timeout_next_play_type
     if resume_from_timeout:
+        from BackEnd.utils.player_entry import build_bench_entry_payload
         # ✅ TIMEOUT: Clear old turns from before timeout (same as quarter breaks clear turns)
         # This prevents old turns (like opening tip) from being returned to frontend
         if len(gm.turns) > 0:
@@ -380,16 +382,47 @@ def simulate_quarter(
                 source="bypass:SIP_RESUME",
             )
             gm._append_turn(sip_turn, text=sip_turn.get("text", "Side inbound"))
+            gm.game_state["entry_animation"] = build_bench_entry_payload(
+                gm,
+                sip_turn,
+                context="timeout_resume_side_inbound",
+            )
             # No-impact turn: SIDE_INBOUND does not consume game clock.
             logging.info(f"✅ TIMEOUT RESUME: SIP turn created with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id}), total turns: {len(gm.turns)}")
         elif resume_from_timeout and timeout_next_play_type == "FREE_THROW":
-            # Free throw turn will be created by simulate_macro_turn (first call from frontend)
-            logging.info(f"✅ TIMEOUT RESUME: Will create FREE_THROW turn via /api/simulate-turn")
-            pass
+            logging.info(f"✅ TIMEOUT RESUME: Creating initial FREE_THROW turn during resume load")
+            turns_before = len(gm.turns)
+            gm.simulate_macro_turn()
+            created_turns = gm.turns[turns_before:]
+            first_turn = created_turns[0] if created_turns else None
+            gm.game_state["entry_animation"] = build_bench_entry_payload(
+                gm,
+                first_turn,
+                context="timeout_resume_free_throw",
+            )
         elif resume_from_timeout and timeout_next_play_type == "BASELINE_INBOUND":
-            # BIP turn will be created by simulate_macro_turn (first call from frontend)
-            logging.info(f"✅ TIMEOUT RESUME: Will create BASELINE_INBOUND turn via /api/simulate-turn")
-            pass
+            logging.info(f"✅ TIMEOUT RESUME: Creating initial BASELINE_INBOUND turn during resume load")
+            pressure_type = gm.game_state.get("offensive_state")
+            next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
+            bip_turn = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+            gm._maybe_set_force_foul_pending_after_inbound(bip_turn, "BASELINE_INBOUND")
+            gm.turn_manager._attach_clock_contract(
+                bip_turn,
+                clock_start=int(gm.game_state.get("time_remaining", 0)),
+                shot_clock_start=int(gm.game_state.get("shot_clock_remaining", 30)),
+                game_state=gm.game_state,
+                source="bypass:BIP_RESUME",
+            )
+            gm._append_turn(bip_turn, text=bip_turn.get("text", "Baseline inbound"))
+            gm.game_state["entry_animation"] = build_bench_entry_payload(
+                gm,
+                bip_turn,
+                context="timeout_resume_baseline_inbound",
+            )
+            if next_defensive_setup:
+                gm.game_state["offensive_state"] = next_defensive_setup
+            else:
+                gm.game_state["_prev_offense_positions_for_hco"] = bip_turn.get("oDestinations") or {}
         elif resume_from_timeout:
             # Fallback: If timeout_next_play_type is unexpected, default to SIP
             logging.warning(f"⚠️ TIMEOUT RESUME: timeout_next_play_type={timeout_next_play_type} is unexpected, defaulting to SIDE_INBOUND")
@@ -403,6 +436,11 @@ def simulate_quarter(
                 source="bypass:SIP_RESUME",
             )
             gm._append_turn(sip_turn, text=sip_turn.get("text", "Side inbound"))
+            gm.game_state["entry_animation"] = build_bench_entry_payload(
+                gm,
+                sip_turn,
+                context="timeout_resume_side_inbound_fallback",
+            )
             # No-impact turn: SIDE_INBOUND does not consume game clock.
         
         # ✅ TIMEOUT: Only clear timeout state and return early if we actually handled a timeout resume
@@ -493,6 +531,7 @@ def simulate_quarter(
         gm._append_turn(tip_turn, text=tip_turn.get("text", ""))
         # Keep opening tip start clock fixed at quarter start baseline (Q1=8:00, OT=4:00).
     elif q == 2:
+        from BackEnd.utils.player_entry import build_bench_entry_payload
         # Q2: Team that didn't win opening tip gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
@@ -534,6 +573,11 @@ def simulate_quarter(
             source="bypass:BIP_QUARTER_START",
         )
         gm._append_turn(inbound_turn, text=inbound_turn["text"])
+        gm.game_state["entry_animation"] = build_bench_entry_payload(
+            gm,
+            inbound_turn,
+            context="quarter_start_baseline_inbound",
+        )
         
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
@@ -541,6 +585,7 @@ def simulate_quarter(
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
     elif q == 3:
+        from BackEnd.utils.player_entry import build_bench_entry_payload
         # Q3: Team that did NOT win opening tip gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
@@ -582,6 +627,11 @@ def simulate_quarter(
             source="bypass:BIP_QUARTER_START",
         )
         gm._append_turn(inbound_turn, text=inbound_turn["text"])
+        gm.game_state["entry_animation"] = build_bench_entry_payload(
+            gm,
+            inbound_turn,
+            context="quarter_start_baseline_inbound",
+        )
         
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
@@ -589,6 +639,7 @@ def simulate_quarter(
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
     elif q == 4:
+        from BackEnd.utils.player_entry import build_bench_entry_payload
         # Q4: Opening tip winner gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
@@ -630,6 +681,11 @@ def simulate_quarter(
             source="bypass:BIP_QUARTER_START",
         )
         gm._append_turn(inbound_turn, text=inbound_turn["text"])
+        gm.game_state["entry_animation"] = build_bench_entry_payload(
+            gm,
+            inbound_turn,
+            context="quarter_start_baseline_inbound",
+        )
         
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]

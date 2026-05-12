@@ -2356,6 +2356,11 @@ def summarize_game_state(game, exclude_animations=True):
         
         # Game data
         "turns": turns,  # Animations excluded for database saves
+        **(
+            {"entry_animation": deepcopy(game.game_state.get("entry_animation"))}
+            if not exclude_animations and isinstance(game.game_state.get("entry_animation"), dict)
+            else {}
+        ),
         # text_log is only needed for live/front-end viewing (legacy/debug play-by-play).
         # Do not persist it to Mongo for normal saves to avoid DB bloat.
         **({"text_log": game.text_log} if not exclude_animations else {}),
