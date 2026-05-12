@@ -2789,10 +2789,11 @@
       /* Default team colors; overridden inline by showSecondaryAnnouncementOverlay.
          --sec-team is the team's brand primary (stripe + chip jersey color).
          --sec-team-deep is the darkened team tone used for the surface wash;
-         derived from --sec-team by darkenHex(color, 0.55) — same recipe as
+         derived from --sec-team by darkenHex(color, 0.38) — still premium,
+         but visibly team-branded across the full ribbon surface.
          Championship Announce's --cm-team-deep. */
       --sec-team: #F79420;
-      --sec-team-deep: #6f4209;
+      --sec-team-deep: #9e6213;
     }
     #announcement-overlay-secondary.is-visible {
       transform: translateY(0);
@@ -2835,12 +2836,15 @@
       align-items: center;
       gap: 18px;
       padding: 0 18px;
-      /* Team wash — replaces the prior charcoal gradient. */
+      /* Team wash with restrained falloff so the surface reads branded, not black. */
       background:
+        radial-gradient(circle at 18% 50%,
+          color-mix(in oklab, var(--sec-team), transparent 72%) 0%,
+          transparent 42%),
         linear-gradient(90deg,
-          color-mix(in oklab, var(--sec-team-deep), #000 10%) 0%,
-          color-mix(in oklab, var(--sec-team-deep), #000 25%) 60%,
-          color-mix(in oklab, var(--sec-team-deep), #000 40%) 100%),
+          color-mix(in oklab, var(--sec-team-deep), #000 4%) 0%,
+          color-mix(in oklab, var(--sec-team-deep), #000 14%) 60%,
+          color-mix(in oklab, var(--sec-team-deep), #000 28%) 100%),
         var(--sec-team-deep);
       border: 1px solid rgba(255,255,255,0.10);
       border-left: none;
@@ -6190,7 +6194,7 @@
 
         if (data && data.teamColor) {
           overlay.style.setProperty('--sec-team', data.teamColor);
-          var deep = secDarkenHex(data.teamColor, 0.55);
+          var deep = secDarkenHex(data.teamColor, 0.38);
           if (deep) {
             overlay.style.setProperty('--sec-team-deep', deep);
           } else {
