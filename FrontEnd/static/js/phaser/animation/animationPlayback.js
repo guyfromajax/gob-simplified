@@ -406,17 +406,26 @@ async function runShotAttempt(scene, payload, context) {
   const height = scene.game?.config?.height;
 
   // Determine the basket the shooter was attacking.
-  const { HOME_RIM_COORDS, AWAY_RIM_COORDS } = await import("./courtConstants.js");
+  const { HOME_RIM_COORDS, AWAY_RIM_COORDS, getMadeShotSweetSpotGrid } =
+    await import("./courtConstants.js");
   const shooterSprite = (sprites || {})[shooter_id] || null;
   const isHomeOffense = shooterSprite?.team === "home";
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   const { gridToPixels } = await import("../utils/gridToPixels.js");
-  const rimPx = gridToPixels(basket.x, basket.y, width, height);
 
-  // Phase 1: ball arcs to rim.
+  // MAKE: ball settles at the "sweet spot" (slightly in front of the rim
+  // center, on the offense's side). MISS / BLOCK: ball hits the rim center
+  // first, then bounces to `ball_bounce_coords` in phase 2 below.
+  // Matches legacy `shootBall` / `getMadeShotSweetSpotGrid` behavior so the
+  // schema engine and legacy renderer terminate makes at the same coord.
+  const shotEndGrid = result === "MAKE"
+    ? getMadeShotSweetSpotGrid(isHomeOffense)
+    : (isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS);
+  const shotEndPx = gridToPixels(shotEndGrid.x, shotEndGrid.y, width, height);
+
+  // Phase 1: ball arcs to its end position (rim for miss, sweet spot for make).
   const ballAnim = await import("./ballAnimationSimple.js");
   if (typeof ballAnim.animateShotToRim === "function") {
-    await ballAnim.animateShotToRim(scene, rimPx, {
+    await ballAnim.animateShotToRim(scene, shotEndPx, {
       duration: 350,
       easing: "Sine.easeInOut",
       arc: { height: 50 },
