@@ -1015,9 +1015,65 @@ def build_covert_release_animation_steps(
     # since the FB ended without a shot resolving — no rebounder placement.
     if result_type != "DEFENSIVE_STOP":
         _apply_post_shot_overlay(outcome_step, turn_result)
+        # Clamp the overlay-derived end coords to each player's archetype
+        # rate × step T so non-gate movers don't appear to teleport from
+        # their step 0 drift positions to the rim cluster. Without this,
+        # the schema engine tweens linearly start→end over T, which means a
+        # support cutter starting at midcourt ends up "sprinting" at
+        # 25+ grid/sec to keep up with the BH. The overlay still sets the
+        # *intended* destination (sync writes it to player.coords post-turn,
+        # so the next turn's DREB / inbound sees the correct positions);
+        # the visible step 1 motion just stops where sprint × T would land.
+        _clamp_step_end_coords_to_archetype(
+            outcome_step, off_lineup, def_lineup
+        )
 
     _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
     return steps
+
+
+def _clamp_step_end_coords_to_archetype(
+    step: AnimationStep,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Clamp each player's end coord to start + (archetype rate × T) along the
+    path. Reads the archetype label already set on the step and uses the
+    matching AG-driven rate. Players whose intended destination is within
+    reach are unchanged; over-reaching players are pulled back along the
+    start→target line to the rate-limited position.
+
+    Stationary archetype is a no-op (rate-irrelevant). Players missing from
+    either coord map are skipped.
+    """
+    start_coords = step.get("start", {}).get("coords") or {}
+    end_coords = step.get("end", {}).get("coords") or {}
+    archetypes = step.get("start", {}).get("archetype") or {}
+    t = float(step.get("end", {}).get("time_elapsed") or 0.0)
+    if t <= 0.0:
+        return
+
+    for pid, start in start_coords.items():
+        target = end_coords.get(pid)
+        if not target or not start:
+            continue
+        arch = archetypes.get(pid) or "default"
+        if arch == "stationary":
+            continue
+        dx = float(target["x"]) - float(start["x"])
+        dy = float(target["y"]) - float(start["y"])
+        dist = (dx * dx + dy * dy) ** 0.5
+        if dist == 0.0:
+            continue
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        max_traversal = rate * t
+        if dist > max_traversal:
+            ratio = max_traversal / dist
+            end_coords[pid] = {
+                "x": float(start["x"]) + dx * ratio,
+                "y": float(start["y"]) + dy * ratio,
+            }
 
 
 def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -> None:
@@ -1070,9 +1126,19 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
                 continue
             end_coords[pid_str] = {"x": float(x), "y": float(y)}
             if isinstance(start_actions, dict):
-                start_actions[pid_str] = "cut"
+                # Promote stationary → cut now that the player has a real
+                # destination; preserve handle_ball / shoot / pass / receive
+                # / guard_* already set by `_build_outcome_step` so role-
+                # specific renderer behavior isn't lost.
+                if start_actions.get(pid_str) == "stationary":
+                    start_actions[pid_str] = "cut"
             if isinstance(start_archetype, dict):
-                start_archetype[pid_str] = "cruise"
+                # Same logic for archetype: only fill in if the emitter left
+                # the player as stationary. `_build_outcome_step` has already
+                # set sprint for non-BH offense and drive for defenders;
+                # don't overwrite those with cruise.
+                if start_archetype.get(pid_str) == "stationary":
+                    start_archetype[pid_str] = "sprint"
 
 
 def _log_fb_roles(

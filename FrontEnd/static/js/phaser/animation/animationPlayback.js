@@ -76,6 +76,25 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     return;
   }
 
+  // Ownership-change handling. When the ball changes owners between steps
+  // (e.g., a pass from passer A to receiver B), the ball sprite is still
+  // parented to A from the prior step's attach. A bare `scene.tweens.add`
+  // would tween world coords on a sprite whose render position is dictated
+  // by A's parent transform — so the ball appears glued to A for the whole
+  // step and then snaps to B at step end (visible teleport).
+  // Detaching here releases the parent transform so the world-coord tween
+  // renders correctly. `snapBallToEndState` re-attaches to the end owner.
+  const startOwner = isBallAttached(step.start.ball)
+    ? step.start.ball.owner_player_id
+    : null;
+  const endOwner = isBallAttached(step.end.ball)
+    ? step.end.ball.owner_player_id
+    : null;
+  if (startOwner && startOwner !== endOwner) {
+    detachBall(scene, ballSprite);
+    ballSprite.setPosition(startPx.x, startPx.y);
+  }
+
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
   scene.tweens.add({
     targets: ballSprite,
