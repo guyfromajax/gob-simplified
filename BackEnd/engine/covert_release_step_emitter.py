@@ -351,17 +351,17 @@ def _build_outlet_pass_step(
     """
     # Outlet pass T: Euclidean ball-flight time at FB pass rate, varied by
     # outlet quality. Good outlets (`outlet_score >= 50`) zip at the canonical
-    # FB pass rate; poor outlets are noticeably slower (2/3 the rate) so the
-    # ball hangs in the air and the play feels sloppier.
-    #   - good: 36 grid/game-sec (= FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
-    #   - poor: 24 grid/game-sec
+    # FB pass rate; poor outlets are noticeably slower so the ball hangs in
+    # the air and the play feels sloppier.
+    #   - good: 30 grid/game-sec (= FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
+    #   - poor: 22 grid/game-sec
     # Floor at 0.5 game-sec so the visual beat is perceptible for short passes.
     from BackEnd.constants import FB_PASS_GRID_SPOTS_PER_GAME_SECOND
     _outlet_score = fb_roles.get("outlet_score")
     _pass_rate = (
         float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
         if _outlet_score is not None and _outlet_score >= 50
-        else 24.0
+        else 22.0
     )
     _dx = float(receiver_coord.get("x", 0)) - float(passer_coord.get("x", 0))
     _dy = float(receiver_coord.get("y", 0)) - float(passer_coord.get("y", 0))
@@ -465,18 +465,20 @@ def _build_outlet_pass_step(
                 gb2_target = {"x": float(spot_home["x"]), "y": float(spot_home["y"])}
             targets.append((gb2_id, gb2_target, "sprint"))
 
-    # All others (non-passer, non-receiver, non-getback): sprint toward the
-    # attacking basket. Schema interrupted-coord logic clamps each player's
-    # end coord to (sprint rate × step T) along the start→basket path. At
-    # the current FB pass speed (36 grid/game-sec), the outlet completes in
-    # ~1-1.5 game-sec, so sprinters cover ~15-20 grid units before the
-    # receiver catches the ball — head start, but not enough to surpass
-    # him at midcourt. Subsequent steps continue the sprint.
+    # All others (non-passer, non-receiver, non-getback): drift a random 1–6
+    # grid spots toward the attacking basket along x, holding y. Archetype
+    # `cruise` (casual transition pace). Keeps step 0 visually focused on
+    # the pass + receiver rather than 6+ sprinters racing the BH; they
+    # ramp up to sprint on step 1 once the receiver has caught the ball.
     excluded = {passer_id, receiver_id, *getback_ids}
     for pid in all_start_coords:
         if pid in excluded:
             continue
-        targets.append((pid, attacking_basket_coord, "sprint"))
+        start = all_start_coords[pid]
+        drift = random.randint(1, 6)
+        drift_x = max(4.0, min(97.0, float(start["x"]) + drift * x_dir))
+        drift_target: GridCoord = {"x": drift_x, "y": float(start["y"])}
+        targets.append((pid, drift_target, "cruise"))
 
     # Compute interrupted end coords: start + (rate × T) along start→target.
     for pid, target, arch in targets:

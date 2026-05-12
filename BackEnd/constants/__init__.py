@@ -214,7 +214,7 @@ PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean — HCO / 
 # duration (game-sec × 350 ms) and the clock-burn for the pass step — these
 # stay 1:1 synced via the schema playback engine (no wall-clock cap). Tune
 # this value to control how fast FB passes feel.
-FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 36
+FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 30
 
 # ---- Movement Rate Refactor (see Movement_Rate_Refactor.md) ---------------
 # New two-tier model: cruise-speed steps (HCO/HCT bring-up) vs AG-driven steps.

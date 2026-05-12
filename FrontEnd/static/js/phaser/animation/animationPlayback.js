@@ -112,6 +112,21 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     // step end via `attachBallToPlayer`.
     ballSprite.setVisible(true);
     ballSprite.setPosition(startPx.x, startPx.y);
+
+    // Outlet-pass SFX. Fires at the moment of detach (ball leaves passer's
+    // hand). Quality gate uses the same `outlet_score` metadata the trail
+    // effect reads, so the audio + visual stay in sync.
+    const outletScoreForSfx = step.start?.advance_trigger?.metadata?.outlet_score;
+    if (typeof outletScoreForSfx === "number") {
+      const sfxFile = outletScoreForSfx >= 50
+        ? "outlet-pass-great.wav"
+        : "outlet-pass-bad.wav";
+      try {
+        new Audio(`/sounds/${sfxFile}`).play().catch(() => {});
+      } catch (_e) {
+        // Fail-silent — audio is non-critical.
+      }
+    }
   } else {
     console.log(
       "🐛 [BALL DETACH] skipping detach: startOwner=%s endOwner=%s (same or unattached)",
@@ -124,11 +139,11 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
   // Sharp-outlet ball trail: emitted by the backend in
   // `_build_outlet_pass_step` (covert_release_step_emitter.py) as
   // `step.start.advance_trigger.metadata.outlet_score`. Trail fires when the
-  // outlet pass is high-quality. Self-cleans after `durationMs`.
-  // TEMP: threshold lowered to > 1 so every outlet pass renders the trail
-  //       for visual QA. Restore to > 70 before shipping.
+  // outlet pass is high-quality (>= 50). Self-cleans after `durationMs`.
+  // The same threshold gates the `outlet-pass-great.wav` SFX in the
+  // ownership-change branch above, so audio + visual stay in sync.
   const outletScore = step.start?.advance_trigger?.metadata?.outlet_score;
-  if (typeof outletScore === "number" && outletScore > 1) {
+  if (typeof outletScore === "number" && outletScore >= 50) {
     createBallTrail(scene, ballSprite, durationMs);
   }
 
