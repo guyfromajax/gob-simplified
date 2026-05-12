@@ -103,6 +103,13 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
       startOwner, endOwner, startCoord, endCoord, durationMs,
     );
     detachBall(scene, ballSprite);
+    // `BallController.detachFromPlayer` calls `ballSprite.setVisible(false)`
+    // when the ball isn't flagged as in-flight — which is the case here since
+    // we're managing the flight via this tween, not via the controller's
+    // startFlight/endFlight primitives. Force visibility back on so the
+    // tween renders. `snapBallToEndState` will re-attach (and re-show) at
+    // step end via `attachBallToPlayer`.
+    ballSprite.setVisible(true);
     ballSprite.setPosition(startPx.x, startPx.y);
   } else {
     console.log(
