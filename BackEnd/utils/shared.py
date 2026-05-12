@@ -608,22 +608,25 @@ def ag_to_grid_per_game_sec(ag):
     Convert AG attribute (1-100, average 50, rare values above 100) to grid
     units per game second.
 
-    Linear curve calibrated to:
-      AG=0   → 10  (slow)
-      AG=50  → 16  (average — matches legacy COF default)
-      AG=100 → 22  (fast)
-      AG>100 → extends linearly (rare; AG=120 → 24.4)
+    Linear curve calibrated so AG=50 base = 12 (matches
+    `CRUISE_BASELINE_GRID_PER_GAME_SEC`), with archetype multipliers
+    (SPRINT 14/12, etc.) producing their documented absolute rates at AG=50:
 
-    Soft-capped at 30 grid/game-sec to bound runaway extrapolation. Floored at
-    0.5 to prevent zero/negative rates from unexpected inputs.
+      AG=0   → 10    (slow; sprint ≈ 11.7)
+      AG=50  → 12    (average; sprint = 14)
+      AG=100 → 14    (fast; sprint ≈ 16.3)
+      AG=150 → 16    (sprint ≈ 18.7)
 
-    Defaults to AG=50 (average) when the input is None or non-numeric.
+    Tight slope (×4): each AG point ≈ +0.04 grid/game-sec base.
+    Capped at 30 grid/game-sec (hardly reachable at this slope), floored at 0.5.
+
+    Defaults to AG=50 when input is None / non-numeric.
     """
     try:
         ag_val = float(ag) if ag is not None else 50.0
     except (TypeError, ValueError):
         ag_val = 50.0
-    rate = 10.0 + (ag_val / 100.0) * 12.0
+    rate = 10.0 + (ag_val / 100.0) * 4.0
     return max(0.5, min(rate, 30.0))
 
 
