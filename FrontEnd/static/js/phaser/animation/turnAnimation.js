@@ -5215,6 +5215,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         scene,
         passInfo,
         playerSprites,
+        enableHcoSfx: isHcoTurn,
       });
       await passPromise;
       if (isStepContractTurn && activeStepStrictMode !== "off") {

@@ -23,6 +23,7 @@ import {
   animateBallToPosition,
 } from "./ballAnimationSimple.js";
 import { getPlayerMovementDurationMs } from "../utils/playerMovementDuration.js";
+import { playHcoPassStartSfx, playHcoReceiveSfx } from "../utils/gameSfx.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -420,6 +421,7 @@ export async function runPass(scene, cfg = {}) {
       cancelBallTweenAndClearOwner(scene, ballSprite);
       // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
       scene.events?.emit('ballDetached');
+      playHcoPassStartSfx(scene, cfg.sfxContext);
       if (PASS_DEBUG) animationDebugLog('detach(A)', { fromId });
 
       const end = endCoords || (toSprite ? { x: toSprite.x, y: toSprite.y } : null);
@@ -525,6 +527,7 @@ export async function runPass(scene, cfg = {}) {
         // For now, don't set it here - let the receive action handle it after its tween completes
       }
 
+      playHcoReceiveSfx(scene, cfg.sfxContext);
       scene.events?.emit('passEnd', { toId });
       if (PASS_DEBUG) animationDebugLog('passEnd', { toId });
       emitSummary('complete');

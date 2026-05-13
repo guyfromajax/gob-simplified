@@ -28,6 +28,7 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
+import { playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
 
 /**
  * ✅ PHASE 3.3: Removed wrapper function
@@ -357,6 +358,7 @@ export async function shootBall({
   
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
+  playShotLaunchSfx(scene, turnData);
   
   // console.log('🏀 shootBall: Ball positioned and visible', {
   //   position: { x: start.x, y: start.y },
@@ -467,6 +469,7 @@ export async function shootBall({
           duration,
           easing: "Sine.easeInOut"
         });
+        playShotResultSfx(scene, turnData, result);
         
         // Handle completion (same logic as before, but now after animateShotToRim completes)
         const actualDuration = Date.now() - tweenStartTime;

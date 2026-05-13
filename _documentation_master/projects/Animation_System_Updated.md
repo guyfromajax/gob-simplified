@@ -1,10 +1,16 @@
 # Animation System Updated
 
-> **Status:** Schema design — validating against turn types before treating it as locked. Started 2026-05-09.
+> **Status:** Schema **locked**. Migration in progress. Started 2026-05-09; last major update 2026-05-13.
 >
-> **Context:** This doc proposes the unified per-step payload schema and validates it against the most uniform turn type (HCO) and the most divergent (Fast Break). It succeeds an earlier scoping doc (`Animation_System_Refactor.md`, since removed) that inventoried turn types and surfaced inconsistencies — the inventory has been folded into the schema validation work below.
+> **Migration progress (high level):**
+> - ✅ **Covert Release Fast Break** — fully migrated; schema-driven via `covert_release_step_emitter.py`. Frontend routes through `playAnimationStep`.
+> - ✅ **DREB** — promoted to its own turn type; `dreb_step_emitter.py` shipped.
+> - 🟡 **HCO / HCT** — schema emitters exist (`skeleton_step_emitter.py`, `hct_step_emitter.py`) and emit `animation_steps`; frontend routes them through `playAnimationStep` when present. Some legacy paths still fire when emitters return None for missing skeleton/animations.
+> - ⏳ **RR FB, Triangle FB, FCP, Free Throw, BIP/SIP, OREB, Opening Tip, Timeout** — still on legacy frontend animation paths.
 >
-> **Architecture commitment:** advance trigger lives on the backend. Backend pre-computes `T = game-seconds when trigger fires`, then derives all end-state fields (interrupted coords, ball state, clock advance) from T. Frontend is a pure playback engine.
+> **Context:** This doc proposes the unified per-step payload schema, validates it against every turn type, and tracks the per-turn-type migration as each emitter lands. It succeeds an earlier scoping doc (`Animation_System_Refactor.md`, since removed) that inventoried turn types and surfaced inconsistencies — the inventory has been folded into the schema validation below.
+>
+> **Architecture commitment:** advance trigger lives on the backend. Backend pre-computes `T = game-seconds when trigger fires`, then derives all end-state fields (interrupted coords, ball state, clock advance) from T. Frontend is a pure playback engine. Game-time and wall-time stay 1:1 synced: `tickMs = 350` (1 game-sec = 350 ms wall-clock), no per-step cap in the schema engine, so backend-authored T directly drives both clock burn and animation duration.
 
 ---
 
@@ -50,7 +56,7 @@ Working list: `SHOT_ATTEMPT`, `FOUL` (variants: O/D/charge/blocking/shooting), `
 | `coords` (end) | Destination = end (HCO is paced — all players reach destination at T) | Schema's degenerate case (`rate × T ≥ full distance` for everyone) |
 | `next` | Implicit `i + 1`; events lead to `turn_stop` | Maps cleanly |
 
-**Verdict:** HCO fits with three concrete upgrades — explicit per-player archetype, explicit ball state, per-step clock + trigger fields.
+**Verdict (historical):** HCO fits with three concrete upgrades — explicit per-player archetype, explicit ball state, per-step clock + trigger fields. **Status: implemented** in `skeleton_step_emitter.py`. Schema steps emit alongside legacy `animations[]`; frontend takes the new engine when `animation_steps` is present, falls back to legacy otherwise.
 
 ---
 
@@ -68,7 +74,7 @@ Working list: `SHOT_ATTEMPT`, `FOUL` (variants: O/D/charge/blocking/shooting), `
 | `coords` (end) | Partially in `animations[i].end` (assumes player reaches destination); interrupted coords don't exist as data | **Interrupted-coord math doesn't exist today** — backend must compute |
 | `next` | Implicit phase transitions in `fastBreak.js` (`if/else` chains, `phase2Kind` routing) | **Needs explicit branching in payload** (outlet_denied / not, intercept tier, MAKE / MISS / BLOCK, etc.) |
 
-**Verdict:** FB doesn't naturally fit. Restructuring is required. Concretely, "phases" in `fastBreak.js` need to be replaced by discrete backend-emitted steps with computed triggers and pre-computed interrupted coords.
+**Verdict (historical):** FB doesn't naturally fit. Restructuring is required. Concretely, "phases" in `fastBreak.js` need to be replaced by discrete backend-emitted steps with computed triggers and pre-computed interrupted coords. **Status: implemented for Covert Release** in `covert_release_step_emitter.py` (2-step or 3-step depending on outcome). RR / Triangle / After-Steal variants still on legacy `fastBreak.js`. See "Covert Release FB emitter — scoping" below.
 
 ### FB step shape (sketch — for one Rim Runner outcome)
 
@@ -150,7 +156,9 @@ Almost no payload — `result_type = "TIMEOUT"`, duration. No sprite movement.
 
 ## HCT emitter — scoping
 
-First turn type to migrate. Below: the concrete mapping from existing HCT data sources (`dynamic_hct.py`, `phase_resolution.py` HCT branch) to the schema's `AnimationStep[]` shape.
+**Status:** Implemented in `BackEnd/engine/hct_step_emitter.py`. Frontend routes HCT turns with `animation_steps` through `playAnimationStep`. Coverage gaps where the emitter returns None still fall back to legacy.
+
+Below: the concrete mapping from existing HCT data sources (`dynamic_hct.py`, `phase_resolution.py` HCT branch) to the schema's `AnimationStep[]` shape.
 
 ### Step decomposition (4 schema steps)
 
@@ -237,7 +245,7 @@ The emitter walks the skeleton and maintains a running ball-owner pointer; each 
 
 ## DREB emitter — scoping
 
-The DREB turn is generated by the backend after any MISS turn whose rebounder is on the defensive team.
+**Status:** Implemented in `BackEnd/engine/dreb_step_emitter.py`. DREB is promoted to its own turn type; `game_manager._build_dreb_turn_from_miss` ([line 541](../../BackEnd/models/game_manager.py)) emits the DREB turn immediately after any MISS turn whose rebounder is on the defensive team. Frontend routes DREB through `playAnimationStep`.
 
 ### Single-placement-authority model
 
@@ -295,7 +303,103 @@ Currently `shot_manager.py` bundles `rebounderId` + `rebound_type` + `ball_bounc
 - The DREB turn payload contains the rebounder selection, ball bounce coords, and the steps array.
 - DREB turn's `next_play_type` (HCO / FAST_BREAK) is what the existing logic puts on the MISS turn today — it just lives on the DREB turn now.
 
-Files touched: `shot_manager.py`, `game_manager.py`, `turn_manager.py`, `phase_resolution.py`. Estimated 4–5 files.
+Files touched (delivered): `shot_manager.py`, `game_manager.py`, `turn_manager.py`, `phase_resolution.py`, plus the new `dreb_step_emitter.py`.
+
+---
+
+## Covert Release FB emitter — scoping
+
+**Status:** First fully-migrated fast-break variant. Implemented in `BackEnd/engine/covert_release_step_emitter.py`. Frontend takes the new engine when `turnData.fast_break_play === "covert_release"` and `turnData.animation_steps` is present ([AnimationEngine.js:302-328](../../FrontEnd/static/js/phaser/animation/AnimationEngine.js)).
+
+### Step decomposition
+
+| # | Step | Trigger | Notes |
+|---|---|---|---|
+| 0 | **Outlet pass** (skipped when rebounder == receiver) | `ball_reaches_player` | T derived from Euclidean distance / pass rate (varies by outlet quality, see below). |
+| 1 | **Outcome** | `player_reaches_position` (BH at outcome spot, or stopper for DEFENSIVE_STOP) | `next: turn_stop` for MAKE / MISS / BLOCK / FOUL / STEAL / DEAD_BALL. DEFENSIVE_STOP continues to step 2. |
+| 2 | **Step-back / HCO setup** (DEFENSIVE_STOP only) | `player_reaches_position` | Implicit end. Caller's next turn is HCO. |
+
+### Outlet pass quality (step 0)
+
+Two coupled effects gate on `fb_roles["outlet_score"]`:
+
+- **Pass speed**:
+  - `outlet_score >= 50` → `FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 30` grid/game-sec (sharp).
+  - `outlet_score < 50` → 22 grid/game-sec (sloppy; hangs longer).
+  - Floored at 0.5 game-sec for very short passes.
+- **Defender read-to-stop** (sharp outlets only): get-back defenders must pass a `player_read` roll (IQ × 0.8 + CH × 0.2 × 1d6) vs threshold `outlet_score × 3` to claim the cut-off stop position; otherwise they retreat to basket defense. Eligibility filtered by x position relative to receiver. Full spec in [`Fast_Break_System.md`](../05_GP_Supporting_Systems/Fast_Break_System.md) — Covert Release — Get-back defender read on outlet pass (step 0).
+
+### Per-player movement (step 0)
+
+- **Outlet passer** (rebounder): stationary at rebound site.
+- **Outlet receiver** (= BH): stationary at release coord.
+- **Get-back defenders**: see read-to-stop spec above.
+- **All others**: drift `random.randint(1, 6)` toward attacking basket along x, holding y, archetype `cruise`. Keeps step 0 focused on the pass; supporting sprinters ramp up on step 1.
+
+### Step metadata for frontend effects
+
+The outlet pass step's `advance_trigger.metadata` carries `outlet_score` (in addition to the standard `from_player_id` / `to_player_id` / `target_coords`). Frontend reads this to gate:
+- **Ball trail effect** ([createBallTrail.js](../../FrontEnd/static/js/phaser/animation/createBallTrail.js)) on `outlet_score >= 50`.
+- **SFX** (`outlet-pass-great.wav` vs `outlet-pass-bad.wav`) on the same threshold, fired at the moment of `detachBall`.
+
+### Files
+
+- Emitter: `BackEnd/engine/covert_release_step_emitter.py`
+- Caller: `phase_resolution.resolve_fast_break_logic` (covert branch); attaches `animation_steps` to the turn payload.
+- Frontend routing: `AnimationEngine.js:302-328`
+- Frontend playback: `animationPlayback.js` (`renderBallTransition`, `runShotAttempt`).
+
+---
+
+## Cross-cutting invariants
+
+These rules apply to every schema-driven turn and to legacy turns that share the same data plumbing (overlay maps, coord sync).
+
+### Single-overlay-authority (post-shot positions)
+
+`shot_manager` is the **sole authority** for where every player ends up after a shot. It populates four overlay maps on the turn result:
+- `offense_rebounder_coords`
+- `defense_rebounder_coords`
+- `offense_getback_coords`
+- `defense_release_coords`
+
+The invariant: **each player appears in at most one overlay map.** Enforced by `canonicalize_post_shot_overlays` ([shared.py:2659](../../BackEnd/utils/shared.py)), which runs:
+1. At every return point in `shot_manager.resolve_shot` (catches the shooter — exempted from all four maps).
+2. Inside the CR FB emitter, after `fb_roles` is attached (catches the outlet passer — exempted from rebounder maps).
+3. Inside `sync_lineup_coords_from_turn` before the overlay-apply loop (safety net).
+
+Idempotent; safe to call multiple times. Priority: **shooter > outlet passer > release > getback > rebound cluster.**
+
+This replaces an earlier ad-hoc pattern where each consumer (schema emitter, sync) had its own exemption logic — which leaked when role conflicts arose (shooter accidentally in `offense_getback_coords`, rebounder in rebounder cluster, release player in rebounder cluster, etc.).
+
+### Overlay precedence (sync)
+
+`TURN_COORDS_OVERLAY_KEYS` order is load-bearing ([shared.py:2645](../../BackEnd/utils/shared.py)):
+```
+("offense_rebounder_coords", "defense_rebounder_coords",
+ "offense_getback_coords", "defense_release_coords")
+```
+Rebounder maps apply FIRST (default for everyone eligible); get-back / release apply LAST so they override for designated non-rebounders. Reversing this order pulls release players back to the rim cluster.
+
+### AG curve (player movement rates)
+
+Single AG curve in [shared.py:606](../../BackEnd/utils/shared.py):
+```
+rate = 9 + (AG / 100) × 6
+```
+Anchored at AG=50 base = 12 (matches `CRUISE_BASELINE_GRID_PER_GAME_SEC`). Slope ×6 gives a moderate spread (AG=0 → 9, AG=100 → 15, AG=150 → 18). Multiplied by archetype factors (sprint=14/12, drive=1.0, shot_motion=10/12) at use sites. So sprint at AG=50 = 14 grid/game-sec, matching documented intent.
+
+Tune by adjusting slope (each ±1 of slope = ±0.5 grid/game-sec swing at AG=100); intercept auto-compensates to keep AG=50 = 12.
+
+### Game-time / wall-time sync
+
+- `tickMs = 350` (1 game-sec = 350 ms wall-clock) — set on `scene.gameClock`.
+- Schema playback engine renders each step at `step.end.time_elapsed × tickMs` wall-clock. **No cap.**
+- Result: backend-computed game-time directly drives both clock-burn and animation duration. Long passes (sloppy outlets, long drives) take proportionally longer in wall-clock too. This is intentional — the user's design goal is "everything synced."
+
+### Coords cross-turn contract
+
+The DREB / migrated-turn emitters read **`player.coords`** (post-sync) for their step 0 start coords, NOT `miss_turn.animation_steps[-1].end.coords`. Reason: `sync_lineup_coords_from_turn` is the only place that applies the FULL post-shot picture (schema end coords + every overlay map in canonical order). The schema's own end.coords only reflects what `_apply_post_shot_overlay` actually wrote — which is partial if a player isn't in any overlay map, or if the emitter returned None.
 
 ---
 
@@ -349,3 +453,46 @@ When migrating a turn type to the new schema:
 - Sync function: [BackEnd/utils/shared.py](../../BackEnd/utils/shared.py) — `sync_lineup_coords_from_turn` (around line 2731)
 - Coord normalization: same file — `_normalize_animation_coords_to_runtime_home`
 - Frontend sprite snap: [FrontEnd/static/js/phaser/animation/animationPlayback.js](../../FrontEnd/static/js/phaser/animation/animationPlayback.js) — `playAnimationStep` end-of-step snap loop
+
+---
+
+## Next steps / open work
+
+Tracked here as a punch list so the work plan stays visible. Order is suggested, not strict.
+
+### Frontend cleanup once a turn type is fully migrated
+
+When a turn type is 100% on the schema engine (no legacy fallback firing), the corresponding legacy frontend file can shrink or be deleted. Track in [`Animation_Cleanup.md`](Animation_Cleanup.md). Current candidates with the most legacy surface area:
+- `fastBreak.js` — currently still hosts RR / Triangle / After-Steal paths. CR FB usage has been removed but the file is still loaded.
+- `turnAnimation.js` — main step loop + legacy inbound / rebound helpers. Will shrink once BIP/SIP/FT/OREB migrate.
+
+### Migration order (proposed)
+
+| Order | Turn type | Notes |
+|---|---|---|
+| 1 | **RR / Triangle FB** | Largest legacy surface; high overlap with CR FB infrastructure. Once these land, all FB variants are schema-driven and `fastBreak.js` can shrink dramatically. |
+| 2 | **BIP / SIP** | 2 steps per turn (setup + inbound pass). Simple shape; good practice turn for the schema. |
+| 3 | **OREB putback** | 1–2 steps. Shares the SHOT_ATTEMPT turn_stop with HCO / HCT / FB so most plumbing exists. |
+| 4 | **Free Throw** | N+1 steps. Shooter at FT line is conceptually simple; multi-attempt flow needs careful step decomposition. |
+| 5 | **FCP** | Same shape as HCO / HCT; mostly mechanical. |
+| 6 | **Opening Tip, Timeout** | Edge cases. Tip is jump-ball + converge; timeout is essentially a no-op turn. |
+
+### Shooter `get_player_position` mismatch (away offense)
+
+Known cosmetic upstream bug: on away-offense FB MAKE, `get_player_position(off_lineup, shooter)` can return None (Python `==` identity mismatch between `fb_roles["shooter"]` and `off_team.lineup[shooter_pos]`). The canonicalize-overlays layer masks this — the shooter is stripped from all overlay maps regardless — but the upstream identity quirk should be traced and fixed eventually. Not blocking.
+
+### Pass animation system
+
+- Pass speed for CR FB is backend-driven via `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (30 sharp / 22 sloppy) + outlet-quality branch. RR / Triangle still use frontend pixel-speed (`DEFAULT_BALL_SPEED = 450 px/sec`, capped at 1000ms wall-clock). After RR / Triangle migrate, all FB passes share the same backend-driven model and the frontend `runPass` becomes vestigial.
+- HCO half-court passes still use `PASS_GRID_SPOTS_PER_GAME_SECOND = 36` (canonical). Separate constant from FB so HCO clock-burn accounting is unaffected by FB tuning.
+
+### Diagnostic logs still in code
+
+- `🐛 [BUG B]` warning logs in `covert_release_step_emitter.py` (~5 of them around the BH end-coord pipeline) helped trace the shooter-in-getback bug. Safe to remove once the AG / overlay system has burned in for a couple more turn-type migrations.
+- `🐛 [BALL DETACH]` console logs in `animationPlayback.js` (renderBallTransition) confirm the detach-before-tween fix is firing. Useful for verifying any new pass animation; remove when no longer instructive.
+
+### Production thresholds (verify before shipping)
+
+- Ball trail effect + outlet SFX: gated on `outlet_score >= 50` in `animationPlayback.js`. This is the production target.
+- `FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 30` (sharp), hardcoded `22.0` (sloppy) in `covert_release_step_emitter.py`. Tune via these two numbers if pass speed needs adjustment.
+- AG curve slope = 6 in `ag_to_grid_per_game_sec` (`rate = 9 + (AG/100) × 6`). Tune slope to adjust the AG=0↔AG=150 speed spread; intercept auto-compensates to hold AG=50 = 12.

@@ -640,6 +640,7 @@ class ShotManager:
             foul_player = None
             shot_score = 0
             shot_score_pre_defense = 0
+            shot_defense_score_for_sfx = 0
         else:
             if has_contest and defender:
                 defense_applied_defenders.append(defender)
@@ -648,7 +649,7 @@ class ShotManager:
             # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
             # Use shot_type instead of playcall for shot score calculation
             # No contest → omit defensive scoring and shooting-foul rolls (still full offense / gravity).
-            shot_score, shot_score_pre_defense, d_foul, foul_player = self.calculate_shot_score(
+            shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player = self.calculate_shot_score(
                 shooter,
                 passer,
                 screener,
@@ -762,6 +763,11 @@ class ShotManager:
                             "step_clock_seconds": timing_contract["step_clock_seconds"],
                             "resolution_step_index": timing_contract["resolution_step_index"],
                             "executed_step_count": timing_contract["executed_step_count"],
+                            "sfx": {
+                                "shot_type": shot_type,
+                                "shot_score_pre_defense": shot_score_pre_defense,
+                                "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+                            },
                         }
                         if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
                             result["fouled_out"] = True
@@ -1933,6 +1939,15 @@ class ShotManager:
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed,
             "events": events,
+            "shot_type": shot_type,
+            "shot_score": shot_score,
+            "shot_score_pre_defense": shot_score_pre_defense,
+            "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            "sfx": {
+                "shot_type": shot_type,
+                "shot_score_pre_defense": shot_score_pre_defense,
+                "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            },
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
@@ -2037,12 +2052,15 @@ class ShotManager:
         Calculate shot score based on attributes, shot_type (inside/attack/outside), defense, gravity, etc.
         Also returns:
             - help_defender: if one triggered (always None now, help defense removed)
+            - pre_defense_shot_score: offensive shot component before defensive impact
+            - shot_defense_score_for_sfx: applied defensive shot impact for SFX selection
             - d_foul: whether a defensive foul occurred
             - foul_player: who committed the foul
         When apply_defense is False (no defender in contest range): skip defense penalty, DEF_A, and shooting foul.
         """
 
         shot_score = 0
+        shot_defense_score_for_sfx = 0
         attrs = shooter.attributes
         # Use shot_type instead of playcall for attribute weights
         # Map shot_type to playcall name for weights lookup
@@ -2104,7 +2122,9 @@ class ShotManager:
             # Apply primary defender's defense score
             if second_defender:
                 # Two defenders: apply both with 35% each
-                shot_score -= defense_score * 0.35
+                primary_defense_impact = defense_score * 0.35
+                shot_defense_score_for_sfx += primary_defense_impact
+                shot_score -= primary_defense_impact
 
                 # Calculate defense score for second defender
                 second_defense_attrs = second_defender.attributes if second_defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
@@ -2136,14 +2156,18 @@ class ShotManager:
                 self.defense_scores.append(second_defense_score)
 
                 # Apply second defender's defense score with 35%
-                shot_score -= second_defense_score * 0.35
+                second_defense_impact = second_defense_score * 0.35
+                shot_defense_score_for_sfx += second_defense_impact
+                shot_score -= second_defense_impact
 
                 # Record defensive attempts for both defenders
                 if second_defender:
                     second_defender.record_stat("DEF_A")
             else:
                 # Single defender: apply 60% impact
-                shot_score -= defense_score * 0.6
+                primary_defense_impact = defense_score * 0.6
+                shot_defense_score_for_sfx += primary_defense_impact
+                shot_score -= primary_defense_impact
 
             if defender:
                 defender.record_stat("DEF_A")
@@ -2188,7 +2212,7 @@ class ShotManager:
         # print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
 
         # help_defender is always None now (help defense removed)
-        return shot_score, pre_defense_shot_score, d_foul, foul_player
+        return shot_score, pre_defense_shot_score, shot_defense_score_for_sfx, d_foul, foul_player
 
     
     def check_defensive_foul_on_shot(self, defender, defense_score, shot_type, shooter=None, shooter_location=None):

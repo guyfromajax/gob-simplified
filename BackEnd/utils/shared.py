@@ -944,7 +944,7 @@ def resolve_offensive_rebound(game, rebounder):
                 or game_state.get("defense_call")
                 or "man"
             )
-            shot_score, _, d_foul, foul_player = shot_manager.calculate_shot_score(
+            shot_score, _, __, d_foul, foul_player = shot_manager.calculate_shot_score(
                 rebounder,
                 None,
                 None,

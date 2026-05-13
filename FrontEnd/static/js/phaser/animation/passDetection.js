@@ -142,14 +142,16 @@ export function detectPassAtStep(animations, stepIndex) {
  * @param {Phaser.Scene} params.scene
  * @param {Object} params.passInfo - Pass info from detectPassAtStep
  * @param {Object} params.playerSprites - Map of playerId -> sprite
+ * @param {boolean} [params.enableHcoSfx] - Whether to play HCO pass/reception SFX for this pass
  * @returns {Promise<void>}
  */
-export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
+export async function handlePassAnimation({ scene, passInfo, playerSprites, enableHcoSfx = false }) {
   if (!passInfo) return;
   
   const { runPass } = await import('./ballTween.js');
   const passerSprite = playerSprites[passInfo.passerId];
   const receiverSprite = playerSprites[passInfo.receiverId];
+  const sfxContext = enableHcoSfx ? await buildHcoSfxContext(scene, passInfo) : null;
   
   if (!passerSprite || !receiverSprite) {
     console.error('❌ [PASS ANIMATION] Missing sprites!', {
@@ -213,7 +215,8 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
       fromId: passInfo.passerId,
       toId: passInfo.receiverId,
       duration: 500, // Default fallback
-      easing: "Sine.easeInOut"
+      easing: "Sine.easeInOut",
+      sfxContext,
     });
     return;
   }
@@ -243,7 +246,8 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
     endCoords: receiverTargetPx,
     duration: passDuration,
     easing: "Sine.easeInOut",
-    stepIndex: passInfo.stepIndex // 🔍 DEBUG: Pass stepIndex for debugging
+    stepIndex: passInfo.stepIndex, // 🔍 DEBUG: Pass stepIndex for debugging
+    sfxContext,
   });
   
   // ✅ CRITICAL FIX: Keep passInFlight true for the NEXT step to prevent
@@ -254,4 +258,7 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
   // console.log('🏀 [PASS ANIMATION] runPass completed, keeping passInFlight=true for next step');
 }
 
-
+async function buildHcoSfxContext(scene, passInfo) {
+  const { buildHcoPassSfxContext } = await import('../utils/gameSfx.js');
+  return buildHcoPassSfxContext(scene, passInfo.passerId, passInfo.receiverId);
+}
