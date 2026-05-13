@@ -131,6 +131,8 @@ Possible live states:
   - shows confirmation modal
   - calls `/franchise/finish-season`
 
+The primary CTA plays `confirm-1-lowervol.wav` on click. For CTA branches that navigate away or reload the FCC, the controller waits for a 200 ms confirm-SFX guard before changing pages so the quieter WAV is audible.
+
 ### EOS-specific behavior
 
 The CTA logic depends on:

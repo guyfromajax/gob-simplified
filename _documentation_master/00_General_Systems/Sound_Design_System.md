@@ -77,7 +77,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | Exit Tournament / Exit Franchise | x-back | `x-back.mp3` | `tournament.js` — `#exit-tournament`; `franchise-command-center.js` — `#exit-franchise` |
 | Set Game Plan, Playbooks | positive-beep | `positive-beep.wav` | `franchise-command-center.js`, `tournament.js` — set-gameplan / playbooks button click |
 | Scouting Report | positive-slide | `positive-slide.wav` | `franchise-command-center.js`, `tournament.js` — `loadScoutingReport()` start |
-| Play Next Game / Run Training | confirm-1 | `confirm-1-lowervol.wav` | Same files — `#play-now` click |
+| Play Next Game / Run Training | confirm-1 | `confirm-1-lowervol.wav` | Same files — `#play-now` click; FCC page-changing branches use a 200 ms navigation guard |
 | Tab headers | click-tiny | `click-tiny.wav` | `FrontEnd/static/js/shared/commandCenterTabs.js` — tab button click |
 
 ---

@@ -3198,10 +3198,16 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+const FCC_CONFIRM_NAV_DELAY_MS = 200;
+function waitForConfirmSfx() {
+  return new Promise(resolve => setTimeout(resolve, FCC_CONFIRM_NAV_DELAY_MS));
+}
+
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
   playSound('confirm-1-lowervol.wav');
+  const confirmSfxReady = waitForConfirmSfx();
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {
@@ -3216,6 +3222,7 @@ playNowBtn.addEventListener('click', async () => {
     params.set('session_type', sessionType);
     params.set('return_url', getCurrentRelativeUrl());
     if (userTeamId) params.set('team_id', userTeamId);
+    await confirmSfxReady;
     window.location.href = `/training.html?${params.toString()}`;
     return;
   }
@@ -3226,6 +3233,7 @@ playNowBtn.addEventListener('click', async () => {
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
     params.set('return_url', getCurrentRelativeUrl());
+    await confirmSfxReady;
     window.location.href = `/recruiting-orders.html?${params.toString()}`;
     return;
   }
@@ -3236,6 +3244,7 @@ playNowBtn.addEventListener('click', async () => {
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
     params.set('return_url', getCurrentRelativeUrl());
+    await confirmSfxReady;
     window.location.href = `/cut-players.html?${params.toString()}`;
     return;
   }
@@ -3253,6 +3262,7 @@ playNowBtn.addEventListener('click', async () => {
         body: JSON.stringify({ franchise_id: franchiseId })
       });
       if (!res.ok) throw new Error('Simulation failed');
+      await confirmSfxReady;
       location.reload();
     } catch (err) {
       console.error(err);
@@ -3331,6 +3341,7 @@ playNowBtn.addEventListener('click', async () => {
     if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
     if (resolvedSide) url += `&my_team=${resolvedSide}`;
     console.log('Navigating to', url);
+    await confirmSfxReady;
     window.location.href = url;
   } catch (err) {
     console.error(err);
