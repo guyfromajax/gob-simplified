@@ -13,8 +13,8 @@ Wire the noted components with the SFX specified. If anything is unclear, please
 | positive-beep   | positive-beep.wav  |
 | positive-slide  | positive-slide.wav |
 | positive-plop   | positive-plop.wav  |
-| confirm-1       | confirm-1.mp3      |
-| confirm-2       | confirm-2.mp3      |
+| confirm-1       | confirm-1-lowervol.wav      |
+| confirm-2       | confirm-2-lowervol.wav      |
 | movement-cycle  | movement-cycle.mp3 |
 | chaotic-choice  | chaotic-choice.wav |
 | whistle-3       | whistle-3.mp3      |

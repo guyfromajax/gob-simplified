@@ -2093,7 +2093,7 @@ async function init() {
       DEBUG && console.log('[lineup] launching quarter', quarter);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
-      playSound('confirm-1.mp3');
+      playSound('confirm-1-lowervol.wav');
       // Delay navigation so the sound can start before the page unloads
       setTimeout(() => { window.location.href = finalUrl; }, 200);
     });

@@ -367,7 +367,7 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     // Submit button handler
     const submitButton = popup.querySelector('.submit-matchups-button');
     submitButton.addEventListener('click', async () => {
-        if (typeof window.playSound === 'function') window.playSound('confirm-1.mp3');
+        if (typeof window.playSound === 'function') window.playSound('confirm-1-lowervol.wav');
         await handleSubmit(popup, gameId);
         if (onResolve) {
             onResolve(); // Resolve promise to allow animation to continue

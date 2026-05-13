@@ -5479,7 +5479,7 @@
           const allPlayOptions = document.querySelectorAll('#offense-play-scroller .play-option');
           const idx = Array.prototype.indexOf.call(allPlayOptions, option);
           if (idx < 0) return;
-          playSound('confirm-2.mp3');
+          playSound('confirm-2-lowervol.wav');
           await showPlayAsync(idx);
         });
       }
@@ -5508,7 +5508,7 @@
         const values = ['fast', 'normal', 'slow'];
         if (btn) {
           btn.addEventListener('click', async () => {
-            playSound('confirm-2.mp3');
+            playSound('confirm-2-lowervol.wav');
             document.querySelectorAll('#pcc-stacks-zone .pcc-stack.tempo .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             await courtSetPlaycallOverride('tempo', values[i]);
@@ -5531,7 +5531,7 @@
         const btn = document.getElementById(id);
         if (btn) {
           btn.addEventListener('click', async () => {
-            playSound('confirm-2.mp3');
+            playSound('confirm-2-lowervol.wav');
             document.querySelectorAll('#pcc-stacks-zone .pcc-stack.aggression .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             await courtSetPlaycallOverride('aggression', value);
@@ -5554,7 +5554,7 @@
         const btn = document.getElementById(id);
         if (btn) {
           btn.addEventListener('click', async () => {
-            playSound('confirm-2.mp3');
+            playSound('confirm-2-lowervol.wav');
             document.querySelectorAll('#pcc-stacks-zone .pcc-stack.press-trap .pcc-stack-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             await courtSetPlaycallOverride('press_trap', value);
@@ -5584,7 +5584,7 @@
       const defenseCardEl = document.getElementById('defense-scheme-card');
       if (defenseCardEl) {
         defenseCardEl.addEventListener('click', async () => {
-          playSound('confirm-2.mp3');
+          playSound('confirm-2-lowervol.wav');
           selectedDefenseScheme = DEFENSE_SCHEMES[currentDefenseIndex];
           updateDefenseCardDisplay();
           await courtSetPlaycallOverride('defense', defenseSchemeToApiValue(DEFENSE_SCHEMES[currentDefenseIndex]));

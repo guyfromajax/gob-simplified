@@ -14,7 +14,7 @@ import {
 let currentAnnouncement = null;
 
 export function playAnnouncementSfx(kind) {
-  const filename = kind === 'shot_clock_violation' ? 'whistle-3.mp3' : 'whistle-1.mp3';
+  const filename = kind === 'shot_clock_violation' ? 'whistle-3.mp3' : 'whistle-1-lowervol.wav';
   try {
     const sfx = new Audio('/sounds/' + encodeURIComponent(filename));
     sfx.volume = 0.7;

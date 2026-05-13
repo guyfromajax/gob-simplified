@@ -65,3 +65,11 @@ SFX Direction
 - Trigger: at the moment the ball reaches the basket spot.
 - If `shot_score_pre_defense - shot_defense_score_for_sfx < -150`: `clank-bad.wav`
 - Else: `clank.wav`
+
+
+
+**Replace All SFX files in the code as follows**
+-confirm-1.mp3 -> confirm-1-lowervol.wav
+-confirm-2.mp3 -> confirm-2-lowervol.wav
+-whistle-1.mp3 -> whistle-1-lowervol.wav
+-Timeout - Airhorn.mp3 -> airhorn-lowervol.wav

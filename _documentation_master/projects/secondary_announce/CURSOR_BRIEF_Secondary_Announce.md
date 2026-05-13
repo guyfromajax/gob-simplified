@@ -81,7 +81,7 @@ Use **Bebas Neue Pro** for all primary and secondary announcement headlines. The
 
 ## SFX
 - **No SFX** for any secondary announcement in v1. Sound design will be added later.
-- Primary's whistles (`whistle-1.mp3`, `whistle-3.mp3`) remain primary-only and unchanged.
+- Primary's whistles (`whistle-1-lowervol.wav`, `whistle-3.mp3`) remain primary-only and unchanged.
 
 ## Out of scope
 - `decisionPillText` / `decisionPillTone` are not used. There is no good-decision / bad-decision pill or indicator in the secondary design.

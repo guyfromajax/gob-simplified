@@ -17,8 +17,8 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | positive-beep   | positive-beep.wav  |
 | positive-slide  | positive-slide.wav |
 | positive-plop   | positive-plop.wav  |
-| confirm-1       | confirm-1.mp3      |
-| confirm-2       | confirm-2.mp3      |
+| confirm-1       | confirm-1-lowervol.wav      |
+| confirm-2       | confirm-2-lowervol.wav      |
 | movement-cycle  | movement-cycle.mp3 |
 | chaotic-choice  | chaotic-choice.wav |
 | whistle-3       | whistle-3.mp3      |
@@ -77,7 +77,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | Exit Tournament / Exit Franchise | x-back | `x-back.mp3` | `tournament.js` — `#exit-tournament`; `franchise-command-center.js` — `#exit-franchise` |
 | Set Game Plan, Playbooks | positive-beep | `positive-beep.wav` | `franchise-command-center.js`, `tournament.js` — set-gameplan / playbooks button click |
 | Scouting Report | positive-slide | `positive-slide.wav` | `franchise-command-center.js`, `tournament.js` — `loadScoutingReport()` start |
-| Play Next Game / Run Training | confirm-1 | `confirm-1.mp3` | Same files — `#play-now` click |
+| Play Next Game / Run Training | confirm-1 | `confirm-1-lowervol.wav` | Same files — `#play-now` click |
 | Tab headers | click-tiny | `click-tiny.wav` | `FrontEnd/static/js/shared/commandCenterTabs.js` — tab button click |
 
 ---
@@ -86,10 +86,10 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Save Game Plan (button or modal) | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/game-plan.js` — btnSaveGamePlan click, modal Save click |
+| Save Game Plan (button or modal) | confirm-2 | `confirm-2-lowervol.wav` | `FrontEnd/static/game-plan.js` — btnSaveGamePlan click, modal Save click |
 | Slider move & release | click-tiny | `click-tiny.wav` | `game-plan.js` — slider `change` in `setupSliders()` |
 | Back To Locker Room | x-back | `x-back.mp3` | `game-plan.js` — btnNavPrimary (Back To Locker Room) click |
-| Play Game | confirm-1 | `confirm-1.mp3` | `game-plan.js` — btnNavPrimary (Play Game) click; navigation delayed 200 ms |
+| Play Game | confirm-1 | `confirm-1-lowervol.wav` | `game-plan.js` — btnNavPrimary (Play Game) click; navigation delayed 200 ms |
 
 ---
 
@@ -97,7 +97,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Save Playbooks | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/playbooks.js` — `handleSubmit()` start |
+| Save Playbooks | confirm-2 | `confirm-2-lowervol.wav` | `FrontEnd/static/playbooks.js` — `handleSubmit()` start |
 | Playcall Center slot buttons (1–6) | click-tiny | `click-tiny.wav` | `playbooks.js` — `handleSlotClick()` |
 | Percentage spinner up/down | click-tiny | `click-tiny.wav` | `playbooks.js` — percentage input `input` when delta ±1 |
 | Percentage manual entry (commit) | click-soft | `click-soft.mp3` | `playbooks.js` — percentage input `change` |
@@ -124,7 +124,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | Box Score button | positive-slide | `positive-slide.wav` | `set-lineup.js` — `#box-score-button` |
 | Autoset Lineup | chaotic-choice | `chaotic-choice.wav` | `set-lineup.js` — `autosetLineup()` start |
 | Grid View / Player View toggle | click-tiny | `click-tiny.wav` | `set-lineup.js` — `.view-toggle-btn` click |
-| Play Game | confirm-1 | `confirm-1.mp3` | `set-lineup.js` — `#play-now` click; navigation delayed 200 ms |
+| Play Game | confirm-1 | `confirm-1-lowervol.wav` | `set-lineup.js` — `#play-now` click; navigation delayed 200 ms |
 
 ---
 
@@ -143,7 +143,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
 | Drag & drop players | click-soft | `click-soft.mp3` | `FrontEnd/static/js/phaser/utils/defenseMatchupsPopup.js` — drop handler |
-| Submit Defense Matchups | confirm-1 | `confirm-1.mp3` | `defenseMatchupsPopup.js` — `.submit-matchups-button` click |
+| Submit Defense Matchups | confirm-1 | `confirm-1-lowervol.wav` | `defenseMatchupsPopup.js` — `.submit-matchups-button` click |
 | Don't show again this game checkbox | click-tiny | `click-tiny.wav` | `defenseMatchupsPopup.js` — `#dont-show-again-checkbox` change |
 
 ---
@@ -152,9 +152,9 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Offense play select | confirm-2 | `confirm-2.mp3` | `FrontEnd/static/court.html` — `#offense-play-scroller` click |
+| Offense play select | confirm-2 | `confirm-2-lowervol.wav` | `FrontEnd/static/court.html` — `#offense-play-scroller` click |
 | Up/down toggle arrows (offense plays) | click-tiny | `click-tiny.wav` | `court.html` — `#play-nav-up`, `#play-nav-down` |
-| Defense play or aggression select | confirm-2 | `confirm-2.mp3` | `court.html` — defense override button click |
+| Defense play or aggression select | confirm-2 | `confirm-2-lowervol.wav` | `court.html` — defense override button click |
 | Red X (offense, defense, aggression) | x-back | `x-back.mp3` | `court.html` — clear-offense-override-x, clear-defense-override-x, clear-aggression-override-x |
 
 ---
@@ -174,8 +174,8 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 
 | Trigger | Sound | Asset | Volume | Location |
 |--------|--------|-------|--------|----------|
-| Timeout popup appears (user-called timeout) | Airhorn | `Timeout - Airhorn.mp3` | 70% | `timeoutButtonManager.js` |
-| Computer timeout (navigate to lineup) | Airhorn | `Timeout - Airhorn.mp3` | 70% | `timeoutButtonManager.js` → `showTimeoutPopup(computerTimeout: true)` |
+| Timeout popup appears (user-called timeout) | Airhorn | `airhorn-lowervol.wav` | 70% | `timeoutButtonManager.js` |
+| Computer timeout (navigate to lineup) | Airhorn | `airhorn-lowervol.wav` | 70% | `timeoutButtonManager.js` → `showTimeoutPopup(computerTimeout: true)` |
 
 ---
 
@@ -183,7 +183,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Foul or dead-ball turnover announcement shown | whistle-1 | `whistle-1.mp3` | `FrontEnd/static/js/phaser/utils/announcements.js` — `showAnnouncement()`, `showAndOneAnnouncement()` when text is foul- or dead-ball-turnover-related. Not played for STEAL! (live-ball). |
+| Foul or dead-ball turnover announcement shown | whistle-1 | `whistle-1-lowervol.wav` | `FrontEnd/static/js/phaser/utils/announcements.js` — `showAnnouncement()`, `showAndOneAnnouncement()` when text is foul- or dead-ball-turnover-related. Not played for STEAL! (live-ball). |
 
 ---
 
@@ -201,7 +201,7 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
 | Auto-Train | chaotic-choice | `chaotic-choice.wav` | `FrontEnd/static/training.js` — `autoAssignTraining()` start |
-| Submit Training | confirm-2 | `confirm-2.mp3` | `training.js` — submit button click |
+| Submit Training | confirm-2 | `confirm-2-lowervol.wav` | `training.js` — submit button click |
 | Slider move & release | click-tiny | `click-tiny.wav` | `training.js` — slider `change` |
 | Coaching style / focus: Authoritarian (any of four) | whistle-3 | `whistle-3.mp3` | `training.js` — coaching radio `change` when value starts with `authoritarian` |
 | Coaching style / focus: Systems Coach (any of four) | positive-slide | `positive-slide.wav` | `training.js` — value starts with `systems-coach` |

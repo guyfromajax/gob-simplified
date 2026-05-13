@@ -880,7 +880,7 @@ if (chooseAttrsRadio) {
 
 if (customFocusAssignBtn) {
   customFocusAssignBtn.addEventListener('click', function () {
-    playSound('confirm-1.mp3');
+    playSound('confirm-1-lowervol.wav');
     commitCustomFocusFromModal();
   });
 }
@@ -1064,7 +1064,7 @@ function showMessageModal(message, buttonLabel = 'Close') {
  */
 submitBtn.addEventListener('click', async function() {
   if (this.disabled) return;
-  playSound('confirm-2.mp3');
+  playSound('confirm-2-lowervol.wav');
   
   const trainingData = collectTrainingData();
   
@@ -1308,7 +1308,7 @@ async function initializeTrainingPoints() {
           recruitingInvitesBtn.style.display = showRecruitingInvites ? 'inline-flex' : 'none';
           if (showRecruitingInvites) {
             recruitingInvitesBtn.onclick = function () {
-              playSound('confirm-1.mp3');
+              playSound('confirm-1-lowervol.wav');
               saveTrainingFormDraft();
               const params = new URLSearchParams();
               params.set('franchise_id', franchiseId);

@@ -943,7 +943,7 @@
       if (this.elements.saveBtn.disabled) {
         return;
       }
-      playSound("confirm-2.mp3");
+      playSound("confirm-2-lowervol.wav");
 
       const payload = {
         mode: this.context.mode,

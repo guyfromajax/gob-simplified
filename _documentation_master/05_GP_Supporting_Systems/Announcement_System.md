@@ -144,7 +144,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 - **Typed turnovers** (mapped from `turnover_type`):
   - `gameAnnouncements.js` typeMap: `TRAVEL → "Travel!"`, `DOUBLE_DRIBBLE → "Double Dribble!"`, `OUT_OF_BOUNDS → "OUT OF BOUNDS!"`, `BAD_PASS → "BAD PASS!"`, `SHOT_CLOCK → "Shot Clock Violation!"`.
   - Legacy `announceFromTurnData` typeMap additionally recognizes: `PALMING → "PALMING!"`, `ILLEGAL_DRIBBLE → "ILLEGAL DRIBBLE!"`, `BACKCOURT → "BACKCOURT VIOLATION!"`.
-- **Shot Clock Violation:** Uses `whistle-3.mp3` (vs `whistle-1.mp3` for other turnovers). See Sounds below.
+- **Shot Clock Violation:** Uses `whistle-3.mp3` (vs `whistle-1-lowervol.wav` for other turnovers). See Sounds below.
 - Shows victim's headshot in offense team color.
 
 **Foul Announcements:**
@@ -165,14 +165,14 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 ### Sounds (SFX)
 
-All announcement SFX route through `playAnnouncementSfx(kind)` in `announcements.js`. Pass `'shot_clock_violation'` for `whistle-3.mp3`; any other value (or `'foul'`) maps to `whistle-1.mp3`. Audio plays at volume 0.7 from `/sounds/` + filename.
+All announcement SFX route through `playAnnouncementSfx(kind)` in `announcements.js`. Pass `'shot_clock_violation'` for `whistle-3.mp3`; any other value (or `'foul'`) maps to `whistle-1-lowervol.wav`. Audio plays at volume 0.7 from `/sounds/` + filename.
 
 | Announcement | Sound file | Triggered from |
 |--------------|------------|----------------|
 | **Shot Clock Violation!** | `whistle-3.mp3` | `gameAnnouncements.js` → `handleTurnoverAnnouncement()` (and the legacy `announceFromTurnData` end branch) |
-| Dead ball turnovers (Travel!, Double Dribble!, OUT OF BOUNDS!, BAD PASS!, etc.) | `whistle-1.mp3` | `gameAnnouncements.js` → `handleTurnoverAnnouncement()` (and legacy `announceFromTurnData`) |
-| Shooting Foul!, Offensive Foul, Defensive Foul, Charge, Blocking Foul | `whistle-1.mp3` | `gameAnnouncements.js` → `handleShootingFoulAnnouncement` / `handleOffensiveFoulAnnouncement` / `handleDefensiveFoulAnnouncement` / `handleChargeAnnouncement` / `handleBlockingFoulAnnouncement` |
-| AND-1 (shooting foul on make) | `whistle-1.mp3` | `announcements.js` → `showAndOneAnnouncement()` |
+| Dead ball turnovers (Travel!, Double Dribble!, OUT OF BOUNDS!, BAD PASS!, etc.) | `whistle-1-lowervol.wav` | `gameAnnouncements.js` → `handleTurnoverAnnouncement()` (and legacy `announceFromTurnData`) |
+| Shooting Foul!, Offensive Foul, Defensive Foul, Charge, Blocking Foul | `whistle-1-lowervol.wav` | `gameAnnouncements.js` → `handleShootingFoulAnnouncement` / `handleOffensiveFoulAnnouncement` / `handleDefensiveFoulAnnouncement` / `handleChargeAnnouncement` / `handleBlockingFoulAnnouncement` |
+| AND-1 (shooting foul on make) | `whistle-1-lowervol.wav` | `announcements.js` → `showAndOneAnnouncement()` |
 
 **No SFX on secondary tier** in v1 — `showSecondaryAnnouncement()` deliberately omits the whistle call. Primary whistles are unchanged.
 
@@ -266,7 +266,7 @@ When a steal leads to a fast break:
   - `showSecondaryAnnouncement(text, team, playerData, meta)` — Builds **secondary** payload (`tier: 'secondary'`), resolves the team primary color via `gameStore.getColors()` (`resolveSecondaryStripeColor`), and calls `window.showAnnouncementOverlay(data)`.
   - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` — Builds primary foul-card payload.
   - `getPlayerImageUrl(photo, playerId)` — Uses explicit portrait paths when provided; otherwise falls back to `generic_headshot.png` (with an `onerror` fallback applied in `court.html`).
-  - `playAnnouncementSfx(kind)` — Plays `whistle-3.mp3` for `'shot_clock_violation'`, otherwise `whistle-1.mp3` at volume 0.7.
+  - `playAnnouncementSfx(kind)` — Plays `whistle-3.mp3` for `'shot_clock_violation'`, otherwise `whistle-1-lowervol.wav` at volume 0.7.
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND`, `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
   - Secondary-tier cases (`PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`) call `showSecondaryAnnouncement()`; everything else calls `showAnnouncement()` / `showAndOneAnnouncement()`.

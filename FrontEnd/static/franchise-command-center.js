@@ -3201,7 +3201,7 @@ function playSound(filename) {
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
-  playSound('confirm-1.mp3');
+  playSound('confirm-1-lowervol.wav');
   const mode = playNowBtn.dataset.mode || 'play';
   
   if (mode === 'training') {

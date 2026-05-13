@@ -328,7 +328,7 @@
   }
 
   function persistAndLeave() {
-    playSound('confirm-2.mp3');
+    playSound('confirm-2-lowervol.wav');
     const payload = {
       offense: Array.from(offenseSel),
       defense: Array.from(defenseSel).filter((id) => !DISABLED_MAN_DEFENSE_IDS.has(String(id))),

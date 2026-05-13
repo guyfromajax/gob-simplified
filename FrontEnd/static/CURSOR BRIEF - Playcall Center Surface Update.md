@@ -155,7 +155,7 @@ The pause button must now anchor against the lifted steel surface, so it gets th
 ## What Did NOT Change
 - HTML structure (only added a single `.pcc-hairline` span)
 - All event listeners
-- All `playSound()` calls (`click-tiny.wav`, `confirm-2.mp3`, `x-back.mp3`)
+- All `playSound()` calls (`click-tiny.wav`, `confirm-2-lowervol.wav`, `x-back.mp3`)
 - Override semantics (OFF auto-clear, DEF persistence)
 - Strategy notch behavior
 - Pause / Timeout JS

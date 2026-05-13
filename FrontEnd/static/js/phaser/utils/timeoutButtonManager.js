@@ -58,7 +58,7 @@ function ensureTimeoutSounds() {
             timeoutSound.volume = 0.5;
         }
         if (!airhornSound) {
-            airhornSound = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+            airhornSound = new Audio(`${staticPath}/sounds/airhorn-lowervol.wav`);
             airhornSound.volume = 0.7;
         }
     } catch (err) {

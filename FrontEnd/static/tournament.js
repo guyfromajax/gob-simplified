@@ -1675,7 +1675,7 @@ async function initializeTournament() {
   const playBtn = document.getElementById('play-now');
   if (playBtn) {
     playBtn.addEventListener('click', async () => {
-      playSound('confirm-1.mp3');
+      playSound('confirm-1-lowervol.wav');
       if (!tournament || !tournament._id) {
         alert('Tournament not loaded');
         return;

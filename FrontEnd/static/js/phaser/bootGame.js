@@ -2680,7 +2680,7 @@ async function initGame() {
       if (quarter > 1 && quarterBreakFrom === 'play_quarter') {
         try {
           const staticPath = (typeof window.API_CONFIG !== 'undefined' && window.API_CONFIG.getStaticPath) ? window.API_CONFIG.getStaticPath() : '';
-          const airhorn = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+          const airhorn = new Audio(`${staticPath}/sounds/airhorn-lowervol.wav`);
           airhorn.volume = 0.7;
           airhorn.play().catch(() => {});
         } catch (e) {}

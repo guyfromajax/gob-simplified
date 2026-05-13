@@ -226,7 +226,7 @@
                 return res.json();
               })
               .then(function (data) {
-                playSound('confirm-1.mp3');
+                playSound('confirm-1-lowervol.wav');
                 showModal({
                   title: 'Cuts Processed',
                   message: formatNames(data.cut_names || namesInOrder) + ' have been cut.',

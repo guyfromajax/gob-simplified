@@ -1102,7 +1102,7 @@ export class AnimationEngine {
   }
 
   /**
-   * Play Timeout - Airhorn.mp3 when the clock hits 0:00 (e.g. final play of quarter hold).
+   * Play airhorn-lowervol.wav when the clock hits 0:00 (e.g. final play of quarter hold).
    */
   _playFinalHoldAirhorn() {
     if (typeof window === 'undefined') return;
@@ -1110,7 +1110,7 @@ export class AnimationEngine {
       const staticPath = (window.API_CONFIG && typeof window.API_CONFIG.getStaticPath === 'function')
         ? window.API_CONFIG.getStaticPath()
         : '/static';
-      const airhorn = new Audio(`${staticPath}/sounds/Timeout - Airhorn.mp3`);
+      const airhorn = new Audio(`${staticPath}/sounds/airhorn-lowervol.wav`);
       airhorn.volume = 0.7;
       airhorn.currentTime = 0;
       airhorn.play().catch(() => {});

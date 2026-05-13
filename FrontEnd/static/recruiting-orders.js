@@ -999,7 +999,7 @@
 
   function handleSaveClick() {
     if (!currentEntries.length) return;
-    Recruiting.playSound('confirm-2.mp3');
+    Recruiting.playSound('confirm-2-lowervol.wav');
     saveOrders(function () {
       var subtitle = isWeek35Mode()
         ? 'Recruiting orders are saved. You can now run recruiting.'

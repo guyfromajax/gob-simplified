@@ -831,7 +831,7 @@ function showUnsavedChangesWarning(onContinue) {
       sessionStorage.setItem('gameplan_suppress_warning', 'true');
     }
     overlay.remove();
-    playSound('confirm-2.mp3');
+    playSound('confirm-2-lowervol.wav');
     await saveGamePlan();
     // After successful save, continue with navigation
     if (!hasUnsavedChanges) {
@@ -932,7 +932,7 @@ async function init() {
       
       btnNavPrimary.addEventListener('click', () => {
         console.log('🚀 [GAME-PLAN] btnNavPrimary (Play Game) CLICKED! About to call navigateToCourt()');
-        playSound('confirm-1.mp3');
+        playSound('confirm-1-lowervol.wav');
         // Delay navigation so the sound can start before the page unloads
         setTimeout(() => navigateToCourt(), 200);
       });
@@ -952,7 +952,7 @@ async function init() {
     console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');
     btnSaveGamePlan.addEventListener('click', () => {
       console.log('🚀 [GAME-PLAN] btnSaveGamePlan CLICKED! About to call saveGamePlan()');
-      playSound('confirm-2.mp3');
+      playSound('confirm-2-lowervol.wav');
       saveGamePlan();
     });
   } else {
