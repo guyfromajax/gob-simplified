@@ -2,7 +2,7 @@
 
 > **Status:** Schema design — validating against turn types before treating it as locked. Started 2026-05-09.
 >
-> **Context:** Successor to [`Animation_System_Refactor.md`](Animation_System_Refactor.md). That doc inventoried turn types and surfaced inconsistencies. This doc proposes the unified per-step payload schema and validates it against the most uniform turn type (HCO) and the most divergent (Fast Break).
+> **Context:** This doc proposes the unified per-step payload schema and validates it against the most uniform turn type (HCO) and the most divergent (Fast Break). It succeeds an earlier scoping doc (`Animation_System_Refactor.md`, since removed) that inventoried turn types and surfaced inconsistencies — the inventory has been folded into the schema validation work below.
 >
 > **Architecture commitment:** advance trigger lives on the backend. Backend pre-computes `T = game-seconds when trigger fires`, then derives all end-state fields (interrupted coords, ball state, clock advance) from T. Frontend is a pure playback engine.
 
