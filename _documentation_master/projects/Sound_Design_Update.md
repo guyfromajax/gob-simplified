@@ -22,8 +22,8 @@ SFX Direction
 - Trigger: at the moment the ball detaches from the shooter sprite.
 - Score source: `shot_score_pre_defense`.
 - `< 101`: `inside-shot-weak.wav`
-- `> 210`: `inside-shot-strong.wav`
-- Else: `inside-shot-medium.wav`
+- `> 210`: `attack-shot-strong.wav`
+- Else: `attack-shot-medium.wav`
 
 **Inside Shots**
 
