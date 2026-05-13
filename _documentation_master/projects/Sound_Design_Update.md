@@ -5,7 +5,7 @@ SFX Direction
 
 - `shot_score_pre_defense`: Existing `resolve_shot()` local variable. This is returned from `calculate_shot_score()` as `pre_defense_shot_score` and represents the shooter/offense value before defensive shot impact is applied.
 - `shot_score`: Existing final shot score after defensive impact and later modifiers. This remains the make/miss score compared against `shot_threshold`.
-- `shot_defense_score_for_sfx`: New SFX metadata value to expose the defensive shot impact used for missed-shot sound selection. Do not infer this from final `shot_score`.
+- `shot_defense_score_for_sfx`: Existing SFX metadata value that exposes defensive shot impact. Current missed-shot SFX no longer branches on this value, but keep the field available for future sound-selection rules.
 
 ## Shot Launch SFX
 
@@ -53,20 +53,21 @@ SFX Direction
 
 ## Shot Result SFX
 
-**Made Shot**
+**Made Shot (HCO, OREB Putback, Fast Break, HCT, FCP)**
 
 - Trigger: at the moment the ball reaches the basket spot.
-- Random choice:
-  - `swish.wav`
-  - `swish-with-rim.wav`
+- `swish.wav`
 
-**Missed Shot**
+**Missed Shot (HCO, OREB Putback, Fast Break, HCT, FCP)**
 
 - Trigger: at the moment the ball reaches the basket spot.
-- If `shot_score_pre_defense - shot_defense_score_for_sfx < -150`: `clank-bad.wav`
-- Else: `clank.wav`
+- `clank.wav`
 
+**Free Throw**
 
+- Trigger: at the moment the ball reaches the basket spot.
+- Made: `free-throw-swish.wav`
+- Missed: `free-throw-miss.wav`
 
 **Replace All SFX files in the code as follows**
 -confirm-1.mp3 -> confirm-1-lowervol.wav

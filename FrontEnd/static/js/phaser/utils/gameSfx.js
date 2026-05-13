@@ -43,25 +43,36 @@ export function playShotLaunchSfx(scene, turnData) {
   const preDefense = toNumber(turnData?.sfx?.shot_score_pre_defense ?? turnData?.shot_score_pre_defense);
   if (preDefense == null) return;
 
-  const prefix = shotType === "outside" ? "three" : "inside-shot";
   const tier = preDefense < 101 ? "weak" : preDefense > 210 ? "strong" : "medium";
-  playGameSfx(scene, `${prefix}-${tier}.wav`);
+  if (shotType === "outside") {
+    playGameSfx(scene, `three-${tier}.wav`);
+    return;
+  }
+  if (shotType === "attack" && tier !== "weak") {
+    playGameSfx(scene, `attack-shot-${tier}.wav`);
+    return;
+  }
+  playGameSfx(scene, `inside-shot-${tier}.wav`);
 }
 
 export function playShotResultSfx(scene, turnData, result) {
   if (result === "MAKE") {
-    const filename = Math.random() < 0.5 ? "swish.wav" : "swish-with-rim.wav";
-    playGameSfx(scene, filename);
+    playGameSfx(scene, "swish.wav");
     return;
   }
 
   if (result !== "MISS") return;
-  const preDefense = toNumber(turnData?.sfx?.shot_score_pre_defense ?? turnData?.shot_score_pre_defense);
-  const defenseScore = toNumber(turnData?.sfx?.shot_defense_score_for_sfx ?? turnData?.shot_defense_score_for_sfx);
-  const filename = preDefense != null && defenseScore != null && preDefense - defenseScore < -150
-    ? "clank-bad.wav"
-    : "clank.wav";
-  playGameSfx(scene, filename);
+  playGameSfx(scene, "clank.wav");
+}
+
+export function playFreeThrowResultSfx(scene, result) {
+  if (result === "MAKE") {
+    playGameSfx(scene, "free-throw-swish.wav");
+    return;
+  }
+  if (result === "MISS") {
+    playGameSfx(scene, "free-throw-miss.wav");
+  }
 }
 
 export function buildHcoPassSfxContext(scene, passerId, receiverId) {

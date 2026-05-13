@@ -8,6 +8,7 @@ import { States, safeTransition, createTransitionGuard } from "../state/gameStat
 import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
 import { DebugFlags, animationDebugLog } from "../utils/debugFlags.js";
 import { getPlayerDuration } from "./turnAnimation.js";
+import { playFreeThrowResultSfx } from "../utils/gameSfx.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -213,6 +214,7 @@ export async function runFreeThrowSequence(
       arc: arcOption
     });
 
+    playFreeThrowResultSfx(scene, result);
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
     
     // Announce made free throw
@@ -484,4 +486,3 @@ export async function runFreeThrowSequence(
 }
 
 export default runFreeThrowSequence;
-
