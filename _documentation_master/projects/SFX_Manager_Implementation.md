@@ -35,6 +35,19 @@ Examples:
 
 The user should define timing in terms of visible basketball moments, not millisecond offsets. The code should map those moments to deterministic animation markers.
 
+## Implementation Status
+
+### Pass 1: Central SFX Manager
+
+Status: implemented.
+
+- `gameSfx.js` owns gameplay SFX playback for current pass, reception, shot-launch, shot-result, free-throw-result, and outlet-pass SFX paths.
+- Gameplay SFX files are preloaded before `GameScene` starts from `bootGame.js`.
+- Each gameplay SFX file uses a small browser-audio pool so rapid repeated sounds do not depend on a freshly created `Audio` object.
+- Active sound references are retained until playback ends or errors.
+- Optional debug logging is available with `window.DEBUG_GAME_SFX = true` or `?debug_sfx=1`.
+- Existing trigger locations are intentionally unchanged in pass 1. Marker-based timing is pass 2.
+
 ## Work Plan
 
 ### Phase 1: Inventory Current SFX Paths
@@ -156,4 +169,3 @@ Update sound and animation docs with:
 - Every intended SFX event logs a traceable marker when debug mode is enabled.
 - SFX timing is tied to exact animation markers instead of broad async function boundaries.
 - No known gameplay animation path can produce a pass or shot visual without going through the shared SFX event system.
-

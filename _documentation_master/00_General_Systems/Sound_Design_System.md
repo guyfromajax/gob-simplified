@@ -2,6 +2,8 @@
 
 Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. The canonical spec is `FrontEnd/static/sounds/_SFX_notes.md`. Playback uses root-relative `/sounds/` with `encodeURIComponent(filename)` for names with spaces/parentheses. Volume is typically 0.7; playback is wrapped in try/catch and `play().catch(() => {})` to avoid autoplay errors.
 
+Gameplay pass, reception, shot-launch, shot-result, free-throw-result, and outlet-pass SFX route through `FrontEnd/static/js/phaser/utils/gameSfx.js`. The manager preloads gameplay SFX before `GameScene` starts, uses small browser-audio pools per file, retains active playback references, and supports debug logging with `window.DEBUG_GAME_SFX = true` or `?debug_sfx=1`.
+
 ---
 
 ## Sound name → file reference

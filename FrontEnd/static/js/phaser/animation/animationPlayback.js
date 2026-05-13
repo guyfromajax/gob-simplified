@@ -26,6 +26,7 @@ import { attachBallToPlayer } from "./ballManager.js";
 // the follow callback and the pass renders as a teleport at step end.
 import { detachBall } from "./BallControllerAdapter.js";
 import { createBallTrail } from "./createBallTrail.js";
+import { playGameSfx } from "../utils/gameSfx.js";
 
 // --- Ball-state helpers ----------------------------------------------------
 
@@ -117,29 +118,12 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     // hand). Quality gate uses the same `outlet_score` metadata the trail
     // effect reads, so the audio + visual stay in sync.
     //
-    // We stash the Audio instance on `scene._activeSfx` (a Set) for the
-    // duration of playback. Without a live reference, the browser GCs the
-    // anonymous Audio object mid-clip — only the first few ms play before
-    // it gets reaped. The `ended` / `error` / play-promise handlers all
-    // drop the reference so the Set drains naturally.
     const outletScoreForSfx = step.start?.advance_trigger?.metadata?.outlet_score;
     if (typeof outletScoreForSfx === "number") {
       const sfxFile = outletScoreForSfx >= 50
         ? "outlet-pass-great.wav"
         : "outlet-pass-bad.wav";
-      try {
-        const sfx = new Audio(`/sounds/${sfxFile}`);
-        if (!scene._activeSfx) scene._activeSfx = new Set();
-        scene._activeSfx.add(sfx);
-        const release = () => {
-          if (scene._activeSfx) scene._activeSfx.delete(sfx);
-        };
-        sfx.addEventListener("ended", release, { once: true });
-        sfx.addEventListener("error", release, { once: true });
-        sfx.play().catch(release);
-      } catch (_e) {
-        // Fail-silent — audio is non-critical.
-      }
+      playGameSfx(scene, sfxFile, 0.7, { event: "outlet_pass_release" });
     }
   } else {
     console.log(

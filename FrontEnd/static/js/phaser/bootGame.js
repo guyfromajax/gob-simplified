@@ -7,6 +7,7 @@ import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
 import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
 import { getOrStartFranchiseStartCpuSims } from './utils/franchiseStartCpuSimsClient.js';
+import { preloadGameSfx } from './utils/gameSfx.js';
 
 // API_CONFIG is loaded as a global script, access via window
 const API_CONFIG = window.API_CONFIG;
@@ -1866,6 +1867,7 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
   // Load game plan and playbook settings before starting the game
   await loadGamePlanSettings();
   await loadPlaybookSettings();
+  await preloadGameSfx();
   
   // ✅ REMOVED: Quarter transition debug logging (cluttering console)
   
