@@ -465,6 +465,8 @@ async function runShotAttempt(scene, payload, context) {
   const shotEndPx = gridToPixels(shotEndGrid.x, shotEndGrid.y, width, height);
 
   // Phase 1: ball arcs to its end position (rim for miss, sweet spot for make).
+  const { playShotLaunchSfx, playShotResultSfx } = await import("../utils/gameSfx.js");
+  playShotLaunchSfx(scene, context?.turnData);
   const ballAnim = await import("./ballAnimationSimple.js");
   if (typeof ballAnim.animateShotToRim === "function") {
     await ballAnim.animateShotToRim(scene, shotEndPx, {
@@ -473,6 +475,7 @@ async function runShotAttempt(scene, payload, context) {
       arc: { height: 50 },
     });
   }
+  playShotResultSfx(scene, context?.turnData, result);
 
   // Phase 2: for MISS / BLOCK, bounce to backend-provided bounce coords.
   // Rebounder pickup happens in the next DREB / OREB turn.

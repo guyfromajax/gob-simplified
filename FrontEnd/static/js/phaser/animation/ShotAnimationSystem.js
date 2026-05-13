@@ -25,6 +25,7 @@ import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { runPass } from './ballTween.js';
+import { playShotLaunchSfx, playShotResultSfx } from '../utils/gameSfx.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -824,6 +825,7 @@ export class ShotAnimationSystem {
     
     // Animate ball flight
     await this.animateBallFlight(shooterSprite, flightTargetPixels, turnData);
+    playShotResultSfx(this.scene, turnData, turnData.result_type);
   }
 
   /**
@@ -852,6 +854,7 @@ export class ShotAnimationSystem {
       if (ballSprite) {
         ballSprite.setVisible(true);
       }
+      playShotLaunchSfx(this.scene, turnData);
 
       // ==================== ANIMATE PLAYERS DURING SHOT ====================
       // getPlayerDuration is already imported at top of file
