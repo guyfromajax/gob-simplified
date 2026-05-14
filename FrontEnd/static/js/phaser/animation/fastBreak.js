@@ -1407,6 +1407,7 @@ async function animateRimRunnerOutletDeniedBeat(
       fromId: passerId,
       toId: recvId,
       easing: "Sine.easeInOut",
+      sfxContext: buildGameplayPassSfxContext(scene, passerId, recvId),
     });
     await new Promise((resolve) => {
       if (scene.time?.delayedCall) scene.time.delayedCall(50, resolve);

@@ -1,4 +1,9 @@
 import { DebugFlags } from '../utils/debugFlags.js';
+import {
+  buildGameplayPassSfxContext,
+  playHcoPassStartSfx,
+  playHcoReceiveSfx,
+} from '../utils/gameSfx.js';
 
 /**
  * HCO Animation System
@@ -256,8 +261,16 @@ export class HCOAnimationSystem {
   async executeOutletPass(passerSprite, receiverSprite, turnData) {
     console.log('🎬 Executing outlet pass from rebounder to PG');
     return new Promise((resolve) => {
+      const passerId = this.findSpriteId(passerSprite);
+      const receiverId = this.findSpriteId(receiverSprite);
+      const sfxContext =
+        passerId && receiverId
+          ? buildGameplayPassSfxContext(this.scene, passerId, receiverId)
+          : null;
+
       // Detach ball from passer
       this.ballController.detachFromPlayer('outlet_pass', { keepVisible: true });
+      playHcoPassStartSfx(this.scene, sfxContext);
       console.log('🎬 Ball detached from rebounder');
       
       // Start ball flight
@@ -278,6 +291,7 @@ export class HCOAnimationSystem {
         onComplete: () => {
           // Attach ball to receiver
           this.ballController.endFlight(receiverSprite);
+          playHcoReceiveSfx(this.scene, sfxContext);
           console.log('🎬 Outlet pass completed - ball attached to PG');
           resolve();
         },
@@ -286,6 +300,18 @@ export class HCOAnimationSystem {
         }
       });
     });
+  }
+
+  findSpriteId(targetSprite) {
+    if (!targetSprite) return null;
+    if (targetSprite.playerId != null) return String(targetSprite.playerId);
+    if (targetSprite.id != null && this.playerSprites?.[String(targetSprite.id)] === targetSprite) {
+      return String(targetSprite.id);
+    }
+    for (const [playerId, sprite] of Object.entries(this.playerSprites || {})) {
+      if (sprite === targetSprite) return String(playerId);
+    }
+    return null;
   }
 
   /**

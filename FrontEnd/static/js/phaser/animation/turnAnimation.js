@@ -2188,7 +2188,8 @@ async function runDefensiveReboundSetup({
       await handlePassAnimation({
         scene,
         passInfo,
-        playerSprites
+        playerSprites,
+        enablePassSfx: true
       });
       drebOutletObserved.authorizingEventReceived = true;
       outletPassFired = true;
