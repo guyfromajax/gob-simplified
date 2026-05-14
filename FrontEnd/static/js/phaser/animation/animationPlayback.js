@@ -179,6 +179,52 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
   }
 }
 
+function resolveScenePlayerRef(scene, rawId) {
+  if (!scene || rawId == null) return { id: null, sprite: null, info: null };
+  const sid = String(rawId);
+  const playerSprites = scene.playerSprites || {};
+  const playerInfo = scene.playerInfo || {};
+
+  if (playerSprites[sid] || playerInfo[sid]) {
+    return { id: sid, sprite: playerSprites[sid] || null, info: playerInfo[sid] || null };
+  }
+
+  for (const [playerId, sprite] of Object.entries(playerSprites)) {
+    if (!sprite) continue;
+    if (String(sprite.playerId ?? sprite.id ?? "") === sid) {
+      return { id: String(playerId), sprite, info: playerInfo[playerId] || null };
+    }
+  }
+
+  return { id: sid, sprite: null, info: null };
+}
+
+function enrichStepAnnouncementPlayerData(scene, playerData) {
+  if (!playerData?.playerId) return playerData || null;
+  const ref = resolveScenePlayerRef(scene, playerData.playerId);
+  const resolvedId = ref.id || String(playerData.playerId);
+  return {
+    ...playerData,
+    playerId: resolvedId,
+    photo: playerData.photo || ref.sprite?.photo || ref.info?.photo || null,
+    name: playerData.name || ref.info?.name || ref.sprite?.name || "",
+    jersey:
+      playerData.jersey ??
+      ref.info?.jersey ??
+      ref.info?.jerseyNumber ??
+      ref.info?.jersey_number ??
+      ref.sprite?.jersey ??
+      "",
+    position:
+      playerData.position ||
+      ref.info?.position ||
+      ref.info?.primary_position ||
+      ref.info?.pos ||
+      ref.sprite?.position ||
+      "",
+  };
+}
+
 
 /**
  * Run an in-step announcement: pause clocks, show announcement, await hold,
@@ -195,10 +241,11 @@ async function runStepAnnouncement(scene, announcement) {
   scene.shotClock?.pause?.(reason);
   try {
     const { showAnnouncement } = await import("../utils/announcements.js");
+    const playerData = enrichStepAnnouncementPlayerData(scene, announcement.player_data);
     showAnnouncement(
       announcement.text,
       announcement.team || "neutral",
-      announcement.player_data || null,
+      playerData,
       announcement.meta || null,
     );
   } catch (err) {

@@ -1086,6 +1086,12 @@ def _build_nice_stop_announcement(
             "photo": getattr(stopper, "photo", None),
             "teamName": None,  # populated client-side from team lookup
         }
+    elif stopper_id:
+        player_data = {
+            "playerId": str(stopper_id),
+            "photo": None,
+            "teamName": None,
+        }
     return {
         "text": text,
         "team": "defense",
