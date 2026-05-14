@@ -300,9 +300,18 @@ function pickRandomCourtEventFile(files) {
   return files[Math.floor(Math.random() * files.length)];
 }
 
+const ONCE_PER_TURN_SECONDARY_HEADLINES = new Set(["Press!", "Trap!", "Fast Break!"]);
+let secondaryCourtEventSfxPlayedThisTurn = new Set();
+
+/** Reset Press / Trap / Fast Break secondary stingers for a new turn. */
+export function resetSecondaryAnnounceCourtSfxDedup() {
+  secondaryCourtEventSfxPlayedThisTurn = new Set();
+}
+
 /**
  * Secondary-announcement court stingers (Sound_Design_Update.md — Court Event SFX).
- * One play per showSecondaryAnnouncement call for mapped headlines only.
+ * Press!, Trap!, and Fast Break! play at most once per turn; other mapped headlines
+ * still fire on every matching showSecondaryAnnouncement call.
  */
 export function playSecondaryAnnounceCourtSfx(scene, headline) {
   const text = String(headline || "").trim();
@@ -328,6 +337,10 @@ export function playSecondaryAnnounceCourtSfx(scene, headline) {
       break;
     default:
       return;
+  }
+  if (ONCE_PER_TURN_SECONDARY_HEADLINES.has(text)) {
+    if (secondaryCourtEventSfxPlayedThisTurn.has(text)) return;
+    secondaryCourtEventSfxPlayedThisTurn.add(text);
   }
   playGameSfx(scene, filename, DEFAULT_VOLUME, { event: "court_event_sfx", headline: text });
 }

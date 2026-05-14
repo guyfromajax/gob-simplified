@@ -14,6 +14,7 @@ import { updatePlaycallCenter } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { syncSpriteAttributesFromPlayerEnergy } from "../utils/syncPlayerSpriteAttributes.js";
 import { isBonusFreeThrowFoulTurn } from "../utils/foulAnnouncementClassifier.js";
+import { resetSecondaryAnnounceCourtSfxDedup } from "../utils/gameSfx.js";
 import {
   getBallController,
   getCurrentOwner,
@@ -71,6 +72,7 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   
   // Set turn.index (required for context)
   turn.index = turnIndex;
+  resetSecondaryAnnounceCourtSfxDedup();
 
   // Steal ownership continuity probe (next turn start).
   // If a previous STEAL turn saved a checkpoint, compare owner continuity before this turn runs.
