@@ -2287,8 +2287,7 @@ export class ShotAnimationSystem {
     // rattles immediately. Misses: leave ball where it is — the standard miss
     // path's animateBallBounce will pick up from here.
     if (turnData.result_type === 'MAKE') {
-      const swishFile = Math.random() < 0.5 ? 'swish.wav' : 'swish-2.wav';
-      playGameSfx(this.scene, swishFile, undefined, {
+      playGameSfx(this.scene, 'swish.wav', undefined, {
         event: 'shot_result',
         result: 'MAKE',
         variant,

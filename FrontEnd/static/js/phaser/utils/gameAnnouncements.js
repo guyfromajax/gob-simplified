@@ -18,7 +18,7 @@ import {
   playAnnouncementSfx,
   getFastBreakPlayLabel,
 } from './announcements.js';
-import { playBlockAnnounceCourtSfx } from './gameSfx.js';
+import { playBlockAnnounceCourtSfx, playChargeAnnounceCourtSfx } from './gameSfx.js';
 import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
@@ -374,6 +374,7 @@ function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
   }
 
   playAnnouncementSfx('foul');
+  playChargeAnnounceCourtSfx(scene);
   showAnnouncement("CHARGE!", defenseTeam, playerData);
 
 }

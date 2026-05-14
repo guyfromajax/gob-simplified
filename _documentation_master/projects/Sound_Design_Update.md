@@ -99,7 +99,7 @@ Court event stingers are **in scope** for the secondary announcement ribbon and 
 **Block Announce**
 
 - Trigger: immediately when the **Block** announce appears.
-- File: `inside-shot-weak.wav`
+- File: `duke-its-blocked.wav`
 
 **Opening Tip SFX**
 
@@ -120,6 +120,22 @@ Court event stingers are **in scope** for the secondary announcement ribbon and 
 
 - Trigger: immediately when the ball attaches to teh stealer's sprite.
 - File: **33/33/34** random each show — `sammy-steal.wav` or `braddock-steal.wav` or `butler-steal.wav`
+
+**Charge Announce**
+
+- Trigger: immediately when the Charge Announce appears.
+- File: `duke-charging.wav`
+
+**FB Defensive Stop Announce**
+
+- Trigger: immediately when the Great Stop! Announce appears.
+- File: `duke-great-stop.wav`
+
+**FB Oulet Denied Announce**
+
+- Trigger: immediately when the FB Outlet Denied Announce appears.
+- File: `duke-denied.wav`
+
 
 
 
@@ -205,20 +221,20 @@ Unless noted, the ball is visible throughout all sub-steps; existing post-resolu
 
 `Swish` and `Clank` are the same animation family ("clean rim approach") — the SFX differs purely by outcome. Same for the Backboard family (`BOB+S` on make / `BOB+R` on miss).
 
-When two filenames are listed for a slot (e.g. `swish.wav` / `swish-2.wav`), the file is chosen 50/50 at play time for variety.
+When two filenames are listed for a slot (e.g. `bb-clank.wav` / `bb-clank-2.wav`), the file is chosen 50/50 at play time for variety.
 
 | Variant | Make SFX | Make Animation | Miss SFX | Miss Animation |
 |---|---|---|---|---|
-| Swish / Clank | `swish.wav` / `swish-2.wav` (50/50) | MADE_SHOT_SWEET_SPOT | `clank.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
-| Back of Rim (BOR) | `back-of-rim.wav`, then `swish.wav` / `swish-2.wav` 150 ms later | MADE_SHOT_SWEET_SPOT | `back-of-rim.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
-| Little Rattle | `rattle-leather.wav` × 2 hops, then `swish.wav` / `swish-2.wav` follow-up | LITTLE RATTLE → make resolve | `rattle-leather.wav` × 2 hops | LITTLE RATTLE → miss resolve |
-| Normal Rattle | `rattle-leather.wav` × 4 hops, then `swish.wav` / `swish-2.wav` follow-up | NORMAL RATTLE → make resolve | `rattle-leather.wav` × 4 hops | NORMAL RATTLE → miss resolve |
-| Heavy Rattle | `rattle-leather.wav` × 8 hops, then `swish.wav` / `swish-2.wav` follow-up | HEAVY RATTLE → make resolve | `rattle-leather.wav` × 8 hops | HEAVY RATTLE → miss resolve |
+| Swish / Clank | `swish.wav` | MADE_SHOT_SWEET_SPOT | `clank.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
+| Back of Rim (BOR) | `back-of-rim.wav`, then `swish.wav` 150 ms later | MADE_SHOT_SWEET_SPOT | `back-of-rim.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
+| Little Rattle | `rattle-leather.wav` × 2 hops, then `swish.wav` follow-up | LITTLE RATTLE → make resolve | `rattle-leather.wav` × 2 hops | LITTLE RATTLE → miss resolve |
+| Normal Rattle | `rattle-leather.wav` × 4 hops, then `swish.wav` follow-up | NORMAL RATTLE → make resolve | `rattle-leather.wav` × 4 hops | NORMAL RATTLE → miss resolve |
+| Heavy Rattle | `rattle-leather.wav` × 8 hops, then `swish.wav` follow-up | HEAVY RATTLE → make resolve | `rattle-leather.wav` × 8 hops | HEAVY RATTLE → miss resolve |
 | Bank Off Backboard | `bb-rim-swish.wav` | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
 | Airball | — | — | `airball.wav` | AIRBALL → OOB (no rebound, → BIP) |
 
 **SFX timing notes**
 
-- **Rattle SFX**: one `rattle-leather.wav` play fires at the start of each hop (40 ms apart). For make rattles, a `swish.wav` / `swish-2.wav` plays immediately after the last hop, overlapping the 150 ms settle tween to MSSS.
-- **BOR make follow-up**: `swish.wav` / `swish-2.wav` plays 150 ms after `back-of-rim.wav` — long enough to read as "rim → through the net," short enough to feel like one event. Knob: `BOR_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
+- **Rattle SFX**: one `rattle-leather.wav` play fires at the start of each hop (40 ms apart). For make rattles, `swish.wav` plays immediately after the last hop, overlapping the 150 ms settle tween to MSSS.
+- **BOR make follow-up**: `swish.wav` plays 150 ms after `back-of-rim.wav` — long enough to read as "rim → through the net," short enough to feel like one event. Knob: `BOR_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
 - **All other variants**: SFX fires at ball-flight `onComplete` (the moment the ball lands at its variant-specific flight target).

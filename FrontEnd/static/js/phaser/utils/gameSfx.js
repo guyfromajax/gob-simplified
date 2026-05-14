@@ -19,7 +19,6 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "attack-shot-strong.wav",
   "shot-standard.wav",
   "swish.wav",
-  "swish-2.wav",
   "clank.wav",
   "back-of-rim.wav",
   "rattle-leather.wav",
@@ -44,6 +43,10 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "sammy-steal.wav",
   "braddock-steal.wav",
   "butler-steal.wav",
+  "duke-its-blocked.wav",
+  "duke-charging.wav",
+  "duke-great-stop.wav",
+  "duke-denied.wav",
 ]);
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
@@ -271,7 +274,7 @@ const SHOT_RESULT_SFX_DRIVEN_BY_ANIMATION = new Set([
 function pickShotResultSfxFilename(variant, normalizedResult) {
   switch (variant) {
     case "SWISH":
-      return Math.random() < 0.5 ? "swish.wav" : "swish-2.wav";
+      return "swish.wav";
     case "CLANK":
       return "clank.wav";
     case "BACK_OF_RIM":
@@ -309,9 +312,8 @@ export function playShotResultSfx(scene, turnData, result) {
   });
 
   if (variant === "BACK_OF_RIM" && normalizedResult === "MAKE") {
-    const followup = Math.random() < 0.5 ? "swish.wav" : "swish-2.wav";
     setTimeout(() => {
-      playGameSfx(scene, followup, DEFAULT_VOLUME, {
+      playGameSfx(scene, "swish.wav", DEFAULT_VOLUME, {
         event: "shot_result",
         result: normalizedResult,
         variant,
@@ -453,7 +455,22 @@ export function playDefenseMatchupModalCourtSfx(scene) {
 
 /** Primary BLOCK! announcement stinger (normal block card only). */
 export function playBlockAnnounceCourtSfx(scene) {
-  playGameSfx(scene, "inside-shot-weak.wav", DEFAULT_VOLUME, { event: "block_announce" });
+  playGameSfx(scene, "duke-its-blocked.wav", DEFAULT_VOLUME, { event: "block_announce" });
+}
+
+/** CHARGE! announcement stinger. */
+export function playChargeAnnounceCourtSfx(scene) {
+  playGameSfx(scene, "duke-charging.wav", DEFAULT_VOLUME, { event: "charge_announce" });
+}
+
+/** Fast Break "Great Stop!" announcement stinger. */
+export function playFBDefensiveStopCourtSfx(scene) {
+  playGameSfx(scene, "duke-great-stop.wav", DEFAULT_VOLUME, { event: "fb_defensive_stop" });
+}
+
+/** Fast Break "FB Outlet Pass Denied!" announcement stinger. */
+export function playFBOutletDeniedCourtSfx(scene) {
+  playGameSfx(scene, "duke-denied.wav", DEFAULT_VOLUME, { event: "fb_outlet_denied" });
 }
 
 if (typeof window !== "undefined") {

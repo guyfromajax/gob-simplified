@@ -20,7 +20,7 @@ import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, playStealSfx } from "../utils/gameSfx.js";
+import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, playStealSfx, playFBDefensiveStopCourtSfx, playFBOutletDeniedCourtSfx } from "../utils/gameSfx.js";
 import * as fastBreakConstants from "../constants/fastBreakConstants.js";
 
 const {
@@ -1324,8 +1324,10 @@ async function animateRimRunnerOutletDeniedBeat(
           secondaryColor: getSecondaryColorForTeam(scene, defSprite.team_id),
         }
       : null;
+    playFBOutletDeniedCourtSfx(scene);
     showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData);
   } else {
+    playFBOutletDeniedCourtSfx(scene);
     showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, null);
   }
 
@@ -3920,6 +3922,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   if (turnData.fast_break === true && turnData.stopper_id) {
     const { showSecondaryAnnouncement, buildSecondaryStopperPlayerData } = await import('../utils/announcements.js');
     const stopperPlayerData = buildSecondaryStopperPlayerData(scene, turnData.stopper_id, playerSprites);
+    playFBDefensiveStopCourtSfx(scene);
     showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData, { scene });
 
     const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
