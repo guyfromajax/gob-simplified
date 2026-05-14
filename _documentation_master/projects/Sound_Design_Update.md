@@ -230,7 +230,7 @@ When two filenames are listed for a slot (e.g. `swish.wav` / `swish-2.wav`), the
 | Little Rattle | `rattle-leather.wav` × 2 hops, then `swish.wav` / `swish-2.wav` follow-up | LITTLE RATTLE → make resolve | `rattle-leather.wav` × 2 hops | LITTLE RATTLE → miss resolve |
 | Normal Rattle | `rattle-leather.wav` × 4 hops, then `swish.wav` / `swish-2.wav` follow-up | NORMAL RATTLE → make resolve | `rattle-leather.wav` × 4 hops | NORMAL RATTLE → miss resolve |
 | Heavy Rattle | `rattle-leather.wav` × 8 hops, then `swish.wav` / `swish-2.wav` follow-up | HEAVY RATTLE → make resolve | `rattle-leather.wav` × 8 hops | HEAVY RATTLE → miss resolve |
-| Bank Off Backboard | `bb-rim-swish.wav` / `bb-swish.wav` (50/50) | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
+| Bank Off Backboard | `bb-rim-swish.wav` | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
 | Airball | — | — | `airball.wav` | AIRBALL → OOB (no rebound, → BIP) |
 
 **SFX timing notes**

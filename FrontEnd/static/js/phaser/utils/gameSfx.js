@@ -273,7 +273,7 @@ function pickShotResultSfxFilename(variant, normalizedResult) {
     case "BACK_OF_RIM":
       return "back-of-rim.wav";
     case "BANK_MAKE":
-      return Math.random() < 0.5 ? "bb-rim-swish.wav" : "bb-swish.wav";
+      return "bb-rim-swish.wav";
     case "BANK_MISS":
       return Math.random() < 0.5 ? "bb-clank.wav" : "bb-clank-2.wav";
     case "AIRBALL":
