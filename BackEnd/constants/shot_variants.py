@@ -183,11 +183,36 @@ def select_shot_variant(shot_score, shot_threshold, shot_type, made, rng=None):
     return rng.choices(variants, weights=weights, k=1)[0]
 
 
-def roll_shot_variant_extras(variant, rng=None):
+def _backboard_y_offset(shooter_y, rng):
+    """Bank y point is biased by the shooter's vertical position so the ball
+    banks toward the side of the backboard near the shooter's lane.
+
+    Boundaries match the brief: the first branch uses strict `<` / `>` and the
+    elif chain covers everything else exhaustively.
+    """
+    if shooter_y is None:
+        raise ValueError(
+            "roll_shot_variant_extras: shooter_y is required for Bank Off "
+            "Backboard variants (BANK_MAKE / BANK_MISS)."
+        )
+    if 22 < shooter_y < 28:
+        return rng.randint(-1, 1)
+    if shooter_y > 27:
+        return rng.randint(0, 3)
+    if shooter_y < 23:
+        return rng.randint(-3, 0)
+    # Unreachable given the three branches above are exhaustive for all reals,
+    # but guard anyway so a future edit can't silently drop a case.
+    raise ValueError(f"_backboard_y_offset: shooter_y={shooter_y!r} fell through")
+
+
+def roll_shot_variant_extras(variant, shooter_y=None, rng=None):
     """Roll variant-specific sub-parameters for replay determinism.
 
-    Returns a flat dict suitable for stamping onto the result payload;
-    empty when the variant has no extras.
+    `shooter_y` is required for the Bank Off Backboard variants — pass the
+    shooter's grid y (e.g. from `_shooter_xy_from_roles`). Returns a flat dict
+    suitable for stamping onto the result payload; empty when the variant has
+    no extras.
     """
     rng = rng or random
 
@@ -198,11 +223,11 @@ def roll_shot_variant_extras(variant, rng=None):
         }
     if variant == SHOT_VARIANT_BANK_MAKE:
         return {
-            "shot_variant_backboard_y_offset": rng.randint(-4, 4),
+            "shot_variant_backboard_y_offset": _backboard_y_offset(shooter_y, rng),
         }
     if variant == SHOT_VARIANT_BANK_MISS:
         return {
-            "shot_variant_backboard_y_offset": rng.randint(-4, 4),
+            "shot_variant_backboard_y_offset": _backboard_y_offset(shooter_y, rng),
             "shot_variant_backboard_miss_rim_offset_x": rng.randint(-1, 1),
             "shot_variant_backboard_miss_rim_offset_y": rng.randint(-1, 1),
         }

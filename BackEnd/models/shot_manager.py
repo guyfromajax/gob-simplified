@@ -1938,7 +1938,7 @@ class ShotManager:
                 shot_type=shot_type,
                 made=made,
             )
-            shot_variant_extras = roll_shot_variant_extras(shot_variant)
+            shot_variant_extras = roll_shot_variant_extras(shot_variant, shooter_y=sy)
 
         result.update({
             "result_type": "MAKE" if made else ("BLOCK" if is_block_outcome else "MISS"),

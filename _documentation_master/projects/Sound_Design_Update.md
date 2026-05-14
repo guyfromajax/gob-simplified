@@ -205,9 +205,15 @@ Unless noted, the ball is visible throughout all sub-steps; existing post-resolu
     - **Hop timing:** 40 ms per hop, linear.
     - **Resolve.** Make → smooth tween to MADE_SHOT_SWEET_SPOT. Miss → smooth tween to the standard bounce spot, then standard rebound resolution.
 
-- **BACKBOARD-MAKE.** Ball flight terminates at the bank point: `x = MSSS_x + 3` home / `MSSS_x - 3` away; `y = MSSS_y + random.randint(-4, 4)`. Then a ~250 ms tween to MADE_SHOT_SWEET_SPOT.
+- **BACKBOARD-MAKE.** Ball flight terminates at the bank point: `x = MSSS_x + 3` home / `MSSS_x - 3` away. Bank `y` is biased by the shooter's grid y so the ball banks toward the side of the backboard near the shooter's lane:
 
-- **BACKBOARD-MISS.** Three stages: (1) flight to bank point (same formula as Backboard-Make); (2) ~200 ms tween to rim-graze point at `x = MSSS_x + random.randint(-1, 1)`, `y = MSSS_y + random.randint(-1, 1)`; (3) standard bounce-spot + rebound resolution.
+    - `22 < shooter_y < 28` (center): `bank_y = MSSS_y + random.randint(-1, 1)`
+    - `shooter_y > 27` (upper side): `bank_y = MSSS_y + random.randint(0, 3)`
+    - `shooter_y < 23` (lower side): `bank_y = MSSS_y + random.randint(-3, 0)`
+
+    Boundary semantics: the first branch uses strict `<` / `>`. The elif chain covers everything else exhaustively (e.g. `y=22` → lower; `y=28` → upper; `y=23`, `y=27` → center). Then a ~250 ms tween to MADE_SHOT_SWEET_SPOT.
+
+- **BACKBOARD-MISS.** Three stages: (1) flight to bank point (same `x` and shooter-y-conditional `y` formula as Backboard-Make); (2) ~200 ms tween to rim-graze point at `x = MSSS_x + random.randint(-1, 1)`, `y = MSSS_y + random.randint(-1, 1)`; (3) standard bounce-spot + rebound resolution.
 
 - **AIRBALL** (Miss only). Ball flight terminates **2 grid units short** of MADE_SHOT_SWEET_SPOT — at `(88, 25)` home / `(12, 25)` away. Then the ball continues to the OOB resting point at `(97, 25)` home / `(3, 25)` away. **No rebound attempt.** Possession changes to the defense, and the next step is **BIP** (this deviates from the normal dead-ball turnover progression, which goes to SIP).
 
@@ -215,12 +221,20 @@ Unless noted, the ball is visible throughout all sub-steps; existing post-resolu
 
 `Swish` and `Clank` are the same animation family ("clean rim approach") — the SFX differs purely by outcome. Same for the Backboard family (`BOB+S` on make / `BOB+R` on miss).
 
+When two filenames are listed for a slot (e.g. `swish.wav` / `swish-2.wav`), the file is chosen 50/50 at play time for variety.
+
 | Variant | Make SFX | Make Animation | Miss SFX | Miss Animation |
 |---|---|---|---|---|
-| Swish / Clank | `swish.wav` or `swish-2.wav` | MADE_SHOT_SWEET_SPOT | `clank.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
-| Back of Rim (BOR) | `back-of-rim.wav` | MADE_SHOT_SWEET_SPOT | `back-of-rim.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
-| Little Rattle | `rattle-leather.wav` (quick 2×) | LITTLE RATTLE → make resolve | `rattle-leather.wav` (quick 2×) | LITTLE RATTLE → miss resolve |
-| Normal Rattle | `rattle-leather.wav` (quick 4×) | NORMAL RATTLE → make resolve | `rattle-leather.wav` (quick 4×) | NORMAL RATTLE → miss resolve |
-| Heavy Rattle | `rattle-leather.wav` (quick 8×) | HEAVY RATTLE → make resolve | `rattle-leather.wav` (quick 8×) | HEAVY RATTLE → miss resolve |
-| Bank Off Backboard | `bb-rim-swish.wav` or `bb-swish.wav` | BACKBOARD-MAKE | `bb-clank.wav` or `bb-clank-2.wav` | BACKBOARD-MISS |
+| Swish / Clank | `swish.wav` / `swish-2.wav` (50/50) | MADE_SHOT_SWEET_SPOT | `clank.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
+| Back of Rim (BOR) | `back-of-rim.wav`, then `swish.wav` / `swish-2.wav` 150 ms later | MADE_SHOT_SWEET_SPOT | `back-of-rim.wav` | HOME_RIM_COORDS / AWAY_RIM_COORDS |
+| Little Rattle | `rattle-leather.wav` × 2 hops, then `swish.wav` / `swish-2.wav` follow-up | LITTLE RATTLE → make resolve | `rattle-leather.wav` × 2 hops | LITTLE RATTLE → miss resolve |
+| Normal Rattle | `rattle-leather.wav` × 4 hops, then `swish.wav` / `swish-2.wav` follow-up | NORMAL RATTLE → make resolve | `rattle-leather.wav` × 4 hops | NORMAL RATTLE → miss resolve |
+| Heavy Rattle | `rattle-leather.wav` × 8 hops, then `swish.wav` / `swish-2.wav` follow-up | HEAVY RATTLE → make resolve | `rattle-leather.wav` × 8 hops | HEAVY RATTLE → miss resolve |
+| Bank Off Backboard | `bb-rim-swish.wav` / `bb-swish.wav` (50/50) | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
 | Airball | — | — | `airball.wav` | AIRBALL → OOB (no rebound, → BIP) |
+
+**SFX timing notes**
+
+- **Rattle SFX**: one `rattle-leather.wav` play fires at the start of each hop (40 ms apart). For make rattles, a `swish.wav` / `swish-2.wav` plays immediately after the last hop, overlapping the 150 ms settle tween to MSSS.
+- **BOR make follow-up**: `swish.wav` / `swish-2.wav` plays 150 ms after `back-of-rim.wav` — long enough to read as "rim → through the net," short enough to feel like one event. Knob: `BOR_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
+- **All other variants**: SFX fires at ball-flight `onComplete` (the moment the ball lands at its variant-specific flight target).
