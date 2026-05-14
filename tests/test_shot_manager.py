@@ -173,6 +173,9 @@ def test_putback_event_payload_and_possession(monkeypatch, made, def_reb, expect
     assert event["event_type"] == "PUTBACK_ATTEMPT"
     assert event["result"] == ("MAKE" if made else "MISS")
     assert event["possession_flips"] is expected_flip
+    assert event.get("shot_type") == "inside"
+    assert isinstance(event.get("shot_score_pre_defense"), (int, float))
+    assert event["sfx"]["shot_score_pre_defense"] == event["shot_score_pre_defense"]
     base_keys = {"event_type", "shooterId", "timeElapsed", "result", "possession_flips"}
     if made:
         base_keys.add("points")

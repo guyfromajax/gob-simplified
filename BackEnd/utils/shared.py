@@ -934,22 +934,31 @@ def resolve_offensive_rebound(game, rebounder):
         foul_player = None
         made = False
         contested = bool(has_shot_defender and defender is not None)
+        shot_type = "inside"
+        shot_score_pre_defense = 0
+        shot_defense_score_for_sfx = 0
+        defense_playcall = (
+            game_state.get("defense_playcall")
+            or game_state.get("defense_call")
+            or "man"
+        )
 
         if contested:
             from BackEnd.models.shot_manager import ShotManager
 
             shot_manager = ShotManager(game)
-            defense_playcall = (
-                game_state.get("defense_playcall")
-                or game_state.get("defense_call")
-                or "man"
-            )
-            shot_score, _, __, d_foul, foul_player = shot_manager.calculate_shot_score(
+            (
+                shot_score,
+                shot_score_pre_defense,
+                shot_defense_score_for_sfx,
+                d_foul,
+                foul_player,
+            ) = shot_manager.calculate_shot_score(
                 rebounder,
                 None,
                 None,
                 defender,
-                "inside",
+                shot_type,
                 defense_playcall,
                 False,
                 True,
@@ -961,6 +970,28 @@ def resolve_offensive_rebound(game, rebounder):
             shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, game)
             made = shot_score >= shot_threshold
         else:
+            from BackEnd.models.shot_manager import ShotManager
+
+            shot_manager = ShotManager(game)
+            (
+                _,
+                shot_score_pre_defense,
+                shot_defense_score_for_sfx,
+                _,
+                _,
+            ) = shot_manager.calculate_shot_score(
+                rebounder,
+                None,
+                None,
+                None,
+                shot_type,
+                defense_playcall,
+                False,
+                True,
+                None,
+                "oreb_putback",
+                apply_defense=False,
+            )
             made = random.randint(1, 100) < 100
 
         if not contested:
@@ -981,6 +1012,14 @@ def resolve_offensive_rebound(game, rebounder):
             "possession_flips": False,
             "position_snapshots": [oreb_putback_snap],
             "contested": contested,
+            "shot_type": shot_type,
+            "shot_score_pre_defense": shot_score_pre_defense,
+            "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            "sfx": {
+                "shot_type": shot_type,
+                "shot_score_pre_defense": shot_score_pre_defense,
+                "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            },
         }
 
         if made:

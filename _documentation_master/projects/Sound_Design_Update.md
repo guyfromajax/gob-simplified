@@ -38,7 +38,7 @@ SFX Direction
 - Score source: `shot_score_pre_defense`.
 - `< 101`: `three-weak.wav`
 - `> 210`: `three-strong.wav`
-- Else: `attack-shot-strong.wav`
+- Else: `attack-shot-medium.wav`
 
 
 ## Gameplay Pass SFX

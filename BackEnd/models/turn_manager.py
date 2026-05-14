@@ -66,6 +66,28 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 
+
+def attach_putback_shot_sfx_fields(turn_payload, oreb_event):
+    """Mirror HCO shot SFX metadata on OREB putback turns for launch stingers."""
+    if not isinstance(turn_payload, dict) or not isinstance(oreb_event, dict):
+        return
+    if oreb_event.get("event_type") != "PUTBACK_ATTEMPT":
+        return
+    pre_defense = oreb_event.get("shot_score_pre_defense")
+    if pre_defense is None:
+        return
+    shot_type = oreb_event.get("shot_type") or "inside"
+    defense_sfx = oreb_event.get("shot_defense_score_for_sfx", 0)
+    turn_payload["shot_type"] = shot_type
+    turn_payload["shot_score_pre_defense"] = pre_defense
+    turn_payload["shot_defense_score_for_sfx"] = defense_sfx
+    turn_payload["sfx"] = {
+        "shot_type": shot_type,
+        "shot_score_pre_defense": pre_defense,
+        "shot_defense_score_for_sfx": defense_sfx,
+    }
+
+
 class TurnManager:
     def __init__(self, game_manager: "GameManager"):
         self.game = game_manager
@@ -3592,6 +3614,7 @@ class TurnManager:
                         pm["foul_count"] = oreb_event.get("foul_count")
                 if oreb_event.get("position_snapshots"):
                     pm["position_snapshots"] = oreb_event["position_snapshots"]
+                attach_putback_shot_sfx_fields(pm, oreb_event)
                 return pm
             else:
                 # Putback missed - check for rebound
@@ -3748,6 +3771,7 @@ class TurnManager:
                 
                 if oreb_event.get("position_snapshots"):
                     result["position_snapshots"] = oreb_event["position_snapshots"]
+                attach_putback_shot_sfx_fields(result, oreb_event)
                 return result
         
         else:

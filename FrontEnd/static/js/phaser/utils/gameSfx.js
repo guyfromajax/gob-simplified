@@ -218,7 +218,7 @@ export function playShotLaunchSfx(scene, turnData) {
       ? "three-weak.wav"
       : preDefense > 210
         ? "three-strong.wav"
-        : "attack-shot-strong.wav";
+        : "attack-shot-medium.wav";
   playGameSfx(scene, filename, DEFAULT_VOLUME, {
     event: "shot_release",
     shotType: shotTypeForSfx(turnData) || null,
