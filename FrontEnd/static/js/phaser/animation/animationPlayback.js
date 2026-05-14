@@ -199,13 +199,30 @@ function resolveScenePlayerRef(scene, rawId, sprites = null) {
   return { id: sid, sprite: null, info: null };
 }
 
-function inferStepAnnouncementPlayerData(announcement, step) {
-  if (announcement?.player_data?.playerId) return announcement.player_data;
+function normalizeAnnouncementPlayerData(playerData) {
+  if (!playerData) return null;
+  const playerId =
+    playerData.playerId ??
+    playerData.player_id ??
+    playerData.id ??
+    playerData._id ??
+    null;
+  return playerId ? { ...playerData, playerId: String(playerId) } : playerData;
+}
+
+function inferStepAnnouncementPlayerData(announcement, step, turnData = null) {
+  const directPlayerData = normalizeAnnouncementPlayerData(
+    announcement?.player_data || announcement?.playerData || null,
+  );
+  if (directPlayerData?.playerId) return directPlayerData;
   const text = String(announcement?.text || "").trim().toLowerCase();
-  if (text !== "nice stop!") return announcement?.player_data || null;
+  if (text !== "nice stop!") return directPlayerData || null;
+  if (turnData?.stopper_id) {
+    return { ...(directPlayerData || {}), playerId: String(turnData.stopper_id) };
+  }
   const actions = step?.start?.action || {};
   const stopperId = Object.entries(actions).find(([, action]) => action === "guard_ball")?.[0];
-  return stopperId ? { ...(announcement?.player_data || {}), playerId: stopperId } : (announcement?.player_data || null);
+  return stopperId ? { ...(directPlayerData || {}), playerId: stopperId } : (directPlayerData || null);
 }
 
 function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
@@ -243,14 +260,14 @@ function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
  * @param {Phaser.Scene} scene
  * @param {import("./animationStepSchema.js").Announcement} announcement
  */
-async function runStepAnnouncement(scene, announcement, sprites = null, step = null) {
+async function runStepAnnouncement(scene, announcement, sprites = null, step = null, turnData = null) {
   if (!scene || !announcement?.text) return;
   const reason = "step_announcement";
   scene.gameClock?.pause?.(reason);
   scene.shotClock?.pause?.(reason);
   try {
     const { showAnnouncement } = await import("../utils/announcements.js");
-    const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step);
+    const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step, turnData);
     const playerData = enrichStepAnnouncementPlayerData(scene, inferredPlayerData, sprites);
     showAnnouncement(
       announcement.text,
@@ -296,7 +313,7 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
  * @param {Phaser.GameObjects.Sprite} [ballSprite]  Required for ball-state-diff rendering.
  * @returns {Promise<import("./animationStepSchema.js").NextStep>}
  */
-export async function playAnimationStep(scene, step, sprites, ballSprite) {
+export async function playAnimationStep(scene, step, sprites, ballSprite, options = {}) {
   if (!scene || !step || !sprites) {
     throw new Error("playAnimationStep: scene, step, and sprites are required");
   }
@@ -312,7 +329,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite) {
 
   // step.start.announcement: play before tweens fire.
   if (step.start?.announcement) {
-    await runStepAnnouncement(scene, step.start.announcement, sprites, step);
+    await runStepAnnouncement(scene, step.start.announcement, sprites, step, options.turnData);
   }
 
   // Spawn one linear tween per player whose start coord differs from end coord.
@@ -370,7 +387,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite) {
 
   // step.end.announcement: play after tweens + snap, before returning next.
   if (step.end?.announcement) {
-    await runStepAnnouncement(scene, step.end.announcement, sprites, step);
+    await runStepAnnouncement(scene, step.end.announcement, sprites, step, options.turnData);
   }
 
   return step.end.next;
@@ -415,7 +432,7 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       throw new Error(`playTurn: missing step at index ${currentIndex}`);
     }
 
-    const next = await playAnimationStep(scene, step, sprites, ballSprite);
+    const next = await playAnimationStep(scene, step, sprites, ballSprite, options);
     if (!next) return null;
 
     if (next.kind === "turn_stop") {

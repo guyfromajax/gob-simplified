@@ -338,6 +338,7 @@ export class AnimationEngine {
           turnData.animation_steps,
           sprites,
           ballSprite,
+          { turnData },
         );
         if (turnStop) {
           await dispatchTurnStop(this.scene, turnStop, {
