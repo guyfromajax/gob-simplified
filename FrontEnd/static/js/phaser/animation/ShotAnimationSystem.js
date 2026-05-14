@@ -2282,9 +2282,17 @@ export class ShotAnimationSystem {
       await this._tweenBallTo(ballSprite, pix, 40, 'Linear');
     }
 
-    // Makes: smooth settle into MSSS. Misses: leave ball where it is — the
-    // standard miss path's animateBallBounce will pick up from here.
+    // Makes: smooth settle into MSSS, with a swish sound that follows the
+    // rattles immediately. Misses: leave ball where it is — the standard miss
+    // path's animateBallBounce will pick up from here.
     if (turnData.result_type === 'MAKE') {
+      const swishFile = Math.random() < 0.5 ? 'swish.wav' : 'swish-2.wav';
+      playGameSfx(this.scene, swishFile, undefined, {
+        event: 'shot_result',
+        result: 'MAKE',
+        variant,
+        followup: 'rattle_swish',
+      });
       const msssPix = gridToPixels(msss.x, msss.y, w, h);
       await this._tweenBallTo(ballSprite, msssPix, 150, 'Quad.easeOut');
     }

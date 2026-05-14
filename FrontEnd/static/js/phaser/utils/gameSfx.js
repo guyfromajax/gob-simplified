@@ -286,6 +286,10 @@ function pickShotResultSfxFilename(variant, normalizedResult) {
   }
 }
 
+// BOR make follows the rim contact with a swish ~150 ms later — long enough
+// to read as "rim → through the net," short enough to feel like one event.
+const BOR_MAKE_SWISH_DELAY_MS = 150;
+
 export function playShotResultSfx(scene, turnData, result) {
   const normalizedResult = normalizeShotResult(result);
   const variant = turnData?.shot_variant || null;
@@ -299,6 +303,18 @@ export function playShotResultSfx(scene, turnData, result) {
     result: normalizedResult,
     variant,
   });
+
+  if (variant === "BACK_OF_RIM" && normalizedResult === "MAKE") {
+    const followup = Math.random() < 0.5 ? "swish.wav" : "swish-2.wav";
+    setTimeout(() => {
+      playGameSfx(scene, followup, DEFAULT_VOLUME, {
+        event: "shot_result",
+        result: normalizedResult,
+        variant,
+        followup: "bor_swish",
+      });
+    }, BOR_MAKE_SWISH_DELAY_MS);
+  }
 }
 
 export function playFreeThrowResultSfx(scene, result) {
