@@ -56,7 +56,7 @@ Status: implemented.
 - `animateBallToPosition()` now supports an `onArrive` marker callback fired inside tween completion before the animation promise resolves.
 - Shot launch SFX for shared shot helpers now fires from `onShotRelease` after ball detachment.
 - Made/missed shot result SFX for shared shot helpers now fires from `onShotArrive` when the ball reaches the rim/sweet spot.
-- Free throw make/miss SFX now fires from `onShotArrive` when the free throw reaches the basket spot.
+- Free throw make/miss SFX now fires when the free throw reaches the basket spot. The active `FreeThrowAnimationSystem` fires inside its manual ball tween `onComplete`; the fallback `freeThrow.js` path fires from `onShotArrive`.
 - `ShotAnimationSystem` has a manual ball tween, so its result SFX now fires inside that tween's `onComplete` instead of after the outer flight promise resolves.
 - Pass/reception SFX already fired from ball detach/arrival in `ballTween.js`; no pass 2 changes were required there.
 

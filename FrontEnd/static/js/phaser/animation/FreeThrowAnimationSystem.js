@@ -21,6 +21,7 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import animationConfig from './animation_config.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
+import { playFreeThrowResultSfx } from '../utils/gameSfx.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -440,6 +441,7 @@ export class FreeThrowAnimationSystem {
         ease: "Sine.easeInOut", // Use same easing as old system
         onComplete: () => {
           this.ballController.endFlight();
+          playFreeThrowResultSfx(this.scene, turnData.actual_result);
           resolve();
         },
         onUpdate: () => {
