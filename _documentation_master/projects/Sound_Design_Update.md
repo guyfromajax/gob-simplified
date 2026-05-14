@@ -9,7 +9,7 @@ SFX Direction
 
 ## Shot Launch SFX
 
-**Outside Shots**
+<!-- **Outside Shots**
 
 - Trigger: at the moment the ball detaches from the shooter sprite.
 - Score source: `shot_score_pre_defense`.
@@ -31,7 +31,15 @@ SFX Direction
 - Score source: `shot_score_pre_defense`.
 - `< 101`: `inside-shot-weak.wav`
 - `> 210`: `inside-shot-strong.wav`
-- Else: `inside-shot-medium.wav`
+- Else: `inside-shot-medium.wav` -->
+
+**All Shot Types (Inside, Attack, Outside)**
+- Trigger: at the moment the ball detaches from the shooter sprite.
+- Score source: `shot_score_pre_defense`.
+- `< 101`: `three-weak.wav`
+- `> 210`: `three-strong.wav`
+- Else: `attack-shot-strong.wav`
+
 
 ## Gameplay Pass SFX
 
@@ -123,3 +131,8 @@ Court event stingers are **in scope** for the secondary announcement ribbon and 
 
 - Trigger: immediately when the **Final Shot** secondary announce appears.
 - File: **50/50** random each show — `sammy-final-shot.mp3` or `final-shot-braddock.mp3`
+
+**Block Announce**
+
+- Trigger: immediately when the **Block** announce appears.
+- File: `inside-shot-weak.wav`

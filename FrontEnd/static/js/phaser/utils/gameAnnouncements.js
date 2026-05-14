@@ -17,6 +17,7 @@ import {
   playAnnouncementSfx,
   getFastBreakPlayLabel,
 } from './announcements.js';
+import { playBlockAnnounceCourtSfx } from './gameSfx.js';
 import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
@@ -294,6 +295,7 @@ function handleBlockAnnouncement(turnData, scene, context) {
     secondaryColor: getSecondaryColorForTeam(scene, blockerSprite.team_id)
   };
 
+  playBlockAnnounceCourtSfx(scene);
   showAnnouncement("BLOCK!", blockerTeam, playerData);
 }
 

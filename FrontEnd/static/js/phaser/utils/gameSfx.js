@@ -210,22 +210,35 @@ function normalizeShotResult(result) {
 }
 
 export function playShotLaunchSfx(scene, turnData) {
-  const shotType = shotTypeForSfx(turnData);
-  if (!["outside", "attack", "inside"].includes(shotType)) return;
-
   const preDefense = toNumber(turnData?.sfx?.shot_score_pre_defense ?? turnData?.shot_score_pre_defense);
   if (preDefense == null) return;
 
-  const tier = preDefense < 101 ? "weak" : preDefense > 210 ? "strong" : "medium";
-  if (shotType === "outside") {
-    playGameSfx(scene, `three-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
-    return;
-  }
-  if (shotType === "attack" && tier !== "weak") {
-    playGameSfx(scene, `attack-shot-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
-    return;
-  }
-  playGameSfx(scene, `inside-shot-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
+  const filename =
+    preDefense < 101
+      ? "three-weak.wav"
+      : preDefense > 210
+        ? "three-strong.wav"
+        : "attack-shot-strong.wav";
+  playGameSfx(scene, filename, DEFAULT_VOLUME, {
+    event: "shot_release",
+    shotType: shotTypeForSfx(turnData) || null,
+    tier: preDefense < 101 ? "weak" : preDefense > 210 ? "strong" : "medium",
+    shot_score_pre_defense: preDefense,
+  });
+
+  // Legacy per-shot-type launch SFX (commented for unified test; may revert).
+  // const shotType = shotTypeForSfx(turnData);
+  // if (!["outside", "attack", "inside"].includes(shotType)) return;
+  // const tier = preDefense < 101 ? "weak" : preDefense > 210 ? "strong" : "medium";
+  // if (shotType === "outside") {
+  //   playGameSfx(scene, `three-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
+  //   return;
+  // }
+  // if (shotType === "attack" && tier !== "weak") {
+  //   playGameSfx(scene, `attack-shot-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
+  //   return;
+  // }
+  // playGameSfx(scene, `inside-shot-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
 }
 
 export function playShotResultSfx(scene, turnData, result) {
@@ -322,6 +335,11 @@ export function playSecondaryAnnounceCourtSfx(scene, headline) {
 /** Defense Matchups modal open stinger (modal open only). */
 export function playDefenseMatchupModalCourtSfx(scene) {
   playGameSfx(scene, "defense-sammy.mp3", DEFAULT_VOLUME, { event: "defense_matchup_modal_open" });
+}
+
+/** Primary BLOCK! announcement stinger (normal block card only). */
+export function playBlockAnnounceCourtSfx(scene) {
+  playGameSfx(scene, "inside-shot-weak.wav", DEFAULT_VOLUME, { event: "block_announce" });
 }
 
 if (typeof window !== "undefined") {
