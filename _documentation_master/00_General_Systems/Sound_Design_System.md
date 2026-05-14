@@ -4,6 +4,8 @@ Sound effects used across the app. Assets live under `FrontEnd/static/sounds/`. 
 
 Gameplay pass, reception, shot-launch, shot-result, free-throw-result, and outlet-pass SFX route through `FrontEnd/static/js/phaser/utils/gameSfx.js`. The manager preloads gameplay SFX before `GameScene` starts, uses small browser-audio pools per file, retains active playback references, and supports debug logging with `window.DEBUG_GAME_SFX = true` or `?debug_sfx=1`.
 
+Shot timing uses animation markers: shared shot helpers fire launch SFX from `onShotRelease` after ball detachment and result SFX from `onShotArrive` when the ball reaches the rim/sweet spot. Free throw result SFX uses the same arrival marker.
+
 ---
 
 ## Sound name → file reference

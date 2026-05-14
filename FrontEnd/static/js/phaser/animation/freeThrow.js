@@ -211,10 +211,10 @@ export async function runFreeThrowSequence(
     await animateShotToRim(scene, rimPx, {
       duration: animationConfig.freeThrow.shotMs,
       easing: "Sine.easeInOut",
-      arc: arcOption
+      arc: arcOption,
+      onShotArrive: () => playFreeThrowResultSfx(scene, result)
     });
 
-    playFreeThrowResultSfx(scene, result);
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
     
     // Announce made free throw

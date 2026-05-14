@@ -194,6 +194,12 @@ function shotTypeForSfx(turnData) {
   return String(turnData?.sfx?.shot_type || turnData?.shot_type || "").toLowerCase();
 }
 
+function normalizeShotResult(result) {
+  if (result === "MAKE" || result === "PUTBACK_MAKE") return "MAKE";
+  if (result === "MISS" || result === "PUTBACK_MISS") return "MISS";
+  return result;
+}
+
 export function playShotLaunchSfx(scene, turnData) {
   const shotType = shotTypeForSfx(turnData);
   if (!["outside", "attack", "inside"].includes(shotType)) return;
@@ -214,13 +220,14 @@ export function playShotLaunchSfx(scene, turnData) {
 }
 
 export function playShotResultSfx(scene, turnData, result) {
-  if (result === "MAKE") {
-    playGameSfx(scene, "swish.wav", DEFAULT_VOLUME, { event: "shot_result", result });
+  const normalizedResult = normalizeShotResult(result);
+  if (normalizedResult === "MAKE") {
+    playGameSfx(scene, "swish.wav", DEFAULT_VOLUME, { event: "shot_result", result: normalizedResult });
     return;
   }
 
-  if (result !== "MISS") return;
-  playGameSfx(scene, "clank.wav", DEFAULT_VOLUME, { event: "shot_result", result });
+  if (normalizedResult !== "MISS") return;
+  playGameSfx(scene, "clank.wav", DEFAULT_VOLUME, { event: "shot_result", result: normalizedResult });
 }
 
 export function playFreeThrowResultSfx(scene, result) {

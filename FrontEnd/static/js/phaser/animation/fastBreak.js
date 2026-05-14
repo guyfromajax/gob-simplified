@@ -2882,13 +2882,13 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
         : basket;
     shotTargetPxWithStopper = gridToPixels(endGrid.x, endGrid.y, width, height);
   }
-  playShotLaunchSfx(scene, turnData);
   await animateShotToRim(scene, shotTargetPxWithStopper, {
     duration: animationConfig.fastBreak?.shotMs ?? 350,
     easing: "Sine.easeInOut",
-    arc: { height: 50 }
+    arc: { height: 50 },
+    onShotRelease: () => playShotLaunchSfx(scene, turnData),
+    onShotArrive: () => playShotResultSfx(scene, turnData, turnData.result_type)
   });
-  playShotResultSfx(scene, turnData, turnData.result_type);
   
   // Stop rebounder animations when ball hits rim (made shot)
   if (turnData.result_type === "MAKE") {
@@ -3203,13 +3203,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     shotTargetPx = gridToPixels(endGrid.x, endGrid.y, width, height);
   }
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
-  playShotLaunchSfx(scene, turnData);
   await animateShotToRim(scene, shotTargetPx, {
     duration: animationConfig.fastBreak?.shotMs ?? 350,
     easing: "Sine.easeInOut",
-    arc: { height: 50 }
+    arc: { height: 50 },
+    onShotRelease: () => playShotLaunchSfx(scene, turnData),
+    onShotArrive: () => playShotResultSfx(scene, turnData, turnData.result_type)
   });
-  playShotResultSfx(scene, turnData, turnData.result_type);
   
   // ✅ Stop rebounder animations when ball hits rim (made shot)
   if (turnData.result_type === "MAKE") {

@@ -254,6 +254,15 @@ function getBallControllerFromScene(scene) {
   }
 }
 
+function fireBallAnimationMarker(callback, markerName) {
+  if (typeof callback !== 'function') return;
+  try {
+    callback();
+  } catch (err) {
+    console.warn(`ballAnimationSimple: ${markerName} marker failed`, err);
+  }
+}
+
 /**
  * Animate ball to a specific position (Step 3 - WIP_GOB approach)
  * 
@@ -268,6 +277,7 @@ function getBallControllerFromScene(scene) {
  * @param {number} options.duration - Duration in ms (if not provided, calculated from distance)
  * @param {string} options.easing - Easing function (default: 'Linear')
  * @param {Object|boolean} options.arc - Arc options: {height: number} or true/false (default: false)
+ * @param {Function} options.onArrive - Optional marker fired when ball reaches the target before the promise resolves
  * @returns {Promise} Resolves when animation completes
  */
 export async function animateBallToPosition(scene, targetPosition, options = {}) {
@@ -276,7 +286,7 @@ export async function animateBallToPosition(scene, targetPosition, options = {})
   }
   
   const ballSprite = scene.ballSprite;
-  const { duration, easing = 'Linear', arc } = options;
+  const { duration, easing = 'Linear', arc, onArrive } = options;
   
   // Calculate duration from distance if not provided
   const calculatedDuration = duration || calculateBallDuration(ballSprite, targetPosition.x, targetPosition.y);
@@ -340,6 +350,7 @@ export async function animateBallToPosition(scene, targetPosition, options = {})
           if (controllerStartedFlight && ballController) {
             ballController.endFlight(null, { keepVisible: true });
           }
+          fireBallAnimationMarker(onArrive, 'onArrive');
           resolve();
         }
       });
@@ -357,6 +368,7 @@ export async function animateBallToPosition(scene, targetPosition, options = {})
           if (controllerStartedFlight && ballController) {
             ballController.endFlight(null, { keepVisible: true });
           }
+          fireBallAnimationMarker(onArrive, 'onArrive');
           resolve();
         }
       });
@@ -464,6 +476,8 @@ export async function animateBallToPlayer(scene, playerSprite, options = {}) {
  * @param {number} options.duration - Duration in ms (if not provided, calculated from distance)
  * @param {string} options.easing - Easing function (default: 'Linear')
  * @param {Object|boolean} options.arc - Arc options: {height: number} or true/false (default: false)
+ * @param {Function} options.onShotRelease - Optional marker fired immediately after ball detaches from shooter
+ * @param {Function} options.onShotArrive - Optional marker fired when ball reaches the rim/target before the promise resolves
  * @returns {Promise} Resolves when animation completes
  */
 export async function animateShotToRim(scene, rimPosition, options = {}) {
@@ -499,10 +513,14 @@ export async function animateShotToRim(scene, rimPosition, options = {}) {
     scene.ballController.isAttached = false;
     // ✅ PHASE 4: Removed old _shotInProgress flag - BallController manages state via lifecycle methods
   }
+
+  fireBallAnimationMarker(options.onShotRelease, 'onShotRelease');
   
   // Animate ball to rim
-  await animateBallToPosition(scene, rimPosition, options);
+  await animateBallToPosition(scene, rimPosition, {
+    ...options,
+    onArrive: options.onShotArrive,
+  });
   
   // ✅ PHASE 4: Removed old flag clearing - BallController manages state via lifecycle methods
 }
-

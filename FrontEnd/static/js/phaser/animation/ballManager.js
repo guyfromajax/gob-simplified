@@ -358,8 +358,6 @@ export async function shootBall({
   
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
-  playShotLaunchSfx(scene, turnData);
-  
   // console.log('🏀 shootBall: Ball positioned and visible', {
   //   position: { x: start.x, y: start.y },
   //   visible: ballSprite.visible,
@@ -467,9 +465,10 @@ export async function shootBall({
       try {
         await animateShotToRim(scene, rimPosition, {
           duration,
-          easing: "Sine.easeInOut"
+          easing: "Sine.easeInOut",
+          onShotRelease: () => playShotLaunchSfx(scene, turnData),
+          onShotArrive: () => playShotResultSfx(scene, turnData, result)
         });
-        playShotResultSfx(scene, turnData, result);
         
         // Handle completion (same logic as before, but now after animateShotToRim completes)
         const actualDuration = Date.now() - tweenStartTime;

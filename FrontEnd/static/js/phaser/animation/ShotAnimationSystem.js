@@ -825,7 +825,6 @@ export class ShotAnimationSystem {
     
     // Animate ball flight
     await this.animateBallFlight(shooterSprite, flightTargetPixels, turnData);
-    playShotResultSfx(this.scene, turnData, turnData.result_type);
   }
 
   /**
@@ -1050,6 +1049,7 @@ export class ShotAnimationSystem {
         duration: this.shotConfig.flightDuration,
         ease: this.shotConfig.flightEase,
         onComplete: () => {
+          playShotResultSfx(this.scene, turnData, turnData.result_type);
           // Ball flight completed - no need to call endFlight since we're managing the tween ourselves
           resolve();
         },
