@@ -264,8 +264,9 @@ export class ShotAnimationSystem {
    * Execute complete shot sequence with player movement
    */
   async executeCompleteShotSequence(turnData) {
+    this._applyDebugVariantOverride(turnData);
     const ballSprite = this.ballController.ballSprite;
-    
+
     // ✅ MATCH playTurnAnimation EXACTLY: Initialize ball holder state
     const { initializeBallHolderState, clearBallHolder } = await import('./ballAnimationSimple.js');
     const { clearPendingOwner } = await import('./BallControllerAdapter.js');
@@ -400,7 +401,13 @@ export class ShotAnimationSystem {
     const rimCoords = (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null)
       ? gridToPixels(turnData.ball_bounce_x, turnData.ball_bounce_y, this.scene.game.config.width, this.scene.game.config.height)
       : this.getRimCoordinates(turnData);
-    
+
+    // Variant-specific intermediate animation (rattle / backboard) between ball flight
+    // landing and the standard make/miss resolution. Skipped for BLOCK.
+    if (!isBlock) {
+      await this.executeShotVariantAnimation(turnData);
+    }
+
     // Execute make or miss handling (BLOCK goes to handleMissedShot)
     if (isMake) {
       await this.handleMadeShot(rimCoords, turnData);
@@ -783,24 +790,14 @@ export class ShotAnimationSystem {
    */
   async handleShotAtStep(shotInfo, turnData) {
     const shooterSprite = this.playerSprites[shotInfo.playerId];
-    // BLOCK: animate ball to block spot instead of rim
-    const isBlock = turnData.result_type === 'BLOCK';
-    const isMake = turnData.result_type === 'MAKE';
-    let flightTargetPixels;
-    if (isBlock && turnData.ball_bounce_x != null && turnData.ball_bounce_y != null) {
-      flightTargetPixels = gridToPixels(
-        turnData.ball_bounce_x,
-        turnData.ball_bounce_y,
-        this.scene.game.config.width,
-        this.scene.game.config.height
-      );
-    } else if (isMake) {
-      const isHomeTeam = shooterSprite?.team === 'home';
-      const g = getMadeShotSweetSpotGrid(isHomeTeam);
-      flightTargetPixels = gridToPixels(g.x, g.y, this.scene.game.config.width, this.scene.game.config.height);
-    } else {
-      flightTargetPixels = this.getRimCoordinates(turnData);
-    }
+    // Variant-aware flight target. BLOCK keeps its existing block-spot path.
+    const flightTargetGrid = this._getShotFlightTargetGrid(turnData);
+    const flightTargetPixels = gridToPixels(
+      flightTargetGrid.x,
+      flightTargetGrid.y,
+      this.scene.game.config.width,
+      this.scene.game.config.height
+    );
     
     // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
     // console.log('🎯 ShotAnimationSystem: Handling shot at step', {
@@ -2056,27 +2053,30 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Calculate bounce coordinates with realistic variance
+   * Calculate bounce coordinates. Backend stamps the canonical bounce spot
+   * on miss-path turns; honor it as the single source of truth so the
+   * rebounder lands where the resolution logic decided.
    */
   calculateBounceCoords(rimCoords, turnData) {
-    // Get shooter sprite to determine which basket
+    if (turnData?.ball_bounce_x != null && turnData?.ball_bounce_y != null) {
+      return gridToPixels(
+        turnData.ball_bounce_x,
+        turnData.ball_bounce_y,
+        this.scene.game.config.width,
+        this.scene.game.config.height
+      );
+    }
+
+    // Fallback (shouldn't happen on standard miss turns) — frontend-rolled
+    // variance preserved so paths without backend coords still animate.
     const shooterSprite = this.getShooterSprite(turnData);
     const isHomeTeam = shooterSprite?.team === 'home';
-    
-    // Convert rim coords back to grid for calculations
     const rimGridX = Math.round(rimCoords.x / (this.scene.game.config.width / 100));
     const rimGridY = Math.round(rimCoords.y / (this.scene.game.config.height / 100));
-    
-    // Y variance: -6 to +6 from basket y coord
-    const yVariance = (Math.random() - 0.5) * 12; // -6 to +6
+    const yVariance = (Math.random() - 0.5) * 12;
     const bounceGridY = rimGridY + yVariance;
-    
-    // X variance: 1-9 from basket x coord
-    // +1 to +9 for away team basket, -1 to -9 for home team basket
-    const xVariance = Math.random() * 9 + 1; // 1 to 9
+    const xVariance = Math.random() * 9 + 1;
     const bounceGridX = isHomeTeam ? rimGridX - xVariance : rimGridX + xVariance;
-    
-    // Convert back to pixel coordinates
     const bounceX = bounceGridX * (this.scene.game.config.width / 100);
     const bounceY = bounceGridY * (this.scene.game.config.height / 100);
     
@@ -2161,6 +2161,207 @@ export class ShotAnimationSystem {
     
     // Return pixel coordinates for rim
     return pixelRimCoords;
+  }
+
+  /**
+   * Variant-aware ball flight target. Returns grid coords.
+   * BLOCK keeps its existing block-spot path.
+   */
+  _getShotFlightTargetGrid(turnData) {
+    const shooterSprite = this.getShooterSprite(turnData);
+    const isHomeTeam = shooterSprite?.team === 'home';
+    const msss = getMadeShotSweetSpotGrid(isHomeTeam);
+    const rim = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
+
+    if (turnData.result_type === 'BLOCK'
+        && turnData.ball_bounce_x != null
+        && turnData.ball_bounce_y != null) {
+      return { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y };
+    }
+
+    const variant = turnData.shot_variant;
+    const isMake = turnData.result_type === 'MAKE';
+
+    switch (variant) {
+      case 'SWISH':
+      case 'BACK_OF_RIM':
+        return isMake ? { ...msss } : { ...rim };
+      case 'CLANK':
+        return { ...rim };
+      case 'LITTLE_RATTLE':
+      case 'NORMAL_RATTLE':
+      case 'HEAVY_RATTLE':
+        return turnData.shot_variant_rattle_start === 'RIM' ? { ...rim } : { ...msss };
+      case 'BANK_MAKE':
+      case 'BANK_MISS': {
+        const xSign = isHomeTeam ? +1 : -1;
+        const yOffset = turnData.shot_variant_backboard_y_offset ?? 0;
+        return { x: msss.x + (xSign * 3), y: msss.y + yOffset };
+      }
+      case 'AIRBALL': {
+        // 2 grid units short of MSSS toward midcourt (animation only in step 2 —
+        // backend resolution change comes in step 3).
+        const xSign = isHomeTeam ? -1 : +1;
+        return { x: msss.x + (xSign * 2), y: msss.y };
+      }
+      default:
+        // Backend should always stamp shot_variant on non-block resolutions; fall
+        // back to legacy MSSS/rim split if it didn't.
+        return isMake ? { ...msss } : { ...rim };
+    }
+  }
+
+  /**
+   * Run any variant-specific animation between ball flight landing and the
+   * standard make/miss resolution. No-op for variants without an intermediate
+   * step (SWISH, CLANK, BACK_OF_RIM, AIRBALL in step 2).
+   */
+  async executeShotVariantAnimation(turnData) {
+    switch (turnData.shot_variant) {
+      case 'LITTLE_RATTLE':
+      case 'NORMAL_RATTLE':
+      case 'HEAVY_RATTLE':
+        await this._animateRattle(turnData);
+        return;
+      case 'BANK_MAKE':
+        await this._animateBackboardMake(turnData);
+        return;
+      case 'BANK_MISS':
+        await this._animateBackboardMiss(turnData);
+        return;
+      default:
+        return;
+    }
+  }
+
+  async _animateRattle(turnData) {
+    const ballSprite = this.ballController?.ballSprite;
+    if (!ballSprite) return;
+
+    const variant = turnData.shot_variant;
+    const hopPairs = ({ LITTLE_RATTLE: 1, NORMAL_RATTLE: 2, HEAVY_RATTLE: 4 })[variant] ?? 0;
+    if (hopPairs === 0) return;
+
+    const startMode = turnData.shot_variant_rattle_start === 'RIM' ? 'RIM' : 'MSSS';
+    const progression = turnData.shot_variant_rattle_progression === 'OPT_2' ? 'OPT_2' : 'OPT_1';
+
+    const shooterSprite = this.getShooterSprite(turnData);
+    const isHomeTeam = shooterSprite?.team === 'home';
+    const msss = getMadeShotSweetSpotGrid(isHomeTeam);
+
+    // Two hop waypoints — MSSS-start oscillates in y, RIM-start oscillates in x.
+    let pointA;
+    let pointB;
+    if (startMode === 'MSSS') {
+      pointA = { x: msss.x, y: msss.y + 1 };
+      pointB = { x: msss.x, y: msss.y - 1 };
+    } else {
+      pointA = { x: msss.x + 1, y: msss.y };
+      pointB = { x: msss.x - 1, y: msss.y };
+    }
+
+    const first = progression === 'OPT_1' ? pointA : pointB;
+    const second = progression === 'OPT_1' ? pointB : pointA;
+
+    const waypoints = [];
+    for (let i = 0; i < hopPairs; i++) {
+      waypoints.push(first, second);
+    }
+
+    const w = this.scene.game.config.width;
+    const h = this.scene.game.config.height;
+
+    for (const wp of waypoints) {
+      const pix = gridToPixels(wp.x, wp.y, w, h);
+      await this._tweenBallTo(ballSprite, pix, 40, 'Linear');
+    }
+
+    // Makes: smooth settle into MSSS. Misses: leave ball where it is — the
+    // standard miss path's animateBallBounce will pick up from here.
+    if (turnData.result_type === 'MAKE') {
+      const msssPix = gridToPixels(msss.x, msss.y, w, h);
+      await this._tweenBallTo(ballSprite, msssPix, 150, 'Quad.easeOut');
+    }
+  }
+
+  async _animateBackboardMake(turnData) {
+    const ballSprite = this.ballController?.ballSprite;
+    if (!ballSprite) return;
+    const shooterSprite = this.getShooterSprite(turnData);
+    const isHomeTeam = shooterSprite?.team === 'home';
+    const msss = getMadeShotSweetSpotGrid(isHomeTeam);
+    const w = this.scene.game.config.width;
+    const h = this.scene.game.config.height;
+    const msssPix = gridToPixels(msss.x, msss.y, w, h);
+    await this._tweenBallTo(ballSprite, msssPix, 250, 'Quad.easeOut');
+  }
+
+  async _animateBackboardMiss(turnData) {
+    const ballSprite = this.ballController?.ballSprite;
+    if (!ballSprite) return;
+    const shooterSprite = this.getShooterSprite(turnData);
+    const isHomeTeam = shooterSprite?.team === 'home';
+    const msss = getMadeShotSweetSpotGrid(isHomeTeam);
+    const dx = turnData.shot_variant_backboard_miss_rim_offset_x ?? 0;
+    const dy = turnData.shot_variant_backboard_miss_rim_offset_y ?? 0;
+    const w = this.scene.game.config.width;
+    const h = this.scene.game.config.height;
+    const grazePix = gridToPixels(msss.x + dx, msss.y + dy, w, h);
+    await this._tweenBallTo(ballSprite, grazePix, 200, 'Quad.easeOut');
+  }
+
+  _tweenBallTo(ballSprite, pix, duration, ease) {
+    return new Promise((resolve) => {
+      this.scene.tweens.add({
+        targets: ballSprite,
+        x: pix.x,
+        y: pix.y,
+        duration,
+        ease,
+        onUpdate: () => this.ballController?.updatePosition?.(ballSprite.x, ballSprite.y),
+        onComplete: resolve,
+      });
+    });
+  }
+
+  /**
+   * Dev affordance: ?debug_shot_variant=NAME forces every shot to use the
+   * named variant. Fills in sensible defaults for any sub-roll fields the
+   * variant needs but didn't come from the backend.
+   */
+  _applyDebugVariantOverride(turnData) {
+    if (typeof window === 'undefined' || !window.location?.search) return;
+    const params = new URLSearchParams(window.location.search);
+    const forced = params.get('debug_shot_variant');
+    if (!forced) return;
+
+    const variant = forced.toUpperCase();
+    turnData.shot_variant = variant;
+
+    const isRattle = variant === 'LITTLE_RATTLE'
+                  || variant === 'NORMAL_RATTLE'
+                  || variant === 'HEAVY_RATTLE';
+    if (isRattle) {
+      if (!turnData.shot_variant_rattle_start) {
+        turnData.shot_variant_rattle_start = Math.random() < 0.5 ? 'MSSS' : 'RIM';
+      }
+      if (!turnData.shot_variant_rattle_progression) {
+        turnData.shot_variant_rattle_progression = Math.random() < 0.5 ? 'OPT_1' : 'OPT_2';
+      }
+    }
+    if (variant === 'BANK_MAKE' || variant === 'BANK_MISS') {
+      if (turnData.shot_variant_backboard_y_offset == null) {
+        turnData.shot_variant_backboard_y_offset = Math.floor(Math.random() * 9) - 4;
+      }
+    }
+    if (variant === 'BANK_MISS') {
+      if (turnData.shot_variant_backboard_miss_rim_offset_x == null) {
+        turnData.shot_variant_backboard_miss_rim_offset_x = Math.floor(Math.random() * 3) - 1;
+      }
+      if (turnData.shot_variant_backboard_miss_rim_offset_y == null) {
+        turnData.shot_variant_backboard_miss_rim_offset_y = Math.floor(Math.random() * 3) - 1;
+      }
+    }
   }
 
   /**

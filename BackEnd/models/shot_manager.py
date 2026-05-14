@@ -18,6 +18,10 @@ from BackEnd.constants import (
     HARD_PROB,
     SOFT_PROB
 )
+from BackEnd.constants.shot_variants import (
+    select_shot_variant,
+    roll_shot_variant_extras,
+)
 from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
 from BackEnd.utils.shared import (
     apply_scoring,
@@ -1924,6 +1928,18 @@ class ShotManager:
             blocking_foul_out_info = getattr(self, "_blocking_foul_out_info", None) if hasattr(self, "_blocking_foul_out_info") else None
         
         is_block_outcome = getattr(self, "_block_spot", None) is not None
+
+        shot_variant = None
+        shot_variant_extras = {}
+        if not is_block_outcome:
+            shot_variant = select_shot_variant(
+                shot_score=shot_score,
+                shot_threshold=shot_threshold,
+                shot_type=shot_type,
+                made=made,
+            )
+            shot_variant_extras = roll_shot_variant_extras(shot_variant)
+
         result.update({
             "result_type": "MAKE" if made else ("BLOCK" if is_block_outcome else "MISS"),
             "ball_handler": shooter,
@@ -1943,14 +1959,18 @@ class ShotManager:
             "shot_score": shot_score,
             "shot_score_pre_defense": shot_score_pre_defense,
             "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            "shot_variant": shot_variant,
             "sfx": {
                 "shot_type": shot_type,
                 "shot_score_pre_defense": shot_score_pre_defense,
                 "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+                "shot_variant": shot_variant,
             },
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
+        if shot_variant_extras:
+            result.update(shot_variant_extras)
         if timing_contract is not None:
             result["step_clock_seconds"] = timing_contract["step_clock_seconds"]
             result["resolution_step_index"] = timing_contract["resolution_step_index"]
