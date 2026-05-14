@@ -296,6 +296,9 @@ function pickShotResultSfxFilename(variant, normalizedResult) {
 // BOR make follows the rim contact with a swish ~150 ms later — long enough
 // to read as "rim → through the net," short enough to feel like one event.
 const BOR_MAKE_SWISH_DELAY_MS = 150;
+// BANK_MAKE plays bb-rim-swish.wav (bank → rim) and follows with a swish
+// almost immediately, since the original recording had the swish trimmed off.
+const BANK_MAKE_SWISH_DELAY_MS = 100;
 
 export function playShotResultSfx(scene, turnData, result) {
   const normalizedResult = normalizeShotResult(result);
@@ -320,6 +323,17 @@ export function playShotResultSfx(scene, turnData, result) {
         followup: "bor_swish",
       });
     }, BOR_MAKE_SWISH_DELAY_MS);
+  }
+
+  if (variant === "BANK_MAKE" && normalizedResult === "MAKE") {
+    setTimeout(() => {
+      playGameSfx(scene, "swish.wav", DEFAULT_VOLUME, {
+        event: "shot_result",
+        result: normalizedResult,
+        variant,
+        followup: "bank_swish",
+      });
+    }, BANK_MAKE_SWISH_DELAY_MS);
   }
 }
 

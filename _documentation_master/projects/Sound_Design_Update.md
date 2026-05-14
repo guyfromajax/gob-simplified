@@ -230,11 +230,12 @@ When two filenames are listed for a slot (e.g. `bb-clank.wav` / `bb-clank-2.wav`
 | Little Rattle | `rattle-leather.wav` × 2 hops, then `swish.wav` follow-up | LITTLE RATTLE → make resolve | `rattle-leather.wav` × 2 hops | LITTLE RATTLE → miss resolve |
 | Normal Rattle | `rattle-leather.wav` × 4 hops, then `swish.wav` follow-up | NORMAL RATTLE → make resolve | `rattle-leather.wav` × 4 hops | NORMAL RATTLE → miss resolve |
 | Heavy Rattle | `rattle-leather.wav` × 8 hops, then `swish.wav` follow-up | HEAVY RATTLE → make resolve | `rattle-leather.wav` × 8 hops | HEAVY RATTLE → miss resolve |
-| Bank Off Backboard | `bb-rim-swish.wav` | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
+| Bank Off Backboard | `bb-rim-swish.wav`, then `swish.wav` 100 ms later | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
 | Airball | — | — | `airball.wav` | AIRBALL → OOB (no rebound, → BIP) |
 
 **SFX timing notes**
 
 - **Rattle SFX**: one `rattle-leather.wav` play fires at the start of each hop (40 ms apart). For make rattles, `swish.wav` plays immediately after the last hop, overlapping the 150 ms settle tween to MSSS.
 - **BOR make follow-up**: `swish.wav` plays 150 ms after `back-of-rim.wav` — long enough to read as "rim → through the net," short enough to feel like one event. Knob: `BOR_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
+- **BANK_MAKE follow-up**: `swish.wav` plays 100 ms after `bb-rim-swish.wav`. The original recording had a baked-in swish that ran too long, so it was trimmed and a separate swish is layered in. Knob: `BANK_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
 - **All other variants**: SFX fires at ball-flight `onComplete` (the moment the ball lands at its variant-specific flight target).
