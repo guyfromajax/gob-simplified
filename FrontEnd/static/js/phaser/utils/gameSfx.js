@@ -23,6 +23,15 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "free-throw-miss.wav",
   "outlet-pass-great.wav",
   "outlet-pass-bad.wav",
+  "defense-sammy.mp3",
+  "fast-break-braddock.mp3",
+  "trap-braddock.mp3",
+  "sammy-press.mp3",
+  "press-braddock.mp3",
+  "quick-shot-braddock.mp3",
+  "slow-it-down-braddock.mp3",
+  "sammy-final-shot.mp3",
+  "final-shot-braddock.mp3",
 ]);
 
 const sfxPools = new Map();
@@ -271,6 +280,48 @@ export function playHcoReceiveSfx(scene, sfxContext) {
   const receiverScore = (iq ?? 0) + (ch ?? 0);
   const tier = receiverScore > 130 ? "strong" : receiverScore < 50 ? "weak" : "medium";
   playGameSfx(scene, `receive-${tier}.wav`, DEFAULT_VOLUME, { event: "pass_receive", tier });
+}
+
+function pickRandomCourtEventFile(files) {
+  if (!files?.length) return null;
+  return files[Math.floor(Math.random() * files.length)];
+}
+
+/**
+ * Secondary-announcement court stingers (Sound_Design_Update.md — Court Event SFX).
+ * One play per showSecondaryAnnouncement call for mapped headlines only.
+ */
+export function playSecondaryAnnounceCourtSfx(scene, headline) {
+  const text = String(headline || "").trim();
+  let filename = null;
+  switch (text) {
+    case "Press!":
+      filename = pickRandomCourtEventFile(["sammy-press.mp3", "press-braddock.mp3"]);
+      break;
+    case "Trap!":
+      filename = "trap-braddock.mp3";
+      break;
+    case "Fast Break!":
+      filename = "fast-break-braddock.mp3";
+      break;
+    case "Quick Shot":
+      filename = "quick-shot-braddock.mp3";
+      break;
+    case "Slow It Down":
+      filename = "slow-it-down-braddock.mp3";
+      break;
+    case "Final Shot":
+      filename = pickRandomCourtEventFile(["sammy-final-shot.mp3", "final-shot-braddock.mp3"]);
+      break;
+    default:
+      return;
+  }
+  playGameSfx(scene, filename, DEFAULT_VOLUME, { event: "court_event_sfx", headline: text });
+}
+
+/** Defense Matchups modal open stinger (modal open only). */
+export function playDefenseMatchupModalCourtSfx(scene) {
+  playGameSfx(scene, "defense-sammy.mp3", DEFAULT_VOLUME, { event: "defense_matchup_modal_open" });
 }
 
 if (typeof window !== "undefined") {

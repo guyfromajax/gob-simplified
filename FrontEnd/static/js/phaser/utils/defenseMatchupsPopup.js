@@ -11,6 +11,8 @@
  * - Player foul outs
  */
 
+import { playDefenseMatchupModalCourtSfx } from './gameSfx.js';
+
 // Position colors for user team
 const POSITION_COLORS = {
     "PG": "#4065AF",
@@ -76,6 +78,7 @@ export async function showDefenseMatchupsPopup(gameId, scene) {
                     // Create popup
                     const popup = createPopupElement(user_team, computer_team, current_matchups, gameId);
                     document.body.appendChild(popup);
+                    playDefenseMatchupModalCourtSfx(scene);
                     
                     // Initialize drag-and-drop (pass resolve so submit resolves the promise)
                     initializeDragAndDrop(popup, gameId, resolve);

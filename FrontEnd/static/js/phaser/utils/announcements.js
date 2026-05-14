@@ -10,6 +10,7 @@ import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
 } from './foulAnnouncementLanguage.js';
+import { playSecondaryAnnounceCourtSfx } from './gameSfx.js';
 
 let currentAnnouncement = null;
 
@@ -239,6 +240,7 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
   };
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
+    playSecondaryAnnounceCourtSfx(meta?.scene ?? null, text);
     window.showAnnouncementOverlay(data);
   }
 }
