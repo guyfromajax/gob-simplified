@@ -17,6 +17,7 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "inside-shot-strong.wav",
   "attack-shot-medium.wav",
   "attack-shot-strong.wav",
+  "shot-standard.wav",
   "swish.wav",
   "swish-2.wav",
   "clank.wav",
@@ -40,6 +41,9 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "slow-it-down-braddock.mp3",
   "sammy-final-shot.mp3",
   "final-shot-braddock.mp3",
+  "sammy-steal.wav",
+  "braddock-steal.wav",
+  "butler-steal.wav",
 ]);
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
@@ -233,7 +237,7 @@ export function playShotLaunchSfx(scene, turnData) {
       ? "three-weak.wav"
       : preDefense > 210
         ? "three-strong.wav"
-        : "attack-shot-medium.wav";
+        : "shot-standard.wav";
   playGameSfx(scene, filename, DEFAULT_VOLUME, {
     event: "shot_release",
     shotType: shotTypeForSfx(turnData) || null,
@@ -314,6 +318,38 @@ export function playShotResultSfx(scene, turnData, result) {
         followup: "bor_swish",
       });
     }, BOR_MAKE_SWISH_DELAY_MS);
+  }
+}
+
+// Fires at the moment the ball attaches to the stealer's sprite. Weighted
+// 33/33/34 across three voice options.
+const STEAL_SFX_FILES = Object.freeze([
+  { file: "sammy-steal.wav", weight: 33 },
+  { file: "braddock-steal.wav", weight: 33 },
+  { file: "butler-steal.wav", weight: 34 },
+]);
+
+export function playStealSfx(scene) {
+  const total = STEAL_SFX_FILES.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of STEAL_SFX_FILES) {
+    roll -= entry.weight;
+    if (roll <= 0) {
+      playGameSfx(scene, entry.file, DEFAULT_VOLUME, { event: "steal" });
+      return;
+    }
+  }
+}
+
+// Fires at the moment the ball attaches to the rebounder sprite. DREB → defense
+// strong; OREB → inside strong.
+export function playReboundSfx(scene, reboundType) {
+  if (reboundType === "DREB") {
+    playGameSfx(scene, "attack-shot-strong.wav", DEFAULT_VOLUME, { event: "rebound", rebound_type: "DREB" });
+    return;
+  }
+  if (reboundType === "OREB") {
+    playGameSfx(scene, "inside-shot-strong.wav", DEFAULT_VOLUME, { event: "rebound", rebound_type: "OREB" });
   }
 }
 

@@ -9,6 +9,7 @@ import { appendToTextScroll } from "../utils/textScroll.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { getPlayerDuration } from "./turnAnimation.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
+import { playGameSfx } from "../utils/gameSfx.js";
 
 const INITIAL_HOLD_DURATION = 2000; // Hold starting positions for 2 seconds (reduced from 4 seconds)
 const ENTRANCE_HOLD_DURATION = 300;
@@ -133,7 +134,12 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
     
     // Find the two centers (they have action: "TIP_JUMP")
     const centerAnimations = animations.filter(anim => anim.action === "TIP_JUMP");
-    
+
+    // SFX: play once at the moment the centers begin their upward jump.
+    if (centerAnimations.length > 0) {
+      playGameSfx(scene, "attack-shot-medium.wav", undefined, { event: "opening_tip_jump" });
+    }
+
     centerAnimations.forEach(anim => {
         const playerSprite = playerSprites[anim.playerId];
         if (!playerSprite) return;
@@ -254,6 +260,11 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
             if (tipWinnerSprite) {
                 // ✅ REMOVED: Opening tip ball attachment logging (cluttering console)
                 attachBallToPlayer(scene, ballSprite, tipWinnerSprite);
+                // SFX: play when the ball attaches to the tip winner.
+                playGameSfx(scene, "attack-shot-strong.wav", undefined, {
+                    event: "opening_tip_won",
+                    tipWinnerId: tipWinnerSprite.playerId,
+                });
                 // Set flag so first HCO turn knows ball is already attached (like _previousTurnWasInbound)
                 scene._previousTurnWasOpeningTip = true;
                 

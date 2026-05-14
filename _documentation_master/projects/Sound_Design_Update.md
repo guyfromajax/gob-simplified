@@ -9,36 +9,12 @@ SFX Direction
 
 ## Shot Launch SFX
 
-<!-- **Outside Shots**
-
-- Trigger: at the moment the ball detaches from the shooter sprite.
-- Score source: `shot_score_pre_defense`.
-- `< 101`: `three-weak.wav`
-- `> 210`: `three-strong.wav`
-- Else: `three-medium.wav`
-
-**Attack Shots**
-
-- Trigger: at the moment the ball detaches from the shooter sprite.
-- Score source: `shot_score_pre_defense`.
-- `< 101`: `inside-shot-weak.wav`
-- `> 210`: `attack-shot-strong.wav`
-- Else: `attack-shot-medium.wav`
-
-**Inside Shots**
-
-- Trigger: at the moment the ball detaches from the shooter sprite.
-- Score source: `shot_score_pre_defense`.
-- `< 101`: `inside-shot-weak.wav`
-- `> 210`: `inside-shot-strong.wav`
-- Else: `inside-shot-medium.wav` -->
-
 **All Shot Types (Inside, Attack, Outside)**
 - Trigger: at the moment the ball detaches from the shooter sprite.
 - Score source: `shot_score_pre_defense`.
 - `< 101`: `three-weak.wav`
 - `> 210`: `three-strong.wav`
-- Else: `attack-shot-medium.wav`
+- Else: `shot-standard.wav`
 
 
 ## Gameplay Pass SFX
@@ -60,18 +36,6 @@ SFX Direction
 - Receiver `(IQ + CH) > 130`: `receive-strong.wav`
 - Receiver `(IQ + CH) < 50`: `receive-weak.wav`
 - Else: `receive-medium.wav`
-
-## Shot Result SFX
-
-**Made Shot (HCO, OREB Putback, Fast Break, HCT, FCP)**
-
-- Trigger: at the moment the ball reaches the basket spot.
-- `swish.wav`
-
-**Missed Shot (HCO, OREB Putback, Fast Break, HCT, FCP)**
-
-- Trigger: at the moment the ball reaches the basket spot.
-- `clank.wav`
 
 **Free Throw**
 
@@ -136,6 +100,26 @@ Court event stingers are **in scope** for the secondary announcement ribbon and 
 
 - Trigger: immediately when the **Block** announce appears.
 - File: `inside-shot-weak.wav`
+
+**Opening Tip SFX**
+
+- Trigger 1: immediately when the jumping players begin to jump (i.e move upward)
+- File 1: `attack-shot-medium.wav`
+
+- Trigger 2: immediately when the ball attaches to the player who receives the opneing tip
+- File 2: `attack-shot-strong.wav`
+
+**Rebound SFX**
+- Trigger for both D and O Rebounds: immediately when the ball attaches to the rebounder sprite
+- Defensive Rebound
+    - File: `attack-shot-strong.wav`
+- Offensive Rebound
+    - File: `inside-shot-strong.wav`
+
+**Steal Announce**
+
+- Trigger: immediately when the ball attaches to teh stealer's sprite.
+- File: **33/33/34** random each show — `sammy-steal.wav` or `braddock-steal.wav` or `butler-steal.wav`
 
 
 

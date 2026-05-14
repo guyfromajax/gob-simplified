@@ -25,7 +25,7 @@ import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { runPass } from './ballTween.js';
-import { playShotLaunchSfx, playShotResultSfx, playGameSfx } from '../utils/gameSfx.js';
+import { playShotLaunchSfx, playShotResultSfx, playGameSfx, playReboundSfx } from '../utils/gameSfx.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -1367,6 +1367,7 @@ export class ShotAnimationSystem {
           this.ballController.attachToPlayer(rebounderSprite, {
             offset: { x: 0, y: -10 }
           });
+          playReboundSfx(this.scene, turnData.rebound_type);
           
           // ✅ FIX: Stop get-back player animations when rebound is secured
           const beforeKillGetBack = getTweenManagerState();

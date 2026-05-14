@@ -28,7 +28,7 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
+import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, playReboundSfx } from "../utils/gameSfx.js";
 
 /**
  * ✅ PHASE 3.3: Removed wrapper function
@@ -841,6 +841,7 @@ export function animateRebound({
               attachBallToPlayer(scene, ballSprite, rebounderSprite, {
                 debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
               });
+              playReboundSfx(scene, reboundType);
             }
             
             const newOffenseId = rebounderSprite.team_id;

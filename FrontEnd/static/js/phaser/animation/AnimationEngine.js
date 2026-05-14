@@ -18,6 +18,7 @@ import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 import HCOAnimationSystem from './HCOAnimationSystem.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
+import { playStealSfx } from '../utils/gameSfx.js';
 import gameStore from '../../state/gameStore.js';
 import { ensureConsistentHeartbeat, stopAllArrivalHeartbeats } from './arrivalHeartbeat.js';
 
@@ -1354,6 +1355,7 @@ export class AnimationEngine {
           attachBallToPlayer(this.scene, context.ballSprite, stealerSprite, {
             reason: 'steal_handler_post_skeleton'
           });
+          playStealSfx(this.scene);
           // Make STEAL end ownership authoritative so stale pass pending owner
           // cannot reclaim the victim at turn boundary.
           setCurrentOwner(this.scene, String(stealerRaw));

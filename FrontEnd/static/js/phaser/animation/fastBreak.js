@@ -20,7 +20,7 @@ import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
+import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, playStealSfx } from "../utils/gameSfx.js";
 import * as fastBreakConstants from "../constants/fastBreakConstants.js";
 
 const {
@@ -1632,6 +1632,7 @@ async function animateRimRunnerInterception(
   const { synchronizeBallState } = await import("./BallControllerAdapter.js");
   synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
   attachBallToPlayer(scene, ballSprite, stealer, { reason: "rim_runner_interception" });
+  playStealSfx(scene);
 
   const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
   const stealerInfo = scene.playerInfo?.[stealerId];

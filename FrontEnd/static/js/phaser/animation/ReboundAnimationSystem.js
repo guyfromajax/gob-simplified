@@ -19,6 +19,7 @@
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
+import { playReboundSfx } from '../utils/gameSfx.js';
 
 export class ReboundAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites) {
@@ -141,6 +142,7 @@ export class ReboundAnimationSystem {
     this.ballController.attachToPlayer(rebounderSprite, {
       offset: this.reboundConfig.rebounderOffset
     });
+    playReboundSfx(this.scene, 'DREB');
 
     // 3. Determine next play type (for logging only - actual handling done by next turn)
     const nextPlayType = this.determineNextPlayType(turnData);
@@ -172,6 +174,7 @@ export class ReboundAnimationSystem {
     this.ballController.attachToPlayer(rebounderSprite, {
       offset: this.reboundConfig.rebounderOffset
     });
+    playReboundSfx(this.scene, 'OREB');
 
     // 3. Determine offensive rebound outcome for logging only
     const outcome = this.determineOffensiveReboundOutcome(turnData);
