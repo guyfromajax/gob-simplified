@@ -251,6 +251,37 @@ function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
   };
 }
 
+function isCovertReleaseDefensiveStopAnnouncement(announcement, turnData = null) {
+  if (turnData?.fast_break_play !== "covert_release") return false;
+  return String(announcement?.text || "").trim().toLowerCase() === "nice stop!";
+}
+
+function resolveDefenseTeamSideForTurn(scene, turnData, sprites = null) {
+  const playerSprites = sprites || scene?.playerSprites || {};
+  const ballHandlerData = turnData?.roles?.ball_handler;
+  const ballHandlerId = ballHandlerData?.player_id || ballHandlerData;
+  const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
+  if (ballHandlerSprite?.team === "home") return "away";
+  if (ballHandlerSprite?.team === "away") return "home";
+  return "away";
+}
+
+function buildCovertReleaseStopperPlayerData(scene, playerData, sprites = null) {
+  if (!playerData?.playerId) return null;
+  const ref = resolveScenePlayerRef(scene, playerData.playerId, sprites);
+  return {
+    playerId: ref.id || String(playerData.playerId),
+    photo: playerData.photo || ref.sprite?.photo || ref.info?.photo || null,
+    name: playerData.name || ref.info?.name || ref.sprite?.name || "",
+    jersey:
+      playerData.jersey ??
+      ref.info?.jersey ??
+      ref.info?.jerseyNumber ??
+      ref.info?.jersey_number ??
+      ref.sprite?.jersey ??
+      "",
+  };
+}
 
 /**
  * Run an in-step announcement: pause clocks, show announcement, await hold,
@@ -266,15 +297,32 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
   scene.gameClock?.pause?.(reason);
   scene.shotClock?.pause?.(reason);
   try {
-    const { showAnnouncement } = await import("../utils/announcements.js");
+    const { showAnnouncement, showSecondaryAnnouncement } = await import("../utils/announcements.js");
     const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step, turnData);
     const playerData = enrichStepAnnouncementPlayerData(scene, inferredPlayerData, sprites);
-    showAnnouncement(
-      announcement.text,
-      announcement.team || "neutral",
-      playerData,
-      announcement.meta || null,
-    );
+    if (isCovertReleaseDefensiveStopAnnouncement(announcement, turnData)) {
+      const stopperRef = playerData?.playerId
+        ? resolveScenePlayerRef(scene, playerData.playerId, sprites)
+        : { id: null, sprite: null, info: null };
+      const defenseTeam = stopperRef.sprite?.team === "home"
+        ? "home"
+        : stopperRef.sprite?.team === "away"
+          ? "away"
+          : resolveDefenseTeamSideForTurn(scene, turnData, sprites);
+      showSecondaryAnnouncement(
+        "Great Stop!",
+        defenseTeam,
+        buildCovertReleaseStopperPlayerData(scene, playerData, sprites),
+        { scene },
+      );
+    } else {
+      showAnnouncement(
+        announcement.text,
+        announcement.team || "neutral",
+        playerData,
+        announcement.meta || null,
+      );
+    }
   } catch (err) {
     console.warn("runStepAnnouncement: showAnnouncement failed", err);
   }

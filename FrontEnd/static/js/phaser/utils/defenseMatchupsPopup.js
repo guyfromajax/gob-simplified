@@ -41,6 +41,17 @@ let dontShowAgainThisGame = false; // Track "Don't show again" checkbox state
  * @returns {Promise} - Resolves when user submits matchups (or closes popup)
  */
 const SESSION_STORAGE_KEY_PREFIX = 'defenseMatchupsDontShow_';
+const ANNOUNCE_SESSION_KEY_PREFIX = 'defenseMatchupsAnnouncePlayed_';
+
+function hasDefenseMatchupAnnouncePlayed(gameId) {
+    if (!gameId || typeof sessionStorage === 'undefined') return false;
+    return sessionStorage.getItem(ANNOUNCE_SESSION_KEY_PREFIX + gameId) === '1';
+}
+
+function markDefenseMatchupAnnouncePlayed(gameId) {
+    if (!gameId || typeof sessionStorage === 'undefined') return;
+    sessionStorage.setItem(ANNOUNCE_SESSION_KEY_PREFIX + gameId, '1');
+}
 
 export async function showDefenseMatchupsPopup(gameId, scene) {
     // Check if user has checked "Don't show again this game" (in-memory or persisted across page reloads)
@@ -78,7 +89,10 @@ export async function showDefenseMatchupsPopup(gameId, scene) {
                     // Create popup
                     const popup = createPopupElement(user_team, computer_team, current_matchups, gameId);
                     document.body.appendChild(popup);
-                    playDefenseMatchupModalCourtSfx(scene);
+                    if (!hasDefenseMatchupAnnouncePlayed(gameId)) {
+                        playDefenseMatchupModalCourtSfx(scene);
+                        markDefenseMatchupAnnouncePlayed(gameId);
+                    }
                     
                     // Initialize drag-and-drop (pass resolve so submit resolves the promise)
                     initializeDragAndDrop(popup, gameId, resolve);
@@ -804,5 +818,6 @@ export function resetDontShowAgainFlag(gameId) {
     dontShowAgainThisGame = false;
     if (typeof sessionStorage !== 'undefined' && gameId) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY_PREFIX + gameId);
+        sessionStorage.removeItem(ANNOUNCE_SESSION_KEY_PREFIX + gameId);
     }
 }
