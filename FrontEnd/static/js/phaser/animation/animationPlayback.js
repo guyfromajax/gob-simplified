@@ -26,7 +26,7 @@ import { attachBallToPlayer } from "./ballManager.js";
 // the follow callback and the pass renders as a teleport at step end.
 import { detachBall } from "./BallControllerAdapter.js";
 import { createBallTrail } from "./createBallTrail.js";
-import { playGameSfx } from "../utils/gameSfx.js";
+import { playGameSfx, playFBDefensiveStopCourtSfx } from "../utils/gameSfx.js";
 
 // --- Ball-state helpers ----------------------------------------------------
 
@@ -303,6 +303,7 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
         : stopperRef.sprite?.team === "away"
           ? "away"
           : resolveDefenseTeamSideForTurn(scene, turnData, sprites);
+      playFBDefensiveStopCourtSfx(scene);
       showSecondaryAnnouncement(
         "Great Stop!",
         defenseTeam,
