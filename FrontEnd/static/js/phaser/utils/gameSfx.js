@@ -18,7 +18,15 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "attack-shot-medium.wav",
   "attack-shot-strong.wav",
   "swish.wav",
+  "swish-2.wav",
   "clank.wav",
+  "back-of-rim.wav",
+  "rattle-leather.wav",
+  "bb-swish.wav",
+  "bb-rim-swish.wav",
+  "bb-clank.wav",
+  "bb-clank-2.wav",
+  "airball.wav",
   "free-throw-swish.wav",
   "free-throw-miss.wav",
   "outlet-pass-great.wav",
@@ -33,6 +41,12 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "sammy-final-shot.mp3",
   "final-shot-braddock.mp3",
 ]);
+
+// Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
+// overlapping plays without truncating earlier ones.
+const POOL_SIZE_OVERRIDES = Object.freeze({
+  "rattle-leather.wav": 8,
+});
 
 const sfxPools = new Map();
 let preloadPromise = null;
@@ -74,7 +88,8 @@ function ensurePool(filename, poolSize = DEFAULT_POOL_SIZE) {
   let pool = sfxPools.get(filename);
   if (pool) return pool;
 
-  const audios = Array.from({ length: poolSize }, () => createAudio(filename));
+  const effectiveSize = POOL_SIZE_OVERRIDES[filename] ?? poolSize;
+  const audios = Array.from({ length: effectiveSize }, () => createAudio(filename));
   pool = { filename, audios, cursor: 0, preloadStarted: false };
   sfxPools.set(filename, pool);
   return pool;
@@ -241,15 +256,49 @@ export function playShotLaunchSfx(scene, turnData) {
   // playGameSfx(scene, `inside-shot-${tier}.wav`, DEFAULT_VOLUME, { event: "shot_release", shotType, tier });
 }
 
+// Variants whose SFX is driven by the animation itself (rattle hops), so the
+// flight-onComplete hook stays silent for them.
+const SHOT_RESULT_SFX_DRIVEN_BY_ANIMATION = new Set([
+  "LITTLE_RATTLE",
+  "NORMAL_RATTLE",
+  "HEAVY_RATTLE",
+]);
+
+function pickShotResultSfxFilename(variant, normalizedResult) {
+  switch (variant) {
+    case "SWISH":
+      return Math.random() < 0.5 ? "swish.wav" : "swish-2.wav";
+    case "CLANK":
+      return "clank.wav";
+    case "BACK_OF_RIM":
+      return "back-of-rim.wav";
+    case "BANK_MAKE":
+      return Math.random() < 0.5 ? "bb-rim-swish.wav" : "bb-swish.wav";
+    case "BANK_MISS":
+      return Math.random() < 0.5 ? "bb-clank.wav" : "bb-clank-2.wav";
+    case "AIRBALL":
+      return "airball.wav";
+    default:
+      // Legacy / unknown variant — fall back to outcome-based SFX.
+      if (normalizedResult === "MAKE") return "swish.wav";
+      if (normalizedResult === "MISS") return "clank.wav";
+      return null;
+  }
+}
+
 export function playShotResultSfx(scene, turnData, result) {
   const normalizedResult = normalizeShotResult(result);
-  if (normalizedResult === "MAKE") {
-    playGameSfx(scene, "swish.wav", DEFAULT_VOLUME, { event: "shot_result", result: normalizedResult });
-    return;
-  }
+  const variant = turnData?.shot_variant || null;
 
-  if (normalizedResult !== "MISS") return;
-  playGameSfx(scene, "clank.wav", DEFAULT_VOLUME, { event: "shot_result", result: normalizedResult });
+  if (SHOT_RESULT_SFX_DRIVEN_BY_ANIMATION.has(variant)) return;
+
+  const filename = pickShotResultSfxFilename(variant, normalizedResult);
+  if (!filename) return;
+  playGameSfx(scene, filename, DEFAULT_VOLUME, {
+    event: "shot_result",
+    result: normalizedResult,
+    variant,
+  });
 }
 
 export function playFreeThrowResultSfx(scene, result) {

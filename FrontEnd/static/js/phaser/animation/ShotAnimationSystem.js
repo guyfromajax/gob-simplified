@@ -25,7 +25,7 @@ import animationConfig from './animation_config.js';
 import { clampGridCoords } from './courtClamp.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { runPass } from './ballTween.js';
-import { playShotLaunchSfx, playShotResultSfx } from '../utils/gameSfx.js';
+import { playShotLaunchSfx, playShotResultSfx, playGameSfx } from '../utils/gameSfx.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -2273,6 +2273,12 @@ export class ShotAnimationSystem {
 
     for (const wp of waypoints) {
       const pix = gridToPixels(wp.x, wp.y, w, h);
+      playGameSfx(this.scene, 'rattle-leather.wav', undefined, {
+        event: 'shot_result',
+        result: turnData.result_type,
+        variant,
+        hop: true,
+      });
       await this._tweenBallTo(ballSprite, pix, 40, 'Linear');
     }
 
