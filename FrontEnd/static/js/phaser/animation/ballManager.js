@@ -28,7 +28,7 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import { playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
+import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
 
 /**
  * ✅ PHASE 3.3: Removed wrapper function
@@ -1087,7 +1087,8 @@ export function animateKickoutReset(
     fromId: rebounderId,
     toId: pgId,
     duration: usedDuration,
-    easing: cfg.easing
+    easing: cfg.easing,
+    sfxContext: buildGameplayPassSfxContext(scene, rebounderId, pgId),
   };
 
   // ALWAYS use actual sprite positions for kickout passes (ignore backend coords)

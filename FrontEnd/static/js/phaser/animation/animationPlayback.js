@@ -179,10 +179,10 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
   }
 }
 
-function resolveScenePlayerRef(scene, rawId) {
+function resolveScenePlayerRef(scene, rawId, sprites = null) {
   if (!scene || rawId == null) return { id: null, sprite: null, info: null };
   const sid = String(rawId);
-  const playerSprites = scene.playerSprites || {};
+  const playerSprites = sprites || scene.playerSprites || {};
   const playerInfo = scene.playerInfo || {};
 
   if (playerSprites[sid] || playerInfo[sid]) {
@@ -199,9 +199,18 @@ function resolveScenePlayerRef(scene, rawId) {
   return { id: sid, sprite: null, info: null };
 }
 
-function enrichStepAnnouncementPlayerData(scene, playerData) {
+function inferStepAnnouncementPlayerData(announcement, step) {
+  if (announcement?.player_data?.playerId) return announcement.player_data;
+  const text = String(announcement?.text || "").trim().toLowerCase();
+  if (text !== "nice stop!") return announcement?.player_data || null;
+  const actions = step?.start?.action || {};
+  const stopperId = Object.entries(actions).find(([, action]) => action === "guard_ball")?.[0];
+  return stopperId ? { ...(announcement?.player_data || {}), playerId: stopperId } : (announcement?.player_data || null);
+}
+
+function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
   if (!playerData?.playerId) return playerData || null;
-  const ref = resolveScenePlayerRef(scene, playerData.playerId);
+  const ref = resolveScenePlayerRef(scene, playerData.playerId, sprites);
   const resolvedId = ref.id || String(playerData.playerId);
   return {
     ...playerData,
@@ -234,14 +243,15 @@ function enrichStepAnnouncementPlayerData(scene, playerData) {
  * @param {Phaser.Scene} scene
  * @param {import("./animationStepSchema.js").Announcement} announcement
  */
-async function runStepAnnouncement(scene, announcement) {
+async function runStepAnnouncement(scene, announcement, sprites = null, step = null) {
   if (!scene || !announcement?.text) return;
   const reason = "step_announcement";
   scene.gameClock?.pause?.(reason);
   scene.shotClock?.pause?.(reason);
   try {
     const { showAnnouncement } = await import("../utils/announcements.js");
-    const playerData = enrichStepAnnouncementPlayerData(scene, announcement.player_data);
+    const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step);
+    const playerData = enrichStepAnnouncementPlayerData(scene, inferredPlayerData, sprites);
     showAnnouncement(
       announcement.text,
       announcement.team || "neutral",
@@ -302,7 +312,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite) {
 
   // step.start.announcement: play before tweens fire.
   if (step.start?.announcement) {
-    await runStepAnnouncement(scene, step.start.announcement);
+    await runStepAnnouncement(scene, step.start.announcement, sprites, step);
   }
 
   // Spawn one linear tween per player whose start coord differs from end coord.
@@ -360,7 +370,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite) {
 
   // step.end.announcement: play after tweens + snap, before returning next.
   if (step.end?.announcement) {
-    await runStepAnnouncement(scene, step.end.announcement);
+    await runStepAnnouncement(scene, step.end.announcement, sprites, step);
   }
 
   return step.end.next;
