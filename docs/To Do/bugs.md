@@ -11,7 +11,7 @@
 11. More action in recruiting
 12. Better player progression between seasons
 13. Announce + Computer Timeout design -- don't hide the announce
-
+14. Charge or Block on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 17 Create "DEFENSE" SFX
 18. Defense Matchups pop up -- DEFENSE when appearing, whistle when exiting
 20. We need to clean up user Timeout implementation cadence

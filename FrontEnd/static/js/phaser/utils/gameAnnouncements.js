@@ -14,6 +14,7 @@ import {
   showAnnouncement,
   showAndOneAnnouncement,
   showSecondaryAnnouncement,
+  buildSecondaryStopperPlayerData,
   playAnnouncementSfx,
   getFastBreakPlayLabel,
 } from './announcements.js';
@@ -157,18 +158,9 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       }
       // Get stopper data if available
       const stopperId = context.stopperId || turnData.stopper_id;
-      let stopperData = null;
-      if (scene && stopperId) {
-        const stopperSprite = scene.playerSprites?.[stopperId];
-        if (stopperSprite) {
-          stopperData = {
-            playerId: stopperId,
-            photo: stopperSprite.photo || null,
-            teamName: stopperSprite.team_id,
-            secondaryColor: getSecondaryColorForTeam(scene, stopperSprite.team_id)
-          };
-        }
-      }
+      const stopperData = scene && stopperId
+        ? buildSecondaryStopperPlayerData(scene, stopperId, scene.playerSprites)
+        : null;
       showSecondaryAnnouncement("Great Stop!", defenseTeam, stopperData);
       break;
 

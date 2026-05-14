@@ -60,6 +60,46 @@ function findRosterPlayer(playerId) {
   return allPlayers.find((player) => String(player?.playerId || player?._id || player?.id) === String(playerId)) || null;
 }
 
+/**
+ * Resolve stopper portrait metadata for secondary Great Stop! ribbons.
+ * Does not require scene.playerInfo — playerId alone is enough for headshot URL fallback.
+ */
+export function buildSecondaryStopperPlayerData(scene, stopperId, sprites = null) {
+  if (stopperId == null || stopperId === '') return null;
+  const sid = String(stopperId);
+  const playerSprites = sprites || scene?.playerSprites || {};
+  const playerInfo = scene?.playerInfo || {};
+
+  let sprite = playerSprites[sid] || playerSprites[stopperId] || null;
+  if (!sprite) {
+    for (const [key, candidate] of Object.entries(playerSprites)) {
+      if (!candidate) continue;
+      const candidateId = String(candidate.playerId ?? candidate.id ?? key);
+      if (candidateId === sid) {
+        sprite = candidate;
+        break;
+      }
+    }
+  }
+
+  let info = playerInfo[sid] || playerInfo[stopperId] || null;
+  if (!info) {
+    for (const [key, value] of Object.entries(playerInfo)) {
+      if (String(key) === sid) {
+        info = value;
+        break;
+      }
+    }
+  }
+
+  return {
+    playerId: sid,
+    photo: sprite?.photo || info?.photo || null,
+    name: sprite?.name || info?.name || '',
+    jersey: info?.jersey ?? sprite?.jersey ?? '',
+  };
+}
+
 function buildAnnouncementPlayerLabel(playerData) {
   if (!playerData) return '';
   const rosterPlayer = findRosterPlayer(playerData.playerId);
@@ -227,6 +267,7 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     ? getPlayerImageUrl(playerData.photo, playerData.playerId)
     : '';
   const jerseyVal = getPlayerJerseyValue(player);
+  const lastName = getPlayerLastName(player) || '';
   const data = {
     tier: 'secondary',
     type: 'standard',
@@ -234,11 +275,18 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     eventSubtitle: typeof meta?.eventSubtitle === 'string' ? meta.eventSubtitle : '',
     photoUrl,
     jersey: jerseyVal ? `#${jerseyVal}` : '',
-    lastName: getPlayerLastName(player) || '',
+    lastName,
     teamColor: resolveSecondaryStripeColor(team),
     decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
   };
+  if (String(text || '').trim() === 'Great Stop!' && !photoUrl && !lastName) {
+    console.warn('[ANN] Great Stop secondary missing headshot payload', {
+      playerId: playerData?.playerId ?? null,
+      hasPlayerData: !!playerData,
+      rosterHit: !!rosterPlayer,
+    });
+  }
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     playSecondaryAnnounceCourtSfx(meta?.scene ?? null, text);
     window.showAnnouncementOverlay(data);

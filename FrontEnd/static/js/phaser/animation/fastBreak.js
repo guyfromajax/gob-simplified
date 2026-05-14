@@ -3917,33 +3917,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 
   // Rim Runner outlet denied: handled in animateRimRunnerOutletDeniedBeat + finalizeRimRunnerNonShotTurn (no Great Stop! here).
   if (turnData.fast_break === true && turnData.stopper_id) {
-    const stopperId = turnData.stopper_id;
-    const stopperSprite = playerSprites[stopperId];
-    
-    if (stopperSprite) {
-      const { showSecondaryAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-      const stopperInfo = scene.playerInfo?.[stopperId];
-      const stopperTeamId = stopperSprite?.team_id;
-      
-      // Handle both new nested structure (object) and old flat structure (string)
-      const homeTeamField = scene.simData?.home_team;
-      const awayTeamField = scene.simData?.away_team;
-      const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-      const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-      const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-      
-      const stopperPlayerData = stopperInfo ? {
-        playerId: stopperId,
-        photo: stopperSprite?.photo || null,
-        teamName: stopperTeamName,
-        secondaryColor: getSecondaryColorForTeam(scene, stopperSprite?.team_id)
-      } : null;
+    const { showSecondaryAnnouncement, buildSecondaryStopperPlayerData } = await import('../utils/announcements.js');
+    const stopperPlayerData = buildSecondaryStopperPlayerData(scene, turnData.stopper_id, playerSprites);
+    showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData, { scene });
 
-      showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData);
-      
-      const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
-      await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));
-    }
+    const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
+    await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));
   } else {
     // Display outcome text for non-Fast Break stops
     if (turnData.hold_up) {
