@@ -47,6 +47,7 @@ Status: implemented.
 - Active sound references are retained until playback ends or errors.
 - Optional debug logging is available with `window.DEBUG_GAME_SFX = true` or `?debug_sfx=1`.
 - Existing trigger locations are intentionally unchanged in pass 1. Marker-based timing is pass 2.
+- Generic pass/reception SFX now apply to HCO, HCT, FCP, BIP, SIP, and Fast Break non-outlet passes. Fast Break outlet passes remain on the dedicated outlet SFX path.
 
 ### Pass 2: Shot Timing Markers
 

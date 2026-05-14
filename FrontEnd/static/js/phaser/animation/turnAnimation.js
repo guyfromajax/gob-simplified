@@ -21,6 +21,7 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext } from "./outletUtils.js";
 import { clampGridCoords } from "./courtClamp.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
+import { buildGameplayPassSfxContext } from "../utils/gameSfx.js";
 import * as unitCompletionContract from "./unitCompletionContract.js";
 import { resolveDrebOutletReceiverTarget } from "./drebOutletTargetResolver.js";
 import { DEBUG } from "../utils/debug.js";
@@ -53,6 +54,7 @@ import {
 } from "../utils/playerMovementDuration.js";
 
 const { enforceUnitCompletionContract } = unitCompletionContract;
+const PASS_SFX_TURN_TYPES = new Set(["HCO", "HCT", "FCP", "BASELINE_INBOUND", "SIDE_INBOUND"]);
 const advanceDynamicEventBoundary =
   unitCompletionContract.advanceDynamicEventBoundary ??
   (async function fallbackAdvanceDynamicEventBoundary({
@@ -677,6 +679,7 @@ async function runStep0EntryPassIfNeeded({
     toId,
     endCoords: { x: toSprite.x, y: toSprite.y },
     easing: "Sine.easeInOut",
+    sfxContext: buildGameplayPassSfxContext(scene, fromId, toId),
   });
 
   attachBallToPlayer(scene, ballSprite, toSprite, { reason: "step0_entry_pass_complete" });
@@ -997,9 +1000,14 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
       const nextTurn = context?.nextTurn;
       const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
       const passPromise = passInfo
-        ? handlePassAnimation({ scene, passInfo, playerSprites })
+        ? handlePassAnimation({ scene, passInfo, playerSprites, enablePassSfx: true })
         : pgSprite
-          ? runPass(scene, { fromId: sfId, toId: pgId, easing: ease })
+          ? runPass(scene, {
+              fromId: sfId,
+              toId: pgId,
+              easing: ease,
+              sfxContext: buildGameplayPassSfxContext(scene, sfId, pgId),
+            })
           : Promise.resolve();
 
       let defenderPromise = Promise.resolve();
@@ -3285,8 +3293,14 @@ async function runInboundSetup({
   const baselineInboundPassStartMs = Date.now();
   const passPromise = passInfo
     ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
-       handlePassAnimation({ scene, passInfo, playerSprites }))
-    : runPass(scene, { fromId: sfId, toId: pgId, duration: 250, easing: "Sine.easeInOut" });
+       handlePassAnimation({ scene, passInfo, playerSprites, enablePassSfx: true }))
+    : runPass(scene, {
+        fromId: sfId,
+        toId: pgId,
+        duration: 250,
+        easing: "Sine.easeInOut",
+        sfxContext: buildGameplayPassSfxContext(scene, sfId, pgId),
+      });
 
   let defenderPromise = Promise.resolve();
   if (isQuickFoulNext) {
@@ -5215,7 +5229,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         scene,
         passInfo,
         playerSprites,
-        enableHcoSfx: isHcoTurn,
+        enablePassSfx: PASS_SFX_TURN_TYPES.has(String(turnData?.current_turn || turnData?.result_type || "")),
       });
       await passPromise;
       if (isStepContractTurn && activeStepStrictMode !== "off") {

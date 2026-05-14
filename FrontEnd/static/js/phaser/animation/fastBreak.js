@@ -20,7 +20,7 @@ import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import { playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
+import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
 import * as fastBreakConstants from "../constants/fastBreakConstants.js";
 
 const {
@@ -670,6 +670,7 @@ async function animateRimRunnerLanePass(scene, turnData, playerSprites, ballSpri
     endCoords: { x: catchPx.x, y: catchPx.y },
     duration: rrDur,
     easing: "Sine.easeInOut",
+    sfxContext: buildGameplayPassSfxContext(scene, passerId, rrId),
   });
 
   await Promise.all([passPromise, rrTween]);
@@ -896,6 +897,7 @@ async function animateTriangleDecisionLeadIn(scene, turnData, playerSprites, bal
       toId: String(toId),
       endCoords: gridToPixels(target.x, target.y, width, height),
       easing: "Sine.easeInOut",
+      sfxContext: buildGameplayPassSfxContext(scene, String(fromId), String(toId)),
     });
     await new Promise((resolve) => {
       if (scene.time?.delayedCall) scene.time.delayedCall(45, resolve);
@@ -1620,6 +1622,7 @@ async function animateRimRunnerInterception(
     toId: stealerId,
     endCoords: { x: stealer.x, y: stealer.y },
     easing: "Sine.easeIn",
+    sfxContext: buildGameplayPassSfxContext(scene, victimId, stealerId),
   });
   await new Promise((resolve) => {
     if (scene.time?.delayedCall) scene.time.delayedCall(45, resolve);

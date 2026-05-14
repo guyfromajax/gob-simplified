@@ -17,6 +17,7 @@
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
+import { buildGameplayPassSfxContext, playHcoPassStartSfx, playHcoReceiveSfx } from '../utils/gameSfx.js';
 
 export class PassAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites) {
@@ -226,6 +227,11 @@ export class PassAnimationSystem {
       
       // Detach ball from passer
       this.ballController.detachFromPlayer('pass', { keepVisible: true });
+      const shouldPlayPassSfx = turnData.pass_type !== 'outlet';
+      const sfxContext = shouldPlayPassSfx
+        ? buildGameplayPassSfxContext(this.scene, turnData.passer_id, turnData.receiver_id)
+        : null;
+      playHcoPassStartSfx(this.scene, sfxContext);
       
       // Start ball flight
       const targetPosition = {
@@ -262,6 +268,7 @@ export class PassAnimationSystem {
           this.ballController.endFlight(receiverSprite, {
             offset: this.passConfig.receiverOffset
           });
+          playHcoReceiveSfx(this.scene, sfxContext);
           resolve();
         },
         onUpdate: () => {

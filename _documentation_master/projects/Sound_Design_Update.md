@@ -33,20 +33,22 @@ SFX Direction
 - `> 210`: `inside-shot-strong.wav`
 - Else: `inside-shot-medium.wav`
 
-## HCO Pass SFX
+## Gameplay Pass SFX
 
-**HCO Passes**
+**Passes**
 
 - Trigger: at the moment the ball detaches from the passer sprite.
-- Scope: HCO skeleton passes only. Do not apply to inbound passes, fast break outlet passes, OREB kickouts, or other non-HCO pass paths unless separately specified.
+- Scope: HCO, HCT, FCP, BIP, SIP, and Fast Break non-outlet passes.
+- Exclusion: Fast Break outlet passes use their dedicated outlet SFX and should not also play these pass/reception SFX.
 - Passer `PS > 75`: `pass-strong.wav`
 - Passer `PS < 25`: `pass-weak.wav`
 - Else: `pass-medium.wav`
 
-**HCO Receptions**
+**Receptions**
 
 - Trigger: at the moment the ball reaches the receiver sprite.
-- Scope: HCO skeleton receptions only. Do not apply to inbound passes, fast break outlet passes, OREB kickouts, or other non-HCO pass paths unless separately specified.
+- Scope: HCO, HCT, FCP, BIP, SIP, and Fast Break non-outlet receptions.
+- Exclusion: Fast Break outlet receptions use their dedicated outlet SFX path and should not also play these pass/reception SFX.
 - Receiver `(IQ + CH) > 130`: `receive-strong.wav`
 - Receiver `(IQ + CH) < 50`: `receive-weak.wav`
 - Else: `receive-medium.wav`

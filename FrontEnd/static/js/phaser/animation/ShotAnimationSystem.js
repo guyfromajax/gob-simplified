@@ -729,7 +729,7 @@ export class ShotAnimationSystem {
           scene: this.scene,
           passInfo,
           playerSprites: this.playerSprites,
-          enableHcoSfx: turnData?.current_turn === "HCO",
+          enablePassSfx: ["HCO", "HCT", "FCP"].includes(turnData?.current_turn),
         });
         await passPromise;
       }

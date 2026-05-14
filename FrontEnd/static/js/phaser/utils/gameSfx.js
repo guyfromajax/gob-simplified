@@ -240,28 +240,32 @@ export function playFreeThrowResultSfx(scene, result) {
   }
 }
 
-export function buildHcoPassSfxContext(scene, passerId, receiverId) {
+export function buildGameplayPassSfxContext(scene, passerId, receiverId) {
   const passerSprite = scene?.playerSprites?.[passerId];
   const receiverSprite = scene?.playerSprites?.[receiverId];
   const passerAttrs = passerSprite?.attributes || scene?.playerInfo?.[passerId]?.attributes || {};
   const receiverAttrs = receiverSprite?.attributes || scene?.playerInfo?.[receiverId]?.attributes || {};
   return {
-    hcoPass: true,
+    passSfx: true,
     passerPS: toNumber(passerAttrs.PS),
     receiverIQ: toNumber(receiverAttrs.IQ),
     receiverCH: toNumber(receiverAttrs.CH),
   };
 }
 
+export function buildHcoPassSfxContext(scene, passerId, receiverId) {
+  return buildGameplayPassSfxContext(scene, passerId, receiverId);
+}
+
 export function playHcoPassStartSfx(scene, sfxContext) {
-  if (!sfxContext?.hcoPass) return;
+  if (!sfxContext?.passSfx && !sfxContext?.hcoPass) return;
   const ps = toNumber(sfxContext.passerPS);
   const tier = ps != null && ps > 75 ? "strong" : ps != null && ps < 25 ? "weak" : "medium";
   playGameSfx(scene, `pass-${tier}.wav`, DEFAULT_VOLUME, { event: "pass_release", tier });
 }
 
 export function playHcoReceiveSfx(scene, sfxContext) {
-  if (!sfxContext?.hcoPass) return;
+  if (!sfxContext?.passSfx && !sfxContext?.hcoPass) return;
   const iq = toNumber(sfxContext.receiverIQ);
   const ch = toNumber(sfxContext.receiverCH);
   const receiverScore = (iq ?? 0) + (ch ?? 0);
