@@ -795,26 +795,8 @@ export function animateRebound({
               });
             }
             
-            // Announce rebound when rebounder reaches the ball
-            const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-            const rebounderTeam = rebounderSprite.team; // "home" or "away"
-            const rebounderTeamId = rebounderSprite.team_id;
-
-            // Handle both new nested structure (object) and old flat structure (string)
-            const homeTeamField = scene.simData?.home_team;
-            const awayTeamField = scene.simData?.away_team;
-            const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-            const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-            const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-
-            const playerData = {
-              playerId: rebounderId,
-              photo: rebounderSprite?.photo || null,
-              teamName: rebounderTeamName,
-              secondaryColor: getSecondaryColorForTeam(scene, rebounderTeamId)
-            };
-
-            showAnnouncement("Rebound!", rebounderTeam, playerData);
+            const { announceReboundHeadlineIfNeeded } = await import('../utils/announcements.js');
+            announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId);
             
             // Identify if this is OREB or DREB (rebounderTeamId already declared above on line 911)
             // Use outer scope variables or re-declare only what we need

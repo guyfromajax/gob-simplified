@@ -20,6 +20,7 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { playReboundSfx } from '../utils/gameSfx.js';
+import { announceReboundHeadlineIfNeeded } from '../utils/announcements.js';
 
 export class ReboundAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites) {
@@ -143,6 +144,12 @@ export class ReboundAnimationSystem {
       offset: this.reboundConfig.rebounderOffset
     });
     playReboundSfx(this.scene, 'DREB');
+    announceReboundHeadlineIfNeeded(
+      this.scene,
+      turnData,
+      rebounderSprite,
+      turnData.rebounder_id ?? turnData.rebounderId ?? turnData.rebounder_player_id
+    );
 
     // 3. Determine next play type (for logging only - actual handling done by next turn)
     const nextPlayType = this.determineNextPlayType(turnData);
@@ -175,6 +182,12 @@ export class ReboundAnimationSystem {
       offset: this.reboundConfig.rebounderOffset
     });
     playReboundSfx(this.scene, 'OREB');
+    announceReboundHeadlineIfNeeded(
+      this.scene,
+      turnData,
+      rebounderSprite,
+      turnData.rebounder_id ?? turnData.rebounderId ?? turnData.rebounder_player_id
+    );
 
     // 3. Determine offensive rebound outcome for logging only
     const outcome = this.determineOffensiveReboundOutcome(turnData);
@@ -288,15 +301,23 @@ export class ReboundAnimationSystem {
    * Helper methods
    */
   getRebounderSprite(turnData) {
-    const rebounderId = turnData.rebounder_id || turnData.player_id;
-    return this.playerSprites[rebounderId] || null;
+    const rebounderId =
+      turnData.rebounder_id ||
+      turnData.rebounderId ||
+      turnData.rebounder_player_id ||
+      turnData.player_id;
+    if (rebounderId == null || rebounderId === '') return null;
+    const sid = String(rebounderId);
+    return this.playerSprites[sid] || this.playerSprites[rebounderId] || null;
   }
 
   determineReboundType(turnData) {
     if (turnData.rebound_type) {
-      return turnData.rebound_type.toLowerCase().includes('defensive') ? 'defensive' : 'offensive';
+      const rt = String(turnData.rebound_type).toUpperCase();
+      if (rt === 'DREB' || rt.includes('DEFENSIVE')) return 'defensive';
+      if (rt === 'OREB' || rt.includes('OFFENSIVE')) return 'offensive';
     }
-    
+
     // Fallback logic based on result type
     if (turnData.result_type === 'DREB') return 'defensive';
     if (turnData.result_type === 'OREB') return 'offensive';

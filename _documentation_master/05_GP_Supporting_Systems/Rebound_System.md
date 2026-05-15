@@ -34,6 +34,16 @@ When the **last** free throw is missed, rebound selection runs in `resolve_free_
 - **Fallback:** If no one on **either** team passes the filter, the engine logs a warning and runs **`determine_rebounder`** again on **full lineups** (no x gate) so a rebound is always assigned.
 - **Scope:** Only **missed last FT** passes `max_x_delta_from_bounce` into `determine_rebounder`. HCO, fast break, and OREB putback-miss rebounds do **not** use this gate unless called with the same keyword explicitly in the future.
 
+## Frontend — "Rebound!" headline (primary overlay)
+
+When the rebounder **secures** the ball in animation, the client shows the primary **Rebound!** headline (portrait + team styling). Implementation details:
+
+- **Helper:** `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `FrontEnd/static/js/phaser/utils/announcements.js`.
+- **Idempotency:** When callers pass the authoritative turn object (`turnData`), the helper sets `turnData._reboundHeadlineShown` after display so `ballManager.animateRebound`, embedded `ShotAnimationSystem.handleEmbeddedRebound`, final-FT `animateRebound`, `ReboundAnimationSystem`, and `announceGameEvent('REBOUND', ...)` cannot double-fire for the same turn.
+- **Call sites:** `ballManager.js` (`animateRebound` rebounder tween `onComplete`), `ShotAnimationSystem.js` (embedded rebound `onComplete`, covers DREB and OREB including FAST_BREAK / `force_foul_after_dreb` branches that previously skipped the old outlet-only announce), `FreeThrowAnimationSystem.js` (passes `turnData` into `animateRebound`), `ReboundAnimationSystem.js` (after attach in defensive/offensive sequences), `gameAnnouncements.js` (`REBOUND` case).
+
+See `Announcement_System.md` for tiering, Block → Rebound ordering, and related flags (`_blockAnnounced`).
+
 ## OREB Putback Shot Defender
 
 OREB putbacks now use a proximity-qualified shot defender system instead of the old weighted-by-position shortcut.

@@ -26,6 +26,7 @@ import { clampGridCoords } from './courtClamp.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { runPass } from './ballTween.js';
 import { playShotLaunchSfx, playShotResultSfx, playGameSfx, playReboundSfx } from '../utils/gameSfx.js';
+import { announceReboundHeadlineIfNeeded } from '../utils/announcements.js';
 import { createBallTrail } from './createBallTrail.js';
 
 export class ShotAnimationSystem {
@@ -1378,7 +1379,13 @@ export class ShotAnimationSystem {
             offset: { x: 0, y: -10 }
           });
           playReboundSfx(this.scene, turnData.rebound_type);
-          
+          announceReboundHeadlineIfNeeded(
+            this.scene,
+            turnData,
+            rebounderSprite,
+            turnData.rebounderId
+          );
+
           // ✅ FIX: Stop get-back player animations when rebound is secured
           const beforeKillGetBack = getTweenManagerState();
           if (this._getBackTweens) {
@@ -1649,23 +1656,8 @@ export class ShotAnimationSystem {
     // ✅ Force Foul after DREB: skip outlet — foul turn animates defender→rebounder and "Quick Foul"
     if ((nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && !turnData.force_foul_after_dreb) {
       // ✅ REMOVED: Defensive rebound logging (cluttering console)
-      
-      // ✅ FIX: Announce rebound before outlet animation
-      // ballManager only announces rebounds for its own rebound positioning code
-      // Outlet pass system needs to announce too
-      const { showAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-      const rebounderSprite = this.playerSprites[turnData.rebounderId];
-      if (rebounderSprite) {
-        const rebounderTeam = rebounderSprite.team; // "home" or "away"
-        const playerData = {
-          playerId: turnData.rebounderId,
-          photo: rebounderSprite.photo || null,
-          teamName: rebounderSprite.team_id,
-          secondaryColor: getSecondaryColorForTeam(this.scene, rebounderSprite.team_id)
-        };
-        showAnnouncement("Rebound!", rebounderTeam, playerData);
-      }
-      
+      // "Rebound!" fires at rebound secure in handleEmbeddedRebound (announceReboundHeadlineIfNeeded).
+
       try {
         // Import and use the same function that works for free throws
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');

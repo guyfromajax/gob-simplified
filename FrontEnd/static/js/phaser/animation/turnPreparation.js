@@ -361,7 +361,7 @@ export async function finalizeTurnAfterAnimation({
       turnoverType: turn.turnover_type 
     });
   }
-  // Note: MAKE, MISS, FREE_THROW, REBOUND announced in their respective animation systems (ballManager, FreeThrowAnimationSystem)
+  // Note: MAKE, MISS, FREE_THROW rebounds — result headlines in animation layers (ballManager, ShotAnimationSystem, announceReboundHeadlineIfNeeded); standalone REBOUND in ReboundAnimationSystem.
   
   // Call onUpdate callback if provided
   if (onUpdate) {

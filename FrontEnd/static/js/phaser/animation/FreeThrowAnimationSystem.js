@@ -688,7 +688,8 @@ export class FreeThrowAnimationSystem {
       rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
       ballSpot: miss.grid,
       shooterId: turnData.shooter_id,
-      preserveBallPosition: true  // ✅ FIX: Ball is already at bounce spot, don't move it
+      preserveBallPosition: true, // ✅ FIX: Ball is already at bounce spot, don't move it
+      turnData,
     });
 
     // Safety attach for FT miss -> DREB path before outlet setup logic.

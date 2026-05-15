@@ -17,6 +17,7 @@ import {
   buildSecondaryStopperPlayerData,
   playAnnouncementSfx,
   getFastBreakPlayLabel,
+  announceReboundHeadlineIfNeeded,
 } from './announcements.js';
 import { playBlockAnnounceCourtSfx, playChargeAnnounceCourtSfx } from './gameSfx.js';
 import {
@@ -255,21 +256,15 @@ function handleFreeThrowMakeAnnouncement(turnData, scene, context, offenseTeam) 
 }
 
 function handleReboundAnnouncement(turnData, scene, context) {
-  const rebounderId = context.rebounderId || turnData.rebounderId || turnData.rebounder_id;
+  const rebounderId = context?.rebounderId ?? turnData?.rebounderId ?? turnData?.rebounder_id;
   if (!rebounderId || !scene) return;
 
-  const rebounderSprite = scene.playerSprites?.[rebounderId];
+  const sid = String(rebounderId);
+  const rebounderSprite =
+    scene.playerSprites?.[sid] ?? scene.playerSprites?.[rebounderId] ?? null;
   if (!rebounderSprite) return;
 
-  const rebounderTeam = rebounderSprite.team; // "home" or "away"
-  const playerData = {
-    playerId: rebounderId,
-    photo: rebounderSprite.photo || null,
-    teamName: rebounderSprite.team_id,
-    secondaryColor: getSecondaryColorForTeam(scene, rebounderSprite.team_id)
-  };
-
-  showAnnouncement("Rebound!", rebounderTeam, playerData);
+  announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, sid);
 }
 
 function handleBlockAnnouncement(turnData, scene, context) {

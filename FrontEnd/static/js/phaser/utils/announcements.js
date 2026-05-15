@@ -314,6 +314,49 @@ export function getFastBreakPlayLabel(playKey) {
 }
 
 /**
+ * Primary "Rebound!" headline when the rebounder secures the ball (center overlay).
+ * Idempotent per turn when `turnData` is provided: sets `turnData._reboundHeadlineShown`
+ * after a successful display so ballManager, ShotAnimationSystem, FT/FB paths, and
+ * `announceGameEvent('REBOUND', ...)` cannot double-fire for the same backend turn.
+ *
+ * @param {import('phaser').Scene} scene
+ * @param {object|null|undefined} turnData
+ * @param {object|null|undefined} rebounderSprite
+ * @param {string|number|null|undefined} rebounderId - Preferred id when sprite keys omit `playerId`
+ * @returns {boolean} true if the headline was shown
+ */
+export function announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId = null) {
+  if (!scene || !rebounderSprite) return false;
+  if (turnData && turnData._reboundHeadlineShown) return false;
+
+  const pid =
+    rebounderId != null && rebounderId !== ''
+      ? String(rebounderId)
+      : String(rebounderSprite.playerId ?? rebounderSprite.id ?? '');
+  if (!pid) return false;
+
+  const rebounderTeam = rebounderSprite.team;
+  const rebounderTeamId = rebounderSprite.team_id;
+  const homeTeamField = scene.simData?.home_team;
+  const awayTeamField = scene.simData?.away_team;
+  const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+  const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+  const rebounderTeamName =
+    rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+
+  const playerData = {
+    playerId: pid,
+    photo: rebounderSprite.photo || null,
+    teamName: rebounderTeamName,
+    secondaryColor: getSecondaryColorForTeam(scene, rebounderTeamId),
+  };
+
+  showAnnouncement('Rebound!', rebounderTeam, playerData);
+  if (turnData) turnData._reboundHeadlineShown = true;
+  return true;
+}
+
+/**
  * Show an announcement — uses new announcement strip (standard variant).
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
  * @param {string} team - 'home', 'away', 'defense', or 'neutral' (unused by strip; kept for API)
@@ -389,8 +432,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     }
   } else if (timing === 'end') {
     // Announcements at turn end (after animation)
-    // Note: "It's Good!" and "Rebound!" are now handled directly in ballManager.js
-    // for precise timing when ball reaches rim/rebounder
+    // Note: "It's Good!" and "Rebound!" use animation-timed helpers (`ballManager`, `ShotAnimationSystem`,
+    // `announceReboundHeadlineIfNeeded` in `announcements.js`) for precise timing when the ball reaches rim/rebounder.
 
     // Charge: offensive foul on drive - announce "Charge!" (not "Offensive Foul!")
     if (turnData.result_type === 'CHARGE') {
