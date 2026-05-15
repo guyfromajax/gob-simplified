@@ -15,6 +15,7 @@ import {
   animateKickoutReset
 } from "./ballManager.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
+import { playGameplayTrack } from "../../musicController.js";
 import { runPass, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
@@ -819,6 +820,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
             // ✅ Attach ball to SF when SF reaches the inbound spot (matching BIP behavior)
             if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
               attachBallToPlayer(scene, ballSprite, sfSprite);
+              playGameplayTrack();
               animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
               const holdMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
               await new Promise(resolve => setTimeout(resolve, holdMs));
@@ -830,6 +832,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
             // ✅ Also attach on stop (in case tween is interrupted)
             if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
               attachBallToPlayer(scene, ballSprite, sfSprite);
+              playGameplayTrack();
               animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
               const holdMs = animationConfig.inbound?.holdAfterPlaceMs ?? 200;
               await new Promise(resolve => setTimeout(resolve, holdMs));
@@ -3251,6 +3254,9 @@ async function runInboundSetup({
 
   animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
+  // Start gameplay background loop when the inbound receiver gets the ball.
+  // No-op if already playing (regular in-play inbounds during ongoing gameplay).
+  playGameplayTrack();
 
   animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   // Removed 1000ms pause for smoother transitions

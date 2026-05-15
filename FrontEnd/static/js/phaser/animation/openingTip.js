@@ -10,6 +10,7 @@ import { gridToPixels } from "../utils/gridToPixels.js";
 import { getPlayerDuration } from "./turnAnimation.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { playGameSfx } from "../utils/gameSfx.js";
+import { playGameplayTrack } from "../../musicController.js";
 
 const INITIAL_HOLD_DURATION = 2000; // Hold starting positions for 2 seconds (reduced from 4 seconds)
 const ENTRANCE_HOLD_DURATION = 300;
@@ -265,6 +266,8 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
                     event: "opening_tip_won",
                     tipWinnerId: tipWinnerSprite.playerId,
                 });
+                // Start gameplay background loop immediately after the tip-winner SFX.
+                playGameplayTrack();
                 // Set flag so first HCO turn knows ball is already attached (like _previousTurnWasInbound)
                 scene._previousTurnWasOpeningTip = true;
                 

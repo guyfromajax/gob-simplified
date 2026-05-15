@@ -22,6 +22,7 @@ import { gridToPixels } from '../utils/gridToPixels.js';
 import animationConfig from './animation_config.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { playFreeThrowResultSfx } from '../utils/gameSfx.js';
+import { playGameplayTrack } from '../../musicController.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -375,6 +376,9 @@ export class FreeThrowAnimationSystem {
     // Attach ball to shooter
     if (shooterSprite) {
       this.ballController.attachToPlayer(shooterSprite);
+      // Start gameplay background loop when FT shooter takes the ball.
+      // No-op if already playing (mid-game FT after a regular shot foul).
+      playGameplayTrack();
     }
 
     // ✅ REMOVED: Free throw positioning complete logging (cluttering console)

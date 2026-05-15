@@ -2863,6 +2863,15 @@ async function init() {
     console.log(`⏱️ [PERF] FCC init() COMPLETE: ${(initEndTime - initStartTime).toFixed(2)}ms`);
   } finally {
     hideFccLoadingOverlay();
+    // Start the FCC background music loop. Random pick (50/50) between the two
+    // scouting tracks per visit. Page unload (Green Action Button → nav) tears
+    // down the audio naturally — no explicit stop hooks needed.
+    try {
+      const { playFccTrack } = await import('/js/musicController.js');
+      playFccTrack();
+    } catch (musicErr) {
+      console.warn('[fcc] background music init failed', musicErr);
+    }
   }
 }
 
