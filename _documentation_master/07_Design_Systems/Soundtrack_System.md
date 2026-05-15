@@ -91,7 +91,7 @@ A single track loops while the user is in the pre-game / between-game setup flow
 
 ### Track
 
-- `Timeout Loop.mp3` (~5 sec). Looped continuously via `audio.loop = true`. Short ambient bed; the loop point is barely audible.
+- `Timeout_Loop.wav` (~17 sec). WAV chosen so the loop is gapless — MP3 encoders pad silence at the file boundaries, which browsers honor when looping. WAV avoids the issue entirely.
 
 ### Page roles
 
@@ -127,7 +127,7 @@ Two tracks switch dynamically based on game state. Separate from the FCC soundtr
 
 ### Tracks
 
-- **Default — `arcade-pulse-1.mp3`** (~5 min): standard gameplay loop. Plays in Q1–Q3 and the early portion of Q4.
+- **Default — `arcade-pulse-1.mp3`** (~5 min): standard gameplay loop. Plays in Q1–Q3 and the early portion of Q4. Stays MP3 because the 5-minute length means the loop boundary only hits rarely; the file-size savings (~7 MB vs ~57 MB as WAV) outweigh the brief loop-gap.
 - **Crunch — `pixel-pulse-1.mp3`** (~30 sec): tension loop. Plays whenever the game is in late-Q4 close-and-late or in any overtime quarter.
 
 ### Switching rules

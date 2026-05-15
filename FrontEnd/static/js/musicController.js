@@ -22,7 +22,7 @@ const GAMEPLAY_CRUNCH_TRACK = "pixel-pulse-1.mp3";
 // Q4 crunch-time gate: less than 121 seconds remaining AND score difference of 6 or fewer.
 const CRUNCH_TIME_SECONDS = 121;
 const CRUNCH_SCORE_DIFF = 6;
-const TIMEOUT_LOOP_TRACK = "Timeout Loop.mp3";
+const TIMEOUT_LOOP_TRACK = "Timeout_Loop.wav";
 const DEFAULT_VOLUME = 0.4;
 const STATE_KEY = "franchise_music_state";
 const TIMEOUT_STATE_KEY = "timeout_loop_music_state";
