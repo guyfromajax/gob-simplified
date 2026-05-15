@@ -94,10 +94,14 @@ Constants are at the top of [musicController.js](FrontEnd/static/js/musicControl
 
 ### Start triggers
 
-- **On court.html entry**: `evaluateGameplayTrack()` runs with quarter + clock + score from URL params and picks the right track. Fires immediately for timeout return, quarter break, and foul-out resume.
-- **Q1 Opening Tip exception**: when the user enters court.html for the Q1 opening tip (`quarter === 1` AND `resume_from_timeout` absent/false), the on-load hook is skipped. Music starts after the tip-winner SFX (`attack-shot-strong.wav`) fires in openingTip.js, which calls `playGameplayTrack()` — the default-track variant. Q1 opening tip always uses the Default track since the score is 0–0 and clock is full.
-- **Per-turn re-evaluation**: after every turn animation, `updateScoreboard(turn)` calls `evaluateGameplayTrack` with the post-turn quarter / clock / score. This is what flips Default ↔ Crunch when conditions change.
-- **Legacy inbound / FT triggers**: the inbound-pass-reception and FT-shooter-ball-take hooks added earlier still call `playGameplayTrack()`. Under the new model, `playGameplayTrack()` is a no-op when any track is already loaded, so these can't accidentally downgrade Crunch back to Default. Kept as defensive belts-and-braces for code paths that might skip the on-load hook.
+Music start is deferred until **after the Defense Matchups modal flow resolves**, with the Q1 Opening Tip carve-out preserved. Concretely:
+
+- **Modal-tied start (default path)**: in `gameScene.js create()`, after the `await showDefenseMatchupsPopup(...)` block, `evaluateGameplayTrack()` fires with quarter + clock + score from URL params.
+  - If the modal **renders** (Q1/quarter-break/timeout entry, animate=true, don't-show-again not set): the `await` blocks until the user clicks **Submit Matchups**. Music starts on submit.
+  - If the modal **does not render** (don't-show-again is set, animate=false, or `shouldShowMatchupsPopup` is false): the `await` resolves immediately and music starts immediately on court.html entry.
+- **Q1 Opening Tip exception**: gated by `if (!isQ1Start)`. Even after the modal submit, music does not start for the opening tip. It waits for the tip-winner SFX (`attack-shot-strong.wav`) which fires in openingTip.js, where `playGameplayTrack()` is called. Q1 opening tip always uses the Default track since score is 0–0 and clock is full.
+- **Per-turn re-evaluation**: after every real turn animation, `updateScoreboard(turn)` calls `evaluateGameplayTrack` with the post-turn quarter / clock / score. This is what flips Default ↔ Crunch when conditions change. Skipped on the initial pre-turn scoreboard paint (`isInitialUpdate` flag) so it can't override the modal-tied start moment.
+- **Legacy inbound / FT triggers**: the inbound-pass-reception and FT-shooter-ball-take hooks added earlier still call `playGameplayTrack()`. Under the new model, `playGameplayTrack()` is a no-op when any track is already loaded, so these can't accidentally downgrade Crunch back to Default. Kept as defensive belts-and-braces for code paths that might skip the modal-tied start.
 
 ### Pause / Resume
 
@@ -141,7 +145,7 @@ Conversely, the gameplay track is fully scoped to court.html — leaving court.h
 
 ### Gameplay track (court.html)
 
-- **On-load evaluator**: [gameScene.js](FrontEnd/static/js/phaser/gameScene.js) `create()` — `evaluateGameplayTrack({quarter, clock, homeScore, awayScore})` gated by `if (!isQ1Start)`. Uses URL params for initial state.
+- **Modal-tied start hook**: [gameScene.js](FrontEnd/static/js/phaser/gameScene.js) `create()` — `evaluateGameplayTrack({quarter, clock, homeScore, awayScore})` placed immediately after the `await showDefenseMatchupsPopup(...)` block, gated by `if (!isQ1Start)`. Uses URL params for initial state. Fires either on modal submit or immediately when the modal is skipped.
 - **Per-turn re-evaluator**: [gameScene.js](FrontEnd/static/js/phaser/gameScene.js) `updateScoreboard()` — `evaluateGameplayTrack(...)` after `liveQuarter` is set and the clock/score are synced. Fires for every turn.
 - **Q1 Opening Tip start**: [openingTip.js](FrontEnd/static/js/phaser/animation/openingTip.js) `animateConvergence` — `playGameplayTrack()` (no args → Default track) right after the `attack-shot-strong.wav` SFX fires. Only fires when the on-load hook was skipped.
 - **Legacy inbound start (defensive)**: [turnAnimation.js](FrontEnd/static/js/phaser/animation/turnAnimation.js) at the BIP and SIP `attachBallToPlayer(scene, ballSprite, sfSprite)` lines. No-op since `playGameplayTrack` only starts when nothing is loaded.

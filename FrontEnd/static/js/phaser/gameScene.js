@@ -806,20 +806,14 @@ export function createGameScene(Phaser) {
       const isTimeoutOrFoulOutResume = resumeFromTimeout;
       this.shouldShowMatchupsPopup = (isQ1Start || isQuarterBreakEntry || isTimeoutOrFoulOutResume) && this.gameId;
 
-      // Gameplay background music: start immediately on every entry to
-      // court.html except the Q1 opening tip, which waits for the tip-winner
-      // SFX in openingTip.js. Q1 timeout/foul-out resumes count as not-tip.
-      // Use evaluateGameplayTrack so Q4 crunch and OT entries land on the
-      // correct track from the first frame instead of switching after the
-      // first turn.
-      if (!isQ1Start) {
-        evaluateGameplayTrack({
-          quarter: this.quarter,
-          clock: urlParams.get('clock'),
-          homeScore: urlParams.get('home_score'),
-          awayScore: urlParams.get('away_score'),
-        });
-      }
+      // Gameplay background music start is deferred until after the Defense
+      // Matchups modal flow completes (see below, right after
+      // `showDefenseMatchupsPopup`). That hook handles both cases:
+      //   - Modal renders → user clicks Submit → await resolves → music starts.
+      //   - Modal doesn't render (don't-show-again, sim mode, etc.) → control
+      //     reaches the hook immediately and music starts.
+      // Q1 opening tip is still gated separately — music waits for the
+      // tip-winner SFX in openingTip.js regardless of modal flow.
       
       // Reset pause state BEFORE killing tweens
       this.isPaused = false;
@@ -2237,15 +2231,23 @@ export function createGameScene(Phaser) {
           livePeriodLabel = turn.quarter > 4 ? `OT${turn.quarter - 4}` : `Q${turn.quarter}`;
         }
 
-        // Reactive gameplay music: every turn re-evaluates which track
+        // Reactive gameplay music: every real turn re-evaluates which track
         // should play. Switches to/from crunch (pixel-pulse) and default
         // (arcade-pulse) are hard-cut at this boundary.
-        evaluateGameplayTrack({
-          quarter: liveQuarter,
-          clock: this.gameClock?.getState?.()?.timeRemaining,
-          homeScore: liveScore[homeTeam],
-          awayScore: liveScore[awayTeam],
-        });
+        //
+        // Skip on the initial pre-turn render — that fires before any
+        // animation runs and would start music during the Q1 opening-tip
+        // window where we explicitly want silence until the tip-winner SFX.
+        // The on-load evaluator in create() has already set the right
+        // initial track for non-opening-tip entries.
+        if (!isInitialUpdate) {
+          evaluateGameplayTrack({
+            quarter: liveQuarter,
+            clock: this.gameClock?.getState?.()?.timeRemaining,
+            homeScore: liveScore[homeTeam],
+            awayScore: liveScore[awayTeam],
+          });
+        }
 
         // ✅ REFACTOR: Direct DOM updates for all scoreboard items (consistent pattern)
         if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
@@ -2649,13 +2651,28 @@ export function createGameScene(Phaser) {
               if (isNewGame) {
                 resetDontShowAgainFlag(this.gameId);
               }
-              
+
               // Show popup and wait for user to submit before starting animation
               await showDefenseMatchupsPopup(this.gameId, this);
             } catch (error) {
               console.error('❌ DEFENSE MATCHUPS: Failed to show popup:', error);
               // Don't block gameplay if popup fails
             }
+          }
+
+          // Gameplay music: starts now for every non-Q1-opening-tip entry.
+          // If the Defense Matchups modal rendered, the await above blocked
+          // until the user clicked Submit Matchups → music starts on submit.
+          // If the modal was skipped (don't-show-again, sim mode), music
+          // starts immediately. Q1 opening tip is still deferred to the
+          // tip-winner SFX in openingTip.js.
+          if (!isQ1Start) {
+            evaluateGameplayTrack({
+              quarter: this.quarter,
+              clock: urlParams.get('clock'),
+              homeScore: urlParams.get('home_score'),
+              awayScore: urlParams.get('away_score'),
+            });
           }
 
           this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1.5);  // 50% larger
