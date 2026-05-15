@@ -196,8 +196,11 @@
   <script src="/js/shared/pointerValidation.js"></script>
   <script src="/set-lineup.js?v=__BUILD_TS__"></script>
   <script type="module">
-    import { clearFranchiseMusicState } from '/js/musicController.js';
-    clearFranchiseMusicState();
+    import { startTimeoutLoop } from '/js/musicController.js';
+    // startTimeoutLoop internally clears the franchise-music state (mutually
+    // exclusive) and either resumes the timeout-loop from a saved position
+    // (when returning from game-plan.html) or starts fresh on first visit.
+    startTimeoutLoop();
   </script>
 </body>
 </html>

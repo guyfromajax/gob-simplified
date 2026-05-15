@@ -22,11 +22,15 @@ const GAMEPLAY_CRUNCH_TRACK = "pixel-pulse-1.mp3";
 // Q4 crunch-time gate: less than 121 seconds remaining AND score difference of 6 or fewer.
 const CRUNCH_TIME_SECONDS = 121;
 const CRUNCH_SCORE_DIFF = 6;
+const TIMEOUT_LOOP_TRACK = "Timeout Loop.mp3";
 const DEFAULT_VOLUME = 0.4;
 const STATE_KEY = "franchise_music_state";
+const TIMEOUT_STATE_KEY = "timeout_loop_music_state";
+const SCOUTING_AMBIENCE_KEY = "gob_scouting_ambience_enabled";
 
 let franchiseAudio = null;
 let gameplayAudio = null;
+let timeoutAudio = null;
 
 function soundsBasePath() {
   if (typeof window !== "undefined" && window.API_CONFIG?.buildStaticPath) {
@@ -106,14 +110,105 @@ function playAudio(audio, label) {
   }
 }
 
+// --- Scouting Ambience preference ---
+// Master switch for the franchise / scouting tracks. Lives in localStorage
+// (device-local). Default is enabled — the only way it goes false is via the
+// Account Settings modal. The timeout-loop and gameplay music are NOT gated
+// by this flag.
+
+export function isScoutingAmbienceEnabled() {
+  try {
+    const raw = localStorage.getItem(SCOUTING_AMBIENCE_KEY);
+    if (raw == null) return true; // default on
+    return raw !== "false";
+  } catch (_err) {
+    return true;
+  }
+}
+
+export function setScoutingAmbienceEnabled(enabled) {
+  try {
+    localStorage.setItem(SCOUTING_AMBIENCE_KEY, enabled ? "true" : "false");
+  } catch (_err) {
+    /* ignore */
+  }
+  debugLog("ambience_set", { enabled });
+}
+
+/**
+ * Path-aware "start music now" helper used when the user flips the Ambience
+ * toggle from Off to On. Picks the right entry point for the current page.
+ * No-op when ambience is disabled or the current page isn't a scouting-music
+ * page.
+ */
+export function tryStartScoutingAmbienceForCurrentPage() {
+  if (!isScoutingAmbienceEnabled()) return;
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname || "";
+  if (path.endsWith("/franchise-command-center.html")) {
+    playFccTrack();
+    return;
+  }
+  if (path.endsWith("/game-plan.html")) {
+    resumeMusicForGamePlan();
+    return;
+  }
+  if (
+    path.endsWith("/standings.html") ||
+    path.endsWith("/rankings.html") ||
+    path.endsWith("/team-roster-view.html") ||
+    path.endsWith("/box-score.html") ||
+    path.endsWith("/recruiting.html") ||
+    path.endsWith("/recruiting-results.html") ||
+    path.endsWith("/training-report.html")
+  ) {
+    resumeFranchiseTrack();
+  }
+}
+
+function readTimeoutState() {
+  try {
+    const raw = localStorage.getItem(TIMEOUT_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.currentTime !== "number") return null;
+    return parsed;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function writeTimeoutState(audio) {
+  if (!audio || audio.dataset.musicKilled === "1") return;
+  try {
+    localStorage.setItem(TIMEOUT_STATE_KEY, JSON.stringify({
+      currentTime: audio.currentTime || 0,
+    }));
+  } catch (_err) {
+    /* ignore */
+  }
+}
+
+function attachTimeoutStatePersistence(audio) {
+  audio.addEventListener("timeupdate", () => writeTimeoutState(audio));
+  window.addEventListener("beforeunload", () => writeTimeoutState(audio));
+}
+
 /**
  * Start the franchise music loop on FCC entry. Symmetric with the rest of the
  * franchise pages: if persisted state exists, resume from it (so a round-trip
  * Standings → FCC carries through the same track). If state is empty (first
  * visit of a session, after a kill point, or after a boundary page wiped it),
  * roll a fresh random pick and start from the beginning.
+ *
+ * Mutually exclusive with the timeout-loop track: clears its state on entry.
  */
 export function playFccTrack() {
+  clearTimeoutLoopState();
+  if (!isScoutingAmbienceEnabled()) {
+    debugLog("fcc_skipped_ambience_off");
+    return;
+  }
   if (franchiseAudio && !franchiseAudio.paused) {
     debugLog("fcc_already_playing", { file: franchiseAudio.dataset.musicTrack });
     return;
@@ -143,6 +238,10 @@ export function playFccTrack() {
  * page (e.g. box-score reached from EOG modal, training-report from training.js).
  */
 export function resumeFranchiseTrack() {
+  if (!isScoutingAmbienceEnabled()) {
+    debugLog("resume_skipped_ambience_off");
+    return;
+  }
   if (franchiseAudio && !franchiseAudio.paused) return;
   const state = readState();
   if (!state) {
@@ -271,4 +370,90 @@ export function pauseGameplayTrack() {
 export function resumeGameplayTrack() {
   if (!gameplayAudio || !gameplayAudio.paused) return;
   playAudio(gameplayAudio, "gameplay_resume");
+}
+
+/**
+ * Start the timeout-loop track. Used on set-lineup.html entry. If timeout
+ * state already exists in localStorage (i.e. the user just came back from
+ * game-plan.html), resume from the saved `currentTime`; otherwise start
+ * fresh from the beginning.
+ *
+ * Mutually exclusive with the franchise track: clears its state on entry.
+ */
+export function startTimeoutLoop() {
+  clearFranchiseMusicState();
+  if (timeoutAudio && !timeoutAudio.paused) {
+    debugLog("timeout_already_playing");
+    return;
+  }
+  const state = readTimeoutState();
+  if (state) {
+    timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK);
+    attachTimeoutStatePersistence(timeoutAudio);
+    timeoutAudio.currentTime = state.currentTime || 0;
+    debugLog("timeout_resume", { t: state.currentTime });
+    playAudio(timeoutAudio, "timeout_resume");
+    return;
+  }
+  timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK);
+  attachTimeoutStatePersistence(timeoutAudio);
+  timeoutAudio.currentTime = 0;
+  writeTimeoutState(timeoutAudio);
+  debugLog("timeout_fresh_start");
+  playAudio(timeoutAudio, "timeout_fresh");
+}
+
+/**
+ * Resume the timeout-loop on opt-in pages (currently only game-plan when
+ * the user arrived from set-lineup). No-op when state is empty.
+ */
+export function resumeTimeoutLoop() {
+  if (timeoutAudio && !timeoutAudio.paused) return;
+  const state = readTimeoutState();
+  if (!state) {
+    debugLog("timeout_resume_no_state");
+    return;
+  }
+  timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK);
+  attachTimeoutStatePersistence(timeoutAudio);
+  timeoutAudio.currentTime = state.currentTime || 0;
+  debugLog("timeout_resume", { t: state.currentTime });
+  playAudio(timeoutAudio, "timeout_resume");
+}
+
+/**
+ * Hard stop on the timeout-loop and wipe persisted state. Called by:
+ *   - Boundary pages on load (court.html)
+ *   - Kill-point handlers (FCC entry via playFccTrack)
+ */
+export function clearTimeoutLoopState() {
+  if (timeoutAudio) {
+    timeoutAudio.dataset.musicKilled = "1";
+    timeoutAudio.pause();
+    timeoutAudio.currentTime = 0;
+    timeoutAudio = null;
+  }
+  try {
+    localStorage.removeItem(TIMEOUT_STATE_KEY);
+  } catch (_err) {
+    /* ignore */
+  }
+  debugLog("timeout_state_cleared");
+}
+
+/**
+ * Dispatcher for game-plan.html, which is a crossover page reached from
+ * either FCC (franchise music in flight) or set-lineup (timeout loop in
+ * flight). Picks whichever state is present; silent if neither.
+ *
+ * Timeout-loop takes precedence when both somehow exist — the user just
+ * came from set-lineup, where startTimeoutLoop already wiped franchise
+ * state, so this is purely defensive.
+ */
+export function resumeMusicForGamePlan() {
+  if (readTimeoutState()) {
+    resumeTimeoutLoop();
+    return;
+  }
+  resumeFranchiseTrack();
 }

@@ -139,7 +139,10 @@ let hasUnsavedChanges = false;
 let lastSavedSettings = null;
 let toastTimer = null;
 let toastHideTimer = null;
-let saveReturnTimer = null;
+
+/** Match `.toast` enter transition in `game-plan.css` (transform + opacity). */
+const TOAST_ENTER_TRANSITION_MS = 220;
+const TOAST_POST_LAND_BUFFER_MS = 100;
 
 /** True when game-plan was opened from FCC / TCC (not from set-lineup). */
 function isGamePlanFromCommandCenter() {
@@ -152,20 +155,12 @@ function isGamePlanFromCommandCenter() {
   );
 }
 
-/** After Save Game Plan: return to FCC/TCC or set-lineup (same destinations as manual back). */
-function scheduleNavigateAfterSaveGamePlan() {
-  if (saveReturnTimer) {
-    clearTimeout(saveReturnTimer);
-    saveReturnTimer = null;
+function navigateAfterSaveGamePlanFromToast() {
+  if (isGamePlanFromCommandCenter()) {
+    executeNavigateToCommandCenter();
+  } else {
+    executeNavigateBack();
   }
-  saveReturnTimer = setTimeout(() => {
-    saveReturnTimer = null;
-    if (isGamePlanFromCommandCenter()) {
-      executeNavigateToCommandCenter();
-    } else {
-      executeNavigateBack();
-    }
-  }, 2000);
 }
 
 // Slider mappings (note: all go to strategy_settings now for unified backend handling)
@@ -229,10 +224,23 @@ function showToast(title, subtitle = '', options = {}) {
   }
   requestAnimationFrame(() => {
     toast.classList.add('visible');
+    if (typeof options.onAfterLand === 'function') {
+      const landMs = TOAST_ENTER_TRANSITION_MS + TOAST_POST_LAND_BUFFER_MS;
+      setTimeout(() => {
+        try {
+          options.onAfterLand();
+        } catch (e) {
+          console.error('[GAME-PLAN] onAfterLand callback failed', e);
+        }
+      }, landMs);
+    }
   });
-  toastTimer = setTimeout(() => {
-    dismissToast();
-  }, 3000);
+  const dismissAfterMs = typeof options.autoDismissMs === 'number' ? options.autoDismissMs : 3000;
+  if (dismissAfterMs > 0) {
+    toastTimer = setTimeout(() => {
+      dismissToast();
+    }, dismissAfterMs);
+  }
 }
 
 function showModal(message) {
@@ -568,12 +576,13 @@ async function saveGamePlan() {
     lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
     hasUnsavedChanges = false;
     
-    showToast('Game Plan Saved', 'Changes applied successfully');
+    showToast('Game Plan Saved', 'Changes applied successfully', {
+      onAfterLand: navigateAfterSaveGamePlanFromToast,
+      autoDismissMs: 0,
+    });
 
     const saveBtn = document.getElementById('btn-save-game-plan');
     if (saveBtn) saveBtn.disabled = true;
-
-    scheduleNavigateAfterSaveGamePlan();
   } catch (err) {
     console.error('Error saving settings:', err);
     showModal('An error occurred while saving. Please try again.');

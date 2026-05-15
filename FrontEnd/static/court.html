@@ -6852,8 +6852,11 @@
   </script>
 
   <script type="module">
-    import { clearFranchiseMusicState } from '/js/musicController.js';
+    import { clearFranchiseMusicState, clearTimeoutLoopState } from '/js/musicController.js';
+    // Game start: kill any franchise or timeout-loop audio carried over from
+    // FCC / set-lineup / game-plan. court.html owns its own gameplay music.
     clearFranchiseMusicState();
+    clearTimeoutLoopState();
   </script>
 
 </body>

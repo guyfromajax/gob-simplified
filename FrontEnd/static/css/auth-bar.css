@@ -519,7 +519,8 @@ body.has-auth-bar {
   transition: transform 0.22s ease;
 }
 
-.account-display-pill.is-team-colors .account-display-pill-thumb {
+.account-display-pill.is-team-colors .account-display-pill-thumb,
+.account-display-pill.is-off .account-display-pill-thumb {
   transform: translateX(100%);
 }
 
@@ -537,8 +538,9 @@ body.has-auth-bar {
   transition: color 0.2s;
 }
 
-.account-display-pill:not(.is-team-colors) .account-display-pill-option-left,
-.account-display-pill.is-team-colors .account-display-pill-option-right {
+.account-display-pill:not(.is-team-colors):not(.is-off) .account-display-pill-option-left,
+.account-display-pill.is-team-colors .account-display-pill-option-right,
+.account-display-pill.is-off .account-display-pill-option-right {
   color: #ffffff;
 }
 

@@ -130,13 +130,12 @@
       '      <div id="account-settings-username" class="account-settings-value">-</div>',
       '    </div>',
       '    <div class="account-settings-row">',
-      '      <div class="account-settings-label">Display</div>',
-      '      <button type="button" id="account-display-pill" class="account-display-pill" aria-label="Display color toggle" aria-pressed="false">',
+      '      <div class="account-settings-label">Scouting Ambience</div>',
+      '      <button type="button" id="account-ambience-pill" class="account-display-pill" aria-label="Scouting ambience toggle" aria-pressed="true">',
       '        <span class="account-display-pill-thumb" aria-hidden="true"></span>',
-      '        <span class="account-display-pill-option account-display-pill-option-left">Default</span>',
-      '        <span class="account-display-pill-option account-display-pill-option-right">Team Colors</span>',
+      '        <span class="account-display-pill-option account-display-pill-option-left">On</span>',
+      '        <span class="account-display-pill-option account-display-pill-option-right">Off</span>',
       '      </button>',
-      '      <div id="account-display-help" class="account-display-help"></div>',
       '    </div>',
       '  </div>',
       '</div>'
@@ -576,24 +575,21 @@
 
   function refreshAccountSettingsModal() {
     var usernameEl = document.getElementById('account-settings-username');
-    var helpEl = document.getElementById('account-display-help');
-    var pill = document.getElementById('account-display-pill');
-    if (!usernameEl || !helpEl || !pill) return;
+    var pill = document.getElementById('account-ambience-pill');
+    if (!usernameEl || !pill) return;
 
     var meData = authMeDataCache || window.__gobAuthMeData || {};
-    var settings = normalizeAccountSettings(meData.account_settings);
-    var displayColor = settings.display_color;
-    var context = getDisplayContext();
-    var canUseTeamColors = !!(context && context.teamPrimaryColor && (context.hasActiveFranchiseTeam !== false));
-    var effectiveDisplayColor = canUseTeamColors ? displayColor : 'default';
     usernameEl.textContent = meData.username || meData.email || 'Coach';
-    pill.classList.toggle('is-team-colors', effectiveDisplayColor === 'team_colors');
-    pill.disabled = !canUseTeamColors;
-    pill.classList.toggle('is-dead', !canUseTeamColors);
-    pill.setAttribute('aria-pressed', effectiveDisplayColor === 'team_colors' ? 'true' : 'false');
-    helpEl.textContent = canUseTeamColors
-      ? ''
-      : 'Team Colors is only available with an active franchise team.';
+
+    // Read the Scouting Ambience flag from the music controller (localStorage).
+    // `is-off` class slides the thumb right to the "Off" option.
+    var enabled = true;
+    try {
+      var raw = localStorage.getItem('gob_scouting_ambience_enabled');
+      enabled = raw == null ? true : raw !== 'false';
+    } catch (_e) {}
+    pill.classList.toggle('is-off', !enabled);
+    pill.setAttribute('aria-pressed', enabled ? 'true' : 'false');
   }
 
   function closeAccountSettingsModal() {
@@ -649,16 +645,26 @@
         if (e.target === backdrop) closeAccountSettingsModal();
       });
     }
-    var pill = document.getElementById('account-display-pill');
+    var pill = document.getElementById('account-ambience-pill');
     if (pill && !pill.dataset.bound) {
       pill.dataset.bound = '1';
       pill.addEventListener('click', function () {
-        if (pill.disabled) return;
-        var useTeamColors = !pill.classList.contains('is-team-colors');
-        persistDisplayColor(useTeamColors ? 'team_colors' : 'default').catch(function () {});
+        var turningOn = pill.classList.contains('is-off');
+        // Dynamically import the music controller so we don't take an upfront
+        // dependency on it from every page that loads the auth bar.
+        import('/js/musicController.js').then(function (mc) {
+          mc.setScoutingAmbienceEnabled(turningOn);
+          if (turningOn) {
+            mc.tryStartScoutingAmbienceForCurrentPage();
+          } else {
+            mc.clearFranchiseMusicState();
+          }
+        }).catch(function (err) {
+          console.warn('[ambience-toggle] music controller import failed', err);
+        });
+        refreshAccountSettingsModal();
       });
     }
-    window.addEventListener('gob:display-context-updated', refreshAccountSettingsModal);
   }
 
   function ensureTutorialsNavSound() {

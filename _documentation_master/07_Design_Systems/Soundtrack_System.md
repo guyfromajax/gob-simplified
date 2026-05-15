@@ -1,6 +1,8 @@
 # Soundtrack System
 
-Two background-music contexts, distinct from the gameplay SFX system in `gameSfx.js`. Both run on loop, hard-cut on start/stop (no fade), and route through their own controller (not the SFX pool) so a long track doesn't sit in a 4-deep audio pool.
+Three background-music contexts, distinct from the gameplay SFX system in `gameSfx.js`. All run on loop, hard-cut on start/stop (no fade), and route through their own controller (not the SFX pool) so a long track doesn't sit in a 4-deep audio pool.
+
+The three contexts are **mutually exclusive** — they cannot play simultaneously. Each context's "start" function clears the other contexts' state and audio.
 
 ## FCC / Franchise Soundtrack
 
@@ -68,6 +70,56 @@ The wiring uses three explicit roles. A page is one of these.
 ### Loop
 
 Each track loops continuously (`audio.loop = true`) until killed or until the page navigates away.
+
+### Scouting Ambience toggle (Account Settings)
+
+The franchise / scouting tracks can be globally disabled via the **Scouting Ambience** toggle in the Account Settings modal (in the auth bar, opened from any franchise page). On by default.
+
+- **Persistence**: localStorage key `gob_scouting_ambience_enabled` (string `"true"` / `"false"`). Device-local; not synced to the server. Missing key = treated as enabled.
+- **Scope**: gates only the scouting tracks (FCC franchise music). The Timeout Loop and Gameplay tracks are unaffected.
+- **Gating**: implemented inside `musicController.js` — `playFccTrack()` and `resumeFranchiseTrack()` both short-circuit with a debug log when the flag is `false`. So any franchise page loaded while the toggle is Off boots silently.
+- **Immediate effect**:
+  - **Toggle Off**: handler calls `clearFranchiseMusicState()` — current franchise track stops and state is wiped.
+  - **Toggle On**: handler calls `tryStartScoutingAmbienceForCurrentPage()` — picks the right entry point based on `window.location.pathname` (FCC → `playFccTrack`, game-plan → `resumeMusicForGamePlan`, other opt-in pages → `resumeFranchiseTrack`). No-op when the user is on a non-scouting page (court.html, set-lineup, training, recruiting-orders, etc.).
+- **Implementation entry points**:
+  - Modal UI: `account-ambience-pill` button in `authBarInit.js`'s `ensureAccountSettingsModal()`. Click handler dynamic-imports `musicController.js` and calls the controller functions.
+  - Controller exports: `isScoutingAmbienceEnabled()`, `setScoutingAmbienceEnabled(bool)`, `tryStartScoutingAmbienceForCurrentPage()`.
+
+## Timeout Loop (set-lineup ↔ game-plan)
+
+A single track loops while the user is in the pre-game / between-game setup flow — specifically the **set-lineup.html ↔ game-plan.html** loop. Persistence between the two pages uses the same localStorage pattern as the franchise soundtrack, scoped to its own state key so the two contexts don't interfere.
+
+### Track
+
+- `Timeout Loop.mp3` (~5 sec). Looped continuously via `audio.loop = true`. Short ambient bed; the loop point is barely audible.
+
+### Page roles
+
+**Opt-in pages** (read/resume timeout state on load, write on unload):
+
+- `set-lineup.html` — entry point for the timeout context. Always plays the loop (either fresh-starts or resumes from saved position).
+- `game-plan.html` — crossover page. Uses a dispatcher: if timeout state is present (user came from set-lineup), resume the timeout loop. If franchise state is present (user came from FCC), resume the franchise track. If neither, silent.
+
+**Boundary pages** (clear timeout state on load):
+
+- `court.html` — game starts; the gameplay soundtrack takes over. Now clears both franchise AND timeout state.
+- `franchise-command-center.html` (FCC) — implicit. `playFccTrack()` calls `clearTimeoutLoopState()` internally on entry, so any timeout-loop state left over from a back-navigation gets wiped before franchise music restarts.
+
+### Start, resume, and stop
+
+- **First entry to set-lineup**: no timeout state, no franchise state (FCC was killed by Play Game / etc.). `startTimeoutLoop()` fresh-starts the track from the beginning, writes timeout state.
+- **set-lineup → game-plan**: game-plan reads timeout state, resumes the loop at the saved `currentTime`. Brief audible nav gap, same as the franchise pattern.
+- **game-plan → set-lineup**: set-lineup reads timeout state, resumes.
+- **Either page → court.html**: court.html boundary clears timeout state and audio. Gameplay music takes over.
+- **Either page → FCC** (back buttons / "Back to Locker Room"): FCC entry's `playFccTrack()` clears timeout state and starts franchise music fresh.
+
+### Mutual exclusivity
+
+The timeout loop and the franchise track cannot coexist:
+
+- `startTimeoutLoop()` calls `clearFranchiseMusicState()` before starting.
+- `playFccTrack()` calls `clearTimeoutLoopState()` before starting.
+- `resumeMusicForGamePlan()` on game-plan prefers timeout state over franchise state when both somehow exist (purely defensive — in normal flow they're mutually wiped).
 
 ## Gameplay Soundtrack (court.html)
 
@@ -138,10 +190,17 @@ Conversely, the gameplay track is fully scoped to court.html — leaving court.h
 
 ### FCC / Franchise track
 
-- **FCC start (fresh)**: `franchise-command-center.js` init, after `hideFccLoadingOverlay()` in the `finally` block. Always starts fresh; writes state.
-- **Opt-in resume on franchise pages**: standings.html, rankings.html, team-roster-view.html, game-plan.html, box-score.html, recruiting.html, recruiting-results.html, training-report.html. Each calls the shared resume helper on load.
-- **Boundary state-clear on load**: set-lineup.html, court.html. Each calls the shared clear helper at the top of its page script.
+- **FCC start (fresh-or-resume)**: `franchise-command-center.js` init, after `hideFccLoadingOverlay()` in the `finally` block. Calls `playFccTrack()`, which clears any leftover timeout-loop state, then resumes franchise state if present or rolls a fresh random pick.
+- **Opt-in resume on franchise pages**: standings.html, rankings.html, team-roster-view.html, box-score.html, recruiting.html, recruiting-results.html, training-report.html. Each calls `resumeFranchiseTrack()` on load.
+- **Game-plan dispatcher**: game-plan.html calls `resumeMusicForGamePlan()` — picks timeout-loop if its state is present, otherwise franchise.
+- **Boundary state-clear on load**: court.html clears franchise state (alongside timeout). set-lineup.html clears it indirectly via `startTimeoutLoop()`.
 - **Explicit state-clear in handlers**: FCC Play Game / Run Training / Run Recruiting / Exit Franchise button click handlers (see [franchise-command-center.js](FrontEnd/static/franchise-command-center.js)).
+
+### Timeout Loop track
+
+- **Start on set-lineup.html**: a `<script type="module">` block at the bottom of [set-lineup.html](FrontEnd/static/set-lineup.html) calls `startTimeoutLoop()`. Internally clears franchise state, then either resumes from saved timeout-loop position or starts fresh.
+- **Game-plan resume**: handled by the shared dispatcher (see above).
+- **Boundary state-clear on load**: [court.html](FrontEnd/static/court.html) calls `clearTimeoutLoopState()` alongside `clearFranchiseMusicState()`. [franchise-command-center.js](FrontEnd/static/franchise-command-center.js) entry clears it implicitly via `playFccTrack()`.
 
 ### Gameplay track (court.html)
 

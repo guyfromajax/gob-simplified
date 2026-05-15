@@ -258,8 +258,12 @@
     document.head.appendChild(apiConfigScript);
   </script>
   <script type="module">
-    import { resumeFranchiseTrack } from '/js/musicController.js';
-    resumeFranchiseTrack();
+    import { resumeMusicForGamePlan } from '/js/musicController.js';
+    // Crossover page: resume whichever music context is in flight.
+    // - From FCC sidebar → franchise music carries over.
+    // - From set-lineup "View Game Plan" → timeout-loop carries over.
+    // - From a deep link with no state → silent.
+    resumeMusicForGamePlan();
   </script>
 </body>
 </html>
