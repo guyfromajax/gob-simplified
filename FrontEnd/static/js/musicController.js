@@ -17,7 +17,11 @@
  */
 
 const FCC_TRACKS = ["scouting-track-1.mp3", "scouting-track-2.mp3"];
-const GAMEPLAY_TRACK = "pixel-pulse-1.mp3";
+const GAMEPLAY_DEFAULT_TRACK = "arcade-pulse-1.mp3";
+const GAMEPLAY_CRUNCH_TRACK = "pixel-pulse-1.mp3";
+// Q4 crunch-time gate: less than 121 seconds remaining AND score difference of 6 or fewer.
+const CRUNCH_TIME_SECONDS = 121;
+const CRUNCH_SCORE_DIFF = 6;
 const DEFAULT_VOLUME = 0.4;
 const STATE_KEY = "franchise_music_state";
 
@@ -103,13 +107,24 @@ function playAudio(audio, label) {
 }
 
 /**
- * Start the franchise music loop with a fresh random pick. Used by the FCC
- * page on every visit (always re-rolls, ignores existing state). Writes new
- * state so downstream franchise pages can resume.
+ * Start the franchise music loop on FCC entry. Symmetric with the rest of the
+ * franchise pages: if persisted state exists, resume from it (so a round-trip
+ * Standings → FCC carries through the same track). If state is empty (first
+ * visit of a session, after a kill point, or after a boundary page wiped it),
+ * roll a fresh random pick and start from the beginning.
  */
 export function playFccTrack() {
   if (franchiseAudio && !franchiseAudio.paused) {
     debugLog("fcc_already_playing", { file: franchiseAudio.dataset.musicTrack });
+    return;
+  }
+  const state = readState();
+  if (state) {
+    franchiseAudio = buildAudio(state.track);
+    attachFranchiseStatePersistence(franchiseAudio);
+    franchiseAudio.currentTime = state.currentTime || 0;
+    debugLog("fcc_resume", { file: state.track, t: state.currentTime });
+    playAudio(franchiseAudio, "fcc_resume");
     return;
   }
   const pick = FCC_TRACKS[Math.floor(Math.random() * FCC_TRACKS.length)];
@@ -117,8 +132,8 @@ export function playFccTrack() {
   attachFranchiseStatePersistence(franchiseAudio);
   franchiseAudio.currentTime = 0;
   writeState(franchiseAudio);
-  debugLog("fcc_pick", { file: pick });
-  playAudio(franchiseAudio, "fcc");
+  debugLog("fcc_fresh_pick", { file: pick });
+  playAudio(franchiseAudio, "fcc_fresh");
 }
 
 /**
@@ -165,20 +180,77 @@ export function clearFranchiseMusicState() {
 }
 
 /**
- * Start the gameplay background loop on court.html. Each fresh start plays
- * from the beginning; calls during ongoing playback are no-ops so mid-game
- * inbound events don't yank the track back to zero.
+ * Start the default gameplay track if nothing is currently loaded. No-op when
+ * any track (default or crunch) is already in the element — that way the
+ * legacy inbound / FT-shooter / opening-tip hooks can't accidentally
+ * "downgrade" the crunch track back to the default. Use
+ * `evaluateGameplayTrack()` for state-driven switching.
  */
-export function playGameplayTrack() {
-  if (gameplayAudio && !gameplayAudio.paused) {
-    debugLog("gameplay_already_playing");
+export function playGameplayTrack(filename = GAMEPLAY_DEFAULT_TRACK) {
+  if (gameplayAudio) {
+    debugLog("gameplay_already_loaded", { current: gameplayAudio.dataset.musicTrack });
     return;
   }
-  if (!gameplayAudio) {
-    gameplayAudio = buildAudio(GAMEPLAY_TRACK);
-  }
+  gameplayAudio = buildAudio(filename);
   gameplayAudio.currentTime = 0;
-  playAudio(gameplayAudio, "gameplay");
+  playAudio(gameplayAudio, "gameplay_start");
+}
+
+/**
+ * Reactive gameplay-track selector. Picks the right track for the current
+ * game state (quarter, clock, score) and hard-cuts to it if the desired
+ * track differs from what's currently loaded. Idempotent: same-track calls
+ * are no-ops (don't restart, don't disturb a user pause).
+ *
+ * Reversible: every call re-evaluates from scratch, so a Q4 score swing that
+ * pushes the diff back above 6 flips the music back to the default track.
+ *
+ * @param {object} ctx
+ * @param {number} ctx.quarter           current quarter (5+ = OT)
+ * @param {number|string} [ctx.clock]    seconds remaining (number) or "M:SS" string
+ * @param {number} [ctx.homeScore]
+ * @param {number} [ctx.awayScore]
+ */
+export function evaluateGameplayTrack(ctx = {}) {
+  const desired = chooseGameplayTrack(ctx);
+  if (gameplayAudio && gameplayAudio.dataset.musicTrack === desired) {
+    return; // already on the right track; respect any paused state
+  }
+  const wasPaused = gameplayAudio?.paused ?? false;
+  if (gameplayAudio) {
+    gameplayAudio.pause();
+  }
+  gameplayAudio = buildAudio(desired);
+  gameplayAudio.currentTime = 0;
+  debugLog("gameplay_track_set", { file: desired, autoplay: !wasPaused, ctx });
+  if (!wasPaused) {
+    playAudio(gameplayAudio, "gameplay_switch");
+  }
+}
+
+function chooseGameplayTrack({ quarter, clock, homeScore, awayScore } = {}) {
+  const q = Number(quarter);
+  if (Number.isFinite(q) && q > 4) return GAMEPLAY_CRUNCH_TRACK;
+  if (Number.isFinite(q) && q === 4) {
+    const sec = parseSecondsRemaining(clock);
+    const diff = Math.abs((Number(homeScore) || 0) - (Number(awayScore) || 0));
+    if (sec < CRUNCH_TIME_SECONDS && diff <= CRUNCH_SCORE_DIFF) {
+      return GAMEPLAY_CRUNCH_TRACK;
+    }
+  }
+  return GAMEPLAY_DEFAULT_TRACK;
+}
+
+function parseSecondsRemaining(clock) {
+  if (typeof clock === "number" && Number.isFinite(clock)) return Math.max(0, clock);
+  if (typeof clock !== "string") return Infinity;
+  if (clock.includes(":")) {
+    const [m, s] = clock.split(":").map(Number);
+    if (Number.isFinite(m) && Number.isFinite(s)) return Math.max(0, m * 60 + s);
+    return Infinity;
+  }
+  const n = Number(clock);
+  return Number.isFinite(n) ? Math.max(0, n) : Infinity;
 }
 
 export function stopGameplayTrack() {
@@ -186,4 +258,17 @@ export function stopGameplayTrack() {
   gameplayAudio.pause();
   gameplayAudio.currentTime = 0;
   debugLog("gameplay_stop");
+}
+
+/** Pause the gameplay loop without resetting position. Wired to the Pause button. */
+export function pauseGameplayTrack() {
+  if (!gameplayAudio || gameplayAudio.paused) return;
+  gameplayAudio.pause();
+  debugLog("gameplay_pause", { t: gameplayAudio.currentTime });
+}
+
+/** Resume the gameplay loop from its current position. Wired to the Resume button. */
+export function resumeGameplayTrack() {
+  if (!gameplayAudio || !gameplayAudio.paused) return;
+  playAudio(gameplayAudio, "gameplay_resume");
 }

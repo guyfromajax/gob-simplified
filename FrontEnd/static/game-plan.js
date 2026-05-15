@@ -139,6 +139,34 @@ let hasUnsavedChanges = false;
 let lastSavedSettings = null;
 let toastTimer = null;
 let toastHideTimer = null;
+let saveReturnTimer = null;
+
+/** True when game-plan was opened from FCC / TCC (not from set-lineup). */
+function isGamePlanFromCommandCenter() {
+  const p = new URLSearchParams(window.location.search);
+  const from = p.get('from') || 'lineup';
+  return (
+    from === 'command_center' ||
+    from === 'tournament-command-center' ||
+    from === 'franchise-command-center'
+  );
+}
+
+/** After Save Game Plan: return to FCC/TCC or set-lineup (same destinations as manual back). */
+function scheduleNavigateAfterSaveGamePlan() {
+  if (saveReturnTimer) {
+    clearTimeout(saveReturnTimer);
+    saveReturnTimer = null;
+  }
+  saveReturnTimer = setTimeout(() => {
+    saveReturnTimer = null;
+    if (isGamePlanFromCommandCenter()) {
+      executeNavigateToCommandCenter();
+    } else {
+      executeNavigateBack();
+    }
+  }, 2000);
+}
 
 // Slider mappings (note: all go to strategy_settings now for unified backend handling)
 const strategySliders = {
@@ -541,6 +569,11 @@ async function saveGamePlan() {
     hasUnsavedChanges = false;
     
     showToast('Game Plan Saved', 'Changes applied successfully');
+
+    const saveBtn = document.getElementById('btn-save-game-plan');
+    if (saveBtn) saveBtn.disabled = true;
+
+    scheduleNavigateAfterSaveGamePlan();
   } catch (err) {
     console.error('Error saving settings:', err);
     showModal('An error occurred while saving. Please try again.');
@@ -882,21 +915,17 @@ async function init() {
   // Button event listeners
   // ✅ TASK 0: Updated button IDs
   const btnSaveGamePlan = document.getElementById('btn-save-game-plan');
-  const btnNavPrimary = document.getElementById('btn-nav-primary'); // "Play Game" or "Back To Locker Room"
   const btnCancel = document.getElementById('btn-cancel');
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
   const pageBackLink = document.getElementById('game-plan-back-link');
   const modalClose = document.getElementById('modal-close');
   
-  // Check if lineup is valid (all 5 positions filled)
-  const lineupValid = pgId && sgId && sfId && pfId && cId;
-  
   // Show/hide buttons based on where user came from
   // ✅ FIX: Check for all command center variations (command_center, tournament-command-center, franchise-command-center)
-  const isFromCommandCenter = from === 'command_center' || 
-                               from === 'tournament-command-center' || 
+  const isFromCommandCenter = from === 'command_center' ||
+                               from === 'tournament-command-center' ||
                                from === 'franchise-command-center';
-  
+
   if (isFromCommandCenter) {
     // From command center (FCC/TCC): use page-level ghost back link, hide footer navigation buttons
     if (pageBackLink) {
@@ -907,36 +936,11 @@ async function init() {
         navigateToCommandCenter();
       });
     }
-    if (btnNavPrimary) btnNavPrimary.style.display = 'none';
     if (btnBackToLineup) btnBackToLineup.style.display = 'none';
     if (btnCancel) btnCancel.style.display = 'none';
   } else {
     if (pageBackLink) pageBackLink.hidden = true;
-    // From lineup: show "Play Game" button and "Back To Lineup" button, hide "Cancel"
-    if (btnNavPrimary) {
-      btnNavPrimary.textContent = 'Play Game';
-      btnNavPrimary.style.display = 'inline-block';
-      
-      // Disable "Play Game" if lineup is invalid
-      if (!lineupValid) {
-        btnNavPrimary.disabled = true;
-        btnNavPrimary.style.opacity = '0.5';
-        btnNavPrimary.style.cursor = 'not-allowed';
-        btnNavPrimary.title = 'Please complete your lineup first (Back To Lineup)';
-      } else {
-        btnNavPrimary.disabled = false;
-        btnNavPrimary.style.opacity = '1';
-        btnNavPrimary.style.cursor = 'pointer';
-        btnNavPrimary.title = '';
-      }
-      
-      btnNavPrimary.addEventListener('click', () => {
-        console.log('🚀 [GAME-PLAN] btnNavPrimary (Play Game) CLICKED! About to call navigateToCourt()');
-        playSound('confirm-1-lowervol.wav');
-        // Delay navigation so the sound can start before the page unloads
-        setTimeout(() => navigateToCourt(), 200);
-      });
-    }
+    // From lineup: "Back To Lineup" only (Play Game is on set-lineup)
     if (btnBackToLineup) {
       btnBackToLineup.style.display = 'inline-block';
       btnBackToLineup.addEventListener('click', () => {

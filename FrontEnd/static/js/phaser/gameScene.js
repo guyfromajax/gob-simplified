@@ -1,4 +1,5 @@
 import { animateGameTurns } from './animation/animateGameTurns.js';
+import { playGameplayTrack, pauseGameplayTrack, resumeGameplayTrack, evaluateGameplayTrack } from '../musicController.js';
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { gridToPixels } from './utils/gridToPixels.js';
 import { finalizeGame } from './finalizeGame.js';
@@ -804,6 +805,21 @@ export function createGameScene(Phaser) {
       const isQuarterBreakEntry = this.quarter > 1;
       const isTimeoutOrFoulOutResume = resumeFromTimeout;
       this.shouldShowMatchupsPopup = (isQ1Start || isQuarterBreakEntry || isTimeoutOrFoulOutResume) && this.gameId;
+
+      // Gameplay background music: start immediately on every entry to
+      // court.html except the Q1 opening tip, which waits for the tip-winner
+      // SFX in openingTip.js. Q1 timeout/foul-out resumes count as not-tip.
+      // Use evaluateGameplayTrack so Q4 crunch and OT entries land on the
+      // correct track from the first frame instead of switching after the
+      // first turn.
+      if (!isQ1Start) {
+        evaluateGameplayTrack({
+          quarter: this.quarter,
+          clock: urlParams.get('clock'),
+          homeScore: urlParams.get('home_score'),
+          awayScore: urlParams.get('away_score'),
+        });
+      }
       
       // Reset pause state BEFORE killing tweens
       this.isPaused = false;
@@ -2221,6 +2237,16 @@ export function createGameScene(Phaser) {
           livePeriodLabel = turn.quarter > 4 ? `OT${turn.quarter - 4}` : `Q${turn.quarter}`;
         }
 
+        // Reactive gameplay music: every turn re-evaluates which track
+        // should play. Switches to/from crunch (pixel-pulse) and default
+        // (arcade-pulse) are hard-cut at this boundary.
+        evaluateGameplayTrack({
+          quarter: liveQuarter,
+          clock: this.gameClock?.getState?.()?.timeRemaining,
+          homeScore: liveScore[homeTeam],
+          awayScore: liveScore[awayTeam],
+        });
+
         // ✅ REFACTOR: Direct DOM updates for all scoreboard items (consistent pattern)
         if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
         if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
@@ -2484,6 +2510,7 @@ export function createGameScene(Phaser) {
             }
             if (this.gameClock) this.gameClock.pause('user_pause');
             if (this.shotClock) this.shotClock.pause('user_pause');
+            pauseGameplayTrack();
             syncPauseButtonDom(true);
           } else {
             // Resume all tweens
@@ -2529,7 +2556,8 @@ export function createGameScene(Phaser) {
             }
             if (this.gameClock) this.gameClock.resume('user_pause');
             if (this.shotClock) this.shotClock.resume('user_pause');
-            
+            resumeGameplayTrack();
+
             syncPauseButtonDom(false);
           }
         });

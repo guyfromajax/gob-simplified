@@ -10,7 +10,7 @@ A single track loops across the entire franchise-mode experience. The user can n
 
 - `scouting-track-1.mp3` (~3 min)
 - `scouting-track-2.mp3` (~4 min)
-- **Selection**: on each *fresh* FCC visit, pick one of the two tracks 50/50. That same track plays for the entire franchise-mode session until killed.
+- **Selection**: a 50/50 random pick happens whenever music starts from an empty state — i.e. the first franchise-mode page visit of a session, or the first visit after a kill point or boundary page wipe. The chosen track then loops continuously across all franchise-mode pages (including round trips through FCC) until killed.
 
 ### Persistence model (localStorage)
 
@@ -30,7 +30,7 @@ The wiring uses three explicit roles. A page is one of these.
 
 **Opt-in resume pages** — read state on load, resume playback, write state on unload:
 
-- `franchise-command-center.html` — *special-case*: always starts a fresh random pick (ignores any existing state), then writes new state so downstream pages can resume.
+- `franchise-command-center.html` — same resume-from-state rule as every other franchise page; only rolls a fresh pick when state is empty. Behaves identically whether the user is arriving for the first time or returning from another franchise page.
 - `standings.html`
 - `rankings.html`
 - `team-roster-view.html` *(crossover: silent if reached pre-franchise via `franchise-select-team.html`, since state will be empty)*
@@ -59,11 +59,11 @@ The wiring uses three explicit roles. A page is one of these.
 
 ### Start, restart, and resume behavior
 
-- **First FCC visit of a session**: random pick (50/50), play from the beginning, write state.
-- **Navigating to another franchise-mode page** (e.g. FCC → Standings): page reads state, resumes the same track at the stored `currentTime`. Brief audible gap during nav.
-- **Subsequent FCC visits within the same session** (e.g. Standings → FCC): FCC re-rolls a fresh random pick and starts from the beginning, overwriting state. The user gets a new musical bed every time they return to FCC.
-- **After a kill point** (Advance / Exit Franchise): state is cleared. Any later franchise-mode page that reads state sees empty state → silent. When the user eventually returns to FCC, FCC's fresh-pick rule kicks in and music starts again.
-- **Closing the browser**: state persists in localStorage but it's irrelevant — the next session's first FCC visit re-rolls fresh anyway.
+- **First franchise-mode page of a session** (typically FCC): no state yet, so a 50/50 random pick happens, plays from the beginning, writes state.
+- **Navigating between franchise-mode pages** (any direction, including back to FCC): the destination page reads state and resumes the same track at the stored `currentTime`. Brief audible gap during nav. No re-rolls — the same track threads through the entire session for musical continuity.
+- **After a kill point** (Advance / Exit Franchise): state is cleared and music stops. Any later franchise-mode page that reads state sees empty → silent. When the user eventually returns to FCC, the empty-state rule kicks in and a fresh random pick starts again.
+- **After a boundary page wipe** (Set Lineup, court.html): same effect as a kill point — state cleared, next FCC visit rolls fresh.
+- **Closing the browser**: state persists in localStorage. The next session's first FCC visit will resume mid-track from where the previous session left off (e.g. starts at 2:30 of scouting-track-2). If this proves disorienting in practice, a `timestamp`-based stale-state expiry or `sessionStorage` first-visit detection can be layered in later — not currently implemented.
 
 ### Loop
 
@@ -71,17 +71,38 @@ Each track loops continuously (`audio.loop = true`) until killed or until the pa
 
 ## Gameplay Soundtrack (court.html)
 
-A single short track loops in the background throughout live gameplay. Separate from the FCC soundtrack and its persistence model — gameplay music is fully scoped to court.html.
+Two tracks switch dynamically based on game state. Separate from the FCC soundtrack and its persistence model — gameplay music is fully scoped to court.html.
 
-### Track
+### Tracks
 
-- `pixel-pulse-1.mp3` (~30 sec)
+- **Default — `arcade-pulse-1.mp3`** (~5 min): standard gameplay loop. Plays in Q1–Q3 and the early portion of Q4.
+- **Crunch — `pixel-pulse-1.mp3`** (~30 sec): tension loop. Plays whenever the game is in late-Q4 close-and-late or in any overtime quarter.
+
+### Switching rules
+
+A small evaluator runs on court.html entry and after every turn, picking which track should be playing:
+
+- Quarter > 4 (any overtime quarter, OT1+) → **Crunch**.
+- Quarter == 4 AND seconds remaining `< 121` AND `|home_score - away_score| <= 6` → **Crunch**.
+- Otherwise → **Default**.
+
+The check is **reversible**: every turn re-evaluates from scratch, so a 7+ point swing during late Q4 will hard-cut back from Crunch to Default. Same-track evaluations are no-ops (don't restart, don't disturb a user pause).
+
+Track switches are **hard cuts** (no fade) — consistent with the rest of the music system. The new track plays from `currentTime = 0`.
+
+Constants are at the top of [musicController.js](FrontEnd/static/js/musicController.js): `GAMEPLAY_DEFAULT_TRACK`, `GAMEPLAY_CRUNCH_TRACK`, `CRUNCH_TIME_SECONDS = 121`, `CRUNCH_SCORE_DIFF = 6`.
 
 ### Start triggers
 
-- **Opening Tip**: starts immediately after the SFX that fires when the ball attaches to the player who catches the opening tip (`attack-shot-strong.wav` — see Sound_Design_Update.md → Opening Tip SFX).
-- **Inbound after timeout / quarter break**: starts when the inbound-pass receiver receives the inbound pass coming out of a timeout or quarter break. (No-op if music is already playing.)
-- **Free Throw return**: starts when the free-throw shooter grabs the ball, if play is resuming into a free-throw turn. (No-op if music is already playing.)
+- **On court.html entry**: `evaluateGameplayTrack()` runs with quarter + clock + score from URL params and picks the right track. Fires immediately for timeout return, quarter break, and foul-out resume.
+- **Q1 Opening Tip exception**: when the user enters court.html for the Q1 opening tip (`quarter === 1` AND `resume_from_timeout` absent/false), the on-load hook is skipped. Music starts after the tip-winner SFX (`attack-shot-strong.wav`) fires in openingTip.js, which calls `playGameplayTrack()` — the default-track variant. Q1 opening tip always uses the Default track since the score is 0–0 and clock is full.
+- **Per-turn re-evaluation**: after every turn animation, `updateScoreboard(turn)` calls `evaluateGameplayTrack` with the post-turn quarter / clock / score. This is what flips Default ↔ Crunch when conditions change.
+- **Legacy inbound / FT triggers**: the inbound-pass-reception and FT-shooter-ball-take hooks added earlier still call `playGameplayTrack()`. Under the new model, `playGameplayTrack()` is a no-op when any track is already loaded, so these can't accidentally downgrade Crunch back to Default. Kept as defensive belts-and-braces for code paths that might skip the on-load hook.
+
+### Pause / Resume
+
+- The court.html **Pause** button (id `pause-btn`) pauses the gameplay music alongside tweens and clocks. Implementation: `pauseGameplayTrack()` — pauses the `<audio>` element without resetting `currentTime`.
+- The same button when toggled to **Resume** resumes from the paused position. Implementation: `resumeGameplayTrack()` — calls `.play()` on the existing audio element if it's currently paused; no-op otherwise.
 
 ### Stop
 
@@ -89,8 +110,8 @@ A single short track loops in the background throughout live gameplay. Separate 
 
 ### Restart and loop
 
-- Every start trigger restarts the track from the beginning (no resume).
-- Continuous loop while on court.html until the user navigates away.
+- Every fresh start (entry to court.html) plays the track from the beginning (no cross-page resume — gameplay music is fully scoped to a single court.html load).
+- Continuous loop while on court.html until paused by the user or the page unloads.
 
 ## Mutual Exclusivity
 
@@ -120,7 +141,11 @@ Conversely, the gameplay track is fully scoped to court.html — leaving court.h
 
 ### Gameplay track (court.html)
 
-- **Start (Opening Tip)**: [openingTip.js](FrontEnd/static/js/phaser/animation/openingTip.js) `animateConvergence` — right after the `attack-shot-strong.wav` SFX fires.
-- **Start (Inbound)**: [turnAnimation.js](FrontEnd/static/js/phaser/animation/turnAnimation.js) — at the BIP and SIP `attachBallToPlayer(scene, ballSprite, sfSprite)` lines.
-- **Start (FT shooter)**: [FreeThrowAnimationSystem.js](FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js) — right after `attachToPlayer(shooterSprite)`.
+- **On-load evaluator**: [gameScene.js](FrontEnd/static/js/phaser/gameScene.js) `create()` — `evaluateGameplayTrack({quarter, clock, homeScore, awayScore})` gated by `if (!isQ1Start)`. Uses URL params for initial state.
+- **Per-turn re-evaluator**: [gameScene.js](FrontEnd/static/js/phaser/gameScene.js) `updateScoreboard()` — `evaluateGameplayTrack(...)` after `liveQuarter` is set and the clock/score are synced. Fires for every turn.
+- **Q1 Opening Tip start**: [openingTip.js](FrontEnd/static/js/phaser/animation/openingTip.js) `animateConvergence` — `playGameplayTrack()` (no args → Default track) right after the `attack-shot-strong.wav` SFX fires. Only fires when the on-load hook was skipped.
+- **Legacy inbound start (defensive)**: [turnAnimation.js](FrontEnd/static/js/phaser/animation/turnAnimation.js) at the BIP and SIP `attachBallToPlayer(scene, ballSprite, sfSprite)` lines. No-op since `playGameplayTrack` only starts when nothing is loaded.
+- **Legacy FT-shooter start (defensive)**: [FreeThrowAnimationSystem.js](FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js) right after `attachToPlayer(shooterSprite)`. Same no-op guarantee.
+- **Pause**: [gameScene.js](FrontEnd/static/js/phaser/gameScene.js) — inside the `pauseBtn` click handler's pause branch, alongside the tween/clock pause calls.
+- **Resume**: same handler's resume branch, alongside the tween/clock resume calls.
 - **Stop**: implicit on court.html unload — no explicit hook.
