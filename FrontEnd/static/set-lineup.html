@@ -195,5 +195,9 @@
   <!-- ✅ PHASE 2: Load pointer validation before set-lineup.js -->
   <script src="/js/shared/pointerValidation.js"></script>
   <script src="/set-lineup.js?v=__BUILD_TS__"></script>
+  <script type="module">
+    import { clearFranchiseMusicState } from '/js/musicController.js';
+    clearFranchiseMusicState();
+  </script>
 </body>
 </html>

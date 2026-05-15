@@ -3232,6 +3232,10 @@ playNowBtn.addEventListener('click', async () => {
     params.set('return_url', getCurrentRelativeUrl());
     if (userTeamId) params.set('team_id', userTeamId);
     await confirmSfxReady;
+    try {
+      const { clearFranchiseMusicState } = await import('/js/musicController.js');
+      clearFranchiseMusicState();
+    } catch {}
     window.location.href = `/training.html?${params.toString()}`;
     return;
   }
@@ -3243,6 +3247,10 @@ playNowBtn.addEventListener('click', async () => {
     params.set('from', 'fcc');
     params.set('return_url', getCurrentRelativeUrl());
     await confirmSfxReady;
+    try {
+      const { clearFranchiseMusicState } = await import('/js/musicController.js');
+      clearFranchiseMusicState();
+    } catch {}
     window.location.href = `/recruiting-orders.html?${params.toString()}`;
     return;
   }
@@ -3351,6 +3359,10 @@ playNowBtn.addEventListener('click', async () => {
     if (resolvedSide) url += `&my_team=${resolvedSide}`;
     console.log('Navigating to', url);
     await confirmSfxReady;
+    try {
+      const { clearFranchiseMusicState } = await import('/js/musicController.js');
+      clearFranchiseMusicState();
+    } catch {}
     window.location.href = url;
   } catch (err) {
     console.error(err);
@@ -3420,8 +3432,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const exitFranchiseBtn = document.getElementById('exit-franchise');
   if (exitFranchiseBtn) {
-    exitFranchiseBtn.addEventListener('click', () => {
+    exitFranchiseBtn.addEventListener('click', async () => {
       playSound('x-back.mp3');
+      try {
+        const { clearFranchiseMusicState } = await import('/js/musicController.js');
+        clearFranchiseMusicState();
+      } catch {}
       window.location.href = '/mode-select.html';
     });
   }
