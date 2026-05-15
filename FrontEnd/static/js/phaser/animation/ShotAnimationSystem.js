@@ -26,6 +26,7 @@ import { clampGridCoords } from './courtClamp.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { runPass } from './ballTween.js';
 import { playShotLaunchSfx, playShotResultSfx, playGameSfx, playReboundSfx } from '../utils/gameSfx.js';
+import { createBallTrail } from './createBallTrail.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -1039,6 +1040,15 @@ export class ShotAnimationSystem {
       // ==================== END PLAYER POSITIONING ====================
 
       // Animate ball to rim
+      // Hot-shot flame trail: attach to the ball for the duration of the
+      // flight tween when the pre-defense shot score crosses the same
+      // "strong" threshold (>210) that gates `three-strong.wav` in the
+      // launch SFX. Same helper used for outlet-pass flames. Self-cleans.
+      const preDefenseScore = Number(turnData?.shot_score_pre_defense);
+      if (Number.isFinite(preDefenseScore) && preDefenseScore > 210) {
+        createBallTrail(this.scene, ballSprite, this.shotConfig.flightDuration);
+      }
+
       const tween = this.scene.tweens.add({
         targets: ballSprite,
         x: rimCoords.x,
