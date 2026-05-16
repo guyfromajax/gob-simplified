@@ -7,6 +7,24 @@ export function headshotTextureKey(playerId) {
   return `${HEADSHOT_TEXTURE_PREFIX}${playerId}`;
 }
 
+// Normalize image paths the same way bootGame.js does for play-by-play headshots:
+// on localhost (Flask static), keep /static/ prefix; on any other host, strip it
+// so the path resolves against the deployed asset root (no /static/ on netlify).
+function normalizeHeadshotUrl(url) {
+  if (!url || typeof url !== "string") return url;
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    (window.location?.hostname === "localhost" ||
+      window.location?.hostname === "127.0.0.1");
+  if (!isLocalhost && url.startsWith("/static/")) {
+    return url.replace("/static", "");
+  }
+  if (isLocalhost && !url.startsWith("/static/") && url.startsWith("/images/")) {
+    return "/static" + url;
+  }
+  return url;
+}
+
 // Preload all roster player photos as Phaser textures so the headshot marker
 // can render them via scene.add.image(). Resolves once the loader is idle.
 // Players whose photo URL fails to load simply won't have a texture registered;
@@ -26,14 +44,14 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
     if (!id || id === "ball" || id === "Ball") continue;
     const key = headshotTextureKey(id);
     if (scene.textures && scene.textures.exists(key)) continue;
-    const url = getPlayerImageUrl(player.photo, id);
+    const url = normalizeHeadshotUrl(getPlayerImageUrl(player.photo, id));
     scene.load.image(key, url);
     queued.push(key);
     queuedUrls.push({ key, url, playerName: player.name });
   }
 
   if (!scene.textures || !scene.textures.exists(HEADSHOT_FALLBACK_KEY)) {
-    const fallbackUrl = getPlayerImageUrl(null, null);
+    const fallbackUrl = normalizeHeadshotUrl(getPlayerImageUrl(null, null));
     scene.load.image(HEADSHOT_FALLBACK_KEY, fallbackUrl);
     queued.push(HEADSHOT_FALLBACK_KEY);
     queuedUrls.push({ key: HEADSHOT_FALLBACK_KEY, url: fallbackUrl, playerName: null });
