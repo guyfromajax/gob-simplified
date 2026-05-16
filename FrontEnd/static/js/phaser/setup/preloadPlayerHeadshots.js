@@ -16,8 +16,10 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
     return Promise.resolve();
   }
 
+  const debug = (typeof window !== "undefined") && !!window.DEBUG_HEADSHOT_MARKER;
   const players = Array.isArray(allPlayers) ? allPlayers : [];
   const queued = [];
+  const queuedUrls = [];
 
   for (const player of players) {
     const id = player?.playerId ?? player?.player_id ?? player?._id;
@@ -27,12 +29,18 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
     const url = getPlayerImageUrl(player.photo, id);
     scene.load.image(key, url);
     queued.push(key);
+    queuedUrls.push({ key, url, playerName: player.name });
   }
 
   if (!scene.textures || !scene.textures.exists(HEADSHOT_FALLBACK_KEY)) {
     const fallbackUrl = getPlayerImageUrl(null, null);
     scene.load.image(HEADSHOT_FALLBACK_KEY, fallbackUrl);
     queued.push(HEADSHOT_FALLBACK_KEY);
+    queuedUrls.push({ key: HEADSHOT_FALLBACK_KEY, url: fallbackUrl, playerName: null });
+  }
+
+  if (debug) {
+    console.log("[headshots] queued for preload:", queuedUrls);
   }
 
   if (queued.length === 0) {
@@ -40,12 +48,23 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
   }
 
   return new Promise((resolve) => {
+    const failed = [];
     const onComplete = () => {
       scene.load.off("loaderror", onLoadError);
+      if (debug) {
+        const loaded = queued.filter((k) => scene.textures.exists(k));
+        console.log("[headshots] preload complete", {
+          loadedCount: loaded.length,
+          loadedKeys: loaded,
+          failedCount: failed.length,
+          failedKeys: failed,
+        });
+      }
       resolve();
     };
     const onLoadError = (file) => {
       if (file && file.key) {
+        failed.push(file.key);
         console.warn(`[headshots] failed to load texture "${file.key}" — marker will use initials fallback`);
       }
     };

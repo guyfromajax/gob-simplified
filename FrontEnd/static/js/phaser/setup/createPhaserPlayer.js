@@ -70,6 +70,7 @@ function getPlayerInitials(name) {
 }
 
 function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
+  const debug = (typeof window !== "undefined") && !!window.DEBUG_HEADSHOT_MARKER;
   const { x, y } = player.startingCoords || { x: 50, y: 25 };
   const { x: px, y: py } = gridToPixels(x, y, scene.game.config.width, scene.game.config.height);
 
@@ -81,6 +82,16 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   const hasPhotoTexture = !!photoKey && scene.textures && scene.textures.exists(photoKey);
   const hasFallbackTexture = scene.textures && scene.textures.exists(HEADSHOT_FALLBACK_KEY);
 
+  if (debug) {
+    console.log("[headshot]", playerId, {
+      photoKey,
+      hasPhotoTexture,
+      hasFallbackTexture,
+      containerOrigin: { px, py },
+      playerName: player.name,
+    });
+  }
+
   const children = [];
 
   const shadow = scene.add.ellipse(0, 26, 30, 8, 0x000000, 0.45);
@@ -89,20 +100,28 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   // Mask Graphics is added as a hidden child of the container so its world
   // transform inherits the container's position — keeps the circular clip
   // aligned with the headshot as the player moves around the court.
+  // NOTE: Phaser's GeometryMask reads draw commands AND world transform from
+  // the source Graphics. We hide it visually via alpha (not setVisible(false))
+  // because some Phaser versions short-circuit the stencil write when the
+  // source is flagged invisible, which produces an empty mask and clips
+  // everything inside the circle.
   const maskGraphics = scene.make.graphics({ x: 0, y: 0, add: false });
   maskGraphics.fillStyle(0xffffff, 1);
   maskGraphics.fillCircle(0, 0, 22);
   const mask = maskGraphics.createGeometryMask();
 
   let photoChild;
+  let usedPath;
   if (hasPhotoTexture || hasFallbackTexture) {
     const textureKey = hasPhotoTexture ? photoKey : HEADSHOT_FALLBACK_KEY;
+    usedPath = hasPhotoTexture ? "photo" : "fallback_texture";
     const photo = scene.add.image(0, 0, textureKey);
     photo.setDisplaySize(44, 44);
     photo.setOrigin(0.5, 0.55);
     photo.setMask(mask);
     photoChild = photo;
   } else {
+    usedPath = "initials_tile";
     const tile = scene.add.rectangle(0, 0, 44, 44, primary);
     tile.setOrigin(0.5, 0.5);
     tile.setMask(mask);
@@ -138,15 +157,26 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   chipText.setOrigin(0.5);
   children.push(chipText);
 
-  // The mask graphics must be a descendant of the container for its world
-  // transform to track player movement. Hidden so it never renders on its own;
-  // createGeometryMask still uses its draw commands for the clip region.
-  maskGraphics.setVisible(false);
+  // Mask graphics must be a container descendant so its world transform tracks
+  // the player. Hide visually with alpha=0 (not setVisible) so the stencil
+  // write still fires; mark non-interactive to keep it inert.
+  maskGraphics.setAlpha(0);
   children.unshift(maskGraphics);
 
   const container = scene.add.container(px, py, children);
   container.setSize(56, 100);
   container.setDepth(1);
+
+  if (debug) {
+    const wt = maskGraphics.getWorldTransformMatrix();
+    console.log("[headshot]", playerId, "post-container", {
+      usedPath,
+      containerPos: { x: container.x, y: container.y },
+      maskWorld: { tx: wt.tx, ty: wt.ty },
+      photoLocal: photoChild ? { x: photoChild.x, y: photoChild.y } : null,
+      childCount: container.list.length,
+    });
+  }
 
   return container;
 }
