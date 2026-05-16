@@ -587,10 +587,27 @@ function resolveSetupTweenAtTargetGridEpsilon() {
   return SETUP_TWEEN_AT_TARGET_GRID_EPS;
 }
 
-function getSpriteGridPosition(sprite, width, height) {
-  if (Number.isFinite(sprite?.gridX) && Number.isFinite(sprite?.gridY)) {
-    return { x: sprite.gridX, y: sprite.gridY };
+function resolveSetupTweenAtTargetPixelEpsilon(width) {
+  const scope = typeof window !== "undefined" ? window : globalThis;
+  const raw = Number(scope?.UESS_HCO_SETUP_TWEEN_AT_TARGET_PX);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  return Math.max(20, Math.round((Number(width) || 1440) * 0.018));
+}
+
+function resolvePlayerSpriteForSetup(playerSprites, rawId) {
+  if (rawId == null) return null;
+  const ref = resolveSpriteById(playerSprites, rawId);
+  if (ref.sprite) return ref.sprite;
+  const want = String(rawId);
+  for (const [id, sprite] of Object.entries(playerSprites || {})) {
+    if (!sprite) continue;
+    if (String(id) === want || String(sprite.playerId ?? "") === want) return sprite;
   }
+  return null;
+}
+
+/** Live court position for setup tween — always from pixels (BIP/SIP often skip gridX refresh). */
+function getSetupTweenLiveGrid(sprite, width, height) {
   return pixelsToGrid(sprite.x, sprite.y, width, height);
 }
 
@@ -616,7 +633,30 @@ async function runSetupTween({
   const width = scene.game.config.width;
   const height = scene.game.config.height;
   const atTargetEps = resolveSetupTweenAtTargetGridEpsilon();
-  const ballOwnerSprite = currentBallOwnerRef?.value ?? null;
+  const atTargetPixelEps = resolveSetupTweenAtTargetPixelEpsilon(width);
+  let ballOwnerSprite = currentBallOwnerRef?.value ?? null;
+  let ballOwnerId =
+    ballOwnerSprite?.playerId != null ? String(ballOwnerSprite.playerId) : null;
+  if (!ballOwnerSprite) {
+    const ownerId = getCurrentOwner(scene) ?? getPendingOwner(scene);
+    if (ownerId != null) {
+      ballOwnerId = String(ownerId);
+      ballOwnerSprite = resolvePlayerSpriteForSetup(playerSprites, ownerId);
+      if (ballOwnerSprite && currentBallOwnerRef) {
+        currentBallOwnerRef.value = ballOwnerSprite;
+      }
+    }
+  } else if (!ballOwnerId) {
+    ballOwnerId = String(ballOwnerSprite.playerId ?? "");
+  }
+  let step0BallHandlerId = null;
+  for (const anim of animations || []) {
+    if (anim?.hasBallAtStep?.[stepIndex]) {
+      step0BallHandlerId =
+        anim.playerId != null ? String(anim.playerId) : null;
+      break;
+    }
+  }
 
   // Phase 3b: HCO bring-up cruise sync. When the backend supplies per-player
   // bring-up game-seconds (BH at random cruise rate, others at baseline),
@@ -642,35 +682,66 @@ async function runSetupTween({
     const targetGridY = firstStep.coords.y;
 
     const { x, y } = gridToPixels(targetGridX, targetGridY, width, height);
-    const currentGrid = getSpriteGridPosition(sprite, width, height);
-    const deltaGrid = Math.hypot(
-      targetGridX - currentGrid.x,
-      targetGridY - currentGrid.y,
+    const liveGrid = getSetupTweenLiveGrid(sprite, width, height);
+    const cachedGrid =
+      Number.isFinite(sprite?.gridX) && Number.isFinite(sprite?.gridY)
+        ? { x: sprite.gridX, y: sprite.gridY }
+        : null;
+    const deltaGridLive = Math.hypot(
+      targetGridX - liveGrid.x,
+      targetGridY - liveGrid.y,
     );
+    const deltaGridCached = cachedGrid
+      ? Math.hypot(targetGridX - cachedGrid.x, targetGridY - cachedGrid.y)
+      : deltaGridLive;
+    // Use live pixels for skip + duration agreement (cached gridX caused 50ms jets after BIP).
+    const deltaGrid = deltaGridLive;
+    const pixelDist = Phaser.Math.Distance.Between(sprite.x, sprite.y, x, y);
     const playerPos = scene?.playerInfo?.[anim.playerId]?.pos;
-    const isBallCarrier = ballOwnerSprite === sprite;
+    const animIdStr = anim.playerId != null ? String(anim.playerId) : "";
+    const isBallCarrier =
+      (ballOwnerId != null &&
+        (ballOwnerId === animIdStr ||
+          String(sprite?.playerId ?? "") === ballOwnerId)) ||
+      ballOwnerSprite === sprite;
+    const isStep0BallHandler =
+      step0BallHandlerId != null && step0BallHandlerId === animIdStr;
     const logRow = {
       playerId: anim.playerId,
       pos: playerPos ?? null,
       deltaGrid: Number(deltaGrid.toFixed(2)),
+      deltaGridCached: Number(deltaGridCached.toFixed(2)),
+      pixelDist: Number(pixelDist.toFixed(1)),
+      gridLag: cachedGrid
+        ? Number(
+            Math.hypot(cachedGrid.x - liveGrid.x, cachedGrid.y - liveGrid.y).toFixed(2),
+          )
+        : 0,
       isBallCarrier,
+      isStep0BallHandler,
       action: null,
       durationMs: null,
       bringupGameSeconds: null,
+      snapReason: null,
     };
 
+    const atTargetByGrid = deltaGrid < atTargetEps;
+    const atTargetByPixel = pixelDist < atTargetPixelEps;
     // BIP/SIP/outlet often place the ball carrier on skeleton step 0 already.
-    // A second tween with ~0 distance clamps to 50ms and looks "supersonic".
-    if (deltaGrid < atTargetEps) {
+    // Grid coords can disagree with pixels; pixel check catches the 50ms jet.
+    if (atTargetByGrid || atTargetByPixel) {
       sprite.x = x;
       sprite.y = y;
       sprite.gridX = targetGridX;
       sprite.gridY = targetGridY;
-      if (isBallCarrier && ballSprite?.setPosition) {
+      const movesBall =
+        isBallCarrier || (ballOwnerSprite == null && isStep0BallHandler);
+      if (movesBall && ballSprite?.setPosition) {
         ballSprite.setPosition(x, y);
         ballSprite.setVisible(true);
       }
       logRow.action = "snap_already_at_step0";
+      logRow.snapReason = atTargetByPixel && !atTargetByGrid ? "pixel" : "grid";
       logRow.durationMs = 0;
       setupTweenLogRows.push(logRow);
       continue;
@@ -684,9 +755,33 @@ async function runSetupTween({
     if (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0) {
       logRow.bringupGameSeconds = playerGameSeconds;
     }
-    const duration = (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0)
+    let duration = (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0)
       ? Math.max(50, Math.round(playerGameSeconds * clockSecondMs))
       : getPlayerDuration(sprite, x, y);
+    // Tiny bringup contract on a short visual move → 50ms jet; use distance-based instead.
+    if (
+      (isBallCarrier || isStep0BallHandler) &&
+      pixelDist < atTargetPixelEps * 2 &&
+      duration < 250
+    ) {
+      duration = Math.max(duration, getPlayerDuration(sprite, x, y));
+      if (duration < 250) {
+        sprite.x = x;
+        sprite.y = y;
+        sprite.gridX = targetGridX;
+        sprite.gridY = targetGridY;
+        if (isBallCarrier && ballSprite?.setPosition) {
+          ballSprite.setPosition(x, y);
+          ballSprite.setVisible(true);
+        }
+        logRow.action = "snap_already_at_step0";
+        logRow.snapReason = "short_move_override";
+        logRow.durationMs = 0;
+        setupTweenLogRows.push(logRow);
+        continue;
+      }
+      logRow.snapReason = "duration_floor";
+    }
     logRow.action = "tween";
     logRow.durationMs = duration;
     setupTweenLogRows.push(logRow);
@@ -707,13 +802,24 @@ async function runSetupTween({
         duration,
         ease: "Linear",
         onUpdate: () => {
-          if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
+          const movesBall =
+            currentBallOwnerRef?.value === sprite ||
+            (ballOwnerId != null && animIdStr === ballOwnerId) ||
+            (ballOwnerSprite == null && isStep0BallHandler);
+          if (movesBall && ballSprite?.setPosition) {
             ballSprite.setPosition(sprite.x, sprite.y);
             ballSprite.setVisible(true);
           }
         },
-        onComplete: resolve,
-        onStop: resolve
+        onComplete: () => {
+          sprite.gridX = targetGridX;
+          sprite.gridY = targetGridY;
+          resolve();
+        },
+        onStop: () => {
+          captureLiveSpriteGrid(sprite, width, height);
+          resolve();
+        },
       });
       if (scene.skipToEnd) {
         tween.stop();
@@ -726,6 +832,31 @@ async function runSetupTween({
   if (setupTweenLogRows.length > 0) {
     const snapped = setupTweenLogRows.filter((r) => r.action === "snap_already_at_step0");
     const tweened = setupTweenLogRows.filter((r) => r.action === "tween");
+    const carrierRow =
+      setupTweenLogRows.find((r) => r.isBallCarrier) ??
+      setupTweenLogRows.find((r) => r.isStep0BallHandler) ??
+      null;
+    const fastestTween = tweened.reduce(
+      (min, row) =>
+        min == null || (row.durationMs != null && row.durationMs < min.durationMs)
+          ? row
+          : min,
+      null,
+    );
+    console.warn(
+      `${HCO_SETUP_TWEEN_TAG} summary`,
+      `snapped=${snapped.length}`,
+      `tweened=${tweened.length}`,
+      `ballOwnerId=${ballOwnerId ?? "?"}`,
+      `step0Bh=${step0BallHandlerId ?? "?"}`,
+      `ballCarrier=${carrierRow?.action ?? "none"}`,
+      `carrierΔ=${carrierRow?.deltaGrid ?? "?"}`,
+      `carrierPx=${carrierRow?.pixelDist ?? "?"}`,
+      `carrierDur=${carrierRow?.durationMs ?? "?"}`,
+      `gridLag=${carrierRow?.gridLag ?? "?"}`,
+      `fastestTween=${fastestTween?.pos ?? "?"} ${fastestTween?.durationMs ?? "?"}ms`,
+      `fromInbound=${setupContext?.fromInbound ?? false}`,
+    );
     console.warn(HCO_SETUP_TWEEN_TAG, "run complete", {
       turn_index: turnData?.index ?? scene?.currentTurn,
       result_type: turnData?.result_type ?? null,
@@ -734,9 +865,14 @@ async function runSetupTween({
       inbound_source: setupContext?.inboundLeadInSource ?? null,
       requires_step0_entry_pass: setupContext?.requiresStep0EntryPass ?? null,
       at_target_eps_grid: atTargetEps,
+      at_target_eps_px: atTargetPixelEps,
+      ball_owner_id: ballOwnerId,
+      step0_ball_handler_id: step0BallHandlerId,
       snapped_count: snapped.length,
       tweened_count: tweened.length,
-      ball_carrier_snapped: snapped.some((r) => r.isBallCarrier),
+      ball_carrier_snapped: snapped.some(
+        (r) => r.isBallCarrier || r.isStep0BallHandler,
+      ),
       players: setupTweenLogRows,
     });
   }
@@ -3179,10 +3315,12 @@ async function runInboundSetup({
             }
           },
           onComplete: () => {
+            captureLiveSpriteGrid(sfSprite, width, height);
             animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
             resolve();
           },
           onStop: () => {
+            captureLiveSpriteGrid(sfSprite, width, height);
             animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
             resolve();
           }
@@ -3203,10 +3341,12 @@ async function runInboundSetup({
             }
           },
           onComplete: () => {
+            captureLiveSpriteGrid(sfSprite, width, height);
             animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
             resolve();
           },
           onStop: () => {
+            captureLiveSpriteGrid(sfSprite, width, height);
             animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
             resolve();
           }
@@ -3227,10 +3367,12 @@ async function runInboundSetup({
       duration: pgDuration,
       ease: "Linear", // Match HCO step movements for consistent feel
       onComplete: () => {
+        captureLiveSpriteGrid(pgSprite, width, height);
         animationDebugLog("pgTween end");
         resolve();
       },
       onStop: () => {
+        captureLiveSpriteGrid(pgSprite, width, height);
         animationDebugLog("pgTween end");
         resolve();
       }
