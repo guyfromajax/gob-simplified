@@ -577,15 +577,46 @@ async function updateBallOwnership({ scene, ballSprite, animations, playerSprite
   });
 }
 
+const HCO_SETUP_TWEEN_TAG = "[HCO SETUP TWEEN]";
+const SETUP_TWEEN_AT_TARGET_GRID_EPS = 1.25;
+
+function resolveSetupTweenAtTargetGridEpsilon() {
+  const scope = typeof window !== "undefined" ? window : globalThis;
+  const raw = Number(scope?.UESS_HCO_SETUP_TWEEN_AT_TARGET_GRID);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  return SETUP_TWEEN_AT_TARGET_GRID_EPS;
+}
+
+function getSpriteGridPosition(sprite, width, height) {
+  if (Number.isFinite(sprite?.gridX) && Number.isFinite(sprite?.gridY)) {
+    return { x: sprite.gridX, y: sprite.gridY };
+  }
+  return pixelsToGrid(sprite.x, sprite.y, width, height);
+}
+
 /**
  * Smoothly move all players to their step 0 positions before possession begins.
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
 
-async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef, turnData = null, stepDurationMs = null }) {
+async function runSetupTween({
+  scene,
+  ballSprite,
+  animations,
+  playerSprites,
+  currentBallOwnerRef,
+  turnData = null,
+  stepDurationMs = null,
+  setupContext = null,
+}) {
   if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
+  const setupTweenLogRows = [];
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+  const atTargetEps = resolveSetupTweenAtTargetGridEpsilon();
+  const ballOwnerSprite = currentBallOwnerRef?.value ?? null;
 
   // Phase 3b: HCO bring-up cruise sync. When the backend supplies per-player
   // bring-up game-seconds (BH at random cruise rate, others at baseline),
@@ -608,23 +639,65 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
     const targetGridX = shouldClampXToRims
       ? Phaser.Math.Clamp(firstStep.coords.x, 9, 91)
       : firstStep.coords.x;
+    const targetGridY = firstStep.coords.y;
 
-    const { x, y } = gridToPixels(
-      targetGridX,
-      firstStep.coords.y,
-      scene.game.config.width,
-      scene.game.config.height
+    const { x, y } = gridToPixels(targetGridX, targetGridY, width, height);
+    const currentGrid = getSpriteGridPosition(sprite, width, height);
+    const deltaGrid = Math.hypot(
+      targetGridX - currentGrid.x,
+      targetGridY - currentGrid.y,
     );
+    const playerPos = scene?.playerInfo?.[anim.playerId]?.pos;
+    const isBallCarrier = ballOwnerSprite === sprite;
+    const logRow = {
+      playerId: anim.playerId,
+      pos: playerPos ?? null,
+      deltaGrid: Number(deltaGrid.toFixed(2)),
+      isBallCarrier,
+      action: null,
+      durationMs: null,
+      bringupGameSeconds: null,
+    };
+
+    // BIP/SIP/outlet often place the ball carrier on skeleton step 0 already.
+    // A second tween with ~0 distance clamps to 50ms and looks "supersonic".
+    if (deltaGrid < atTargetEps) {
+      sprite.x = x;
+      sprite.y = y;
+      sprite.gridX = targetGridX;
+      sprite.gridY = targetGridY;
+      if (isBallCarrier && ballSprite?.setPosition) {
+        ballSprite.setPosition(x, y);
+        ballSprite.setVisible(true);
+      }
+      logRow.action = "snap_already_at_step0";
+      logRow.durationMs = 0;
+      setupTweenLogRows.push(logRow);
+      continue;
+    }
 
     // Resolve duration: backend per-player game_seconds takes precedence;
     // fall back to AG-based distance duration for legacy turn payloads.
-    const playerPos = scene?.playerInfo?.[anim.playerId]?.pos;
     const playerGameSeconds = bringupPerPlayer && playerPos
       ? Number(bringupPerPlayer[playerPos])
       : NaN;
+    if (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0) {
+      logRow.bringupGameSeconds = playerGameSeconds;
+    }
     const duration = (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0)
       ? Math.max(50, Math.round(playerGameSeconds * clockSecondMs))
       : getPlayerDuration(sprite, x, y);
+    logRow.action = "tween";
+    logRow.durationMs = duration;
+    setupTweenLogRows.push(logRow);
+
+    if (isBallCarrier && duration < 200) {
+      console.warn(HCO_SETUP_TWEEN_TAG, "short ball-carrier tween (not skipped)", {
+        ...logRow,
+        atTargetEps,
+        turn_index: turnData?.index ?? scene?.currentTurn,
+      });
+    }
 
     promises.push(new Promise((resolve) => {
       const tween = scene.tweens.add({
@@ -649,6 +722,24 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   }
 
   await Promise.all(promises);
+
+  if (setupTweenLogRows.length > 0) {
+    const snapped = setupTweenLogRows.filter((r) => r.action === "snap_already_at_step0");
+    const tweened = setupTweenLogRows.filter((r) => r.action === "tween");
+    console.warn(HCO_SETUP_TWEEN_TAG, "run complete", {
+      turn_index: turnData?.index ?? scene?.currentTurn,
+      result_type: turnData?.result_type ?? null,
+      current_turn: turnData?.current_turn ?? null,
+      from_inbound: setupContext?.fromInbound ?? null,
+      inbound_source: setupContext?.inboundLeadInSource ?? null,
+      requires_step0_entry_pass: setupContext?.requiresStep0EntryPass ?? null,
+      at_target_eps_grid: atTargetEps,
+      snapped_count: snapped.length,
+      tweened_count: tweened.length,
+      ball_carrier_snapped: snapped.some((r) => r.isBallCarrier),
+      players: setupTweenLogRows,
+    });
+  }
 }
 
 async function runStep0EntryPassIfNeeded({
@@ -4782,6 +4873,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       currentBallOwnerRef,
       turnData,
       stepDurationMs: getContractStepDurationMs(0, null),
+      setupContext: {
+        fromInbound,
+        inboundLeadInSource,
+        requiresStep0EntryPass,
+      },
     });
   } else {
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
