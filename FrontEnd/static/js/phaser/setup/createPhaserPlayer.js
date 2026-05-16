@@ -97,17 +97,19 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   const shadow = scene.add.ellipse(0, 26, 30, 8, 0x000000, 0.45);
   children.push(shadow);
 
-  // Mask Graphics is added as a hidden child of the container so its world
-  // transform inherits the container's position — keeps the circular clip
-  // aligned with the headshot as the player moves around the court.
-  // NOTE: Phaser's GeometryMask reads draw commands AND world transform from
-  // the source Graphics. We hide it visually via alpha (not setVisible(false))
-  // because some Phaser versions short-circuit the stencil write when the
-  // source is flagged invisible, which produces an empty mask and clips
-  // everything inside the circle.
-  const maskGraphics = scene.make.graphics({ x: 0, y: 0, add: false });
+  // Phaser 3.60 quirk: a GeometryMask source added as a Container child does
+  // not reliably inherit the container's world transform during stencil
+  // rendering — the stencil ends up at scene (0,0) so the clipped image
+  // becomes invisible at the player's actual position. Workaround: keep the
+  // mask Graphics at scene level and sync its position to the container each
+  // frame via scene 'update' event. Cleanup on container destroy.
+  const maskGraphics = scene.add.graphics();
   maskGraphics.fillStyle(0xffffff, 1);
   maskGraphics.fillCircle(0, 0, 22);
+  maskGraphics.x = px;
+  maskGraphics.y = py;
+  // alpha=0 (not setVisible(false)) so the stencil write still fires.
+  maskGraphics.setAlpha(0);
   const mask = maskGraphics.createGeometryMask();
 
   let photoChild;
@@ -157,21 +159,27 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   chipText.setOrigin(0.5);
   children.push(chipText);
 
-  // Mask graphics must be a container descendant so its world transform tracks
-  // the player. Hide visually with alpha=0 (not setVisible) so the stencil
-  // write still fires; mark non-interactive to keep it inert.
-  maskGraphics.setAlpha(0);
-  children.unshift(maskGraphics);
-
   const container = scene.add.container(px, py, children);
   container.setSize(56, 100);
   container.setDepth(1);
+
+  // Keep the scene-level mask aligned with the container each frame.
+  const syncMask = () => {
+    maskGraphics.x = container.x;
+    maskGraphics.y = container.y;
+  };
+  scene.events.on("update", syncMask);
+  container.once("destroy", () => {
+    scene.events.off("update", syncMask);
+    if (maskGraphics.scene) maskGraphics.destroy();
+  });
 
   if (debug) {
     const wt = maskGraphics.getWorldTransformMatrix();
     console.log("[headshot]", playerId, "post-container", {
       usedPath,
       containerPos: { x: container.x, y: container.y },
+      maskPos: { x: maskGraphics.x, y: maskGraphics.y },
       maskWorld: { tx: wt.tx, ty: wt.ty },
       photoLocal: photoChild ? { x: photoChild.x, y: photoChild.y } : null,
       childCount: container.list.length,

@@ -69,12 +69,12 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
     const failed = [];
     const onComplete = () => {
       scene.load.off("loaderror", onLoadError);
+      const loaded = queued.filter((k) => scene.textures.exists(k));
+      // Unconditional one-line summary so we can verify load health without a debug flag.
+      console.log(`[headshots] preload complete — loaded ${loaded.length}/${queued.length}, failed ${failed.length}`);
       if (debug) {
-        const loaded = queued.filter((k) => scene.textures.exists(k));
-        console.log("[headshots] preload complete", {
-          loadedCount: loaded.length,
+        console.log("[headshots] detail", {
           loadedKeys: loaded,
-          failedCount: failed.length,
           failedKeys: failed,
         });
       }
