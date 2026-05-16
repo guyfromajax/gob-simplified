@@ -36,14 +36,14 @@
 - **Execution semantics source of truth:** `6.4 Canonical Execution-Unit Matrices (Draft v0)` defines intra-turn units and completion semantics for all canonical turn families.
 - **Architecture status:** Universal movement/clock intent is defined; implementation remains hybrid in several branches.
 - **Authority model status:** Current hybrid authority (backend contract + frontend heuristic fallback) is temporary migration mode, not target architecture.
-- **Critical stabilization status:** `DREB -> outlet -> HCO` lead-in slice is in progress (functionally stabilized; full end-state sync closure pending).
+- **Critical stabilization status:** `DREB -> outlet -> HCO` lead-in: **client** runs `runDefensiveReboundSetup` immediately after discrete **`DREB`** `animation_steps` **`playTurn`** (`AnimationEngine._maybeRunDiscreteDrebOutletLeadIn`, May 2026) when `DREB.next_play_type` is **HCO/HCT/FCP**, using the prior **MISS/BLOCK** for `dreb_outlet_pass` / get-back. **End-state sync** (sprite vs backend tolerance, duplicate embedded rebound vs discrete capture) may still need tuning — see `Turn_by_Turn_System.md`, `Rebound_System.md`.
 - **Known risk themes:** mixed authority (backend contract vs frontend fallback), timeout-based completion fallbacks, and boundary handoff inconsistencies.
 - **Intentional constraint:** migration remains incremental and contract-first; no broad rewrite.
 - **Target authority end-state:** backend contract is the single primary authority for movement/ownership/transition semantics; frontend fallback is explicit degraded mode only and retired from strict units as contract coverage reaches thresholds.
 
 ### Current Local Implementation Snapshot (April 2026)
 
-- `dreb_outlet_pass.receiver_target` is now emitted by backend shot/rebound flow as the unit-specific receiver movement authority for `hco.lead_in.from_dreb_outlet`.
+- `dreb_outlet_pass.receiver_target` is now emitted by backend shot/rebound flow as the unit-specific receiver movement authority for `hco.lead_in.from_dreb_outlet`. **Frontend:** that unit is executed inside **`runDefensiveReboundSetup`** (`turnAnimation.js`), invoked from **`AnimationEngine`** after discrete **DREB** `playTurn` (not from `ShotAnimationSystem.handleDefensiveRebound` when the MISS row’s `next_play_type` is **`DREB`**). See `_documentation_master/05_GP_Supporting_Systems/Turn_by_Turn_System.md` (Discrete `DREB` turn).
 - HCO skeleton-step runtime enforcement has landed locally for `hco.step[n].movement` and `hco.step[n].pass`:
   - shared completion validator: `FrontEnd/static/js/phaser/animation/unitCompletionContract.js`
   - strictness runtime flag: `window.HCO_STEP_MOVEMENT_STRICT_CONTRACT = "throw" | "warn" | "off"`
@@ -77,7 +77,7 @@
 
 **Implementation status:** local runtime contract checks and telemetry are landed for step movement/pass validation; remaining work is acceptance-gate cleanup, live validation, and promotion from provisional strict rollout to trusted slice completion.
 
-**Active stabilization slice:** `hco.lead_in.from_dreb_outlet` -> **in progress** (deterministic + prototype validation passed; full end-state sync criteria still open).
+**Active stabilization slice:** `hco.lead_in.from_dreb_outlet` — **wired** via `runDefensiveReboundSetup` after discrete **DREB** `playTurn` (`AnimationEngine`, May 2026). Remaining work: strict-contract coverage on mixed branches, telemetry thresholds, and optional suppression of duplicate MISS-embedded rebound capture when `next_play_type === "DREB"`.
 
 ## Reviewer Reading Order (External)
 
@@ -236,6 +236,7 @@ None at this time. Product/architecture decisions are currently locked; remainin
 - Current strict DREB outlet contract shape:
   - `dreb_outlet_pass{ passer_id, receiver_id, receiver_target{x,y}, required, contract_source }`
   - `receiver_target` is unit-specific movement authority for `hco.lead_in.from_dreb_outlet` (do not substitute generic shot-turn `animations[].end` as primary authority).
+  - **Execution (discrete DREB row):** after **`AnimationEngine`** `playTurn` for **`DREB`**, **`_maybeRunDiscreteDrebOutletLeadIn`** calls **`runDefensiveReboundSetup`** (`turnAnimation.js`) with the **prior MISS/BLOCK** as authority. See **`Turn_by_Turn_System.md`** / **`Rebound_System.md`**.
 
 ---
 
@@ -259,7 +260,7 @@ This is an additive migration, not per-branch one-offs. Each slice removes uniqu
 
 **Current rollout map (completed -> next):**
 - Fast Break family (RR + generic FB shot/stop) -> Phase 1 contract/telemetry framework completed; branch hardening and threshold calibration in progress
-- DREB -> outlet -> HCO setup path -> stabilizing (in progress; completion-contract hardening active)
+- DREB -> outlet -> HCO setup path -> **outlet lead-in invoked post–discrete-DREB `playTurn`** (`AnimationEngine`); end-state sync / duplicate-capture cleanup still active
 - HCO shot/rebound family (non-FB) -> next
 - SIDE_INBOUND / BASELINE_INBOUND / OREB / pressure flows -> follow
 
@@ -317,7 +318,7 @@ This section defines intra-turn execution units and completion semantics for eac
 
 | unit_id | unit_type | when it applies | execution_mode | advance_trigger | visual_settle_trigger | failure_policy | clock_anchor | owner_authority_at_end |
 |---|---|---|---|---|---|---|---|---|
-| `hco.lead_in.from_dreb_outlet` | lead_in_phase | prior turn ends with DREB and next is HCO/HCT/FCP | dynamic_event | outlet pass received | outlet movement + pass settled | throw | transition budget | outlet receiver |
+| `hco.lead_in.from_dreb_outlet` | lead_in_phase | prior sim row is discrete **`DREB`** (`animation_steps` capture only) and **next** is HCO/HCT/FCP; client runs `runDefensiveReboundSetup` after DREB `playTurn` using **prior MISS/BLOCK** for `dreb_outlet_pass` / get-back | dynamic_event | outlet pass received | outlet movement + pass settled | throw | transition budget | outlet receiver |
 | `hco.lead_in.from_sip_or_bip` | lead_in_phase | prior turn is SIP/BIP into HCO | dynamic_event | inbound pass received | inbound setup + pass settled | warn -> throw | inbound turn budget | inbound receiver / BH |
 | `hco.step[n].movement` | skeleton_step | each HCO skeleton step | skeleton | required movers reach step-n targets | required step-n tweens complete | warn/throw | `step_clock_seconds[n]` | per-step owner contract |
 | `hco.step[n].pass` | skeleton_step | step-n includes pass action | skeleton | pass received | ball flight + receiver settle | throw | same step budget | pass receiver |
@@ -1022,7 +1023,7 @@ Phase 1 is complete only when:
 
 - [ ] **HCO resolution hard overrun with invalid elapsed clock** (`severity`: Critical, `priority`: P0): observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on `DEAD BALL` path. This indicates timer baseline/state contamination (not normal jitter). **Mitigation applied (Option A):** turn-boundary guards now use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`); validate in live runs before closing.
 - [ ] **HCO step-pass hard overrun with invalid elapsed clock in BATCH/DEAD BALL sub-turns** (`severity`: Critical, `priority`: P0): observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6` on `DEAD BALL` batch sub-turn processing. Magnitude indicates elapsed baseline contamination/leak (not jitter). Track as separate from resolution-path overrun; likely same timer-source class but distinct enforcement site (`step pass` guard).
-- [ ] **DREB->HCO strict contract degradation still triggered in mixed OREB/putback flows** (`severity`: High, `priority`: P1): observed `missing_outlet_receiver_animation_end` followed by synthetic pass fallback (`Using synthetic passInfo for non-strict branch`), indicating incomplete backend endpoint coverage on some rebound-derived transitions.
+- [ ] **DREB->HCO strict contract degradation still triggered in mixed OREB/putback flows** (`severity`: High, `priority`: P1): observed `missing_outlet_receiver_animation_end` followed by synthetic pass fallback (`Using synthetic passInfo for non-strict branch`), indicating incomplete backend endpoint coverage on some rebound-derived transitions. **Note (May 2026):** discrete **DREB** → **HCO/HCT/FCP** now runs **`runDefensiveReboundSetup`** after **`AnimationEngine`** `playTurn`; this item tracks **remaining** mixed-branch / strict-endpoint gaps, not the old “outlet never runs” gap for that path.
 - [ ] **HCO/FCP/HCT player classification mismatch in OREB/putback contexts** (`severity`: High, `priority`: P1): repeated warning `Expected 5 offensive and 5 defensive players`; likely destabilizes ownership/step gating on adjacent turns.
 - [ ] **Clock continuity drift around putback/inbound boundaries** (`severity`: High, `priority`: P1): repeated `Ignoring non-monotonic clock update` warnings; may be display-order only, but currently treated as timing-integrity risk until proven otherwise.
 - [ ] **SIDE_INBOUND fallback pass authority still active** (`severity`: Medium, `priority`: P2): `Using fallback hardcoded SF→PG pass` persists; increases variance in SIP->HCO entry behavior and should be retired.

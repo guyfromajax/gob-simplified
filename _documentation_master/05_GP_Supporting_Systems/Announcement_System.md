@@ -85,7 +85,7 @@
    - **"BLOCKING FOUL!"** - Defensive blocking foul on drive (result_type === 'FOUL', foul_team DEFENSE, text contains "blocking foul")
    - **"OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"** - Other non-shooting fouls (with fouling player headshot)
    - **"BLOCK!"** - Block on shot attempt (ShotAnimationSystem when ball reaches block spot, before rebound; blocker's image)
-   - **"Rebound!"** - Rebound secured (DREB and OREB): `announceReboundHeadlineIfNeeded()` in `announcements.js`, invoked from `ballManager.animateRebound` (legacy/FT/FB/putback chains), `ShotAnimationSystem.handleEmbeddedRebound` (HCO MISS/BLOCK embedded rebound), `ReboundAnimationSystem` (standalone `REBOUND` turns), and `announceGameEvent('REBOUND', ...)` when wired.
+   - **"Rebound!"** - Rebound secured (DREB and OREB): `announceReboundHeadlineIfNeeded()` in `announcements.js`; see **Rebound announcements** below. **Discrete `DREB` turn** (separate row after some MISS/BLOCK): outlet choreography is **`AnimationEngine._maybeRunDiscreteDrebOutletLeadIn`** → `runDefensiveReboundSetup` after DREB `playTurn` (see `Turn_by_Turn_System.md`); **Rebound!** usually still fires on the **embedded** MISS/BLOCK path via `ShotAnimationSystem.handleEmbeddedRebound`, not on the DREB `animation_steps` row alone.
 
 **Long Form Documentation**
 
@@ -119,7 +119,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Tier:** **Primary** (center-court overlay).
 
 **Locations:**
-- Per-animation result announcements fire directly from the animation modules when the ball reaches the relevant beat (rim, rebounder, block spot). See `ballManager.js`, `ShotAnimationSystem.js`, `fastBreak.js`, `FreeThrowAnimationSystem.js`.
+- Per-animation result announcements fire directly from the animation modules when the ball reaches the relevant beat (rim, rebounder, block spot). See `ballManager.js`, `ShotAnimationSystem.js`, **`AnimationEngine.js`** (discrete **DREB** outlet is movement here, not a headline), `fastBreak.js`, `FreeThrowAnimationSystem.js`. Turn-type and discrete-**DREB** routing: `_documentation_master/05_GP_Supporting_Systems/Turn_by_Turn_System.md`.
 - Fallback/result text is also handled in `announcements.js` → `announceFromTurnData(turn, 'end', ...)`, invoked from `animateGameTurns.js` for turns whose result wasn't already announced inline.
 
 **Shot Results:**
@@ -161,8 +161,8 @@ The Announcement System provides visual feedback for game events using timing-ba
 - **"BLOCK!"** - Announced in `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (when ball has reached block spot), **before** the rebound is announced, so order is always Block → Rebound. Shows blocker's headshot. Routed via `announceGameEvent('BLOCK', ...)` in `gameAnnouncements.js`. Fallback: `finalizeTurnAfterAnimation` announces BLOCK only if `!turn._blockAnnounced`.
 
 **Rebound Announcements:**
-- **"Rebound!"** - `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `announcements.js`. Fires when the rebounder secures the ball (embedded path: rebounder tween `onComplete` after attach + rebound SFX; `ballManager.animateRebound`: rebounder tween `onComplete`). **DREB and OREB** on embedded misses both use the same hook so FAST_BREAK / `force_foul_after_dreb` / odd `next_play_type` branches still get the headline when the rebound animates. Idempotent via `turnData._reboundHeadlineShown` when `turnData` is passed (always pass the authoritative MISS/BLOCK or rebound turn from callers).
-- Shows rebounder's headshot using the same primary standard card as other results (`teamName` resolves from `scene.simData` home/away names; `secondaryColor` from `gameStore.getColors()`).
+- **"Rebound!"** - `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `announcements.js`. Fires when the rebounder secures the ball (embedded path: rebounder tween `onComplete` after attach + rebound SFX; `ballManager.animateRebound`: rebounder tween `onComplete`). **DREB and OREB** on embedded misses both use the same hook so FAST_BREAK / `force_foul_after_dreb` / odd `next_play_type` branches still get the headline when the rebound animates. Idempotent via `turnData._reboundHeadlineShown` when `turnData` is passed (always pass the authoritative MISS/BLOCK or rebound turn from callers). Primary card uses the same portrait styling as other results (`teamName` from `scene.simData` home/away names; `secondaryColor` from `gameStore.getColors()`).
+- **Discrete `DREB` row (migration):** Backend may append a separate **`DREB`** turn whose `animation_steps` only capture the ball. **Rebound!** idempotency should continue to use the **MISS/BLOCK** turn object when that turn still runs **`ShotAnimationSystem`** embedded rebound; the DREB row does not replace the headline hook by itself. **Outlet** (pass / bring-up) is **`runDefensiveReboundSetup`** after DREB `playTurn` — see **`Rebound_System.md`** (DREB vs outlet) and **`Turn_by_Turn_System.md`** (Discrete `DREB` turn).
 
 ### Sounds (SFX)
 
@@ -283,6 +283,8 @@ When a steal leads to a fast break:
   - `handleMissedShot()` — emits `BLOCK` via `announceGameEvent('BLOCK', ...)` when `result_type === 'BLOCK'`, before the rebound; sets `turnData._blockAnnounced = true`. Also emits `FOUL_SHOOTING` when a shooting foul is detected on the miss.
   - `handleEmbeddedRebound()` — calls `announceReboundHeadlineIfNeeded` in the rebounder tween `onComplete` (after attach + rebound SFX) for both DREB and OREB; `handleDefensiveRebound` no longer duplicates the headline before outlet setup.
   - HCO make path emits `"It's Good!"` / AND-1 in unison with the rim hold (single 1000ms period).
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js`
+  - Discrete **`DREB`** + `animation_steps`: after **`playTurn`**, **`_maybeRunDiscreteDrebOutletLeadIn`** runs **`runDefensiveReboundSetup`** when next is **HCO/HCT/FCP** (outlet / bring-up — not an announcement). Cross-ref: `Turn_by_Turn_System.md`, `Rebound_System.md`.
 - `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js`
   - Free-throw make announcements; also dispatches `PRESSURE_FCP` / `PRESSURE_HCT` (secondary) when the next defensive setup applies pressure after a final FT.
   - Final FT miss → `animateRebound` passes `turnData` so **Rebound!** uses the same idempotent flag as other paths.

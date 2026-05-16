@@ -8,6 +8,7 @@ Use this list as the canonical turn-type set across backend/frontend docs.
 - `FCP`
 - `HCT`
 - `FAST_BREAK`
+- `DREB` — **Discrete defensive rebound turn** (own `animation_steps` row); emitted after some **MISS/BLOCK** turns when the backend splits rebound capture from the shot turn (see below). Not the same as `rebound_type: "DREB"` living only inside another turn’s payload.
 - `OREB`
 - `OPENING_TIP`
 - `BASELINE_INBOUND` (**BIP**)
@@ -36,17 +37,20 @@ Use this list as the canonical turn-type set across backend/frontend docs.
 
 **Key Files:**
 - `BackEnd/models/turn_manager.py` - Standard fields (Bucket 1), turn creation
-- `BackEnd/models/game_manager.py` - `_append_turn()` (single funnel for appending turns + **player coords sync**)
+- `BackEnd/models/game_manager.py` - `_append_turn()` (single funnel for appending turns + **player coords sync**); discrete **`DREB`** turn append + `_build_dreb_turn_from_miss()` when migration gates match
+- `BackEnd/engine/dreb_step_emitter.py` - **`animation_steps`** for discrete **DREB** (rebound capture only)
 - `BackEnd/utils/shared.py` - `sync_lineup_coords_from_turn()`, `apply_coords_from_animations_list()`
 - `BackEnd/models/shot_manager.py` - Shot-specific fields (Bucket 2)
 - `BackEnd/engine/phase_resolution.py` - FCP/HCT/Free Throw fields (Bucket 2), resolution calculations
-- `BackEnd/models/animator.py` - Animation data creation (Bucket 3)
+- `BackEnd/models/animator.py` - Animation data creation (Bucket 3) for turns that use legacy `animations[]`
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` - Routes **`DREB`** + `animation_steps` through `playTurn`; runs **`runDefensiveReboundSetup`** after capture when next is HCO/HCT/FCP
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runDefensiveReboundSetup` (outlet lead-in / `hco.lead_in.from_dreb_outlet`)
 - `FrontEnd/static/js/phaser/gameScene.js` - `simulateTurnByTurn()` method
 
 ## System Flow
 
 1. **Backend Turn Creation**: Handler creates result with Bucket 2 (bespoke fields)
-2. **Turn Manager Processing**: Adds Bucket 1 (standard fields) and calls Animator for Bucket 3
+2. **Turn Manager Processing**: Adds Bucket 1 (standard fields) and calls Animator for Bucket 3 **when that path applies** (many turn types). Discrete **`DREB`** rows may attach **`animation_steps`** at append time (`game_manager` + `dreb_step_emitter`) instead.
 3. **Turn Append + Coords Sync**: `GameManager._append_turn()` appends the turn, then runs `sync_lineup_coords_from_turn()` so all **10 active players**’ `Player.coords` match the same spatial data the frontend uses for that turn (see **Player coordinates sync** below).
 4. **Result Serialization**: Complete turn data serialized to JSON and sent to frontend
 5. **Frontend Animation**: Receives turn data, uses all three buckets for routing, animation, and UI updates
@@ -116,8 +120,8 @@ Every turn result from the backend contains data organized into **three distinct
 - `shooter`, `shooter_id`, `shooter_pos` - Shooter information
 - `ball_handler`, `passer`, `screener`, `defender` - Participant names
 - `points`, `scoring_team` - Scoring data (if made)
-- `next_play_type` - "BASELINE_INBOUND", "HCO", "FAST_BREAK", "FREE_THROW", etc.
-- `dreb_outlet_pass` - `{passer_id, receiver_id}` outlet contract for `MISS/BLOCK -> DREB -> {HCO|HCT|FCP}` transitions
+- `next_play_type` - "BASELINE_INBOUND", "HCO", "FAST_BREAK", "FREE_THROW", **"DREB"** (when a discrete DREB turn follows; see **Discrete `DREB` turn**), etc.
+- `dreb_outlet_pass` - Outlet contract for **MISS/BLOCK → DREB → {HCO|HCT|FCP}** (strict shape may include `receiver_target`; see `Unified_Animation_System.md`). The contract is authored on the **MISS/BLOCK** turn; the frontend runs `runDefensiveReboundSetup` after the discrete **DREB** `animation_steps` finish, using that prior turn as `authorityTurnData`.
 - `next_defensive_setup` - "FCP", "HCT", "HCO", None
 - `free_throws_remaining`, `has_and_one` - Free throw data (if foul)
 - `intended_shooter_pos`, `intended_shooter_id` - For audible/hot read popup
@@ -165,17 +169,30 @@ Every turn result from the backend contains data organized into **three distinct
 
 **Purpose:** Provides turn-specific data needed for animations, announcements, and UI updates. Only present when relevant to the turn type.
 
+#### Discrete `DREB` turn (defensive rebound as its own turn)
+
+For selected **MISS/BLOCK** flows (e.g. **HCO**, **HCT**, **FAST_BREAK Covert Release** when migrated), `BackEnd/models/game_manager.py` may append a **separate** turn with `result_type` / `current_turn` **`DREB`** after the shot turn. On that path:
+
+1. The **shot** turn still carries rebound resolution fields (`rebounderId`, `rebound_type`, **`dreb_outlet_pass`**, `offense_getback`, etc.) and may set `next_play_type` / `next_turn` to **`DREB`** so the client knows a DREB row follows.
+2. The **`DREB`** turn carries **`animation_steps`** built by `BackEnd/engine/dreb_step_emitter.py` — **rebound capture only** (rebounder to ball; others stationary at post-shot coords from `shot_manager`).
+3. **Half-court outlet** (rebounder → PG / contract receiver, then bring-up toward the new offense end) is **not** inside those `animation_steps`. The client runs **`runDefensiveReboundSetup`** in **`AnimationEngine`** immediately after discrete DREB **`playTurn`** completes, when `DREB.next_play_type` is **`HCO`**, **`HCT`**, or **`FCP`**, using the **prior** MISS/BLOCK row as `authorityTurnData` / get-back source. It is **skipped** when the DREB routes to **`FAST_BREAK`** (outlet/choreography continues inside the fast-break sequence) or when the shot turn has **`force_foul_after_dreb`**.
+
+**Related docs:** `Unified_Animation_System.md` (execution unit **`hco.lead_in.from_dreb_outlet`**, strict `dreb_outlet_pass` contract), `Announcement_System.md` (**Rebound!** headline vs outlet choreography), `Rebound_System.md` (post-shot placement vs outlet).
+
+**Not migrated to discrete DREB** (examples): final **FREE_THROW** miss → DREB (rebound + outlet still run on the FT animation path); some **FCP** / other FB variants may still bundle DREB on the MISS turn until migration notes say otherwise.
+
 #### Bucket 3: Animation Data ✅ **Always Present (but may be empty)**
 
 **Set by:** `Animator` class (`animator.py`) - Created in `turn_manager.py` (lines 512-522)
 
 **Always Included:**
-- `animations[]` - Array of per-player movement tracks
+- `animations[]` - Array of per-player movement tracks (legacy / many turn types)
   - Each animation contains:
     - `playerId` - Player identifier
     - `movement[]` - Array of movement steps
       - Each step: `coords` (x, y), `action`, `timestamp`, `has_ball`
   - May be empty array `[]` if no animation (e.g., some free throws, turnovers)
+- **`animation_steps`** — Step-based playback envelope for migrated turns (**`HCO`**, **`HCT`**, **`DREB`**, selected **FAST_BREAK**). Discrete **DREB** rows use this instead of bundling rebound capture into the shot turn’s `animations[]`.
 
 **Conditional:**
 - `events[]` - High-level events array

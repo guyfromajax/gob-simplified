@@ -348,6 +348,12 @@ export class AnimationEngine {
             turnData,
           });
         }
+        // Discrete DREB turn: rebound capture is `animation_steps` only. Half-court outlet
+        // (`hco.lead_in.from_dreb_outlet` via `runDefensiveReboundSetup`) must run here — the
+        // prior MISS turn sets `next_play_type` to "DREB", so ShotAnimationSystem skips outlet.
+        if (turnData?.current_turn === "DREB" || turnData?.result_type === "DREB") {
+          await this._maybeRunDiscreteDrebOutletLeadIn(turnData, context, sprites, ballSprite);
+        }
         return;
       }
 
@@ -370,6 +376,60 @@ export class AnimationEngine {
       // Keep heartbeat running consistently across turns; only full-cleanup on teardown.
       this.isProcessing = false;
     }
+  }
+
+  /**
+   * After discrete DREB `animation_steps` playback, run half-court outlet lead-in when the
+   * next route is HCO/HCT/FCP. Authority + get-back live on the prior MISS/BLOCK turn
+   * (`dreb_outlet_pass`, `offense_getback`). Skips FAST_BREAK (outlet lives in FB sequence)
+   * and `force_foul_after_dreb` on the shot turn.
+   */
+  async _maybeRunDiscreteDrebOutletLeadIn(turnData, context, sprites, ballSprite) {
+    if (turnData?._drebOutletLeadInDone) return;
+
+    const nextRaw = turnData?.next_play_type;
+    const next = typeof nextRaw === "string" ? nextRaw.toUpperCase() : "";
+    if (next === "FAST_BREAK") return;
+    if (!next || !["HCO", "HCT", "FCP"].includes(next)) return;
+
+    const scene = this.scene;
+    const idx =
+      typeof turnData?.index === "number"
+        ? turnData.index
+        : typeof scene?.currentTurn === "number"
+          ? scene.currentTurn
+          : null;
+    if (idx == null || idx < 1) return;
+
+    const missTurn = scene?.simData?.turns?.[idx - 1];
+    if (
+      !missTurn ||
+      (missTurn.result_type !== "MISS" && missTurn.result_type !== "BLOCK")
+    ) {
+      return;
+    }
+    if (missTurn.force_foul_after_dreb) return;
+
+    const playerSprites =
+      sprites ||
+      context?.playerSprites ||
+      this.playerSprites ||
+      scene?.playerSprites ||
+      {};
+    const bs =
+      ballSprite || context?.ballSprite || scene?.ballSprite;
+
+    const { runDefensiveReboundSetup } = await import("./turnAnimation.js");
+    await runDefensiveReboundSetup({
+      scene,
+      ballSprite: bs,
+      playerSprites,
+      rebounderId: turnData.rebounderId,
+      nextPlayType: nextRaw || next,
+      turnData: missTurn,
+      authorityTurnData: missTurn,
+    });
+    turnData._drebOutletLeadInDone = true;
   }
 
   /**

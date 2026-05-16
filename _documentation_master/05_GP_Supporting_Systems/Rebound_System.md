@@ -16,9 +16,13 @@ A unified system that handles rebound logic for all missed shot instances.
 
 The MISS turn emitter absorbs these into the final step's `end.coords` via its `_apply_post_shot_overlay` helper. `sync_lineup_coords_from_turn` then writes them to `player.coords`. Overlay precedence is set in `TURN_COORDS_OVERLAY_KEYS` (rebounder maps applied first, get-back / release applied last — get-back / release win for the specific role-players they designate).
 
-### DREB animates rebound capture only, not placement
+### DREB animates rebound capture only (backend step); outlet is a separate client beat
 
-The DREB turn (when DREB is the rebound outcome) is purely an animation of the rebound capture: the rebounder moves from his post-shot position to the bounce coords. **DREB does not re-decide where any non-rebounder ends up.** All 9 non-rebounders are `stationary` at the position shot_manager assigned them.
+**Backend discrete `DREB` turn** (`result_type` / `current_turn` **`DREB`**, `animation_steps` from `dreb_step_emitter.py`): animates **only** the rebounder moving to the ball at the bounce spot. **It does not re-place the other nine players** — they stay where `shot_manager` put them on the prior **MISS/BLOCK** turn (placement authority above).
+
+**Half-court outlet** (rebounder dribble / pass to outlet receiver per `dreb_outlet_pass`, teammates moving toward the new offense end — unit **`hco.lead_in.from_dreb_outlet`** in `turnAnimation.js` → `runDefensiveReboundSetup`) **is not** emitted as part of `dreb_step_emitter` steps. For discrete **DREB → HCO/HCT/FCP**, the client runs that setup **after** `AnimationEngine` finishes **`playTurn`** for the DREB row, using the **previous** MISS/BLOCK turn for **`dreb_outlet_pass`** and **`offense_getback`**. Skip when `DREB.next_play_type` is **FAST_BREAK** (fast break owns outlet) or when the shot turn has **`force_foul_after_dreb`**.
+
+**Embedded DREB** (MISS/BLOCK turn still owns rebound, no separate `DREB` row — e.g. many **FREE_THROW** misses, unmigrated FCP / FB variants): outlet still runs from **`ShotAnimationSystem.handleDefensiveRebound`** → **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP** on that same shot turn. **Rebound!** headline rules (including idempotency with discrete rows): **`Announcement_System.md`**.
 
 This replaces the earlier two-authorities-via-player-id-matching design, where the DREB step ran its own frontcourt-filter / random-near-bounce placement logic and tried to honor shot_manager's get-back / release maps via an exempt list. That coupling was brittle — any mismatch in the exempt set yanked role-players to the rim cluster. See [`Animation_System_Updated.md`](../projects/Animation_System_Updated.md) "DREB emitter — scoping" for the current model.
 
@@ -40,7 +44,7 @@ When the rebounder **secures** the ball in animation, the client shows the prima
 
 - **Helper:** `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `FrontEnd/static/js/phaser/utils/announcements.js`.
 - **Idempotency:** When callers pass the authoritative turn object (`turnData`), the helper sets `turnData._reboundHeadlineShown` after display so `ballManager.animateRebound`, embedded `ShotAnimationSystem.handleEmbeddedRebound`, final-FT `animateRebound`, `ReboundAnimationSystem`, and `announceGameEvent('REBOUND', ...)` cannot double-fire for the same turn.
-- **Call sites:** `ballManager.js` (`animateRebound` rebounder tween `onComplete`), `ShotAnimationSystem.js` (embedded rebound `onComplete`, covers DREB and OREB including FAST_BREAK / `force_foul_after_dreb` branches that previously skipped the old outlet-only announce), `FreeThrowAnimationSystem.js` (passes `turnData` into `animateRebound`), `ReboundAnimationSystem.js` (after attach in defensive/offensive sequences), `gameAnnouncements.js` (`REBOUND` case).
+- **Call sites:** `ballManager.js`, **`ShotAnimationSystem.js`** (embedded MISS/BLOCK rebound secure), **`FreeThrowAnimationSystem.js`**, `ReboundAnimationSystem.js`, `gameAnnouncements.js` (`REBOUND`). **Discrete `DREB` turn:** rebound headline may still fire on the embedded MISS path; **outlet** runs after **`AnimationEngine`** `playTurn` for the **`DREB`** row (`_maybeRunDiscreteDrebOutletLeadIn` → `runDefensiveReboundSetup`).
 
 See `Announcement_System.md` for tiering, Block → Rebound ordering, and related flags (`_blockAnnounced`).
 

@@ -699,8 +699,9 @@ export class AnimationRouter {
         });
       }
 
-      // Note: HCO outlet pass step is now handled directly in ShotAnimationSystem.handleDefensiveRebound
-      // using the same runDefensiveReboundSetup function that works for free throws
+      // Discrete DREB → HCO/HCT/FCP outlet: `runDefensiveReboundSetup` after DREB `playTurn`
+      // (`AnimationEngine._maybeRunDiscreteDrebOutletLeadIn`). MISS turn may set `next_play_type`
+      // to "DREB", so `ShotAnimationSystem.handleDefensiveRebound` does not run outlet on the shot turn.
       
       // No state machine needed - just process the turn directly
       if (!shouldLog) {
