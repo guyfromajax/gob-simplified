@@ -2,12 +2,12 @@
 // Every behavior change introduced with the headshot marker is gated on this flag.
 export const USE_HEADSHOT_MARKER = true;
 
-// Ball position offset from the player container's origin (= headshot center).
-// When USE_HEADSHOT_MARKER is false this MUST be { x: 0, y: 0 } so ball behavior
-// is byte-identical to the pre-headshot codebase.
-export const BALL_ATTACH_OFFSET = USE_HEADSHOT_MARKER
-  ? { x: 42, y: 24 }
-  : { x: 0, y: 0 };
+// Ball position offset from the player container's origin (= headshot center
+// in headshot mode, sprite center in legacy mode). Currently {0,0} in both
+// modes — the ball attaches to the sprite center, matching pre-headshot
+// behavior. The composition wiring is kept in place so a future setting can
+// re-introduce a hip anchor without touching every call site.
+export const BALL_ATTACH_OFFSET = { x: 0, y: 0 };
 
 // Resolve a ball position anchored to a player sprite, optionally composed with
 // an additional per-call offset (preserves existing arc/lift offsets like y - 10).
