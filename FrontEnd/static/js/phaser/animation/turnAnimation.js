@@ -342,7 +342,7 @@ function captureLiveSpriteGrid(sprite, width, height) {
  * Steal HCO Setup Animation
  * Moves the stealer (ball handler) back away from basket before HCO skeleton starts
  */
-async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) {
+export async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) {
   const ballHandlerId = turnData.roles?.ball_handler_id;
   const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
   

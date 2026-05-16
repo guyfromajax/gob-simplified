@@ -348,6 +348,18 @@ export class AnimationEngine {
           || this.scene?.playerSprites
           || {};
         const ballSprite = context.ballSprite || this.scene?.ballSprite;
+        // Post-steal HCO: `roles.is_steal_hco_setup` only ran inside legacy `playTurnAnimation`.
+        // HCO/HCT rows with `animation_steps` bypass that path — run step-back + floor shift here first.
+        if (
+          turnData?.roles?.is_steal_hco_setup &&
+          (currentTurnNorm === "HCO" ||
+            currentTurnNorm === "HCT" ||
+            turnData?.current_turn === "HCO" ||
+            turnData?.current_turn === "HCT")
+        ) {
+          const { animateStealHCOSetup } = await import("./turnAnimation.js");
+          await animateStealHCOSetup(this.scene, turnData, sprites, ballSprite);
+        }
         const turnStop = await playTurn(
           this.scene,
           turnData.animation_steps,
