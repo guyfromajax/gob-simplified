@@ -23,6 +23,7 @@ import animationConfig from './animation_config.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
 import { playFreeThrowResultSfx } from '../utils/gameSfx.js';
 import { playGameplayTrack } from '../../musicController.js';
+import { playerBallPos } from '../setup/markerConfig.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -426,8 +427,9 @@ export class FreeThrowAnimationSystem {
       const ballAnim = animations.find((a) => a.playerId === "ball");
       const shotDuration = ballAnim?.duration || this.ftConfig.shotDuration;
 
-      // Position ball at shooter
-      ballSprite.setPosition(shooterSprite.x, shooterSprite.y - 10);
+      // Position ball at shooter (hip + existing lift)
+      const ftReleasePos = playerBallPos(shooterSprite, { x: 0, y: -10 });
+      ballSprite.setPosition(ftReleasePos.x, ftReleasePos.y);
       ballSprite.setVisible(true);
 
       // Start flight

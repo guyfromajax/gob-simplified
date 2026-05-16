@@ -1,5 +1,6 @@
 
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
+import { preloadPlayerHeadshots } from './setup/preloadPlayerHeadshots.js';
 import { playTurnAnimation } from './animation/turnAnimation.js';
 import { onAction } from './animation/onAction.js';
 import { passBall, attachBallToPlayer } from './animation/ballManager.js';
@@ -16,7 +17,7 @@ export function createTestScene(Phaser) {
     console.log("✅ TestScene preloaded");
   }
 
-  create() {
+  async create() {
     console.log("TestScene created")
     // Mock player data
     const playerId = "p1";
@@ -61,6 +62,8 @@ export function createTestScene(Phaser) {
       }
     };
   
+
+    await preloadPlayerHeadshots(this, allPlayers);
 
     this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo, Phaser);
 

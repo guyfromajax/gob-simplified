@@ -5,6 +5,7 @@
  */
 
 import { BallController } from '../BallController.js';
+import { BALL_ATTACH_OFFSET } from '../../setup/markerConfig.js';
 
 // Mock Phaser ball sprite
 const createMockBallSprite = () => ({
@@ -82,8 +83,12 @@ describe('BallController', () => {
     test('should position ball on player correctly', () => {
       const playerSprite = createMockPlayerSprite();
       ballController.attachToPlayer(playerSprite);
-      
-      expect(mockBallSprite.setPosition).toHaveBeenCalledWith(150, 240); // y - 10 offset
+
+      // Default offset is BALL_ATTACH_OFFSET (hip anchor for headshot marker; {0,0} when flag is off).
+      expect(mockBallSprite.setPosition).toHaveBeenCalledWith(
+        150 + BALL_ATTACH_OFFSET.x,
+        250 + BALL_ATTACH_OFFSET.y,
+      );
       expect(mockBallSprite.setDepth).toHaveBeenCalledWith(11); // player depth + 1
     });
 
@@ -259,9 +264,12 @@ describe('BallController', () => {
       playerSprite.y = 300;
       
       ballController.updatePosition(200, 300);
-      
-      // Should reposition ball on player
-      expect(mockBallSprite.setPosition).toHaveBeenCalledWith(200, 290);
+
+      // Should reposition ball on player, anchored at hip via BALL_ATTACH_OFFSET.
+      expect(mockBallSprite.setPosition).toHaveBeenCalledWith(
+        200 + BALL_ATTACH_OFFSET.x,
+        300 + BALL_ATTACH_OFFSET.y,
+      );
     });
   });
 

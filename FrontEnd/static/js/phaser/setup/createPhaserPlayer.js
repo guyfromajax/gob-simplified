@@ -1,21 +1,19 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { USE_HEADSHOT_MARKER } from "./markerConfig.js";
+import { headshotTextureKey, HEADSHOT_FALLBACK_KEY } from "./preloadPlayerHeadshots.js";
 
-export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }) {
+export function createPhaserPlayer(args) {
+  return USE_HEADSHOT_MARKER
+    ? createHeadshotMarker(args)
+    : createLegacyMarker(args);
+}
+
+function createLegacyMarker({ scene, player, teamInfo, position, Phaser }) {
   const { x, y } = player.startingCoords || { x: 50, y: 25 };
   const { x: px, y: py } = gridToPixels(x, y, scene.game.config.width, scene.game.config.height);
 
-  const isHome = player.team === "home"; // ✅ Determine team side
-  
-  // console.log(`createPhaserPlayer for ${player.playerId ?? player.player_id}:`, {
-  //   name: player.name,
-  //   team: player.team,
-  //   position: position,
-  //   startingCoords: { x, y },
-  //   pixelCoords: { px, py },
-  //   isHome
-  // });
+  const isHome = player.team === "home";
 
-  // ✅ Style logic per GDD
   const fillColor = isHome
     ? Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color
     : 0xffffff;
@@ -28,12 +26,10 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
     ? teamInfo.secondary_color
     : teamInfo.primary_color;
 
-  // ✅ Create player circle (20% larger than original: 20 → 24)
   const circle = scene.add.circle(0, 0, 24, fillColor);
   circle.setStrokeStyle(3, borderColor);
   circle.setDepth(1);
 
-  // ✅ Position abbreviation — centered inside
   const label = scene.add.text(0, 0, position, {
     font: "bold 18px Arial",
     color: textColor,
@@ -42,13 +38,11 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   label.setOrigin(0.5);
   label.setDepth(2);
 
-  // ✅ Jersey number — above if home, below if away
-  // ✅ FIX: Handle jersey number 0 - use explicit check to preserve 0
   const jerseyOffset = isHome ? -32 : 32;
-  const jerseyValue = (typeof player.jersey === 'number') 
-    ? String(player.jersey) 
-    : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '') 
-      ? String(player.jersey) 
+  const jerseyValue = (typeof player.jersey === 'number')
+    ? String(player.jersey)
+    : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '')
+      ? String(player.jersey)
       : '';
   const jersey = scene.add.text(0, jerseyOffset, jerseyValue, {
     font: "bold 15px Arial",
@@ -58,13 +52,101 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   jersey.setOrigin(0.5);
   jersey.setDepth(2);
 
-  // ✅ Container to group all elements
   const container = scene.add.container(px, py, [circle, label, jersey]);
   container.setDepth(1);
-  // const team_identifier = teamInfo.team_id;
-  // container.team = team_identifier; // attach team to sprite container
-
 
   return container;
 }
-  
+
+function getPlayerInitials(name) {
+  if (!name || typeof name !== "string") return "?";
+  const tokens = name.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return "?";
+  if (tokens.length === 1) return tokens[0][0].toUpperCase();
+  const first = tokens[0][0] || "";
+  const last = tokens[tokens.length - 1][0] || "";
+  const initials = `${first}${last}`.toUpperCase();
+  return initials || "?";
+}
+
+function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
+  const { x, y } = player.startingCoords || { x: 50, y: 25 };
+  const { x: px, y: py } = gridToPixels(x, y, scene.game.config.width, scene.game.config.height);
+
+  const isHome = player.team === "home";
+  const primary = Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color;
+
+  const playerId = player.playerId ?? player.player_id ?? player._id;
+  const photoKey = playerId ? headshotTextureKey(playerId) : null;
+  const hasPhotoTexture = !!photoKey && scene.textures && scene.textures.exists(photoKey);
+  const hasFallbackTexture = scene.textures && scene.textures.exists(HEADSHOT_FALLBACK_KEY);
+
+  const children = [];
+
+  const shadow = scene.add.ellipse(0, 26, 30, 8, 0x000000, 0.45);
+  children.push(shadow);
+
+  // Mask Graphics is added as a hidden child of the container so its world
+  // transform inherits the container's position — keeps the circular clip
+  // aligned with the headshot as the player moves around the court.
+  const maskGraphics = scene.make.graphics({ x: 0, y: 0, add: false });
+  maskGraphics.fillStyle(0xffffff, 1);
+  maskGraphics.fillCircle(0, 0, 22);
+  const mask = maskGraphics.createGeometryMask();
+
+  let photoChild;
+  if (hasPhotoTexture || hasFallbackTexture) {
+    const textureKey = hasPhotoTexture ? photoKey : HEADSHOT_FALLBACK_KEY;
+    const photo = scene.add.image(0, 0, textureKey);
+    photo.setDisplaySize(44, 44);
+    photo.setOrigin(0.5, 0.55);
+    photo.setMask(mask);
+    photoChild = photo;
+  } else {
+    const tile = scene.add.rectangle(0, 0, 44, 44, primary);
+    tile.setOrigin(0.5, 0.5);
+    tile.setMask(mask);
+    const initials = scene.add.text(0, 0, getPlayerInitials(player.name), {
+      font: '700 13px "Bebas Neue"',
+      color: teamInfo.secondary_color,
+      align: "center"
+    });
+    initials.setOrigin(0.5, 0.5);
+    initials.setMask(mask);
+    children.push(tile, initials);
+  }
+  if (photoChild) children.push(photoChild);
+
+  const borderRing = scene.add.circle(0, 0, 22);
+  borderRing.setStrokeStyle(3, primary);
+  children.push(borderRing);
+
+  const innerSeparator = scene.add.circle(0, 0, 20);
+  innerSeparator.setStrokeStyle(1, 0x000000, 0.6);
+  children.push(innerSeparator);
+
+  const posY = isHome ? -38 : 38;
+  const chipBg = scene.add.rectangle(0, posY, 28, 18, primary);
+  chipBg.setOrigin(0.5);
+  children.push(chipBg);
+
+  const chipText = scene.add.text(0, posY, position, {
+    font: '700 13px "Bebas Neue"',
+    color: teamInfo.secondary_color,
+    align: "center"
+  });
+  chipText.setOrigin(0.5);
+  children.push(chipText);
+
+  // The mask graphics must be a descendant of the container for its world
+  // transform to track player movement. Hidden so it never renders on its own;
+  // createGeometryMask still uses its draw commands for the clip region.
+  maskGraphics.setVisible(false);
+  children.unshift(maskGraphics);
+
+  const container = scene.add.container(px, py, children);
+  container.setSize(56, 100);
+  container.setDepth(1);
+
+  return container;
+}

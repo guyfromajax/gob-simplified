@@ -9,6 +9,7 @@
  */
 
 import { BallController } from './BallController.js';
+import { playerBallPos } from '../setup/markerConfig.js';
 
 /**
  * Global BallController instance - single source of truth
@@ -418,10 +419,11 @@ export async function updateBallOwnership(options) {
     if (pendingSprite) {
       // Update ball position
       if (ballSprite?.setPosition) {
-        ballSprite.setPosition(pendingSprite.x, pendingSprite.y);
+        const pendingPos = playerBallPos(pendingSprite);
+        ballSprite.setPosition(pendingPos.x, pendingPos.y);
         ballSprite.setVisible(true);
       }
-      
+
       // Update references
       if (currentBallOwnerRef) {
         currentBallOwnerRef.value = pendingSprite;
@@ -490,10 +492,11 @@ export async function updateBallOwnership(options) {
       
       // Update ball position
       if (ballSprite?.setPosition) {
-        ballSprite.setPosition(playerSprite.x, playerSprite.y);
+        const holderPos = playerBallPos(playerSprite);
+        ballSprite.setPosition(holderPos.x, holderPos.y);
         ballSprite.setVisible(true);
       }
-      
+
       // Update references
       if (currentBallOwnerRef) {
         currentBallOwnerRef.value = playerSprite;

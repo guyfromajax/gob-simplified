@@ -4,6 +4,7 @@ import {
   playHcoPassStartSfx,
   playHcoReceiveSfx,
 } from '../utils/gameSfx.js';
+import { playerBallPos } from '../setup/markerConfig.js';
 
 /**
  * HCO Animation System
@@ -274,18 +275,19 @@ export class HCOAnimationSystem {
       console.log('🎬 Ball detached from rebounder');
       
       // Start ball flight
+      const hcoOutletTarget = playerBallPos(receiverSprite, { x: 0, y: -10 });
       this.ballController.startFlight({
-        x: receiverSprite.x,
-        y: receiverSprite.y - 10
+        x: hcoOutletTarget.x,
+        y: hcoOutletTarget.y
       });
       console.log('🎬 Ball flight started to PG position');
-      
+
       // Animate ball to receiver
       const ballSprite = this.ballController.ballSprite;
       const tween = this.scene.tweens.add({
         targets: ballSprite,
-        x: receiverSprite.x,
-        y: receiverSprite.y - 10,
+        x: hcoOutletTarget.x,
+        y: hcoOutletTarget.y,
         duration: 400,
         ease: 'Power2',
         onComplete: () => {

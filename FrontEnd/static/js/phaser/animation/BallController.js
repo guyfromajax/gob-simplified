@@ -32,6 +32,7 @@
  */
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
+import { BALL_ATTACH_OFFSET } from '../setup/markerConfig.js';
 
 export class BallController {
   constructor(scene, ballSprite) {
@@ -333,7 +334,7 @@ export class BallController {
   positionBallOnPlayer(playerSprite, options = {}) {
     if (!this.ballSprite || !playerSprite) return;
 
-    const offset = options.offset || { x: 0, y: 0 };
+    const offset = options.offset || BALL_ATTACH_OFFSET;
     const x = playerSprite.x + offset.x;
     const y = playerSprite.y + offset.y;
 
@@ -351,7 +352,7 @@ export class BallController {
     this.stopFollowingPlayer(); // Stop any existing following
 
     this.followingPlayer = playerSprite;
-    this.followOffset = options.offset || { x: 0, y: 0 };
+    this.followOffset = options.offset || BALL_ATTACH_OFFSET;
     this.followCallback = () => {
       if (this.followingPlayer && this.ballSprite && this.isAttached) {
         const x = this.followingPlayer.x + this.followOffset.x;

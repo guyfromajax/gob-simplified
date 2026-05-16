@@ -18,6 +18,7 @@
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { buildGameplayPassSfxContext, playHcoPassStartSfx, playHcoReceiveSfx } from '../utils/gameSfx.js';
+import { playerBallPos } from '../setup/markerConfig.js';
 
 export class PassAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites) {
@@ -234,10 +235,7 @@ export class PassAnimationSystem {
       playHcoPassStartSfx(this.scene, sfxContext);
       
       // Start ball flight
-      const targetPosition = {
-        x: receiverSprite.x + this.passConfig.receiverOffset.x,
-        y: receiverSprite.y + this.passConfig.receiverOffset.y
-      };
+      const targetPosition = playerBallPos(receiverSprite, this.passConfig.receiverOffset);
       
       this.ballController.startFlight(targetPosition, {
         duration: passConfig.duration,
@@ -253,7 +251,8 @@ export class PassAnimationSystem {
       }
       
       // Position ball at passer
-      ballSprite.setPosition(passerSprite.x, passerSprite.y - 10);
+      const passerBallPos = playerBallPos(passerSprite, { x: 0, y: -10 });
+      ballSprite.setPosition(passerBallPos.x, passerBallPos.y);
       ballSprite.setVisible(true);
       
       // Create pass animation

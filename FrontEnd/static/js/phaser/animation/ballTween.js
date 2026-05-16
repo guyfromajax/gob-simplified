@@ -24,6 +24,7 @@ import {
 } from "./ballAnimationSimple.js";
 import { getPlayerMovementDurationMs } from "../utils/playerMovementDuration.js";
 import { playHcoPassStartSfx, playHcoReceiveSfx } from "../utils/gameSfx.js";
+import { playerBallPos } from "../setup/markerConfig.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -256,7 +257,8 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
           getCurrentOwner(scene) === sprite.playerId &&
           ballSprite.setPosition
         ) {
-          ballSprite.setPosition(sprite.x, sprite.y);
+          const pos = playerBallPos(sprite);
+          ballSprite.setPosition(pos.x, pos.y);
           ballSprite.setVisible(true);
         }
       },
@@ -424,7 +426,7 @@ export async function runPass(scene, cfg = {}) {
       playHcoPassStartSfx(scene, cfg.sfxContext);
       if (PASS_DEBUG) animationDebugLog('detach(A)', { fromId });
 
-      const end = endCoords || (toSprite ? { x: toSprite.x, y: toSprite.y } : null);
+      const end = endCoords || (toSprite ? playerBallPos(toSprite) : null);
       if (!end) {
         emitSummary('skipped');
         resolveFn();

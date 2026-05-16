@@ -1,4 +1,5 @@
 import { gridToPixels } from "../../utils/gridToPixels.js";
+import { BALL_ATTACH_OFFSET } from "../../setup/markerConfig.js";
 import animationConfig from "../animation_config.js";
 import {
   safeTransition,
@@ -394,11 +395,16 @@ export class PossessionRunner {
       const coords = setup.ball.coords;
       if (coords?.x != null && coords?.y != null) {
         const { x, y } = this.toPixels(coords.x, coords.y);
+        // When the ball is attached to an owner at setup, anchor at the hip
+        // (BALL_ATTACH_OFFSET); loose / opening-tip placements stay on the spot.
+        const hasOwner = !!setup.ball?.ownerId;
+        const ax = x + (hasOwner ? BALL_ATTACH_OFFSET.x : 0);
+        const ay = y + (hasOwner ? BALL_ATTACH_OFFSET.y : 0);
         if (typeof this.ballSprite.setPosition === "function") {
-          this.ballSprite.setPosition(x, y);
+          this.ballSprite.setPosition(ax, ay);
         } else {
-          this.ballSprite.x = x;
-          this.ballSprite.y = y;
+          this.ballSprite.x = ax;
+          this.ballSprite.y = ay;
         }
         this.ballSprite.setVisible?.(true);
       }
@@ -573,7 +579,10 @@ export class PossessionRunner {
         },
         onUpdate: () => {
           if (payload?.hasBall && this.ballSprite) {
-            this.ballSprite.setPosition?.(sprite.x, sprite.y);
+            this.ballSprite.setPosition?.(
+              sprite.x + BALL_ATTACH_OFFSET.x,
+              sprite.y + BALL_ATTACH_OFFSET.y,
+            );
           }
         },
         onComplete: () => {

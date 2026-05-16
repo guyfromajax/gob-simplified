@@ -6,6 +6,7 @@
 
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from '../utils/gridToPixels.js';
+import { BALL_ATTACH_OFFSET, playerBallPos } from '../setup/markerConfig.js';
 
 /**
  * Detect if a pass is happening at a specific step
@@ -224,7 +225,7 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites, enab
   
   const { getBallDuration } = await import('./ballTween.js');
   const receiverGrid = passInfo?.receiverCoords;
-  const receiverTargetPx =
+  const gridDerivedPx =
     receiverGrid &&
     Number.isFinite(Number(receiverGrid.x)) &&
     Number.isFinite(Number(receiverGrid.y))
@@ -234,7 +235,11 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites, enab
           scene.game.config.width,
           scene.game.config.height
         )
-      : { x: receiverSprite.x, y: receiverSprite.y };
+      : null;
+  // Compose the ball-attach offset so the pass lands at the receiver's hip (not sprite center).
+  const receiverTargetPx = gridDerivedPx
+    ? { x: gridDerivedPx.x + BALL_ATTACH_OFFSET.x, y: gridDerivedPx.y + BALL_ATTACH_OFFSET.y }
+    : playerBallPos(receiverSprite);
   const passDuration = getBallDuration(
     ballSprite,
     receiverTargetPx.x,

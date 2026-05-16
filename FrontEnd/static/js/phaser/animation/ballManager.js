@@ -28,6 +28,7 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
+import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, playReboundSfx } from "../utils/gameSfx.js";
 
 /**
@@ -355,8 +356,10 @@ export async function shootBall({
     lastLoggedY = ballSprite.y;
   };
   scene.events.on('update', positionWatcher);
-  
-  ballSprite.setPosition(start.x, start.y);
+
+  // Shot release anchored to shooter's hip (sprite position + ball attach offset);
+  // basket endpoint (rim) below remains a fixed court coord.
+  ballSprite.setPosition(start.x + BALL_ATTACH_OFFSET.x, start.y + BALL_ATTACH_OFFSET.y);
   ballSprite.setVisible(true);
   // console.log('🏀 shootBall: Ball positioned and visible', {
   //   position: { x: start.x, y: start.y },
@@ -1075,9 +1078,10 @@ export function animateKickoutReset(
   };
 
   // ALWAYS use actual sprite positions for kickout passes (ignore backend coords)
-  // Backend coords may be stale after rebound animation moves players
-  opts.startCoords = { x: rebounderSprite.x, y: rebounderSprite.y };
-  opts.endCoords = { x: pgSprite.x, y: pgSprite.y };
+  // Backend coords may be stale after rebound animation moves players.
+  // Anchor at the hip (BALL_ATTACH_OFFSET) so the kickout pass starts/ends at hand level.
+  opts.startCoords = { x: rebounderSprite.x + BALL_ATTACH_OFFSET.x, y: rebounderSprite.y + BALL_ATTACH_OFFSET.y };
+  opts.endCoords = { x: pgSprite.x + BALL_ATTACH_OFFSET.x, y: pgSprite.y + BALL_ATTACH_OFFSET.y };
   
   if (debugEnabled) {
     animationDebugLog('animateKickoutReset: Using sprite positions', {

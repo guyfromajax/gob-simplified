@@ -6,6 +6,7 @@
  */
 
 import { gridToPixels } from '../utils/gridToPixels.js';
+import { BALL_ATTACH_OFFSET } from '../setup/markerConfig.js';
 
 // Basketball court position targets (grid coordinates)
 // Away offense attacks toward X=9, Home offense attacks toward X=91
@@ -143,12 +144,12 @@ async function animateAdvanceUpCourt({
     ease: 'Linear'
   });
   
-  // Animate ball with handler
+  // Animate ball with handler (offset to handler's hip)
   if (ballSprite) {
     scene.tweens.add({
       targets: ballSprite,
-      x: ballHandlerPixels.x,
-      y: ballHandlerPixels.y,
+      x: ballHandlerPixels.x + BALL_ATTACH_OFFSET.x,
+      y: ballHandlerPixels.y + BALL_ATTACH_OFFSET.y,
       duration: duration,
       ease: 'Linear'
     });
@@ -279,12 +280,12 @@ async function animateSideInboundMovement({
     ease: 'Sine.easeInOut'
   });
   
-  // Animate ball with handler
+  // Animate ball with handler (offset to handler's hip)
   if (ballSprite) {
     scene.tweens.add({
       targets: ballSprite,
-      x: ballHandlerPixels.x,
-      y: ballHandlerPixels.y,
+      x: ballHandlerPixels.x + BALL_ATTACH_OFFSET.x,
+      y: ballHandlerPixels.y + BALL_ATTACH_OFFSET.y,
       duration: duration,
       ease: 'Sine.easeInOut'
     });

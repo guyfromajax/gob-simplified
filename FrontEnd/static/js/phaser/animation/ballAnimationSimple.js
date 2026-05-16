@@ -21,6 +21,7 @@ import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 // Lazy import cancelBallTweenAndClearOwner to avoid circular dependency (imported dynamically in animateShotToRim)
 // Import BallController adapter for delegation
 import { getBallController } from './BallControllerAdapter.js';
+import { playerBallPos } from '../setup/markerConfig.js';
 
 /**
  * Initialize ball holder state on scene
@@ -401,12 +402,10 @@ export async function animateBallToPlayer(scene, playerSprite, options = {}) {
   
   const ballSprite = scene.ballSprite;
   const { duration, easing = 'Linear', offset = { x: 0, y: -10 } } = options;
-  
-  // Calculate target position (player position + offset)
-  const targetPosition = {
-    x: playerSprite.x + offset.x,
-    y: playerSprite.y + offset.y
-  };
+
+  // Compose caller-supplied offset on top of the headshot ball-attach anchor.
+  // When USE_HEADSHOT_MARKER is false, BALL_ATTACH_OFFSET is {0,0} so behavior matches the legacy default.
+  const targetPosition = playerBallPos(playerSprite, offset);
   
   // Calculate duration from distance if not provided
   const calculatedDuration = duration || calculateBallDuration(ballSprite, targetPosition.x, targetPosition.y);

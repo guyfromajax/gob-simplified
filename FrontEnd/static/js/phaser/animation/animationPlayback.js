@@ -17,6 +17,7 @@
  */
 
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { attachBallToPlayer } from "./ballManager.js";
 // IMPORTANT: import `detachBall` from BallControllerAdapter — not from
 // ballManager / ballTween — because the latter only cancels tweens, while
@@ -74,8 +75,16 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
   const endCoord = ballCoordFromState(step.end.ball, step.end.coords);
   if (!startCoord || !endCoord) return;
 
+  // When the ball is attached to a player, its visual anchor is the player's
+  // hip (sprite + BALL_ATTACH_OFFSET); when in flight or loose, it tracks the
+  // raw ball coordinate. Compose the offset conditionally so both modes work.
+  const startAttachOffset = isBallAttached(step.start.ball) ? BALL_ATTACH_OFFSET : { x: 0, y: 0 };
+  const endAttachOffset = isBallAttached(step.end.ball) ? BALL_ATTACH_OFFSET : { x: 0, y: 0 };
+
   // Snap-to-start. If previous step ended at the same coord, this is a no-op.
   const startPx = gridToPixels(startCoord.x, startCoord.y, width, height);
+  startPx.x += startAttachOffset.x;
+  startPx.y += startAttachOffset.y;
   ballSprite.setPosition(startPx.x, startPx.y);
 
   if (
@@ -112,6 +121,7 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     // tween renders. `snapBallToEndState` will re-attach (and re-show) at
     // step end via `attachBallToPlayer`.
     ballSprite.setVisible(true);
+    // startPx already includes startAttachOffset above; this is the same starting hip position.
     ballSprite.setPosition(startPx.x, startPx.y);
 
     // Outlet-pass SFX. Fires at the moment of detach (ball leaves passer's
@@ -133,6 +143,8 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
   }
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+  endPx.x += endAttachOffset.x;
+  endPx.y += endAttachOffset.y;
 
   // Sharp-outlet ball trail: emitted by the backend in
   // `_build_outlet_pass_step` (covert_release_step_emitter.py) as
@@ -167,7 +179,9 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
   if (!endCoord) return;
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
-  ballSprite.setPosition(endPx.x, endPx.y);
+  // Compose ball-attach offset when ball ends attached to a player (anchor at hip).
+  const endAttachOffset = isBallAttached(endBall) ? BALL_ATTACH_OFFSET : { x: 0, y: 0 };
+  ballSprite.setPosition(endPx.x + endAttachOffset.x, endPx.y + endAttachOffset.y);
 
   if (isBallAttached(endBall)) {
     const ownerSprite = sprites[endBall.owner_player_id];

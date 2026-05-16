@@ -1,6 +1,7 @@
 import { animateGameTurns } from './animation/animateGameTurns.js';
 import { playGameplayTrack, pauseGameplayTrack, resumeGameplayTrack, evaluateGameplayTrack } from '../musicController.js';
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
+import { preloadPlayerHeadshots } from './setup/preloadPlayerHeadshots.js';
 import { gridToPixels } from './utils/gridToPixels.js';
 import { finalizeGame } from './finalizeGame.js';
 import { emit } from './utils/eventBus.js';
@@ -1838,7 +1839,9 @@ export function createGameScene(Phaser) {
           child.list.some(item => item.type === 'Circle')
         );
         // console.log('🔍 PRE-CREATION: Existing containers in scene:', existingContainers.length);
-        
+
+        await preloadPlayerHeadshots(this, actualPlayers);
+
         this.playerSprites = loadPhaserPlayers(this, actualPlayers, Phaser);
         
         // Count sprites AFTER creation

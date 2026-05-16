@@ -15,6 +15,7 @@ import { animateStep } from "./animateStep.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
+import { playerBallPos } from "../setup/markerConfig.js";
 import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 // ✅ PHASE 2.6 COMPLETE: These are now handled by AnimationRouter via turnPreparation.js
 // import { updatePlaycallDisplay } from "../utils/playcallDisplay.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
@@ -319,7 +320,8 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         rebounder_x: rebounderSprite.x,
         rebounder_y: rebounderSprite.y,
       });
-      ballSprite.setPosition(rebounderSprite.x, rebounderSprite.y);
+      const reboundBallPos = playerBallPos(rebounderSprite);
+      ballSprite.setPosition(reboundBallPos.x, reboundBallPos.y);
       ballSprite.setVisible(true);
     }
 

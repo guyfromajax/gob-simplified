@@ -26,6 +26,7 @@ import { buildGameplayPassSfxContext } from "../utils/gameSfx.js";
 import * as unitCompletionContract from "./unitCompletionContract.js";
 import { resolveDrebOutletReceiverTarget } from "./drebOutletTargetResolver.js";
 import { DEBUG } from "../utils/debug.js";
+import { playerBallPos } from "../setup/markerConfig.js";
 import {
   DebugFlags,
   animationDebugLog,
@@ -737,7 +738,8 @@ async function runSetupTween({
       const movesBall =
         isBallCarrier || (ballOwnerSprite == null && isStep0BallHandler);
       if (movesBall && ballSprite?.setPosition) {
-        ballSprite.setPosition(x, y);
+        const snapBallPos = playerBallPos(sprite);
+        ballSprite.setPosition(snapBallPos.x, snapBallPos.y);
         ballSprite.setVisible(true);
       }
       logRow.action = "snap_already_at_step0";
@@ -771,7 +773,8 @@ async function runSetupTween({
         sprite.gridX = targetGridX;
         sprite.gridY = targetGridY;
         if (isBallCarrier && ballSprite?.setPosition) {
-          ballSprite.setPosition(x, y);
+          const carrierBallPos = playerBallPos(sprite);
+          ballSprite.setPosition(carrierBallPos.x, carrierBallPos.y);
           ballSprite.setVisible(true);
         }
         logRow.action = "snap_already_at_step0";
@@ -807,7 +810,8 @@ async function runSetupTween({
             (ballOwnerId != null && animIdStr === ballOwnerId) ||
             (ballOwnerSprite == null && isStep0BallHandler);
           if (movesBall && ballSprite?.setPosition) {
-            ballSprite.setPosition(sprite.x, sprite.y);
+            const tweenBallPos = playerBallPos(sprite);
+            ballSprite.setPosition(tweenBallPos.x, tweenBallPos.y);
             ballSprite.setVisible(true);
           }
         },
@@ -3311,7 +3315,8 @@ async function runInboundSetup({
           ease: "Linear",
           onUpdate: () => {
             if (ballSprite?.setPosition) {
-              ballSprite.setPosition(sfSprite.x, sfSprite.y);
+              const sfBallPos = playerBallPos(sfSprite);
+              ballSprite.setPosition(sfBallPos.x, sfBallPos.y);
             }
           },
           onComplete: () => {
@@ -3337,7 +3342,8 @@ async function runInboundSetup({
           ease: "Linear",
           onUpdate: () => {
             if (ballSprite?.setPosition) {
-              ballSprite.setPosition(sfSprite.x, sfSprite.y);
+              const sfBallPos = playerBallPos(sfSprite);
+              ballSprite.setPosition(sfBallPos.x, sfBallPos.y);
             }
           },
           onComplete: () => {

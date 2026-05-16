@@ -28,6 +28,7 @@ import { runPass } from './ballTween.js';
 import { playShotLaunchSfx, playShotResultSfx, playGameSfx, playReboundSfx } from '../utils/gameSfx.js';
 import { announceReboundHeadlineIfNeeded } from '../utils/announcements.js';
 import { createBallTrail } from './createBallTrail.js';
+import { playerBallPos } from '../setup/markerConfig.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -93,7 +94,7 @@ export class ShotAnimationSystem {
     await runPass(this.scene, {
       fromId,
       toId,
-      endCoords: { x: toSprite.x, y: toSprite.y },
+      endCoords: playerBallPos(toSprite),
       easing: 'Sine.easeInOut',
     });
 
@@ -1989,17 +1990,18 @@ export class ShotAnimationSystem {
       });
       
       // Start ball flight
+      const outletPassTarget = playerBallPos(receiverSprite, { x: 0, y: -10 });
       this.ballController.startFlight({
-        x: receiverSprite.x,
-        y: receiverSprite.y - 10
+        x: outletPassTarget.x,
+        y: outletPassTarget.y
       });
-      
+
       // Animate ball to receiver
       const ballSprite = this.ballController.ballSprite;
       const tween = this.scene.tweens.add({
         targets: ballSprite,
-        x: receiverSprite.x,
-        y: receiverSprite.y - 10,
+        x: outletPassTarget.x,
+        y: outletPassTarget.y,
         duration: 400,
         ease: 'Power2',
         onComplete: () => {

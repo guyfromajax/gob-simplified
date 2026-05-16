@@ -12,6 +12,7 @@ import { clampGridCoords } from "./courtClamp.js";
  * @returns {Promise} resolves when tween completes
  */
 import { PASS_DEBUG } from "./ballTween.js";
+import { playerBallPos } from "../setup/markerConfig.js";
 import {
   getPendingOwner,
   getCurrentOwner,
@@ -361,7 +362,8 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
             !getPendingOwner(scene) &&
             !validTargets.includes(ballSprite)
           ) {
-            ballSprite.setPosition(sprite.x, sprite.y);
+            const pos = playerBallPos(sprite);
+            ballSprite.setPosition(pos.x, pos.y);
           }
         }
       },
