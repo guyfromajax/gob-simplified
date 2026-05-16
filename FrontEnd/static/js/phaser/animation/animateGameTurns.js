@@ -859,9 +859,14 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Removed verbose turn processing log
     
-    // Keep turn index available for any embedded paths that read scene.currentTurn early.
-    scene.currentTurn = i;
-    turn.index = i;
+    // Caller may set turn.index to a global turn counter (turn-by-turn passes turns: [one row]).
+    // Preserve it so AnimationEngine can resolve prior rows; otherwise use loop index i.
+    const preservedTurnIndex =
+      typeof turn.index === "number" && Number.isFinite(turn.index) && turn.index >= 0
+        ? Math.floor(turn.index)
+        : i;
+    scene.currentTurn = preservedTurnIndex;
+    turn.index = preservedTurnIndex;
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     
@@ -910,7 +915,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ PHASE 2.6: Route FREE_THROW through AnimationRouter
       // Active player display, free throw sequence, and text scroll are handled by handler
       // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: onUpdate and updateDebugScore handled by AnimationRouter
       // Note: onUpdate is already called inside runFreeThrowSequence for each FT attempt
@@ -919,7 +924,7 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // ✅ CHARGE: Route through AnimationRouter so finalizeTurnAfterAnimation announces "Charge!" (not "Offensive Foul!")
     if (turn.result_type === "CHARGE") {
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
     }
@@ -941,7 +946,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // This includes FCP/HCT fouls (fcp_foul/hct_foul flags) and regular HCO fouls (when we add them)
       if (turn.animations && turn.animations.length > 0) {
         // Foul with animations - route through AnimationRouter
-        turn.index = i;
+        turn.index = preservedTurnIndex;
         await animationRouter.processTurn(turn);
         continue;
       } else {
@@ -975,7 +980,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // This includes FCP/HCT dead ball turnovers and regular HCO dead ball (when we add them)
       if (turn.animations && turn.animations.length > 0) {
         // Dead ball with animations - route through AnimationRouter
-        turn.index = i;
+        turn.index = preservedTurnIndex;
         await animationRouter.processTurn(turn);
         continue;
       } else {
@@ -996,7 +1001,7 @@ export async function animateGameTurns({ //hasBallAtStep
     if (turn.result_type === "SIDE_INBOUND") {
       // ✅ PHASE 2.6: Route SIDE_INBOUND through AnimationRouter (always run full SIP)
       // Fix: Run SIP even when in FastBreak (e.g. BATCH [CHARGE, SIDE_INBOUND] or [FOUL, SIDE_INBOUND])
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
     }
@@ -1005,7 +1010,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ PHASE 2.6: Route BASELINE_INBOUND through AnimationRouter
       // FCP/HCT state tracking, player animations, and state transitions are handled by handler
       // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: onUpdate and updateDebugScore handled by AnimationRouter
       continue;
@@ -1015,7 +1020,7 @@ export async function animateGameTurns({ //hasBallAtStep
     if (turn.result_type === "DEFENSIVE_STOP") {
       // Fast Break defensive stop routes to handleFastBreak(), non-Fast Break uses handleDefensiveStop()
       // Text scroll, announcements, and score updates are handled by handler
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: onUpdate and updateDebugScore handled by AnimationRouter
       continue;
@@ -1025,14 +1030,14 @@ export async function animateGameTurns({ //hasBallAtStep
     // own turn with `animation_steps`. Without this branch the loop falls through and never calls
     // AnimationEngine — so `playTurn` + `_maybeRunDiscreteDrebOutletLeadIn` never run (outlet skipped).
     if (turn.result_type === "DREB") {
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
     }
 
     // ✅ TIMEOUT: Handle TIMEOUT turns - route through AnimationRouter
     if (turn.result_type === "TIMEOUT") {
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       console.log('⏸️ TIMEOUT: Stopping animation loop - user will navigate to lineup screen');
       break; // Exit the loop - don't process any more turns
@@ -1057,7 +1062,7 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ PHASE 2.6: Route through AnimationRouter
       // handleOrebTurn, announcements, and score updates are handled by handler
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: Announcements, onUpdate, and updateDebugScore handled by AnimationRouter
       continue;
@@ -1263,7 +1268,7 @@ export async function animateGameTurns({ //hasBallAtStep
         isFCPHCT: false, // Should be false since we checked above
         willRouteToRouter: true
       });
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
       continue;
@@ -1289,7 +1294,7 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ PHASE 2.6: Route through AnimationRouter
       // runOpeningTipSequence, state transition, announcements, and score updates are handled by handler
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: Validation, opening tip sequence, state transition, onUpdate, and updateDebugScore handled by AnimationRouter
       continue;
@@ -1310,7 +1315,7 @@ export async function animateGameTurns({ //hasBallAtStep
         fast_break: turn.fast_break,
         next_play_type: turn.next_play_type
       });
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       // Note: Announcements, onUpdate, and updateDebugScore handled by AnimationRouter
       continue;
@@ -1331,7 +1336,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
       if (turn.animations && turn.animations.length > 0) {
         // HCO with animations - route through AnimationRouter
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
       } else {
@@ -1351,14 +1356,14 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // ✅ Phase 4: Final Turn — route FINAL_HOLD to AnimationRouter (clock out, then quarter/game end)
     if (turn.result_type === "FINAL_HOLD") {
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
     }
 
     // ✅ Phase 4: Final Turn shot (blocking foul) — route FOUL with final_turn to AnimationRouter
     if (turn.final_turn === true && turn.result_type === "FOUL") {
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
     }
@@ -1445,7 +1450,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ FIX (Bug 3 REAL FIX): Only route if isHCO (was executing for ALL turns!)
       if (isHCO) {
       // Ensure turn.index is set (AnimationRouter will use it for context)
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       
       // Removed verbose before/after process turn logs
       
@@ -1488,7 +1493,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // This includes FCP/HCT steals and regular HCO steals (when we add them)
       if (turn.animations && turn.animations.length > 0) {
         // Steal with animations - route through AnimationRouter
-      turn.index = i;
+      turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;
       } else {

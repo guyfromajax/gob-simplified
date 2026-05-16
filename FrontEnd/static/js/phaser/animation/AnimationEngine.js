@@ -447,23 +447,44 @@ export class AnimationEngine {
         : typeof scene?.currentTurn === "number"
           ? scene.currentTurn
           : null;
-    if (idx == null || idx < 1) {
-      console.warn(tag, "skip: bad_turn_index", {
-        turnData_index: turnData?.index,
-        scene_currentTurn: scene?.currentTurn,
-      });
-      return;
+
+    const turnsArr = scene?.simData?.turns;
+    const priorFromChain =
+      context?.simData?.__priorAnimatedTurn ??
+      scene?.simData?.__priorAnimatedTurn ??
+      null;
+
+    let missTurn = null;
+    if (
+      priorFromChain &&
+      (priorFromChain.result_type === "MISS" ||
+        priorFromChain.result_type === "BLOCK")
+    ) {
+      missTurn = priorFromChain;
+    } else if (
+      Array.isArray(turnsArr) &&
+      typeof idx === "number" &&
+      idx >= 1 &&
+      idx - 1 < turnsArr.length
+    ) {
+      const cand = turnsArr[idx - 1];
+      if (
+        cand &&
+        (cand.result_type === "MISS" || cand.result_type === "BLOCK")
+      ) {
+        missTurn = cand;
+      }
     }
 
-    const missTurn = scene?.simData?.turns?.[idx - 1];
-    if (
-      !missTurn ||
-      (missTurn.result_type !== "MISS" && missTurn.result_type !== "BLOCK")
-    ) {
+    if (!missTurn) {
       console.warn(tag, "skip: prior_turn_not_MISS_BLOCK", {
-        idx,
-        prior_result_type: missTurn?.result_type ?? null,
-        prior_has_dreb_outlet: !!missTurn?.dreb_outlet_pass,
+        turnData_index: turnData?.index,
+        scene_currentTurn: scene?.currentTurn,
+        resolved_idx: idx,
+        has_prior_chain:
+          !!priorFromChain && !!priorFromChain.result_type,
+        prior_chain_result_type: priorFromChain?.result_type ?? null,
+        turns_batch_len: turnsArr?.length ?? 0,
       });
       return;
     }

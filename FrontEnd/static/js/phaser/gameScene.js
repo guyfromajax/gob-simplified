@@ -2910,6 +2910,10 @@ export function createGameScene(Phaser) {
       
       // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
       const initialTurns = initialSimData.turns || [];
+      // Discrete DREB outlet lead-in needs the prior animated row (MISS/BLOCK); turn-by-turn only
+      // passes `turns: [current]` into animateGameTurns, so simData.turns has no predecessor — we thread
+      // the last completed turn on the scene for AnimationEngine._maybeRunDiscreteDrebOutletLeadIn.
+      this._priorAnimatedTurnForLeadIn = null;
 
       // Live clock mode: disable speculative preloading so backend turn decisions
       // (forced-shot/violation at 0) are computed after the visible turn completes.
@@ -3269,6 +3273,8 @@ export function createGameScene(Phaser) {
           ballSprite: this.ballSprite,
           onUpdate: updateScoreboard
         });
+        this._priorAnimatedTurnForLeadIn =
+          initialTurns.length > 0 ? initialTurns[initialTurns.length - 1] : null;
       }
 
       // Main turn-by-turn loop
@@ -3409,12 +3415,14 @@ export function createGameScene(Phaser) {
                 ...initialSimData,
                 turns: [turn],
                 home_team: initialSimData.home_team,
-                away_team: initialSimData.away_team
+                away_team: initialSimData.away_team,
+                __priorAnimatedTurn: this._priorAnimatedTurnForLeadIn,
               },
               playerSprites: this.playerSprites,
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
             });
+            this._priorAnimatedTurnForLeadIn = turn;
             // Break out of the while loop - don't make any more API calls
             break;
           }
@@ -3473,18 +3481,24 @@ export function createGameScene(Phaser) {
               }
               
               try {
+                const priorForSubTurn =
+                  subTurnIndex === 0
+                    ? this._priorAnimatedTurnForLeadIn
+                    : turn.batch_turns[subTurnIndex - 1];
                 await animateGameTurns({
                   scene: this,
                   simData: { 
                     ...initialSimData,
                     turns: [subTurn],
                     home_team: initialSimData.home_team,
-                    away_team: initialSimData.away_team
+                    away_team: initialSimData.away_team,
+                    __priorAnimatedTurn: priorForSubTurn,
                   },
                   playerSprites: this.playerSprites,
                   ballSprite: this.ballSprite,
                   onUpdate: updateScoreboard
                 });
+                this._priorAnimatedTurnForLeadIn = subTurn;
                 const subTurnElapsedMs = Date.now() - subTurnStartAtMs;
                 validateBatchBoundaryDuration({
                   turnLike: subTurn,
@@ -3557,12 +3571,14 @@ export function createGameScene(Phaser) {
                 ...initialSimData,
                 turns: [turn],
                 home_team: initialSimData.home_team,
-                away_team: initialSimData.away_team
+                away_team: initialSimData.away_team,
+                __priorAnimatedTurn: this._priorAnimatedTurnForLeadIn,
               },
               playerSprites: this.playerSprites,
               ballSprite: this.ballSprite,
               onUpdate: updateScoreboard
             });
+            this._priorAnimatedTurnForLeadIn = turn;
             const singleTurnElapsedMs = Date.now() - singleTurnStartAtMs;
             validateBatchBoundaryDuration({
               turnLike: turn,
