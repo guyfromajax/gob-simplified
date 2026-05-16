@@ -324,10 +324,24 @@ export class AnimationEngine {
         );
       }
 
+      const currentTurnNorm = String(turnData?.current_turn || "").toUpperCase();
+      const resultTypeNorm = String(turnData?.result_type || "").toUpperCase();
       if (
         hasAnimationSteps
-        && (newPlaybackTurnTypes.has(turnData?.current_turn) || isMigratedFbVariant)
+        && (newPlaybackTurnTypes.has(turnData?.current_turn) ||
+          newPlaybackTurnTypes.has(currentTurnNorm) ||
+          isMigratedFbVariant)
       ) {
+        if (resultTypeNorm === "DREB" || currentTurnNorm === "DREB") {
+          console.warn("[DREB OUTLET LEAD-IN] discrete DREB entered new playback (playTurn)", {
+            current_turn: turnData?.current_turn,
+            result_type: turnData?.result_type,
+            next_play_type: turnData?.next_play_type,
+            turn_index: turnData?.index ?? this.scene?.currentTurn,
+            rebounderId: turnData?.rebounderId,
+            steps: turnData?.animation_steps?.length ?? 0,
+          });
+        }
         const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js");
         const sprites = context.playerSprites
           || this.playerSprites
@@ -351,10 +365,25 @@ export class AnimationEngine {
         // Discrete DREB turn: rebound capture is `animation_steps` only. Half-court outlet
         // (`hco.lead_in.from_dreb_outlet` via `runDefensiveReboundSetup`) must run here — the
         // prior MISS turn sets `next_play_type` to "DREB", so ShotAnimationSystem skips outlet.
-        if (turnData?.current_turn === "DREB" || turnData?.result_type === "DREB") {
+        if (currentTurnNorm === "DREB" || resultTypeNorm === "DREB") {
           await this._maybeRunDiscreteDrebOutletLeadIn(turnData, context, sprites, ballSprite);
         }
         return;
+      }
+
+      if (
+        (resultTypeNorm === "DREB" || currentTurnNorm === "DREB") &&
+        !hasAnimationSteps
+      ) {
+        console.warn(
+          "[DREB OUTLET LEAD-IN] discrete DREB turn has NO animation_steps — falling through to legacy handler; outlet hook will NOT run",
+          {
+            current_turn: turnData?.current_turn,
+            result_type: turnData?.result_type,
+            next_play_type: turnData?.next_play_type,
+            turn_index: turnData?.index ?? this.scene?.currentTurn,
+          }
+        );
       }
 
       // Determine the appropriate handler
@@ -385,12 +414,31 @@ export class AnimationEngine {
    * and `force_foul_after_dreb` on the shot turn.
    */
   async _maybeRunDiscreteDrebOutletLeadIn(turnData, context, sprites, ballSprite) {
-    if (turnData?._drebOutletLeadInDone) return;
+    const tag = "[DREB OUTLET LEAD-IN]";
+    if (turnData?._drebOutletLeadInDone) {
+      console.warn(tag, "skip: already_done", {
+        turn_index: turnData?.index ?? this.scene?.currentTurn,
+        next_play_type: turnData?.next_play_type,
+      });
+      return;
+    }
 
     const nextRaw = turnData?.next_play_type;
     const next = typeof nextRaw === "string" ? nextRaw.toUpperCase() : "";
-    if (next === "FAST_BREAK") return;
-    if (!next || !["HCO", "HCT", "FCP"].includes(next)) return;
+    if (next === "FAST_BREAK") {
+      console.warn(tag, "skip: next_is_FAST_BREAK", {
+        turn_index: turnData?.index ?? this.scene?.currentTurn,
+      });
+      return;
+    }
+    if (!next || !["HCO", "HCT", "FCP"].includes(next)) {
+      console.warn(tag, "skip: next_not_halfcourt_route", {
+        next_play_type_raw: nextRaw,
+        next_normalized: next || null,
+        turn_index: turnData?.index ?? this.scene?.currentTurn,
+      });
+      return;
+    }
 
     const scene = this.scene;
     const idx =
@@ -399,16 +447,30 @@ export class AnimationEngine {
         : typeof scene?.currentTurn === "number"
           ? scene.currentTurn
           : null;
-    if (idx == null || idx < 1) return;
+    if (idx == null || idx < 1) {
+      console.warn(tag, "skip: bad_turn_index", {
+        turnData_index: turnData?.index,
+        scene_currentTurn: scene?.currentTurn,
+      });
+      return;
+    }
 
     const missTurn = scene?.simData?.turns?.[idx - 1];
     if (
       !missTurn ||
       (missTurn.result_type !== "MISS" && missTurn.result_type !== "BLOCK")
     ) {
+      console.warn(tag, "skip: prior_turn_not_MISS_BLOCK", {
+        idx,
+        prior_result_type: missTurn?.result_type ?? null,
+        prior_has_dreb_outlet: !!missTurn?.dreb_outlet_pass,
+      });
       return;
     }
-    if (missTurn.force_foul_after_dreb) return;
+    if (missTurn.force_foul_after_dreb) {
+      console.warn(tag, "skip: force_foul_after_dreb on shot turn", { idx });
+      return;
+    }
 
     const playerSprites =
       sprites ||
@@ -419,17 +481,35 @@ export class AnimationEngine {
     const bs =
       ballSprite || context?.ballSprite || scene?.ballSprite;
 
-    const { runDefensiveReboundSetup } = await import("./turnAnimation.js");
-    await runDefensiveReboundSetup({
-      scene,
-      ballSprite: bs,
-      playerSprites,
+    console.warn(tag, "invoke runDefensiveReboundSetup", {
       rebounderId: turnData.rebounderId,
       nextPlayType: nextRaw || next,
-      turnData: missTurn,
-      authorityTurnData: missTurn,
+      dreb_turn_index: idx,
+      miss_turn_index: idx - 1,
+      miss_result_type: missTurn.result_type,
+      has_dreb_outlet_pass: !!missTurn.dreb_outlet_pass,
     });
+
+    const { runDefensiveReboundSetup } = await import("./turnAnimation.js");
+    try {
+      await runDefensiveReboundSetup({
+        scene,
+        ballSprite: bs,
+        playerSprites,
+        rebounderId: turnData.rebounderId,
+        nextPlayType: nextRaw || next,
+        turnData: missTurn,
+        authorityTurnData: missTurn,
+      });
+    } catch (err) {
+      console.error(tag, "runDefensiveReboundSetup threw", {
+        message: err?.message,
+        rebounderId: turnData.rebounderId,
+      });
+      throw err;
+    }
     turnData._drebOutletLeadInDone = true;
+    console.warn(tag, "complete", { dreb_turn_index: idx });
   }
 
   /**
