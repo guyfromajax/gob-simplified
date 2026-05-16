@@ -6,7 +6,7 @@ export const USE_HEADSHOT_MARKER = true;
 // When USE_HEADSHOT_MARKER is false this MUST be { x: 0, y: 0 } so ball behavior
 // is byte-identical to the pre-headshot codebase.
 export const BALL_ATTACH_OFFSET = USE_HEADSHOT_MARKER
-  ? { x: 28, y: 16 }
+  ? { x: 42, y: 24 }
   : { x: 0, y: 0 };
 
 // Resolve a ball position anchored to a player sprite, optionally composed with

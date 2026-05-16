@@ -94,7 +94,7 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
 
   const children = [];
 
-  const shadow = scene.add.ellipse(0, 26, 30, 8, 0x000000, 0.45);
+  const shadow = scene.add.ellipse(0, 39, 45, 12, 0x000000, 0.45);
   children.push(shadow);
 
   // Phaser 3.60 quirk: a GeometryMask source added as a Container child does
@@ -105,7 +105,7 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   // frame via scene 'update' event. Cleanup on container destroy.
   const maskGraphics = scene.add.graphics();
   maskGraphics.fillStyle(0xffffff, 1);
-  maskGraphics.fillCircle(0, 0, 22);
+  maskGraphics.fillCircle(0, 0, 33);
   maskGraphics.x = px;
   maskGraphics.y = py;
   // alpha=0 (not setVisible(false)) so the stencil write still fires.
@@ -118,17 +118,17 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
     const textureKey = hasPhotoTexture ? photoKey : HEADSHOT_FALLBACK_KEY;
     usedPath = hasPhotoTexture ? "photo" : "fallback_texture";
     const photo = scene.add.image(0, 0, textureKey);
-    photo.setDisplaySize(44, 44);
+    photo.setDisplaySize(66, 66);
     photo.setOrigin(0.5, 0.55);
     photo.setMask(mask);
     photoChild = photo;
   } else {
     usedPath = "initials_tile";
-    const tile = scene.add.rectangle(0, 0, 44, 44, primary);
+    const tile = scene.add.rectangle(0, 0, 66, 66, primary);
     tile.setOrigin(0.5, 0.5);
     tile.setMask(mask);
     const initials = scene.add.text(0, 0, getPlayerInitials(player.name), {
-      font: '700 13px "Bebas Neue"',
+      font: '700 20px "Bebas Neue"',
       color: teamInfo.secondary_color,
       align: "center"
     });
@@ -138,21 +138,21 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   }
   if (photoChild) children.push(photoChild);
 
-  const borderRing = scene.add.circle(0, 0, 22);
+  const borderRing = scene.add.circle(0, 0, 33);
   borderRing.setStrokeStyle(3, primary);
   children.push(borderRing);
 
-  const innerSeparator = scene.add.circle(0, 0, 20);
+  const innerSeparator = scene.add.circle(0, 0, 30);
   innerSeparator.setStrokeStyle(1, 0x000000, 0.6);
   children.push(innerSeparator);
 
-  const posY = isHome ? -38 : 38;
-  const chipBg = scene.add.rectangle(0, posY, 28, 18, primary);
+  const posY = isHome ? -57 : 57;
+  const chipBg = scene.add.rectangle(0, posY, 42, 27, primary);
   chipBg.setOrigin(0.5);
   children.push(chipBg);
 
   const chipText = scene.add.text(0, posY, position, {
-    font: '700 13px "Bebas Neue"',
+    font: '700 20px "Bebas Neue"',
     color: teamInfo.secondary_color,
     align: "center"
   });
@@ -160,7 +160,7 @@ function createHeadshotMarker({ scene, player, teamInfo, position, Phaser }) {
   children.push(chipText);
 
   const container = scene.add.container(px, py, children);
-  container.setSize(56, 100);
+  container.setSize(84, 150);
   container.setDepth(1);
 
   // Keep the scene-level mask aligned with the container each frame.
