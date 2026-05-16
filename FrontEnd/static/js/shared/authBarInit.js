@@ -12,6 +12,7 @@
   'use strict';
 
   var authMeDataCache = null;
+  var musicControllerPromise = null;
 
   var PAGES_WITHOUT_AUTH_BAR = [
     // Gameplay / lineup
@@ -573,6 +574,24 @@
     };
   }
 
+  function loadMusicController() {
+    if (!musicControllerPromise) {
+      musicControllerPromise = import('/js/musicController.js');
+    }
+    return musicControllerPromise;
+  }
+
+  function applyAmbiencePillVisual(pill, enabled) {
+    if (!pill) return;
+    // `is-off` slides the thumb right to the "Off" option.
+    pill.classList.toggle('is-off', !enabled);
+    pill.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  }
+
+  function syncAmbiencePillFromController(pill, mc) {
+    applyAmbiencePillVisual(pill, mc.isScoutingAmbienceEnabled());
+  }
+
   function refreshAccountSettingsModal() {
     var usernameEl = document.getElementById('account-settings-username');
     var pill = document.getElementById('account-ambience-pill');
@@ -581,15 +600,13 @@
     var meData = authMeDataCache || window.__gobAuthMeData || {};
     usernameEl.textContent = meData.username || meData.email || 'Coach';
 
-    // Read the Scouting Ambience flag from the music controller (localStorage).
-    // `is-off` class slides the thumb right to the "Off" option.
-    var enabled = true;
-    try {
-      var raw = localStorage.getItem('gob_scouting_ambience_enabled');
-      enabled = raw == null ? true : raw !== 'false';
-    } catch (_e) {}
-    pill.classList.toggle('is-off', !enabled);
-    pill.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    loadMusicController()
+      .then(function (mc) {
+        syncAmbiencePillFromController(pill, mc);
+      })
+      .catch(function (err) {
+        console.warn('[account-settings] music controller import failed', err);
+      });
   }
 
   function closeAccountSettingsModal() {
@@ -650,19 +667,19 @@
       pill.dataset.bound = '1';
       pill.addEventListener('click', function () {
         var turningOn = pill.classList.contains('is-off');
-        // Dynamically import the music controller so we don't take an upfront
-        // dependency on it from every page that loads the auth bar.
-        import('/js/musicController.js').then(function (mc) {
-          mc.setScoutingAmbienceEnabled(turningOn);
-          if (turningOn) {
-            mc.tryStartScoutingAmbienceForCurrentPage();
-          } else {
-            mc.clearFranchiseMusicState();
-          }
-        }).catch(function (err) {
-          console.warn('[ambience-toggle] music controller import failed', err);
-        });
-        refreshAccountSettingsModal();
+        loadMusicController()
+          .then(function (mc) {
+            mc.setScoutingAmbienceEnabled(turningOn);
+            syncAmbiencePillFromController(pill, mc);
+            if (turningOn) {
+              mc.tryStartScoutingAmbienceForCurrentPage();
+            } else {
+              mc.clearFranchiseMusicState();
+            }
+          })
+          .catch(function (err) {
+            console.warn('[ambience-toggle] music controller import failed', err);
+          });
       });
     }
   }
