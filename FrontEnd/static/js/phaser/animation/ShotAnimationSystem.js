@@ -1632,23 +1632,28 @@ export class ShotAnimationSystem {
     }
     
     const nextPlayType = turnData.next_play_type;
+    const nextPlayTypeNorm = String(nextPlayType || '').toUpperCase();
 
     // Diagnostic: which branch of the post-DREB routing are we taking?
     // Restored after "cluttering console" cleanup — silent skips here mask outlet-pass bugs.
+    const drebRoutingBranch =
+      (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && !turnData.force_foul_after_dreb
+        ? `runDefensiveReboundSetup (${nextPlayType})`
+        : (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && turnData.force_foul_after_dreb
+          ? `skipped: force_foul_after_dreb (${nextPlayType})`
+          : nextPlayType === 'FAST_BREAK'
+            ? 'skipped: FAST_BREAK handles its own outlet'
+            : nextPlayTypeNorm === 'DREB'
+              ? 'deferred: next_play_type is DREB (discrete rebound turn follows MISS; outlet runs after that turn’s animation via AnimationEngine)'
+              : `skipped: unhandled nextPlayType="${nextPlayType}"`;
+
     console.log('🏀 [DREB ROUTING] handleDefensiveRebound branch decision', {
       rebounderId: turnData.rebounderId,
       nextPlayType,
       force_foul_after_dreb: !!turnData.force_foul_after_dreb,
       result_type: turnData.result_type,
       rebound_type: turnData.rebound_type,
-      branch:
-        (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && !turnData.force_foul_after_dreb
-          ? `runDefensiveReboundSetup (${nextPlayType})`
-          : (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') && turnData.force_foul_after_dreb
-            ? `skipped: force_foul_after_dreb (${nextPlayType})`
-            : nextPlayType === 'FAST_BREAK'
-              ? 'skipped: FAST_BREAK handles its own outlet'
-              : `skipped: unhandled nextPlayType="${nextPlayType}"`,
+      branch: drebRoutingBranch,
     });
 
     // Use the same defensive rebound setup for HCO, HCT, and FCP

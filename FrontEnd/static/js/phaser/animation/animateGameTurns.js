@@ -1021,6 +1021,15 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ Discrete defensive rebound row (MISS → DREB → HCO): backend emits `result_type === "DREB"` as its
+    // own turn with `animation_steps`. Without this branch the loop falls through and never calls
+    // AnimationEngine — so `playTurn` + `_maybeRunDiscreteDrebOutletLeadIn` never run (outlet skipped).
+    if (turn.result_type === "DREB") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
+    }
+
     // ✅ TIMEOUT: Handle TIMEOUT turns - route through AnimationRouter
     if (turn.result_type === "TIMEOUT") {
       turn.index = i;
