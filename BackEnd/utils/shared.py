@@ -1857,6 +1857,7 @@ def summarize_game_state(game, exclude_animations=True):
                 "team_id": team_obj.team_id,
                 "pos": pos,  # None for bench players
                 "jersey": player.jersey,
+                "height": getattr(player, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                 "photo": getattr(player, "photo", None),  # Player headshot image
                 "primary_color": getattr(team_obj, "primary_color", "#000000"),
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
@@ -1892,6 +1893,7 @@ def summarize_game_state(game, exclude_animations=True):
                     "team_id": team_obj.team_id,
                     "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
                     "jersey": player_obj.jersey,
+                    "height": getattr(player_obj, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                     "photo": getattr(player_obj, "photo", None),  # Player headshot image
                     "primary_color": getattr(team_obj, "primary_color", "#000000"),
                     "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),

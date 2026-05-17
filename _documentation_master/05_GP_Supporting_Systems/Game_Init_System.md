@@ -150,6 +150,68 @@ Watch for:
 
 ---
 
+## Player-level data ingestion
+
+Independent of mode (single / tournament / franchise), every game begins by loading rosters and constructing in-memory `Player` objects. This is where biographical fields like `height`, `weight`, `jersey`, `name`, and `photo` enter the gameplay system.
+
+### Source of truth in MongoDB
+
+| Mode | Collection | Notes |
+|------|-----------|-------|
+| Single / Tournament | `players` | Canonical player documents, queried by string `_id`. Each doc carries `first_name`, `last_name`, `height`, `weight`, `jersey`, `year`, `attributes`, optional `position_ratings`, optional `photo`. |
+| Franchise | `franchise_players_data` (FPD), with fallback to `players` | FPD holds per-franchise overrides of `attributes`, `position_ratings`, and `meta` (which includes `height`, `weight`, `jersey`, `year`, `first_name`, `last_name`). When FPD `meta` provides a field, it overrides the base `players` doc. |
+
+### Load path: `load_roster` → `Player(data)`
+
+1. **`TeamManager.__init__`** ([Backend/models/team_manager.py](Backend/models/team_manager.py)) calls `self._load_roster()`.
+2. **`_load_roster()`** calls `load_roster(team_name, franchise_id=…)` from [Backend/utils/roster_loader.py](Backend/utils/roster_loader.py).
+3. **`load_roster`** assembles raw player dicts. For franchise mode, it merges `franchise_players_data.{pid}.meta.height` (and other meta fields) onto the base players-collection doc — FPD wins when set.
+4. Each player dict is passed to the **`Player(data)`** constructor at [Backend/models/player.py:14](Backend/models/player.py#L14), which extracts:
+   - `self.player_id`, `self.first_name`, `self.last_name`, `self.name` (composed)
+   - `self.team`, `self.jersey`, `self.year`, `self.photo`
+   - `self.height = data.get("height", data.get("HT", 75))` — **integer inches**, defaults to 75" (6'3") if both missing (legacy `HT` field name supported)
+   - `self.weight = data.get("weight", data.get("WT", 200))`
+   - `self.attributes` via `_extract_attributes()` — includes `EM`, `CH`, `MO`, `NG` plus anchor copies for all attrs
+   - `self.position_ratings` — per-position rating dict (franchise/universal rosters only)
+   - `self.stats` — game stats template
+
+### What ends up on the game document
+
+`summarize_game_state` ([Backend/utils/shared.py](Backend/utils/shared.py)) builds the per-player projection that lands on the `games` doc. The projection includes only what gameplay + frontend systems need — **not the full Player object**. Current per-player fields:
+
+| Field | Source on `Player` |
+|-------|-------------------|
+| `playerId` | `player.player_id` |
+| `name` | `player.name` (composed first + last) |
+| `team` | `"home"` / `"away"` (lineup side) |
+| `team_id` | `team_obj.team_id` |
+| `pos` | Lineup position (`PG`/`SG`/`SF`/`PF`/`C`) or `None` for bench |
+| `jersey` | `player.jersey` |
+| `height` | `player.height` (integer inches) — **added May 2026** for v2 player sprite (height-linked headshot radius) |
+| `photo` | `player.photo` |
+| `primary_color` / `secondary_color` | `team_obj.primary_color` / `secondary_color` |
+| `x` / `y` | `player.coords` |
+| `stats` | `player.stats["game"]` |
+| `attributes` | `{EM, CH, MO, NG}` only — most attributes stay in-memory and aren't persisted |
+
+**Not on the game doc:** `weight`, `year`, `position_ratings`, `anchor_*` attributes, `metadata`. These live on the in-memory `Player` only. To expose any of them to the frontend or persist them, they need to be added to the `players.append({…})` blocks in `summarize_game_state`.
+
+### Frontend access path
+
+The simulate-quarter response body uses `summarize_game_state(gm, exclude_animations=False)` as its payload. Whatever lands on the per-player dict in `summarize_game_state` flows directly to `simData.players` on the frontend (which becomes `actualPlayers` in `loadPhaserPlayers`, which becomes the `player` arg destructured by `createPhaserPlayer`).
+
+The `/api/game/{game_id}` endpoint takes a different path — it re-projects players from the saved `games` doc via a separate `players_with_energy` loop in `api.py` (~lines 1769 and 1851). When adding a new player field, **update both** so the field is available whether the court loads via simulate-quarter (mid-game) or via /api/game (initial scoreboard load on the court page).
+
+### When you need to add a new player field
+
+Three-step recipe:
+
+1. Confirm the field is on the **Python `Player` object** (or add it to `Player.__init__` reading from `data.get("...")`).
+2. Add it to the player dict in **all three `players.append({…})` blocks** in `summarize_game_state` (`shared.py`). This puts the field on the game doc and on simulate-quarter responses.
+3. Add it to **both `players_with_energy` projections** in `api.py` (`/api/game/{game_id}` endpoint) so initial court loads include it.
+
+---
+
 ## Single game mode init
 
 - **Init handler** initializes `home_playbook_settings` / `away_playbook_settings` as empty dicts and, after summarize, assigns them into `summary["teams"][…]["playbook_settings"]`, and syncs `GameManager` team playbooks to those dicts.
@@ -190,13 +252,15 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 | Game doc team slot keys | `BackEnd/utils/resolve_game_teams_slot_keys.py` — `resolve_home_away_teams_slot_keys` |
 | Scouting shape (gameplay) | `BackEnd/models/team_manager.py` — `normalize_scouting_data_for_gameplay()` |
 | In-memory game | `BackEnd/models/game_manager.py` — `GameManager` |
-| Per-team state | `BackEnd/models/team_manager.py` — `TeamManager` |
+| Per-team state | `BackEnd/models/team_manager.py` — `TeamManager`, `_load_roster()` |
+| Roster loading | `BackEnd/utils/roster_loader.py` — `load_roster()` (players collection + FPD merge for franchise) |
+| Player class | `BackEnd/models/player.py` — `Player.__init__`, biographical + attribute extraction |
 | Summary → DB shape | `BackEnd/utils/shared.py` — `summarize_game_state()` |
 | Greenfield Q1 (franchise) | `BackEnd/api/api.py` — franchise branch using `prepare_ftd_for_new_game` |
 | Court load + header | `FrontEnd/static/js/phaser/utils/loadGameStats.js` — `initializeGameStats`, `displayAccumulatedHeaderState` |
 | Sim vs scoreboard meta | `FrontEnd/static/js/phaser/gameScene.js` — merged `team_scoreboard_meta` across turns |
-| Collections | `franchise_team_data`, `franchises`, `teams`, `games` |
+| Collections | `franchise_team_data`, `franchise_players_data`, `franchises`, `teams`, `players`, `games` |
 
 ---
 
-**Last updated:** April 2026 — `franchise_id` always on game doc when provided; GET + enrich scoreboard pipeline; `team_scoreboard_meta` + frontend merge; prior: FTD name-resolution at `init-game`; scouting template merge for defense `used` / full row shape.
+**Last updated:** May 2026 — Player-level data ingestion section added (`roster_loader` → `Player(data)` → `summarize_game_state` projection); `height` added to per-player game-doc projection for v2 player sprite. Prior: April 2026 — `franchise_id` always on game doc when provided; GET + enrich scoreboard pipeline; `team_scoreboard_meta` + frontend merge; FTD name-resolution at `init-game`; scouting template merge for defense `used` / full row shape.

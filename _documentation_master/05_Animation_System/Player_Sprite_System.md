@@ -10,7 +10,7 @@ The player sprite system renders the 10 on-court players as headshot-centered ma
 | --- | --- |
 | Marker container origin | `gridToPixels(player.startingCoords)` — i.e., the center of the player's head |
 | Visual diameter (headshot circle) | 66px (radius 33) |
-| Border ring outer diameter | ~70px (radius 33 + 3px team-primary stroke) |
+| Border ring | Retired in v2 — only a thin black hairline (1px, radius `headR - 1`) sits inside the headshot edge for legibility. v1 still uses a 3px team-primary stroke. |
 | Container bounding box | 84×150 (width × height, includes chip + shadow) |
 | Position chip offset | y = ±57 from head center (home above, away below) |
 | Ball attach point | `(sprite.x, sprite.y)` — center of the headshot (offset infrastructure preserved but currently `{0, 0}`) |
@@ -50,46 +50,39 @@ createPhaserPlayer({ scene, player, teamInfo, position, Phaser })
 
 ## Marker Composition (Headshot Mode)
 
-Children of the container, in z-order (back → front):
+Children of the v1 container, in z-order (back → front):
 
 1. **Shadow** — `ellipse(0, 39, 45, 12, 0x000000, 0.45)` — soft drop shadow below the head
 2. **Headshot photo** — `image(0, 0, headshot_${playerId})` displayed at 66×66, origin `(0.5, 0.55)` (face anchored slightly above center), clipped to a 33-radius circle via geometry mask
-3. **Border ring** — `circle(0, 0, 33)` with 3px stroke in team primary color
+3. **Border ring** — `circle(0, 0, 33)` with 3px stroke in team primary color (v1 only — v2 retires this)
 4. **Inner separator** — `circle(0, 0, 30)` with 1px black 60%-alpha stroke (keeps light photos legible against light court)
 5. **Position chip bg** — `rectangle(0, ±57, 42, 27)` in team primary
 6. **Position chip text** — Bebas Neue 700 20px in team secondary color (`PG`, `SG`, `SF`, `PF`, `C`)
 
 Home team chip sits above the head (y = -57); away team chip sits below (y = +57).
 
-### Symmetric team colors
+For v2's full child list and additions, see the "v2 Additions" section below.
 
-Unlike the legacy marker (which inverted fill/border by home/away), the headshot marker uses **the team's own primary color** for both home AND away. The headshot itself carries team identity, so the symmetric border reads more clearly.
+### Symmetric team colors (v1)
+
+Unlike the legacy marker (which inverted fill/border by home/away), the v1 headshot marker uses **the team's own primary color** for both home AND away border rings. The headshot itself carries team identity, so the symmetric border reads more clearly. In v2 the team border is dropped entirely — the home/away inverted color scheme on the position chip now carries the team distinction (see "Chip placement and styling" below).
 
 ## v2 Additions
 
-v2 layers four enhancements on top of the v1 marker. All gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly.
+v2 layers three enhancements on top of the v1 marker and **drops the team-primary border ring** (replaced by a thin black hairline). All v2 changes gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly (border ring restored, no vignette, no stamina ring, fixed radius).
 
 | Feature | Source field | If missing |
 | --- | --- | --- |
 | Vignette | (none) | Always rendered |
 | Stamina ring | `player.NG ?? player.attributes?.NG` | Ring omitted (no track, no fill) |
-| Rating-tiered border | `player.rating` (0–99) | Default 3px primary band (same as v1) |
-| Height-linked radius | `player.heightInches` | Default `r = 28.5` (≈ 5'10") |
+| Height-linked radius | `player.height` (integer inches) | Default `r = 28.5` (≈ 5'10") |
+| **Removed:** team-color border ring | — | v2 replaces it with a 1px black hairline inside the headshot edge |
 
 ### Height → radius
 
 Linear 0.75 px/inch around the 6'4" v1 baseline (r=33), clamped 25.5 (≤ 5'6") to 39 (≥ 7'0"). Default 28.5 (≈ 5'10") when height is unknown — close to HS roster average so missing-data players don't visually jump when the backend supplies the field later.
 
-### Rating tiers
-
-| Rating | Border |
-| --- | --- |
-| ≥ 80 | 5px team primary, alpha 1.0 |
-| 65–79 | 4px team primary, alpha 1.0 |
-| 40–64 | 3px team primary, alpha 1.0 |
-| 20–39 | 3px team primary, alpha 0.6 |
-| < 20 | 3px desaturated gray (`#6b7280`), alpha 0.85 |
-| missing | 3px team primary, alpha 1.0 (= v1 default) |
+Field source: `player.height` (integer inches). See `Game_Init_System.md` → "Player-level data ingestion" for the load path (DB → `Player.__init__` → `summarize_game_state` → simData).
 
 ### Stamina ring
 

@@ -11,19 +11,6 @@ function headRadiusForHeight(heightInches) {
   return Math.max(25.5, Math.min(39, 30 + (heightInches - 72) * 0.75));
 }
 
-// Rating → border thickness/alpha. Falls back to the default 3px primary band
-// when rating is missing or in the normal range, so missing-data players stay
-// visually identical to v1 until the backend supplies the field.
-function ratingBorderTreatment(rating, primaryHex, Phaser) {
-  const primary = Phaser.Display.Color.HexStringToColor(primaryHex).color;
-  if (rating == null) return { width: 3, color: primary, alpha: 1 };
-  if (rating < 20) return { width: 3, color: 0x6b7280, alpha: 0.85 }; // desaturated
-  if (rating >= 80) return { width: 5, color: primary, alpha: 1 };
-  if (rating >= 65) return { width: 4, color: primary, alpha: 1 };
-  if (rating >= 40) return { width: 3, color: primary, alpha: 1 };
-  return { width: 3, color: primary, alpha: 0.6 };
-}
-
 function getInitialsFromFullName(fullName) {
   if (!fullName || typeof fullName !== "string") return "?";
   const tokens = fullName.trim().split(/\s+/).filter(Boolean);
@@ -38,12 +25,10 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
 
   const playerId = player.playerId ?? player.player_id ?? player._id;
   const stamina = player.NG ?? player.attributes?.NG;
-  const rating = player.rating;          // may be undefined — degrades to default tier
-  const heightIn = player.heightInches;   // may be undefined — degrades to default radius
+  const heightIn = player.height; // integer inches; undefined → default in headRadiusForHeight
   const isHome = player.team === "home";
 
   const headR = headRadiusForHeight(heightIn);
-  const tier = ratingBorderTreatment(rating, teamInfo.primary_color, Phaser);
   const primary = Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color;
   const secondary = teamInfo.secondary_color;
   // Home chip above, away chip below (preserves the v1 placement rule).
@@ -104,12 +89,9 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   const staminaGfx = scene.add.graphics();
   drawStaminaArc(staminaGfx, headR, stamina);
 
-  // 6. Border ring (rating-tiered)
-  const border = scene.add.circle(0, 0, headR);
-  border.setStrokeStyle(tier.width, tier.color, tier.alpha);
-
-  // 7. Inner separator
-  const inner = scene.add.circle(0, 0, headR - 3);
+  // 6. Inner separator (thin dark hairline around the photo edge for legibility
+  //    against the light court; the team-color border has been removed in v2).
+  const inner = scene.add.circle(0, 0, headR - 1);
   inner.setStrokeStyle(1, 0x000000, 0.6);
 
   // 8. Position chip — rounded rect via Graphics. Home above / away below;
@@ -124,7 +106,7 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   });
   chipTx.setOrigin(0.5);
 
-  const children = [vig3, vig2, vig1, shadow, photoChild, staminaGfx, border, inner, chipGfx, chipTx];
+  const children = [vig3, vig2, vig1, shadow, photoChild, staminaGfx, inner, chipGfx, chipTx];
 
   const container = scene.add.container(px, py, children);
   container.setSize(96, 168);

@@ -1769,6 +1769,7 @@ try:
                             player_data = {
                                 "_id": p.get("playerId") or p.get("player_id"),
                                 "name": p.get("name"),
+                                "height": p.get("height"),  # Integer inches; used by v2 player sprite
                                 "NG": ng_value,  # ✅ Real-time NG from attributes.NG
                                 "team": p.get("team"),
                                 "stats": {},  # Empty stats for new game
@@ -1851,6 +1852,7 @@ try:
                         player_data = {
                             "_id": p.get("playerId") or p.get("player_id"),
                             "name": p.get("name"),
+                            "height": p.get("height"),  # Integer inches; used by v2 player sprite
                             "NG": ng_value,  # ✅ Real-time NG from attributes.NG (saved during timeout)
                             "team": p.get("team"),
                             "stats": saved_stats,  # ✅ Flat game stats dict (PTS, REB, AST, etc.)
