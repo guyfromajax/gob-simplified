@@ -1,6 +1,6 @@
 # Player Sprite System
 
-**Status:** ✅ **PRODUCTION** — v1 headshot marker shipped May 2026. v2 enhancements (vignette, stamina ring, height-linked radius, chip-color inversion per team, team-color border dropped) shipped behind `USE_MARKER_V2_FEATURES`.
+**Status:** ✅ **PRODUCTION** — v1 headshot marker shipped May 2026. v2 enhancements (team-color backdrop + vignette, stamina ring, height-linked radius, chip-color inversion per team, team-color border dropped) shipped behind `USE_MARKER_V2_FEATURES`.
 
 The player sprite system renders the 10 on-court players as headshot-centered markers and keeps the ball anchored to whichever marker currently has possession. The system is reversible via two feature flags: `USE_HEADSHOT_MARKER` (v1 vs legacy) and `USE_MARKER_V2_FEATURES` (v2 vs v1).
 
@@ -43,7 +43,7 @@ createPhaserPlayer({ scene, player, teamInfo, position, Phaser })
 | `FrontEnd/static/js/phaser/setup/markerConfig.js` | Feature flags (`USE_HEADSHOT_MARKER`, `USE_MARKER_V2_FEATURES`), ball-attach offset constant, `playerBallPos(sprite, extra)` helper |
 | `FrontEnd/static/js/phaser/setup/preloadPlayerHeadshots.js` | Phaser texture preload + URL normalization (strips `/static/` on netlify) |
 | `FrontEnd/static/js/phaser/setup/createPhaserPlayer.js` | Dispatcher → v2 / v1 / legacy. Holds `createHeadshotMarker` (v1) and `createLegacyMarker` as module-private functions |
-| `FrontEnd/static/js/phaser/setup/createHeadshotMarkerV2.js` | v2 builder: vignette + stamina ring + height-linked radius + chip-color inversion per team (team-color border ring dropped vs v1) |
+| `FrontEnd/static/js/phaser/setup/createHeadshotMarkerV2.js` | v2 builder: team-color backdrop fill + vignette + stamina ring + height-linked radius + chip-color inversion per team (team-color border ring dropped vs v1) |
 | `FrontEnd/static/js/phaser/setup/staminaRing.js` | `drawStaminaArc(gfx, headR, stamina)` helper. Extracted from the marker builder so `syncPlayerSpriteAttributes.js` can import without a circular dependency. Pure JS, no Phaser dependency. |
 | `FrontEnd/static/js/phaser/setup/loadPhaserPlayers.js` | Iterates roster, calls `createPhaserPlayer`, attaches metadata (`team_id`, `team`, `playerId`, `jersey`, `name`) to each container |
 | `FrontEnd/static/js/phaser/utils/syncPlayerSpriteAttributes.js` | Per-turn NG sync; v2 stamina ring redraws here when `container.staminaGfx` is present |
@@ -61,7 +61,20 @@ Children of the v1 container, in z-order (back → front):
 
 Home team chip sits above the head (y = -57); away team chip sits below (y = +57).
 
-For v2's full child list and additions, see the "v2 Additions" section below.
+### v2 children (z-order, back → front)
+
+When `USE_MARKER_V2_FEATURES = true`, the container holds these children instead of the v1 list above:
+
+1. **Vignette (outer halo)** — 3 stacked `circle` discs at `r = headR + 15 / 9 / 5`, in `bgColor` (team primary for home, soft white `0xf5f5f5` for away), alphas `0.18 / 0.30 / 0.42`
+2. **Floor shadow** — `ellipse(0, headR + 6, headR × 1.36, 12, 0x000000, 0.45)` — always black regardless of team
+3. **Inside-mask backdrop disc** — `circle(0, 0, headR, bgColor, 0.90)` — shows through transparent pixels of the photo (above head, around shoulders) to tint the marker in the team color
+4. **Headshot photo** — `image(0, 0, headshot_${playerId})` at `headR × 2`, masked to a `headR`-radius circle via the scene-level mask Graphics
+5. **Stamina ring** — `Graphics` arc just outside the headshot edge (see "Stamina ring" section below)
+6. **Inner separator** — `circle(0, 0, headR - 1)` with 1px black 60%-alpha stroke (legibility hairline)
+7. **Position chip bg** — `Graphics.fillRoundedRect(-21, chipY - 13, 42, 27, 5)`, fill per team rule (see "Chip placement and styling" below)
+8. **Position chip text** — Bebas Neue 20px, text color per team rule
+
+For v2's design rationale (why the backdrop, why team-color vignette, etc.), see "v2 Additions" below.
 
 ### Symmetric team colors (v1)
 
@@ -69,14 +82,26 @@ Unlike the legacy marker (which inverted fill/border by home/away), the v1 heads
 
 ## v2 Additions
 
-v2 layers three enhancements on top of the v1 marker and **drops the team-primary border ring** (replaced by a thin black hairline). All v2 changes gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly (border ring restored, no vignette, no stamina ring, fixed radius).
+v2 layers four enhancements on top of the v1 marker and **drops the team-primary border ring** (replaced by a thin black hairline). All v2 changes gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly (border ring restored, no backdrop tint, no vignette, no stamina ring, fixed radius).
 
 | Feature | Source field | If missing |
 | --- | --- | --- |
-| Vignette | (none) | Always rendered |
+| Team-color backdrop fill | `player.team` (home/away) + `teamInfo.primary_color` | Always rendered (per-team color) |
+| Vignette (team-color halo) | `player.team` + `teamInfo.primary_color` | Always rendered |
 | Stamina ring | `player.NG ?? player.attributes?.NG` | Ring omitted (no track, no fill) |
 | Height-linked radius | `player.height` (integer inches) | Default `r = 28.5` (≈ 5'10") |
 | **Removed:** team-color border ring | — | v2 replaces it with a 1px black hairline inside the headshot edge |
+
+### Team-color backdrop + vignette
+
+| Team | `bgColor` | Inside-mask disc alpha | Outer vignette alphas (3 stacked) |
+| --- | --- | --- | --- |
+| Home | `teamInfo.primary_color` (parsed via `Phaser.Display.Color.HexStringToColor`) | 0.90 | 0.42 / 0.30 / 0.18 (inner → outer) |
+| Away | `0xf5f5f5` (soft white, not pure) | 0.90 | 0.42 / 0.30 / 0.18 |
+
+The inside-mask disc (`r = headR`, alpha 0.90) sits between the shadow and the photo. It shows through transparent pixels of the headshot photo (above the head, around shoulders) so the marker reads as the team color at a glance. The 3-disc vignette outside the headshot uses the same color at lower alphas to soften the marker's edge into the court.
+
+The floor shadow ellipse stays black regardless of team — its job is to ground the marker to the court, not to carry team identity.
 
 ### Height → radius
 
@@ -126,7 +151,14 @@ This normalization is critical — without it, prod players 404 because `/static
 
 1. If `headshot_${playerId}` exists in the texture manager → use it
 2. Else if `headshot_fallback` exists → render the generic headshot (clipped to the same circle)
-3. Else (rare — both URLs failed) → render a solid team-primary tile with the player's initials (`firstInitial + lastInitial`, e.g. `JD`) in Bebas Neue 20px
+3. Else (rare — both URLs failed) → render an initials tile with the player's first + last initials (e.g. `JD`) in Bebas Neue 20px
+
+**Initials tile contrast (v2):** the tile's fill must contrast with the new team-color backdrop disc that sits behind it:
+
+| Team | Backdrop disc | Initials tile fill | Initials text color |
+| --- | --- | --- | --- |
+| Home | team primary | team **secondary** | team primary |
+| Away | white `0xf5f5f5` | team primary | team secondary |
 
 The fallback decision happens per player at marker creation time, so individual photo failures don't break the whole court.
 

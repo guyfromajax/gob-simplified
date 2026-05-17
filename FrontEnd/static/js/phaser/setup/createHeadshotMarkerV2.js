@@ -30,6 +30,7 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
 
   const headR = headRadiusForHeight(heightIn);
   const primary = Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color;
+  const secondaryColorInt = Phaser.Display.Color.HexStringToColor(teamInfo.secondary_color).color;
   const secondary = teamInfo.secondary_color;
   // Home chip above, away chip below (preserves the v1 placement rule).
   const chipY = isHome ? -(headR + 24) : +(headR + 24);
@@ -37,14 +38,25 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   // away = white fill + primary text (inverse scheme).
   const chipFillColor = isHome ? primary : 0xffffff;
   const chipTextColor = isHome ? secondary : teamInfo.primary_color;
+  // Backdrop fill (inside-mask disc + outer vignette) per team:
+  // home = team primary, away = soft white. Tints the area behind transparent
+  // photo pixels and the vignette halo so home/away read at a glance.
+  const bgColor = isHome ? primary : 0xf5f5f5;
 
-  // 1. Vignette (3 stacked dark discs)
-  const vig3 = scene.add.circle(0, 0, headR + 15, 0x000000, 0.18);
-  const vig2 = scene.add.circle(0, 0, headR + 9, 0x000000, 0.30);
-  const vig1 = scene.add.circle(0, 0, headR + 5, 0x000000, 0.42);
+  // 1. Vignette (3 stacked discs in team-backdrop color — softens edge into court)
+  const vig3 = scene.add.circle(0, 0, headR + 15, bgColor, 0.18);
+  const vig2 = scene.add.circle(0, 0, headR + 9, bgColor, 0.30);
+  const vig1 = scene.add.circle(0, 0, headR + 5, bgColor, 0.42);
 
-  // 2. Floor shadow (proportional to headR — bigger heads cast bigger shadows)
+  // 2. Floor shadow (proportional to headR — bigger heads cast bigger shadows).
+  //    Kept black for the grounding-to-court effect regardless of team.
   const shadow = scene.add.ellipse(0, headR + 6, Math.round(headR * 1.36), 12, 0x000000, 0.45);
+
+  // 2a. Inside-mask backdrop disc — sits behind the photo at the same radius.
+  //     Shows through transparent photo pixels (above head, around shoulders),
+  //     giving the marker a strong team-color tint. Alpha 0.90 lets a small
+  //     amount of court bleed through so it doesn't look pasted on.
+  const insideFill = scene.add.circle(0, 0, headR, bgColor, 0.90);
 
   // 3. Scene-level mask Graphics. Mirrors v1 exactly:
   //    - fillStyle BEFORE fillCircle (else the stencil writes empty and the photo vanishes)
@@ -75,10 +87,15 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
     photo.setMask(mask);
     photoChild = photo;
   } else {
-    const tile = scene.add.circle(0, 0, headR, primary);
+    // Initials tile must contrast with the backdrop disc behind it:
+    //   home backdrop is team primary, so the tile uses secondary; text returns to primary
+    //   away backdrop is white, so the tile stays team primary; text stays secondary
+    const tileColor = isHome ? secondaryColorInt : primary;
+    const tileTextColor = isHome ? teamInfo.primary_color : secondary;
+    const tile = scene.add.circle(0, 0, headR, tileColor);
     const tileTx = scene.add.text(0, 0, getInitialsFromFullName(player.name), {
       font: '20px "Bebas Neue"',
-      color: secondary,
+      color: tileTextColor,
       align: "center",
     });
     tileTx.setOrigin(0.5);
@@ -106,7 +123,9 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   });
   chipTx.setOrigin(0.5);
 
-  const children = [vig3, vig2, vig1, shadow, photoChild, staminaGfx, inner, chipGfx, chipTx];
+  // Z-order: outer vignette → shadow → inside backdrop fill → photo (masked) →
+  // stamina ring → inner hairline → position chip.
+  const children = [vig3, vig2, vig1, shadow, insideFill, photoChild, staminaGfx, inner, chipGfx, chipTx];
 
   const container = scene.add.container(px, py, children);
   container.setSize(96, 168);
