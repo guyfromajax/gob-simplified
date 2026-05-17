@@ -1951,18 +1951,31 @@
       box-shadow: none;
     }
 
-    .play-headshot {
+    /* Positioned wrapper so the initials fallback tile can absolute-fill
+       the same 38×38 footprint as the img without leaking onto the play-info
+       column. Width/height/border move from .play-headshot to the wrap so the
+       initials tile picks up the same outline. */
+    .play-headshot-wrap {
+      position: relative;
       width: 38px;
       height: 38px;
+      flex-shrink: 0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .play-headshot {
+      width: 100%;
+      height: 100%;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.2);
       object-fit: cover;
       object-position: top center;
-      flex-shrink: 0;
       background: rgba(0, 0, 0, 0.5);
+      display: block;
     }
 
-    .play-option.selected .play-headshot {
+    .play-option.selected .play-headshot,
+    .play-option.selected .play-headshot-wrap {
       border-color: rgba(247, 148, 32, 0.85);
       box-shadow: 0 0 8px -1px var(--orange-glow);
     }
@@ -2045,6 +2058,7 @@
     }
 
     .hud-headshot-container {
+      position: relative;
       width: 70px;
       height: 70px;
       border-radius: 50%;
@@ -2656,6 +2670,17 @@
     /* Smaller initials inside the compact secondary ribbon headshot (48×48). */
     .sec-headshot .ann-headshot-initials {
       font-size: 22px;
+    }
+    /* Playcall Center surfaces — same fallback rule as announcements; per-surface
+       text size matches each container's footprint. */
+    .play-headshot-wrap .ann-headshot-initials {
+      font-size: 18px;
+    }
+    .hud-headshot-container .ann-headshot-initials {
+      font-size: 30px;
+    }
+    .tooltip-image-wrap .ann-headshot-initials {
+      font-size: 28px;
     }
     .ann-portrait-caption {
       position: absolute;
@@ -3290,13 +3315,24 @@
       align-items: center;
     }
 
-    .tooltip-image {
+    /* Wrapper so the initials fallback tile can absolute-fill the same
+       60×60 footprint as the img without leaking onto the tooltip stats column. */
+    .tooltip-image-wrap {
+      position: relative;
       width: 60px;
       height: 60px;
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .tooltip-image {
+      width: 100%;
+      height: 100%;
       border-radius: 6px;
       object-fit: cover;
       border: 1px solid #444;
       background: #333;
+      display: block;
     }
 
     .tooltip-stats {
@@ -3803,7 +3839,9 @@
   <!-- End Google Tag Manager (noscript) -->
   <!-- Player Tooltip -->
   <div id="player-tooltip">
-    <img class="tooltip-image" id="tooltip-player-image" src="" alt="Player" />
+    <div class="tooltip-image-wrap">
+      <img class="tooltip-image" id="tooltip-player-image" src="" alt="Player" />
+    </div>
     <div class="tooltip-stats">
       <div class="tooltip-stat-row">
         <span class="tooltip-stat-label">Energy:</span>
@@ -4931,12 +4969,10 @@
             const headshotImg = playOption.querySelector('.play-headshot');
             if (headshotImg) {
               const imgPath = API_CONFIG.buildStaticPath(`/images/players/${shooterId}.png`);
-              headshotImg.src = imgPath;
               headshotImg.setAttribute('data-player-id', shooterId);
-              headshotImg.onerror = () => {
-                console.warn(`⚠️ [PLAYCALL HEADSHOTS] Headshot failed to load: ${imgPath}, using default`);
-                headshotImg.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
-              };
+              // Team-aware initials fallback when the per-player photo fails;
+              // matches the announcement system + v2 on-court sprite rule.
+              applyHeadshotFallback(headshotImg, imgPath, buildPlaycallInitialsInfo(shooterId));
               
               // Add tooltip event listeners (if tooltip functions exist)
               if (typeof showPlaycallHeadshotTooltip === 'function') {
@@ -4975,24 +5011,30 @@
       headshotImg.className = 'play-headshot';
       headshotImg.src = '';
       headshotImg.alt = 'Shooter';
-      
+
+      // Positioned wrapper so the initials fallback tile can absolute-fill the
+      // 38×38 footprint without leaking onto the play-info column.
+      const headshotWrap = document.createElement('div');
+      headshotWrap.className = 'play-headshot-wrap';
+      headshotWrap.appendChild(headshotImg);
+
       const playInfo = document.createElement('div');
       playInfo.className = 'play-info';
-      
+
       const playNameDiv = document.createElement('div');
       playNameDiv.className = 'play-name';
       playNameDiv.textContent = playName;
-      
+
       const playFocusDiv = document.createElement('div');
       playFocusDiv.className = 'play-focus';
       playFocusDiv.textContent = playFocus || '';
-      
+
       playInfo.appendChild(playNameDiv);
       playInfo.appendChild(playFocusDiv);
-      
-      playOption.appendChild(headshotImg);
+
+      playOption.appendChild(headshotWrap);
       playOption.appendChild(playInfo);
-      
+
       return playOption;
     }
     
@@ -6190,7 +6232,9 @@
       };
 
       // Build (or reuse) a sibling initials tile next to the failed img.
-      // Mirrors the v2 sprite rule: home → tile=secondary/text=primary; away → tile=primary/text=secondary.
+      // Color rule (shared across sprites, announcements, playcall center):
+      //   Home → tile = team primary,   text = team secondary
+      //   Away → tile = team secondary, text = team primary
       var renderInitialsFallback = function(imgEl, info) {
         if (!imgEl || !imgEl.parentNode) return;
         var parent = imgEl.parentNode;
@@ -6199,8 +6243,8 @@
         var tile = document.createElement('div');
         tile.className = 'ann-headshot-initials';
         var isHome = !!info.isHome;
-        tile.style.backgroundColor = isHome ? (info.secondaryColor || '#fff') : (info.primaryColor || '#333');
-        tile.style.color           = isHome ? (info.primaryColor   || '#333') : (info.secondaryColor || '#fff');
+        tile.style.backgroundColor = isHome ? (info.primaryColor   || '#333') : (info.secondaryColor || '#fff');
+        tile.style.color           = isHome ? (info.secondaryColor || '#fff') : (info.primaryColor   || '#333');
         tile.textContent = computeAnnouncementInitials(info.name);
         parent.appendChild(tile);
       };
@@ -6213,6 +6257,41 @@
           var existing = imgEl.parentNode.querySelector('.ann-headshot-initials');
           if (existing) existing.remove();
         }
+      };
+
+      // Resolve { isHome, primaryColor, secondaryColor, name } for any user-team
+      // playerId in the Playcall Center (play-option headshots, reveal HUD,
+      // hover tooltip). All three surfaces show user-team players only.
+      // Source order:
+      //   1. window.currentGameScene.playerInfo[playerId] for { name, team }
+      //   2. URL ?my_team= as team-side fallback when scene isn't ready yet
+      //      (e.g. early page load before gameScene.create() finishes)
+      //   3. window.gameStore.getColors() for the team color hexes
+      // Returns null when team or colors can't be resolved — applyHeadshotFallback
+      // then falls through to generic_headshot.png the same as before.
+      var buildPlaycallInitialsInfo = function(playerId) {
+        if (!playerId) return null;
+        var scene = (typeof window !== 'undefined') ? window.currentGameScene : null;
+        var info = scene && scene.playerInfo ? scene.playerInfo[playerId] : null;
+        var teamSide = info && info.team;
+        if (teamSide !== 'home' && teamSide !== 'away') {
+          try {
+            var params = new URLSearchParams(window.location.search);
+            var myTeam = params.get('my_team');
+            if (myTeam === 'home' || myTeam === 'away') teamSide = myTeam;
+          } catch (e) { /* ignore */ }
+        }
+        if (teamSide !== 'home' && teamSide !== 'away') return null;
+        var colors = (window.gameStore && typeof window.gameStore.getColors === 'function')
+          ? window.gameStore.getColors() : null;
+        var teamColors = colors && (teamSide === 'home' ? colors.home : colors.away);
+        if (!teamColors || !teamColors.primary_color || !teamColors.secondary_color) return null;
+        return {
+          isHome: teamSide === 'home',
+          primaryColor: teamColors.primary_color,
+          secondaryColor: teamColors.secondary_color,
+          name: (info && info.name) || ''
+        };
       };
 
       // applyHeadshotFallback(imgEl, src, initialsInfo)
@@ -6616,9 +6695,10 @@
         return;
       }
       
-      // Set player image
-      image.src = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
-      image.onerror = () => { image.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png'); };
+      // Set player image — team-aware initials fallback when the per-player
+      // photo fails (matches announcement system + v2 on-court sprite rule).
+      const tooltipImgSrc = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
+      applyHeadshotFallback(image, tooltipImgSrc, buildPlaycallInitialsInfo(playerId));
       
       // Energy (NG)
       const ng = stats.NG ?? stats.ng ?? 1.0;
@@ -6709,15 +6789,13 @@
       // Set intended shooter headshot
       if (data.intendedShooterId) {
         const photoUrl = API_CONFIG.buildStaticPath(`/images/players/${data.intendedShooterId}.png`);
-        headshotEl.src = photoUrl;
         headshotEl.style.display = 'block';
-        
-        // Fallback to default if image fails to load
-        headshotEl.onerror = () => {
-          headshotEl.src = API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
-        };
+        // Team-aware initials fallback when the per-player photo fails;
+        // matches the announcement system + v2 on-court sprite rule.
+        applyHeadshotFallback(headshotEl, photoUrl, buildPlaycallInitialsInfo(data.intendedShooterId));
       } else {
         headshotEl.style.display = 'none';
+        clearInitialsFallback(headshotEl);
       }
 
       // Defense type (Man, 2-3 Zone, 3-2 Zone, etc.)

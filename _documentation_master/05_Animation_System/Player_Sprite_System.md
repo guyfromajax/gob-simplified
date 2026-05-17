@@ -158,12 +158,14 @@ v2 uses a two-tier fallback (intentionally narrower than other UIs):
 
 The v1 marker (`USE_MARKER_V2_FEATURES = false`) still uses the 3-tier chain (photo → generic → initials). The `headshot_fallback` preload stays in `preloadPlayerHeadshots.js` to support v1 and any future caller; v2 just doesn't read it.
 
-**Initials tile contrast (v2):** the tile's fill must contrast with the team-color backdrop disc that sits behind it:
+**Initials tile colors (v2):** shared rule across all UI surfaces that fall back to initials (sprite, announcements, Playcall Center):
 
-| Team | Backdrop disc | Initials tile fill | Initials text color |
-| --- | --- | --- | --- |
-| Home | team primary | team **secondary** | team primary |
-| Away | white `0xf5f5f5` | team primary | team secondary |
+| Team | Tile fill | Text color |
+| --- | --- | --- |
+| Home | team **primary** | team **secondary** |
+| Away | team **secondary** | team **primary** |
+
+On the v2 sprite the tile sits in front of the team-color backdrop disc (home backdrop = primary; away = soft white `0xf5f5f5`). Home's tile and backdrop are both primary by design — they blend into a single field while the secondary-color initials remain readable. Away's secondary-color tile contrasts the white backdrop.
 
 The fallback decision happens per player at marker creation time, so individual photo failures don't break the whole court.
 

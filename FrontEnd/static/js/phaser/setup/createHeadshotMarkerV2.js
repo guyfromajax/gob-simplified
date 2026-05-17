@@ -89,11 +89,16 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
     photo.setMask(mask);
     photoChild = photo;
   } else {
-    // Initials tile must contrast with the backdrop disc behind it:
-    //   home backdrop is team primary, so the tile uses secondary; text returns to primary
-    //   away backdrop is white, so the tile stays team primary; text stays secondary
-    const tileColor = isHome ? secondaryColorInt : primary;
-    const tileTextColor = isHome ? teamInfo.primary_color : secondary;
+    // Initials tile — shared color rule across sprites, announcements, and
+    // playcall center:
+    //   Home → tile = team primary,   text = team secondary
+    //   Away → tile = team secondary, text = team primary
+    // Note: on the v2 sprite, the tile sits in front of the team-color backdrop
+    // disc (home backdrop = primary, away = soft white). Home's tile and
+    // backdrop are both primary — they blend by design; the secondary text
+    // remains visible. Away's tile (secondary) contrasts the white backdrop.
+    const tileColor = isHome ? primary : secondaryColorInt;
+    const tileTextColor = isHome ? secondary : teamInfo.primary_color;
     const tile = scene.add.circle(0, 0, headR, tileColor);
     const tileTx = scene.add.text(0, 0, getInitialsFromFullName(player.name), {
       font: '20px "Bebas Neue"',
