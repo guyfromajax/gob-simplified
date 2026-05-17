@@ -37,14 +37,14 @@ export function drawStaminaArc(gfx, headR, stamina) {
   const fillEnd = (startDeg + totalSweep * visualFill) * DEG_TO_RAD;
 
   // Background track (full sweep, dim)
-  gfx.lineStyle(2, 0x000000, 0.35);
+  gfx.lineStyle(4, 0x000000, 0.35);
   gfx.beginPath();
   gfx.arc(0, 0, r, startRad, trackEnd, false);
   gfx.strokePath();
 
   // Foreground stamina fill
   if (visualFill > 0.005) {
-    gfx.lineStyle(2, color, 0.9);
+    gfx.lineStyle(4, color, 0.9);
     gfx.beginPath();
     gfx.arc(0, 0, r, startRad, fillEnd, false);
     gfx.strokePath();

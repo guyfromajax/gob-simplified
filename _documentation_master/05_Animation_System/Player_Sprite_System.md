@@ -111,7 +111,7 @@ Field source: `player.height` (integer inches). See `Game_Init_System.md` → "P
 
 ### Stamina ring
 
-- 2px stroke at `r = headR + 9` (just outside the border)
+- 4px stroke at `r = headR + 9` (just outside the headshot edge)
 - 340° arc with a 20° gap at 12 o'clock
 - Color tiers: green (>0.89) → yellow (≥0.80) → orange (≥0.70) → red (<0.70)
 - Nonlinear fill curve: each color band occupies 25% of the visual arc regardless of underlying NG distribution
