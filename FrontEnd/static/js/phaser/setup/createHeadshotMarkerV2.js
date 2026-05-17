@@ -24,12 +24,6 @@ function ratingBorderTreatment(rating, primaryHex, Phaser) {
   return { width: 3, color: primary, alpha: 0.6 };
 }
 
-function getLastNameFromFullName(fullName) {
-  if (!fullName) return null;
-  const tokens = String(fullName).trim().split(/\s+/);
-  return tokens.length ? tokens[tokens.length - 1].toUpperCase() : null;
-}
-
 function getInitialsFromFullName(fullName) {
   if (!fullName || typeof fullName !== "string") return "?";
   const tokens = fullName.trim().split(/\s+/).filter(Boolean);
@@ -46,14 +40,18 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   const stamina = player.NG ?? player.attributes?.NG;
   const rating = player.rating;          // may be undefined — degrades to default tier
   const heightIn = player.heightInches;   // may be undefined — degrades to default radius
-  const lastName = getLastNameFromFullName(player.name);
+  const isHome = player.team === "home";
 
   const headR = headRadiusForHeight(heightIn);
   const tier = ratingBorderTreatment(rating, teamInfo.primary_color, Phaser);
   const primary = Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color;
   const secondary = teamInfo.secondary_color;
-  const chipY = -(headR + 24);
-  const nameY = +(headR + 24);
+  // Home chip above, away chip below (preserves the v1 placement rule).
+  const chipY = isHome ? -(headR + 24) : +(headR + 24);
+  // Chip styling per team: home = primary fill + secondary text;
+  // away = white fill + primary text (inverse scheme).
+  const chipFillColor = isHome ? primary : 0xffffff;
+  const chipTextColor = isHome ? secondary : teamInfo.primary_color;
 
   // 1. Vignette (3 stacked dark discs)
   const vig3 = scene.add.circle(0, 0, headR + 15, 0x000000, 0.18);
@@ -114,38 +112,19 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   const inner = scene.add.circle(0, 0, headR - 3);
   inner.setStrokeStyle(1, 0x000000, 0.6);
 
-  // 8. Position chip — rounded rect via Graphics; chip is ALWAYS above the head
-  //    in v2 (the v1 home/away above/below rule is retired — team identity is
-  //    carried by the chip + name strip colors).
+  // 8. Position chip — rounded rect via Graphics. Home above / away below;
+  //    home uses primary fill + secondary text, away inverts to white fill + primary text.
   const chipGfx = scene.add.graphics();
-  chipGfx.fillStyle(primary, 1);
+  chipGfx.fillStyle(chipFillColor, 1);
   chipGfx.fillRoundedRect(-21, chipY - 13, 42, 27, 5);
   const chipTx = scene.add.text(0, chipY, position, {
     font: '20px "Bebas Neue"',
-    color: secondary,
+    color: chipTextColor,
     align: "center",
   });
   chipTx.setOrigin(0.5);
 
-  // 9. Name strip — only if a last name can be resolved
-  let nameGfx = null;
-  let nameTx = null;
-  if (lastName) {
-    let display = lastName;
-    if (display.length > 8) display = display.substring(0, 7) + ".";
-    nameGfx = scene.add.graphics();
-    nameGfx.fillStyle(primary, 1);
-    nameGfx.fillRoundedRect(-36, nameY - 10, 72, 21, 4);
-    nameTx = scene.add.text(0, nameY, display, {
-      font: '15px "Bebas Neue"',
-      color: secondary,
-      align: "center",
-    });
-    nameTx.setOrigin(0.5);
-  }
-
   const children = [vig3, vig2, vig1, shadow, photoChild, staminaGfx, border, inner, chipGfx, chipTx];
-  if (nameGfx) children.push(nameGfx, nameTx);
 
   const container = scene.add.container(px, py, children);
   container.setSize(96, 168);

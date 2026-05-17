@@ -67,12 +67,11 @@ Unlike the legacy marker (which inverted fill/border by home/away), the headshot
 
 ## v2 Additions
 
-v2 layers five enhancements on top of the v1 marker. All gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly.
+v2 layers four enhancements on top of the v1 marker. All gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly.
 
 | Feature | Source field | If missing |
 | --- | --- | --- |
 | Vignette | (none) | Always rendered |
-| Name strip | parse `player.name` last token | Strip omitted; rest of marker renders normally |
 | Stamina ring | `player.NG ?? player.attributes?.NG` | Ring omitted (no track, no fill) |
 | Rating-tiered border | `player.rating` (0–99) | Default 3px primary band (same as v1) |
 | Height-linked radius | `player.heightInches` | Default `r = 28.5` (≈ 5'10") |
@@ -101,9 +100,16 @@ Linear 0.75 px/inch around the 6'4" v1 baseline (r=33), clamped 25.5 (≤ 5'6") 
 - Live redraw: `syncSpriteAttributesFromPlayerEnergy` calls `drawStaminaArc` on every animated turn, but only for containers that have `staminaGfx` (i.e., v2 markers). v1/legacy markers skip cleanly.
 - **Low-stamina pulse is intentionally NOT wired.** A future "low-stamina pulse" setting toggle will add `ensureStaminaPulse` to `staminaRing.js`.
 
-### Chip placement change
+### Chip placement and styling
 
-v1 placed the position chip above the head for home players and below for away. v2 retires that rule — **both teams' chips sit above the head**, with the new name strip below. Team identity is carried by the chip + name-strip colors instead of placement.
+v2 preserves v1's home-above / away-below chip placement rule but inverts the chip color scheme per team:
+
+| Team | Placement | Chip fill | Chip text |
+| --- | --- | --- | --- |
+| Home | above head (`y = -(headR + 24)`) | team primary color | team secondary color |
+| Away | below head (`y = +(headR + 24)`) | white (`0xffffff`) | team primary color |
+
+The border ring around the headshot stays in the team primary color for both teams (symmetric — the chip carries the home/away distinction via the inverted fill).
 
 ## Headshot Loading
 
