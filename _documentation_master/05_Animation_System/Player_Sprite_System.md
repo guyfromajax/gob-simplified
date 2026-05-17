@@ -1,6 +1,6 @@
 # Player Sprite System
 
-**Status:** ✅ **PRODUCTION** — v1 headshot marker shipped May 2026. v2 enhancements (vignette, name strip, stamina ring, rating-tiered border, height-linked radius) shipped behind `USE_MARKER_V2_FEATURES`.
+**Status:** ✅ **PRODUCTION** — v1 headshot marker shipped May 2026. v2 enhancements (vignette, stamina ring, height-linked radius, chip-color inversion per team, team-color border dropped) shipped behind `USE_MARKER_V2_FEATURES`.
 
 The player sprite system renders the 10 on-court players as headshot-centered markers and keeps the ball anchored to whichever marker currently has possession. The system is reversible via two feature flags: `USE_HEADSHOT_MARKER` (v1 vs legacy) and `USE_MARKER_V2_FEATURES` (v2 vs v1).
 
@@ -11,7 +11,7 @@ The player sprite system renders the 10 on-court players as headshot-centered ma
 | Marker container origin | `gridToPixels(player.startingCoords)` — i.e., the center of the player's head |
 | Visual diameter (headshot circle) | 66px (radius 33) |
 | Border ring | Retired in v2 — only a thin black hairline (1px, radius `headR - 1`) sits inside the headshot edge for legibility. v1 still uses a 3px team-primary stroke. |
-| Container bounding box | 84×150 (width × height, includes chip + shadow) |
+| Container bounding box | v1: 84×150 · v2: 96×168 (wider/taller for the vignette + stamina ring extents) |
 | Position chip offset | y = ±57 from head center (home above, away below) |
 | Ball attach point | `(sprite.x, sprite.y)` — center of the headshot (offset infrastructure preserved but currently `{0, 0}`) |
 | Feature flags | `USE_HEADSHOT_MARKER` (legacy ↔ v1+) and `USE_MARKER_V2_FEATURES` (v1 ↔ v2) in `markerConfig.js` |
@@ -43,7 +43,7 @@ createPhaserPlayer({ scene, player, teamInfo, position, Phaser })
 | `FrontEnd/static/js/phaser/setup/markerConfig.js` | Feature flags (`USE_HEADSHOT_MARKER`, `USE_MARKER_V2_FEATURES`), ball-attach offset constant, `playerBallPos(sprite, extra)` helper |
 | `FrontEnd/static/js/phaser/setup/preloadPlayerHeadshots.js` | Phaser texture preload + URL normalization (strips `/static/` on netlify) |
 | `FrontEnd/static/js/phaser/setup/createPhaserPlayer.js` | Dispatcher → v2 / v1 / legacy. Holds `createHeadshotMarker` (v1) and `createLegacyMarker` as module-private functions |
-| `FrontEnd/static/js/phaser/setup/createHeadshotMarkerV2.js` | v2 builder: vignette + stamina ring + rating-tiered border + height-linked radius + name strip |
+| `FrontEnd/static/js/phaser/setup/createHeadshotMarkerV2.js` | v2 builder: vignette + stamina ring + height-linked radius + chip-color inversion per team (team-color border ring dropped vs v1) |
 | `FrontEnd/static/js/phaser/setup/staminaRing.js` | `drawStaminaArc(gfx, headR, stamina)` helper. Extracted from the marker builder so `syncPlayerSpriteAttributes.js` can import without a circular dependency. Pure JS, no Phaser dependency. |
 | `FrontEnd/static/js/phaser/setup/loadPhaserPlayers.js` | Iterates roster, calls `createPhaserPlayer`, attaches metadata (`team_id`, `team`, `playerId`, `jersey`, `name`) to each container |
 | `FrontEnd/static/js/phaser/utils/syncPlayerSpriteAttributes.js` | Per-turn NG sync; v2 stamina ring redraws here when `container.staminaGfx` is present |
@@ -102,7 +102,7 @@ v2 preserves v1's home-above / away-below chip placement rule but inverts the ch
 | Home | above head (`y = -(headR + 24)`) | team primary color | team secondary color |
 | Away | below head (`y = +(headR + 24)`) | white (`0xffffff`) | team primary color |
 
-The border ring around the headshot stays in the team primary color for both teams (symmetric — the chip carries the home/away distinction via the inverted fill).
+There is no team-color border ring in v2 — only a 1px black hairline inside the headshot edge for legibility. The chip's inverted fill is the sole home/away color cue.
 
 ## Headshot Loading
 
@@ -253,6 +253,7 @@ These are the fields confirmed on the `player` object passed to `createPhaserPla
 | `team_id` | string | Team identifier (e.g., `"XAVIEN"`) |
 | `pos` | string | Position abbreviation (`"PG"`, `"SG"`, `"SF"`, `"PF"`, `"C"`) |
 | `photo` | string \| null | Image URL (often `/static/images/players/{id}.png`). May need normalization via `preloadPlayerHeadshots`'s helper |
+| `height` | number \| null | **Integer inches.** Wired through `summarize_game_state` and the `/api/game` projection (May 2026). Used by v2 height-linked radius. See `Game_Init_System.md` → "Player-level data ingestion" for the full DB → simData load path. |
 | `startingCoords` | `{ x, y }` | Grid coords (0–100 × 0–50) |
 | `attributes.NG` | number 0–1 | **Stamina / energy.** Lives at `player.NG` or `player.attributes.NG`. Updated per-turn via `syncSpriteAttributesFromPlayerEnergy`. |
 | `attributes.AG` | number | Athleticism (used for movement speed) |
@@ -260,12 +261,12 @@ These are the fields confirmed on the `player` object passed to `createPhaserPla
 
 Fields that do **NOT** exist on simData players (despite living elsewhere in the backend):
 
-- `rating` / `overall` — player rating
-- `heightInches` — height as integer
-- `lastName` — only `name` (full) is provided
-- `photoKey` — texture keys are derived via `headshotTextureKey(playerId)` from `setup/preloadPlayerHeadshots.js`, not stored on the player object
+- `rating` / `overall` — player rating. Backend has per-position ratings (`player.position_ratings`) but no composite rating on the simData projection.
+- `heightInches` — **wrong field name.** Use `player.height` (integer inches; see row above).
+- `lastName` — only `name` (full) is provided. Parse the last whitespace-split token if needed.
+- `photoKey` — texture keys are derived via `headshotTextureKey(playerId)` from `setup/preloadPlayerHeadshots.js`, not stored on the player object.
 
-If a marker feature requires one of these missing fields, the field needs to be propagated from the backend simData first.
+If a marker feature requires a field not on this list, propagate it through `summarize_game_state` and the `/api/game` `players_with_energy` projections — see the recipe in `Game_Init_System.md`.
 
 ## Live Updates
 

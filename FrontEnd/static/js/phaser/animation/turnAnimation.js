@@ -749,24 +749,35 @@ async function runSetupTween({
       continue;
     }
 
-    // Resolve duration: backend per-player game_seconds takes precedence;
-    // fall back to AG-based distance duration for legacy turn payloads.
+    // Resolve duration: backend bring-up contract (grid-based) when present;
+    // always floor with AG×distance so sprites far from assumed start don't jet.
+    const distanceDuration = getPlayerDuration(sprite, x, y);
     const playerGameSeconds = bringupPerPlayer && playerPos
       ? Number(bringupPerPlayer[playerPos])
       : NaN;
     if (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0) {
       logRow.bringupGameSeconds = playerGameSeconds;
     }
-    let duration = (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0)
-      ? Math.max(50, Math.round(playerGameSeconds * clockSecondMs))
-      : getPlayerDuration(sprite, x, y);
+    let duration = distanceDuration;
+    if (Number.isFinite(playerGameSeconds) && playerGameSeconds > 0) {
+      const contractDuration = Math.max(50, Math.round(playerGameSeconds * clockSecondMs));
+      if (contractDuration > duration) {
+        duration = contractDuration;
+      } else if (distanceDuration > contractDuration) {
+        duration = distanceDuration;
+        logRow.durationFloored = "pixel_distance";
+        logRow.contractDurationMs = contractDuration;
+      } else {
+        duration = contractDuration;
+      }
+    }
     // Tiny bringup contract on a short visual move → 50ms jet; use distance-based instead.
     if (
       (isBallCarrier || isStep0BallHandler) &&
       pixelDist < atTargetPixelEps * 2 &&
       duration < 250
     ) {
-      duration = Math.max(duration, getPlayerDuration(sprite, x, y));
+      duration = Math.max(duration, distanceDuration);
       if (duration < 250) {
         sprite.x = x;
         sprite.y = y;
@@ -794,6 +805,17 @@ async function runSetupTween({
         ...logRow,
         atTargetEps,
         turn_index: turnData?.index ?? scene?.currentTurn,
+      });
+    }
+    if (
+      (isBallCarrier || isStep0BallHandler) &&
+      logRow.durationFloored === "pixel_distance"
+    ) {
+      console.warn(HCO_SETUP_TWEEN_TAG, "ball-handler duration floored to pixel distance", {
+        ...logRow,
+        turn_index: turnData?.index ?? scene?.currentTurn,
+        result_type: turnData?.result_type ?? null,
+        from_inbound: setupContext?.fromInbound ?? false,
       });
     }
 
@@ -847,16 +869,23 @@ async function runSetupTween({
           : min,
       null,
     );
+    const pixelFloored = tweened.filter((r) => r.durationFloored === "pixel_distance");
+    const carrierPxPerSec =
+      carrierRow?.pixelDist > 0 && carrierRow?.durationMs > 0
+        ? Number((carrierRow.pixelDist / (carrierRow.durationMs / 1000)).toFixed(0))
+        : null;
     console.warn(
       `${HCO_SETUP_TWEEN_TAG} summary`,
       `snapped=${snapped.length}`,
       `tweened=${tweened.length}`,
+      `pixelFloored=${pixelFloored.length}`,
       `ballOwnerId=${ballOwnerId ?? "?"}`,
       `step0Bh=${step0BallHandlerId ?? "?"}`,
       `ballCarrier=${carrierRow?.action ?? "none"}`,
       `carrierΔ=${carrierRow?.deltaGrid ?? "?"}`,
       `carrierPx=${carrierRow?.pixelDist ?? "?"}`,
       `carrierDur=${carrierRow?.durationMs ?? "?"}`,
+      `carrierPxPerSec=${carrierPxPerSec ?? "?"}`,
       `gridLag=${carrierRow?.gridLag ?? "?"}`,
       `fastestTween=${fastestTween?.pos ?? "?"} ${fastestTween?.durationMs ?? "?"}ms`,
       `fromInbound=${setupContext?.fromInbound ?? false}`,
