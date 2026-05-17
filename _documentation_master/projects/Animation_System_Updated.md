@@ -1,12 +1,13 @@
 # Animation System Updated
 
-> **Status:** Schema **locked**. Migration in progress. Started 2026-05-09; last major update 2026-05-13.
+> **Status:** Schema **locked**. Migration in progress. Started 2026-05-09; last major update 2026-05-17.
 >
 > **Migration progress (high level):**
 > - ✅ **Covert Release Fast Break** — fully migrated; schema-driven via `covert_release_step_emitter.py`. Frontend routes through `playAnimationStep`.
 > - ✅ **DREB** — promoted to its own turn type; `dreb_step_emitter.py` shipped.
+> - ✅ **Rim Runner Fast Break** — schema-driven via `rim_runner_step_emitter.py`. All 5 branches (Shot / STEAL / Bat OOB / Hold-up / Outlet Denied) emit `animation_steps`. Reusable `_build_burst_step` + `_build_outlet_pass_step` builders factored for Triangle's upcoming migration. Frontend routes through `playAnimationStep` when present.
 > - 🟡 **HCO / HCT** — schema emitters exist (`skeleton_step_emitter.py`, `hct_step_emitter.py`) and emit `animation_steps`; frontend routes them through `playAnimationStep` when present. Some legacy paths still fire when emitters return None for missing skeleton/animations.
-> - ⏳ **RR FB, Triangle FB, FCP, Free Throw, BIP/SIP, OREB, Opening Tip, Timeout** — still on legacy frontend animation paths.
+> - ⏳ **Triangle FB, FCP, Free Throw, BIP/SIP, OREB, Opening Tip, Timeout** — still on legacy frontend animation paths.
 >
 > **Context:** This doc proposes the unified per-step payload schema, validates it against every turn type, and tracks the per-turn-type migration as each emitter lands. It succeeds an earlier scoping doc (`Animation_System_Refactor.md`, since removed) that inventoried turn types and surfaced inconsistencies — the inventory has been folded into the schema validation below.
 >
@@ -348,6 +349,74 @@ The outlet pass step's `advance_trigger.metadata` carries `outlet_score` (in add
 - Caller: `phase_resolution.resolve_fast_break_logic` (covert branch); attaches `animation_steps` to the turn payload.
 - Frontend routing: `AnimationEngine.js:302-328`
 - Frontend playback: `animationPlayback.js` (`renderBallTransition`, `runShotAttempt`).
+
+---
+
+## Rim Runner FB emitter — scoping
+
+**Status:** Schema-driven. Implemented in `BackEnd/engine/rim_runner_step_emitter.py`. Frontend takes the new engine when `turnData.fast_break_play === "rim_runner"` and `turnData.animation_steps` is present ([AnimationEngine.js:302-330](../../FrontEnd/static/js/phaser/animation/AnimationEngine.js)).
+
+### Step decomposition (5 terminal branches)
+
+Branches share steps 0–1 (Burst, Outlet pass); outlet-denied forks at step 1.
+
+| Branch | Steps | Terminal `next` |
+|---|---|---|
+| **Outlet → Shot** | 0 Burst → 1 Outlet pass → 2 Lane pass (BH→RR catch; "Fast Break!" announcement) → 3 Shot motion | `turn_stop: SHOT_ATTEMPT` |
+| **Outlet → STEAL** | 0 → 1 → 2 Lane pass intercepted ("Interception!" announcement) | `turn_stop: STEAL` |
+| **Outlet → Bat OOB** | 0 → 1 → 2 Lane pass batted ("Out of bounds!" announcement) | `turn_stop: DEAD_BALL_TURNOVER` |
+| **Outlet → Hold-up → HCO settle** | 0 → 1 → 2 Hold-up lead-in ("No Fast Break" announcement) | implicit end → HCO |
+| **Outlet Denied → HCO settle** | 0 → 1 Defender close-out ("FB Outlet Pass Denied!" announcement) → 2 Receiver cutback + drift → 3 Recovery pass | implicit end → HCO |
+
+Edge case: when rebounder == outlet receiver (`skip_outlet_pass = true`), step 1 is skipped — burst chains directly to the branch's step 2 (or step 1 for outlet-denied).
+
+### Branch dispatch (keyed off `turn_result` flags)
+
+| Flag | Routes to |
+|---|---|
+| `rim_runner_outlet_failed` | Outlet Denied |
+| `rim_runner_no_lane_pass` | Hold-up |
+| `rim_runner_interception` | STEAL |
+| `rim_runner_bat_oob` | Bat OOB |
+| otherwise (`result_type` ∈ {MAKE, MISS, BLOCK, FOUL}) | Shot |
+
+### Reusable builders (for Triangle)
+
+- `_build_burst_step` — Step 0 burst. All burst movers fire in parallel toward `rim_runner_burst_phase.{rr_to, receiver_to, outlet_defender_to, other_players[i]}`; gate = outlet receiver reaches `receiver_to` at default archetype.
+- `_build_outlet_pass_step` — Step 1 outlet pass. Sharp/sloppy rate branch on `outlet_score` (mirrors CR); drift continues for supporting movers through the pass.
+
+Triangle's emitter (next migration) imports both directly — Triangle's lead-in matches RR's burst + outlet exactly; divergence starts at step 2.
+
+### Outlet-denied distance gate (sim)
+
+Outlet defender must be within **10 grid Euclidean** of the outlet passer (rebounder) to claim the denial. Beyond that, the contest auto-succeeds regardless of attribute rolls — denial is geometrically implausible at distance. Enforced in [rim_runner_fast_break.py](../../BackEnd/engine/rim_runner_fast_break.py) at Step A (outlet contest). All RR animation is unaffected by the gate (defender still tweens toward the contest spot in burst step 0); only the sim outcome shifts.
+
+### Step metadata for frontend effects
+
+Per-branch announcement payloads carry headshot card data + decision pill + SFX hints via `Announcement.meta`. All RR announcements are `style: "secondary"`.
+
+| Cue | Step + position | meta |
+|---|---|---|
+| "Fast Break!" + decision pill + FB play subtitle (Shot branch) | step 2 (lane pass) `start.announcement` | `decisionPillText`, `decisionPillTone`, `eventSubtitle` |
+| "Interception!" (STEAL) | step 2 (lane pass intercepted) `end.announcement` | `sfx: "steal"` |
+| "Out of bounds!" (Bat OOB) | step 2 (lane pass batted) `end.announcement` | `text_scroll: "Batted out of bounds."`, `hold_ms: 650` |
+| "No Fast Break" + decision pill (Hold-up) | step 2 (hold-up lead-in) `start.announcement` | `decisionPillText`, `decisionPillTone` |
+| "FB Outlet Pass Denied!" + court SFX (Outlet Denied) | step 1 (defender close-out) `end.announcement` | `sfx: "fb_outlet_denied_court"` |
+
+Intercept / Bat OOB contact-point math (`_compute_interception_contact_grid`) and OOB grid resolution (`_nearest_oob_grid`) are mirrored from the frontend helpers (`resolveFbInterceptionContactGrid`, `resolveNearestOutOfBoundsGrid`) so the backend can stamp `advance_trigger.metadata.contact_coords` (and `oob_coords` for batted) without the frontend recomputing them.
+
+### `hco_setup` (FB → next HCO turn signal)
+
+When the FB ends with the BH (outlet receiver) holding the ball away from the offensive PG (Hold-up or Outlet Denied branches), the emitter stamps `turn_result["hco_setup"] = {"inbound_pass": {from_player_id, to_player_id, from_coords}}`. `game_manager.run_micro_turn` propagates this onto the next HCO turn payload at the turn-append seam. Replaces the historical frontend `scene._rimRunnerHoldUpInboundPass` flag (which had since been removed; the new signal is the backend source of truth). HCO consumer wiring deferred to HCO's full migration — until then, the data rides on the HCO turn payload unread.
+
+### Files
+
+- Emitter: `BackEnd/engine/rim_runner_step_emitter.py`
+- Caller: `phase_resolution.resolve_fast_break_logic` (RR branch); attaches `animation_steps` to the turn payload.
+- Sim: `BackEnd/engine/rim_runner_fast_break.py` (outlet contest distance gate at Step A).
+- HCO setup propagation: `BackEnd/models/game_manager.py` (`run_micro_turn` turn-append seam).
+- Frontend routing: `AnimationEngine.js:302-330` (RR added to `MIGRATED_FB_PLAYS` set).
+- Frontend playback: `animationPlayback.js` (`renderBallTransition`, `runShotAttempt`, `runStepAnnouncement`).
 
 ---
 

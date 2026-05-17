@@ -640,7 +640,1072 @@ def _build_outlet_pass_step(
     return {"start": start, "end": end}
 
 
-# --- Main entry point (stub — branch builders land next) -------------------
+# --- Shot-outcome helpers --------------------------------------------------
+
+
+def _ball_bounce_coords(turn_result: Dict[str, Any]) -> Optional[GridCoord]:
+    bx = turn_result.get("ball_bounce_x")
+    by = turn_result.get("ball_bounce_y")
+    if bx is None or by is None:
+        return None
+    return {"x": float(bx), "y": float(by)}
+
+
+def _resolve_shot_next(turn_result: Dict[str, Any]) -> NextStep:
+    """``next`` pointer for the shot-motion terminal step."""
+    result_type = (turn_result.get("result_type") or "").upper()
+    if result_type in ("MAKE", "MISS", "BLOCK"):
+        return {
+            "kind": "turn_stop",
+            "event": "SHOT_ATTEMPT",
+            "payload": {
+                "result": result_type,
+                "shooter_id": _safe_id(turn_result.get("shooter")),
+                "defender_id": _safe_id(turn_result.get("defender")),
+                "ball_bounce_coords": _ball_bounce_coords(turn_result),
+            },
+        }
+    if result_type == "FOUL":
+        return {
+            "kind": "turn_stop",
+            "event": "FOUL",
+            "payload": {
+                "foul_team": turn_result.get("foul_team"),
+                "fouler_id": turn_result.get("foul_player_id"),
+                "victim_id": turn_result.get("victim_id"),
+            },
+        }
+    return {"kind": "next_step", "index": 999}
+
+
+# --- Branch step builders: Shot branch -------------------------------------
+
+
+def _build_lane_pass_step(
+    *,
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+) -> Optional[AnimationStep]:
+    """Shot branch step 2: lane pass (BH → RR catch).
+
+    Gate: ball reaches RR at catch grid (RR.x_post_burst + 6 toward
+    attacking basket, RR.y_post_burst). RR sprints to catch grid; ball
+    flies passer → catch grid concurrently. Co-arrival at T.
+
+    ``step.start.announcement = "Fast Break!"`` secondary, offense side,
+    passer headshot, decision pill + FB play subtitle.
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    bh_id = _safe_id(phase.get("outlet_receiver_id"))
+    rr_id = _safe_id(phase.get("rr_id"))
+    if not bh_id or not rr_id or bh_id == rr_id:
+        return None
+    if bh_id not in step_start_coords or rr_id not in step_start_coords:
+        return None
+
+    bh_coord = step_start_coords[bh_id]
+    rr_coord = step_start_coords[rr_id]
+    x_dir = -1 if is_away_offense else 1
+    catch_grid: GridCoord = {
+        "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
+        "y": float(rr_coord["y"]),
+    }
+
+    rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
+    rr_rate = _ag_grid_per_game_sec(rr_player, "sprint")
+    t = max(0.3, _traversal_seconds(rr_coord, catch_grid, rr_rate))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[bh_id] = "pass"
+    actions[rr_id] = "receive"
+    archetype[rr_id] = "sprint"
+    destinations[rr_id] = dict(catch_grid)
+    end_coords[rr_id] = dict(catch_grid)
+
+    ball_start: BallState = {
+        "from_player_id": bh_id,
+        "to_player_id": rr_id,
+        "current_coords": dict(bh_coord),
+    }
+    ball_end: BallState = {"owner_player_id": rr_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "from_player_id": bh_id,
+            "to_player_id": rr_id,
+            "target_coords": dict(catch_grid),
+        },
+    }
+
+    bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
+    announcement: Announcement = {
+        "text": "Fast Break!",
+        "team": "away" if is_away_offense else "home",
+        "player_data": _build_player_data(bh_player, fallback_id=bh_id),
+        "meta": {
+            **_decision_pill_meta(turn_result),
+            "eventSubtitle": _fb_play_label(turn_result.get("fast_break_play")),
+        },
+        "hold_ms": 1000,
+        "style": "secondary",
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+        "announcement": announcement,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    return {"start": start, "end": end}
+
+
+def _build_shot_motion_step(
+    *,
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    animations: List[Dict[str, Any]],
+    step_start_coords: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> Optional[AnimationStep]:
+    """Shot branch step 3: shot motion (RR → shot spot). Ends with
+    ``turn_stop: SHOT_ATTEMPT``. Reads end coords from legacy
+    ``animations[]`` since ``shot_manager`` has already computed shot spot
+    + defender spot. Mirrors CR's outcome-step pattern.
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    rr_id = _safe_id(phase.get("rr_id"))
+    if not rr_id or rr_id not in step_start_coords:
+        return None
+
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(step_start_coords[pid]) for pid in step_start_coords
+    }
+    for pid in step_start_coords:
+        anim_end = _movement_end_coord(animations, pid)
+        if anim_end is not None:
+            end_coords[pid] = anim_end
+
+    rr_coord_start = step_start_coords[rr_id]
+    rr_coord_end = end_coords.get(rr_id, rr_coord_start)
+    rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
+    rr_rate = _ag_grid_per_game_sec(rr_player, "sprint")
+    t = max(0.2, _traversal_seconds(rr_coord_start, rr_coord_end, rr_rate))
+
+    defender_id = _safe_id(turn_result.get("defender") or fb_roles.get("defender"))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(end_coords.get(pid, step_start_coords[pid]))
+        for pid in step_start_coords
+    }
+
+    actions[rr_id] = "shoot"
+    archetype[rr_id] = "sprint"
+
+    if defender_id and defender_id in step_start_coords:
+        actions[defender_id] = "guard_ball"
+        archetype[defender_id] = "drive"
+
+    for pid in step_start_coords:
+        if pid in (rr_id, defender_id):
+            continue
+        if _movement_end_coord(animations, pid) is not None:
+            if _is_offense_player(pid, off_lineup):
+                actions[pid] = "cut"
+                archetype[pid] = "sprint"
+            else:
+                actions[pid] = "guard_offball"
+                archetype[pid] = "drive"
+
+    # Clamp non-gate movers via interrupted-coord at archetype rate × t,
+    # mirroring CR's shot-outcome clamp so support players don't teleport.
+    for pid, start_coord in step_start_coords.items():
+        if pid == rr_id:
+            continue
+        target = end_coords.get(pid)
+        if target is None:
+            continue
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, archetype[pid])
+        end_coords[pid] = _interrupted_coord(start_coord, target, rate, t)
+
+    ball_start: BallState = {"owner_player_id": rr_id}
+    ball_end: BallState = {"owner_player_id": rr_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": rr_id,
+            "target_coords": dict(rr_coord_end),
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": _resolve_shot_next(turn_result),
+    }
+    return {"start": start, "end": end}
+
+
+# --- Branch step builders: STEAL & Bat OOB ---------------------------------
+
+
+def _build_lane_pass_intercepted_step(
+    *,
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> Optional[AnimationStep]:
+    """STEAL branch step 2: lane pass intercepted.
+
+    Gate: ball reaches stealer at contact grid (intercept contact point
+    via ``_compute_interception_contact_grid``). RR partial sprint to
+    ``(rr.x + 3 toward basket, rr.y)``; stealer sprint to contact grid.
+
+    ``step.end.announcement = "Interception!"`` secondary defense,
+    stealer headshot, 1000ms hold, steal SFX.
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    bh_id = _safe_id(phase.get("outlet_receiver_id"))
+    rr_id = _safe_id(phase.get("rr_id"))
+    stealer_id = _safe_id(turn_result.get("stealer_id")) or _safe_id(
+        fb_roles.get("defender")
+    )
+    if not bh_id or not rr_id or not stealer_id:
+        return None
+    if bh_id not in step_start_coords or rr_id not in step_start_coords:
+        return None
+    if stealer_id not in step_start_coords:
+        return None
+
+    bh_coord = step_start_coords[bh_id]
+    rr_coord = step_start_coords[rr_id]
+    x_dir = -1 if is_away_offense else 1
+
+    rr_partial: GridCoord = {
+        "x": float(max(4.0, min(97.0, rr_coord["x"] + 3 * x_dir))),
+        "y": float(rr_coord["y"]),
+    }
+    catch_target: GridCoord = {
+        "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
+        "y": float(rr_coord["y"]),
+    }
+    contact_grid = _compute_interception_contact_grid(bh_coord, catch_target)
+
+    stealer_coord = step_start_coords[stealer_id]
+    stealer_player = _player_lookup_by_id(off_lineup, def_lineup, stealer_id)
+    stealer_rate = _ag_grid_per_game_sec(stealer_player, "sprint")
+    t = max(0.3, _traversal_seconds(stealer_coord, contact_grid, stealer_rate))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[bh_id] = "pass"
+    actions[rr_id] = "cut"
+    archetype[rr_id] = "sprint"
+    destinations[rr_id] = dict(rr_partial)
+    end_coords[rr_id] = dict(rr_partial)
+
+    actions[stealer_id] = "guard_ball"
+    archetype[stealer_id] = "sprint"
+    destinations[stealer_id] = dict(contact_grid)
+    end_coords[stealer_id] = dict(contact_grid)
+
+    ball_start: BallState = {
+        "from_player_id": bh_id,
+        "to_player_id": rr_id,
+        "current_coords": dict(bh_coord),
+    }
+    ball_end: BallState = {"owner_player_id": stealer_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "from_player_id": bh_id,
+            "to_player_id": stealer_id,
+            "target_coords": dict(contact_grid),
+            "contact_coords": dict(contact_grid),
+        },
+    }
+
+    defense_team = "home" if is_away_offense else "away"
+    announcement: Announcement = {
+        "text": "Interception!",
+        "team": defense_team,
+        "player_data": _build_player_data(stealer_player, fallback_id=stealer_id),
+        "meta": {"sfx": "steal"},
+        "hold_ms": 1000,
+        "style": "secondary",
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {
+            "kind": "turn_stop",
+            "event": "STEAL",
+            "payload": {"stealer_id": stealer_id, "victim_id": bh_id},
+        },
+        "announcement": announcement,
+    }
+    return {"start": start, "end": end}
+
+
+def _build_lane_pass_batted_step(
+    *,
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> Optional[AnimationStep]:
+    """Bat OOB branch step 2: lane pass batted out of bounds.
+
+    Gate: ``ball_reaches_player`` with player = the batting defender at
+    contact grid (per the decision in Q-A: defender doubles as gate even
+    though they bat rather than catch). RR partial sprint to ``(rr.x + 4
+    toward basket, rr.y)``; defender sprints to contact grid; ball flies
+    BH → contact → drifts to nearest OOB grid (loose at step end).
+
+    ``step.end.announcement = "Out of bounds!"`` secondary neutral, no
+    headshot, 650ms hold, text scroll = "Batted out of bounds."
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    bh_id = _safe_id(phase.get("outlet_receiver_id"))
+    rr_id = _safe_id(phase.get("rr_id"))
+    defender_id = (
+        _safe_id(turn_result.get("defender_id"))
+        or _safe_id(turn_result.get("defender"))
+        or _safe_id(fb_roles.get("defender"))
+    )
+    if not bh_id or not rr_id or not defender_id:
+        return None
+    if bh_id not in step_start_coords or rr_id not in step_start_coords:
+        return None
+    if defender_id not in step_start_coords:
+        return None
+
+    bh_coord = step_start_coords[bh_id]
+    rr_coord = step_start_coords[rr_id]
+    x_dir = -1 if is_away_offense else 1
+
+    rr_partial: GridCoord = {
+        "x": float(max(4.0, min(97.0, rr_coord["x"] + 4 * x_dir))),
+        "y": float(rr_coord["y"]),
+    }
+    catch_target: GridCoord = {
+        "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
+        "y": float(rr_coord["y"]),
+    }
+    contact_grid = _compute_interception_contact_grid(bh_coord, catch_target)
+    oob_grid = _nearest_oob_grid(contact_grid)
+
+    defender_coord = step_start_coords[defender_id]
+    defender_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
+    defender_rate = _ag_grid_per_game_sec(defender_player, "sprint")
+    t = max(0.3, _traversal_seconds(defender_coord, contact_grid, defender_rate))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[bh_id] = "pass"
+    actions[rr_id] = "cut"
+    archetype[rr_id] = "sprint"
+    destinations[rr_id] = dict(rr_partial)
+    end_coords[rr_id] = dict(rr_partial)
+
+    actions[defender_id] = "guard_ball"
+    archetype[defender_id] = "sprint"
+    destinations[defender_id] = dict(contact_grid)
+    end_coords[defender_id] = dict(contact_grid)
+
+    ball_start: BallState = {
+        "from_player_id": bh_id,
+        "to_player_id": rr_id,
+        "current_coords": dict(bh_coord),
+    }
+    ball_end: BallState = {"coords": dict(oob_grid)}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "from_player_id": bh_id,
+            "to_player_id": defender_id,
+            "target_coords": dict(contact_grid),
+            "contact_coords": dict(contact_grid),
+            "oob_coords": dict(oob_grid),
+        },
+    }
+
+    announcement: Announcement = {
+        "text": "Out of bounds!",
+        "team": "neutral",
+        "player_data": None,
+        "meta": {"text_scroll": "Batted out of bounds."},
+        "hold_ms": 650,
+        "style": "secondary",
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {
+            "kind": "turn_stop",
+            "event": "DEAD_BALL_TURNOVER",
+            "payload": {"victim_id": bh_id, "ball_oob_coords": dict(oob_grid)},
+        },
+        "announcement": announcement,
+    }
+    return {"start": start, "end": end}
+
+
+# --- Branch step builders: Hold-up -----------------------------------------
+
+
+def _build_hold_up_step(
+    *,
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> Optional[AnimationStep]:
+    """Hold-up branch step 2: BH settle + supporting drift.
+
+    Gate: BH reaches hold-up spot (``bh.x + 6 toward attacking basket,
+    bh.y ± 8 toward y=25``). Other players drift toward attacking basket
+    at cruise rate; end coords clamped via interrupted-coord at ``rate × T``.
+
+    ``step.start.announcement = "No Fast Break"`` secondary offense, BH
+    headshot, decision pill — only fires when ``rim_runner_no_lane_pass``.
+    Implicit end (next = ``next_step`` past array) — caller transitions to
+    HCO (with optional ``hco_setup`` inbound pass when BH ≠ PG).
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    bh_id = _safe_id(phase.get("outlet_receiver_id"))
+    if not bh_id or bh_id not in step_start_coords:
+        return None
+
+    bh_coord = step_start_coords[bh_id]
+    x_dir = -1 if is_away_offense else 1
+    settle_y_delta = 8.0 if bh_coord["y"] < 25 else -8.0
+    settle_target: GridCoord = {
+        "x": float(max(4.0, min(97.0, bh_coord["x"] + 6 * x_dir))),
+        "y": float(max(1.0, min(49.0, bh_coord["y"] + settle_y_delta))),
+    }
+
+    bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
+    bh_rate = _ag_grid_per_game_sec(bh_player, "default")
+    t = max(0.5, _traversal_seconds(bh_coord, settle_target, bh_rate))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[bh_id] = "handle_ball"
+    archetype[bh_id] = "default"
+    destinations[bh_id] = dict(settle_target)
+    end_coords[bh_id] = dict(settle_target)
+
+    for pid, start_coord in step_start_coords.items():
+        if pid == bh_id:
+            continue
+        drift_target: GridCoord = {
+            "x": float(max(4.0, min(97.0, start_coord["x"] + 40 * x_dir))),
+            "y": float(start_coord["y"]),
+        }
+        destinations[pid] = dict(drift_target)
+        actions[pid] = (
+            "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+        )
+        archetype[pid] = "cruise"
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "cruise")
+        end_coords[pid] = _interrupted_coord(start_coord, drift_target, rate, t)
+
+    ball_start: BallState = {"owner_player_id": bh_id}
+    ball_end: BallState = {"owner_player_id": bh_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": bh_id,
+            "target_coords": dict(settle_target),
+        },
+    }
+
+    no_lane_pass = bool(turn_result.get("rim_runner_no_lane_pass"))
+    announcement: Optional[Announcement] = None
+    if no_lane_pass:
+        announcement = {
+            "text": "No Fast Break",
+            "team": "away" if is_away_offense else "home",
+            "player_data": _build_player_data(bh_player, fallback_id=bh_id),
+            "meta": _decision_pill_meta(turn_result),
+            "hold_ms": 1000,
+            "style": "secondary",
+        }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    if announcement is not None:
+        start["announcement"] = announcement
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": 999},
+    }
+    return {"start": start, "end": end}
+
+
+# --- Branch step builders: Outlet Denied (3 sub-steps) ---------------------
+
+
+def _build_outlet_denied_defender_step(
+    *,
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+) -> Optional[AnimationStep]:
+    """Outlet denied branch step 1: defender close-out beat.
+
+    Gate: outlet defender reaches ``(passer.x + 2 toward basket, passer.y)``.
+    Ball stays with outlet passer (rebounder) — no pass fires.
+
+    ``step.end.announcement = "FB Outlet Pass Denied!"`` secondary defense,
+    defender headshot, 1000ms hold, court SFX.
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    passer_id = _safe_id(phase.get("outlet_passer_id"))
+    receiver_id = _safe_id(phase.get("outlet_receiver_id"))
+    defender_id = _safe_id(phase.get("outlet_defender_id"))
+    if not passer_id or not receiver_id or not defender_id:
+        return None
+    if defender_id not in step_start_coords or passer_id not in step_start_coords:
+        return None
+
+    passer_coord = step_start_coords[passer_id]
+    x_dir = -1 if is_away_offense else 1
+    defender_target: GridCoord = {
+        "x": float(max(4.0, min(97.0, passer_coord["x"] + 2 * x_dir))),
+        "y": float(passer_coord["y"]),
+    }
+
+    defender_coord = step_start_coords[defender_id]
+    defender_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
+    defender_rate = _ag_grid_per_game_sec(defender_player, "default")
+    t = max(0.3, _traversal_seconds(defender_coord, defender_target, defender_rate))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[passer_id] = "handle_ball"
+    actions[defender_id] = "guard_ball"
+    archetype[defender_id] = "default"
+    destinations[defender_id] = dict(defender_target)
+    end_coords[defender_id] = dict(defender_target)
+
+    ball_start: BallState = {"owner_player_id": passer_id}
+    ball_end: BallState = {"owner_player_id": passer_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": defender_id,
+            "target_coords": dict(defender_target),
+        },
+    }
+
+    defense_team = "home" if is_away_offense else "away"
+    announcement: Announcement = {
+        "text": "FB Outlet Pass Denied!",
+        "team": defense_team,
+        "player_data": _build_player_data(defender_player, fallback_id=defender_id),
+        "meta": {"sfx": "fb_outlet_denied_court"},
+        "hold_ms": 1000,
+        "style": "secondary",
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+        "announcement": announcement,
+    }
+    return {"start": start, "end": end}
+
+
+def _build_outlet_denied_cutback_step(
+    *,
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+) -> Optional[AnimationStep]:
+    """Outlet denied branch step 2: receiver cutback + supporting drift.
+
+    Gate: outlet receiver reaches cutback target ``(passer.x, passer.y ± 6
+    toward y=25)``. Other players (except passer / receiver / defender)
+    drift toward attacking basket at cruise rate.
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    passer_id = _safe_id(phase.get("outlet_passer_id"))
+    receiver_id = _safe_id(phase.get("outlet_receiver_id"))
+    defender_id = _safe_id(phase.get("outlet_defender_id"))
+    if not passer_id or not receiver_id:
+        return None
+    if passer_id not in step_start_coords or receiver_id not in step_start_coords:
+        return None
+
+    passer_coord = step_start_coords[passer_id]
+    receiver_coord = step_start_coords[receiver_id]
+    cutback_y_delta = 6.0 if passer_coord["y"] < 25 else -6.0
+    cutback_target: GridCoord = {
+        "x": float(passer_coord["x"]),
+        "y": float(max(1.0, min(49.0, passer_coord["y"] + cutback_y_delta))),
+    }
+
+    receiver_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
+    receiver_rate = _ag_grid_per_game_sec(receiver_player, "default")
+    t = max(0.3, _traversal_seconds(receiver_coord, cutback_target, receiver_rate))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[passer_id] = "handle_ball"
+    actions[receiver_id] = "cut"
+    archetype[receiver_id] = "default"
+    destinations[receiver_id] = dict(cutback_target)
+    end_coords[receiver_id] = dict(cutback_target)
+
+    x_dir = -1 if is_away_offense else 1
+    key_ids = {passer_id, receiver_id, defender_id}
+    for pid, start_coord in step_start_coords.items():
+        if pid in key_ids:
+            continue
+        drift_target: GridCoord = {
+            "x": float(max(4.0, min(97.0, start_coord["x"] + 40 * x_dir))),
+            "y": float(start_coord["y"]),
+        }
+        destinations[pid] = dict(drift_target)
+        actions[pid] = (
+            "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+        )
+        archetype[pid] = "cruise"
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "cruise")
+        end_coords[pid] = _interrupted_coord(start_coord, drift_target, rate, t)
+
+    ball_start: BallState = {"owner_player_id": passer_id}
+    ball_end: BallState = {"owner_player_id": passer_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": receiver_id,
+            "target_coords": dict(cutback_target),
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    return {"start": start, "end": end}
+
+
+def _build_outlet_denied_recovery_pass_step(
+    *,
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_start_coords: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> Optional[AnimationStep]:
+    """Outlet denied branch step 3: recovery pass (passer → receiver after
+    cutback). Uses standard FB pass rate (no outlet_score gating — this is
+    a deliberate post-stabilization pass). Implicit end."""
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    passer_id = _safe_id(phase.get("outlet_passer_id"))
+    receiver_id = _safe_id(phase.get("outlet_receiver_id"))
+    if not passer_id or not receiver_id or passer_id == receiver_id:
+        return None
+    if passer_id not in step_start_coords or receiver_id not in step_start_coords:
+        return None
+
+    passer_coord = step_start_coords[passer_id]
+    receiver_coord = step_start_coords[receiver_id]
+    dist = _euclid(passer_coord, receiver_coord)
+    t = max(0.5, dist / float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND))
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
+    archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in step_start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in step_start_coords.items()
+    }
+
+    actions[passer_id] = "pass"
+    actions[receiver_id] = "receive"
+
+    ball_start: BallState = {
+        "from_player_id": passer_id,
+        "to_player_id": receiver_id,
+        "current_coords": dict(passer_coord),
+    }
+    ball_end: BallState = {"owner_player_id": receiver_id}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "from_player_id": passer_id,
+            "to_player_id": receiver_id,
+            "target_coords": dict(receiver_coord),
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(step_start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": 999},
+    }
+    return {"start": start, "end": end}
+
+
+# --- Post-emit hooks (canonicalize overlays + hco_setup) -------------------
+
+
+def _stamp_hco_setup(
+    turn_result: Dict[str, Any],
+    game: Any,
+    steps: List[AnimationStep],
+) -> None:
+    """When the FB turn ends with the BH (outlet receiver) holding the ball
+    away from the offensive PG (hold-up or outlet-denied branches), stamp
+    ``hco_setup.inbound_pass`` so the next HCO turn can render a BH → PG
+    inbound during HCO step 0.
+
+    Backend-source-of-truth signal (replaces the legacy frontend
+    ``scene._rimRunnerHoldUpInboundPass`` flag). Game manager propagates
+    this onto the next HCO turn payload; HCO consumer reads from there.
+    """
+    needs_inbound = bool(turn_result.get("rim_runner_no_lane_pass")) or bool(
+        turn_result.get("rim_runner_outlet_failed")
+    )
+    if not needs_inbound:
+        return
+
+    fb_roles = turn_result.get("roles") or {}
+    burst_phase = fb_roles.get("rim_runner_burst_phase") or {}
+    bh_id = _safe_id(burst_phase.get("outlet_receiver_id"))
+    if not bh_id:
+        return
+
+    off_team = getattr(game, "offense_team", None)
+    if off_team is None:
+        return
+    pg = (getattr(off_team, "lineup", {}) or {}).get("PG")
+    pg_id = _safe_id(pg)
+    if not pg_id or bh_id == pg_id:
+        return
+
+    from_coords: Optional[GridCoord] = None
+    if steps:
+        last_end = (steps[-1].get("end") or {})
+        last_end_coords = last_end.get("coords") or {}
+        bh_coords = last_end_coords.get(bh_id)
+        if isinstance(bh_coords, dict) and "x" in bh_coords and "y" in bh_coords:
+            from_coords = {"x": float(bh_coords["x"]), "y": float(bh_coords["y"])}
+
+    turn_result["hco_setup"] = {
+        "inbound_pass": {
+            "from_player_id": bh_id,
+            "to_player_id": pg_id,
+            "from_coords": from_coords,
+        }
+    }
+
+
+def _finalize_rr_steps(
+    turn_result: Dict[str, Any],
+    game: Any,
+    steps: List[AnimationStep],
+) -> Optional[List[AnimationStep]]:
+    """Single exit hook for the RR dispatcher. Re-canonicalizes post-shot
+    overlays (factors in the FB-specific ``outlet_passer`` role that
+    ``shot_manager`` didn't know about) and stamps ``hco_setup`` for
+    hold-up / outlet-denied. Returns ``None`` when no steps were built so
+    the caller falls back to legacy rendering."""
+    if not steps:
+        return None
+    try:
+        from BackEnd.utils.shared import canonicalize_post_shot_overlays
+
+        canonicalize_post_shot_overlays(turn_result)
+    except Exception:
+        # Canonicalize is best-effort; failure shouldn't block the steps emit.
+        pass
+    _stamp_hco_setup(turn_result, game, steps)
+    return steps
+
+
+# --- Main entry point: branch dispatcher -----------------------------------
 
 
 def build_rim_runner_animation_steps(
@@ -649,22 +1714,206 @@ def build_rim_runner_animation_steps(
 ) -> Optional[List[AnimationStep]]:
     """Convert a Rim Runner FB ``turn_result`` into ``AnimationStep[]``.
 
-    Returns ``None`` when required data is missing (graceful degradation
-    during parallel-build phase — caller falls back to legacy renderer).
+    Branch dispatch keyed off turn_result flags + ``result_type``:
+        ``rim_runner_outlet_failed`` → Outlet Denied (3 sub-steps after burst)
+        ``rim_runner_no_lane_pass``  → Hold-up
+        ``rim_runner_interception``  → STEAL
+        ``rim_runner_bat_oob``       → Bat OOB
+        otherwise                    → Shot (lane pass + shot motion)
 
-    **STATUS:** Foundation + reusable burst/outlet builders implemented.
-    Branch-specific step builders (shot motion, intercept, bat OOB, hold-up,
-    outlet denied) are TODO; this entry point currently returns ``None`` so
-    callers stay on the legacy path until the branch builders land in the
-    follow-up patch.
+    Returns ``None`` when required data is missing — caller falls back to
+    the legacy renderer.
     """
-    fast_break_play = turn_result.get("fast_break_play")
-    if fast_break_play != "rim_runner":
+    if turn_result.get("fast_break_play") != "rim_runner":
         return None
 
-    # TODO(phase 2): dispatch on
-    #   rim_runner_outlet_failed / rim_runner_no_lane_pass /
-    #   rim_runner_interception / rim_runner_bat_oob / result_type
-    # and assemble the per-branch step list using the reusable builders
-    # above plus branch-specific builders.
-    return None
+    fb_roles = turn_result.get("roles") or {}
+    burst_phase = fb_roles.get("rim_runner_burst_phase")
+    if not burst_phase:
+        return None
+
+    off_team = getattr(game, "offense_team", None)
+    def_team = getattr(game, "defense_team", None)
+    off_lineup = getattr(off_team, "lineup", {}) if off_team else {}
+    def_lineup = getattr(def_team, "lineup", {}) if def_team else {}
+    is_away_offense = bool(
+        fb_roles.get("is_away_offense") or burst_phase.get("is_away_offense")
+    )
+
+    all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
+    if not all_start_coords:
+        return None
+
+    game_state = getattr(game, "game_state", {}) or {}
+    clock_remaining = float(game_state.get("time_remaining", 0) or 0)
+    shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
+
+    outlet_failed = bool(turn_result.get("rim_runner_outlet_failed"))
+    no_lane_pass = bool(turn_result.get("rim_runner_no_lane_pass"))
+    interception = bool(turn_result.get("rim_runner_interception"))
+    bat_oob = bool(turn_result.get("rim_runner_bat_oob"))
+
+    steps: List[AnimationStep] = []
+    elapsed = 0.0
+
+    # Step 0: burst (all branches).
+    burst_step = _build_burst_step(
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        all_start_coords=all_start_coords,
+        is_away_offense=is_away_offense,
+        clock_remaining_at_start=clock_remaining,
+        shot_clock_remaining_at_start=shot_clock_remaining,
+        next_step_index=1,
+    )
+    if burst_step is None:
+        return None
+    steps.append(burst_step)
+    elapsed += float(burst_step["end"]["time_elapsed"])
+    last_end_coords = dict(burst_step["end"]["coords"])
+
+    # Outlet denied: forks at step 1 (no outlet pass; defender close-out instead).
+    if outlet_failed:
+        denied_defender = _build_outlet_denied_defender_step(
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+            next_step_index=2,
+        )
+        if denied_defender is None:
+            return None
+        steps.append(denied_defender)
+        elapsed += float(denied_defender["end"]["time_elapsed"])
+        last_end_coords = dict(denied_defender["end"]["coords"])
+
+        denied_cutback = _build_outlet_denied_cutback_step(
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+            next_step_index=3,
+        )
+        if denied_cutback is None:
+            return _finalize_rr_steps(turn_result, game, steps)
+        steps.append(denied_cutback)
+        elapsed += float(denied_cutback["end"]["time_elapsed"])
+        last_end_coords = dict(denied_cutback["end"]["coords"])
+
+        recovery_pass = _build_outlet_denied_recovery_pass_step(
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        )
+        if recovery_pass is not None:
+            steps.append(recovery_pass)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    # All other branches: outlet pass (unless skip_outlet_pass).
+    skip_outlet_pass = bool(burst_phase.get("skip_outlet_pass"))
+    if not skip_outlet_pass:
+        outlet_step = _build_outlet_pass_step(
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+            next_step_index=2,
+        )
+        if outlet_step is None:
+            return None
+        steps.append(outlet_step)
+        elapsed += float(outlet_step["end"]["time_elapsed"])
+        last_end_coords = dict(outlet_step["end"]["coords"])
+
+    next_idx = len(steps) + 1
+
+    if interception:
+        intercept = _build_lane_pass_intercepted_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        )
+        if intercept is not None:
+            steps.append(intercept)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    if bat_oob:
+        batted = _build_lane_pass_batted_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        )
+        if batted is not None:
+            steps.append(batted)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    if no_lane_pass:
+        hold_up = _build_hold_up_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        )
+        if hold_up is not None:
+            steps.append(hold_up)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    # Shot branch: lane pass + shot motion.
+    lane_pass = _build_lane_pass_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        step_start_coords=last_end_coords,
+        is_away_offense=is_away_offense,
+        clock_remaining_at_start=clock_remaining - elapsed,
+        shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        next_step_index=next_idx,
+    )
+    if lane_pass is None:
+        return None
+    steps.append(lane_pass)
+    elapsed += float(lane_pass["end"]["time_elapsed"])
+    last_end_coords = dict(lane_pass["end"]["coords"])
+
+    shot_motion = _build_shot_motion_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        animations=turn_result.get("animations") or [],
+        step_start_coords=last_end_coords,
+        clock_remaining_at_start=clock_remaining - elapsed,
+        shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+    )
+    if shot_motion is not None:
+        steps.append(shot_motion)
+
+    return _finalize_rr_steps(turn_result, game, steps)

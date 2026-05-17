@@ -835,6 +835,20 @@ class GameManager:
         # This ensures ALL turns have accurate next_turn (no None values)
         _t0 = _time.time()
         result["next_turn"] = self.determine_next_turn(result)
+
+        # Propagate hco_setup from a prior FB turn (RR hold-up / outlet-denied)
+        # to the next HCO turn payload. Backend signal for the BH → PG inbound
+        # pass when the FB ends with the BH (≠ PG) holding the ball. Consumer
+        # is the HCO emitter once it migrates; until then the data is
+        # preserved on the HCO turn for downstream pickup.
+        if (
+            isinstance(result, dict)
+            and result.get("current_turn") == "HCO"
+            and isinstance(previous_result, dict)
+            and previous_result.get("hco_setup")
+        ):
+            result["hco_setup"] = previous_result["hco_setup"]
+
         self._append_turn(result)
         _perf["next_turn_append"] = (_time.time() - _t0) * 1000
 

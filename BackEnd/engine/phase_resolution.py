@@ -1040,7 +1040,27 @@ def resolve_fast_break_logic(game: "GameManager"):
     if rebound and fb_play_key in (RIM_RUNNER, TRIANGLE):
         from BackEnd.engine.rim_runner_fast_break import resolve_rim_runner_fast_break
 
-        return resolve_rim_runner_fast_break(game, fb_play_key)
+        rr_result = resolve_rim_runner_fast_break(game, fb_play_key)
+
+        # Parallel-build: emit unified AnimationStep[] for Rim Runner. Triangle
+        # still uses legacy rendering until its own migration lands. The emitter
+        # internally re-canonicalizes post-shot overlays (for outlet_passer
+        # exemption) and stamps `hco_setup.inbound_pass` on hold-up /
+        # outlet-denied branches when BH != PG.
+        if fb_play_key == "rim_runner":
+            try:
+                from BackEnd.engine.rim_runner_step_emitter import (
+                    build_rim_runner_animation_steps,
+                )
+                anim_steps = build_rim_runner_animation_steps(rr_result, game)
+                if anim_steps is not None:
+                    rr_result["animation_steps"] = anim_steps
+            except Exception as e:
+                logging.warning(
+                    "build_rim_runner_animation_steps failed: %s", e
+                )
+
+        return rr_result
 
     if rebound:
         #resetting last_rebound to avoid carry over bugs

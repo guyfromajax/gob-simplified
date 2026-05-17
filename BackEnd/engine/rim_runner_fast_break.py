@@ -933,23 +933,45 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     fb_roles["defense"] = get_in_play_defenders(ball_handler, def_lineup, is_away_offense)
 
     # --- Step A: outlet contest ---
+    # Distance gate: outlet defender must be within 10 grid Euclidean of the
+    # outlet passer (rebounder) to meaningfully contest the pass. Beyond
+    # that, denial is geometrically implausible — auto-success regardless of
+    # attribute rolls. See Animation_System_Updated.md / Advance_Triggers.md.
+    outlet_within_range = True
+    if outlet_defender and rebounder:
+        rc = getattr(rebounder, "coords", None) or {}
+        dc = getattr(outlet_defender, "coords", None) or {}
+        if (
+            isinstance(rc, dict) and "x" in rc and "y" in rc
+            and isinstance(dc, dict) and "x" in dc and "y" in dc
+        ):
+            dx = float(dc["x"]) - float(rc["x"])
+            dy = float(dc["y"]) - float(rc["y"])
+            if (dx * dx + dy * dy) ** 0.5 > 10.0:
+                outlet_within_range = False
+
     off_attrs = getattr(rebounder, "attributes", {}) if rebounder else {}
     outlet_off_base = (
         off_attrs.get("PS", 0) * 0.5 + off_attrs.get("ST", 0) * 0.3 + off_attrs.get("IQ", 0) * 0.2
     )
     outlet_offense_score = outlet_off_base * random.randint(1, 6)
 
-    if outlet_defender:
+    if outlet_defender and outlet_within_range:
         da = outlet_defender.attributes
         outlet_def_base = da.get("IQ", 0) * 0.5 + da.get("OD", 0) * 0.3 + da.get("ST", 0) * 0.2
         outlet_defense_score = outlet_def_base * random.randint(1, 6)
     else:
         outlet_defense_score = 0.0
 
-    outlet_ok = (
-        (1.5 * outlet_offense_score) + (3 * fb_eff)
-        > outlet_defense_score + (2 * fb_opp)
-    )
+    if not outlet_within_range:
+        # Auto-success when defender is out of range — bypass the inequality
+        # entirely so a zero-zero attribute roll edge case can't trip denial.
+        outlet_ok = True
+    else:
+        outlet_ok = (
+            (1.5 * outlet_offense_score) + (3 * fb_eff)
+            > outlet_defense_score + (2 * fb_opp)
+        )
 
     if not outlet_ok:
         game_state["offensive_state"] = "HCO"
