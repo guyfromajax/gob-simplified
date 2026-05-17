@@ -139,6 +139,12 @@ class Announcement(TypedDict, total=False):
     hold_ms: float
     """Wall-clock duration to keep the world paused (default 1000)."""
 
+    style: Literal["primary", "secondary"]
+    """Optional. ``"primary"`` (default — large centered banner via
+    ``showAnnouncement``) or ``"secondary"`` (compact side banner via
+    ``showSecondaryAnnouncement``). Explicit routing signal — replaces the
+    legacy text-string sniffing in the playback engine. Absent → ``"primary"``."""
+
 
 # --- Step start / end -------------------------------------------------------
 

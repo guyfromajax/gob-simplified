@@ -1097,6 +1097,7 @@ def _build_nice_stop_announcement(
         "team": "defense",
         "player_data": player_data,
         "meta": None,
+        "style": "secondary",
         "hold_ms": 1000,
     }
 

@@ -303,6 +303,9 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
     const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step, turnData);
     const playerData = enrichStepAnnouncementPlayerData(scene, inferredPlayerData, sprites);
     if (isCovertReleaseDefensiveStopAnnouncement(announcement, turnData)) {
+      // Legacy CR override: rewrite "Nice Stop!" → "Great Stop!", play court SFX,
+      // resolve stopper via dedicated builder. Pre-dates the explicit `style`
+      // field; kept for backwards compat with CR emitter output.
       const stopperId =
         playerData?.playerId
         ?? turnData?.stopper_id
@@ -323,6 +326,13 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
         defenseTeam,
         buildSecondaryStopperPlayerData(scene, stopperId, sprites),
         { scene },
+      );
+    } else if (announcement.style === "secondary") {
+      showSecondaryAnnouncement(
+        announcement.text,
+        announcement.team || "neutral",
+        playerData,
+        { ...(announcement.meta || {}), scene },
       );
     } else {
       showAnnouncement(

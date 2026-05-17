@@ -78,24 +78,25 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | distance ÷ `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (=24); floored at 0.5 game-sec |
+| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | distance ÷ pass rate (sharp = `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` = 30; sloppy = 22 hardcoded); floored at 0.5 game-sec |
 | 1 | Shot motion (→ `turn_stop: SHOT_ATTEMPT`) | `player_reaches_position` | shooter (BH; reaches shot spot) | BH traversal time at `sprint` archetype |
 
 #### Branch: Outlet → Defensive Stop
 
 | # | Step | Trigger | Gating player | T |
 |---|---|---|---|---|
-| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | distance ÷ `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (=24); floored at 0.5 game-sec |
+| 0 | Outlet pass | `ball_reaches_player` | outlet receiver | distance ÷ pass rate (sharp = `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` = 30; sloppy = 22 hardcoded); floored at 0.5 game-sec |
 | 1 | Defensive stop motion | `player_reaches_position` | **slower of {BH, defensive stopper}** reaching their stop spot | slower mover's traversal time at `sprint` archetype (BH) / `drive` archetype (stopper) |
 | 2 | Step-back / HCO setup (→ implicit end-of-turn) | `player_reaches_position` | slowest mover (max traversal at drive) | slowest mover's traversal time at `drive` archetype |
 
 **Step 0 (outlet pass) per-player movement:**
 - **Outlet passer** (rebounder): stationary.
 - **Outlet receiver**: stationary at receive spot.
-- **Get-back defenders** (from prior shot's `offense_getback`, if any):
-  - Player 1: tweens to `(receiver.x ± 2 toward attacking basket, receiver.y)` — cuts off the receiver.
-  - Player 2 (if present): tweens to same-side `lowPost` from `HCO_STRING_SPOTS` (`upper lowPost` if `receiver.y > 24`, else `lower lowPost`).
-  - Archetype = `sprint` (14 grid/sec at AG=50; aggressive cut-off pace).
+- **Get-back defenders** (from prior shot's `offense_getback`, if any). Behavior gated on outlet quality:
+  - **Sharp outlet** (`outlet_score >= 50`, 1–2 get-back defenders): **read-to-stop**. Defenders are first split by eligibility — a defender is eligible to attempt the stop only if their x is at-or-past the receiver's x in the attacking direction (home offense: `defender.x >= receiver.x`; away offense: `defender.x <= receiver.x`). Ineligible defenders (behind the receiver in the attacking direction) auto-retreat to defend the basket without rolling. Among eligible defenders, the **closest to the receiver** (Euclidean; exact ties → random) attempts first — their `player_read` score is rolled against threshold `outlet_score × 3`. **Pass** → that defender claims the cut-off stop at `(receiver.x ± 2 toward attacking basket, receiver.y)` and any other get-back defender retreats to basket defense. **Fail** → that defender retreats and the next eligible defender (if any) attempts the read.
+  - **Sloppy outlet** (`outlet_score < 50` or unset, or 0 / 3+ get-back defenders): legacy deterministic behavior — player 1 (in `getback_player_ids` order) takes the cut-off at `(receiver.x ± 2 toward attacking basket, receiver.y)`; player 2 (if present) takes the same-side `lowPost` from `HCO_STRING_SPOTS` (`upper lowPost` if `receiver.y > 24`, else `lower lowPost`).
+  - **Basket-defense retreat spot** (used by any defender who retreats): random spot in the defender box near the attacking rim — home offense: `(87–91, 20–30)`; away offense: `(9–13, 20–30)`. When two defenders both retreat, the second is placed with ≥2 grid offset on both axes from the first to avoid stacking.
+  - Archetype = `sprint` (14 grid/sec at AG=50; aggressive cut-off pace) for all get-back defenders, both branches.
 - **All other players** (non-passer, non-receiver, non-getback — typically 5–7 of them): drift a random **1–6 grid spots toward the attacking basket along x** (y held). Archetype = `cruise` (casual transition pace, not full sprint). They sprint with the play on step 1+; the small drift on step 0 keeps the outlet pass visually focused on the ball + receiver instead of crowding the BH with 6+ sprinters.
 
 **Step 1 end announcement:** `step.end.announcement = "Nice Stop!"` (team: defense, headshot: defensive stopper). Playback engine pauses clocks, shows announcement for `hold_ms = 1000`, resumes, then proceeds to step 2.
@@ -111,7 +112,7 @@ Edge case: when rebounder == release player (no distinct outlet passer), step 0 
 - **All 5 defenders**: mirror with same-lineup-position matchup (def_PG → off_PG's spot, def_SG → off_SG's spot, etc.). The 5 spots form a 2-3 zone footprint by construction.
 
 Notes:
-- Step 0 T is **distance-driven**: `distance ÷ FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (= 24 grid/game-sec; FB-specific so HCO's canonical `PASS_GRID_SPOTS_PER_GAME_SECOND = 36` is unaffected). Floored at 0.5 game-sec so very short passes still register visually. Replaces the earlier `outlet_score`-gated 1.0 / 2.0 fixed-T branches.
+- Step 0 T is **distance-driven**, with pass rate gated on outlet quality. **Sharp outlets** (`fb_roles["outlet_score"] >= 50`) fly at `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` (= 30 grid/game-sec; FB-specific so HCO's canonical `PASS_GRID_SPOTS_PER_GAME_SECOND = 36` is unaffected). **Sloppy outlets** (`outlet_score < 50` or unset) fly at a hardcoded 22 grid/game-sec — the ball hangs in the air longer and the play reads as less crisp. Floored at 0.5 game-sec so very short passes still register visually. Replaces the earlier `outlet_score`-gated **fixed-T** (1.0 / 2.0 second) branches; outlet-quality gating now lives on the *rate* instead.
 - DEFENSIVE_STOP has no schema-vocab `turn_stop` event for "defensive stop" — step 2 ends with `next: next_step` past the array (implicit end of turn). Caller transitions to HCO.
 - Other outcome variants (FOUL / STEAL / DEAD_BALL_TURNOVER) reuse step 1 with `gating_player = BH` and the appropriate `turn_stop` event on `next` — no step 2.
 - HCO BH default = PG. Set-play-specific BH detection (e.g., for plays where the BH is SG or SF) is a future enhancement.
