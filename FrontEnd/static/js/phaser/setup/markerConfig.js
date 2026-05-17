@@ -2,6 +2,11 @@
 // Every behavior change introduced with the headshot marker is gated on this flag.
 export const USE_HEADSHOT_MARKER = true;
 
+// Gates the v2 additions (vignette, name strip, stamina ring, rating-tiered
+// border, height-linked radius). Only meaningful when USE_HEADSHOT_MARKER=true.
+// Flip to false to render the v1 headshot marker exactly.
+export const USE_MARKER_V2_FEATURES = true;
+
 // Ball position offset from the player container's origin (= headshot center
 // in headshot mode, sprite center in legacy mode). Currently {0,0} in both
 // modes — the ball attaches to the sprite center, matching pre-headshot

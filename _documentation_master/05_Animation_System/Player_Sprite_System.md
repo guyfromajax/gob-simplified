@@ -1,8 +1,8 @@
 # Player Sprite System
 
-**Status:** ✅ **PRODUCTION** — headshot marker shipped May 2026.
+**Status:** ✅ **PRODUCTION** — v1 headshot marker shipped May 2026. v2 enhancements (vignette, name strip, stamina ring, rating-tiered border, height-linked radius) shipped behind `USE_MARKER_V2_FEATURES`.
 
-The player sprite system renders the 10 on-court players as headshot-centered markers and keeps the ball anchored to whichever marker currently has possession. The system is reversible via a single feature flag.
+The player sprite system renders the 10 on-court players as headshot-centered markers and keeps the ball anchored to whichever marker currently has possession. The system is reversible via two feature flags: `USE_HEADSHOT_MARKER` (v1 vs legacy) and `USE_MARKER_V2_FEATURES` (v2 vs v1).
 
 ## Quick Facts
 
@@ -14,7 +14,7 @@ The player sprite system renders the 10 on-court players as headshot-centered ma
 | Container bounding box | 84×150 (width × height, includes chip + shadow) |
 | Position chip offset | y = ±57 from head center (home above, away below) |
 | Ball attach point | `(sprite.x, sprite.y)` — center of the headshot (offset infrastructure preserved but currently `{0, 0}`) |
-| Feature flag | `USE_HEADSHOT_MARKER` in `markerConfig.js` |
+| Feature flags | `USE_HEADSHOT_MARKER` (legacy ↔ v1+) and `USE_MARKER_V2_FEATURES` (v1 ↔ v2) in `markerConfig.js` |
 
 ## Architecture
 
@@ -29,17 +29,24 @@ loadPhaserPlayers(scene, allPlayers, Phaser)
     ↓ (per player)
 createPhaserPlayer({ scene, player, teamInfo, position, Phaser })
     ↓
-USE_HEADSHOT_MARKER ? createHeadshotMarker(...) : createLegacyMarker(...)
+   !USE_HEADSHOT_MARKER → createLegacyMarker(...)
+   USE_MARKER_V2_FEATURES → createHeadshotMarkerV2(...)
+   else                   → createHeadshotMarker(...)   ← v1
 ```
+
+**Phaser dependency injection convention:** the `Phaser` namespace is passed *through the args* to `createPhaserPlayer` (and forwarded to v1/v2 builders). It is NOT in scope at module level in any of the setup/ files, so module-private helpers that need `Phaser.Display.Color.HexStringToColor` or similar must take `Phaser` as a parameter. Don't reference `Phaser` from a free function — it'll be `undefined`. Pure-math helpers should avoid Phaser entirely (inline `Math.PI / 180` for `Phaser.Math.DegToRad`, etc.).
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `FrontEnd/static/js/phaser/setup/markerConfig.js` | Feature flag, ball-attach offset constant, `playerBallPos(sprite, extra)` helper |
+| `FrontEnd/static/js/phaser/setup/markerConfig.js` | Feature flags (`USE_HEADSHOT_MARKER`, `USE_MARKER_V2_FEATURES`), ball-attach offset constant, `playerBallPos(sprite, extra)` helper |
 | `FrontEnd/static/js/phaser/setup/preloadPlayerHeadshots.js` | Phaser texture preload + URL normalization (strips `/static/` on netlify) |
-| `FrontEnd/static/js/phaser/setup/createPhaserPlayer.js` | Dispatcher → `createHeadshotMarker` (new) or `createLegacyMarker` (old, preserved verbatim) |
+| `FrontEnd/static/js/phaser/setup/createPhaserPlayer.js` | Dispatcher → v2 / v1 / legacy. Holds `createHeadshotMarker` (v1) and `createLegacyMarker` as module-private functions |
+| `FrontEnd/static/js/phaser/setup/createHeadshotMarkerV2.js` | v2 builder: vignette + stamina ring + rating-tiered border + height-linked radius + name strip |
+| `FrontEnd/static/js/phaser/setup/staminaRing.js` | `drawStaminaArc(gfx, headR, stamina)` helper. Extracted from the marker builder so `syncPlayerSpriteAttributes.js` can import without a circular dependency. Pure JS, no Phaser dependency. |
 | `FrontEnd/static/js/phaser/setup/loadPhaserPlayers.js` | Iterates roster, calls `createPhaserPlayer`, attaches metadata (`team_id`, `team`, `playerId`, `jersey`, `name`) to each container |
+| `FrontEnd/static/js/phaser/utils/syncPlayerSpriteAttributes.js` | Per-turn NG sync; v2 stamina ring redraws here when `container.staminaGfx` is present |
 
 ## Marker Composition (Headshot Mode)
 
@@ -57,6 +64,46 @@ Home team chip sits above the head (y = -57); away team chip sits below (y = +57
 ### Symmetric team colors
 
 Unlike the legacy marker (which inverted fill/border by home/away), the headshot marker uses **the team's own primary color** for both home AND away. The headshot itself carries team identity, so the symmetric border reads more clearly.
+
+## v2 Additions
+
+v2 layers five enhancements on top of the v1 marker. All gate on `USE_MARKER_V2_FEATURES`; flipping to `false` returns to v1 exactly.
+
+| Feature | Source field | If missing |
+| --- | --- | --- |
+| Vignette | (none) | Always rendered |
+| Name strip | parse `player.name` last token | Strip omitted; rest of marker renders normally |
+| Stamina ring | `player.NG ?? player.attributes?.NG` | Ring omitted (no track, no fill) |
+| Rating-tiered border | `player.rating` (0–99) | Default 3px primary band (same as v1) |
+| Height-linked radius | `player.heightInches` | Default `r = 28.5` (≈ 5'10") |
+
+### Height → radius
+
+Linear 0.75 px/inch around the 6'4" v1 baseline (r=33), clamped 25.5 (≤ 5'6") to 39 (≥ 7'0"). Default 28.5 (≈ 5'10") when height is unknown — close to HS roster average so missing-data players don't visually jump when the backend supplies the field later.
+
+### Rating tiers
+
+| Rating | Border |
+| --- | --- |
+| ≥ 80 | 5px team primary, alpha 1.0 |
+| 65–79 | 4px team primary, alpha 1.0 |
+| 40–64 | 3px team primary, alpha 1.0 |
+| 20–39 | 3px team primary, alpha 0.6 |
+| < 20 | 3px desaturated gray (`#6b7280`), alpha 0.85 |
+| missing | 3px team primary, alpha 1.0 (= v1 default) |
+
+### Stamina ring
+
+- 2px stroke at `r = headR + 9` (just outside the border)
+- 340° arc with a 20° gap at 12 o'clock
+- Color tiers: green (>0.89) → yellow (≥0.80) → orange (≥0.70) → red (<0.70)
+- Nonlinear fill curve: each color band occupies 25% of the visual arc regardless of underlying NG distribution
+- Live redraw: `syncSpriteAttributesFromPlayerEnergy` calls `drawStaminaArc` on every animated turn, but only for containers that have `staminaGfx` (i.e., v2 markers). v1/legacy markers skip cleanly.
+- **Low-stamina pulse is intentionally NOT wired.** A future "low-stamina pulse" setting toggle will add `ensureStaminaPulse` to `staminaRing.js`.
+
+### Chip placement change
+
+v1 placed the position chip above the head for home players and below for away. v2 retires that rule — **both teams' chips sit above the head**, with the new name strip below. Team identity is carried by the chip + name-strip colors instead of placement.
 
 ## Headshot Loading
 
@@ -100,13 +147,42 @@ The headshot is clipped to a circle via Phaser's `GeometryMask`. **The mask Grap
 
 Phaser 3.60 has a quirk where a GeometryMask source added as a Container child doesn't reliably inherit the container's world transform during stencil rendering. The stencil writes at scene (0, 0) instead of the container's position, so the masked image becomes invisible at the player's actual on-court location.
 
-### Workaround
+### Workaround — the literal pattern
 
-1. Create the mask `Graphics` at scene level via `scene.add.graphics()` (not `scene.make.graphics({ add: false })`)
-2. Position it initially at `(px, py)`
-3. Hide visually with `setAlpha(0)` — **not** `setVisible(false)`, which short-circuits the stencil write
-4. Register a `scene.events.on('update', syncMask)` handler that updates the mask's `x/y` to match the container every frame
-5. On `container.once('destroy', ...)`, remove the listener and destroy the mask Graphics to prevent leaks
+Copy this exactly. Two non-obvious gotchas to preserve:
+
+```js
+// 1. scene.add.graphics() — NOT scene.make.graphics({ add: false }).
+//    The mask Graphics must be on the scene's display list so its transform
+//    matrix gets updated each frame.
+const maskGraphics = scene.add.graphics();
+
+// 2. fillStyle() BEFORE fillCircle(). Without fillStyle, the Graphics has zero
+//    filled pixels, the stencil writes empty, and the masked content vanishes.
+maskGraphics.fillStyle(0xffffff, 1);
+
+// 3. fillCircle at LOCAL (0, 0), then translate the Graphics via .x/.y to (px, py).
+//    Drawing the circle at (px, py) AND translating to (px, py) produces world
+//    coords of (2*px, 2*py) — mask ends up in the wrong place.
+maskGraphics.fillCircle(0, 0, headR);
+maskGraphics.x = px;
+maskGraphics.y = py;
+
+// 4. setAlpha(0), NOT setVisible(false). Some Phaser render paths short-circuit
+//    on visible:false and skip the stencil write.
+maskGraphics.setAlpha(0);
+
+const mask = maskGraphics.createGeometryMask();
+photo.setMask(mask);
+
+// 5. Sync the Graphics to the container each frame, clean up on destroy.
+const syncMask = () => { maskGraphics.x = container.x; maskGraphics.y = container.y; };
+scene.events.on('update', syncMask);
+container.once('destroy', () => {
+  scene.events.off('update', syncMask);
+  if (maskGraphics.scene) maskGraphics.destroy();
+});
+```
 
 This is reliable but adds ~10 per-frame property assignments (one per on-court marker). Negligible perf impact.
 

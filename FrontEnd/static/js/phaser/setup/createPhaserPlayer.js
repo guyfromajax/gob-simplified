@@ -1,11 +1,13 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { USE_HEADSHOT_MARKER } from "./markerConfig.js";
+import { USE_HEADSHOT_MARKER, USE_MARKER_V2_FEATURES } from "./markerConfig.js";
 import { headshotTextureKey, HEADSHOT_FALLBACK_KEY } from "./preloadPlayerHeadshots.js";
+import { createHeadshotMarkerV2 } from "./createHeadshotMarkerV2.js";
 
 export function createPhaserPlayer(args) {
-  return USE_HEADSHOT_MARKER
-    ? createHeadshotMarker(args)
-    : createLegacyMarker(args);
+  if (!USE_HEADSHOT_MARKER) return createLegacyMarker(args);
+  return USE_MARKER_V2_FEATURES
+    ? createHeadshotMarkerV2(args)
+    : createHeadshotMarker(args);
 }
 
 function createLegacyMarker({ scene, player, teamInfo, position, Phaser }) {

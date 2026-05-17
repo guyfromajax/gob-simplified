@@ -3,6 +3,9 @@
  * Engine: attributes.AG ≈ floor(anchor_AG * NG). We mirror that using anchor from roster payload + per-turn NG from player_energy.
  */
 
+import { USE_MARKER_V2_FEATURES } from "../setup/markerConfig.js";
+import { drawStaminaArc } from "../setup/staminaRing.js";
+
 const MOVEMENT_ANCHOR_KEY = "_agMovementAnchor";
 
 /**
@@ -32,6 +35,7 @@ export function attachMovementAttributeAnchor(player, sprite) {
 
 /**
  * After each turn, apply NG from turn.player_energy and rescale AG on sprites (active lineup).
+ * Also redraws the v2 marker's stamina ring when v2 features are enabled.
  * @param {Record<string, object>} playerSprites - id -> container
  * @param {Record<string, { NG?: number }>} playerEnergy - from turn.player_energy
  */
@@ -46,15 +50,20 @@ export function syncSpriteAttributesFromPlayerEnergy(playerSprites, playerEnergy
     if (!Number.isFinite(ng)) continue;
 
     const anchor = sprite[MOVEMENT_ANCHOR_KEY];
-    if (!Number.isFinite(Number(anchor))) continue;
-
-    const newAg = Math.floor(Number(anchor) * ng);
-    if (!sprite.attributes || typeof sprite.attributes !== "object") {
-      sprite.attributes = {};
-    } else {
-      sprite.attributes = { ...sprite.attributes };
+    if (Number.isFinite(Number(anchor))) {
+      const newAg = Math.floor(Number(anchor) * ng);
+      if (!sprite.attributes || typeof sprite.attributes !== "object") {
+        sprite.attributes = {};
+      } else {
+        sprite.attributes = { ...sprite.attributes };
+      }
+      sprite.attributes.AG = newAg;
+      sprite.attributes.NG = ng;
     }
-    sprite.attributes.AG = newAg;
-    sprite.attributes.NG = ng;
+
+    // v2 stamina ring redraw — guarded so v1/legacy markers (no staminaGfx) skip cleanly.
+    if (USE_MARKER_V2_FEATURES && sprite.staminaGfx) {
+      drawStaminaArc(sprite.staminaGfx, sprite.headR, ng);
+    }
   }
 }
