@@ -6233,8 +6233,8 @@
 
       // Build (or reuse) a sibling initials tile next to the failed img.
       // Color rule (shared across sprites, announcements, playcall center):
-      //   Home → tile = team primary,   text = team secondary
-      //   Away → tile = team secondary, text = team primary
+      //   Home → tile = team primary, text = team secondary
+      //   Away → tile = white,        text = team primary
       var renderInitialsFallback = function(imgEl, info) {
         if (!imgEl || !imgEl.parentNode) return;
         var parent = imgEl.parentNode;
@@ -6243,8 +6243,8 @@
         var tile = document.createElement('div');
         tile.className = 'ann-headshot-initials';
         var isHome = !!info.isHome;
-        tile.style.backgroundColor = isHome ? (info.primaryColor   || '#333') : (info.secondaryColor || '#fff');
-        tile.style.color           = isHome ? (info.secondaryColor || '#fff') : (info.primaryColor   || '#333');
+        tile.style.backgroundColor = isHome ? (info.primaryColor   || '#333') : '#ffffff';
+        tile.style.color           = isHome ? (info.secondaryColor || '#fff') : (info.primaryColor || '#333');
         tile.textContent = computeAnnouncementInitials(info.name);
         parent.appendChild(tile);
       };

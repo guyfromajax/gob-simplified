@@ -30,7 +30,6 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
 
   const headR = headRadiusForHeight(heightIn);
   const primary = Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color;
-  const secondaryColorInt = Phaser.Display.Color.HexStringToColor(teamInfo.secondary_color).color;
   const secondary = teamInfo.secondary_color;
   // Home chip above, away chip below (preserves the v1 placement rule).
   const chipY = isHome ? -(headR + 24) : +(headR + 24);
@@ -91,13 +90,14 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   } else {
     // Initials tile — shared color rule across sprites, announcements, and
     // playcall center:
-    //   Home → tile = team primary,   text = team secondary
-    //   Away → tile = team secondary, text = team primary
+    //   Home → tile = team primary, text = team secondary
+    //   Away → tile = white,        text = team primary
     // Note: on the v2 sprite, the tile sits in front of the team-color backdrop
     // disc (home backdrop = primary, away = soft white). Home's tile and
     // backdrop are both primary — they blend by design; the secondary text
-    // remains visible. Away's tile (secondary) contrasts the white backdrop.
-    const tileColor = isHome ? primary : secondaryColorInt;
+    // remains visible. Away's white tile sits over the soft-white backdrop
+    // for a clean white field that the primary-color initials read against.
+    const tileColor = isHome ? primary : 0xffffff;
     const tileTextColor = isHome ? secondary : teamInfo.primary_color;
     const tile = scene.add.circle(0, 0, headR, tileColor);
     const tileTx = scene.add.text(0, 0, getInitialsFromFullName(player.name), {

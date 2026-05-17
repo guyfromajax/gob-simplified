@@ -348,3 +348,57 @@ A future iteration will expose user-facing sprite display settings, allowing pla
 - Legacy circle with position text + jersey number above/below
 
 When the user picks the no-headshot option, the legacy inverted color scheme (home: primary fill + secondary border; away: white fill + primary border) returns. The symmetric team-primary border described above is specific to the headshot mode.
+
+---
+
+## Color Schemes for Non-Headshot Players
+
+When a player has no available photo, the UI renders a **team-aware initials tile** in place of the headshot. The same color rule is shared across every surface that shows player headshots, so a player whose photo is missing reads consistently whether they appear on the court, in an announcement, or in the Playcall Center.
+
+### Shared color rule
+
+| Team | Tile fill | Text color |
+| --- | --- | --- |
+| **Home** | team **primary** | team **secondary** |
+| **Away** | team **white** | team **primary** |
+<!-- | **Away** | team **secondary** | team **primary** | -->
+
+Initials are the player's first + last initial (e.g. `JD`). If the name can't be parsed, `?` is shown. Text always uses Bebas Neue at 400 weight.
+
+### Surfaces that use this rule
+
+| Surface | Container | Tile dimensions | Font size |
+| --- | --- | --- | --- |
+| On-court sprite (v2) | inside `headR`-radius mask | matches `headR` × 2 (variable by height) | 20px |
+| Announcement — primary portrait | `.ann-portrait-zone` | 100 × 130 | 44px |
+| Announcement — secondary ribbon | `.sec-headshot` | 48 × 48 | 22px |
+| Announcement — foul card shooter / fouler | `.ann-portrait-zone` | 100 × 130 | 44px |
+| Playcall Center — play option | `.play-headshot-wrap` | 38 × 38 | 18px |
+| Playcall Center — reveal HUD | `.hud-headshot-container` | 70 × 70 | 30px |
+| Playcall Center — player tooltip | `.tooltip-image-wrap` | 60 × 60 | 28px |
+
+Foul cards resolve each headshot's team independently — the shooter and fouler are always on opposite teams, so each tile applies its own home/away rule.
+
+### Where this is implemented
+
+| Layer | Function | Location |
+| --- | --- | --- |
+| Sprite (v2) | inline initials path inside `createHeadshotMarkerV2` | [`setup/createHeadshotMarkerV2.js`](../../FrontEnd/static/js/phaser/setup/createHeadshotMarkerV2.js) |
+| Announcements | `buildHeadshotInitialsInfo(player, teamSide)` → attached as `headshotInitials` / `shooterHeadshotInitials` / `foulerHeadshotInitials` on the overlay payload | [`utils/announcements.js`](../../FrontEnd/static/js/phaser/utils/announcements.js) |
+| Playcall Center | `window.buildPlaycallInitialsInfo(playerId)` reads `currentGameScene.playerInfo` + `gameStore.getColors()` | inline in `court.html` |
+| Shared renderer | `applyHeadshotFallback(imgEl, src, initialsInfo)` → `renderInitialsFallback()` | inline in `court.html` |
+
+If `initialsInfo` is unresolvable (missing team colors or a non-user team), `applyHeadshotFallback` falls through to `generic_headshot.png` so no surface ever shows a broken-image icon.
+
+### Legacy sprite mode (no headshot at all)
+
+Distinct from the "missing photo" case above — the legacy marker is selected by flipping `USE_HEADSHOT_MARKER = false` in `markerConfig.js`. It renders no photo for any player. Its color scheme inverts by team:
+
+| Team | Circle fill | Border | Position text | Jersey text |
+| --- | --- | --- | --- | --- |
+| **Home** | team **primary** | team **secondary** | team **secondary** | team **secondary** (above head) |
+| **Away** | white (`0xffffff`) | team **primary** | team **primary** | team **primary** (below head) |
+
+Geometry: 24-radius circle (~48px diameter), 3px stroke. Position abbreviation centered inside, jersey number above (home) or below (away). No vignette, no stamina ring, no inside-mask backdrop.
+
+This mode is preserved verbatim from pre-headshot code. It will return as an opt-in choice when the user-facing sprite settings ship — see "Future Work" above.
