@@ -100,64 +100,33 @@ export function buildSecondaryStopperPlayerData(scene, stopperId, sprites = null
   };
 }
 
-function buildAnnouncementPlayerLabel(playerData) {
-  if (!playerData) return '';
-  const rosterPlayer = findRosterPlayer(playerData.playerId);
-  const jersey = getPlayerJerseyValue(rosterPlayer || playerData);
-  const lastName = getPlayerLastName(rosterPlayer || playerData);
-  if (!jersey && !lastName) return '';
-  if (!jersey) return lastName;
-  if (!lastName) return `#${jersey}`;
-  return `#${jersey} ${lastName}`;
-}
-
-function createPlayerAnnouncementCard(playerData, scale = 1.0) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'announcement-player-card';
-  wrapper.style.display = 'flex';
-  wrapper.style.flexDirection = 'column';
-  wrapper.style.alignItems = 'center';
-  wrapper.style.justifyContent = 'flex-start';
-  wrapper.style.gap = `${Math.max(4, Math.round(6 * scale))}px`;
-  wrapper.style.flexShrink = '0';
-
-  const container = document.createElement('div');
-  container.className = 'announcement-headshot';
-  container.style.width = `${60 * scale}px`;
-  container.style.height = `${60 * scale}px`;
-  container.style.flexShrink = '0';
-  container.style.backgroundColor = playerData.secondaryColor || '#333333';
-  container.style.backgroundSize = 'cover';
-  container.style.backgroundPosition = 'center';
-
-  const img = document.createElement('img');
-  img.src = getPlayerImageUrl(playerData.photo, playerData.playerId);
-  img.alt = 'Player';
-  img.style.width = '100%';
-  img.style.height = '100%';
-  img.style.objectFit = 'cover';
-  img.onerror = () => {
-    img.src = getPlayerImageUrl(null, null);
-  };
-  container.appendChild(img);
-  wrapper.appendChild(container);
-
-  const labelText = buildAnnouncementPlayerLabel(playerData);
-  if (labelText) {
-    const label = document.createElement('div');
-    label.className = 'announcement-player-label';
-    label.textContent = labelText;
-    label.style.fontSize = `${Math.max(0.7, 0.85 * scale)}rem`;
-    label.style.fontWeight = '700';
-    label.style.lineHeight = '1';
-    label.style.textAlign = 'center';
-    label.style.color = '#ffffff';
-    label.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.8)';
-    label.style.whiteSpace = 'nowrap';
-    wrapper.appendChild(label);
+/**
+ * Build the team-aware initials-tile descriptor that court.html's
+ * applyHeadshotFallback consumes when a per-player photo fails to load.
+ * Mirrors the v2 on-court sprite fallback rule (home → tile=secondary/text=primary,
+ * away → tile=primary/text=secondary). Returns null when team colors or name are
+ * unresolvable — applyHeadshotFallback then falls back to generic_headshot.png.
+ *
+ * @param {Object|null} player - Roster or playerData object (used for name resolution)
+ * @param {'home'|'away'|string} teamSide - Which team the player is on
+ * @returns {{isHome:boolean, primaryColor:string, secondaryColor:string, name:string}|null}
+ */
+function buildHeadshotInitialsInfo(player, teamSide) {
+  const side = teamSide === 'home' ? 'home' : (teamSide === 'away' ? 'away' : null);
+  if (!side) return null;
+  const colors = gameStore.getColors();
+  const teamColors = side === 'home' ? colors?.home : colors?.away;
+  if (!teamColors?.primary_color || !teamColors?.secondary_color) return null;
+  let name = player?.name;
+  if (!name && (player?.first_name || player?.last_name)) {
+    name = `${player.first_name || ''} ${player.last_name || ''}`.trim();
   }
-
-  return wrapper;
+  return {
+    isHome: side === 'home',
+    primaryColor: teamColors.primary_color,
+    secondaryColor: teamColors.secondary_color,
+    name: name || '',
+  };
 }
 
 /** Build player image URL with static prefix (localhost vs production). Prefer explicit photo; else /players/{playerId}.png when id known; else generic. Card img onerror maps to generic. */
@@ -197,13 +166,18 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   const foulerRoster = foulPlayerData ? findRosterPlayer(foulPlayerData.playerId) : null;
   const shooter = shooterRoster || shooterData;
   const fouler = foulerRoster || foulPlayerData;
+  // Shooter is on `team`; fouler is by definition on the opposite team.
+  const shooterTeamSide = team === 'away' ? 'away' : 'home';
+  const foulerTeamSide = shooterTeamSide === 'home' ? 'away' : 'home';
   const data = {
     type: 'foul',
     foulEventText: "It's Good!",
     shooterPhotoUrl: getPlayerImageUrl(shooterData?.photo, shooterData?.playerId),
+    shooterHeadshotInitials: shooterData ? buildHeadshotInitialsInfo(shooter, shooterTeamSide) : null,
     shooterJersey: getPlayerJerseyValue(shooter) ? `#${getPlayerJerseyValue(shooter)}` : '',
     shooterLastName: getPlayerLastName(shooter) || '',
     foulerPhotoUrl: getPlayerImageUrl(foulPlayerData?.photo, foulPlayerData?.playerId),
+    foulerHeadshotInitials: foulPlayerData ? buildHeadshotInitialsInfo(fouler, foulerTeamSide) : null,
     foulerJersey: getPlayerJerseyValue(fouler) ? `#${getPlayerJerseyValue(fouler)}` : '',
     foulerLastName: getPlayerLastName(fouler) || '',
   };
@@ -211,16 +185,6 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
   }
-}
-
-/**
- * Helper to create headshot element
- * @param {Object} playerData - { playerId, photo, teamName, secondaryColor }
- * @param {number} scale - Size multiplier (1.0 = full, 0.6 = 60%)
- * Headshot background uses team secondary color (no team background image).
- */
-function createHeadshotElement(playerData, scale = 1.0) {
-  return createPlayerAnnouncementCard(playerData, scale);
 }
 
 /**
@@ -274,6 +238,7 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     eventText: text || '',
     eventSubtitle: typeof meta?.eventSubtitle === 'string' ? meta.eventSubtitle : '',
     photoUrl,
+    headshotInitials: playerData ? buildHeadshotInitialsInfo(player, team) : null,
     jersey: jerseyVal ? `#${jerseyVal}` : '',
     lastName,
     teamColor: resolveSecondaryStripeColor(team),
@@ -374,6 +339,7 @@ export function showAnnouncement(text, team = 'home', playerData = null, meta = 
     type: 'standard',
     eventText: text || '',
     photoUrl,
+    headshotInitials: playerData ? buildHeadshotInitialsInfo(player, team) : null,
     jersey: jerseyVal ? `#${jerseyVal}` : '',
     lastName: getPlayerLastName(player) || '',
     position: getPlayerPosition(player) || '',

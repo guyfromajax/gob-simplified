@@ -247,8 +247,13 @@ When a steal leads to a fast break:
   1. Explicit `photo` path on the caller's `playerData` (if provided).
   2. `/images/players/{playerId}.png` (resolved via `API_CONFIG.buildStaticPath` so localhost/production paths both work) when a `playerId` is available.
   3. `generic_headshot.png` when no `playerId` is supplied.
-- The image element in `court.html` (both primary and secondary tiers) applies an `onerror` handler via `applyHeadshotFallback()` that falls back to `generic_headshot.png`, so bad or missing portrait paths degrade cleanly without a broken-image icon.
-- Jersey and last name are resolved by `buildAnnouncementPlayerLabel()` / `getPlayerJerseyValue()` / `getPlayerLastName()` from `gameStore` rosters or the passed `playerData`. The primary overlay displays `#jersey lastName` in the portrait caption; the secondary ribbon shows them stacked in the chip (`#jersey` above last name).
+- **Fallback when the per-player photo fails to load:** The image element in `court.html` (both primary and secondary tiers) applies an `onerror` handler via `applyHeadshotFallback(imgEl, src, initialsInfo)`. When `initialsInfo` is supplied (the standard case for any announcement built by `showAnnouncement`, `showSecondaryAnnouncement`, or `showAndOneAnnouncement`), the failed `<img>` is hidden and replaced with a sibling `<div class="ann-headshot-initials">` showing the player's initials. Colors mirror the v2 on-court sprite rule (see `Player_Sprite_System.md` → "Initials tile contrast"):
+  - **Home** player → tile fill = team **secondary**, text = team **primary**
+  - **Away** player → tile fill = team **primary**, text = team **secondary**
+- Each headshot resolves its own team independently — important in the foul card where shooter and fouler are on opposite teams; each side gets its own initials-tile color rule.
+- The `initialsInfo` descriptor (`{isHome, primaryColor, secondaryColor, name}`) is built per-headshot by `buildHeadshotInitialsInfo(player, teamSide)` in `announcements.js` and attached to the overlay payload as `headshotInitials` (primary/secondary single-player) or `shooterHeadshotInitials` / `foulerHeadshotInitials` (foul card).
+- If `initialsInfo` is unresolvable (no team colors in `gameStore`, or `applyHeadshotFallback` called without it), the legacy generic-headshot fallback still runs — no broken-image icon either way.
+- Jersey and last name are resolved by `getPlayerJerseyValue()` / `getPlayerLastName()` from `gameStore` rosters or the passed `playerData`. The primary overlay displays `#jersey lastName` in the portrait caption; the secondary ribbon shows them stacked in the chip (`#jersey` above last name).
 - If no player data is provided (no `photoUrl` and no `lastName` in the payload), both tiers collapse their player column and center the headline (`.no-player` state).
 
 ### Key Files
@@ -268,7 +273,8 @@ When a steal leads to a fast break:
   - `showAnnouncement(text, team, playerData, meta)` — Builds **primary** standard payload and calls `window.showAnnouncementOverlay(data)`.
   - `showSecondaryAnnouncement(text, team, playerData, meta)` — Builds **secondary** payload (`tier: 'secondary'`), resolves the team primary color via `gameStore.getColors()` (`resolveSecondaryStripeColor`), and calls `window.showAnnouncementOverlay(data)`.
   - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` — Builds primary foul-card payload.
-  - `getPlayerImageUrl(photo, playerId)` — Uses explicit portrait paths when provided; otherwise falls back to `generic_headshot.png` (with an `onerror` fallback applied in `court.html`).
+  - `getPlayerImageUrl(photo, playerId)` — Uses explicit portrait paths when provided; otherwise falls back to `generic_headshot.png`. When the resolved URL fails to load, `court.html`'s `applyHeadshotFallback` swaps in the team-aware initials tile (see "Player images and labels" above).
+  - `buildHeadshotInitialsInfo(player, teamSide)` — Resolves `{isHome, primaryColor, secondaryColor, name}` from `gameStore.getColors()` + the player record. Used by all three `show*Announcement` builders to attach the `headshotInitials` payload that `applyHeadshotFallback` consumes on photo-load failure.
   - `playAnnouncementSfx(kind)` — Plays `whistle-3.mp3` for `'shot_clock_violation'`, otherwise `whistle-1-lowervol.wav` at volume 0.7.
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
