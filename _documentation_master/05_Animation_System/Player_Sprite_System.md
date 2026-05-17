@@ -149,11 +149,16 @@ This normalization is critical — without it, prod players 404 because `/static
 
 ### Fallback chain
 
-1. If `headshot_${playerId}` exists in the texture manager → use it
-2. Else if `headshot_fallback` exists → render the generic headshot (clipped to the same circle)
-3. Else (rare — both URLs failed) → render an initials tile with the player's first + last initials (e.g. `JD`) in Bebas Neue 20px
+v2 uses a two-tier fallback (intentionally narrower than other UIs):
 
-**Initials tile contrast (v2):** the tile's fill must contrast with the new team-color backdrop disc that sits behind it:
+1. If `headshot_${playerId}` exists in the texture manager → use it
+2. Else → render the team-aware initials tile with the player's first + last initials (e.g. `JD`) in Bebas Neue 20px
+
+**Why v2 skips the generic-headshot fallback:** other UI surfaces (announcements, Playcall Center, defense matchups, etc.) fall through to `generic_headshot.png` so a missing photo still shows a placeholder face. The on-court v2 marker deliberately routes to initials instead so each player on the court stays visually distinct — a court full of identical generic faces was the failure mode this avoids.
+
+The v1 marker (`USE_MARKER_V2_FEATURES = false`) still uses the 3-tier chain (photo → generic → initials). The `headshot_fallback` preload stays in `preloadPlayerHeadshots.js` to support v1 and any future caller; v2 just doesn't read it.
+
+**Initials tile contrast (v2):** the tile's fill must contrast with the team-color backdrop disc that sits behind it:
 
 | Team | Backdrop disc | Initials tile fill | Initials text color |
 | --- | --- | --- | --- |

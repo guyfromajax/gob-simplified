@@ -1,5 +1,5 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { headshotTextureKey, HEADSHOT_FALLBACK_KEY } from "./preloadPlayerHeadshots.js";
+import { headshotTextureKey } from "./preloadPlayerHeadshots.js";
 import { drawStaminaArc } from "./staminaRing.js";
 
 // Height in inches → headshot radius. Linear 0.75 px/inch around the 6'4" v1
@@ -71,17 +71,19 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   maskGraphics.setAlpha(0);
   const mask = maskGraphics.createGeometryMask();
 
-  // 4. Headshot — three-tier fallback (photo → generic → initials tile).
+  // 4. Headshot — two-tier fallback (per-player photo → initials tile).
+  //    v2 skips the generic-headshot fallback that other UIs (announcements,
+  //    playcall center, etc.) and the v1 marker still use; missing photos
+  //    surface as the team-aware initials tile so each marker stays uniquely
+  //    identifiable on the court.
   //    The initials path uses a colored circle which is already circular,
   //    so it does not need a mask.
   const photoKey = playerId ? headshotTextureKey(playerId) : null;
   const hasPhotoTexture = !!photoKey && scene.textures && scene.textures.exists(photoKey);
-  const hasFallbackTexture = scene.textures && scene.textures.exists(HEADSHOT_FALLBACK_KEY);
 
   let photoChild;
-  if (hasPhotoTexture || hasFallbackTexture) {
-    const textureKey = hasPhotoTexture ? photoKey : HEADSHOT_FALLBACK_KEY;
-    const photo = scene.add.image(0, 0, textureKey);
+  if (hasPhotoTexture) {
+    const photo = scene.add.image(0, 0, photoKey);
     photo.setDisplaySize(headR * 2, headR * 2);
     photo.setOrigin(0.5, 0.55);
     photo.setMask(mask);
