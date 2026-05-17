@@ -136,6 +136,12 @@ Court event stingers are **in scope** for the secondary announcement ribbon and 
 - Trigger: immediately when the FB Outlet Denied Announce appears.
 - File: `duke-denied.wav`
 
+**No Fast Break Announce**
+
+- Trigger: immediately when the **No Fast Break** secondary announce appears (RR FB hold-up branch, step 2 start in `rim_runner_step_emitter.py`).
+- File: `duke-hold-up.wav`
+- Wiring: fires from `runStepAnnouncement` in `animationPlayback.js` when the schema-emitted announcement text matches `No Fast Break`. Audio instance stashed on `scene._activeSfx` until `ended` / `error` to prevent mid-clip GC. Same lifecycle pattern as the outlet-pass SFX.
+
 
 
 

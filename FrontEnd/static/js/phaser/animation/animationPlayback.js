@@ -275,6 +275,33 @@ function isCovertReleaseDefensiveStopAnnouncement(announcement, turnData = null)
   return String(announcement?.text || "").trim().toLowerCase() === "nice stop!";
 }
 
+function isNoFastBreakAnnouncement(announcement) {
+  return String(announcement?.text || "").trim().toLowerCase() === "no fast break";
+}
+
+/**
+ * Play `duke-hold-up.wav` when the "No Fast Break" announcement fires
+ * (RR FB hold-up branch, step 2 start). Stashes the Audio instance on
+ * `scene._activeSfx` so the browser doesn't GC the anonymous Audio object
+ * mid-clip — same pattern as the outlet-pass SFX in `renderBallTransition`.
+ * Fail-silent.
+ */
+function playNoFastBreakSfx(scene) {
+  try {
+    const sfx = new Audio(`/sounds/duke-hold-up.wav`);
+    if (!scene._activeSfx) scene._activeSfx = new Set();
+    scene._activeSfx.add(sfx);
+    const release = () => {
+      if (scene._activeSfx) scene._activeSfx.delete(sfx);
+    };
+    sfx.addEventListener("ended", release, { once: true });
+    sfx.addEventListener("error", release, { once: true });
+    sfx.play().catch(release);
+  } catch (_e) {
+    // Audio is non-critical.
+  }
+}
+
 function resolveDefenseTeamSideForTurn(scene, turnData, sprites = null) {
   const playerSprites = sprites || scene?.playerSprites || {};
   const ballHandlerData = turnData?.roles?.ball_handler;
@@ -298,6 +325,15 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
   const reason = "step_announcement";
   scene.gameClock?.pause?.(reason);
   scene.shotClock?.pause?.(reason);
+
+  // Announcement-tied SFX. Fire alongside the announcement so audio + visual
+  // are synced. Once per announcement display (this function runs once per
+  // step.start.announcement / step.end.announcement). Add new cases here as
+  // additional announcements need accompanying SFX.
+  if (isNoFastBreakAnnouncement(announcement)) {
+    playNoFastBreakSfx(scene);
+  }
+
   try {
     const { showAnnouncement, showSecondaryAnnouncement, buildSecondaryStopperPlayerData } = await import("../utils/announcements.js");
     const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step, turnData);
