@@ -6259,6 +6259,16 @@
         }
       };
 
+      // Diagnostic logging gate. Enable with:
+      //   window.DEBUG_PLAYCALL_HEADSHOT = true
+      // then hard-reload (Cmd+Shift+R) so populatePlayHeadshots picks up the flag.
+      var _dbgPC = function(label, payload) {
+        if (typeof window !== 'undefined' && window.DEBUG_PLAYCALL_HEADSHOT) {
+          if (payload === undefined) console.log('[playcall-headshot]', label);
+          else console.log('[playcall-headshot]', label, payload);
+        }
+      };
+
       // Resolve { isHome, primaryColor, secondaryColor, name } for any user-team
       // playerId in the Playcall Center (play-option headshots, reveal HUD,
       // hover tooltip). All three surfaces show user-team players only.
@@ -6270,28 +6280,49 @@
       // Returns null when team or colors can't be resolved — applyHeadshotFallback
       // then falls through to generic_headshot.png the same as before.
       var buildPlaycallInitialsInfo = function(playerId) {
-        if (!playerId) return null;
+        if (!playerId) {
+          _dbgPC('buildPlaycallInitialsInfo: no playerId provided');
+          return null;
+        }
         var scene = (typeof window !== 'undefined') ? window.currentGameScene : null;
         var info = scene && scene.playerInfo ? scene.playerInfo[playerId] : null;
         var teamSide = info && info.team;
+        var teamSource = teamSide ? 'playerInfo' : null;
         if (teamSide !== 'home' && teamSide !== 'away') {
           try {
             var params = new URLSearchParams(window.location.search);
             var myTeam = params.get('my_team');
-            if (myTeam === 'home' || myTeam === 'away') teamSide = myTeam;
+            if (myTeam === 'home' || myTeam === 'away') {
+              teamSide = myTeam;
+              teamSource = 'url:my_team';
+            }
           } catch (e) { /* ignore */ }
         }
-        if (teamSide !== 'home' && teamSide !== 'away') return null;
+        if (teamSide !== 'home' && teamSide !== 'away') {
+          _dbgPC('buildPlaycallInitialsInfo: unresolved teamSide → null', {
+            playerId: playerId, hasScene: !!scene, hasPlayerInfo: !!(scene && scene.playerInfo),
+            infoForId: info, urlMyTeam: (function(){ try { return new URLSearchParams(window.location.search).get('my_team'); } catch(e){ return null; } })()
+          });
+          return null;
+        }
         var colors = (window.gameStore && typeof window.gameStore.getColors === 'function')
           ? window.gameStore.getColors() : null;
         var teamColors = colors && (teamSide === 'home' ? colors.home : colors.away);
-        if (!teamColors || !teamColors.primary_color || !teamColors.secondary_color) return null;
-        return {
+        if (!teamColors || !teamColors.primary_color || !teamColors.secondary_color) {
+          _dbgPC('buildPlaycallInitialsInfo: missing team colors → null', {
+            playerId: playerId, teamSide: teamSide, teamSource: teamSource,
+            hasGameStore: !!window.gameStore, colorsLoaded: !!colors, teamColors: teamColors
+          });
+          return null;
+        }
+        var out = {
           isHome: teamSide === 'home',
           primaryColor: teamColors.primary_color,
           secondaryColor: teamColors.secondary_color,
           name: (info && info.name) || ''
         };
+        _dbgPC('buildPlaycallInitialsInfo: resolved', { playerId: playerId, teamSide: teamSide, teamSource: teamSource, out: out });
+        return out;
       };
 
       // applyHeadshotFallback(imgEl, src, initialsInfo)
@@ -6304,12 +6335,29 @@
         if (!imgEl) return;
         var generic = genericHeadshotPath();
         clearInitialsFallback(imgEl);
+        _dbgPC('applyHeadshotFallback: setup', {
+          el: imgEl.className || imgEl.id || imgEl.tagName,
+          src: src,
+          hasInitialsInfo: !!initialsInfo,
+          initialsInfo: initialsInfo || null
+        });
         imgEl.onerror = function() {
           this.onerror = null;
           if (initialsInfo) {
+            // Unconditional warn — replaces the legacy PLAYCALL HEADSHOTS warn so
+            // a missing photo file is still surfaced even without the debug flag.
+            console.warn('[headshot fallback] image failed, rendering initials tile', {
+              el: imgEl.className || imgEl.id || imgEl.tagName,
+              src: src,
+              initials: initialsInfo
+            });
             this.style.display = 'none';
             renderInitialsFallback(imgEl, initialsInfo);
           } else {
+            console.warn('[headshot fallback] image failed, no initialsInfo — falling back to generic', {
+              el: imgEl.className || imgEl.id || imgEl.tagName,
+              src: src
+            });
             this.src = generic;
           }
         };
