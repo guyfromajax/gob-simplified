@@ -4972,7 +4972,7 @@
               headshotImg.setAttribute('data-player-id', shooterId);
               // Team-aware initials fallback when the per-player photo fails;
               // matches the announcement system + v2 on-court sprite rule.
-              applyHeadshotFallback(headshotImg, imgPath, buildPlaycallInitialsInfo(shooterId));
+              window.applyHeadshotFallback(headshotImg, imgPath, window.buildPlaycallInitialsInfo(shooterId));
               
               // Add tooltip event listeners (if tooltip functions exist)
               if (typeof showPlaycallHeadshotTooltip === 'function') {
@@ -6545,6 +6545,14 @@
         overlay.classList.add('hidden');
         delete overlay.dataset.timeoutHeld;
       };
+
+      // Expose the headshot fallback helpers globally so call sites in earlier
+      // script blocks (populatePlayHeadshots) and later blocks (showPlaycallReveal,
+      // showPlaycallHeadshotTooltip) can use them too — they live in this IIFE's
+      // closure and aren't otherwise reachable from outside.
+      window.applyHeadshotFallback = applyHeadshotFallback;
+      window.buildPlaycallInitialsInfo = buildPlaycallInitialsInfo;
+      window.clearInitialsFallback = clearInitialsFallback;
     })();
   </script>
   <script type="module">
@@ -6746,7 +6754,7 @@
       // Set player image — team-aware initials fallback when the per-player
       // photo fails (matches announcement system + v2 on-court sprite rule).
       const tooltipImgSrc = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
-      applyHeadshotFallback(image, tooltipImgSrc, buildPlaycallInitialsInfo(playerId));
+      window.applyHeadshotFallback(image, tooltipImgSrc, window.buildPlaycallInitialsInfo(playerId));
       
       // Energy (NG)
       const ng = stats.NG ?? stats.ng ?? 1.0;
@@ -6840,10 +6848,10 @@
         headshotEl.style.display = 'block';
         // Team-aware initials fallback when the per-player photo fails;
         // matches the announcement system + v2 on-court sprite rule.
-        applyHeadshotFallback(headshotEl, photoUrl, buildPlaycallInitialsInfo(data.intendedShooterId));
+        window.applyHeadshotFallback(headshotEl, photoUrl, window.buildPlaycallInitialsInfo(data.intendedShooterId));
       } else {
         headshotEl.style.display = 'none';
-        clearInitialsFallback(headshotEl);
+        window.clearInitialsFallback(headshotEl);
       }
 
       // Defense type (Man, 2-3 Zone, 3-2 Zone, etc.)
