@@ -161,9 +161,60 @@ Court-spot positions (rebound bounce spots, inbound spots, opening tip ball coor
 Flip `USE_HEADSHOT_MARKER` to `false` in `markerConfig.js` and:
 
 - `createPhaserPlayer` dispatches to `createLegacyMarker` (the verbatim pre-headshot code — circle + position text + jersey above/below)
-- `BALL_ATTACH_OFFSET` becomes `{0, 0}`, so every ball animation behaves byte-identically to develop pre-May-2026
+- Ball behavior is unchanged in either mode because `BALL_ATTACH_OFFSET` is currently `{0, 0}` in both modes
 
 No other code path needs to change. The flag is the single point of control.
+
+## Player Data Available to the Marker
+
+These are the fields confirmed on the `player` object passed to `createPhaserPlayer({ scene, player, teamInfo, position, Phaser })`. Use this list before assuming a field exists — backend simData does NOT carry the same schema as the roster API.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `playerId` / `player_id` / `_id` | string | UUID. Use `player.playerId ?? player.player_id ?? player._id` |
+| `name` | string | Full name (e.g., `"James Davies"`). Last name is **not** a separate field — parse from `name` if needed |
+| `jersey` / `jerseyNumber` / `jersey_number` | number/string | Jersey number. Zero is valid; check with explicit `=== 0` |
+| `team` | `"home"` \| `"away"` | Team side |
+| `team_id` | string | Team identifier (e.g., `"XAVIEN"`) |
+| `pos` | string | Position abbreviation (`"PG"`, `"SG"`, `"SF"`, `"PF"`, `"C"`) |
+| `photo` | string \| null | Image URL (often `/static/images/players/{id}.png`). May need normalization via `preloadPlayerHeadshots`'s helper |
+| `startingCoords` | `{ x, y }` | Grid coords (0–100 × 0–50) |
+| `attributes.NG` | number 0–1 | **Stamina / energy.** Lives at `player.NG` or `player.attributes.NG`. Updated per-turn via `syncSpriteAttributesFromPlayerEnergy`. |
+| `attributes.AG` | number | Athleticism (used for movement speed) |
+| `attributes.anchor_AG` | number | Pre-fatigue AG anchor (engine: `AG ≈ anchor_AG * NG`) |
+
+Fields that do **NOT** exist on simData players (despite living elsewhere in the backend):
+
+- `rating` / `overall` — player rating
+- `heightInches` — height as integer
+- `lastName` — only `name` (full) is provided
+- `photoKey` — texture keys are derived via `headshotTextureKey(playerId)` from `setup/preloadPlayerHeadshots.js`, not stored on the player object
+
+If a marker feature requires one of these missing fields, the field needs to be propagated from the backend simData first.
+
+## Live Updates
+
+### Stamina / energy (per-turn)
+
+Backend ships `turn.player_energy` as part of each animated turn. Frontend applies it via:
+
+```js
+import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAttributes.js';
+// playerSprites: { [playerId]: container }
+// playerEnergy:  { [playerId]: { NG: number } }
+syncSpriteAttributesFromPlayerEnergy(playerSprites, turn.player_energy);
+```
+
+This currently lives in two places:
+
+- `animation/turnPreparation.js:~123` (preferred — called via `prepareTurnForAnimation`)
+- `gameScene.js:~1981`
+
+Any future "live stamina visualization" on the marker should hook into the same `syncSpriteAttributesFromPlayerEnergy` call site rather than introducing a separate subscriber.
+
+### Coordinate updates (per animation step)
+
+Player containers' `x`/`y` are tweened by the animation systems (turnAnimation, animateStep, PassAnimationSystem, ShotAnimationSystem, etc.). The scene-level mask sync runs in `scene.events.on('update', ...)` and tracks these tweens automatically — no per-system hook needed.
 
 ## Tests
 
