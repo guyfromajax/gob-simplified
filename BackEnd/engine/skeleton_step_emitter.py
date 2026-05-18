@@ -379,7 +379,24 @@ def build_skeleton_animation_steps(
     step_clock_seconds: List[float] = turn_result.get("step_clock_seconds") or []
     roles: Dict[str, Any] = turn_result.get("roles") or {}
 
+    # 🔍 [RESET DIAG] temporary — remove once HCO Reset prepending is verified.
+    import logging as _reset_diag_log
+    _reset_diag_log.warning(
+        "🔍 [RESET DIAG] skeleton_emitter entry: current_turn=%s next_play_type=%s "
+        "has_hco_setup=%s has_skeleton_steps=%s (%d) has_animations=%s (%d) "
+        "has_step_clock_seconds=%s (%d)",
+        turn_result.get("current_turn"),
+        turn_result.get("next_play_type"),
+        isinstance(turn_result.get("hco_setup"), dict),
+        bool(skeleton_steps), len(skeleton_steps),
+        bool(animations), len(animations),
+        bool(step_clock_seconds), len(step_clock_seconds),
+    )
+
     if not skeleton_steps or not animations or not step_clock_seconds:
+        _reset_diag_log.warning(
+            "🔍 [RESET DIAG] skeleton_emitter EARLY RETURN None — Reset will NOT fire"
+        )
         return None
 
     # Walk over min(skeleton_steps, step_clock_seconds, animation_movements - 1).
