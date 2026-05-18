@@ -48,7 +48,10 @@ from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import (
     AWAY_RIM_COORDS,
+    FB_OUTLET_QUALITY_THRESHOLD,
     FB_PASS_GRID_SPOTS_PER_GAME_SECOND,
+    FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY,
+    FB_PASS_MIN_GAME_SECONDS,
     HOME_RIM_COORDS,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -570,11 +573,11 @@ def _build_outlet_pass_step(
     outlet_score = fb_roles.get("outlet_score")
     pass_rate = (
         float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
-        if outlet_score is not None and outlet_score >= 50
-        else 22.0
+        if outlet_score is not None and outlet_score >= FB_OUTLET_QUALITY_THRESHOLD
+        else float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY)
     )
     dist = _euclid(passer_coord, receiver_coord)
-    t = max(0.5, dist / pass_rate)
+    t = max(FB_PASS_MIN_GAME_SECONDS, dist / pass_rate)
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
     archetype: Dict[str, PlayerArchetype] = {
@@ -1613,7 +1616,7 @@ def _build_outlet_denied_recovery_pass_step(
     passer_coord = step_start_coords[passer_id]
     receiver_coord = step_start_coords[receiver_id]
     dist = _euclid(passer_coord, receiver_coord)
-    t = max(0.5, dist / float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND))
+    t = max(FB_PASS_MIN_GAME_SECONDS, dist / float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
     archetype: Dict[str, PlayerArchetype] = {

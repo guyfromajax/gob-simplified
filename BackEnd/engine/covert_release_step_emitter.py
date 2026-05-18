@@ -356,17 +356,22 @@ def _build_outlet_pass_step(
     #   - good: 30 grid/game-sec (= FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
     #   - poor: 22 grid/game-sec
     # Floor at 0.5 game-sec so the visual beat is perceptible for short passes.
-    from BackEnd.constants import FB_PASS_GRID_SPOTS_PER_GAME_SECOND
+    from BackEnd.constants import (
+        FB_OUTLET_QUALITY_THRESHOLD,
+        FB_PASS_GRID_SPOTS_PER_GAME_SECOND,
+        FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY,
+        FB_PASS_MIN_GAME_SECONDS,
+    )
     _outlet_score = fb_roles.get("outlet_score")
     _pass_rate = (
         float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
-        if _outlet_score is not None and _outlet_score >= 50
-        else 22.0
+        if _outlet_score is not None and _outlet_score >= FB_OUTLET_QUALITY_THRESHOLD
+        else float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY)
     )
     _dx = float(receiver_coord.get("x", 0)) - float(passer_coord.get("x", 0))
     _dy = float(receiver_coord.get("y", 0)) - float(passer_coord.get("y", 0))
     _grid_dist = (_dx * _dx + _dy * _dy) ** 0.5
-    t = max(0.5, _grid_dist / _pass_rate)
+    t = max(FB_PASS_MIN_GAME_SECONDS, _grid_dist / _pass_rate)
 
     x_dir = -1 if is_away_offense else 1
     attacking_basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
@@ -407,9 +412,10 @@ def _build_outlet_pass_step(
         d_id for d_id in getback_ids
         if d_id in all_start_coords and d_id not in (passer_id, receiver_id)
     ]
+    from BackEnd.constants import FB_OUTLET_QUALITY_THRESHOLD as _SHARP_OUTLET_THRESHOLD
     use_read_system = (
         outlet_score is not None
-        and outlet_score >= 50
+        and outlet_score >= _SHARP_OUTLET_THRESHOLD
         and 1 <= len(valid_getback_ids) <= 2
     )
 

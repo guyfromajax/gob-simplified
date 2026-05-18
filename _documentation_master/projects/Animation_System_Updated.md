@@ -17,29 +17,44 @@
 
 ## Proposed schema
 
-Each animation step has a **start state**, an **advance trigger**, and a **derived end state**.
+Each animation step has a **start state**, an **advance trigger**, and a **derived end state**. Canonical source: [`BackEnd/utils/animation_step_schema.py`](../../BackEnd/utils/animation_step_schema.py) (with JSDoc mirror at [`FrontEnd/static/js/phaser/animation/animationStepSchema.js`](../../FrontEnd/static/js/phaser/animation/animationStepSchema.js)). Keep the two in lockstep when the schema evolves.
 
-### Start of step
+### Start of step (`StepStart`)
+
+**Required fields:**
 - `coords` — `{[player_id]: {x, y}}` for all players on court
 - `destination` — `{[player_id]: {x, y} | null}` (null = stationary)
-- `action` — `{[player_id]: <closed vocab>}`. Working list: `handle_ball`, `pass`, `receive`, `cut`, `screen`, `shoot`, `stationary`, `sprint`, `guard_ball`, `guard_offball`. May extend during turn-type audits.
-- `archetype` — `{[player_id]: <closed vocab>}` (e.g. `default`, `sprint`, `drive`, `shot_motion`, `cruise`, `stationary`) — drives per-player rate via the AG curve
-- `ball` — either `{owner_player_id}` or `{in_flight: {from_player_id, to_player_id, current_coords}}`
+- `action` — `{[player_id]: <closed vocab>}`. Current vocab: `handle_ball`, `pass`, `receive`, `cut`, `screen`, `shoot`, `stationary`, `sprint`, `guard_ball`, `guard_offball`, `post_up`. May extend during further turn-type audits.
+- `archetype` — `{[player_id]: <closed vocab>}` (`default`, `sprint`, `drive`, `shot_motion`, `cruise`, `stationary`) — drives per-player rate via the AG curve
+- `ball` — one of:
+  - `BallAttached`: `{owner_player_id}`
+  - `BallInFlight`: `{from_player_id, to_player_id, current_coords}`
+  - `BallLoose`: `{coords}` (no owner; e.g., DREB step start, batted-OOB step end)
 - `clock` — `{clock_remaining, shot_clock_remaining}` (game-seconds)
-- `advance_trigger` — `{condition: <metadata>, T_game_seconds: <computed>}`
+- `advance_trigger` — `{condition, T_game_seconds, metadata}` — condition is the closed-vocab trigger type (e.g. `player_reaches_position`, `ball_reaches_player`, `fixed_duration`, `shot_resolved`, `stopper_action`), `T_game_seconds` is the precomputed step duration, and `metadata` carries condition-specific extras (e.g. `target_player_id`, `target_coords`, `contact_coords`, `outlet_score`).
 
-### End of step (derived from start + T)
+**Optional fields:**
+- `announcement` — `Announcement` payload. When present, playback engine pauses clocks, shows the announcement, awaits `hold_ms`, then resumes clocks **BEFORE** the step's tweens fire. Used for entry-of-turn announcements like `"Fast Break!"` / `"No Fast Break"` / `"Trap!"`. Carries `{text, team, player_data?, meta?, hold_ms, style}` where `style ∈ {"primary", "secondary"}` routes to the correct banner renderer.
+- `tween_durations` — `{[player_id]: game_seconds}`. Per-player tween duration. When present, playback tweens each player for their individual duration; fast finishers idle at their end coord until step T elapses. When absent, playback falls back to step T (which stretches fast finishers' tweens — the "lazy drift" anti-pattern). Backend always stamps when it has per-player rate info; frontend never recomputes.
+
+### End of step (`StepEnd`, derived from start + T)
+
+**Required fields:**
 - `coords` — interrupted position per player (formula: along start→destination at distance `rate × T`, or destination if `rate × T ≥ full distance`)
-- `ball` — final state at T
-- `time_elapsed` — T (game-seconds)
+- `ball` — `BallAttached | BallInFlight | BallLoose` at T
+- `time_elapsed` — T (game-seconds). Equal to `advance_trigger.T_game_seconds`.
 - `clock` — state after T elapses
 - `next` — one of:
-  - `{kind: "next_step", index}` (linear continuation)
-  - `{kind: "branch", outcome, ...}` (outcome-driven; backend already resolved which branch)
-  - `{kind: "turn_stop", event, payload}` (turn ends)
+  - `{kind: "next_step", index}` (linear continuation; an index past the array length terminates the turn implicitly — caller transitions to the next turn)
+  - `{kind: "branch", outcome, next_step_index}` (outcome-driven; backend already resolved which branch)
+  - `{kind: "turn_stop", event, payload}` (turn ends — see event types below)
 
-### Turn-stopping event types (to be enumerated)
-Working list: `SHOT_ATTEMPT`, `FOUL` (variants: O/D/charge/blocking/shooting), `STEAL`, `DEAD_BALL_TURNOVER`, `SHOT_CLOCK_EXPIRED`, `GAME_CLOCK_EXPIRED`, `TIMEOUT`, `JUMP_BALL`. Confirm completeness during turn-type audits.
+**Optional fields:**
+- `announcement` — same shape as `StepStart.announcement`. When present, playback snaps sprites to end coords, pauses clocks, shows the announcement, awaits `hold_ms`, then resumes clocks **BEFORE** returning `next`. Used for mid-turn announcements like `"Nice Stop!"` / `"Interception!"` / `"FB Outlet Pass Denied!"` that play after a movement beat completes.
+
+### Turn-stopping event types
+
+Closed vocab: `SHOT_ATTEMPT`, `FOUL` (variants: `O_FOUL`/`D_FOUL`/`charge`/`blocking`/`shooting`), `STEAL`, `DEAD_BALL_TURNOVER`, `SHOT_CLOCK_EXPIRED`, `GAME_CLOCK_EXPIRED`, `TIMEOUT`, `JUMP_BALL`. Confirm completeness during further turn-type audits.
 
 ---
 
