@@ -515,41 +515,6 @@ def _player_y(p: Any, default: float = 25.0) -> float:
     return default
 
 
-def _rebound_spot_x_for_rr(rebounder: Any, most_recent: Optional[dict]) -> float:
-    """Prefer ball bounce x from recent MAKE/MISS/BLOCK turn; else rebounder grid x."""
-    if most_recent:
-        bx = most_recent.get("ball_bounce_x")
-        if bx is not None:
-            try:
-                return float(bx)
-            except (TypeError, ValueError):
-                pass
-    return _player_x(rebounder) if rebounder else 50.0
-
-
-def _use_dynamic_rr_outlet_placement(is_away_offense: bool, rebound_x: float) -> bool:
-    """
-    When True, outlet receiver target x = rebound + 12 (home FB) or rebound - 12 (away FB),
-    and rim runner sprint x is offset from that receiver target (not from RR's pre-burst x).
-
-    Home attacking right: trigger on left/away half with rebound x > 25.
-    Away attacking left: trigger on right/home half with rebound x < 75.
-    """
-    if not is_away_offense:
-        return 25.0 < rebound_x < 50.0
-    return 50.0 < rebound_x < 75.0
-
-
-def _y_toward_25(py: float, max_step: int = 6) -> float:
-    """Move defensive y at most ``max_step`` toward 25 (grid)."""
-    target = 25.0
-    delta = target - py
-    if delta == 0:
-        return py
-    step = int(max(-max_step, min(max_step, delta)))
-    return float(max(1, min(49, int(round(py + step)))))
-
-
 def _y_toward_rr_clamped(py: float, rr_y: float, max_step: int = 6) -> float:
     """Move y up to ``max_step`` toward rim runner y without crossing past ``rr_y``."""
     dy = float(rr_y) - float(py)
@@ -734,7 +699,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     # opposite-wing y from RR's burst destination.
     # Outlet receiver: offense player whose starting coords are closest to the
     # outlet spot. Rebounder is eligible; only RR is excluded.
-    best_tx = 40.0 if not is_away_offense else 60.0
+    best_tx = 45.0 if not is_away_offense else 55.0
 
     offense_players = [p for p in off_lineup.values() if p is not None]
     best_p: Any = None
@@ -823,17 +788,10 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             nx = _defender_x_toward_basket(px, x_dir, 15, basket_x)
             ny = _y_toward_rr_clamped(py, float(rr_new_y), max_step=6)
         else:
-            attrs = getattr(pl, "attributes", {}) or {}
-            iq = float(attrs.get("IQ", 0) or 0)
-            ag = float(attrs.get("AG", 0) or 0)
-            roll_adj = random.randint(1, 100) - fb_opp
-            check = 0.5 * iq + 0.5 * ag
-            if check > roll_adj:
-                dx = random.randint(15, 20)
-            else:
-                dx = random.randint(8, 12)
-            nx = _defender_x_toward_basket(px, x_dir, dx, basket_x)
-            ny = float(_y_toward_25(py))
+            # Other defenders (non-getback, non-outlet-defender): same short
+            # drift as other offense — 1–4 grid toward basket, y unchanged.
+            nx = max(4, min(97, int(round(px + x_dir * random.randint(1, 4)))))
+            ny = float(py)
         # Phase 4b: per-segment game_seconds for the secondary movers' burst tweens.
         # AG-driven via Movement Rate Refactor helper (default archetype).
         # Frontend reads `other_players[i].game_seconds × clockSecondMs`.

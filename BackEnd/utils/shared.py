@@ -2838,8 +2838,8 @@ def _normalize_animation_coords_to_runtime_home(
     always read as if home were on offense regardless of which team actually
     was. That dual-orientation convention caused cross-court tween bugs at
     possession-flip boundaries and confused multiple code paths
-    (`_eligible_fb_lineup`, `_use_dynamic_rr_outlet_placement`) that already
-    expected display orientation.
+    (`_eligible_fb_lineup` and other FB callsites) that already expected
+    display orientation.
 
     Now ``player.coords`` stores coords in the same orientation animations
     are emitted (display orientation = real visual position). The function
