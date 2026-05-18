@@ -1197,10 +1197,45 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         apply_fast_break_cg_time(turn_result, shot_attempted=True)
         return turn_result
 
+    # Positional gate: defender must be (a) within 8 grid Euclidean of the
+    # pass lane (BH → RR line segment) AND (b) at-or-past RR's x in the
+    # attacking direction. If either fails, no intercept attempt — fall
+    # through to completion (shot). Prevents far-away defenders from
+    # "stealing" the lane pass on attribute roll alone.
+    _bh_x = _player_x(ball_handler)
+    _bh_y = _player_y(ball_handler)
+    _rr_x = _player_x(rr)
+    _rr_y = _player_y(rr)
+    _def_x = _player_x(primary_def)
+    _def_y = _player_y(primary_def)
+
+    _dx_lane = _rr_x - _bh_x
+    _dy_lane = _rr_y - _bh_y
+    _lane_len_sq = _dx_lane * _dx_lane + _dy_lane * _dy_lane
+    if _lane_len_sq < 1e-9:
+        _lane_dist = ((_def_x - _bh_x) ** 2 + (_def_y - _bh_y) ** 2) ** 0.5
+    else:
+        _t = max(
+            0.0,
+            min(
+                1.0,
+                ((_def_x - _bh_x) * _dx_lane + (_def_y - _bh_y) * _dy_lane) / _lane_len_sq,
+            ),
+        )
+        _proj_x = _bh_x + _t * _dx_lane
+        _proj_y = _bh_y + _t * _dy_lane
+        _lane_dist = ((_def_x - _proj_x) ** 2 + (_def_y - _proj_y) ** 2) ** 0.5
+
+    _past_rr = (_def_x >= _rr_x) if not is_away_offense else (_def_x <= _rr_x)
+    _can_intercept = _lane_dist <= 8.0 and _past_rr
+
     da = primary_def.attributes
     intercept_score = (
-        da.get("OD", 0) * 0.6 + da.get("AG", 0) * 0.2 + da.get("IQ", 0) * 0.2
-    ) * random.randint(1, 6)
+        (da.get("OD", 0) * 0.6 + da.get("AG", 0) * 0.2 + da.get("IQ", 0) * 0.2)
+        * random.randint(1, 6)
+        if _can_intercept
+        else 0
+    )
 
     tier_hi = 250 - fb_opp
     tier_mid = 200 - fb_opp

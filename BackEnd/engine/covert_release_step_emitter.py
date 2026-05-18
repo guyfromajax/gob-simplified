@@ -567,6 +567,7 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
         from BackEnd.constants import (
             BURST_MULTIPLIER,
+            CRUISE_MULTIPLIER,
             DRIVE_MULTIPLIER,
             SHOT_MOTION_MULTIPLIER,
             SPRINT_MULTIPLIER,
@@ -589,7 +590,9 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         return base_rate * SPRINT_MULTIPLIER
     if archetype == "burst":
         return base_rate * BURST_MULTIPLIER
-    # default / cruise / stationary / unknown → base AG rate.
+    if archetype == "cruise":
+        return base_rate * CRUISE_MULTIPLIER
+    # default / stationary / unknown → base AG rate.
     return base_rate
 
 

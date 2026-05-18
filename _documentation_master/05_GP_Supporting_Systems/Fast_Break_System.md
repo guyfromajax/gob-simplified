@@ -681,10 +681,21 @@ The outlet passer tracks:
 ##Step 0: Burst
   -Advance Trigger (AT): player_reaches_position (PRT)
     -Outlet Receiver reaches destination (sprint rate)
+  -Movement speeds
+    -RR: Burst 
+    -Outlet Receiver: sprint
+    -Get Back Defenders: sprint
+    -Outlet Passer: stationary
+    -Other players: drift
+
 
 ##Step 1 Branches
   -Step 1: Outlet Pass (see below for Step 2 branches)
     -Step 1: Outlet pass
+      -AT: ball_reaches_destination (BRD)
+      -Movement Speeds:
+        -RR, Get Back Defenders, Other: sprint
+        -Outlet Passer / Receiver: stationary
   -Step 1: Outlet Denied
     -Step 1: Defender Close Out
     -Step 2: Paralle Movement

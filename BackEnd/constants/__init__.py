@@ -218,6 +218,7 @@ FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 40
 FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY = 30  # FB outlet pass when outlet_score < threshold
 FB_OUTLET_QUALITY_THRESHOLD = 50                # sharp/sloppy split on fb_roles["outlet_score"]
 FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (short passes still register)
+RESET_INBOUND_PASS_GRID_PER_GAME_SECOND = 24    # Reset step inbound pass (BH → PG)
 
 # ---- Movement Rate Refactor (see Movement_Rate_Refactor.md) ---------------
 # New two-tier model: cruise-speed steps (HCO/HCT bring-up) vs AG-driven steps.
@@ -230,6 +231,7 @@ BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 12  # BH random high end during bring-up (= 
 # When CRUISE_BASELINE changes, these multipliers must be re-derived to preserve
 # the absolute rates (otherwise you're changing more than one speed at a time).
 DRIVE_MULTIPLIER                  = 1.0    # Drive = 1.0 × cruise (12 × 1.0 = 12 grid/sec at AG=50)
+CRUISE_MULTIPLIER                 = 10.0 / 12.0  # Cruise → 10 grid/sec at AG=50 (settle / transition pace)
 SHOT_MOTION_MULTIPLIER            = 10.0 / 12.0  # Shot motion → 10 grid/sec at AG=50
 # Sprint = max-effort fast-break movement (RR burst, BH cover-ground in open
 # court, FB shot motion). Multiplier sized so AG=50 rate = 14 grid/sec.

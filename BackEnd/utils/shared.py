@@ -17,6 +17,7 @@ from BackEnd.constants import (
     CRUISE_BASELINE_GRID_PER_GAME_SEC,
     BH_CRUISE_MIN_GRID_PER_GAME_SEC,
     BH_CRUISE_MAX_GRID_PER_GAME_SEC,
+    CRUISE_MULTIPLIER,
     DRIVE_MULTIPLIER,
     SHOT_MOTION_MULTIPLIER,
     SPRINT_MULTIPLIER,
@@ -716,6 +717,8 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
         rate = base_rate * SHOT_MOTION_MULTIPLIER
     elif archetype == "sprint":
         rate = base_rate * SPRINT_MULTIPLIER
+    elif archetype == "cruise":
+        rate = base_rate * CRUISE_MULTIPLIER
     else:
         rate = base_rate
     return calc_isotropic_segment_seconds(start, end, rate)

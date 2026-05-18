@@ -408,8 +408,55 @@ def build_skeleton_animation_steps(
     steps: List[AnimationStep] = []
     elapsed_so_far = 0.0
 
+    # Reset prepend: when this HCO turn carries hco_setup.inbound_pass (set by
+    # a source turn that ended with BH ≠ PG — e.g., FB hold-up, outlet
+    # denied), emit 1-2 Reset steps before the skeleton fires. Phase 1
+    # implementation: source turns still emit their own lead-in steps, so
+    # this layer renders Reset on top during verification. Phase 2 removes
+    # the source-turn duplicates.
+    hco_setup = turn_result.get("hco_setup")
+    inbound_pass = hco_setup.get("inbound_pass") if isinstance(hco_setup, dict) else None
+    is_hco_turn = turn_result.get("current_turn") == "HCO"
+    if is_hco_turn and isinstance(inbound_pass, dict):
+        from BackEnd.utils.reset_step_helper import build_reset_steps
+
+        reset_bh_id = inbound_pass.get("from_player_id")
+        reset_start_coords = _coords_at_movement_index(animations, 0)
+        away_offense = bool(
+            getattr(off_team, "team_id", None) == getattr(getattr(game, "away_team", None), "team_id", None)
+        )
+        if reset_bh_id and reset_start_coords:
+            reset_steps = build_reset_steps(
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                start_coords=reset_start_coords,
+                is_away_offense=away_offense,
+                bh_id=str(reset_bh_id),
+                clock_remaining_at_start=clock_remaining_at_turn_start,
+                shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
+                start_index=0,
+                next_step_index_after_reset=0,  # fixed up below
+            )
+            if reset_steps:
+                # Post-fix: last Reset step's next.index points to skeleton step 0,
+                # which lands at len(reset_steps) in the final steps array.
+                reset_steps[-1]["end"]["next"] = {
+                    "kind": "next_step",
+                    "index": len(reset_steps),
+                }
+                steps.extend(reset_steps)
+                elapsed_so_far = float(sum(s["end"]["time_elapsed"] for s in reset_steps))
+
+    reset_count = len(steps)
+
     for i in range(num_steps):
-        start_coords = _coords_at_movement_index(animations, i)
+        # When Reset prepended, skeleton step 0's start coords = Reset's last
+        # step end coords (so the schema's start-matches-prior-end contract
+        # holds across the seam).
+        if i == 0 and reset_count > 0:
+            start_coords = dict(steps[-1]["end"]["coords"])
+        else:
+            start_coords = _coords_at_movement_index(animations, i)
         end_coords = _coords_at_movement_index(animations, i + 1)
         if not start_coords or not end_coords:
             return None
@@ -473,9 +520,11 @@ def build_skeleton_animation_steps(
             )
 
         # Next pointer: linear i+1 except final step (branches on result_type).
+        # When Reset is prepended, shift skeleton step indices by reset_count
+        # so the chain references the final steps array correctly.
         next_step: NextStep
         if i < num_steps - 1:
-            next_step = {"kind": "next_step", "index": i + 1}
+            next_step = {"kind": "next_step", "index": i + 1 + reset_count}
         else:
             next_step = _resolve_final_step_next(turn_result)
 

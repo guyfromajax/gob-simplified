@@ -180,6 +180,7 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
         from BackEnd.constants import (
             BURST_MULTIPLIER,
+            CRUISE_MULTIPLIER,
             DRIVE_MULTIPLIER,
             SHOT_MOTION_MULTIPLIER,
             SPRINT_MULTIPLIER,
@@ -201,6 +202,8 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         return base_rate * SPRINT_MULTIPLIER
     if archetype == "burst":
         return base_rate * BURST_MULTIPLIER
+    if archetype == "cruise":
+        return base_rate * CRUISE_MULTIPLIER
     return base_rate
 
 
@@ -487,6 +490,9 @@ def _build_burst_step(
         }
         _commit_mover(defender_id, d_target, "guard_ball", "default")
 
+    getback_ids = {
+        str(pid) for pid in (fb_roles.get("getback_player_ids") or []) if pid is not None
+    }
     key_ids = {rr_id, receiver_id, passer_id, defender_id}
     for row in other_players:
         pid = _safe_id(row.get("player_id"))
@@ -496,10 +502,11 @@ def _build_burst_step(
             "x": float(row.get("to_x", all_start_coords[pid]["x"])),
             "y": float(row.get("to_y", all_start_coords[pid]["y"])),
         }
-        action: PlayerAction = (
-            "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-        )
-        _commit_mover(pid, target, action, "default")
+        is_off = _is_offense_player(pid, off_lineup)
+        action: PlayerAction = "cut" if is_off else "guard_offball"
+        # Get-back defenders sprint back; other non-key movers default.
+        arch: PlayerArchetype = "sprint" if pid in getback_ids else "default"
+        _commit_mover(pid, target, action, arch)
 
     skip_outlet_pass = bool(phase.get("skip_outlet_pass"))
     ball_owner = receiver_id if skip_outlet_pass else (passer_id or receiver_id)
@@ -902,7 +909,7 @@ def _build_shot_motion_step(
 
     if defender_id and defender_id in step_start_coords:
         actions[defender_id] = "guard_ball"
-        archetype[defender_id] = "drive"
+        archetype[defender_id] = "sprint"
 
     for pid in step_start_coords:
         if pid in (rr_id, defender_id):
@@ -910,7 +917,7 @@ def _build_shot_motion_step(
         if _movement_end_coord(animations, pid) is not None:
             if _is_offense_player(pid, off_lineup):
                 actions[pid] = "cut"
-                archetype[pid] = "sprint"
+                archetype[pid] = "drive"
             else:
                 actions[pid] = "guard_offball"
                 archetype[pid] = "drive"
@@ -1008,14 +1015,15 @@ def _build_lane_pass_intercepted_step(
     rr_coord = step_start_coords[rr_id]
     x_dir = -1 if is_away_offense else 1
 
-    rr_partial: GridCoord = {
-        "x": float(max(4.0, min(97.0, rr_coord["x"] + 3 * x_dir))),
-        "y": float(rr_coord["y"]),
-    }
+    # RR moves to the full catch_grid even though the pass is cut off — matches
+    # the shot-branch destination for consistency across all three lane-pass
+    # variants. The contact_grid (where the defender intercepts) is computed
+    # from the same target.
     catch_target: GridCoord = {
         "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
         "y": float(rr_coord["y"]),
     }
+    rr_partial: GridCoord = dict(catch_target)
     contact_grid = _compute_interception_contact_grid(bh_coord, catch_target)
 
     stealer_coord = step_start_coords[stealer_id]
@@ -1146,14 +1154,13 @@ def _build_lane_pass_batted_step(
     rr_coord = step_start_coords[rr_id]
     x_dir = -1 if is_away_offense else 1
 
-    rr_partial: GridCoord = {
-        "x": float(max(4.0, min(97.0, rr_coord["x"] + 4 * x_dir))),
-        "y": float(rr_coord["y"]),
-    }
+    # RR moves to the full catch_grid even though the pass gets batted —
+    # matches the shot-branch destination.
     catch_target: GridCoord = {
         "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
         "y": float(rr_coord["y"]),
     }
+    rr_partial: GridCoord = dict(catch_target)
     contact_grid = _compute_interception_contact_grid(bh_coord, catch_target)
     oob_grid = _nearest_oob_grid(contact_grid)
 
