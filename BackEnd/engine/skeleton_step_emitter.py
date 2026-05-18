@@ -19,6 +19,7 @@ cutover.
 
 from typing import Any, Dict, List, Optional
 
+from BackEnd.utils.animation_step_helpers import stamp_tween_durations
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -496,6 +497,7 @@ def build_skeleton_animation_steps(
                 "next": next_step,
             },
         }
+        stamp_tween_durations(step["start"], end_coords, t, off_lineup, def_lineup)
         steps.append(step)
         elapsed_so_far += t
 

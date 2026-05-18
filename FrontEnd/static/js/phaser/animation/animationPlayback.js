@@ -436,8 +436,13 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   }
 
   // Spawn one linear tween per player whose start coord differs from end coord.
-  // Tweens run in parallel — backend has guaranteed they all arrive at their
-  // end coords at exactly the step's duration.
+  // Backend stamps per-player tween durations on step.start.tween_durations
+  // (in game-seconds); convert to ms via clockSecondMs. Players who finish
+  // before step T sit idle at their end coord until the wall-clock timer
+  // below fires — produces the natural "settle and wait" feel rather than
+  // stretching every player's tween across the gating player's duration.
+  // When tween_durations is absent (legacy emitters), fall back to step T.
+  const perPlayerDurations = step.start.tween_durations || {};
   for (const [playerId, startCoord] of Object.entries(step.start.coords)) {
     const sprite = sprites[playerId];
     const endCoord = step.end.coords[playerId];
@@ -448,12 +453,18 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     const dy = endCoord.y - startCoord.y;
     if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) continue;
 
+    const playerGameSec = perPlayerDurations[playerId];
+    const playerDurationMs =
+      typeof playerGameSec === "number" && playerGameSec > 0
+        ? Math.max(50, Math.round(playerGameSec * clockSecondMs))
+        : durationMs;
+
     const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
     scene.tweens.add({
       targets: sprite,
       x: endPx.x,
       y: endPx.y,
-      duration: durationMs,
+      duration: playerDurationMs,
       ease: "Linear",
     });
   }

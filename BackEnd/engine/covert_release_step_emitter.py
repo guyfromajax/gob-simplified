@@ -546,6 +546,7 @@ def _build_outlet_pass_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": next_step_index},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -588,6 +589,41 @@ def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
     if rate <= 0:
         return 0.0
     return _euclid(start, end) / rate
+
+
+def _stamp_tween_durations(
+    start: Dict[str, Any],
+    end_coords: Dict[str, GridCoord],
+    step_t: float,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Stamp per-player tween durations on ``start["tween_durations"]``
+    (in game-seconds). Mirrors the helper in ``rim_runner_step_emitter``.
+
+    For each player who moves: ``duration = min(distance / rate, step_t)``.
+    Stationary players omitted (no tween fires for zero-distance anyway).
+    Without this, the playback engine falls back to step T per player,
+    which stretches fast finishers' tweens — visible "lazy drift" feel.
+    """
+    start_coords = start.get("coords") or {}
+    archetype = start.get("archetype") or {}
+    durations: Dict[str, float] = {}
+    for pid, sc in start_coords.items():
+        ec = end_coords.get(pid)
+        if ec is None:
+            continue
+        dist = _euclid(sc, ec)
+        if dist < 1e-6:
+            continue
+        arch = archetype.get(pid, "default")
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        if rate <= 0:
+            continue
+        durations[pid] = float(min(dist / rate, step_t))
+    if durations:
+        start["tween_durations"] = durations
 
 
 def _build_outcome_step(
@@ -805,6 +841,7 @@ def _build_outcome_step(
         "clock": clock_end,
         "next": next_step,
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -1065,6 +1102,7 @@ def _build_step_back_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": 999},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 

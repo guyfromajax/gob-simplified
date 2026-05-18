@@ -235,6 +235,44 @@ def _attacking_basket(is_away_offense: bool) -> GridCoord:
     return {"x": float(rim["x"]), "y": float(rim["y"])}
 
 
+def _stamp_tween_durations(
+    start: StepStart,
+    end_coords: Dict[str, GridCoord],
+    step_t: float,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Stamp per-player tween durations on ``start["tween_durations"]``
+    (in game-seconds). For each player who moves: ``duration = min(distance
+    / rate, step_t)``. Stationary players are omitted (no tween fires for
+    zero-distance start→end anyway).
+
+    Cross-cutting fix: without this, the playback engine falls back to step
+    T for every player, which stretches fast-finishing players' tweens
+    across the gating player's duration (the "lazy drift" anti-pattern).
+    With this, each player tweens for their natural duration then idles at
+    their end coord until step T elapses. See Animation_System_Updated.md.
+    """
+    start_coords = start.get("coords") or {}
+    archetype = start.get("archetype") or {}
+    durations: Dict[str, float] = {}
+    for pid, sc in start_coords.items():
+        ec = end_coords.get(pid)
+        if ec is None:
+            continue
+        dist = _euclid(sc, ec)
+        if dist < 1e-6:
+            continue
+        arch = archetype.get(pid, "default")
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        if rate <= 0:
+            continue
+        durations[pid] = float(min(dist / rate, step_t))
+    if durations:
+        start["tween_durations"] = durations
+
+
 # --- RR-specific geometry helpers ------------------------------------------
 
 
@@ -491,6 +529,7 @@ def _build_burst_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": next_step_index},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -594,11 +633,14 @@ def _build_outlet_pass_step(
         rate = _ag_grid_per_game_sec(player, arch)
         end_coords[pid] = _interrupted_coord(step_start_coords[pid], target, rate, t)
 
-    ball_start: BallState = {
-        "from_player_id": passer_id,
-        "to_player_id": receiver_id,
-        "current_coords": dict(passer_coord),
-    }
+    # Ball state continuity: step start = attached to passer (carries over from
+    # the prior step's end.ball, which was the burst's BallAttached(passer)).
+    # Step end = attached to receiver. Schema engine's renderBallTransition
+    # detects the ownership change, detaches from passer's parent transform,
+    # tweens world coords, and reattaches at end. Without this (i.e., starting
+    # in_flight here) the detach never fires and the ball renders glued to
+    # the passer's follow callback for the whole step — visible teleport.
+    ball_start: BallState = {"owner_player_id": passer_id}
     ball_end: BallState = {"owner_player_id": receiver_id}
 
     advance_trigger: AdvanceTrigger = {
@@ -637,6 +679,7 @@ def _build_outlet_pass_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": next_step_index},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -739,11 +782,9 @@ def _build_lane_pass_step(
     destinations[rr_id] = dict(catch_grid)
     end_coords[rr_id] = dict(catch_grid)
 
-    ball_start: BallState = {
-        "from_player_id": bh_id,
-        "to_player_id": rr_id,
-        "current_coords": dict(bh_coord),
-    }
+    # Ball state continuity (see _build_outlet_pass_step). BH had the ball
+    # at end of step 1; lane pass is BallAttached(BH) → BallAttached(RR).
+    ball_start: BallState = {"owner_player_id": bh_id}
     ball_end: BallState = {"owner_player_id": rr_id}
 
     advance_trigger: AdvanceTrigger = {
@@ -795,6 +836,7 @@ def _build_lane_pass_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": next_step_index},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -911,6 +953,7 @@ def _build_shot_motion_step(
         "clock": clock_end,
         "next": _resolve_shot_next(turn_result),
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -991,11 +1034,9 @@ def _build_lane_pass_intercepted_step(
     destinations[stealer_id] = dict(contact_grid)
     end_coords[stealer_id] = dict(contact_grid)
 
-    ball_start: BallState = {
-        "from_player_id": bh_id,
-        "to_player_id": rr_id,
-        "current_coords": dict(bh_coord),
-    }
+    # Ball state continuity (see _build_outlet_pass_step). BH had the ball
+    # at end of step 1; intercept is BallAttached(BH) → BallAttached(stealer).
+    ball_start: BallState = {"owner_player_id": bh_id}
     ball_end: BallState = {"owner_player_id": stealer_id}
 
     advance_trigger: AdvanceTrigger = {
@@ -1049,6 +1090,7 @@ def _build_lane_pass_intercepted_step(
         },
         "announcement": announcement,
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -1131,11 +1173,11 @@ def _build_lane_pass_batted_step(
     destinations[defender_id] = dict(contact_grid)
     end_coords[defender_id] = dict(contact_grid)
 
-    ball_start: BallState = {
-        "from_player_id": bh_id,
-        "to_player_id": rr_id,
-        "current_coords": dict(bh_coord),
-    }
+    # Ball state continuity (see _build_outlet_pass_step). BH had the ball
+    # at end of step 1; batted is BallAttached(BH) → BallLoose(OOB grid).
+    # advance_trigger.metadata.contact_coords + oob_coords let the frontend
+    # render the bend (passer → contact → drift to OOB).
+    ball_start: BallState = {"owner_player_id": bh_id}
     ball_end: BallState = {"coords": dict(oob_grid)}
 
     advance_trigger: AdvanceTrigger = {
@@ -1189,6 +1231,7 @@ def _build_lane_pass_batted_step(
         },
         "announcement": announcement,
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -1317,6 +1360,7 @@ def _build_hold_up_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": 999},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -1428,6 +1472,7 @@ def _build_outlet_denied_defender_step(
         "next": {"kind": "next_step", "index": next_step_index},
         "announcement": announcement,
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -1541,6 +1586,7 @@ def _build_outlet_denied_cutback_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": next_step_index},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 
@@ -1583,11 +1629,10 @@ def _build_outlet_denied_recovery_pass_step(
     actions[passer_id] = "pass"
     actions[receiver_id] = "receive"
 
-    ball_start: BallState = {
-        "from_player_id": passer_id,
-        "to_player_id": receiver_id,
-        "current_coords": dict(passer_coord),
-    }
+    # Ball state continuity (see _build_outlet_pass_step). Passer held the
+    # ball through the outlet-denied cutback (step 2); recovery pass is
+    # BallAttached(passer) → BallAttached(receiver).
+    ball_start: BallState = {"owner_player_id": passer_id}
     ball_end: BallState = {"owner_player_id": receiver_id}
 
     advance_trigger: AdvanceTrigger = {
@@ -1625,6 +1670,7 @@ def _build_outlet_denied_recovery_pass_step(
         "clock": clock_end,
         "next": {"kind": "next_step", "index": 999},
     }
+    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
 
 

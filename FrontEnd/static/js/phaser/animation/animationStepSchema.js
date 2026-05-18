@@ -124,6 +124,12 @@
  * @property {Announcement} [announcement]
  *   Optional. Plays BEFORE step tweens fire. Used for entry-of-turn
  *   announcements like "Trap!" / "Fast Break!".
+ * @property {Object<PlayerId, number>} [tween_durations]
+ *   Optional. Per-player tween duration in game-seconds. When present, the
+ *   playback engine tweens each player for their individual duration;
+ *   fast finishers idle until step T elapses. When absent, fallback to
+ *   step T (which stretches fast finishers — the "lazy drift" anti-pattern).
+ *   Backend always stamps when it has per-player rate info.
  */
 
 /**

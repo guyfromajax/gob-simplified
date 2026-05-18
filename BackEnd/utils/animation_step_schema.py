@@ -163,6 +163,19 @@ class StepStart(TypedDict, total=False):
     the step's tweens. Used for entry-of-turn announcements like
     ``"Trap!"`` / ``"Fast Break!"``."""
 
+    tween_durations: Dict[PlayerId, float]
+    """Optional. Per-player tween duration in **game-seconds**. When present,
+    the playback engine tweens each player for their individual duration
+    (typically ``min(natural_distance / player_rate, step_T)``); players who
+    finish before step T idle at their end coord until the step's clock
+    elapses. When absent for a player (or when this field is missing
+    entirely), the playback engine falls back to the step's total T —
+    which stretches fast-finishing players' tweens over T, producing the
+    visible "lazy drift" anti-pattern we want to avoid.
+
+    Backend stamps this when it has per-player rate info (which is always —
+    AG + archetype determine rate). Frontend never recomputes."""
+
 
 class NextLinear(TypedDict):
     kind: Literal["next_step"]
