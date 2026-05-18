@@ -425,8 +425,13 @@ def _build_burst_step(
         "x": float(receiver_to["x"]),
         "y": float(receiver_to["y"]),
     }
+    # When rebounder == outlet receiver (skip_outlet_pass), he dribbles
+    # the ball to the outlet spot — bump his archetype to sprint so he
+    # closes the distance at FB pace rather than default cruise.
+    _skip_outlet_pass = bool(phase.get("skip_outlet_pass"))
+    receiver_archetype: PlayerArchetype = "sprint" if _skip_outlet_pass else "default"
     receiver_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
-    receiver_rate = _ag_grid_per_game_sec(receiver_player, "default")
+    receiver_rate = _ag_grid_per_game_sec(receiver_player, receiver_archetype)
     t = max(0.1, _traversal_seconds(receiver_start, receiver_end_target, receiver_rate))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in all_start_coords}
@@ -465,7 +470,7 @@ def _build_burst_step(
             "sprint",
         )
 
-    _commit_mover(receiver_id, receiver_end_target, "cut", "default")
+    _commit_mover(receiver_id, receiver_end_target, "cut", receiver_archetype)
     end_coords[receiver_id] = dict(receiver_end_target)
 
     if passer_id and passer_id in all_start_coords:

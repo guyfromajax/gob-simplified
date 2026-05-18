@@ -312,6 +312,7 @@ export class AnimationEngine {
       // can confirm which variant fired and which rendering path it took.
       if (turnData?.current_turn === "FAST_BREAK") {
         const willUseNewEngine = hasAnimationSteps && isMigratedFbVariant;
+        const _burstPhase = turnData?.roles?.rim_runner_burst_phase || {};
         console.warn(
           "🏀 [FB DISPATCH]",
           {
@@ -321,6 +322,9 @@ export class AnimationEngine {
             has_animation_steps: hasAnimationSteps,
             steps_count: hasAnimationSteps ? turnData.animation_steps.length : 0,
             path: willUseNewEngine ? "NEW_PLAYBACK_ENGINE" : "LEGACY_HANDLER",
+            skip_outlet_pass: _burstPhase.skip_outlet_pass ?? "(not set)",
+            outlet_passer_id: _burstPhase.outlet_passer_id ?? turnData?.roles?.outlet_passer ?? "(none)",
+            outlet_receiver_id: _burstPhase.outlet_receiver_id ?? turnData?.roles?.outlet_receiver ?? "(none)",
           }
         );
       }
