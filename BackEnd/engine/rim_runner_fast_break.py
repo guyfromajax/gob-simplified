@@ -726,66 +726,35 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     else:
         rr_new_y = float(random.randint(15, 20))
 
-    receive_ty = 15.0 if rr_new_y > 24 else 35.0
+    receive_ty = 15.0 if rr_new_y > 25 else 35.0
 
     most_recent = _find_most_recent_shot_turn(game)
-    rebound_x = _rebound_spot_x_for_rr(rebounder, most_recent)
-    use_dynamic = _use_dynamic_rr_outlet_placement(is_away_offense, rebound_x)
+
+    # Outlet receive spot: fixed at x=40 (home offense) or x=60 (away offense),
+    # opposite-wing y from RR's burst destination.
+    # Outlet receiver: offense player whose starting coords are closest to the
+    # outlet spot. Rebounder is eligible; only RR is excluded.
+    best_tx = 40.0 if not is_away_offense else 60.0
 
     offense_players = [p for p in off_lineup.values() if p is not None]
     best_p: Any = None
     best_d2 = float("inf")
-    best_tx = 50.0
-
-    if use_dynamic:
-        # Outlet receiver x from rebound; RR ends dx_burst spots toward basket from receiver target.
-        if not is_away_offense:
-            base_tx = float(max(4, min(97, int(round(rebound_x + 12)))))
-        else:
-            base_tx = float(max(4, min(97, int(round(rebound_x - 12)))))
-        best_tx = base_tx
-        for p in offense_players:
-            pid = getattr(p, "player_id", None)
-            if rr_id is not None and pid is not None and str(pid) == str(rr_id):
-                continue
-            px = _player_x(p)
-            py = _player_y(p)
-            dy = receive_ty - py
-            d2 = (best_tx - px) ** 2 + dy * dy
-            if d2 < best_d2:
-                best_d2 = d2
-                best_p = p
+    for p in offense_players:
+        pid = getattr(p, "player_id", None)
+        if rr_id is not None and pid is not None and str(pid) == str(rr_id):
+            continue
+        px = _player_x(p)
+        py = _player_y(p)
+        d2 = (best_tx - px) ** 2 + (receive_ty - py) ** 2
+        if d2 < best_d2:
+            best_d2 = d2
+            best_p = p
+    if best_p is None:
+        best_p = pg or rebounder
         if best_p is None:
-            best_p = pg or rebounder
-            if best_p is None:
-                best_p = next(p for p in offense_players if p)
-        rr_new_x = float(max(4, min(97, int(round(best_tx + x_dir * dx_burst)))))
-    else:
-        rr_new_x = float(max(4, min(97, int(round(rr_x0 + x_dir * dx_burst)))))
-        for p in offense_players:
-            pid = getattr(p, "player_id", None)
-            if rr_id is not None and pid is not None and str(pid) == str(rr_id):
-                continue
-            px = _player_x(p)
-            py = _player_y(p)
-            tx_raw = px + 8 * x_dir
-            tx = min(tx_raw, 40.0) if not is_away_offense else max(tx_raw, 60.0)
-            tx = float(max(4, min(97, int(round(tx)))))
-            dy = receive_ty - py
-            d2 = (tx - px) ** 2 + dy * dy
-            if d2 < best_d2:
-                best_d2 = d2
-                best_p = p
-                best_tx = tx
+            best_p = next(p for p in offense_players if p)
 
-        if best_p is None:
-            best_p = pg or rebounder
-            if best_p is None:
-                best_p = next(p for p in offense_players if p)
-            px = _player_x(best_p)
-            tx_raw = px + 8 * x_dir
-            tx_clamped = min(tx_raw, 40.0) if not is_away_offense else max(tx_raw, 60.0)
-            best_tx = float(max(4, min(97, int(round(tx_clamped)))))
+    rr_new_x = float(max(4, min(97, int(round(rr_x0 + x_dir * dx_burst)))))
 
     skip_outlet_pass = bool(
         rebounder is not None
