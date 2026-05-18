@@ -459,6 +459,20 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         ? Math.max(50, Math.round(playerGameSec * clockSecondMs))
         : durationMs;
 
+    // 🐌 [TWEEN] diagnostic — remove once stretching bug is confirmed resolved.
+    // Shows per-player: distance, backend-stamped game_seconds, resolved ms,
+    // whether we fell back to step T, and what step T is in ms.
+    console.log(
+      "🐌 [TWEEN] pid=%s dist=%.1f gameSec=%s durMs=%d fellback=%s step_t_ms=%d clockSecondMs=%d",
+      playerId,
+      Math.sqrt(dx * dx + dy * dy),
+      typeof playerGameSec === "number" ? playerGameSec.toFixed(2) : "MISSING",
+      playerDurationMs,
+      typeof playerGameSec !== "number" || !(playerGameSec > 0),
+      durationMs,
+      clockSecondMs,
+    );
+
     const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
     scene.tweens.add({
       targets: sprite,

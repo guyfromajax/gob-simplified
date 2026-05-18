@@ -106,3 +106,14 @@ def stamp_tween_durations(
         durations[pid] = float(min(dist / rate, step_t))
     if durations:
         start["tween_durations"] = durations
+
+    # 🐌 [TWEEN_DURATIONS] diagnostic — remove once stretching bug is confirmed
+    # resolved across CR / RR / HCT / HCO. Logs step T (game-sec) + per-player
+    # computed durations so we can verify backend stamping is producing sane
+    # values and the field reaches the frontend.
+    import logging as _tween_log
+    _tween_log.warning(
+        "🐌 [TWEEN_DURATIONS] step_t=%.2fs durations=%s",
+        step_t,
+        {pid: round(d, 2) for pid, d in durations.items()},
+    )
