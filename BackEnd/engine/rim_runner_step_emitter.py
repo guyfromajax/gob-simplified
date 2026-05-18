@@ -428,10 +428,11 @@ def _build_burst_step(
         "x": float(receiver_to["x"]),
         "y": float(receiver_to["y"]),
     }
-    # Outlet receiver always moves at burst speed to the outlet spot,
+    # Outlet receiver always moves at sprint speed to the outlet spot,
     # whether they're the rebounder (skip_outlet_pass case) or a separate
-    # receiver catching a pass. Burst = peak FB-explosion archetype.
-    receiver_archetype: PlayerArchetype = "burst"
+    # receiver catching a pass. RR moves at the faster `burst` archetype
+    # (set in the burst-targets loop below).
+    receiver_archetype: PlayerArchetype = "sprint"
     receiver_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
     receiver_rate = _ag_grid_per_game_sec(receiver_player, receiver_archetype)
     t = max(0.1, _traversal_seconds(receiver_start, receiver_end_target, receiver_rate))

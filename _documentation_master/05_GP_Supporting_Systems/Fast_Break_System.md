@@ -675,3 +675,36 @@ The outlet passer tracks:
 - **Triangle (`triangle`)**: Implement engine path and extend *Fast break plays* subsection above.
 - **Fast Break Fouls**: Add foul handling during fast break sequences
 - **Fast Break Turnovers**: Add turnover handling during fast break sequences
+
+
+**Rim Runner Fast Break Step Schema Details**
+##Step 0: Burst
+  -Advance Trigger (AT): player_reaches_position (PRT)
+    -Outlet Receiver reaches destination (sprint rate)
+
+##Step 1 Branches
+  -Step 1: Outlet Pass (see below for Step 2 branches)
+    -Step 1: Outlet pass
+  -Step 1: Outlet Denied
+    -Step 1: Defender Close Out
+    -Step 2: Paralle Movement
+    -Step 3: Reset Step
+
+
+
+##Step 2 Branches (from Outlet Pass)
+  -Shot Branch
+    -Step 2: Lane Pass
+    -Step 3: Shot Motion
+
+  -Steal Branch
+    -Step 2: Lane Pass (Interception)
+
+  -Bat Ball OOB Branch
+    -Step 2: Lane Pass (Ball Batted OOB)
+
+  -Hold Up Branch
+    -Step 2: Hold Up Step
+    -Step 2: Lead In
+
+  

@@ -236,7 +236,7 @@ SHOT_MOTION_MULTIPLIER            = 10.0 / 12.0  # Shot motion → 10 grid/sec a
 SPRINT_MULTIPLIER                 = 14.0 / 12.0  # → 14 grid/sec at AG=50
 # Burst = peak full-speed movement (RR + outlet receiver on the FB burst step).
 # Faster than sprint to convey the explosive start of a fast break.
-BURST_MULTIPLIER                  = 20.0 / 12.0  # → 20 grid/sec at AG=50
+BURST_MULTIPLIER                  = 24.0 / 12.0  # → 20 grid/sec at AG=50
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
