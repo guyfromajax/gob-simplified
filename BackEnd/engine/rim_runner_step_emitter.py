@@ -179,6 +179,7 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     try:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
         from BackEnd.constants import (
+            BURST_MULTIPLIER,
             DRIVE_MULTIPLIER,
             SHOT_MOTION_MULTIPLIER,
             SPRINT_MULTIPLIER,
@@ -198,6 +199,8 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         return base_rate * SHOT_MOTION_MULTIPLIER
     if archetype == "sprint":
         return base_rate * SPRINT_MULTIPLIER
+    if archetype == "burst":
+        return base_rate * BURST_MULTIPLIER
     return base_rate
 
 
@@ -425,10 +428,10 @@ def _build_burst_step(
         "x": float(receiver_to["x"]),
         "y": float(receiver_to["y"]),
     }
-    # Outlet receiver always moves at sprint speed to the outlet spot,
+    # Outlet receiver always moves at burst speed to the outlet spot,
     # whether they're the rebounder (skip_outlet_pass case) or a separate
-    # receiver catching a pass.
-    receiver_archetype: PlayerArchetype = "sprint"
+    # receiver catching a pass. Burst = peak FB-explosion archetype.
+    receiver_archetype: PlayerArchetype = "burst"
     receiver_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
     receiver_rate = _ag_grid_per_game_sec(receiver_player, receiver_archetype)
     t = max(0.1, _traversal_seconds(receiver_start, receiver_end_target, receiver_rate))
@@ -466,7 +469,7 @@ def _build_burst_step(
             rr_id,
             {"x": float(rr_to["x"]), "y": float(rr_to["y"])},
             "sprint",
-            "sprint",
+            "burst",
         )
 
     _commit_mover(receiver_id, receiver_end_target, "cut", receiver_archetype)

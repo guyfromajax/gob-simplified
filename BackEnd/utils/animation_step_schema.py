@@ -39,6 +39,7 @@ behavior (sprite frames, ball events). Orthogonal to archetype."""
 PlayerArchetype = Literal[
     "default",
     "sprint",
+    "burst",
     "drive",
     "shot_motion",
     "cruise",
