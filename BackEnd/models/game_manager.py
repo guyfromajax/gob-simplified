@@ -508,27 +508,50 @@ class GameManager:
         - flips=False → next offense = current ``self.offense_team`` (e.g.,
           CR/RR FB stop where offense retains for HCO)
         """
+        import logging as _stamp_log
         if not isinstance(result, dict):
             return
-        if result.get("next_play_type") != "HCO":
+        _next_play = result.get("next_play_type")
+        if _next_play != "HCO":
+            _stamp_log.warning(
+                "🔍 [RESET STAMP] skip: current_turn=%s next_play_type=%s (not HCO)",
+                result.get("current_turn"), _next_play,
+            )
             return
 
         anim_steps = result.get("animation_steps") or []
         if not anim_steps:
-            return  # legacy path — no Reset
+            _stamp_log.warning(
+                "🔍 [RESET STAMP] skip: current_turn=%s no animation_steps (legacy path)",
+                result.get("current_turn"),
+            )
+            return
 
         last_end = anim_steps[-1].get("end") or {}
         last_ball = last_end.get("ball") or {}
         bh_id = last_ball.get("owner_player_id")
         if not bh_id:
-            return  # ball loose / in-flight at turn end — no clear BH
+            _stamp_log.warning(
+                "🔍 [RESET STAMP] skip: current_turn=%s last_ball=%s (no owner_player_id)",
+                result.get("current_turn"), last_ball,
+            )
+            return
 
         possession_flips = bool(result.get("possession_flips"))
         next_off_team = self.defense_team if possession_flips else self.offense_team
         pg = (getattr(next_off_team, "lineup", {}) or {}).get("PG")
         pg_id = getattr(pg, "player_id", None) if pg is not None else None
         if not pg_id or str(bh_id) == str(pg_id):
-            return  # BH is already PG — no inbound needed
+            _stamp_log.warning(
+                "🔍 [RESET STAMP] skip: bh_id=%s pg_id=%s (BH is PG or no PG)",
+                bh_id, pg_id,
+            )
+            return
+
+        _stamp_log.warning(
+            "🔍 [RESET STAMP] STAMPING: current_turn=%s bh_id=%s pg_id=%s possession_flips=%s",
+            result.get("current_turn"), bh_id, pg_id, possession_flips,
+        )
 
         from_coords = None
         last_end_coords = last_end.get("coords") or {}
@@ -901,6 +924,7 @@ class GameManager:
         # Propagate hco_setup from a prior turn to the next HCO turn payload.
         # The source turn was stamped above (or in the RR emitter); HCO emitter
         # consumes the propagated field to prepend Reset before the skeleton.
+        import logging as _prop_log
         if (
             isinstance(result, dict)
             and result.get("current_turn") == "HCO"
@@ -908,6 +932,16 @@ class GameManager:
             and previous_result.get("hco_setup")
         ):
             result["hco_setup"] = previous_result["hco_setup"]
+            _prop_log.warning(
+                "🔍 [RESET PROP] propagating hco_setup to HCO turn (prev current_turn=%s)",
+                previous_result.get("current_turn"),
+            )
+        elif isinstance(result, dict) and result.get("current_turn") == "HCO":
+            _prop_log.warning(
+                "🔍 [RESET PROP] HCO turn but prev had no hco_setup (prev current_turn=%s, prev next_play_type=%s)",
+                (previous_result or {}).get("current_turn") if isinstance(previous_result, dict) else None,
+                (previous_result or {}).get("next_play_type") if isinstance(previous_result, dict) else None,
+            )
 
         self._append_turn(result)
         _perf["next_turn_append"] = (_time.time() - _t0) * 1000
