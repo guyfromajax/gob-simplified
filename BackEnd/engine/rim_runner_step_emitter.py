@@ -1717,7 +1717,19 @@ def _stamp_hco_setup(
 
     fb_roles = turn_result.get("roles") or {}
     burst_phase = fb_roles.get("rim_runner_burst_phase") or {}
-    bh_id = _safe_id(burst_phase.get("outlet_receiver_id"))
+
+    # BH at end of FB turn = ball owner at last step's end.ball. This is
+    # whoever physically has the ball when the FB closes (outlet receiver
+    # for hold-up; rebounder/outlet passer for outlet-denied where the
+    # pass never fired).
+    bh_id: Optional[str] = None
+    if steps:
+        last_end = steps[-1].get("end") or {}
+        last_ball = last_end.get("ball") or {}
+        bh_id = _safe_id(last_ball.get("owner_player_id"))
+    if not bh_id:
+        # Fallback: outlet receiver from burst phase.
+        bh_id = _safe_id(burst_phase.get("outlet_receiver_id"))
     if not bh_id:
         return
 
@@ -1837,7 +1849,11 @@ def build_rim_runner_animation_steps(
     elapsed += float(burst_step["end"]["time_elapsed"])
     last_end_coords = dict(burst_step["end"]["coords"])
 
-    # Outlet denied: forks at step 1 (no outlet pass; defender close-out instead).
+    # Outlet denied: forks at step 1 (no outlet pass; defender close-out).
+    # The cutback + recovery-pass beats have been moved to HCO's Reset step
+    # (destination-turn pattern). This branch ends at the defender close-out
+    # with the rebounder still holding the ball; hco_setup signals the next
+    # HCO turn to fire Reset for the inbound to PG.
     if outlet_failed:
         denied_defender = _build_outlet_denied_defender_step(
             fb_roles=fb_roles,
@@ -1847,40 +1863,11 @@ def build_rim_runner_animation_steps(
             is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_remaining - elapsed,
             shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-            next_step_index=2,
+            next_step_index=999,  # implicit end → HCO turn
         )
         if denied_defender is None:
             return None
         steps.append(denied_defender)
-        elapsed += float(denied_defender["end"]["time_elapsed"])
-        last_end_coords = dict(denied_defender["end"]["coords"])
-
-        denied_cutback = _build_outlet_denied_cutback_step(
-            fb_roles=fb_roles,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            step_start_coords=last_end_coords,
-            is_away_offense=is_away_offense,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-            next_step_index=3,
-        )
-        if denied_cutback is None:
-            return _finalize_rr_steps(turn_result, game, steps)
-        steps.append(denied_cutback)
-        elapsed += float(denied_cutback["end"]["time_elapsed"])
-        last_end_coords = dict(denied_cutback["end"]["coords"])
-
-        recovery_pass = _build_outlet_denied_recovery_pass_step(
-            fb_roles=fb_roles,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            step_start_coords=last_end_coords,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-        )
-        if recovery_pass is not None:
-            steps.append(recovery_pass)
         return _finalize_rr_steps(turn_result, game, steps)
 
     # All other branches: outlet pass (unless skip_outlet_pass).

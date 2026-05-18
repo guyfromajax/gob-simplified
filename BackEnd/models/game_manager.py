@@ -491,6 +491,61 @@ class GameManager:
                     )
                     return
 
+    def _maybe_stamp_hco_setup(self, result: dict) -> None:
+        """Stamp ``hco_setup.inbound_pass`` on a turn that transitions to HCO
+        when the ball ends up with a player who is NOT the next offense's PG.
+        The signal is then propagated to the next HCO turn payload, where the
+        HCO emitter consumes it to prepend a Reset step before the skeleton.
+
+        Covers all migrated turn types that close into HCO: CR FB defensive
+        stop, RR FB hold-up / outlet-denied, DREB → HCO, Steal → HCO, plus
+        any future migrated source. Legacy turns (no ``animation_steps``)
+        are skipped — Reset only fires on the new playback path.
+
+        Determines "next offense" via ``result['possession_flips']``:
+        - flips=True → next offense = current ``self.defense_team`` (e.g.,
+          DREB, steal — possession moves to the other team)
+        - flips=False → next offense = current ``self.offense_team`` (e.g.,
+          CR/RR FB stop where offense retains for HCO)
+        """
+        if not isinstance(result, dict):
+            return
+        if result.get("next_play_type") != "HCO":
+            return
+
+        anim_steps = result.get("animation_steps") or []
+        if not anim_steps:
+            return  # legacy path — no Reset
+
+        last_end = anim_steps[-1].get("end") or {}
+        last_ball = last_end.get("ball") or {}
+        bh_id = last_ball.get("owner_player_id")
+        if not bh_id:
+            return  # ball loose / in-flight at turn end — no clear BH
+
+        possession_flips = bool(result.get("possession_flips"))
+        next_off_team = self.defense_team if possession_flips else self.offense_team
+        pg = (getattr(next_off_team, "lineup", {}) or {}).get("PG")
+        pg_id = getattr(pg, "player_id", None) if pg is not None else None
+        if not pg_id or str(bh_id) == str(pg_id):
+            return  # BH is already PG — no inbound needed
+
+        from_coords = None
+        last_end_coords = last_end.get("coords") or {}
+        bh_coords = last_end_coords.get(str(bh_id))
+        if isinstance(bh_coords, dict) and "x" in bh_coords and "y" in bh_coords:
+            from_coords = {
+                "x": float(bh_coords["x"]),
+                "y": float(bh_coords["y"]),
+            }
+
+        result.setdefault("hco_setup", {})
+        result["hco_setup"]["inbound_pass"] = {
+            "from_player_id": str(bh_id),
+            "to_player_id": str(pg_id),
+            "from_coords": from_coords,
+        }
+
     def _append_turn(self, turn_result, text=None):
         """
         Single funnel for appending any turn. Appends to turns + text_log, then runs
@@ -836,11 +891,16 @@ class GameManager:
         _t0 = _time.time()
         result["next_turn"] = self.determine_next_turn(result)
 
-        # Propagate hco_setup from a prior FB turn (RR hold-up / outlet-denied)
-        # to the next HCO turn payload. Backend signal for the BH → PG inbound
-        # pass when the FB ends with the BH (≠ PG) holding the ball. Consumer
-        # is the HCO emitter once it migrates; until then the data is
-        # preserved on the HCO turn for downstream pickup.
+        # Stamp hco_setup on THIS turn when it transitions to HCO with the
+        # ball ending up away from the next offense's PG. Single source of
+        # truth — covers CR FB defensive stop, DREB → HCO, Steal → HCO, plus
+        # the FB hold-up / outlet-denied paths (which also stamp locally in
+        # the RR emitter; redundant but identical payload, harmless).
+        self._maybe_stamp_hco_setup(result)
+
+        # Propagate hco_setup from a prior turn to the next HCO turn payload.
+        # The source turn was stamped above (or in the RR emitter); HCO emitter
+        # consumes the propagated field to prepend Reset before the skeleton.
         if (
             isinstance(result, dict)
             and result.get("current_turn") == "HCO"
