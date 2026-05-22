@@ -3146,54 +3146,64 @@ class TurnManager:
     def resolve_half_court_offense(self):
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         result = resolve_half_court_offense_logic(self.game)
-
-        # Boundary stamp: ensure every HCO turn (including stopper paths —
-        # FOUL / STEAL / DEAD_BALL_TURNOVER) carries ``current_turn="HCO"``.
-        # The resolver stamps it only for shot-result paths (line 4255),
-        # so stopper turns previously reached the FE with ``current_turn=None``
-        # and failed the new-playback gate in AnimationEngine.js — the schema
-        # animation_steps were emitted but never rendered. setdefault keeps
-        # any explicit value (e.g., FCP/HCT transitions if they ever route
-        # through this function) intact.
-        if isinstance(result, dict):
-            result.setdefault("current_turn", "HCO")
-
-        # Parallel-build: emit unified AnimationStep[] alongside legacy
-        # animations[]. Single injection point for all HCO return paths
-        # (shot, fouls, steals, dead-ball turnovers). See
-        # _documentation_master/projects/Animation_System_Updated.md.
-        # Defensive: emitter failure must not block the existing payload.
-        if isinstance(result, dict):
-            try:
-                from BackEnd.engine.skeleton_step_emitter import (
-                    build_skeleton_animation_steps,
-                )
-                anim_steps = build_skeleton_animation_steps(result, self.game)
-                if anim_steps is not None:
-                    result["animation_steps"] = anim_steps
-                    # Align result["time_elapsed"] with the schema's total
-                    # game-clock burn for MAKE/MISS/BLOCK. The legacy
-                    # step_clock_seconds-based time_elapsed counts only
-                    # skeleton-step durations; the [ball_flight] + [bounce]
-                    # sub-steps add ball-arc + bounce game-sec that must
-                    # also decrement the game clock (shot clock is pinned
-                    # across those sub-steps — handled separately via
-                    # `_shot_detach_elapsed_seconds`).
-                    result_type_for_te = (result.get("result_type") or "").upper()
-                    if result_type_for_te in ("MAKE", "MISS", "BLOCK") and anim_steps:
-                        first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
-                        last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
-                        cs_start = first_clock.get("clock_remaining")
-                        cs_end = last_clock.get("clock_remaining")
-                        if cs_start is not None and cs_end is not None:
-                            schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
-                            result["time_elapsed"] = int(round(schema_game_burn))
-            except Exception as e:
-                logging.warning(
-                    "build_skeleton_animation_steps (HCO) failed: %s", e
-                )
-
+        self._emit_hco_animation_steps(result)
         return result
+
+    def _emit_hco_animation_steps(self, result):
+        """Single injection point for HCO-tagged turn results — both the normal
+        ``resolve_half_court_offense`` path and the ``resolve_final_turn_shot``
+        path (≤30s Final Shot variant) route through here so every HCO turn
+        carries a unified ``animation_steps`` payload.
+
+        Mechanics:
+          - Boundary-stamps ``current_turn="HCO"`` (stopper paths — FOUL /
+            STEAL / DEAD_BALL_TURNOVER — would otherwise reach the FE with
+            ``current_turn=None`` and fail the schema-playback gate).
+          - Emits ``animation_steps`` via ``build_skeleton_animation_steps``.
+          - Aligns ``time_elapsed`` with the schema's game-clock burn for
+            MAKE/MISS/BLOCK — *except* for Final Shot results, which
+            explicitly set ``time_elapsed = time_remaining`` so the quarter
+            clock runs out (see
+            ``resolve_final_turn_shot_logic`` in ``phase_resolution.py``).
+          - Defensive: emitter failure does not block the existing payload.
+        """
+        if not isinstance(result, dict):
+            return
+        result.setdefault("current_turn", "HCO")
+        try:
+            from BackEnd.engine.skeleton_step_emitter import (
+                build_skeleton_animation_steps,
+            )
+            anim_steps = build_skeleton_animation_steps(result, self.game)
+            if anim_steps is None:
+                return
+            result["animation_steps"] = anim_steps
+            # Skip the schema-burn time_elapsed override for Final Shot —
+            # those turns deliberately burn the entire remaining quarter
+            # clock (``time_remaining``) regardless of natural step T.
+            if result.get("final_turn") is True:
+                return
+            # Align result["time_elapsed"] with the schema's total
+            # game-clock burn for MAKE/MISS/BLOCK. The legacy
+            # step_clock_seconds-based time_elapsed counts only
+            # skeleton-step durations; the [ball_flight] + [bounce]
+            # sub-steps add ball-arc + bounce game-sec that must
+            # also decrement the game clock (shot clock is pinned
+            # across those sub-steps — handled separately via
+            # ``_shot_detach_elapsed_seconds``).
+            result_type_for_te = (result.get("result_type") or "").upper()
+            if result_type_for_te in ("MAKE", "MISS", "BLOCK") and anim_steps:
+                first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
+                last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
+                cs_start = first_clock.get("clock_remaining")
+                cs_end = last_clock.get("clock_remaining")
+                if cs_start is not None and cs_end is not None:
+                    schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
+                    result["time_elapsed"] = int(round(schema_game_burn))
+        except Exception as e:
+            logging.warning(
+                "build_skeleton_animation_steps (HCO) failed: %s", e
+            )
 
     def resolve_final_turn_shot(self):
         """Final Turn shot (≤30s): alignment (Phase 2) + shot execution (Phase 3)."""
@@ -3201,9 +3211,11 @@ class TurnManager:
         o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
         d_dest, zone_playcall = self._build_final_turn_defense_alignment()
         self.game.game_state["defense_playcall"] = zone_playcall
-        return resolve_final_turn_shot_logic(
+        result = resolve_final_turn_shot_logic(
             self.game, o_dest, d_dest, position_to_spot, bh_pos
         )
+        self._emit_hco_animation_steps(result)
+        return result
 
     def _build_final_turn_offense_alignment(self):
         """Final Turn offense: BH 60% PG / 30% SG / 10% SF; PG/SG deep wings; SF/PF corners; C key.
