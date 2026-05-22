@@ -273,6 +273,118 @@ export class AnimationEngine {
   }
 
   /**
+   * UESS schema playback (`animationPlayback.playTurn`). Returns true when
+   * steps were rendered; false when this turn should use a legacy handler.
+   */
+  async runSchemaPlaybackTurn(turnData, context = {}) {
+    const steps = turnData?.animation_steps;
+    if (!Array.isArray(steps) || steps.length === 0) {
+      return false;
+    }
+    const currentTurnNorm = String(turnData?.current_turn || "").toUpperCase();
+    const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle"]);
+    const isMigratedFbVariant =
+      currentTurnNorm === "FAST_BREAK"
+      && MIGRATED_FB_PLAYS.has(turnData?.fast_break_play);
+    if (currentTurnNorm === "FAST_BREAK" && !isMigratedFbVariant) {
+      return false;
+    }
+
+    const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js");
+    const sprites = context.playerSprites
+      || this.playerSprites
+      || this.scene?.playerSprites
+      || {};
+    const ballSprite = context.ballSprite || this.scene?.ballSprite;
+
+    if (
+      turnData?.roles?.is_steal_hco_setup
+      && (currentTurnNorm === "HCO" || currentTurnNorm === "HCT")
+    ) {
+      const { animateStealHCOSetup } = await import("./turnAnimation.js");
+      await animateStealHCOSetup(this.scene, turnData, sprites, ballSprite);
+    }
+
+    const turnStop = await playTurn(
+      this.scene,
+      steps,
+      sprites,
+      ballSprite,
+      { turnData },
+    );
+    if (turnStop) {
+      await dispatchTurnStop(this.scene, turnStop, {
+        sprites,
+        ballSprite,
+        turnData,
+      });
+    }
+
+    const resultTypeNorm = String(turnData?.result_type || "").toUpperCase();
+    if (resultTypeNorm === "DREB" || currentTurnNorm === "DREB") {
+      await this._maybeRunDiscreteDrebOutletLeadIn(
+        turnData,
+        context,
+        sprites,
+        ballSprite,
+      );
+    }
+
+    return true;
+  }
+
+  /**
+   * Post-schema hooks for FREE_THROW (announcements, scroll, pressure after final make).
+   * Rebound capture / outlet are discrete DREB / OREB turns — not embedded here.
+   */
+  async _finishSchemaFreeThrowTurn(turnData, context = {}) {
+    const { getBallHandlerIdFromTurn, updateActivePlayers } = await import(
+      "../utils/activePlayerDisplay.js"
+    );
+    const shooterId = getBallHandlerIdFromTurn(turnData, 0);
+    const sprites =
+      context.playerSprites || this.playerSprites || this.scene?.playerSprites;
+    if (shooterId && sprites) {
+      updateActivePlayers(
+        shooterId,
+        null,
+        this.scene?.simData?.home_team_id,
+        sprites,
+      );
+    }
+
+    const { appendToTextScroll } = await import("../utils/textScroll.js");
+    appendToTextScroll(turnData?.text || "Free throw attempt");
+
+    const attempt = (turnData?.attempts || [])[0];
+    const isMake = String(attempt || "").toUpperCase() === "MAKE";
+    const ftRemaining = Number(turnData?.free_throws_remaining ?? 0);
+    const isFinal = ftRemaining <= 0;
+
+    if (isMake) {
+      const { announceGameEvent } = await import("../utils/gameAnnouncements.js");
+      announceGameEvent("FT_MAKE", turnData, this.scene, {
+        shooterId: turnData?.shooter_id ?? shooterId,
+      });
+      if (isFinal) {
+        if (turnData?.next_defensive_setup === "FCP") {
+          announceGameEvent("PRESSURE_FCP", turnData, this.scene);
+        } else if (turnData?.next_defensive_setup === "HCT") {
+          announceGameEvent("PRESSURE_HCT", turnData, this.scene);
+        }
+      }
+    }
+
+    if (turnData?.quarter_ends_after) {
+      if (context.onUpdate) context.onUpdate({ clock: "0:00" });
+      this._playFinalHoldAirhorn();
+      const animationConfig = (await import("./animation_config.js")).default;
+      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
+      await new Promise((resolve) => setTimeout(resolve, holdMs));
+    }
+  }
+
+  /**
    * Main entry point for all animations
    * Routes turn data to the appropriate handler
    */
@@ -300,8 +412,7 @@ export class AnimationEngine {
       // are migrated. Other turn types fall through to the legacy handler
       // dispatch below. See:
       // _documentation_master/projects/Animation_System_Updated.md
-      const newPlaybackTurnTypes = new Set(["HCO", "HCT", "DREB"]);
-      const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner"]);
+      const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle"]);
       const isMigratedFbVariant =
         turnData?.current_turn === "FAST_BREAK"
         && MIGRATED_FB_PLAYS.has(turnData?.fast_break_play);
@@ -329,14 +440,88 @@ export class AnimationEngine {
         );
       }
 
+      // BIP diagnostic: log every BIP at the dispatch point so we can confirm
+      // unified vs legacy routing during the BIP migration.
+      if (turnData?.current_turn === "BASELINE_INBOUND") {
+        console.warn(
+          "🏠 [BIP DISPATCH]",
+          {
+            result_type: turnData?.result_type,
+            next_play_type: turnData?.next_play_type,
+            has_animation_steps: hasAnimationSteps,
+            steps_count: hasAnimationSteps ? turnData.animation_steps.length : 0,
+            path: hasAnimationSteps ? "NEW_PLAYBACK_ENGINE" : "LEGACY_HANDLER",
+          }
+        );
+        // Pressure-state plumbing: legacy handleBaselineInbound sets
+        // scene.currentPressureType / pressureSequenceActive so subsequent
+        // FCP/HCT turns render in the right state. Replicate here so the
+        // unified path doesn't drop the contract.
+        const hasFCPHCTSetup = turnData?.next_defensive_setup === "FCP"
+          || turnData?.next_defensive_setup === "HCT";
+        if (hasFCPHCTSetup) {
+          this.scene.currentPressureType = turnData.next_defensive_setup;
+          this.scene.pressureSequenceActive = true;
+        } else {
+          this.scene.currentPressureType = null;
+          this.scene.pressureSequenceActive = false;
+        }
+      }
+
+      // SIP diagnostic: log SIDE_INBOUND turns at the dispatch point so we
+      // can confirm new playback engine vs. legacy routing during the SIP
+      // migration. No pressure-state plumbing — SIP always transitions to HCO.
+      if (turnData?.current_turn === "SIDE_INBOUND") {
+        console.warn(
+          "🏠 [SIP DISPATCH]",
+          {
+            result_type: turnData?.result_type,
+            next_play_type: turnData?.next_play_type,
+            has_animation_steps: hasAnimationSteps,
+            steps_count: hasAnimationSteps ? turnData.animation_steps.length : 0,
+            path: hasAnimationSteps ? "NEW_PLAYBACK_ENGINE" : "LEGACY_HANDLER",
+          }
+        );
+      }
+
+      if (
+        turnData?.current_turn === "FREE_THROW"
+        || turnData?.result_type === "FREE_THROW"
+      ) {
+        console.warn("🏀 [FT DISPATCH]", {
+          result_type: turnData?.result_type,
+          attempts: turnData?.attempts,
+          free_throws_remaining: turnData?.free_throws_remaining,
+          rebound_type: turnData?.rebound_type,
+          next_play_type: turnData?.next_play_type,
+          has_animation_steps: hasAnimationSteps,
+          steps_count: hasAnimationSteps ? turnData.animation_steps.length : 0,
+          path: hasAnimationSteps ? "NEW_PLAYBACK_ENGINE" : "LEGACY_HANDLER",
+        });
+      }
+
       const currentTurnNorm = String(turnData?.current_turn || "").toUpperCase();
       const resultTypeNorm = String(turnData?.result_type || "").toUpperCase();
-      if (
-        hasAnimationSteps
-        && (newPlaybackTurnTypes.has(turnData?.current_turn) ||
-          newPlaybackTurnTypes.has(currentTurnNorm) ||
-          isMigratedFbVariant)
-      ) {
+      // Any turn that carries animation_steps uses schema playback except
+      // un-migrated Fast Break variants (Triangle / After Steal). Do not
+      // gate on current_turn alone — MAKE/MISS HCO rows must not fall through
+      // to ShotAnimationSystem / playTurnAnimation when steps are present.
+      const isUnmigratedFastBreak =
+        currentTurnNorm === "FAST_BREAK" && !isMigratedFbVariant;
+      const useNewPlaybackEngine = hasAnimationSteps && !isUnmigratedFastBreak;
+
+      if (turnData?.current_turn === "HCO") {
+        console.warn("🏠 [HCO DISPATCH]", {
+          result_type: turnData?.result_type,
+          current_turn: turnData?.current_turn,
+          has_animation_steps: hasAnimationSteps,
+          steps_count: hasAnimationSteps ? turnData.animation_steps.length : 0,
+          path: useNewPlaybackEngine ? "NEW_PLAYBACK_ENGINE" : "LEGACY_HANDLER",
+          has_hco_setup: Boolean(turnData?.hco_setup?.inbound_pass),
+        });
+      }
+
+      if (useNewPlaybackEngine) {
         if (resultTypeNorm === "DREB" || currentTurnNorm === "DREB") {
           console.warn("[DREB OUTLET LEAD-IN] discrete DREB entered new playback (playTurn)", {
             current_turn: turnData?.current_turn,
@@ -347,45 +532,36 @@ export class AnimationEngine {
             steps: turnData?.animation_steps?.length ?? 0,
           });
         }
-        const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js");
-        const sprites = context.playerSprites
-          || this.playerSprites
-          || this.scene?.playerSprites
-          || {};
-        const ballSprite = context.ballSprite || this.scene?.ballSprite;
-        // Post-steal HCO: `roles.is_steal_hco_setup` only ran inside legacy `playTurnAnimation`.
-        // HCO/HCT rows with `animation_steps` bypass that path — run step-back + floor shift here first.
+        await this.runSchemaPlaybackTurn(turnData, context);
         if (
-          turnData?.roles?.is_steal_hco_setup &&
-          (currentTurnNorm === "HCO" ||
-            currentTurnNorm === "HCT" ||
-            turnData?.current_turn === "HCO" ||
-            turnData?.current_turn === "HCT")
+          currentTurnNorm === "FREE_THROW"
+          || resultTypeNorm === "FREE_THROW"
         ) {
-          const { animateStealHCOSetup } = await import("./turnAnimation.js");
-          await animateStealHCOSetup(this.scene, turnData, sprites, ballSprite);
-        }
-        const turnStop = await playTurn(
-          this.scene,
-          turnData.animation_steps,
-          sprites,
-          ballSprite,
-          { turnData },
-        );
-        if (turnStop) {
-          await dispatchTurnStop(this.scene, turnStop, {
-            sprites,
-            ballSprite,
-            turnData,
-          });
-        }
-        // Discrete DREB turn: rebound capture is `animation_steps` only. Half-court outlet
-        // (`hco.lead_in.from_dreb_outlet` via `runDefensiveReboundSetup`) must run here — the
-        // prior MISS turn sets `next_play_type` to "DREB", so ShotAnimationSystem skips outlet.
-        if (currentTurnNorm === "DREB" || resultTypeNorm === "DREB") {
-          await this._maybeRunDiscreteDrebOutletLeadIn(turnData, context, sprites, ballSprite);
+          await this._finishSchemaFreeThrowTurn(turnData, context);
         }
         return;
+      }
+
+      if (hasAnimationSteps && isUnmigratedFastBreak) {
+        console.warn(
+          "[UESS DISPATCH] animation_steps present but Fast Break variant uses legacy handler",
+          { fast_break_play: turnData?.fast_break_play },
+        );
+      }
+
+      const isHcoFamily =
+        currentTurnNorm === "HCO"
+        || resultTypeNorm === "HCO"
+        || (["MAKE", "MISS", "BLOCK"].includes(resultTypeNorm) && !turnData?.fast_break);
+      if (isHcoFamily && !hasAnimationSteps) {
+        console.warn(
+          "[UESS DISPATCH] HCO-family turn has NO animation_steps — legacy playTurnAnimation / ShotAnimationSystem",
+          {
+            current_turn: turnData?.current_turn,
+            result_type: turnData?.result_type,
+            has_legacy_animations: Boolean(turnData?.animations?.length),
+          },
+        );
       }
 
       if (
@@ -471,12 +647,20 @@ export class AnimationEngine {
       scene?.simData?.__priorAnimatedTurn ??
       null;
 
+    const isPriorShotMissFamily = (row) => {
+      if (!row) return false;
+      const rt = String(row.result_type || "").toUpperCase();
+      if (rt === "MISS" || rt === "BLOCK") return true;
+      if (rt !== "FREE_THROW") return false;
+      const att = (row.attempts || [])[0];
+      return (
+        String(att || "").toUpperCase() === "MISS"
+        && Number(row.free_throws_remaining ?? 0) <= 0
+      );
+    };
+
     let missTurn = null;
-    if (
-      priorFromChain &&
-      (priorFromChain.result_type === "MISS" ||
-        priorFromChain.result_type === "BLOCK")
-    ) {
+    if (priorFromChain && isPriorShotMissFamily(priorFromChain)) {
       missTurn = priorFromChain;
     } else if (
       Array.isArray(turnsArr) &&
@@ -485,16 +669,13 @@ export class AnimationEngine {
       idx - 1 < turnsArr.length
     ) {
       const cand = turnsArr[idx - 1];
-      if (
-        cand &&
-        (cand.result_type === "MISS" || cand.result_type === "BLOCK")
-      ) {
+      if (isPriorShotMissFamily(cand)) {
         missTurn = cand;
       }
     }
 
     if (!missTurn) {
-      console.warn(tag, "skip: prior_turn_not_MISS_BLOCK", {
+      console.warn(tag, "skip: prior_turn_not_MISS_BLOCK_FT", {
         turnData_index: turnData?.index,
         scene_currentTurn: scene?.currentTurn,
         resolved_idx: idx,
@@ -673,6 +854,17 @@ export class AnimationEngine {
    */
 
   async handleFreeThrow(turnData, context) {
+    const hasSchemaSteps =
+      Array.isArray(turnData?.animation_steps)
+      && turnData.animation_steps.length > 0;
+    if (hasSchemaSteps) {
+      console.warn(
+        "AnimationEngine: FREE_THROW has animation_steps — should use schema path in processTurn",
+      );
+      await this._finishSchemaFreeThrowTurn(turnData, context);
+      return;
+    }
+
     console.log('AnimationEngine: Handling free throw with new FreeThrowAnimationSystem');
     
     // ✅ PHASE 2.6: Update active player display (moved from animateGameTurns.js)
@@ -1635,6 +1827,10 @@ export class AnimationEngine {
   }
 
   async handleShotAttempt(turnData, context) {
+    if (await this.runSchemaPlaybackTurn(turnData, context)) {
+      return;
+    }
+
     // Use new shot animation system if available
     if (this.shotSystem) {
       await this.shotSystem.processShot(turnData);
@@ -1730,9 +1926,11 @@ export class AnimationEngine {
       return;
     }
 
-    // ✅ PHASE 2.3: Note: Pre/post setup is handled by AnimationRouter
-    // This handler only needs to call playTurnAnimation with the provided context
-    // Import and use existing turn animation handler for now
+    if (await this.runSchemaPlaybackTurn(turnData, context)) {
+      return;
+    }
+
+    // Legacy HCO setup / stopper turns without animation_steps.
     const { playTurnAnimation } = await import('./turnAnimation.js');
     // ✅ PHASE 2.1: Pass full context including turnIndex and onUpdate
     await playTurnAnimation({

@@ -29,7 +29,7 @@
 
 /**
  * @typedef {(
- *   "default" | "sprint" | "drive" | "shot_motion" | "cruise" | "stationary"
+ *   "sprint" | "burst" | "standard" | "shot_motion" | "cruise" | "stationary"
  * )} PlayerArchetype
  *   Movement-rate selector. Multiplied with player AG curve to produce
  *   grid/game-second rate. Orthogonal to action.
@@ -113,6 +113,26 @@
  */
 
 /**
+ * @typedef {Object} StepSfx
+ *   Backend-resolved SFX cue. FE plays the named file at the appropriate
+ *   ball-motion moment (release / arrival).
+ * @property {string} file               Asset filename (e.g. "swish.wav").
+ * @property {number} [volume]           Defaults to 0.7 if omitted.
+ * @property {string} [event]            Telemetry tag for playGameSfx.
+ */
+
+/**
+ * @typedef {Object} TimedSfx
+ *   Backend-resolved SFX cue with an explicit wall-clock offset from step
+ *   start. The FE schedules `setTimeout` for each cue. Used for variant
+ *   follow-up cues that overlap the next sub-step's motion.
+ * @property {string} file
+ * @property {number} delay_ms           ms after step start.
+ * @property {number} [volume]
+ * @property {string} [event]
+ */
+
+/**
  * @typedef {Object} StepStart
  * @property {Object<PlayerId, GridCoord>}        coords
  * @property {Object<PlayerId, (GridCoord|null)>} destination
@@ -130,6 +150,22 @@
  *   fast finishers idle until step T elapses. When absent, fallback to
  *   step T (which stretches fast finishers — the "lazy drift" anti-pattern).
  *   Backend always stamps when it has per-player rate info.
+ * @property {("shot"|"pass")} [ball_motion_style]
+ *   Optional. Overrides the ball tween duration: "shot" → 27 grid/game-sec
+ *   (min 700 ms FE playback floor), "pass" → 30 grid/game-sec.
+ *   "pass" → PASS_GRID_SPOTS_PER_GAME_SECOND (30). Absent → ball tweens over step T.
+ * @property {GridCoord} [ball_arrival_coord]
+ *   Optional. Overrides the ball-tween end coord (used for moving-receiver
+ *   meet-points). Absent → derived from `step.end.ball` owner / coords.
+ * @property {StepSfx} [sfx_on_ball_release]
+ *   Optional. Fires at the moment the ball detaches from its start-owner
+ *   (= ball-tween start). Used for pass release, shot release, etc.
+ * @property {StepSfx} [sfx_on_ball_arrival]
+ *   Optional. Fires at the ball-tween onComplete (= ball reaches destination).
+ *   Used for reception, shot result, etc.
+ * @property {TimedSfx[]} [timed_sfx]
+ *   Optional. Ordered list of cues fired at explicit offsets from step
+ *   start. Each cue runs independently of ball motion (FE uses setTimeout).
  */
 
 /**

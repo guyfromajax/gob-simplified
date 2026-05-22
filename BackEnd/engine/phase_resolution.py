@@ -957,7 +957,7 @@ def apply_fast_break_cg_time(turn_result, shot_attempted=False):
     if len(path_points) >= 2:
         for idx in range(1, len(path_points)):
             distance_seconds += calc_ag_segment_seconds(
-                path_points[idx - 1], path_points[idx], bh, archetype="default"
+                path_points[idx - 1], path_points[idx], bh, archetype="standard"
             )
 
     overhead_seconds = 0.0
@@ -1042,16 +1042,15 @@ def resolve_fast_break_logic(game: "GameManager"):
 
         rr_result = resolve_rim_runner_fast_break(game, fb_play_key)
 
-        # Parallel-build: emit unified AnimationStep[] for Rim Runner. Triangle
-        # still uses legacy rendering until its own migration lands. The emitter
-        # internally re-canonicalizes post-shot overlays (for outlet_passer
-        # exemption) and stamps `hco_setup.inbound_pass` on hold-up /
-        # outlet-denied branches when BH != PG.
+        # Parallel-build: unified AnimationStep[] for Rim Runner and Triangle.
+        # Emitters re-canonicalize post-shot overlays and stamp
+        # ``hco_setup.inbound_pass`` on hold-up / outlet-denied when BH != PG.
         if fb_play_key == "rim_runner":
             try:
                 from BackEnd.engine.rim_runner_step_emitter import (
                     build_rim_runner_animation_steps,
                 )
+
                 anim_steps = build_rim_runner_animation_steps(rr_result, game)
                 if anim_steps is not None:
                     rr_result["animation_steps"] = anim_steps
@@ -1059,6 +1058,17 @@ def resolve_fast_break_logic(game: "GameManager"):
                 logging.warning(
                     "build_rim_runner_animation_steps failed: %s", e
                 )
+        elif fb_play_key == TRIANGLE:
+            try:
+                from BackEnd.engine.triangle_step_emitter import (
+                    build_triangle_animation_steps,
+                )
+
+                anim_steps = build_triangle_animation_steps(rr_result, game)
+                if anim_steps is not None:
+                    rr_result["animation_steps"] = anim_steps
+            except Exception as e:
+                logging.warning("build_triangle_animation_steps failed: %s", e)
 
         return rr_result
 
@@ -2125,6 +2135,8 @@ def resolve_free_throw_logic(game):
                 bounce_spot,
                 max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
             )
+            # Stamped here so ``ft_step_emitter`` + discrete OREB/DREB share one bounce.
+            game_state["_ft_last_bounce_spot"] = dict(bounce_spot)
 
             anim_list = animations if isinstance(animations, list) else []
             player_anim_count = sum(
@@ -2221,6 +2233,33 @@ def resolve_free_throw_logic(game):
             # Add next play type for defensive rebounds
             if game_state.get("last_rebound") == "DREB":
                 result["next_play_type"] = game_state.get("offensive_state", "HCO")
+
+    # Final miss: authoritative bounce + crash lists for schema + discrete rebound turns.
+    if (
+        not makes_shot
+        and game_state.get("free_throws_remaining", 0) <= 0
+    ):
+        bounce_spot = game_state.pop("_ft_last_bounce_spot", None)
+        if isinstance(bounce_spot, dict) and "x" in bounce_spot and "y" in bounce_spot:
+            result["ball_bounce_x"] = float(bounce_spot["x"])
+            result["ball_bounce_y"] = float(bounce_spot["y"])
+        rebounder_id = result.get("rebounderId")
+        shooter_id = result.get("shooter_id")
+        bx = result.get("ball_bounce_x")
+        by = result.get("ball_bounce_y")
+        if rebounder_id and shooter_id and bx is not None and by is not None:
+            from BackEnd.engine.ft_step_emitter import collect_ft_rebound_crashers
+
+            off_crash, def_crash = collect_ft_rebound_crashers(
+                off_lineup,
+                def_lineup,
+                {"x": float(bx), "y": float(by)},
+                rebounder_id=str(rebounder_id),
+                shooter_id=str(shooter_id),
+                max_x_delta=float(FREE_THROW_REBOUND_MAX_X_DELTA),
+            )
+            result["offense_rebounders"] = off_crash
+            result["defense_rebounders"] = def_crash
 
     attach_position_snapshots(result, [ft_snap])
     return result
@@ -4957,9 +4996,10 @@ def resolve_half_court_offense_logic(game):
             turn_result["resolution_step_index"] = timing_contract["resolution_step_index"]
             turn_result["executed_step_count"] = timing_contract["executed_step_count"]
             turn_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
-            # Add skeleton and animations to result
+            # Add skeleton to result. Legacy ``animations[]`` is no longer
+            # stamped on HCO turn results (Phase 2 of HCO UESS migration);
+            # the schema emitter builds them internally from the skeleton.
             turn_result["skeleton"] = skeleton or {}
-            turn_result["animations"] = animations
             # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
             lean_value = game_state.get("lean_result_value", 0)
             if "lean:" not in turn_result.get("text", ""):
@@ -5017,9 +5057,10 @@ def resolve_half_court_offense_logic(game):
             foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             foul_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
             logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
-            # Add skeleton and animations to result
+            # Add skeleton to result. Legacy ``animations[]`` no longer stamped
+            # on HCO results (Phase 2 of UESS migration); schema emitter builds
+            # them internally.
             foul_result["skeleton"] = skeleton or {}
-            foul_result["animations"] = animations
             # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
             lean_value = game_state.get("lean_result_value", 0)
             if "lean:" not in foul_result.get("text", ""):
@@ -5075,9 +5116,10 @@ def resolve_half_court_offense_logic(game):
             foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
             foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             foul_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
-            # Add skeleton and animations to result
+            # Add skeleton to result. Legacy ``animations[]`` no longer stamped
+            # on HCO results (Phase 2 of UESS migration); schema emitter builds
+            # them internally.
             foul_result["skeleton"] = skeleton or {}
-            foul_result["animations"] = animations
             # ✅ ADD LEAN METER VALUE: Add raw result value (-100 to +100) to text for frontend parsing
             lean_value = game_state.get("lean_result_value", 0)
             if "lean:" not in foul_result.get("text", ""):
@@ -5264,16 +5306,10 @@ def resolve_half_court_offense_logic(game):
     if serializable_roles:  # Only add roles if we have something to add
         shot_result["roles"] = serializable_roles
     
-    # Convert skeleton to animations if skeleton exists
-    if skeleton and "steps" in skeleton:
-        skeleton_animations = animator.skeleton_to_animations(
-            skeleton, 
-            off_lineup, 
-            def_lineup, 
-            add_defenders=True
-        )
-        if skeleton_animations:
-            shot_result["animations"] = skeleton_animations
+    # Phase 2 of HCO UESS migration: legacy ``animations[]`` is no longer
+    # stamped on HCO shot results. The schema emitter (skeleton_step_emitter)
+    # builds them internally from the skeleton when assembling
+    # ``animation_steps[]``. The animator call previously here is dropped.
 
     # 4. scouting report update (new buckets)
     try:
@@ -6877,7 +6913,6 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     def_lineup = def_team.lineup
 
     dyn = compute_dynamic_hct_turn(game)
-    animations = dyn["animations"]
     result_type = dyn["result_type"]
     ball_handler = dyn["ball_handler"]
     defender = dyn["defender"]
@@ -6888,10 +6923,6 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         if ball_handler is not None:
             ball_handler.record_stat("TO")
         def_scouting["defense"]["HCT"]["success"] += 1
-
-    # Apply final coords from the animation tail to player.coords.
-    if animations:
-        apply_coords_from_animations_list(game, animations)
 
     # Possession flip + next play type per existing HCT conventions.
     possession_flips = result_type in ("DEAD BALL", "STEAL")
@@ -6919,6 +6950,44 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     }
     _record_hct_stats(hct_roles, {"result_type": result_type}, game, off_lineup, def_lineup)
 
+    # Engine returned a defensive bail (missing PG/PG-defender). Return a
+    # minimal payload — emitter will skip and frontend falls back to whatever
+    # placeholder is available.
+    if dyn.get("bail"):
+        return {
+            "result_type": result_type,
+            "text": text,
+            "current_turn": "HCT",
+            "next_play_type": next_play_type,
+            "next_turn": next_play_type,
+            "ball_handler": ball_handler,
+            "defender": defender,
+            "shooter": ball_handler,
+            "passer": "",
+            "screener": "",
+            "offense_team_id": off_team.team_id,
+            "possession_flips": possession_flips,
+            "time_elapsed": 0.0,
+            "step_clock_seconds": [0.0],
+            "resolution_step_index": 0,
+            "executed_step_count": 0,
+            "events": [],
+            "skeleton": {},
+            "roles": roles,
+            "foul_team": None,
+            "foul_player_id": None,
+            "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
+            "defender_id": getattr(defender, "player_id", None) if defender else None,
+            "fouled_out": False,
+            "foul_count": 0,
+        }
+
+    # Intermediate data for the emitter. ``turn_manager`` calls
+    # ``build_dynamic_hct_animation_steps`` (which reads these fields +
+    # ``prior_turn.final_coords`` + ``prior_turn.final_ball_handler_id``) to
+    # assemble three schema steps: entry walk-up, converge, attack. The
+    # emitter overwrites ``animation_steps``, ``time_elapsed``, and
+    # ``step_clock_seconds`` with the full 3-step totals.
     return {
         "result_type": result_type,
         "text": text,
@@ -6932,13 +7001,13 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "screener": "",
         "offense_team_id": off_team.team_id,
         "possession_flips": possession_flips,
-        "time_elapsed": dyn["time_elapsed"],
-        "step_clock_seconds": dyn["step_clock_seconds"],
-        "resolution_step_index": max(0, len(dyn["step_clock_seconds"]) - 1),
-        "executed_step_count": len(dyn["step_clock_seconds"]),
+        # Engine-portion totals only; emitter adds walk-up duration.
+        "time_elapsed": dyn["converge_seconds"] + dyn["attack_seconds"],
+        "step_clock_seconds": [dyn["converge_seconds"], dyn["attack_seconds"]],
+        "resolution_step_index": 1,  # 2 engine steps → last index is 1
+        "executed_step_count": 2,
         "events": [],
         "skeleton": {},
-        "animations": animations,
         "roles": roles,
         "foul_team": None,
         "foul_player_id": None,
@@ -6946,6 +7015,16 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "defender_id": getattr(defender, "player_id", None) if defender else None,
         "fouled_out": False,
         "foul_count": 0,
+        # Intermediate data for the emitter.
+        "hct_bh_pos": dyn["bh_pos"],
+        "hct_bh_target": dyn["bh_target"],
+        "hct_other_offense_targets": dyn["other_offense_targets"],
+        "hct_def_initial_targets": dyn["def_initial_targets"],
+        "hct_converge_target": dyn["converge_target"],
+        "hct_converge_seconds": dyn["converge_seconds"],
+        "hct_attack_bh_target": dyn["attack_bh_target"],
+        "hct_attack_def_target": dyn["attack_def_target"],
+        "hct_attack_seconds": dyn["attack_seconds"],
     }
 
 

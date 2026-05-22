@@ -17,6 +17,7 @@ import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags, animationDebugLog } from '../utils/debugFlags.js';
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
 import { ENABLE_TIMEOUT_BUTTON } from '../utils/timeoutButtonManager.js';
+import { waitMsRespectingPause, waitWhileUserPaused } from './playbackPause.js';
 
 export class AnimationRouter {
   constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null, updateDebugScore = null) {
@@ -389,14 +390,18 @@ export class AnimationRouter {
     if (!this.scene?.tweens?.getTweensOf || timeoutMs <= 0) {
       return { waitedMs: 0, remainingTweens: this._countActiveTweensForBoundary() };
     }
-    const start = Date.now();
+    let elapsed = 0;
     let remaining = this._countActiveTweensForBoundary();
-    while (remaining > 0 && (Date.now() - start) < timeoutMs) {
-      await new Promise((resolve) => setTimeout(resolve, stepMs));
-      remaining = this._countActiveTweensForBoundary();
+    while (remaining > 0 && elapsed < timeoutMs) {
+      await waitWhileUserPaused(this.scene);
+      await waitMsRespectingPause(this.scene, stepMs);
+      if (!this.scene?.isPaused) {
+        elapsed += stepMs;
+        remaining = this._countActiveTweensForBoundary();
+      }
     }
     return {
-      waitedMs: Math.max(0, Date.now() - start),
+      waitedMs: Math.max(0, elapsed),
       remainingTweens: remaining,
     };
   }
@@ -435,7 +440,7 @@ export class AnimationRouter {
           : Date.now();
       await Promise.race([
         p,
-        new Promise((resolve) => setTimeout(resolve, tailWaitMs)),
+        waitMsRespectingPause(this.scene, tailWaitMs),
       ]);
       const waitEndMs =
         typeof performance !== "undefined" && typeof performance.now === "function"
@@ -459,7 +464,7 @@ export class AnimationRouter {
         : Date.now();
     await Promise.race([
       p,
-      new Promise((resolve) => setTimeout(resolve, fallbackWaitMs)),
+      waitMsRespectingPause(this.scene, fallbackWaitMs),
     ]);
     const waitEndMs =
       typeof performance !== "undefined" && typeof performance.now === "function"

@@ -270,46 +270,17 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
                 playGameplayTrack();
                 // Set flag so first HCO turn knows ball is already attached (like _previousTurnWasInbound)
                 scene._previousTurnWasOpeningTip = true;
-                
-                // ✅ REFACTOR: Use centralized pass system for tip winner → PG pass
-                // Find PG for the tip winner's team
-                const tipWinnerTeam = tipWinnerSprite.team || tipWinnerSprite.team_id;
-                let pgSprite = null;
-                let pgId = null;
-                
-                for (const [id, sprite] of Object.entries(playerSprites)) {
-                    const info = scene.playerInfo?.[id];
-                    if (info?.pos === "PG" && (sprite.team === tipWinnerTeam || sprite.team_id === tipWinnerTeam)) {
-                        pgSprite = sprite;
-                        pgId = id;
-                        break;
-                    }
-                }
-                
-                if (pgSprite && pgId) {
-                    // Wait a moment for ball attachment to settle, then pass to PG
-                    scene.time.delayedCall(300, async () => {
-                        const { handlePassAnimation } = await import('./passDetection.js');
-                        const syntheticPassInfo = {
-                            passerId: tipWinnerSprite.playerId,
-                            receiverId: pgId,
-                            stepIndex: 0,
-                            timestamp: Date.now()
-                        };
-                        await handlePassAnimation({
-                            scene,
-                            passInfo: syntheticPassInfo,
-                            playerSprites
-                        });
-                        if (onComplete) onComplete();
-                    });
-                } else {
-                    console.warn("⚠️ Could not find PG for tip winner's team, skipping pass");
-                    // Wait a moment before continuing
-                    scene.time.delayedCall(300, () => {
-                        if (onComplete) onComplete();
-                    });
-                }
+
+                // The tip-winner → PG pass is INTENTIONALLY no longer rendered
+                // here. The HCO entry orchestrator (`skeleton_step_emitter`'s
+                // Handoff / Kickout / Walk Up) on the next turn handles the
+                // BH→PG transition based on `prior_turn.final_ball_handler_id`
+                // (= tip winner). Running both produced a double-pass to PG.
+                // Brief settle delay preserves the original beat between tip
+                // attach and HCO turn start.
+                scene.time.delayedCall(300, () => {
+                    if (onComplete) onComplete();
+                });
             } else {
                 console.warn("⚠️ Could not find tip winner to attach ball to");
                 // Wait a moment before continuing

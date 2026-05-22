@@ -755,7 +755,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         # Phase 4b: per-segment game_seconds for the outlet defender's contest tween.
         od_start = {"x": float(_player_x(outlet_defender)), "y": float(_player_y(outlet_defender))}
         od_to["game_seconds"] = calc_ag_segment_seconds(
-            od_start, od_to, outlet_defender, archetype="default"
+            od_start, od_to, outlet_defender, archetype="standard"
         )
 
     off_ids = {str(getattr(p, "player_id", None)) for p in off_lineup.values() if p}
@@ -799,7 +799,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             {"x": float(px), "y": float(py)},
             {"x": float(nx), "y": float(ny)},
             pl,
-            archetype="default",
+            archetype="standard",
         )
         other_moves.append(
             {
@@ -816,7 +816,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     rr_to = {
         "x": float(rr_new_x),
         "y": float(rr_new_y),
-        "game_seconds": calc_ag_segment_seconds(rr_from, {"x": float(rr_new_x), "y": float(rr_new_y)}, rr, archetype="default"),
+        "game_seconds": calc_ag_segment_seconds(rr_from, {"x": float(rr_new_x), "y": float(rr_new_y)}, rr, archetype="standard"),
     }
     recv_start = {
         "x": float(_player_x(ball_handler)),
@@ -825,7 +825,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     recv_end = {"x": float(best_tx), "y": float(receive_ty)}
     if ball_handler and recv_start is not None:
         recv_end["game_seconds"] = calc_ag_segment_seconds(
-            recv_start, {"x": float(best_tx), "y": float(receive_ty)}, ball_handler, archetype="default",
+            recv_start, {"x": float(best_tx), "y": float(receive_ty)}, ball_handler, archetype="standard",
         )
 
     fb_roles["rim_runner_burst_phase"] = {

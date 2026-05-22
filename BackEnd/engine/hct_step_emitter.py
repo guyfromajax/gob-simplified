@@ -74,7 +74,7 @@ def _archetype_for_hct_step(
         return "default"
     if step_index == 3:
         if is_ball_handler:
-            return "drive"
+            return "standard"
         return "default"
     # Defensive default (shouldn't hit for the 4-step HCT model).
     return "default"

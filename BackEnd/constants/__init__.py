@@ -203,12 +203,11 @@ SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
 SITUATIONAL_BIP_RECEIVER_POS = "SG"
 SITUATIONAL_SIP_RECEIVER_POS = "SG"
 
-# Movement rates. Legacy per-archetype pace constants were retired in Phase 4d
-# (see Movement_Rate_Refactor.md) — they're now derived per-player from AG via
-# ``calc_ag_segment_seconds`` and ``ag_to_grid_per_game_sec``, and the cruise
-# baseline lives in ``CRUISE_BASELINE_GRID_PER_GAME_SEC`` below. Pass speed
-# stays a constant — ball physics, not player AG.
-PASS_GRID_SPOTS_PER_GAME_SECOND = 36  # Pass (ball in air): Euclidean — HCO / clock-burn accounting.
+# Movement rates. Per-archetype absolute rates at AG=50; the AG curve scales
+# them proportionally for other AG values via
+# ``ag_to_grid_per_game_sec(ag) / STANDARD_GRID_PER_GAME_SEC``.
+# Pass speeds are independent constants — ball physics, not player AG.
+PASS_GRID_SPOTS_PER_GAME_SECOND = 30  # Pass (ball in air): Euclidean — HCO / clock-burn accounting.
 # Fast-break-specific pass rate (schema-based emitters: CR FB). Used by
 # `calc_fb_pass_segment_seconds`. Drives both the visible wall-clock animation
 # duration (game-sec × 350 ms) and the clock-burn for the pass step — these
@@ -218,27 +217,46 @@ FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 40
 FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY = 30  # FB outlet pass when outlet_score < threshold
 FB_OUTLET_QUALITY_THRESHOLD = 50                # sharp/sloppy split on fb_roles["outlet_score"]
 FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (short passes still register)
-RESET_INBOUND_PASS_GRID_PER_GAME_SECOND = 24    # Reset step inbound pass (BH → PG)
+RESET_INBOUND_PASS_GRID_PER_GAME_SECOND = 30    # Reset step inbound pass (BH → PG)
+INBOUND_PASS_GRID_PER_GAME_SECOND = 30          # Inbound pass (SF → PG) for BIP / SIP
+HCO_STEP_T_FLOOR_GAME_SECONDS = 0.5             # Min step T for HCO skeleton steps (short-distance steps still visibly play)
 
-# ---- Movement Rate Refactor (see Movement_Rate_Refactor.md) ---------------
-# New two-tier model: cruise-speed steps (HCO/HCT bring-up) vs AG-driven steps.
-# Phase 1 ships these constants without wiring them; helpers in shared.py
-# accept them but route to the legacy pace constants until Phase 2/4 land.
-CRUISE_BASELINE_GRID_PER_GAME_SEC = 12  # Cruise baseline for non-BH movers (AG=50 rate)
-BH_CRUISE_MIN_GRID_PER_GAME_SEC   = 8   # BH random low end during bring-up
-BH_CRUISE_MAX_GRID_PER_GAME_SEC   = 12  # BH random high end during bring-up (= cruise baseline; BH walking ball up never exceeds default cruise)
-# Multipliers below are sized so absolute rates at AG=50 are: drive=12, shot_motion=10.
-# When CRUISE_BASELINE changes, these multipliers must be re-derived to preserve
-# the absolute rates (otherwise you're changing more than one speed at a time).
-DRIVE_MULTIPLIER                  = 1.0    # Drive = 1.0 × cruise (12 × 1.0 = 12 grid/sec at AG=50)
-CRUISE_MULTIPLIER                 = 10.0 / 12.0  # Cruise → 10 grid/sec at AG=50 (settle / transition pace)
-SHOT_MOTION_MULTIPLIER            = 10.0 / 12.0  # Shot motion → 10 grid/sec at AG=50
-# Sprint = max-effort fast-break movement (RR burst, BH cover-ground in open
-# court, FB shot motion). Multiplier sized so AG=50 rate = 14 grid/sec.
-SPRINT_MULTIPLIER                 = 14.0 / 12.0  # → 14 grid/sec at AG=50
-# Burst = peak full-speed movement (RR + outlet receiver on the FB burst step).
-# Faster than sprint to convey the explosive start of a fast break.
-BURST_MULTIPLIER                  = 24.0 / 12.0  # → 20 grid/sec at AG=50
+# ---- Per-archetype absolute rates (grid/game-sec at AG=50) ----------------
+# Add a new archetype: define an absolute rate here, list it in
+# ``PlayerArchetype`` Literal, and add a branch in ``_ag_grid_per_game_sec``.
+CRUISE_GRID_PER_GAME_SEC      = 12  # archetype "cruise"      — BH bring-up / settle / transition pace
+SHOT_MOTION_GRID_PER_GAME_SEC = 14  # archetype "shot_motion" — shooter during shot
+STANDARD_GRID_PER_GAME_SEC    = 14  # archetype "standard"    — base / unaccelerated (AG curve anchor @ AG=50)
+SPRINT_GRID_PER_GAME_SEC      = 18  # archetype "sprint"      — max-effort movement (walk-up non-BH, converge)
+BURST_GRID_PER_GAME_SEC       = 28  # archetype "burst"       — peak explosive start (FB outlet)
+
+# Shot ball motion: ball flight rate during the [ball_flight] HCO sub-step.
+# FE mirrors this in animationPlayback.js (grid-distance / rate × tickMs).
+# ~27 grid/game-sec at tickMs=350 is main-branch-equivalent (~333 px/s horizontal).
+# Slower than passes by design — shooters are deliberate, passes are quick-twitch.
+SHOT_BALL_GRID_PER_GAME_SECOND = 27
+FREE_THROW_SHOT_GRID_PER_GAME_SECOND = 12  # FT shot ball motion (grid/game-sec)
+# Bounce sub-step T: fixed 300ms wall-clock at tickMs=350. Ball rate during
+# bounce therefore varies with distance (rim → bounce_coords) — that spread is
+# intentional, a "settle" feels different per bounce length.
+BOUNCE_STEP_GAME_SECONDS = 300.0 / 350.0
+
+# Post-shot variant animation timings (Sound_Design_Update.md §Ball Resolve
+# Animations). Expressed in game-seconds at the default 350 ms/game-sec
+# clock so FE wall-clock matches the legacy reference timings.
+RATTLE_HOP_GAME_SECONDS = 40.0 / 350.0            # Per-hop wall-clock for RATTLE
+RATTLE_MAKE_SETTLE_GAME_SECONDS = 150.0 / 350.0   # RATTLE make: settle into MSSS
+BANK_MAKE_SETTLE_GAME_SECONDS = 250.0 / 350.0     # BANK_MAKE: bank → MSSS
+BANK_MISS_GRAZE_GAME_SECONDS = 200.0 / 350.0      # BANK_MISS: bank → rim-graze
+BOR_MAKE_FOLLOWUP_SWISH_DELAY_MS = 150.0          # BACK_OF_RIM make swish offset
+BANK_MAKE_FOLLOWUP_SWISH_DELAY_MS = 100.0         # BANK_MAKE swish offset
+
+# AIRBALL OOB resting points (Sound_Design_Update.md: ball continues from
+# 2-short-of-MSSS to the OOB sideline). Animation only; backend resolution
+# still routes the rebound until the resolution-step 3 cleanup lands.
+AIRBALL_OOB_HOME_COORDS = {"x": 97.0, "y": 25.0}
+AIRBALL_OOB_AWAY_COORDS = {"x": 3.0, "y": 25.0}
+AIRBALL_OOB_GAME_SECONDS = 400.0 / 350.0          # 2-short → OOB resting tween
 
 HCO_STRING_SPOTS = {
     "key": {"x": 64, "y": 25},
@@ -283,6 +301,12 @@ HCO_STRING_SPOTS = {
     # low-x starting point (see Dynamic_HCT_Turns.md, bug #2).
     "hct_inbound_pg": {"x": 10, "y": 25},
     "hct_inbound_sg": {"x": 15, "y": 35},
+    # FCP inbound-side setup spots (home orientation). Pre-flipped equivalents
+    # of the FCP skeleton's step-0 opp:True spots so BIP can place offense
+    # directly without re-applying opp logic downstream.
+    "fcp_inbound_pg": {"x": 15, "y": 15},
+    "fcp_inbound_sg": {"x": 11, "y": 36},
+    "fcp_outlet_pf": {"x": 43, "y": 25},
 }
 
 # ---- HCO Setup Positions ---------------------------------------------------
@@ -317,16 +341,32 @@ HCO_SETUP_OFFENSE_POS_SPOTS = {
 HCO_SETUP_HCO_BH_RADIUS = 10  # max grid units from FB BH for HCO BH placement
 
 
-# FCP/HCT setup positions (step 0 extracted from skeletons)
-# These positions are used during BASELINE_INBOUND setup before skeleton animation
-# All FCP variants use the same starting positions
-FCP_SETUP_POSITIONS = {
-    "PG": "lower bird",
-    "SG": "upper midBaseline",
-    "SF": "inbound_left",
-    "PF": "deep key",
-    "C": "key"
+# FCP setup positions — randomized per position range at BIP time. Replaces
+# the legacy static `FCP_SETUP_POSITIONS` mapping. SF is NOT in these maps;
+# SF uses the dynamic chemistry-aware inbound logic (see HCO BIP / FCP setup
+# helper in `turn_manager.py`). All ranges expressed in HOME orientation
+# (x≈0..50 = back-court for home offense). For away offense, the build
+# function flips via ``getAwayTeamCoords``.
+# See FCP_HCT_System.md → "FCP Starting Alignment".
+FCP_OFFENSE_SETUP_RANGES = {
+    "PG": {"x": (12, 18), "y": (15, 23)},
+    "SG": {"x": (12, 18), "y": (27, 35)},
+    "PF": {"x": (45, 55), "y": (20, 30)},
+    "C":  {"x": (60, 70), "y": (20, 30)},
 }
+FCP_DEFENSE_SETUP_RANGES = {
+    "PG": {"x": (20, 25), "y": (23, 27)},
+    "SG": {"x": (26, 31), "y": (30, 36)},
+    "SF": {"x": (26, 31), "y": (14, 20)},
+    "PF": {"x": (50, 55), "y": (23, 27)},
+    "C":  {"x": (71, 76), "y": (23, 27)},
+}
+# Final separation required between any two players when their random rolls
+# land on the same exact (x, y). The chosen player is offset by this many
+# grid spots in a random direction — final separation = this constant,
+# moved player's new location is exactly this far from his original (so it
+# satisfies both the "within N of original" and "≥ N from other" rules).
+FCP_SETUP_COLLISION_OFFSET_GRID = 2
 
 # All HCT variants use the same starting positions.
 # PG/SG sit on the inbound side near the inbounder so dynamic-HCT step 1

@@ -103,7 +103,7 @@ class Animator:
         animations = []
         duration = 800
 
-        def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"], archetype="default"):
+        def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"], archetype="standard"):
             # ✅ FIX: For ball handler, use outlet position from fb_roles as start (guaranteed HOME orientation)
             # This ensures we're starting from the correct position after the outlet pass
             if has_ball:

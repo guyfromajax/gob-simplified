@@ -519,21 +519,57 @@ class GameManager:
             )
             return
 
-        anim_steps = result.get("animation_steps") or []
-        if not anim_steps:
-            _stamp_log.warning(
-                "🔍 [RESET STAMP] skip: current_turn=%s no animation_steps (legacy path)",
-                result.get("current_turn"),
-            )
-            return
+        # Determine BH at end of this turn. Try event-specific sources first
+        # (so legacy-rendered turns without animation_steps still work), then
+        # fall back to animation_steps + roles.
+        bh_id = None
+        bh_source = None
 
-        last_end = anim_steps[-1].get("end") or {}
-        last_ball = last_end.get("ball") or {}
-        bh_id = last_ball.get("owner_player_id")
+        result_type_upper = str(result.get("result_type") or "").upper()
+        current_turn_upper = str(result.get("current_turn") or "").upper()
+
+        # 1. STEAL: stealer has the ball.
+        if result_type_upper == "STEAL":
+            bh_id = result.get("stealer_id") or result.get("stealerId")
+            bh_source = "steal:stealer_id"
+
+        # 2. DREB turn: rebounder has the ball.
+        elif current_turn_upper == "DREB":
+            bh_id = result.get("rebounderId") or result.get("rebounder_id")
+            if not bh_id:
+                rebounder = result.get("rebounder") or (result.get("roles") or {}).get("rebounder")
+                if isinstance(rebounder, dict):
+                    bh_id = rebounder.get("player_id") or rebounder.get("playerId")
+                elif rebounder is not None and hasattr(rebounder, "player_id"):
+                    bh_id = rebounder.player_id
+            bh_source = "dreb:rebounder"
+
+        # 3. Animation_steps last ball owner (schema-emitted source turns).
+        if not bh_id:
+            anim_steps = result.get("animation_steps") or []
+            if anim_steps:
+                last_end = anim_steps[-1].get("end") or {}
+                last_ball = last_end.get("ball") or {}
+                candidate = last_ball.get("owner_player_id")
+                if candidate:
+                    bh_id = candidate
+                    bh_source = "anim_steps:last_ball"
+
+        # 4. Fallback: roles.ball_handler (covers FB hold-up, HCT continue, etc.)
+        if not bh_id:
+            roles = result.get("roles") or {}
+            ball_handler = roles.get("ball_handler")
+            if isinstance(ball_handler, dict):
+                bh_id = ball_handler.get("player_id") or ball_handler.get("playerId")
+            elif ball_handler is not None and hasattr(ball_handler, "player_id"):
+                bh_id = ball_handler.player_id
+            if bh_id:
+                bh_source = "roles:ball_handler"
+
         if not bh_id:
             _stamp_log.warning(
-                "🔍 [RESET STAMP] skip: current_turn=%s last_ball=%s (no owner_player_id)",
-                result.get("current_turn"), last_ball,
+                "🔍 [RESET STAMP] skip: current_turn=%s result_type=%s — no BH source matched",
+                result.get("current_turn"), result.get("result_type"),
             )
             return
 
@@ -549,18 +585,37 @@ class GameManager:
             return
 
         _stamp_log.warning(
-            "🔍 [RESET STAMP] STAMPING: current_turn=%s bh_id=%s pg_id=%s possession_flips=%s",
-            result.get("current_turn"), bh_id, pg_id, possession_flips,
+            "🔍 [RESET STAMP] STAMPING via %s: current_turn=%s bh_id=%s pg_id=%s possession_flips=%s",
+            bh_source, result.get("current_turn"), bh_id, pg_id, possession_flips,
         )
 
         from_coords = None
-        last_end_coords = last_end.get("coords") or {}
-        bh_coords = last_end_coords.get(str(bh_id))
-        if isinstance(bh_coords, dict) and "x" in bh_coords and "y" in bh_coords:
-            from_coords = {
-                "x": float(bh_coords["x"]),
-                "y": float(bh_coords["y"]),
-            }
+        anim_steps = result.get("animation_steps") or []
+        if anim_steps:
+            last_end_coords = (anim_steps[-1].get("end") or {}).get("coords") or {}
+            bh_coords = last_end_coords.get(str(bh_id))
+            if isinstance(bh_coords, dict) and "x" in bh_coords and "y" in bh_coords:
+                from_coords = {
+                    "x": float(bh_coords["x"]),
+                    "y": float(bh_coords["y"]),
+                }
+        if from_coords is None:
+            # Fallback: read player.coords from the lineup (legacy path).
+            target_pid = str(bh_id)
+            for lineup in (
+                getattr(self.offense_team, "lineup", None) or {},
+                getattr(self.defense_team, "lineup", None) or {},
+            ):
+                for player in lineup.values():
+                    if player is None:
+                        continue
+                    if str(getattr(player, "player_id", "")) == target_pid:
+                        c = getattr(player, "coords", None) or {}
+                        if isinstance(c, dict) and "x" in c and "y" in c:
+                            from_coords = {"x": float(c["x"]), "y": float(c["y"])}
+                        break
+                if from_coords is not None:
+                    break
 
         result.setdefault("hco_setup", {})
         result["hco_setup"]["inbound_pass"] = {
@@ -606,6 +661,24 @@ class GameManager:
 
         if isinstance(turn_result, dict):
             sync_lineup_coords_from_turn(self, turn_result)
+
+        # Universal end-of-turn stamps. Read by cross-turn bridges (Handoff,
+        # Kickout, Walk Up, future possession-flip bridges) so they have one
+        # canonical source for prior turn's end state — avoids turn-type-
+        # specific parsing.
+        if isinstance(turn_result, dict):
+            from BackEnd.utils.animation_step_helpers import (
+                build_final_coords,
+                build_final_ball_handler_id,
+            )
+            turn_result["final_coords"] = build_final_coords(self)
+            turn_result["final_ball_handler_id"] = build_final_ball_handler_id(turn_result)
+            logging.warning(
+                "📍 [FINAL_COORDS] stamped %d players for turn=%s bh=%s",
+                len(turn_result["final_coords"]),
+                turn_result.get("current_turn"),
+                turn_result.get("final_ball_handler_id"),
+            )
 
         # Log per-player coords at TURN END (after sync). These represent
         # where players are at the END of this turn — what the next turn
@@ -698,6 +771,8 @@ class GameManager:
             clock_remaining=clock_remaining,
             shot_clock_remaining=shot_clock_remaining,
             otb_foul=otb_foul,
+            offense_rebounders=miss_turn.get("offense_rebounders"),
+            defense_rebounders=miss_turn.get("defense_rebounders"),
         )
 
         if not animation_steps:
@@ -717,6 +792,8 @@ class GameManager:
             "current_turn": "DREB",
             "text": "Defensive rebound.",
             "rebounderId": str(rebounder_id),
+            "offense_rebounders": miss_turn.get("offense_rebounders") or [],
+            "defense_rebounders": miss_turn.get("defense_rebounders") or [],
             "ball_bounce_x": float(bx),
             "ball_bounce_y": float(by),
             "time_elapsed": int(round(time_elapsed)) if time_elapsed >= 1 else 1,
@@ -1002,9 +1079,33 @@ class GameManager:
             result.get("current_turn") == "FAST_BREAK"
             and result.get("fast_break_play") == "covert_release"
         )
+        # Per the OREB UESS migration (D3 c + Q1 ii): treat PUTBACK_MISS as
+        # "just another kind of miss" for the purpose of triggering a DREB
+        # turn. The OREB turn ends at [bounce]; the defensive second
+        # rebound becomes its own DREB turn via the same builder.
+        is_putback_miss_with_dreb = (
+            result.get("current_turn") == "OREB"
+            and result.get("result_type") == "PUTBACK_MISS"
+            and result.get("rebound_type") == "DREB"
+        )
+        is_ft_final_miss_dreb = (
+            result.get("current_turn") == "FREE_THROW"
+            and (result.get("attempts") or [None])[0] == "MISS"
+            and int(result.get("free_throws_remaining", 0) or 0) == 0
+            and result.get("rebound_type") == "DREB"
+        )
         if (
-            (result.get("current_turn") in ("HCT", "HCO") or is_migrated_fb_miss)
-            and result.get("result_type") in ("MISS", "BLOCK")
+            (
+                result.get("current_turn") in ("HCT", "HCO")
+                or is_migrated_fb_miss
+                or is_putback_miss_with_dreb
+                or is_ft_final_miss_dreb
+            )
+            and (
+                result.get("result_type") in ("MISS", "BLOCK")
+                or is_putback_miss_with_dreb
+                or is_ft_final_miss_dreb
+            )
             and result.get("rebound_type") == "DREB"
             and result.get("next_play_type") in ("HCO", "FAST_BREAK")
         ):
@@ -1019,6 +1120,9 @@ class GameManager:
                 dreb_turn["next_turn"] = original_next
 
                 self._append_turn(dreb_turn)
+                # DREB turn doesn't go through the main _micro_turn flow,
+                # so stamp hco_setup here for its DREB → HCO transition.
+                self._maybe_stamp_hco_setup(dreb_turn)
                 self.turn_manager.update_clock_and_possession(dreb_turn)
 
                 if dreb_turn.get("possession_flips"):

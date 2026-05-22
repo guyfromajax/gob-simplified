@@ -230,5 +230,10 @@ def roll_shot_variant_extras(variant, shooter_y=None, rng=None):
             "shot_variant_backboard_y_offset": _backboard_y_offset(shooter_y, rng),
             "shot_variant_backboard_miss_rim_offset_x": rng.randint(-1, 1),
             "shot_variant_backboard_miss_rim_offset_y": rng.randint(-1, 1),
+            # Pre-roll the 50/50 SFX choice so replays stay deterministic
+            # (matches the legacy random.random() < 0.5 split in gameSfx.js).
+            "shot_variant_bank_miss_sfx_file": rng.choice(
+                ("bb-clank.wav", "bb-clank-2.wav"),
+            ),
         }
     return {}

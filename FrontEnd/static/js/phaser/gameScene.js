@@ -1,5 +1,6 @@
 import { animateGameTurns } from './animation/animateGameTurns.js';
 import { playGameplayTrack, pauseGameplayTrack, resumeGameplayTrack, evaluateGameplayTrack } from '../musicController.js';
+import { syncSceneTimePaused } from './animation/playbackPause.js';
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { preloadPlayerHeadshots } from './setup/preloadPlayerHeadshots.js';
 import { gridToPixels } from './utils/gridToPixels.js';
@@ -2503,6 +2504,7 @@ export function createGameScene(Phaser) {
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           this.isPaused = !this.isPaused;
           if (this.isPaused) {
+            syncSceneTimePaused(this, true);
             // Pause all tweens
             if (this.tweens) {
               this.tweens.pauseAll();
@@ -2518,6 +2520,7 @@ export function createGameScene(Phaser) {
             pauseGameplayTrack();
             syncPauseButtonDom(true);
           } else {
+            syncSceneTimePaused(this, false);
             // Resume all tweens
             if (this.tweens) {
               // Ensure timeScale is set to 1 (normal speed) - it might have been set to 0

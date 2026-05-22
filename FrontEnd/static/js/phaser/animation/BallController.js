@@ -184,7 +184,9 @@ export class BallController {
    */
   detachFromPlayer(reason = 'detach', options = {}) {
     if (!this.isAttached) {
-      console.warn('BallController: Cannot detach - ball is not attached');
+      // Common case for loose-ball schema sub-steps (rattle hops, bounce,
+      // airball continuation) — playback engine fires detach defensively as
+      // a stale-follow-callback safety net. No-op silently.
       return false;
     }
 

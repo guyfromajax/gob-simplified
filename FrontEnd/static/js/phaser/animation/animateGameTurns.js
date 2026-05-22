@@ -845,7 +845,7 @@ export async function animateGameTurns({ //hasBallAtStep
   try {
     for (let i = 0; i < turns.length; i++) {
       const turn = turns[i];
-    
+
     // ✅ DEBUG: Log state at start of each turn (to trace state persistence)
     if (i > 0 && (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK")) {
       console.log('🔍 [TURN START - STATE CHECK]', {
@@ -933,20 +933,27 @@ export async function animateGameTurns({ //hasBallAtStep
 
     if (turn.result_type === "FOUL") {
       // ✅ DEBUG: Log FOUL routing decision
+      const hasFoulSteps = Array.isArray(turn.animation_steps) && turn.animation_steps.length > 0;
       console.log('🔍 [FOUL ROUTING]', {
         turn_index: i,
         has_animations: !!turn.animations?.length,
         animation_count: turn.animations?.length || 0,
+        has_animation_steps: hasFoulSteps,
+        animation_steps_count: turn.animation_steps?.length || 0,
+        current_turn: turn.current_turn,
         fcp_foul: turn.fcp_foul,
         hct_foul: turn.hct_foul,
         foul_team: turn.foul_team,
         pressureSequenceActive: scene.pressureSequenceActive,
-        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+        will_route_to_router: !!((turn.animations && turn.animations.length > 0) || hasFoulSteps)
       });
-      
-      // ✅ FIX: Route ALL fouls with animations through AnimationRouter
-      // This includes FCP/HCT fouls (fcp_foul/hct_foul flags) and regular HCO fouls (when we add them)
-      if (turn.animations && turn.animations.length > 0) {
+
+      // Route fouls through AnimationRouter when they carry either legacy
+      // ``animations[]`` (FCP/HCT path) OR schema ``animation_steps[]``
+      // (new HCO-stopper path). Without the second clause, HCO stopper
+      // turns reached this branch with empty legacy animations and never
+      // animated.
+      if ((turn.animations && turn.animations.length > 0) || hasFoulSteps) {
         // Foul with animations - route through AnimationRouter
         turn.index = preservedTurnIndex;
         await animationRouter.processTurn(turn);
@@ -967,20 +974,23 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (turn.result_type === "DEAD BALL") {
-      // ✅ DEBUG: Log DEAD BALL routing decision
+      const hasDeadBallSteps = Array.isArray(turn.animation_steps) && turn.animation_steps.length > 0;
       console.log('🔍 [DEAD_BALL ROUTING]', {
         turn_index: i,
         has_animations: !!turn.animations?.length,
         animation_count: turn.animations?.length || 0,
+        has_animation_steps: hasDeadBallSteps,
+        animation_steps_count: turn.animation_steps?.length || 0,
+        current_turn: turn.current_turn,
         pressureSequenceActive: scene.pressureSequenceActive,
         possession_flips: turn.possession_flips,
         possession_team_id: turn.possession_team_id,
-        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+        will_route_to_router: !!((turn.animations && turn.animations.length > 0) || hasDeadBallSteps)
       });
-      
-      // ✅ FIX: Route ALL dead ball with animations through AnimationRouter
-      // This includes FCP/HCT dead ball turnovers and regular HCO dead ball (when we add them)
-      if (turn.animations && turn.animations.length > 0) {
+
+      // Route through router when EITHER legacy ``animations[]`` OR new
+      // schema ``animation_steps[]`` is present.
+      if ((turn.animations && turn.animations.length > 0) || hasDeadBallSteps) {
         // Dead ball with animations - route through AnimationRouter
         turn.index = preservedTurnIndex;
         await animationRouter.processTurn(turn);
@@ -1333,10 +1343,16 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // ✅ DEBUG: Log HCO routing decision
     if (turn.result_type === "HCO") {
-      
+
       // ✅ FIX: Route ALL HCO result_type turns with animations through AnimationRouter
-      // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
-      if (turn.animations && turn.animations.length > 0) {
+      // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns.
+      // Accept either legacy ``animations[]`` (un-migrated turns) OR the unified
+      // ``animation_steps[]`` schema (HCT trap-broken turns emit only the latter
+      // after the dynamic_hct refactor). Without the animation_steps branch the
+      // HCT turn falls into the silent else and never animates.
+      const hasLegacyAnimations = turn.animations && turn.animations.length > 0;
+      const hasAnimationSteps = turn.animation_steps && turn.animation_steps.length > 0;
+      if (hasLegacyAnimations || hasAnimationSteps) {
         // HCO with animations - route through AnimationRouter
       turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
@@ -1480,20 +1496,24 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // ✅ DEBUG: Log STEAL routing decision
     if (turn.result_type === "STEAL") {
+      const hasStealSteps = Array.isArray(turn.animation_steps) && turn.animation_steps.length > 0;
       console.log('🔍 [STEAL ROUTING]', {
         turn_index: i,
         has_animations: !!turn.animations?.length,
         animation_count: turn.animations?.length || 0,
+        has_animation_steps: hasStealSteps,
+        animation_steps_count: turn.animation_steps?.length || 0,
+        current_turn: turn.current_turn,
         pressureSequenceActive: scene.pressureSequenceActive,
         possession_flips: turn.possession_flips,
         possession_team_id: turn.possession_team_id,
         next_play_type: turn.next_play_type,
-        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+        will_route_to_router: !!((turn.animations && turn.animations.length > 0) || hasStealSteps)
       });
-      
-      // ✅ FIX: Route ALL steals with animations through AnimationRouter
-      // This includes FCP/HCT steals and regular HCO steals (when we add them)
-      if (turn.animations && turn.animations.length > 0) {
+
+      // Route through router when EITHER legacy ``animations[]`` OR new
+      // schema ``animation_steps[]`` is present.
+      if ((turn.animations && turn.animations.length > 0) || hasStealSteps) {
         // Steal with animations - route through AnimationRouter
       turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);

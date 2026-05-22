@@ -1,0 +1,1352 @@
+"""Transition bridge step builders — emit ``AnimationStep[]`` that close
+cross-turn seams where setup logic snaps ``player.coords`` before the
+destination turn animates. All bridges read the universal
+``prior_turn["final_coords"]`` (stamped by ``_append_turn``) and produce
+schema-conformant steps that the destination turn's emitter prepends.
+
+Naming convention: ``build_<source>_to_<destination>_bridge_steps``.
+
+Long-term, each bridge collapses into the destination turn's native
+emitter step 0 — the helper interface is identical so the migration is a
+no-op rename of the call site.
+"""
+
+from __future__ import annotations
+
+import math
+import random
+from typing import Any, Dict, List, Optional
+
+from BackEnd.constants import (
+    INBOUND_PASS_GRID_PER_GAME_SECOND,
+    FB_PASS_MIN_GAME_SECONDS,
+    HCO_STRING_SPOTS,
+    RESET_INBOUND_PASS_GRID_PER_GAME_SECOND,
+)
+from BackEnd.utils.animation_step_helpers import (
+    _ag_grid_per_game_sec,
+    _euclid,
+    _player_lookup_by_id,
+    pass_arrival_sfx,
+    pass_release_sfx,
+    stamp_tween_durations,
+)
+from BackEnd.utils.animation_step_schema import (
+    AdvanceTrigger,
+    AnimationStep,
+    BallInFlight,
+    BallState,
+    ClockState,
+    GridCoord,
+    PlayerAction,
+    PlayerArchetype,
+    StepEnd,
+    StepStart,
+)
+
+
+_HCO_LANE_DRIFT_SPOTS = (
+    "basketSpot",
+    "lower lowPost",
+    "upper lowPost",
+    "lower midPost",
+    "upper midPost",
+    "midLane",
+    "upper highPost",
+    "lower highPost",
+    "topLane",
+)
+
+
+# Kickout outlet spot pools — ported from legacy OREB Kickout
+# (FrontEnd/static/js/phaser/animation/turnAnimation.js runOffensiveReboundKickoutSetup).
+# Receiver outlets are perimeter spots out beyond the lane; passer (BH)
+# outlets are the central/lane-adjacent spots from which the kickout pass
+# is delivered. Vertical-half pairing constraint (upper / lower / central)
+# keeps the BH and receiver on the same side of the floor.
+_KICKOUT_RECEIVER_OUTLET_SPOTS = (
+    "key",
+    "deep key",
+    "upper midWing",
+    "deep upper wing",
+    "lower midWing",
+    "deep lower wing",
+)
+_KICKOUT_PASSER_OUTLET_BASE = ("topLane",)  # always allowed
+_KICKOUT_PASSER_OUTLET_KEY = "key"           # allowed unless receiver took it
+_KICKOUT_PASSER_OUTLET_UPPER = "upper apex"  # only if receiver upper or central
+_KICKOUT_PASSER_OUTLET_LOWER = "lower apex"  # only if receiver lower or central
+
+
+def _tempo_to_hold_seconds(tempo: Any) -> float:
+    """Map team tempo → hold-step duration in game-seconds. Matches the
+    BH=PG handoff "hold" beat where the BH stays put while the other 9
+    drift into HCO setup.
+
+    fast (3-4, "fast")  → 1.0
+    normal (2, "normal") → 2.0
+    slow (0-1, "slow")   → 3.0
+    anything else         → 2.0 (fallback = normal)
+    """
+    if isinstance(tempo, str):
+        s = tempo.strip().lower()
+        if s == "fast":
+            return 1.0
+        if s == "slow":
+            return 3.0
+        if s == "normal":
+            return 2.0
+        return 2.0
+    if isinstance(tempo, (int, float)):
+        n = int(tempo)
+        if n >= 3:
+            return 1.0
+        if n <= 1:
+            return 3.0
+        return 2.0
+    return 2.0
+
+
+def _lane_spot_coords(spot_label: str, is_away_offense: bool) -> GridCoord:
+    spot = HCO_STRING_SPOTS.get(spot_label, {"x": 50, "y": 25})
+    x = float(spot["x"])
+    y = float(spot["y"])
+    if is_away_offense:
+        x = 100.0 - x
+    return {"x": x, "y": y}
+
+
+def _pick_pg_receive_target(bh_coord: GridCoord, is_away_offense: bool) -> GridCoord:
+    """Random point within 10 grid Euclidean of BH. Court-bounds clamped
+    and over-and-back enforced: when BH is at-or-past midcourt in the
+    attacking direction, PG cannot be behind midcourt."""
+    angle = random.uniform(0.0, 2.0 * math.pi)
+    radius = random.uniform(0.0, 10.0)
+    x = float(bh_coord["x"]) + radius * math.cos(angle)
+    y = float(bh_coord["y"]) + radius * math.sin(angle)
+    x = max(0.0, min(100.0, x))
+    y = max(0.0, min(50.0, y))
+    if not is_away_offense and float(bh_coord["x"]) >= 50.0:
+        x = max(50.0, x)
+    elif is_away_offense and float(bh_coord["x"]) <= 50.0:
+        x = min(50.0, x)
+    return {"x": x, "y": y}
+
+
+def _interrupted_coord(
+    start: GridCoord, target: GridCoord, rate: float, t: float
+) -> GridCoord:
+    """Where the player ends up after moving from ``start`` toward ``target``
+    at ``rate`` (grid/game-sec) for ``t`` game-seconds. Clamps at target."""
+    dist = _euclid(start, target)
+    max_traversal = max(0.0, rate * t)
+    if dist <= max_traversal or dist < 1e-9:
+        return {"x": float(target["x"]), "y": float(target["y"])}
+    ratio = max_traversal / dist
+    return {
+        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
+        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
+    }
+
+
+def _pick_kickout_receiver_outlet(is_away_offense: bool) -> tuple:
+    """Pick a receiver outlet spot (perimeter) at random. Returns
+    (spot_label, GridCoord). Label is used downstream to constrain the
+    BH outlet to a matching vertical half."""
+    label = random.choice(_KICKOUT_RECEIVER_OUTLET_SPOTS)
+    return label, _lane_spot_coords(label, is_away_offense)
+
+
+def _pick_kickout_passer_outlet(
+    receiver_spot_label: str,
+    is_away_offense: bool,
+) -> GridCoord:
+    """Pick a passer (BH) outlet spot, constrained to the same vertical
+    half as the receiver. Mirrors the legacy logic at
+    runOffensiveReboundKickoutSetup."""
+    is_receiver_upper = "upper" in receiver_spot_label
+    is_receiver_lower = "lower" in receiver_spot_label
+    is_receiver_central = receiver_spot_label in ("key", "deep key")
+
+    options: List[str] = list(_KICKOUT_PASSER_OUTLET_BASE)
+    if receiver_spot_label != _KICKOUT_PASSER_OUTLET_KEY:
+        options.append(_KICKOUT_PASSER_OUTLET_KEY)
+    if is_receiver_central or is_receiver_upper:
+        options.append(_KICKOUT_PASSER_OUTLET_UPPER)
+    if is_receiver_central or is_receiver_lower:
+        options.append(_KICKOUT_PASSER_OUTLET_LOWER)
+
+    chosen = random.choice(options)
+    return _lane_spot_coords(chosen, is_away_offense)
+
+
+def build_walk_up_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+    bh_id: str,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    bh_archetype: PlayerArchetype = "cruise",
+    other_archetype: PlayerArchetype = "cruise",
+    gate_player_ids: Optional[List[str]] = None,
+    metadata_reason: str = "walk_up",
+) -> AnimationStep:
+    """Universal "walk up" step. All 10 players move from ``start_coords`` to
+    ``end_coords``; ``bh_id`` dribbles.
+
+    Step duration (T) is gated on the slowest player in ``gate_player_ids``.
+    Non-gate players move at their archetype rate; if their natural travel
+    time exceeds T, they end at the interrupted coord (= start + rate × T)
+    rather than the full target — preserves natural movement speed and
+    avoids snap teleports. If they'd arrive before T, they reach target and
+    idle there until T elapses.
+
+    When ``gate_player_ids`` is ``None`` (default), gates on the slowest of
+    ALL players — preserves legacy behavior for callers that want everyone
+    to settle before advancing.
+    """
+    # Per-player natural travel time (dist / archetype rate).
+    natural_t: Dict[str, float] = {}
+    rates: Dict[str, float] = {}
+    for pid, sc in start_coords.items():
+        ec = end_coords.get(pid)
+        if not ec:
+            continue
+        dist = _euclid(sc, ec)
+        if dist < 1e-6:
+            continue
+        arch = bh_archetype if pid == bh_id else other_archetype
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        if rate <= 0:
+            continue
+        natural_t[pid] = dist / rate
+        rates[pid] = rate
+
+    # Step T = slowest among the gate players (or all players when no gate set).
+    # Also record which player drove the slowest_t so the advance_trigger
+    # metadata names the actual gate, not whichever player happens to have
+    # the longest start→end distance (which can be a non-gate defender when
+    # gate_player_ids restricts the timing to a small subset).
+    if gate_player_ids:
+        gate_set = {str(g) for g in gate_player_ids if g}
+        gate_items = [(pid, ti) for pid, ti in natural_t.items() if pid in gate_set]
+    else:
+        gate_items = list(natural_t.items())
+    if gate_items:
+        gate_slowest_id, slowest_t = max(gate_items, key=lambda item: item[1])
+    else:
+        gate_slowest_id, slowest_t = None, 0.0
+    t = max(1.5, slowest_t)
+
+    actions: Dict[str, PlayerAction] = {}
+    archetype: Dict[str, PlayerArchetype] = {}
+    destinations: Dict[str, Optional[GridCoord]] = {}
+    final_end_coords: Dict[str, GridCoord] = {}
+
+    for pid, sc in start_coords.items():
+        target = end_coords.get(pid, sc)
+        destinations[pid] = dict(target)
+        # End coord: gate players + fast-enough non-gate players → full target.
+        # Slower non-gate players → interrupted at their natural rate within T.
+        player_rate = rates.get(pid, 0.0)
+        if player_rate > 0 and pid in natural_t and natural_t[pid] > t:
+            final_end_coords[pid] = _interrupted_coord(sc, target, player_rate, t)
+        else:
+            final_end_coords[pid] = dict(target)
+        if pid == bh_id:
+            actions[pid] = "handle_ball"
+            archetype[pid] = bh_archetype
+        else:
+            archetype[pid] = other_archetype
+            actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+
+    ball_state: BallState = {"owner_player_id": bh_id}
+
+    # Prefer the gate player that drove slowest_t. Fall back to overall
+    # slowest-mover only when no gate player moved (e.g. all gate members
+    # were stationary, which would have produced T = 1.5 floor above).
+    gate_id = gate_slowest_id or _slowest_mover_id(start_coords, final_end_coords)
+    gate_target = final_end_coords.get(gate_id) if gate_id else None
+    if gate_id and gate_target:
+        advance_trigger: AdvanceTrigger = {
+            "condition": "player_reaches_position",
+            "T_game_seconds": float(t),
+            "metadata": {
+                "target_player_id": str(gate_id),
+                "target_coords": {
+                    "x": float(gate_target["x"]),
+                    "y": float(gate_target["y"]),
+                },
+                "reason": metadata_reason,
+            },
+        }
+    else:
+        advance_trigger = {
+            "condition": "fixed_duration",
+            "T_game_seconds": float(t),
+            "metadata": {"reason": f"{metadata_reason}_fallback"},
+        }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_state,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": final_end_coords,
+        "ball": ball_state,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, final_end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
+def build_handoff_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    bh_id: str,
+    receiver_id: str,
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    tempo: Any = None,
+    pass_speed_grid_per_game_sec: float = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND),
+    metadata_reason: str = "handoff",
+) -> List[AnimationStep]:
+    """Universal handoff beat — BH delivers ball to ``receiver_id`` (PG).
+
+    Three cases:
+    - **BH = PG (hold)**: 1 step. BH stays put holding ball; other 9 drift
+      toward HCO lane spots at cruise. Duration from team tempo
+      (fast=1s, normal=2s, slow=3s, fallback=2s). Gate = fixed_duration.
+    - **BH ≠ PG, sub-step A (PG converge)**: PG sprints to a random spot
+      within 10 grid Euclidean of BH (court-clamped, over-and-back
+      enforced). BH stationary. Other 8 drift toward lane spots at
+      cruise (interrupted if step ends first). Gate = PG reaches target.
+    - **BH ≠ PG, sub-step B (Inbound pass)**: BH passes to PG at converge
+      target. Other 8 continue drifting at cruise. Gate = ball reaches PG.
+
+    Lane targets are pre-picked once and persist across all sub-steps.
+
+    Returns ``[]`` when essential data is missing.
+    """
+    if not bh_id or not receiver_id:
+        return []
+    if bh_id not in start_coords or receiver_id not in start_coords:
+        return []
+
+    # Pre-pick lane targets for non-key players. Persists across sub-steps
+    # so the drift reads as continuous motion.
+    key_ids = {bh_id, receiver_id}
+    lane_targets: Dict[str, GridCoord] = {}
+    for pid in start_coords:
+        if pid in key_ids:
+            continue
+        spot_label = random.choice(_HCO_LANE_DRIFT_SPOTS)
+        lane_targets[pid] = _lane_spot_coords(spot_label, is_away_offense)
+
+    # BH = PG: emit a single "hold" sub-step (BH stays, others drift).
+    if bh_id == receiver_id:
+        hold_step = _build_handoff_hold_substep(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            start_coords=start_coords,
+            bh_id=bh_id,
+            lane_targets=lane_targets,
+            hold_seconds=_tempo_to_hold_seconds(tempo),
+            clock_remaining_at_start=clock_remaining_at_start,
+            shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+            next_step_index=next_step_index,
+            metadata_reason=f"{metadata_reason}_hold",
+        )
+        return [hold_step]
+
+    bh_coord = start_coords[bh_id]
+    pg_target = _pick_pg_receive_target(bh_coord, is_away_offense)
+
+    step_a = _build_handoff_converge_substep(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=start_coords,
+        bh_id=bh_id,
+        pg_id=receiver_id,
+        pg_target=pg_target,
+        lane_targets=lane_targets,
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=next_step_index + 1,
+        metadata_reason=f"{metadata_reason}_converge",
+    )
+
+    step_b_start_coords = dict(step_a["end"]["coords"])
+    a_clock = step_a["end"]["clock"]
+    step_b = _build_handoff_pass_substep(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=step_b_start_coords,
+        bh_id=bh_id,
+        pg_id=receiver_id,
+        lane_targets=lane_targets,
+        clock_remaining_at_start=a_clock["clock_remaining"],
+        shot_clock_remaining_at_start=a_clock["shot_clock_remaining"],
+        next_step_index=next_step_index + 2,  # post-fixed by composer
+        pass_speed_grid_per_game_sec=pass_speed_grid_per_game_sec,
+        metadata_reason=f"{metadata_reason}_pass",
+    )
+    return [step_a, step_b]
+
+
+def _build_handoff_hold_substep(
+    *,
+    off_lineup,
+    def_lineup,
+    start_coords: Dict[str, GridCoord],
+    bh_id: str,
+    lane_targets: Dict[str, GridCoord],
+    hold_seconds: float,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    metadata_reason: str,
+) -> AnimationStep:
+    """BH=PG hold sub-step: BH stays put holding ball; other 9 drift to
+    lane spots at cruise (interrupted if they don't reach in ``hold_seconds``).
+    Gate = fixed_duration."""
+    t = float(hold_seconds)
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {pid: dict(coord) for pid, coord in start_coords.items()}
+
+    actions[bh_id] = "handle_ball"
+
+    for pid, target in lane_targets.items():
+        if pid not in start_coords:
+            continue
+        actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+        archetype[pid] = "cruise"
+        destinations[pid] = dict(target)
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "cruise")
+        end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
+
+    ball_state: BallState = {"owner_player_id": bh_id}
+    advance_trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": float(t),
+        "metadata": {"reason": metadata_reason},
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_state,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_state,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
+def _build_handoff_converge_substep(
+    *,
+    off_lineup,
+    def_lineup,
+    start_coords: Dict[str, GridCoord],
+    bh_id: str,
+    pg_id: str,
+    pg_target: GridCoord,
+    lane_targets: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    metadata_reason: str,
+) -> AnimationStep:
+    """Sub-step A: PG sprints to receive target; BH holds ball; others drift."""
+    pg_player = _player_lookup_by_id(off_lineup, def_lineup, pg_id)
+    pg_rate = _ag_grid_per_game_sec(pg_player, "sprint")
+    pg_start = start_coords[pg_id]
+    t = max(0.1, _euclid(pg_start, pg_target) / pg_rate if pg_rate > 0 else 0.5)
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {pid: dict(coord) for pid, coord in start_coords.items()}
+
+    actions[bh_id] = "handle_ball"
+
+    actions[pg_id] = "cut"
+    archetype[pg_id] = "sprint"
+    destinations[pg_id] = dict(pg_target)
+    end_coords[pg_id] = dict(pg_target)
+
+    for pid, target in lane_targets.items():
+        if pid not in start_coords:
+            continue
+        actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+        archetype[pid] = "cruise"
+        destinations[pid] = dict(target)
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "cruise")
+        end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
+
+    ball_state: BallState = {"owner_player_id": bh_id}
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": pg_id,
+            "target_coords": dict(pg_target),
+            "reason": metadata_reason,
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_state,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_state,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
+def build_pass_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    passer_id: str,
+    receiver_id: str,
+    continuing_targets: Optional[Dict[str, GridCoord]] = None,
+    continuing_archetype: PlayerArchetype = "cruise",
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    pass_speed_grid_per_game_sec: float = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND),
+    metadata_reason: str = "pass",
+) -> AnimationStep:
+    """Universal Pass step. Strict shape: passer + receiver stationary while
+    the ball arcs between them; gated on ``ball_reaches_player``.
+
+    Other 8 players optionally drift toward per-player ``continuing_targets``
+    at ``continuing_archetype`` rate (interrupted by step duration). Pass
+    over ``continuing_targets=None`` to freeze everyone except passer/receiver.
+
+    Step duration = pass distance / pass speed (floor: FB_PASS_MIN_GAME_SECONDS).
+
+    Used wherever one player passes to another with optional non-key drift:
+    BIP/SIP inbound passes, Reset's inbound-pass sub-step, future FB lane
+    passes (after we settle the leading-pass math separately).
+    """
+    if passer_id not in start_coords or receiver_id not in start_coords:
+        # Degenerate input — caller should fall back.
+        raise ValueError(f"build_pass_step: passer or receiver missing from start_coords")
+
+    passer_coord = start_coords[passer_id]
+    receiver_coord = start_coords[receiver_id]
+    dist = _euclid(passer_coord, receiver_coord)
+    rate = max(1e-6, pass_speed_grid_per_game_sec)
+    t = max(FB_PASS_MIN_GAME_SECONDS, dist / rate)
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {pid: dict(coord) for pid, coord in start_coords.items()}
+
+    actions[passer_id] = "pass"
+    actions[receiver_id] = "receive"
+
+    if continuing_targets:
+        for pid, target in continuing_targets.items():
+            if pid not in start_coords or pid in (passer_id, receiver_id):
+                continue
+            actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+            archetype[pid] = continuing_archetype
+            destinations[pid] = dict(target)
+            player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+            rate_player = _ag_grid_per_game_sec(player, continuing_archetype)
+            end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate_player, t)
+
+    ball_start: BallState = {
+        "from_player_id": str(passer_id),
+        "to_player_id": str(receiver_id),
+        "current_coords": dict(passer_coord),
+    }
+    ball_end: BallState = {"owner_player_id": str(receiver_id)}
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "from_player_id": str(passer_id),
+            "to_player_id": str(receiver_id),
+            "reason": metadata_reason,
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    # Pass / Reception SFX (Sound_Design_Update.md). Covers every caller of
+    # ``build_pass_step`` — BIP/SIP inbound passes, Reset's inbound-pass
+    # sub-step, Handoff/Kickout pass sub-steps. FB outlet passes use a
+    # dedicated emitter (covert_release_step_emitter) and don't route
+    # through here, so they're correctly excluded per the doc.
+    passer_player = _player_lookup_by_id(off_lineup, def_lineup, passer_id)
+    receiver_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
+    start["sfx_on_ball_release"] = pass_release_sfx(passer_player)
+    start["sfx_on_ball_arrival"] = pass_arrival_sfx(receiver_player)
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
+def _build_handoff_pass_substep(
+    *,
+    off_lineup,
+    def_lineup,
+    start_coords: Dict[str, GridCoord],
+    bh_id: str,
+    pg_id: str,
+    lane_targets: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    pass_speed_grid_per_game_sec: float,
+    metadata_reason: str,
+) -> AnimationStep:
+    """Sub-step B of the handoff beat — thin wrapper around build_pass_step
+    that supplies lane drift targets for the non-key 8 players."""
+    return build_pass_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=start_coords,
+        passer_id=bh_id,
+        receiver_id=pg_id,
+        continuing_targets=lane_targets,
+        continuing_archetype="cruise",
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=next_step_index,
+        pass_speed_grid_per_game_sec=pass_speed_grid_per_game_sec,
+        metadata_reason=metadata_reason,
+    )
+
+
+def build_kickout_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    bh_id: str,
+    receiver_id: str,
+    setup_coords: Dict[str, GridCoord],
+    is_away_offense: bool,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    pass_speed_grid_per_game_sec: float = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND),
+    metadata_reason: str = "kickout",
+) -> List[AnimationStep]:
+    """Universal Kickout beat — current BH (in front court near basket)
+    kicks the ball BACK to ``receiver_id`` (the HCO playcall's step 0 BH).
+    Fires when HCO entry conditions detect BH past the offensive arc
+    threshold (x >= 71 home / <= 29 away).
+
+    Two sub-steps mirror the legacy OREB Kickout shape:
+
+    - **Sub-step A (Outlet positioning)**: BH sprints to a perimeter
+      passer outlet; receiver sprints to a perimeter receive outlet
+      (constrained to same vertical half). Other 8 sprint toward their
+      ``setup_coords`` (= HCO step 0 setup positions); interrupted at T.
+      Gate: slower of BH/receiver arrival.
+    - **Sub-step B (Pass)**: BH stationary at passer outlet; receiver
+      stationary at receive outlet. Ball travels BH → receiver. Other 8
+      continue toward setup positions; interrupted at T.
+      Gate: ball reaches receiver.
+
+    Returns ``[]`` when BH == receiver or essential data missing.
+    """
+    if not bh_id or not receiver_id or bh_id == receiver_id:
+        return []
+    if bh_id not in start_coords or receiver_id not in start_coords:
+        return []
+
+    # Pick outlet spots via legacy logic (random + vertical-half pairing).
+    receiver_spot_label, receiver_outlet = _pick_kickout_receiver_outlet(is_away_offense)
+    bh_outlet = _pick_kickout_passer_outlet(receiver_spot_label, is_away_offense)
+
+    # Pre-pick targets for other 8 (their HCO step 0 setup positions).
+    # Persists across both sub-steps so drift reads continuously.
+    key_ids = {bh_id, receiver_id}
+    other_targets: Dict[str, GridCoord] = {}
+    for pid in start_coords:
+        if pid in key_ids:
+            continue
+        target = setup_coords.get(pid)
+        if isinstance(target, dict) and "x" in target and "y" in target:
+            other_targets[pid] = {"x": float(target["x"]), "y": float(target["y"])}
+
+    step_a = _build_kickout_positioning_substep(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=start_coords,
+        bh_id=bh_id,
+        receiver_id=receiver_id,
+        bh_outlet=bh_outlet,
+        receiver_outlet=receiver_outlet,
+        other_targets=other_targets,
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=next_step_index + 1,
+        metadata_reason=f"{metadata_reason}_positioning",
+    )
+
+    step_b_start_coords = dict(step_a["end"]["coords"])
+    a_clock = step_a["end"]["clock"]
+
+    step_b = build_pass_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=step_b_start_coords,
+        passer_id=bh_id,
+        receiver_id=receiver_id,
+        continuing_targets=other_targets,
+        continuing_archetype="sprint",
+        clock_remaining_at_start=a_clock["clock_remaining"],
+        shot_clock_remaining_at_start=a_clock["shot_clock_remaining"],
+        next_step_index=next_step_index + 2,
+        pass_speed_grid_per_game_sec=pass_speed_grid_per_game_sec,
+        metadata_reason=f"{metadata_reason}_pass",
+    )
+
+    return [step_a, step_b]
+
+
+def _build_kickout_positioning_substep(
+    *,
+    off_lineup,
+    def_lineup,
+    start_coords: Dict[str, GridCoord],
+    bh_id: str,
+    receiver_id: str,
+    bh_outlet: GridCoord,
+    receiver_outlet: GridCoord,
+    other_targets: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    metadata_reason: str,
+) -> AnimationStep:
+    """Sub-step A: BH and receiver both sprint to their outlet spots;
+    other 8 sprint toward HCO setup positions. Gate = slower of BH/receiver."""
+    bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
+    rx_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
+    bh_rate = _ag_grid_per_game_sec(bh_player, "sprint")
+    rx_rate = _ag_grid_per_game_sec(rx_player, "sprint")
+
+    bh_start = start_coords[bh_id]
+    rx_start = start_coords[receiver_id]
+    bh_t = _euclid(bh_start, bh_outlet) / bh_rate if bh_rate > 0 else 0.5
+    rx_t = _euclid(rx_start, receiver_outlet) / rx_rate if rx_rate > 0 else 0.5
+    t = max(0.5, bh_t, rx_t)
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {pid: dict(coord) for pid, coord in start_coords.items()}
+
+    # BH: sprint to passer outlet, holding ball.
+    actions[bh_id] = "handle_ball"
+    archetype[bh_id] = "sprint"
+    destinations[bh_id] = dict(bh_outlet)
+    end_coords[bh_id] = dict(bh_outlet)
+
+    # Receiver: sprint to receive outlet.
+    actions[receiver_id] = "cut"
+    archetype[receiver_id] = "sprint"
+    destinations[receiver_id] = dict(receiver_outlet)
+    end_coords[receiver_id] = dict(receiver_outlet)
+
+    # Other 8: sprint toward HCO setup; interrupted at T.
+    for pid, target in other_targets.items():
+        if pid not in start_coords:
+            continue
+        actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+        archetype[pid] = "sprint"
+        destinations[pid] = dict(target)
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, "sprint")
+        end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
+
+    ball_state: BallState = {"owner_player_id": bh_id}
+    # Gate on the slower of BH/receiver.
+    gate_id = bh_id if bh_t >= rx_t else receiver_id
+    gate_target = bh_outlet if gate_id == bh_id else receiver_outlet
+    advance_trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "target_player_id": str(gate_id),
+            "target_coords": {"x": float(gate_target["x"]), "y": float(gate_target["y"])},
+            "reason": metadata_reason,
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+    }
+
+    start: StepStart = {
+        "coords": dict(start_coords),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_state,
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_state,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
+_INBOUND_PASSER_HOLD_GAME_SECONDS: float = 1.0
+
+
+def _build_inbound_passer_hold_step(
+    *,
+    start_coords: Dict[str, GridCoord],
+    sf_id: str,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+    hold_t_game_sec: float = _INBOUND_PASSER_HOLD_GAME_SECONDS,
+    metadata_reason: str = "inbound_passer_hold",
+) -> AnimationStep:
+    """1-game-sec beat where the inbound passer holds the ball at the
+    inbound spot before throwing the pass. All 10 players stationary at
+    their step-1 (or step-2 for BIP-after-make) end positions; SF carries
+    the ball.
+
+    Clock fields here decrement by the hold T (defaults to 1 game-sec).
+    Callers may override the end clock to pin one or both clocks (BIP pins
+    shot clock; SIP pins both clocks).
+    """
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {pid: None for pid in start_coords}
+    actions[sf_id] = "handle_ball"
+
+    end_coords: Dict[str, GridCoord] = {pid: dict(c) for pid, c in start_coords.items()}
+
+    trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": float(hold_t_game_sec),
+        "metadata": {"reason": metadata_reason},
+    }
+
+    sf_coord = start_coords.get(sf_id) or {"x": 50.0, "y": 25.0}
+    return {
+        "start": {
+            "coords": {pid: dict(c) for pid, c in start_coords.items()},
+            "destination": destinations,
+            "action": actions,
+            "archetype": archetype,
+            "ball": {"owner_player_id": str(sf_id)},
+            "clock": {
+                "clock_remaining": float(clock_remaining_at_start),
+                "shot_clock_remaining": float(shot_clock_remaining_at_start),
+            },
+            "advance_trigger": trigger,
+        },
+        "end": {
+            "coords": end_coords,
+            "ball": {"owner_player_id": str(sf_id)},
+            "time_elapsed": float(hold_t_game_sec),
+            "clock": {
+                "clock_remaining": float(clock_remaining_at_start) - hold_t_game_sec,
+                "shot_clock_remaining": float(shot_clock_remaining_at_start) - hold_t_game_sec,
+            },
+            "next": {"kind": "next_step", "index": next_step_index},
+        },
+    }
+
+
+def build_bip_animation_steps(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    prior_final_coords: Dict[str, GridCoord],
+    setup_coords: Dict[str, GridCoord],
+    sf_id: str,
+    pg_id: str,
+    ball_start_coord: GridCoord,
+    is_fast_break_after_make: bool = False,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> List[AnimationStep]:
+    """Baseline Inbound Pass (BIP) — emits the 4-step "rim pickup" sequence
+    that runs after every made-shot transition (HCO / FB / OREB Putback /
+    HCT/FCP / made FT):
+
+    - **Step 1 — SF to rim**: SF walks from his post-shot position to the
+      rim (= ``ball_start_coord``, where the made shot rested). Other 9
+      walk toward their BIP setup positions concurrently. Ball stays LOOSE
+      at the rim throughout the step; it attaches to SF at step end via
+      ``snapBallToEndState`` when SF arrives. Gate = SF reaches rim.
+    - **Step 2 — SF to inbound spot**: SF walks rim → ``setup_coords[sf_id]``
+      (the dynamically-chosen inbound baseline spot) carrying the ball.
+      Other 9 continue toward their setup positions if not yet there.
+      Gate = slower of [SF reaches inbound, PG reaches receive].
+    - **Step 3 — Passer hold**: 1-game-sec beat where SF holds the ball at
+      the inbound spot before the pass. All 10 stationary at step-2 end
+      coords.
+    - **Step 4 — Inbound pass**: SF passes to PG. Other 8 may continue
+      toward setup positions during the pass (``continuing_targets``).
+
+    Clock policy: GAME clock burns through all four steps. SHOT clock is
+    PINNED across the entire turn — it doesn't start until the inbound
+    receiver receives the pass (= the moment this turn ends; the next turn
+    burns shot clock as normal). This matches the real-basketball rule
+    that the shot clock starts on receipt, not on the inbound throw.
+
+    All four steps use ``standard`` archetype for SF (per the dev brief).
+    Other players keep their existing archetype (``cruise``; ``sprint`` for
+    FB-after-make legacy carry-over).
+
+    Caller (``setup_baseline_inbound``) stamps the returned list onto
+    ``turn_result["animation_steps"]``.
+    """
+    if not prior_final_coords or not setup_coords or not sf_id or not pg_id:
+        return []
+    if sf_id not in prior_final_coords or pg_id not in setup_coords:
+        return []
+    if sf_id not in setup_coords:
+        return []
+    if not isinstance(ball_start_coord, dict) or "x" not in ball_start_coord or "y" not in ball_start_coord:
+        return []
+
+    rim_coord: GridCoord = {
+        "x": float(ball_start_coord["x"]),
+        "y": float(ball_start_coord["y"]),
+    }
+    sf_inbound_coord = setup_coords[str(sf_id)]
+
+    # Non-SF players' archetype: cruise (legacy default), sprint for
+    # FB-after-MAKE — kept as a low-impact carry-over flag.
+    other_arch: PlayerArchetype = "sprint" if is_fast_break_after_make else "cruise"
+
+    # ===== Step 1: SF walks post-shot → rim. Others walk to BIP setup. =====
+    step1_end_target = dict(setup_coords)
+    step1_end_target[str(sf_id)] = dict(rim_coord)
+
+    step1 = build_walk_up_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=prior_final_coords,
+        end_coords=step1_end_target,
+        bh_id=str(sf_id),
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=1,
+        bh_archetype="standard",
+        other_archetype=other_arch,
+        gate_player_ids=[str(sf_id)],  # gate on SF reaching the rim
+        metadata_reason="bip_sf_to_rim",
+    )
+    # Ball is LOOSE at the rim throughout step 1; SF arrives at rim coord at
+    # step end, then snapBallToEndState attaches via the BallAttached(SF)
+    # end state below. The default build_walk_up_step ball state is
+    # BallAttached(bh_id) — we override start to BallLoose at rim.
+    step1["start"]["ball"] = {"coords": dict(rim_coord)}
+
+    # ===== Step 2: SF walks rim → inbound spot. Others continue or stay. =====
+    step2_start_coords = dict(step1["end"]["coords"])
+    step2_end_target = dict(step2_start_coords)
+    step2_end_target[str(sf_id)] = dict(sf_inbound_coord)
+    # Non-SF players that haven't reached their setup positions yet continue
+    # toward them this step. Already-arrived players stay put naturally
+    # (start == end → no movement).
+    for pid, target in setup_coords.items():
+        if pid == str(sf_id):
+            continue
+        step2_end_target[pid] = dict(target)
+
+    step2 = build_walk_up_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=step2_start_coords,
+        end_coords=step2_end_target,
+        bh_id=str(sf_id),
+        clock_remaining_at_start=step1["end"]["clock"]["clock_remaining"],
+        shot_clock_remaining_at_start=step1["end"]["clock"]["shot_clock_remaining"],
+        next_step_index=2,
+        bh_archetype="standard",
+        other_archetype=other_arch,
+        # Gate on SF + PG so PG is at receive spot for the upcoming pass.
+        gate_player_ids=[str(sf_id), str(pg_id)],
+        metadata_reason="bip_sf_to_inbound",
+    )
+
+    # ===== Step 3: Passer hold (1 game-sec). =====
+    step3 = _build_inbound_passer_hold_step(
+        start_coords=step2["end"]["coords"],
+        sf_id=str(sf_id),
+        clock_remaining_at_start=step2["end"]["clock"]["clock_remaining"],
+        shot_clock_remaining_at_start=step2["end"]["clock"]["shot_clock_remaining"],
+        next_step_index=3,
+        metadata_reason="bip_passer_hold",
+    )
+
+    # ===== Step 4: Inbound pass SF → PG. =====
+    pass_step = build_pass_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=step3["end"]["coords"],
+        passer_id=str(sf_id),
+        receiver_id=str(pg_id),
+        continuing_targets=setup_coords,
+        continuing_archetype=other_arch,
+        clock_remaining_at_start=step3["end"]["clock"]["clock_remaining"],
+        shot_clock_remaining_at_start=step3["end"]["clock"]["shot_clock_remaining"],
+        pass_speed_grid_per_game_sec=float(INBOUND_PASS_GRID_PER_GAME_SECOND),
+        next_step_index=999,
+        metadata_reason="bip_inbound_pass",
+    )
+
+    # ===== Clock policy: pin SHOT clock across all 4 steps. =====
+    # GAME clock burns naturally (default build_*_step behavior).
+    # SHOT clock stays at the turn-start value until this turn ends; the
+    # next turn (HCO / etc.) starts burning shot clock on receiver pickup.
+    pinned_shot_clock = float(shot_clock_remaining_at_start)
+    for step in (step1, step2, step3, pass_step):
+        step["start"]["clock"]["shot_clock_remaining"] = pinned_shot_clock
+        step["end"]["clock"]["shot_clock_remaining"] = pinned_shot_clock
+
+    return [step1, step2, step3, pass_step]
+
+
+def build_sip_animation_steps(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    prior_final_coords: Dict[str, GridCoord],
+    prior_final_ball_handler_id: Optional[str],
+    setup_coords: Dict[str, GridCoord],
+    sf_id: str,
+    pg_id: str,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+) -> List[AnimationStep]:
+    """Side Inbound Pass (SIP) — emits three schema-compliant steps:
+
+    - **Step 1 — Setup walk-in**: All 10 players move from prior-turn end coords
+      to SIP setup positions (SF→sideline inbound spot, PG→receive spot,
+      others to SIP scatter formation). All players move at ``standard``
+      archetype. Gate is *all 10 players* — step T = slowest mover's natural
+      travel time. Ball starts loose at the prior turn's ball-handler coord
+      and travels to SF's end position at shot-style speed, attaches at end.
+    - **Step 2 — Passer hold**: 1-game-sec beat where SF holds the ball at
+      the inbound spot before the pass. All 10 stationary at step-1 end coords.
+    - **Step 3 — Inbound pass**: SF passes to PG. All 10 players stationary
+      at their step 2 coords. Pass T = pass distance / inbound pass speed.
+
+    SIP does not burn game clock — clock fields on all three steps are pinned
+    to the turn-start clock state. The visual takes wall-clock time but the
+    game clock stays paused until HCO begins.
+
+    Caller (``setup_side_inbound``) stamps the returned list onto
+    ``turn_result["animation_steps"]`` and keeps ``time_elapsed = 0``.
+    """
+    if not prior_final_coords or not setup_coords or not sf_id or not pg_id:
+        return []
+    if sf_id not in setup_coords or pg_id not in setup_coords:
+        return []
+
+    # Ball start coord: prior BH's position (universal rule across SIP entries —
+    # dead-ball turnover, steal, non-shooting foul). Fallback to SF's start
+    # coord if the prior BH id isn't resolvable (ball effectively appears
+    # with SF, no visible ball motion).
+    if (
+        prior_final_ball_handler_id
+        and str(prior_final_ball_handler_id) in prior_final_coords
+    ):
+        ball_start_coord = prior_final_coords[str(prior_final_ball_handler_id)]
+    elif sf_id in prior_final_coords:
+        ball_start_coord = prior_final_coords[sf_id]
+    else:
+        return []
+
+    # --- Step 1 — Setup walk-in (gate = all 10 players, standard archetype) ---
+    setup_step = build_walk_up_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=prior_final_coords,
+        end_coords=setup_coords,
+        bh_id=str(sf_id),
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=1,  # → hold step
+        bh_archetype="standard",
+        other_archetype="standard",
+        # SIP gates on every player — no one teleports, step T = slowest.
+        gate_player_ids=[str(pid) for pid in prior_final_coords.keys()],
+        metadata_reason="sip_setup_walkin",
+    )
+
+    # Ball: loose at prior BH coord at step start, attaches to SF at step end
+    # (default build_walk_up_step behavior). Shot-style motion → fixed
+    # wall-clock rate, independent of step T.
+    setup_step["start"]["ball"] = {
+        "coords": {
+            "x": float(ball_start_coord["x"]),
+            "y": float(ball_start_coord["y"]),
+        },
+    }
+    setup_step["start"]["ball_motion_style"] = "shot"
+
+    # --- Step 2 — Passer hold (1 game-sec). ---
+    hold_step = _build_inbound_passer_hold_step(
+        start_coords=setup_step["end"]["coords"],
+        sf_id=str(sf_id),
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=2,  # → pass step
+        metadata_reason="sip_passer_hold",
+    )
+
+    # --- Step 3 — Inbound pass (SF→PG, all others stationary) ---
+    pass_step = build_pass_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=hold_step["end"]["coords"],
+        passer_id=str(sf_id),
+        receiver_id=str(pg_id),
+        # No continuing_targets → other 8 stationary at their step 2 end coords.
+        continuing_targets=None,
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        pass_speed_grid_per_game_sec=float(INBOUND_PASS_GRID_PER_GAME_SECOND),
+        # End of SIP turn — index past array signals turn-end.
+        next_step_index=999,
+        metadata_reason="sip_inbound_pass",
+    )
+
+    # SIP burns no game clock. Pin every clock field on all three steps to the
+    # turn-start clock state (the moment the dead-ball whistle blew). Tween
+    # wall-clock durations are unchanged; only the game-clock readings flat.
+    pinned_clock: ClockState = {
+        "clock_remaining": float(clock_remaining_at_start),
+        "shot_clock_remaining": float(shot_clock_remaining_at_start),
+    }
+    for step in (setup_step, hold_step, pass_step):
+        step["start"]["clock"] = dict(pinned_clock)
+        step["end"]["clock"] = dict(pinned_clock)
+
+    return [setup_step, hold_step, pass_step]
+
+
+def build_ot_to_hco_bridge_steps(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    prior_final_coords: Dict[str, GridCoord],
+    setup_coords: Dict[str, GridCoord],
+    bh_id: str,
+    is_away_offense: bool,
+    tempo: Any,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+) -> List[AnimationStep]:
+    """OT → HCO seam. Composes ``build_handoff_step`` (hold when BH = PG,
+    converge + pass when BH ≠ PG) + ``build_walk_up_step``.
+    """
+    if not prior_final_coords or not setup_coords or not bh_id:
+        return []
+    if bh_id not in prior_final_coords or bh_id not in setup_coords:
+        return []
+
+    pg = (off_lineup or {}).get("PG")
+    pg_id = str(getattr(pg, "player_id", "")) if pg is not None else ""
+    if not pg_id or pg_id not in prior_final_coords:
+        # Degenerate lineup — skip handoff; walk-up keeps current BH.
+        pg_id = ""
+
+    steps: List[AnimationStep] = []
+    clock_r = float(clock_remaining_at_start)
+    shot_r = float(shot_clock_remaining_at_start)
+
+    if pg_id:
+        handoff_steps = build_handoff_step(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            start_coords=prior_final_coords,
+            bh_id=str(bh_id),
+            receiver_id=pg_id,
+            is_away_offense=is_away_offense,
+            tempo=tempo,
+            clock_remaining_at_start=clock_r,
+            shot_clock_remaining_at_start=shot_r,
+            next_step_index=0,  # internal pointers; final fixed below
+            metadata_reason="ot_to_hco_handoff",
+        )
+        steps.extend(handoff_steps)
+        if handoff_steps:
+            tail_clock = handoff_steps[-1]["end"]["clock"]
+            clock_r = tail_clock["clock_remaining"]
+            shot_r = tail_clock["shot_clock_remaining"]
+
+    # After handoff, PG is the ball carrier (whether it was hold or pass).
+    walk_bh_id = pg_id or str(bh_id)
+
+    walk_up = build_walk_up_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=(steps[-1]["end"]["coords"] if steps else prior_final_coords),
+        end_coords=setup_coords,
+        bh_id=walk_bh_id,
+        clock_remaining_at_start=clock_r,
+        shot_clock_remaining_at_start=shot_r,
+        next_step_index=next_step_index,
+        bh_archetype="cruise",
+        other_archetype="sprint",
+        metadata_reason="ot_to_hco_walkup",
+    )
+    steps.append(walk_up)
+
+    # Fix internal next-pointers so each step points to the next slot in the
+    # final array. The LAST step keeps its `next_step_index` (= skeleton 0).
+    for i, s in enumerate(steps[:-1]):
+        s["end"]["next"] = {"kind": "next_step", "index": i + 1}
+    return steps
+
+
+def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
+    target = str(pid)
+    for player in (off_lineup or {}).values():
+        if player is None:
+            continue
+        if str(getattr(player, "player_id", "")) == target:
+            return True
+    return False
+
+
+def _slowest_mover_id(
+    start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+) -> Optional[str]:
+    slowest_pid: Optional[str] = None
+    max_dist = -1.0
+    for pid, sc in start_coords.items():
+        ec = end_coords.get(pid)
+        if not ec:
+            continue
+        d = _euclid(sc, ec)
+        if d > max_dist:
+            max_dist = d
+            slowest_pid = pid
+    return slowest_pid

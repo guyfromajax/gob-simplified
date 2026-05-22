@@ -157,6 +157,13 @@ export class FreeThrowAnimationSystem {
    * Process a free throw turn
    */
   async processFreeThrow(turnData) {
+    if (
+      Array.isArray(turnData?.animation_steps)
+      && turnData.animation_steps.length > 0
+    ) {
+      return;
+    }
+
     if (this.activeSequence) {
       console.warn('FreeThrowAnimationSystem: Already processing a free throw sequence, queuing...');
       this.sequenceQueue.push(turnData);

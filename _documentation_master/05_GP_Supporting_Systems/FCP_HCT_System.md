@@ -146,6 +146,39 @@ The **Full Court Press (FCP)** and **Half Court Trap (HCT)** system handles defe
 - `get_ball_handler_from_skeleton()` - Determines ball handler dynamically from skeleton steps
 - `determine_defensive_pressure_type()` - Determines if FCP/HCT should be applied (in `BackEnd/models/turn_manager.py`)
 
+### FCP Starting Alignment (BIP-end positions)
+
+Set during the BASELINE_INBOUND turn that precedes an FCP turn (see `TurnManager._build_fcp_setup_positions` in `turn_manager.py`). Players are placed in their press-break formation at the end of BIP; the FCP turn then animates from these BIP-end coords toward the first post-inbound skeleton step (players who can't reach in step T freeze at their interrupted coord per UESS §9.5 — no teleport).
+
+All coords below are in HOME orientation (home offense). For away offense, x is flipped via `getAwayTeamCoords`. Defenders use their own randomized ranges (no longer derived from offensive positions via `get_defender_coords`); dynamic per-step shadowing inside the FCP turn is unchanged.
+
+**Offense ranges** (`FCP_OFFENSE_SETUP_RANGES` in `constants/__init__.py`):
+
+| Pos | x range | y range | Notes |
+|---|---|---|---|
+| SF | 3 (fixed) | chemistry-aware | Inbounder. SF y mirrors HCO BIP's dynamic logic: chem > 15 → (25,35) if PG_y > 24 else (15,25); chem ≤ 15 → (15,35) |
+| PG | random.randint(12, 18) | random.randint(15, 23) | Lower inbound receive option |
+| SG | random.randint(12, 18) | random.randint(27, 35) | Upper inbound receive option |
+| PF | random.randint(45, 55) | random.randint(20, 30) | Mid-court outlet |
+| C  | random.randint(60, 70) | random.randint(20, 30) | Front-court anchor |
+
+**Defense ranges** (`FCP_DEFENSE_SETUP_RANGES`):
+
+| Pos | x range | y range |
+|---|---|---|
+| PG | random.randint(20, 25) | random.randint(23, 27) |
+| SG | random.randint(26, 31) | random.randint(30, 36) |
+| SF | random.randint(26, 31) | random.randint(14, 20) |
+| PF | random.randint(50, 55) | random.randint(23, 27) |
+| C  | random.randint(71, 76) | random.randint(23, 27) |
+
+**Collision rule** (`FCP_SETUP_COLLISION_OFFSET_GRID = 2`):
+
+- Trigger: any two of the 10 players (offense + defense) land on the exact same `(x, y)`.
+- Resolution: pick one of the two at random; offset by exactly 2 grid spots in a random direction (random angle ∈ [0, 2π)). The moved player's new location is 2 grid spots from his original AND 2 grid spots from the other player.
+- Re-checked iteratively (up to 10 rounds) in case the move creates a new collision.
+- No clamp — the moved player may end up outside his declared range.
+
 ### When FCP/HCT Activates
 
 **Trigger Conditions:**

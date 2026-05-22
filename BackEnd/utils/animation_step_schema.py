@@ -13,7 +13,7 @@ frontend is a pure playback engine — no advance-trigger detection, no
 destination calculation.
 """
 
-from typing import Dict, Literal, Optional, TypedDict, Union
+from typing import Dict, List, Literal, Optional, TypedDict, Union
 
 # --- Closed vocabularies ----------------------------------------------------
 
@@ -37,10 +37,9 @@ PlayerAction = Literal[
 behavior (sprite frames, ball events). Orthogonal to archetype."""
 
 PlayerArchetype = Literal[
-    "default",
     "sprint",
     "burst",
-    "drive",
+    "standard",
     "shot_motion",
     "cruise",
     "stationary",
@@ -117,6 +116,32 @@ class AdvanceTrigger(TypedDict):
     type system. Tighten later if useful."""
 
 
+class StepSfx(TypedDict, total=False):
+    """Backend-resolved SFX cue. Frontend plays the named file at the
+    appropriate ball-motion moment (release / arrival) — no FE-side decision
+    logic. ``file`` is the asset filename (e.g. ``"pass-medium.wav"``);
+    ``volume`` defaults to 0.7 if omitted; ``event`` is a debug/telemetry
+    tag forwarded to ``playGameSfx``."""
+
+    file: str
+    volume: float
+    event: str
+
+
+class TimedSfx(TypedDict, total=False):
+    """Backend-resolved SFX cue with an explicit wall-clock offset relative to
+    the step's start. The FE schedules a ``setTimeout``-style fire at
+    ``delay_ms`` and plays ``file``. Used for variant-specific follow-up
+    cues that overlap the next sub-step's motion (e.g. BANK_MAKE: swish.wav
+    100 ms after bb-rim-swish; BACK_OF_RIM make: swish.wav 150 ms after
+    back-of-rim.wav). Multiple cues per step are supported."""
+
+    file: str
+    delay_ms: float
+    volume: float
+    event: str
+
+
 class Announcement(TypedDict, total=False):
     """In-step announcement with mandatory pause-the-world behavior. Optional
     field on StepStart (plays before step tweens fire) or StepEnd (plays
@@ -176,6 +201,62 @@ class StepStart(TypedDict, total=False):
 
     Backend stamps this when it has per-player rate info (which is always —
     AG + archetype determine rate). Frontend never recomputes."""
+
+    ball_motion_style: Literal["shot", "pass"]
+    """Optional. Overrides the ball's tween duration for this step. Without
+    this field, the ball tweens over the step's total T (gating on slowest
+    mover).
+
+    Values:
+      - ``"shot"`` — shot ball rate (~16 grid/game-sec). Used for the HCO
+        [ball_flight] sub-step (shot arc) and any other case where the ball
+        moves at shot speed regardless of step T (e.g., BIP step 1). Slower
+        than passes by design — shooters are deliberate, passes are
+        quick-twitch.
+      - ``"pass"`` — half-court pass rate (30 grid/game-sec). Used by HCO
+        mid-skeleton pass steps so the ball renders at the canonical pass
+        speed even when step T is gated by the slowest player (and would
+        otherwise drag the ball below 24).
+
+    Paired field for ``"pass"``: ``ball_arrival_coord`` (see below). On
+    pass tween completion the FE re-attaches the ball to ``step.end.ball``'s
+    owner so the ball moves with them for the remainder of step T."""
+
+    ball_arrival_coord: GridCoord
+    """Optional. Overrides where the ball's tween terminates (the
+    pixel/grid target the FE tweens toward). Without this field, the ball
+    tweens to the coord derived from ``step.end.ball`` (i.e., the
+    end-state owner's step-end position).
+
+    Used by HCO mid-skeleton pass steps so the ball lands on the
+    *receiver's position at ball-arrival time* (= meet-point computed
+    from the receiver's archetype rate vs. the 30 grid/game-sec pass
+    rate) rather than the receiver's step-end coord — critical when the
+    receiver is still moving during the pass (e.g., catching while
+    cutting). Backend pre-resolves the meet-point; FE consumes it
+    without recomputing."""
+
+    sfx_on_ball_release: StepSfx
+    """Optional. SFX cue fired at the moment the ball detaches from its
+    start-owner (= start of the ball tween in the FE). Used for pass
+    release SFX (``pass-{tier}.wav``) on HCO mid-skeleton pass steps;
+    backend picks the tier from the passer's PS attribute. Generic
+    mechanism — can layer on any step where the ball detaches."""
+
+    sfx_on_ball_arrival: StepSfx
+    """Optional. SFX cue fired at the moment the ball arrives at its
+    destination (= ball tween onComplete in the FE). Used for reception
+    SFX (``receive-{tier}.wav``) on HCO mid-skeleton pass steps;
+    backend picks the tier from the receiver's (IQ + CH). Generic
+    mechanism — can layer on any step where the ball arrives at a
+    target."""
+
+    timed_sfx: List[TimedSfx]
+    """Optional. Ordered list of SFX cues fired at explicit offsets from
+    step start. Each cue runs independently of ball motion (the FE schedules
+    a ``setTimeout`` for each). Used for variant-specific follow-up cues
+    that overlap the next sub-step's motion (BANK_MAKE swish at 100 ms,
+    BACK_OF_RIM make swish at 150 ms). Empty / absent → no extra cues."""
 
 
 class NextLinear(TypedDict):

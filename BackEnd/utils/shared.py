@@ -14,13 +14,10 @@ from BackEnd.constants import (
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
-    CRUISE_BASELINE_GRID_PER_GAME_SEC,
-    BH_CRUISE_MIN_GRID_PER_GAME_SEC,
-    BH_CRUISE_MAX_GRID_PER_GAME_SEC,
-    CRUISE_MULTIPLIER,
-    DRIVE_MULTIPLIER,
-    SHOT_MOTION_MULTIPLIER,
-    SPRINT_MULTIPLIER,
+    CRUISE_GRID_PER_GAME_SEC,
+    STANDARD_GRID_PER_GAME_SEC,
+    SHOT_MOTION_GRID_PER_GAME_SEC,
+    SPRINT_GRID_PER_GAME_SEC,
 )
 
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
@@ -436,7 +433,7 @@ def calc_skeleton_step_timing_contract(
                 if action == "drive":
                     if mover is not None:
                         sec = calc_ag_segment_seconds(
-                            start_coords, end_coords, mover, archetype="drive"
+                            start_coords, end_coords, mover, archetype="standard"
                         )
                     else:
                         sec = calc_drive_segment_seconds(start_coords, end_coords)
@@ -446,7 +443,7 @@ def calc_skeleton_step_timing_contract(
                         if phase_type == "HCO":
                             archetype = "shot_motion" if step_has_shoot else "compressed_hco"
                         else:
-                            archetype = "default"
+                            archetype = "standard"
                         sec = calc_ag_segment_seconds(
                             start_coords, end_coords, mover, archetype=archetype
                         )
@@ -554,7 +551,7 @@ def calc_drive_segment_seconds(start, end):
     Attack drive to basket: legacy fallback rate (12 grid/game-sec). Used by
     ``calc_skeleton_step_timing_contract``'s legacy path when no off_lineup is
     provided. AG-driven callers should use ``calc_ag_segment_seconds(...,
-    archetype="drive")`` instead.
+    archetype="standard")`` instead.
     """
     if not start or not end:
         return 0.0
@@ -609,17 +606,16 @@ def ag_to_grid_per_game_sec(ag):
     Convert AG attribute (1-100, average 50, rare values above 100) to grid
     units per game second.
 
-    Linear curve calibrated so AG=50 base = 12 (matches
-    `CRUISE_BASELINE_GRID_PER_GAME_SEC`), with archetype multipliers
-    (SPRINT 14/12, etc.) producing their documented absolute rates at AG=50:
+    Linear curve calibrated so AG=50 base = 14 (matches
+    `STANDARD_GRID_PER_GAME_SEC`), with archetypes producing their documented
+    absolute rates at AG=50 (see UESS_System.md §3.3):
 
-      AG=0   → 9     (slow; sprint = 10.5)
-      AG=50  → 12    (average; sprint = 14)
-      AG=100 → 15    (fast; sprint = 17.5)
-      AG=150 → 18    (sprint = 21)
+      AG=0   → 7     (slow)
+      AG=50  → 14    (average; sprint = 18)
+      AG=100 → 21    (fast)
 
-    Slope ×6: each AG point = +0.06 grid/game-sec base, +0.07 sprint.
-    Capped at 30 grid/game-sec, floored at 0.5.
+    Slope ×7: each AG point = +0.07 grid/game-sec base. Capped at 60
+    grid/game-sec, floored at 0.5.
 
     Defaults to AG=50 when input is None / non-numeric.
     """
@@ -627,59 +623,46 @@ def ag_to_grid_per_game_sec(ag):
         ag_val = float(ag) if ag is not None else 50.0
     except (TypeError, ValueError):
         ag_val = 50.0
-    rate = 9.0 + (ag_val / 100.0) * 6.0
-    return max(0.5, min(rate, 30.0))
+    rate = 7.0 + (ag_val / 100.0) * 7.0
+    return max(0.5, min(rate, 60.0))
 
 
 def calc_cruise_segment_seconds(start, end, *, role="default"):
     """
     Cruise-speed segment timing — AG-independent, lineup-independent. Used for
-    HCO bring-up and HCT step 1 (the bring-the-ball-up moments where players
-    are not pushing max effort).
+    HCO bring-up (the bring-the-ball-up moments where players are not pushing
+    max effort).
 
-    role="bh"      → fresh random.uniform(BH_CRUISE_MIN, BH_CRUISE_MAX) per call,
-                     giving each BH bring-up an organic pace (8-16 grid/game-sec).
-                     Slow random rate → more game-clock burn for that step.
-    role="default" → CRUISE_BASELINE_GRID_PER_GAME_SEC (16). Used by the other
-                     four offense players and all five defenders during a
-                     cruise step.
-
-    Visual sync: this helper produces the game-clock cost. Visual tween
-    duration is wired to match this value once Phase 3 lands (frontend reads
-    step_clock_seconds as authoritative). Until Phase 3, visual is still
-    AG-driven and may diverge from the game-clock for cruise steps.
+    role="bh"      → CRUISE_GRID_PER_GAME_SEC (12). Used by the ball handler
+                     during bring-up.
+    role="default" → STANDARD_GRID_PER_GAME_SEC (14). Used by the other four
+                     offense players and all five defenders during a cruise
+                     step.
 
     Args:
         start, end: {"x": ..., "y": ...} grid coord dicts
         role: "default" for non-BH cruisers, "bh" for the ball handler
     """
     if role == "bh":
-        rate = random.uniform(
-            BH_CRUISE_MIN_GRID_PER_GAME_SEC,
-            BH_CRUISE_MAX_GRID_PER_GAME_SEC,
-        )
+        rate = CRUISE_GRID_PER_GAME_SEC
     else:
-        rate = CRUISE_BASELINE_GRID_PER_GAME_SEC
+        rate = STANDARD_GRID_PER_GAME_SEC
     return calc_isotropic_segment_seconds(start, end, rate)
 
 
-def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
+def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
     """
     AG-driven segment timing — speed scales with the player's AG attribute.
     Used for max-effort movement (drives, fast breaks, defensive close-outs,
     in-shot motion, HCO/HCT/FCP skeleton steps post-bring-up).
 
     When ``player`` is provided (Phase 4-migrated call sites):
-        rate = ag_to_grid_per_game_sec(player.AG) × archetype_multiplier
-        - archetype="default"        → multiplier 1.0     (free-running AG rate)
-        - archetype="drive"          → DRIVE_MULTIPLIER (0.75 — drive contested)
-        - archetype="shot_motion"    → SHOT_MOTION_MULTIPLIER (0.625 — shot motion)
-        - archetype="compressed_hco" → SHOT_MOTION_MULTIPLIER (0.625 — folds into shot_motion;
-                                       Compressed-HCO=10 vs HCO Shot=10 in legacy were the
-                                       same numeric rate)
-        - archetype="sprint"         → SPRINT_MULTIPLIER (1.25 — max-effort fast break:
-                                       RR burst, BH cover-ground in open court,
-                                       FB shot motion). See Fast_Break_Refactor.md.
+        rate = absolute archetype rate × AG scale factor.
+        - archetype="standard"       → STANDARD_GRID_PER_GAME_SEC (14 @ AG=50)
+        - archetype="shot_motion"    → SHOT_MOTION_GRID_PER_GAME_SEC (14 @ AG=50)
+        - archetype="compressed_hco" → SHOT_MOTION_GRID_PER_GAME_SEC (folds into shot_motion)
+        - archetype="sprint"         → SPRINT_GRID_PER_GAME_SEC (18 @ AG=50)
+        - archetype="cruise"         → CRUISE_GRID_PER_GAME_SEC (12 @ AG=50)
 
     When ``player`` is None (Phase 1/legacy call sites that haven't been
     migrated yet): falls back to the legacy per-archetype pace constants.
@@ -693,7 +676,7 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
     """
     if player is None:
         # Legacy path — preserves pre-Phase-4 behavior at unmigrated call sites.
-        if archetype == "drive":
+        if archetype in ("drive", "standard"):
             rate = _LEGACY_DRIVE_RATE
         elif archetype == "shot_motion":
             rate = _LEGACY_HCO_SHOT_RATE
@@ -707,20 +690,20 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="default"):
             rate = _LEGACY_COF_RATE
         return calc_isotropic_segment_seconds(start, end, rate)
 
-    # AG-driven path — Phase 4 behavior.
+    # AG-driven path — Phase 4 behavior. Absolute rates × AG scale factor.
     attrs = getattr(player, "attributes", None) or {}
     ag = attrs.get("AG", 50)
-    base_rate = ag_to_grid_per_game_sec(ag)
-    if archetype == "drive":
-        rate = base_rate * DRIVE_MULTIPLIER
+    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
+    if archetype in ("drive", "standard"):
+        rate = STANDARD_GRID_PER_GAME_SEC * ag_scale
     elif archetype in ("shot_motion", "compressed_hco"):
-        rate = base_rate * SHOT_MOTION_MULTIPLIER
+        rate = SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
     elif archetype == "sprint":
-        rate = base_rate * SPRINT_MULTIPLIER
+        rate = SPRINT_GRID_PER_GAME_SEC * ag_scale
     elif archetype == "cruise":
-        rate = base_rate * CRUISE_MULTIPLIER
+        rate = CRUISE_GRID_PER_GAME_SEC * ag_scale
     else:
-        rate = base_rate
+        rate = STANDARD_GRID_PER_GAME_SEC * ag_scale
     return calc_isotropic_segment_seconds(start, end, rate)
 
 
@@ -1006,6 +989,33 @@ def resolve_offensive_rebound(game, rebounder):
             )
         rebounder.record_stat("FGA")
 
+        # Roll the shot variant + extras for the putback (per D1 — putbacks
+        # now get variant-driven rim effects). Same selector + extras helper
+        # the main shot path uses, just called directly here rather than
+        # routing the entire putback through ``shot_manager.resolve_shot``
+        # (lightweight reuse, avoids a larger resolve_shot refactor).
+        from BackEnd.constants.shot_variants import (
+            select_shot_variant,
+            roll_shot_variant_extras,
+        )
+        try:
+            shot_threshold_for_variant = off_team.team_attributes["shot_threshold"]
+        except (KeyError, TypeError):
+            shot_threshold_for_variant = 100
+        try:
+            _putback_variant = select_shot_variant(
+                shot_score=shot_score_pre_defense,
+                shot_threshold=shot_threshold_for_variant,
+                shot_type=shot_type,
+                made=made,
+            )
+            _putback_variant_extras = roll_shot_variant_extras(
+                _putback_variant, shooter_y=shooter_y,
+            )
+        except Exception:
+            _putback_variant = None
+            _putback_variant_extras = {}
+
         event = {
             "event_type": "PUTBACK_ATTEMPT",
             "shooterId": getattr(rebounder, "player_id", None),
@@ -1018,12 +1028,16 @@ def resolve_offensive_rebound(game, rebounder):
             "shot_type": shot_type,
             "shot_score_pre_defense": shot_score_pre_defense,
             "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            "shot_variant": _putback_variant,
             "sfx": {
                 "shot_type": shot_type,
                 "shot_score_pre_defense": shot_score_pre_defense,
                 "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+                "shot_variant": _putback_variant,
             },
         }
+        if _putback_variant_extras:
+            event.update(_putback_variant_extras)
 
         if made:
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])
@@ -2965,25 +2979,29 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
                     if ns:
                         positions[ns] = dict(normalized)
 
-    # Belt-and-suspenders: enforce role-exclusivity on the overlay maps before
-    # applying them. shot_manager already calls this at its return points, but
-    # callers that mutate `turn_result["roles"]` post-shot (e.g., attaching
-    # `outlet_passer` to a FB result) need a re-canonicalize so the role
-    # invariant accounts for those late-attached roles. Idempotent.
+    # Re-canonicalize overlay maps for role-exclusivity. shot_manager already
+    # calls this at its return points, but callers that mutate
+    # `turn_result["roles"]` post-shot (e.g., attaching `outlet_passer` to a
+    # FB result) need a refresh so the role invariant accounts for those
+    # late-attached roles. Idempotent. (Kept even though overlay maps no
+    # longer override schema end.coords below — DREB/legacy callers still
+    # read the overlay maps directly.)
     canonicalize_post_shot_overlays(turn_result)
 
-    for key in TURN_COORDS_OVERLAY_KEYS:
-        block = turn_result.get(key)
-        if not isinstance(block, dict):
-            continue
-        for pid, coords in block.items():
-            if not isinstance(coords, dict):
-                continue
-            if coords.get("x") is None or coords.get("y") is None:
-                continue
-            ns = _norm_player_id(pid)
-            if ns:
-                positions[ns] = {"x": float(coords["x"]), "y": float(coords["y"])}
+    # Overlay maps DELIBERATELY DO NOT override `animation_steps[-1].end.coords`
+    # anymore. UESS §9.5: non-gate movers freeze at their interrupted coord,
+    # never snap to destination. The HCO schema emitter
+    # (`skeleton_step_emitter._build_post_shot_sub_steps`) bakes overlay
+    # destinations into [shoot] + [ball_flight] + [bounce] sub-steps as
+    # interrupted coords with per-player tween_durations — so the last step's
+    # end.coords IS the authoritative post-shot position for each player.
+    # Letting the overlay map win here would re-introduce the snap and break
+    # cross-turn carry-forward (next turn would seed from destination instead
+    # of interrupted, defeating the §9.5 intent).
+    #
+    # Non-migrated turn types (shooting fouls, legacy OREB) still read overlay
+    # maps via their own paths (e.g. `_build_dreb_turn_from_miss` in
+    # game_manager). Those paths are unaffected by dropping this override.
 
     for team in (game.home_team, game.away_team):
         for player in (team.lineup or {}).values():

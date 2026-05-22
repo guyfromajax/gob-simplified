@@ -179,11 +179,11 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     try:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
         from BackEnd.constants import (
-            BURST_MULTIPLIER,
-            CRUISE_MULTIPLIER,
-            DRIVE_MULTIPLIER,
-            SHOT_MOTION_MULTIPLIER,
-            SPRINT_MULTIPLIER,
+            BURST_GRID_PER_GAME_SEC,
+            CRUISE_GRID_PER_GAME_SEC,
+            STANDARD_GRID_PER_GAME_SEC,
+            SHOT_MOTION_GRID_PER_GAME_SEC,
+            SPRINT_GRID_PER_GAME_SEC,
         )
     except Exception:
         return 12.0
@@ -193,18 +193,18 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     else:
         attrs = getattr(player, "attributes", None) or {}
         ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
-    base_rate = float(ag_to_grid_per_game_sec(ag))
-    if archetype == "drive":
-        return base_rate * DRIVE_MULTIPLIER
+    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
+    if archetype == "standard":
+        return STANDARD_GRID_PER_GAME_SEC * ag_scale
     if archetype in ("shot_motion", "compressed_hco"):
-        return base_rate * SHOT_MOTION_MULTIPLIER
+        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
     if archetype == "sprint":
-        return base_rate * SPRINT_MULTIPLIER
+        return SPRINT_GRID_PER_GAME_SEC * ag_scale
     if archetype == "burst":
-        return base_rate * BURST_MULTIPLIER
+        return BURST_GRID_PER_GAME_SEC * ag_scale
     if archetype == "cruise":
-        return base_rate * CRUISE_MULTIPLIER
-    return base_rate
+        return CRUISE_GRID_PER_GAME_SEC * ag_scale
+    return STANDARD_GRID_PER_GAME_SEC * ag_scale
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
@@ -272,7 +272,7 @@ def _stamp_tween_durations(
         dist = _euclid(sc, ec)
         if dist < 1e-6:
             continue
-        arch = archetype.get(pid, "default")
+        arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         rate = _ag_grid_per_game_sec(player, arch)
         if rate <= 0:
@@ -488,7 +488,7 @@ def _build_burst_step(
             "x": float(defender_to["x"]),
             "y": float(defender_to["y"]),
         }
-        _commit_mover(defender_id, d_target, "guard_ball", "default")
+        _commit_mover(defender_id, d_target, "guard_ball", "standard")
 
     getback_ids = {
         str(pid) for pid in (fb_roles.get("getback_player_ids") or []) if pid is not None
@@ -505,7 +505,7 @@ def _build_burst_step(
         is_off = _is_offense_player(pid, off_lineup)
         action: PlayerAction = "cut" if is_off else "guard_offball"
         # Get-back defenders sprint back; other non-key movers default.
-        arch: PlayerArchetype = "sprint" if pid in getback_ids else "default"
+        arch: PlayerArchetype = "sprint" if pid in getback_ids else "standard"
         _commit_mover(pid, target, action, arch)
 
     skip_outlet_pass = bool(phase.get("skip_outlet_pass"))
@@ -638,10 +638,10 @@ def _build_outlet_pass_step(
             arch: PlayerArchetype = "sprint"
             action: PlayerAction = "sprint"
         elif pid == defender_id:
-            arch = "default"
+            arch = "standard"
             action = "guard_ball"
         else:
-            arch = "default"
+            arch = "standard"
             action = (
                 "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
             )
@@ -917,10 +917,10 @@ def _build_shot_motion_step(
         if _movement_end_coord(animations, pid) is not None:
             if _is_offense_player(pid, off_lineup):
                 actions[pid] = "cut"
-                archetype[pid] = "drive"
+                archetype[pid] = "standard"
             else:
                 actions[pid] = "guard_offball"
-                archetype[pid] = "drive"
+                archetype[pid] = "standard"
 
     # Clamp non-gate movers via interrupted-coord at archetype rate × t,
     # mirroring CR's shot-outcome clamp so support players don't teleport.
@@ -1292,7 +1292,7 @@ def _build_hold_up_step(
     }
 
     bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
-    bh_rate = _ag_grid_per_game_sec(bh_player, "default")
+    bh_rate = _ag_grid_per_game_sec(bh_player, "standard")
     t = max(0.5, _traversal_seconds(bh_coord, settle_target, bh_rate))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
@@ -1307,7 +1307,7 @@ def _build_hold_up_step(
     }
 
     actions[bh_id] = "handle_ball"
-    archetype[bh_id] = "default"
+    archetype[bh_id] = "standard"
     destinations[bh_id] = dict(settle_target)
     end_coords[bh_id] = dict(settle_target)
 
@@ -1422,7 +1422,7 @@ def _build_outlet_denied_defender_step(
 
     defender_coord = step_start_coords[defender_id]
     defender_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
-    defender_rate = _ag_grid_per_game_sec(defender_player, "default")
+    defender_rate = _ag_grid_per_game_sec(defender_player, "standard")
     t = max(0.3, _traversal_seconds(defender_coord, defender_target, defender_rate))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
@@ -1438,7 +1438,7 @@ def _build_outlet_denied_defender_step(
 
     actions[passer_id] = "handle_ball"
     actions[defender_id] = "guard_ball"
-    archetype[defender_id] = "default"
+    archetype[defender_id] = "standard"
     destinations[defender_id] = dict(defender_target)
     end_coords[defender_id] = dict(defender_target)
 
@@ -1529,7 +1529,7 @@ def _build_outlet_denied_cutback_step(
     }
 
     receiver_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
-    receiver_rate = _ag_grid_per_game_sec(receiver_player, "default")
+    receiver_rate = _ag_grid_per_game_sec(receiver_player, "standard")
     t = max(0.3, _traversal_seconds(receiver_coord, cutback_target, receiver_rate))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
@@ -1545,7 +1545,7 @@ def _build_outlet_denied_cutback_step(
 
     actions[passer_id] = "handle_ball"
     actions[receiver_id] = "cut"
-    archetype[receiver_id] = "default"
+    archetype[receiver_id] = "standard"
     destinations[receiver_id] = dict(cutback_target)
     end_coords[receiver_id] = dict(cutback_target)
 

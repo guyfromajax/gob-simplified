@@ -702,20 +702,28 @@ The outlet passer tracks:
     -Step 3: Reset Step
 
 
-
-##Step 2 Branches (from Outlet Pass)
-  -Shot Branch
+##Step 2: Lane Pass or Hold Up
+  -Lane Pass Branches (Shot, Interception, or OOB)
     -Step 2: Lane Pass
+      -Movement:
+        -RR +6 x (sprint)
+        -If Primary Defender & (Interceopt or Batted Ball): contact_grid spot
+        -All other players: stationary
+      -Movmeent Speeds: sprint (all moving players)
+      -AT: ball_reaches_player
+        -Shot: RR
+        -Steal or Batted Ball OOB: Primary Defender
     -Step 3: Shot Motion
-
-  -Steal Branch
-    -Step 2: Lane Pass (Interception)
-
-  -Bat Ball OOB Branch
-    -Step 2: Lane Pass (Ball Batted OOB)
+      -Movement:
+        -RR: Shot Spot
+        -Shot Defender: guard ball
+      -Movmeent Speeds: 
+        -RR & Shot Defender: sprint
+        -All other moving players: drive
+      -AT: PRD, RR reaches Shot Spot
 
   -Hold Up Branch
     -Step 2: Hold Up Step
-    -Step 2: Lead In
+    -Step 3: Lead In
 
   

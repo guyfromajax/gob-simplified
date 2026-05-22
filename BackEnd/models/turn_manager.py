@@ -2,6 +2,7 @@ from BackEnd.models.logger import Logger
 from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animator import Animator
+import math
 import random
 import json
 import logging
@@ -590,7 +591,167 @@ class TurnManager:
         )
         attach_position_snapshots(payload, [sip_snap])
 
+        # Emit unified animation_steps. SIP is a 2-step turn (mirror of BIP):
+        # Step 1 = setup walk-in (all 10 players to SIP destinations; ball
+        # travels from prior BH coord to SF at shot speed). Step 2 = inbound
+        # pass (SF→PG; all others stationary). No game-clock burn — clock
+        # fields are pinned to turn-start on every step.
+        try:
+            from BackEnd.utils.transition_bridge import build_sip_animation_steps
+
+            sf_player = offense_team.lineup.get("SF")
+            pg_player = offense_team.lineup.get("PG")
+            sf_id = str(getattr(sf_player, "player_id", "") or "")
+            pg_id = str(getattr(pg_player, "player_id", "") or "")
+
+            setup_coords: Dict[str, Dict[str, float]] = {}
+            for pos, coord in (o_dest or {}).items():
+                player = offense_team.lineup.get(pos)
+                pid = getattr(player, "player_id", None)
+                if pid is not None and isinstance(coord, dict):
+                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+            for pos, coord in (d_dest or {}).items():
+                player = defense_team.lineup.get(pos)
+                pid = getattr(player, "player_id", None)
+                if pid is not None and isinstance(coord, dict):
+                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+
+            prior_turns = getattr(game, "turns", None) or []
+            prior_turn = prior_turns[-1] if prior_turns else None
+            prior_final_coords = (
+                prior_turn.get("final_coords") if isinstance(prior_turn, dict) else None
+            ) or {}
+            prior_final_bh_id = (
+                prior_turn.get("final_ball_handler_id") if isinstance(prior_turn, dict) else None
+            )
+
+            clock_state = getattr(game, "game_state", {}) or {}
+            clock_r = float(clock_state.get("time_remaining", 0) or 0)
+            shot_r = float(clock_state.get("shot_clock_remaining", 0) or 0)
+
+            if sf_id and pg_id and prior_final_coords and setup_coords:
+                anim_steps = build_sip_animation_steps(
+                    off_lineup=offense_team.lineup,
+                    def_lineup=defense_team.lineup,
+                    prior_final_coords=prior_final_coords,
+                    prior_final_ball_handler_id=prior_final_bh_id,
+                    setup_coords=setup_coords,
+                    sf_id=sf_id,
+                    pg_id=pg_id,
+                    clock_remaining_at_start=clock_r,
+                    shot_clock_remaining_at_start=shot_r,
+                )
+                if anim_steps:
+                    payload["animation_steps"] = anim_steps
+                    import logging
+                    logging.warning(
+                        "🌉 [SIP_BRIDGE FIRED] step_count=%d sf_id=%s pg_id=%s prior_bh=%s",
+                        len(anim_steps), sf_id, pg_id, prior_final_bh_id,
+                    )
+        except Exception as e:
+            import logging
+            logging.warning("build_sip_animation_steps failed: %s", e)
+
         return payload
+
+    def _build_fcp_setup_positions(
+        self,
+        *,
+        is_away_offense: bool,
+        offense_chemistry: int,
+        current_pg_y: int,
+    ):
+        """Build randomized BIP-end positions for an FCP turn (offense + defense).
+
+        Offense ranges per ``FCP_OFFENSE_SETUP_RANGES`` (PG/SG/PF/C). SF uses
+        the same chemistry-aware dynamic-y logic as HCO BIP (sf_x = inbound
+        baseline x; sf_y range biased by team chemistry + current PG y).
+
+        Defense ranges per ``FCP_DEFENSE_SETUP_RANGES`` (all 5 positions —
+        replaces the legacy `get_defender_coords`-derived layout for FCP only).
+
+        Coords are generated in HOME orientation. Caller flips via
+        ``getAwayTeamCoords`` if away offense.
+
+        Collision resolution: any pair landing on the exact same (x, y) is
+        broken by moving one randomly-chosen player by exactly
+        ``FCP_SETUP_COLLISION_OFFSET_GRID`` grid spots in a random direction.
+        The moved player ends up that distance from BOTH their original
+        coord AND the other colliding player. Re-checked iteratively (≤10
+        rounds) in case the move creates a new exact collision.
+
+        Returns ``(o_dest_home, d_dest_home, inbound_spot_home)``.
+        """
+        from BackEnd.constants import (
+            FCP_OFFENSE_SETUP_RANGES,
+            FCP_DEFENSE_SETUP_RANGES,
+            FCP_SETUP_COLLISION_OFFSET_GRID,
+        )
+
+        # --- SF (dynamic inbound, chemistry-aware y) ---
+        # Mirrors HCO BIP's SF logic. SF x is fixed at the inbound baseline
+        # (home: x=3); chemistry-aware y_range biased toward PG side when
+        # team chemistry is high.
+        sf_x = 3  # home-orientation baseline
+        if offense_chemistry > 15:
+            sf_y_range = (25, 35) if current_pg_y > 24 else (15, 25)
+        else:
+            sf_y_range = (15, 35)
+        sf_y = random.randint(*sf_y_range)
+
+        o_dest_home = {"SF": {"x": float(sf_x), "y": float(sf_y)}}
+        for pos, ranges in FCP_OFFENSE_SETUP_RANGES.items():
+            o_dest_home[pos] = {
+                "x": float(random.randint(*ranges["x"])),
+                "y": float(random.randint(*ranges["y"])),
+            }
+
+        d_dest_home = {}
+        for pos, ranges in FCP_DEFENSE_SETUP_RANGES.items():
+            d_dest_home[pos] = {
+                "x": float(random.randint(*ranges["x"])),
+                "y": float(random.randint(*ranges["y"])),
+            }
+
+        # --- Collision resolution ---
+        # "On top of each other" = exact same (x, y). Tag each coord with a
+        # team prefix so the loop can update the right dict.
+        def _tagged_items():
+            return (
+                [(("off", pos), coord) for pos, coord in o_dest_home.items()]
+                + [(("def", pos), coord) for pos, coord in d_dest_home.items()]
+            )
+
+        for _ in range(10):  # iterate in case a move creates a new collision
+            items = _tagged_items()
+            collision = None
+            for i in range(len(items)):
+                for j in range(i + 1, len(items)):
+                    a_coord = items[i][1]
+                    b_coord = items[j][1]
+                    if a_coord["x"] == b_coord["x"] and a_coord["y"] == b_coord["y"]:
+                        collision = (items[i], items[j])
+                        break
+                if collision:
+                    break
+            if not collision:
+                break
+            chosen_tag, chosen_coord = random.choice(collision)
+            theta = random.uniform(0.0, 2.0 * math.pi)
+            offset = float(FCP_SETUP_COLLISION_OFFSET_GRID)
+            new_coord = {
+                "x": chosen_coord["x"] + offset * math.cos(theta),
+                "y": chosen_coord["y"] + offset * math.sin(theta),
+            }
+            team_key, pos = chosen_tag
+            if team_key == "off":
+                o_dest_home[pos] = new_coord
+            else:
+                d_dest_home[pos] = new_coord
+
+        # Ball spot at SF's inbound coord (home orientation; caller flips).
+        inbound_spot_home = dict(o_dest_home["SF"])
+        return o_dest_home, d_dest_home, inbound_spot_home
 
     def setup_baseline_inbound(self, next_defensive_setup=None):
         """
@@ -619,29 +780,45 @@ class TurnManager:
         # Home orientation uses left baseline (x=3), away uses right baseline (x=97 after flip)
         inbound_spot_home = {"x": 3, "y": 25}  # Left baseline (home orientation)
 
-        # ✅ NEW: Use skeleton step 0 positions for FCP/HCT setup
-        # This ensures players start in their press-break formation (extracted from skeletons)
+        # FCP setup: randomized per-position ranges with chemistry-aware
+        # dynamic SF inbound y (see FCP_HCT_System.md → "FCP Starting
+        # Alignment"). Defenders use their own randomized ranges (no longer
+        # derived via `get_defender_coords`).
+        # HCT setup: legacy static `HCT_SETUP_POSITIONS` mapping.
+        setup_locations = None
+        fcp_helper_outputs = None
         if next_defensive_setup == "FCP":
-            from BackEnd.constants import FCP_SETUP_POSITIONS, HCO_STRING_SPOTS
-            setup_locations = FCP_SETUP_POSITIONS
+            offense_attrs = offense_team.team_attributes or {}
+            offense_chemistry = int(offense_attrs.get("team_chemistry", 15) or 15)
+            current_pg = offense_team.lineup.get("PG")
+            current_pg_y = 25
+            if getattr(current_pg, "coords", None):
+                current_pg_y = int(current_pg.coords.get("y", 25) or 25)
+            fcp_helper_outputs = self._build_fcp_setup_positions(
+                is_away_offense=is_away_offense,
+                offense_chemistry=offense_chemistry,
+                current_pg_y=current_pg_y,
+            )
+            setup_locations = "FCP_RANDOMIZED"  # sentinel — triggers downstream branches
         elif next_defensive_setup == "HCT":
             from BackEnd.constants import HCT_SETUP_POSITIONS, HCO_STRING_SPOTS
             setup_locations = HCT_SETUP_POSITIONS
-        else:
-            setup_locations = None
 
         if setup_locations:
             from BackEnd.constants import HCO_STRING_SPOTS
-            o_dest_home = {}
-            for pos, location in setup_locations.items():
-                coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
-                o_dest_home[pos] = coords.copy()
-                self.logger.log(f"destAssigned:{pos}")
-
-            # For FCP/HCT, ball spot should be at SF's inbound location (inbound_left or inbound_right)
-            # SF is always the inbounder for FCP/HCT
-            sf_location = setup_locations.get("SF", "inbound_left")
-            inbound_spot_home = HCO_STRING_SPOTS.get(sf_location, {"x": 50, "y": 25})
+            if next_defensive_setup == "FCP":
+                o_dest_home, d_dest_home_fcp, inbound_spot_home = fcp_helper_outputs
+                for pos in o_dest_home:
+                    self.logger.log(f"destAssigned:{pos}")
+            else:
+                # HCT (legacy static mapping)
+                o_dest_home = {}
+                for pos, location in setup_locations.items():
+                    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    o_dest_home[pos] = coords.copy()
+                    self.logger.log(f"destAssigned:{pos}")
+                sf_location = setup_locations.get("SF", "inbound_left")
+                inbound_spot_home = HCO_STRING_SPOTS.get(sf_location, {"x": 50, "y": 25})
 
             # Flip offensive coordinates if the away team has possession.
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
@@ -717,31 +894,50 @@ class TurnManager:
         # get_defender_coords handles coordinate orientation automatically
         if setup_locations:
             self.logger.log("defenseUpdate:start")
-            d_dest = {}
-            for pos, defender in defense_team.lineup.items():
-                if pos == "PG":
-                    d_coords = get_defender_coords(
-                        bh_coords,
-                        is_away_offense,
-                        aggression,
-                        "baseline_inbound",
-                        None,
-                        is_ball_handler=True
-                    )
-                    d_dest[pos] = d_coords
-                elif pos in o_dest:
-                    o_coords = o_dest[pos]
-                    o_spot = "key"
-                    d_coords = get_defender_coords(
-                        o_coords,
-                        is_away_offense,
-                        aggression,
-                        o_spot,
-                        bh_coords,
-                        is_ball_handler=False,
-                        ball_spot="baseline_inbound"
-                    )
-                    d_dest[pos] = d_coords
+            if next_defensive_setup == "HCT":
+                # HCT-specific: defenders plant on the opposite half from the
+                # inbound (PG at center court, others at HCT_STANDARD_NORMAL
+                # centroids). This matches dynamic HCT step 0's expected
+                # defender starting alignment so BIP→HCT has no teleport.
+                from BackEnd.engine.dynamic_hct import (
+                    hct_initial_defender_coords,
+                )
+                d_dest = hct_initial_defender_coords(is_away_offense)
+            elif next_defensive_setup == "FCP":
+                # FCP-specific: defenders use the same randomized-range
+                # alignment generated alongside the offense in
+                # `_build_fcp_setup_positions`. Flip for away offense.
+                d_dest = (
+                    getAwayTeamCoords(dict(d_dest_home_fcp))
+                    if is_away_offense
+                    else dict(d_dest_home_fcp)
+                )
+            else:
+                d_dest = {}
+                for pos, defender in defense_team.lineup.items():
+                    if pos == "PG":
+                        d_coords = get_defender_coords(
+                            bh_coords,
+                            is_away_offense,
+                            aggression,
+                            "baseline_inbound",
+                            None,
+                            is_ball_handler=True
+                        )
+                        d_dest[pos] = d_coords
+                    elif pos in o_dest:
+                        o_coords = o_dest[pos]
+                        o_spot = "key"
+                        d_coords = get_defender_coords(
+                            o_coords,
+                            is_away_offense,
+                            aggression,
+                            o_spot,
+                            bh_coords,
+                            is_ball_handler=False,
+                            ball_spot="baseline_inbound"
+                        )
+                        d_dest[pos] = d_coords
             self.logger.log("defenseUpdate:end")
 
         from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
@@ -774,9 +970,19 @@ class TurnManager:
                 payload["offense_setup_positions"] = {
                     pos: {"coords": coords} for pos, coords in o_dest.items()
                 }
+            elif next_defensive_setup == "FCP":
+                # FCP randomized BIP setup: source from o_dest (per-position
+                # ranges with collision avoidance, generated above) — NOT
+                # from skeleton step 0. Players will animate from these
+                # BIP-end coords toward the first post-inbound skeleton
+                # step at archetype rate; non-gate movers freeze at the
+                # interrupted coord (§9.5) — no teleport.
+                payload["offense_setup_positions"] = {
+                    pos: {"coords": coords} for pos, coords in o_dest.items()
+                }
             else:
-                # FCP (and any other future pressure type): keep skeleton step 0
-                # positions as the source of offense setup.
+                # Other future pressure types: keep skeleton step 0 positions
+                # as the source of offense setup.
                 from BackEnd.engine.phase_resolution import get_skeleton_for_turn
                 skeleton = get_skeleton_for_turn("HCO", next_defensive_setup, self.game)
                 if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
@@ -799,6 +1005,73 @@ class TurnManager:
             "bip_inbound_setup",
         )
         attach_position_snapshots(payload, [bip_snap])
+
+        # Emit unified animation_steps. BIP is now a 2-step turn:
+        # Step 1 = setup walk-in (SF carries ball to baseline; everyone moves
+        # to BIP destinations). Step 2 = inbound pass (SF→PG; other 8 continue
+        # toward Step 1 destinations). See transition_bridge.build_bip_animation_steps.
+        try:
+            from BackEnd.utils.transition_bridge import build_bip_animation_steps
+
+            sf_player = offense_team.lineup.get("SF")
+            pg_player = offense_team.lineup.get("PG")
+            sf_id = str(getattr(sf_player, "player_id", "") or "")
+            pg_id = str(getattr(pg_player, "player_id", "") or "")
+
+            # Build setup_coords (player_id-keyed) from per-position o_dest/d_dest.
+            setup_coords: Dict[str, Dict[str, float]] = {}
+            for pos, coord in (o_dest or {}).items():
+                player = offense_team.lineup.get(pos)
+                pid = getattr(player, "player_id", None)
+                if pid is not None and isinstance(coord, dict):
+                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+            for pos, coord in (d_dest or {}).items():
+                player = defense_team.lineup.get(pos)
+                pid = getattr(player, "player_id", None)
+                if pid is not None and isinstance(coord, dict):
+                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+
+            prior_turns = getattr(game, "turns", None) or []
+            prior_turn = prior_turns[-1] if prior_turns else None
+            prior_final_coords = (
+                prior_turn.get("final_coords") if isinstance(prior_turn, dict) else None
+            ) or {}
+
+            clock_state = getattr(game, "game_state", {}) or {}
+            clock_r = float(clock_state.get("time_remaining", 0) or 0)
+            shot_r = float(clock_state.get("shot_clock_remaining", 0) or 0)
+
+            # Ball starts at the rim where the shot was just made — that's
+            # the new offense's DEFENSIVE basket (inverse of their attacking
+            # basket). For home offense, the just-scored rim is AWAY_RIM_COORDS;
+            # for away offense, it's HOME_RIM_COORDS.
+            ball_start_coord = (
+                dict(AWAY_RIM_COORDS) if not is_away_offense else dict(HOME_RIM_COORDS)
+            )
+
+            if sf_id and pg_id and prior_final_coords and setup_coords:
+                anim_steps = build_bip_animation_steps(
+                    off_lineup=offense_team.lineup,
+                    def_lineup=defense_team.lineup,
+                    prior_final_coords=prior_final_coords,
+                    setup_coords=setup_coords,
+                    sf_id=sf_id,
+                    pg_id=pg_id,
+                    ball_start_coord=ball_start_coord,
+                    is_fast_break_after_make=False,  # FB-after-MAKE not yet implemented
+                    clock_remaining_at_start=clock_r,
+                    shot_clock_remaining_at_start=shot_r,
+                )
+                if anim_steps:
+                    payload["animation_steps"] = anim_steps
+                    import logging
+                    logging.warning(
+                        "🌉 [BIP_BRIDGE FIRED] step_count=%d sf_id=%s pg_id=%s next=%s ball_start=%s",
+                        len(anim_steps), sf_id, pg_id, payload.get("next_play_type"), ball_start_coord,
+                    )
+        except Exception as e:
+            import logging
+            logging.warning("build_bip_animation_steps failed: %s", e)
 
         return payload
 
@@ -1071,6 +1344,15 @@ class TurnManager:
             low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
         elif state == "FREE_THROW":
             result = self.resolve_free_throw()
+            if isinstance(result, dict):
+                try:
+                    from BackEnd.engine.ft_step_emitter import build_ft_animation_steps
+
+                    anim_steps = build_ft_animation_steps(result, self.game)
+                    if anim_steps:
+                        result["animation_steps"] = anim_steps
+                except Exception as e:
+                    logging.warning("build_ft_animation_steps failed: %s", e)
         elif state == "FAST_BREAK":
             self.logger.log("fb:start")
             self.game.game_state["fastBreakInProgress"] = True
@@ -1078,9 +1360,60 @@ class TurnManager:
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
+            # Parallel-build: stamp unified animation_steps alongside legacy
+            # animations[]. FCP carries a skeleton in the same shape HCO uses,
+            # so the shared skeleton emitter works. Defensive: failure must
+            # not block the existing payload.
+            if isinstance(result, dict):
+                try:
+                    from BackEnd.engine.skeleton_step_emitter import (
+                        build_skeleton_animation_steps,
+                    )
+                    anim_steps = build_skeleton_animation_steps(
+                        result, self.game, turn_type="FCP"
+                    )
+                    if anim_steps is not None:
+                        result["animation_steps"] = anim_steps
+                        # Align result["time_elapsed"] with the schema's
+                        # total game-clock burn for MAKE/MISS/BLOCK on FCP
+                        # turns. Mirrors the HCO realignment in
+                        # `resolve_half_court_offense` — without this, the
+                        # legacy step_clock_seconds-based time_elapsed
+                        # excludes the [ball_flight] + [bounce] sub-step
+                        # durations, causing FCP shot turns to under-burn
+                        # the game clock by ~1-1.5 game-sec each.
+                        fcp_result_type = (result.get("result_type") or "").upper()
+                        if fcp_result_type in ("MAKE", "MISS", "BLOCK") and anim_steps:
+                            first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
+                            last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
+                            cs_start = first_clock.get("clock_remaining")
+                            cs_end = last_clock.get("clock_remaining")
+                            if cs_start is not None and cs_end is not None:
+                                schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
+                                result["time_elapsed"] = int(round(schema_game_burn))
+                except Exception as e:
+                    logging.warning(
+                        "build_skeleton_animation_steps (FCP) failed: %s", e
+                    )
         elif state == "HCT":
             self.logger.log("hct:start")
             result = resolve_half_court_trap_logic(self.game)
+            # Parallel-build: stamp unified animation_steps for HCT. Dynamic
+            # HCT returns skeleton:{} so the standard skeleton emitter bails;
+            # use the dynamic-specific helper. Static HCT (legacy) is wired
+            # internally by resolve_half_court_trap_logic.
+            if isinstance(result, dict) and "animation_steps" not in result:
+                try:
+                    from BackEnd.engine.dynamic_hct_step_emitter import (
+                        build_dynamic_hct_animation_steps,
+                    )
+                    anim_steps = build_dynamic_hct_animation_steps(result, self.game)
+                    if anim_steps is not None:
+                        result["animation_steps"] = anim_steps
+                except Exception as e:
+                    logging.warning(
+                        "build_dynamic_hct_animation_steps failed: %s", e
+                    )
         else:
             # HCO: normal half-court offense (Force Foul after DREB is now handled at DREB time in game_manager)
             if result is not None:
@@ -1188,10 +1521,37 @@ class TurnManager:
         # ✅ SS&S: Set current_turn from the state we used for routing (start of turn), not post-handler state.
         # Handlers update offensive_state for the *next* turn; current_turn must reflect the turn we just ran.
         result["current_turn"] = state  # HCO, FCP, HCT, FAST_BREAK, FREE_THROW, or OREB
-        
+
         # ✅ SS&S: Copy next_play_type to next_turn for explicit naming
         if "next_play_type" in result and result["next_play_type"]:
             result["next_turn"] = result["next_play_type"]
+
+        # 🔍 [RESET BYPASS DIAG] Detect HCO turns that skipped the skeleton emitter.
+        # If this fires, the Reset preamble could not be prepended for this turn.
+        if state == "HCO" and "animation_steps" not in result:
+            prior = (getattr(self.game, "turns", None) or [])
+            prior_last = prior[-1] if prior else None
+            prior_next = prior_last.get("next_play_type") if isinstance(prior_last, dict) else None
+            prior_has_setup = (
+                isinstance(prior_last, dict)
+                and prior_next == "HCO"
+                and isinstance(prior_last.get("hco_setup"), dict)
+            )
+            logging.warning(
+                "🔍 [RESET BYPASS] HCO turn produced NO animation_steps — emitter skipped. "
+                "result_type=%s forced_shot=%s forced_shot_reason=%s quick_foul=%s "
+                "has_skeleton=%s has_animations=%s has_step_clock_seconds=%s "
+                "prior_next_play=%s prior_has_hco_setup=%s",
+                result.get("result_type"),
+                result.get("forced_shot"),
+                result.get("forced_shot_reason"),
+                result.get("quick_foul"),
+                bool(result.get("skeleton")),
+                bool(result.get("animations")),
+                bool(result.get("step_clock_seconds")),
+                prior_next,
+                prior_has_setup,
+            )
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
@@ -1273,8 +1633,14 @@ class TurnManager:
             if state == "FAST_BREAK":
                 self.logger.log("fb:end")
                 self.game.game_state["fastBreakInProgress"] = False
-        # If animations weren't assigned yet (e.g. fast break, free throw), use fallback
-        if "animations" not in result:
+        # If animations weren't assigned yet (e.g. fast break, free throw), use fallback.
+        # Skip the fallback entirely when the turn already has schema-native
+        # ``animation_steps`` (HCO / HCT / DREB / FB-migrated turns): those turns
+        # are rendered by the new playback engine and do not need legacy
+        # ``animations[]``. Phase 2 of HCO UESS migration drops the legacy field
+        # from HCO turn_result; this gate prevents the fallback from re-stamping it.
+        has_animation_steps = isinstance(result.get("animation_steps"), list) and len(result["animation_steps"]) > 0
+        if "animations" not in result and not has_animation_steps:
             # Phase 5: Final Turn shot — use skeleton_to_animations for play execution (BH/shooter movement, then shot)
             if result.get("final_turn") and result.get("skeleton"):
                 from BackEnd.models.animator import Animator
@@ -1293,7 +1659,7 @@ class TurnManager:
                         roles["shooter"] = result["shooter"]
                     if "ball_handler" not in roles and result.get("ball_handler"):
                         roles["ball_handler"] = result["ball_handler"]
-                    
+
                     from BackEnd.models.animator import Animator
                     animator = Animator(self.game)
                     result["animations"] = animator.capture_halfcourt_animation(
@@ -2781,6 +3147,17 @@ class TurnManager:
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         result = resolve_half_court_offense_logic(self.game)
 
+        # Boundary stamp: ensure every HCO turn (including stopper paths —
+        # FOUL / STEAL / DEAD_BALL_TURNOVER) carries ``current_turn="HCO"``.
+        # The resolver stamps it only for shot-result paths (line 4255),
+        # so stopper turns previously reached the FE with ``current_turn=None``
+        # and failed the new-playback gate in AnimationEngine.js — the schema
+        # animation_steps were emitted but never rendered. setdefault keeps
+        # any explicit value (e.g., FCP/HCT transitions if they ever route
+        # through this function) intact.
+        if isinstance(result, dict):
+            result.setdefault("current_turn", "HCO")
+
         # Parallel-build: emit unified AnimationStep[] alongside legacy
         # animations[]. Single injection point for all HCO return paths
         # (shot, fouls, steals, dead-ball turnovers). See
@@ -2794,8 +3171,24 @@ class TurnManager:
                 anim_steps = build_skeleton_animation_steps(result, self.game)
                 if anim_steps is not None:
                     result["animation_steps"] = anim_steps
+                    # Align result["time_elapsed"] with the schema's total
+                    # game-clock burn for MAKE/MISS/BLOCK. The legacy
+                    # step_clock_seconds-based time_elapsed counts only
+                    # skeleton-step durations; the [ball_flight] + [bounce]
+                    # sub-steps add ball-arc + bounce game-sec that must
+                    # also decrement the game clock (shot clock is pinned
+                    # across those sub-steps — handled separately via
+                    # `_shot_detach_elapsed_seconds`).
+                    result_type_for_te = (result.get("result_type") or "").upper()
+                    if result_type_for_te in ("MAKE", "MISS", "BLOCK") and anim_steps:
+                        first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
+                        last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
+                        cs_start = first_clock.get("clock_remaining")
+                        cs_end = last_clock.get("clock_remaining")
+                        if cs_start is not None and cs_end is not None:
+                            schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
+                            result["time_elapsed"] = int(round(schema_game_burn))
             except Exception as e:
-                import logging
                 logging.warning(
                     "build_skeleton_animation_steps (HCO) failed: %s", e
                 )
@@ -3307,6 +3700,57 @@ class TurnManager:
         logging.debug(f"🔍 [COMPUTER TIMEOUT] No conditions met for {computer_team.name} Q{quarter}")
         return False
 
+    def _stamp_oreb_animation_steps(self, result):
+        """For OREB-typed results (PUTBACK_MAKE / PUTBACK_MISS / OREB_KICKOUT),
+        build the UESS ``animation_steps`` payload and realign
+        ``result["time_elapsed"]`` from the schema's total game-clock burn.
+        Idempotent + a no-op for any other result_type (e.g., OTB_FOUL).
+
+        For PUTBACK_MISS, also stamps top-level ``ball_bounce_x/y`` from
+        ``result["ballSpot"]`` (the second-bounce coords) so:
+          1. The OREB emitter's ``[bounce]`` step can target it.
+          2. ``game_manager._build_dreb_turn_from_miss`` (extended to fire
+             on PUTBACK_MISS) can read it when chaining into a DREB turn.
+        And sets ``next_play_type = "HCO"`` if not already set (e.g., not
+        overridden to ``FREE_THROW`` by a shooting foul on the putback).
+        """
+        if not isinstance(result, dict):
+            return result
+        result_type = (result.get("result_type") or "").upper()
+        if result_type not in ("PUTBACK_MAKE", "PUTBACK_MISS", "OREB_KICKOUT"):
+            return result
+
+        if result_type == "PUTBACK_MISS":
+            ballspot = result.get("ballSpot")
+            if isinstance(ballspot, dict):
+                bsx = ballspot.get("x")
+                bsy = ballspot.get("y")
+                if bsx is not None and "ball_bounce_x" not in result:
+                    result["ball_bounce_x"] = float(bsx)
+                if bsy is not None and "ball_bounce_y" not in result:
+                    result["ball_bounce_y"] = float(bsy)
+            if not result.get("next_play_type"):
+                result["next_play_type"] = "HCO"
+
+        try:
+            from BackEnd.engine.oreb_step_emitter import build_oreb_animation_steps
+            anim_steps = build_oreb_animation_steps(result, self.game)
+            if anim_steps is not None:
+                result["animation_steps"] = anim_steps
+                # Align result["time_elapsed"] with the schema's total
+                # game-clock burn (mirrors the HCO/FCP realignment).
+                if anim_steps:
+                    first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
+                    last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
+                    cs_start = first_clock.get("clock_remaining")
+                    cs_end = last_clock.get("clock_remaining")
+                    if cs_start is not None and cs_end is not None:
+                        schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
+                        result["time_elapsed"] = int(round(schema_game_burn))
+        except Exception as e:
+            logging.warning("build_oreb_animation_steps failed: %s", e)
+        return result
+
     def resolve_offensive_rebound_turn(self):
         """
         Process an offensive rebound as a separate turn.
@@ -3423,7 +3867,7 @@ class TurnManager:
                 block_payload,
                 [build_oreb_kickout_snapshot(self.game, off_lineup, def_lineup)],
             )
-            return block_payload
+            return self._stamp_oreb_animation_steps(block_payload)
         
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
@@ -3615,7 +4059,21 @@ class TurnManager:
                 if oreb_event.get("position_snapshots"):
                     pm["position_snapshots"] = oreb_event["position_snapshots"]
                 attach_putback_shot_sfx_fields(pm, oreb_event)
-                return pm
+                # Forward shot variant + rattle/backboard extras to the
+                # PUTBACK_MAKE turn so the FE renders the variant-driven
+                # rim effects (resolved in ``resolve_offensive_rebound``).
+                if oreb_event.get("shot_variant") and "shot_variant" not in pm:
+                    pm["shot_variant"] = oreb_event["shot_variant"]
+                for _vk in (
+                    "shot_variant_rattle_start",
+                    "shot_variant_rattle_progression",
+                    "shot_variant_backboard_y_offset",
+                    "shot_variant_backboard_miss_rim_offset_x",
+                    "shot_variant_backboard_miss_rim_offset_y",
+                ):
+                    if _vk in oreb_event and _vk not in pm:
+                        pm[_vk] = oreb_event[_vk]
+                return self._stamp_oreb_animation_steps(pm)
             else:
                 # Putback missed - check for rebound
                 text = f"{get_name_safe(rebounder)} goes back up but misses."
@@ -3772,7 +4230,19 @@ class TurnManager:
                 if oreb_event.get("position_snapshots"):
                     result["position_snapshots"] = oreb_event["position_snapshots"]
                 attach_putback_shot_sfx_fields(result, oreb_event)
-                return result
+                # Forward shot variant + rattle/backboard extras.
+                if oreb_event.get("shot_variant") and "shot_variant" not in result:
+                    result["shot_variant"] = oreb_event["shot_variant"]
+                for _vk in (
+                    "shot_variant_rattle_start",
+                    "shot_variant_rattle_progression",
+                    "shot_variant_backboard_y_offset",
+                    "shot_variant_backboard_miss_rim_offset_x",
+                    "shot_variant_backboard_miss_rim_offset_y",
+                ):
+                    if _vk in oreb_event and _vk not in result:
+                        result[_vk] = oreb_event[_vk]
+                return self._stamp_oreb_animation_steps(result)
         
         else:
             # Kickout
@@ -3856,7 +4326,7 @@ class TurnManager:
             }
             if oreb_event.get("position_snapshots"):
                 kick_payload["position_snapshots"] = oreb_event["position_snapshots"]
-            return kick_payload
+            return self._stamp_oreb_animation_steps(kick_payload)
 
     def update_clock_and_possession(self, result):
         _cc_clock_start = int(self.game.game_state.get("time_remaining", 0))

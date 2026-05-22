@@ -21,13 +21,21 @@ Algorithm:
 - Trigger: `player_reaches_position` (rebounder → ball bounce coords).
 - T = rebounder's AG-driven traversal time at `sprint` archetype.
 - Rebounder: `cut` + `sprint` → bounce coords.
-- Every other player: `stationary` at their start coord.
+- Rebound attemptors (`offense_rebounders` + `defense_rebounders` from the
+  prior MISS turn, minus captor): `cut` + `cruise` → bounce ± (4 x, 6 y).
+- Everyone else: `stationary` at post-shot coords (get-back / release).
 - Ball: BallLoose at bounce → BallAttached(rebounder).
 - Next: implicit end for normal capture; turn_stop FOUL for over-the-back.
 """
 
 from typing import Any, Dict, List, Optional
 
+from BackEnd.constants import HCO_STEP_T_FLOOR_GAME_SECONDS
+from BackEnd.utils.animation_step_helpers import (
+    rebound_attemptor_ids,
+    stamp_rebound_capture_player_motion,
+    stamp_tween_durations,
+)
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -71,6 +79,8 @@ def build_dreb_animation_steps(
     clock_remaining: float,
     shot_clock_remaining: float,
     otb_foul: Optional[Dict[str, Any]] = None,
+    offense_rebounders: Optional[List[Any]] = None,
+    defense_rebounders: Optional[List[Any]] = None,
 ) -> Optional[List[AnimationStep]]:
     """Build the DREB turn's single AnimationStep.
 
@@ -103,10 +113,16 @@ def build_dreb_animation_steps(
     if not rebounder_start:
         return None
 
-    # T = rebounder's traversal time at sprint archetype. Canonical step
-    # duration; nothing else moves during the step.
-    t_game_seconds = calc_ag_segment_seconds(
-        rebounder_start, bounce_coords, rebounder, archetype="sprint"
+    # T = rebounder's traversal time at sprint (gates the step).
+    t_game_seconds = max(
+        HCO_STEP_T_FLOOR_GAME_SECONDS,
+        calc_ag_segment_seconds(
+            rebounder_start, bounce_coords, rebounder, archetype="sprint",
+        ),
+    )
+
+    attemptor_ids = rebound_attemptor_ids(
+        offense_rebounders, defense_rebounders, rebounder_id,
     )
 
     coords_start: Dict[str, GridCoord] = {}
@@ -114,6 +130,7 @@ def build_dreb_animation_steps(
     destinations: Dict[str, Optional[GridCoord]] = {}
     actions: Dict[str, str] = {}
     archetypes: Dict[str, str] = {}
+    tween_durations: Dict[str, float] = {}
 
     for player in _player_iter(off_lineup, def_lineup):
         pid = _player_id(player)
@@ -123,19 +140,25 @@ def build_dreb_animation_steps(
         if start is None:
             continue
         coords_start[pid] = {"x": float(start["x"]), "y": float(start["y"])}
+        coords_end[pid] = dict(coords_start[pid])
+        destinations[pid] = None
+        actions[pid] = "stationary"
+        archetypes[pid] = "stationary"
 
-        if pid == rebounder_id:
-            coords_end[pid] = {"x": float(bounce_coords["x"]), "y": float(bounce_coords["y"])}
-            destinations[pid] = {"x": float(bounce_coords["x"]), "y": float(bounce_coords["y"])}
-            actions[pid] = "cut"
-            archetypes[pid] = "sprint"
-        else:
-            # Hold post-shot position assigned by shot_manager. DREB has
-            # no opinion on where non-rebounders go.
-            coords_end[pid] = coords_start[pid]
-            destinations[pid] = None
-            actions[pid] = "stationary"
-            archetypes[pid] = "stationary"
+    stamp_rebound_capture_player_motion(
+        start_coords=coords_start,
+        end_coords=coords_end,
+        destinations=destinations,
+        actions=actions,
+        archetypes=archetypes,
+        tween_durations=tween_durations,
+        rebounder_id=str(rebounder_id),
+        bounce_coords=bounce_coords,
+        attemptor_ids=attemptor_ids,
+        step_t=float(t_game_seconds),
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
     ball_start: BallState = {
         "coords": {"x": float(bounce_coords["x"]), "y": float(bounce_coords["y"])}
@@ -188,6 +211,18 @@ def build_dreb_animation_steps(
             "ball": ball_start,
             "clock": clock_start,
             "advance_trigger": trigger,
+            # Rebound SFX cue (Sound_Design_Update.md → "Rebound SFX").
+            # Fires when the ball attaches to the rebounder's sprite, which
+            # in the DREB step happens at step-end snap (the ball is
+            # already sitting at bounce_coords at step start; only the
+            # rebounder moves). FE fires this cue from the step-end snap
+            # path when the ball tween early-returns (no ball movement),
+            # so the SFX still hits the moment of attach.
+            "sfx_on_ball_arrival": {
+                "file": "attack-shot-strong.wav",
+                "volume": 0.7,
+                "event": "rebound_dreb",
+            },
         },
         "end": {
             "coords": coords_end,
@@ -197,4 +232,6 @@ def build_dreb_animation_steps(
             "next": next_step,
         },
     }
+    if tween_durations:
+        step["start"]["tween_durations"] = tween_durations
     return [step]

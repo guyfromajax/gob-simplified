@@ -566,11 +566,11 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     try:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
         from BackEnd.constants import (
-            BURST_MULTIPLIER,
-            CRUISE_MULTIPLIER,
-            DRIVE_MULTIPLIER,
-            SHOT_MOTION_MULTIPLIER,
-            SPRINT_MULTIPLIER,
+            BURST_GRID_PER_GAME_SEC,
+            CRUISE_GRID_PER_GAME_SEC,
+            STANDARD_GRID_PER_GAME_SEC,
+            SHOT_MOTION_GRID_PER_GAME_SEC,
+            SPRINT_GRID_PER_GAME_SEC,
         )
     except Exception:
         # Test-context fallback: AG=50 sprint ≈ 18.67 grid/sec.
@@ -581,19 +581,19 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     else:
         attrs = getattr(player, "attributes", None) or {}
         ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
-    base_rate = float(ag_to_grid_per_game_sec(ag))
-    if archetype == "drive":
-        return base_rate * DRIVE_MULTIPLIER
+    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
+    if archetype == "standard":
+        return STANDARD_GRID_PER_GAME_SEC * ag_scale
     if archetype in ("shot_motion", "compressed_hco"):
-        return base_rate * SHOT_MOTION_MULTIPLIER
+        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
     if archetype == "sprint":
-        return base_rate * SPRINT_MULTIPLIER
+        return SPRINT_GRID_PER_GAME_SEC * ag_scale
     if archetype == "burst":
-        return base_rate * BURST_MULTIPLIER
+        return BURST_GRID_PER_GAME_SEC * ag_scale
     if archetype == "cruise":
-        return base_rate * CRUISE_MULTIPLIER
+        return CRUISE_GRID_PER_GAME_SEC * ag_scale
     # default / stationary / unknown → base AG rate.
-    return base_rate
+    return STANDARD_GRID_PER_GAME_SEC * ag_scale
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
@@ -628,7 +628,7 @@ def _stamp_tween_durations(
         dist = _euclid(sc, ec)
         if dist < 1e-6:
             continue
-        arch = archetype.get(pid, "default")
+        arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         rate = _ag_grid_per_game_sec(player, arch)
         if rate <= 0:
@@ -705,7 +705,7 @@ def _build_outcome_step(
         sid = str(stopper_id)
         if sid in actions:
             actions[sid] = "guard_ball"
-            archetype[sid] = "drive"
+            archetype[sid] = "standard"
 
     # Defenders default to guard_offball (overrides "stationary" only when
     # they have a movement end recorded by the animator).
@@ -721,7 +721,7 @@ def _build_outcome_step(
             continue
         if _movement_end_coord(animations, pid) is not None:
             actions[pid] = "guard_offball"
-            archetype[pid] = "drive"
+            archetype[pid] = "standard"
 
     # Non-BH offensive players: when the animator gives them a movement end
     # (i.e. they're not actually stationary), tag them as `cut` / `sprint`
@@ -754,7 +754,7 @@ def _build_outcome_step(
         st_start = step_start_coords.get(stopper_pid)
         st_end = end_coords.get(stopper_pid)
         st_traversal = (
-            _traversal_seconds(st_start, st_end, _ag_grid_per_game_sec(stopper, "drive"))
+            _traversal_seconds(st_start, st_end, _ag_grid_per_game_sec(stopper, "normal"))
             if st_start and st_end
             else 0.0
         )
@@ -796,7 +796,7 @@ def _build_outcome_step(
         if dist == 0.0:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "drive") if player else 12.0
+        rate = _ag_grid_per_game_sec(player, "normal") if player else 12.0
         max_traversal = rate * t
         if dist > max_traversal:
             ratio = max_traversal / dist
@@ -1047,7 +1047,7 @@ def _build_step_back_step(
         dy = end["y"] - start["y"]
         dist = (dx * dx + dy * dy) ** 0.5
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "drive") if player else 12.0
+        rate = _ag_grid_per_game_sec(player, "normal") if player else 12.0
         traversal = dist / rate if rate > 0 else 0.0
         if traversal > t:
             t = traversal
@@ -1083,7 +1083,7 @@ def _build_step_back_step(
             actions[pid] = "handle_ball"
         else:
             actions[pid] = "cut"
-        archetype[pid] = "drive"
+        archetype[pid] = "standard"
 
     ball_state: BallState = (
         {"owner_player_id": fb_bh_id} if fb_bh_id else {"owner_player_id": ""}
@@ -1362,7 +1362,7 @@ def _clamp_step_end_coords_to_archetype(
         target = end_coords.get(pid)
         if not target or not start:
             continue
-        arch = archetypes.get(pid) or "default"
+        arch = archetypes.get(pid) or "standard"
         if arch == "stationary":
             continue
         dx = float(target["x"]) - float(start["x"])

@@ -202,7 +202,19 @@ def execute_opening_tip(game):
     time_elapsed = random.randint(1, 5) + 1
     
     text = f"{winner_name} wins the tip!"
-    
+
+    # Identify ball handler: the offense (tip-winning) player whose end coord
+    # is the ball_landing_coords (the converger). Falls back to PG.
+    bh_id = None
+    for anim in animations:
+        end = anim.get("end") or {}
+        if end.get("x") == ball_landing_coords["x"] and end.get("y") == ball_landing_coords["y"]:
+            bh_id = anim.get("playerId")
+            break
+    if bh_id is None:
+        pg = offense_team.lineup.get("PG")
+        bh_id = getattr(pg, "player_id", None) if pg else None
+
     turn_result = {
         "result_type": "OPENING_TIP",
         "text": text,
@@ -212,6 +224,7 @@ def execute_opening_tip(game):
         "current_turn": "OPENING_TIP",  # ✅ SS&S: Explicit turn type
         "animations": animations,
         "ball_landing_coords": ball_landing_coords,
+        "ball_handler_id": bh_id,  # Tip winner who ran to the ball; consumed by OT→HCO bridge.
         "home_wins": home_wins,
         "winner": winner_name,
         "next_play_type": "HCO",

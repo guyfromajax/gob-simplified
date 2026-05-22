@@ -7,7 +7,8 @@ unified AnimationStep[] payload defined in
 
 Used by HCO and FCP — both are multi-step paced offensive turns where
 each skeleton step represents a synchronized player-position transition
-gated by the slowest mover. HCT has its own emitter
+gated by the slowest offensive mover (defense runs in parallel).
+HCT has its own emitter
 (``hct_step_emitter.py``) because HCT is a fixed 4-step dynamic structure,
 not skeleton-driven.
 
@@ -17,9 +18,38 @@ Coexists with the legacy ``animations[]`` payload until per-turn-type
 cutover.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from BackEnd.utils.animation_step_helpers import stamp_tween_durations
+from BackEnd.constants import (
+    AIRBALL_OOB_AWAY_COORDS,
+    AIRBALL_OOB_GAME_SECONDS,
+    AIRBALL_OOB_HOME_COORDS,
+    AWAY_RIM_COORDS,
+    BANK_MAKE_SETTLE_GAME_SECONDS,
+    BANK_MISS_GRAZE_GAME_SECONDS,
+    BOUNCE_STEP_GAME_SECONDS,
+    HCO_STEP_T_FLOOR_GAME_SECONDS,
+    HOME_RIM_COORDS,
+    MADE_SHOT_SWEET_SPOT_AWAY_RIM,
+    MADE_SHOT_SWEET_SPOT_HOME_RIM,
+    PASS_GRID_SPOTS_PER_GAME_SECOND,
+    RATTLE_HOP_GAME_SECONDS,
+    RATTLE_MAKE_SETTLE_GAME_SECONDS,
+    SHOT_BALL_GRID_PER_GAME_SECOND,
+)
+from BackEnd.utils.animation_step_helpers import (
+    _ag_grid_per_game_sec,
+    _euclid,
+    _player_lookup_by_id,
+    pass_arrival_sfx,
+    pass_release_sfx,
+    rattle_hop_sfx,
+    rattle_make_settle_sfx,
+    shot_followup_timed_sfx,
+    shot_launch_sfx,
+    shot_result_sfx,
+    stamp_tween_durations,
+)
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -54,19 +84,28 @@ _ACTION_MAP: Dict[str, PlayerAction] = {
 _OFFENSE_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
 
-def _archetype_for_action(action: PlayerAction) -> PlayerArchetype:
+def _archetype_for_action(action: PlayerAction, turn_type: str = "HCO") -> PlayerArchetype:
     """Per-player archetype derived from action.
 
-    HCO/FCP are paced turns — every player is expected to reach their
-    step destination by ``step_clock_seconds[i]``. The slowest mover
-    consumes the full step time; faster movers idle. Archetype tags
-    rendering pace, not gating.
+    HCO/FCP are paced turns — every player is expected to reach their step
+    destination by the gate. The slowest gate-eligible mover consumes the
+    full step time; faster movers idle. Archetype tags rendering pace, not
+    gating.
+
+    Per-turn-type rules:
+      - ``shoot`` → ``shot_motion`` (both HCO + FCP)
+      - ``stationary`` / ``post_up`` → ``stationary``
+      - HCO default → ``standard``
+      - FCP default → ``sprint`` (press-break urgency — all FCP movement
+        runs at sprint pace per FCP_HCT_System.md / UESS FCP wiring)
     """
     if action == "shoot":
         return "shot_motion"
     if action in ("stationary", "post_up"):
         return "stationary"
-    return "cruise"
+    if turn_type == "FCP":
+        return "sprint"
+    return "standard"
 
 
 # --- Helpers ---------------------------------------------------------------
@@ -128,6 +167,7 @@ def _coords_at_movement_index(
 
 def _walk_ball_owners(
     skeleton_steps: List[Dict[str, Any]],
+    seed_owner_pos: Optional[str] = None,
 ) -> List[tuple]:
     """Walk the skeleton once and produce a list of
     ``(start_owner_pos, end_owner_pos)`` pairs — one per step.
@@ -139,9 +179,15 @@ def _walk_ball_owners(
 
     Maintains a single running owner pointer across the walk to avoid
     off-by-one issues from computing each boundary independently.
+
+    ``seed_owner_pos`` seeds the running owner before step 0. Used by FCP
+    to carry the BIP-end BH (per ``prior_turn["final_ball_handler_id"]``)
+    into the first FCP skeleton step — otherwise FCP step 0 falls back to
+    ``roles["ball_handler"]`` (the late-skeleton BH, often a different
+    player), which causes the ball to teleport at step 0 end.
     """
     walks: List[tuple] = []
-    current_owner: Optional[str] = None
+    current_owner: Optional[str] = seed_owner_pos
     for step in skeleton_steps:
         pos_actions = step.get("pos_actions") or {}
         for pos in _OFFENSE_POSITIONS:
@@ -178,29 +224,6 @@ def _shooter_pos_in_step(step: Dict[str, Any]) -> Optional[str]:
         if action == "shoot":
             return pos
     return None
-
-
-def _slowest_mover_id(
-    start_coords: Dict[str, GridCoord],
-    end_coords: Dict[str, GridCoord],
-) -> Optional[str]:
-    """Identify the gating player for a paced step — the player with the
-    largest start→end traversal distance. Falls back to None if no players
-    move (e.g., everyone stationary).
-    """
-    longest: Optional[str] = None
-    max_dist_sq = -1.0
-    for pid, start in start_coords.items():
-        end = end_coords.get(pid)
-        if end is None:
-            continue
-        dx = end["x"] - start["x"]
-        dy = end["y"] - start["y"]
-        dist_sq = dx * dx + dy * dy
-        if dist_sq > max_dist_sq:
-            max_dist_sq = dist_sq
-            longest = pid
-    return longest
 
 
 def _build_advance_trigger_player_reaches(
@@ -266,16 +289,226 @@ def _build_archetype_map(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     actions: Dict[str, PlayerAction],
+    turn_type: str = "HCO",
 ) -> Dict[str, PlayerArchetype]:
-    """Per-player archetype derived from per-player action."""
+    """Per-player archetype derived from per-player action + turn type."""
     out: Dict[str, PlayerArchetype] = {}
     for lineup in (off_lineup, def_lineup):
         for pos in _OFFENSE_POSITIONS:
             pid = _player_id_at_pos(lineup, pos)
             if not pid:
                 continue
-            out[pid] = _archetype_for_action(actions.get(pid, "stationary"))
+            out[pid] = _archetype_for_action(
+                actions.get(pid, "stationary"), turn_type
+            )
     return out
+
+
+# --- FCP-specific gate helpers ---------------------------------------------
+
+_FCP_STOPPER_EVENT_TYPES = frozenset({
+    "o_foul", "d_foul", "dead_ball_turnover", "steal",
+})
+
+
+def _offensive_player_ids(off_lineup: Dict[str, Any]) -> List[str]:
+    """Return all 5 offensive player IDs from the lineup, in PG..C order."""
+    out: List[str] = []
+    for pos in _OFFENSE_POSITIONS:
+        pid = _player_id_at_pos(off_lineup, pos)
+        if pid:
+            out.append(pid)
+    return out
+
+
+def _slowest_among(
+    start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+    eligible_ids: List[str],
+) -> Optional[str]:
+    """Pick the player from ``eligible_ids`` with the longest start→end
+    distance. Returns None if no eligible player has movement data."""
+    longest: Optional[str] = None
+    max_dist_sq = -1.0
+    for pid in eligible_ids:
+        start = start_coords.get(pid)
+        end = end_coords.get(pid)
+        if start is None or end is None:
+            continue
+        dx = end["x"] - start["x"]
+        dy = end["y"] - start["y"]
+        dist_sq = dx * dx + dy * dy
+        if dist_sq > max_dist_sq:
+            max_dist_sq = dist_sq
+            longest = pid
+    return longest
+
+
+def _natural_t(
+    pid: str,
+    start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+    archetype: Dict[str, PlayerArchetype],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> float:
+    """Compute the natural travel time for a player to reach his step-end
+    coord at his archetype rate. Returns 0 if data is missing or distance
+    is zero."""
+    sc = start_coords.get(pid)
+    ec = end_coords.get(pid)
+    if sc is None or ec is None:
+        return 0.0
+    dist = _euclid(sc, ec)
+    if dist < 1e-6:
+        return 0.0
+    arch = archetype.get(pid, "standard")
+    player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+    rate = _ag_grid_per_game_sec(player, arch)
+    if rate <= 0:
+        return 0.0
+    return dist / rate
+
+
+def _build_step_end_coords_with_interrupts(
+    start_coords: Dict[str, GridCoord],
+    destinations: Dict[str, Optional[GridCoord]],
+    archetype: Dict[str, PlayerArchetype],
+    step_t: float,
+    gate_id: Optional[str],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> Dict[str, GridCoord]:
+    """UESS §9.5 — gate player reaches full ``destination``; all others end at
+    interrupted coord (``start + rate × step_t`` toward destination, clamped).
+    """
+    final: Dict[str, GridCoord] = {}
+    for pid, sc in start_coords.items():
+        dest = destinations.get(pid)
+        if dest is None:
+            continue
+        if pid == gate_id:
+            final[pid] = {"x": float(dest["x"]), "y": float(dest["y"])}
+            continue
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        arch = archetype.get(pid, "standard")
+        rate = _ag_grid_per_game_sec(player, arch)
+        ec, _ = _interpolate_step_end(sc, dest, rate, step_t)
+        final[pid] = ec
+    return final
+
+
+def _is_fcp_stopper_action_step(
+    skeleton_steps: List[Dict[str, Any]], i: int, num_steps: int,
+) -> bool:
+    """True iff step ``i`` is the truncated final skeleton step preceding
+    the appended event-marker step (the one with ``events`` containing a
+    stopper-action type). For FCP, this step gates on the players involved
+    in the stop action rather than the slowest offensive player."""
+    if i + 1 >= num_steps:
+        return False
+    next_step = skeleton_steps[i + 1]
+    events = next_step.get("events") or []
+    for e in events:
+        if isinstance(e, dict) and e.get("type") in _FCP_STOPPER_EVENT_TYPES:
+            return True
+    return False
+
+
+def _position_of_player_id(
+    lineup: Dict[str, Any], player_id: Optional[str],
+) -> Optional[str]:
+    """Find the lineup position (PG/SG/SF/PF/C) for a given player_id."""
+    if not player_id:
+        return None
+    target = str(player_id)
+    for pos, player in (lineup or {}).items():
+        if player is None:
+            continue
+        pid = getattr(player, "player_id", None)
+        if pid is not None and str(pid) == target:
+            return pos
+    return None
+
+
+def _resolve_fcp_stopper_gate_ids(
+    skeleton_steps: List[Dict[str, Any]],
+    action_step_index: int,
+    turn_result: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    roles: Dict[str, Any],
+) -> List[str]:
+    """Return the list of player IDs that gate the FCP stopper action step,
+    per the FCP gate spec:
+
+      - o_foul: ``foul_player_id`` (offense) + his same-position defender
+      - d_foul: ``foul_player_id`` (defense) + his same-position offense
+      - steal: ``victim_id`` (offense) + ``stealer_id`` (defense)
+      - dead_ball_turnover: BH at stop step + his same-position defender.
+        Also covers SHOT_CLOCK_VIOLATION (same event type per
+        ``apply_stopper_system_to_skeleton``).
+
+    Defender ↔ offense matchup is strictly 1:1 by lineup position
+    (matches ``_position_fcp_defenders`` shadowing rule).
+    """
+    event_marker_idx = action_step_index + 1
+    if event_marker_idx >= len(skeleton_steps):
+        return []
+
+    event_marker = skeleton_steps[event_marker_idx]
+    events = event_marker.get("events") or []
+    stopper_type: Optional[str] = None
+    for e in events:
+        if isinstance(e, dict) and e.get("type") in _FCP_STOPPER_EVENT_TYPES:
+            stopper_type = str(e["type"])
+            break
+    if stopper_type is None:
+        return []
+
+    if stopper_type == "o_foul":
+        offense_id = str(turn_result.get("foul_player_id") or "")
+        if not offense_id:
+            return []
+        offense_pos = _position_of_player_id(off_lineup, offense_id)
+        defender_id = _player_id_at_pos(def_lineup, offense_pos) if offense_pos else None
+        return [pid for pid in (offense_id, defender_id) if pid]
+
+    if stopper_type == "d_foul":
+        defender_id = str(turn_result.get("foul_player_id") or "")
+        if not defender_id:
+            return []
+        defender_pos = _position_of_player_id(def_lineup, defender_id)
+        offense_id = _player_id_at_pos(off_lineup, defender_pos) if defender_pos else None
+        return [pid for pid in (defender_id, offense_id) if pid]
+
+    if stopper_type == "steal":
+        victim_id = str(turn_result.get("victim_id") or "")
+        stealer_id = str(turn_result.get("stealer_id") or "")
+        return [pid for pid in (victim_id, stealer_id) if pid]
+
+    if stopper_type == "dead_ball_turnover":
+        # BH at stop step = offense position with a pos_action on the
+        # appended event marker (apply_stopper_system_to_skeleton stamps
+        # only the BH there with action=handle_ball).
+        em_pos_actions = event_marker.get("pos_actions") or {}
+        bh_pos: Optional[str] = None
+        for pos in _OFFENSE_POSITIONS:
+            if em_pos_actions.get(pos):
+                bh_pos = pos
+                break
+        bh_id = _player_id_at_pos(off_lineup, bh_pos) if bh_pos else None
+        if not bh_id:
+            # Fallback: take BH from roles.
+            bh_player = (roles or {}).get("ball_handler")
+            bh_id = _safe_id(bh_player)
+        if not bh_id:
+            return []
+        bh_pos_resolved = bh_pos or _position_of_player_id(off_lineup, bh_id)
+        defender_id = _player_id_at_pos(def_lineup, bh_pos_resolved) if bh_pos_resolved else None
+        return [pid for pid in (bh_id, defender_id) if pid]
+
+    return []
 
 
 def _bh_defender_pos(roles: Dict[str, Any]) -> Optional[str]:
@@ -360,6 +593,7 @@ def _resolve_final_step_next(turn_result: Dict[str, Any]) -> NextStep:
 def build_skeleton_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
+    turn_type: str = "HCO",
 ) -> Optional[List[AnimationStep]]:
     """Convert a skeleton-shaped turn_result (HCO or FCP) into the unified
     AnimationStep[] payload.
@@ -368,6 +602,10 @@ def build_skeleton_animation_steps(
         turn_result: turn dict containing ``skeleton``, ``animations``,
             ``step_clock_seconds``, ``roles``, ``result_type``.
         game: GameManager (for clock state at turn start).
+        turn_type: ``"HCO"`` (default) or ``"FCP"``. Drives whether the entry
+            orchestrator (Handoff / Kickout / Walk Up) runs. HCO turns run the
+            orchestrator universally; FCP turns skip it (BIP setup positions
+            handle their entry seam).
 
     Returns:
         List[AnimationStep] in step order, or None if required data is
@@ -379,12 +617,45 @@ def build_skeleton_animation_steps(
     step_clock_seconds: List[float] = turn_result.get("step_clock_seconds") or []
     roles: Dict[str, Any] = turn_result.get("roles") or {}
 
-    # 🔍 [RESET DIAG] temporary — remove once HCO Reset prepending is verified.
-    import logging as _reset_diag_log
-    _reset_diag_log.warning(
-        "🔍 [RESET DIAG] skeleton_emitter entry: current_turn=%s next_play_type=%s "
+    # Phase 2 of HCO UESS migration: if the caller didn't stamp ``animations``
+    # on the turn_result (HCO drops legacy ``animations[]`` from the payload),
+    # build them locally via the animator using the skeleton + lineups. The
+    # animator's offense + man/zone defender placement logic is unchanged;
+    # only the call site moved from ``resolve_half_court_offense_logic`` to
+    # here. ``animations`` stays internal to this emitter and is not written
+    # back to ``turn_result``.
+    if not animations and skeleton_steps:
+        off_team_check = getattr(game, "offense_team", None)
+        def_team_check = getattr(game, "defense_team", None)
+        off_lineup_check = getattr(off_team_check, "lineup", {}) if off_team_check else {}
+        def_lineup_check = getattr(def_team_check, "lineup", {}) if def_team_check else {}
+        try:
+            from BackEnd.models.animator import Animator
+            animations = Animator(game).skeleton_to_animations(
+                skeleton,
+                off_lineup_check,
+                def_lineup_check,
+                add_defenders=True,
+                is_fcp=(turn_type == "FCP"),
+                is_hct=False,
+            )
+        except Exception as _anim_err:
+            import logging as _anim_log
+            _anim_log.warning(
+                "skeleton_step_emitter: internal animator build failed: %s",
+                _anim_err,
+            )
+
+    # Diagnostic on entry to skeleton emitter (HCO + FCP). Logs what inputs
+    # the emitter received so we can confirm the skeleton / animations /
+    # step_clock_seconds shape per turn. Remove once the migration has burned
+    # in across all skeleton-style turn types.
+    import logging as _skel_emit_log
+    _skel_emit_log.warning(
+        "🔍 [SKELETON_EMIT] entry: turn_type=%s current_turn=%s next_play_type=%s "
         "has_hco_setup=%s has_skeleton_steps=%s (%d) has_animations=%s (%d) "
         "has_step_clock_seconds=%s (%d)",
+        turn_type,
         turn_result.get("current_turn"),
         turn_result.get("next_play_type"),
         isinstance(turn_result.get("hco_setup"), dict),
@@ -393,17 +664,16 @@ def build_skeleton_animation_steps(
         bool(step_clock_seconds), len(step_clock_seconds),
     )
 
-    if not skeleton_steps or not animations or not step_clock_seconds:
-        _reset_diag_log.warning(
-            "🔍 [RESET DIAG] skeleton_emitter EARLY RETURN None — Reset will NOT fire"
+    if not skeleton_steps or not animations:
+        _skel_emit_log.warning(
+            "🔍 [SKELETON_EMIT] EARLY RETURN None — schema steps will not emit"
         )
         return None
 
-    # Walk over min(skeleton_steps, step_clock_seconds, animation_movements - 1).
-    # The legacy animations[] always carries len(skeleton_steps)+1 movement
-    # waypoints per player (start + N step ends). step_clock_seconds[] carries
-    # one entry per step.
-    num_steps = min(len(skeleton_steps), len(step_clock_seconds))
+    # Walk one step per skeleton step. Phase 3 of HCO UESS migration: step T
+    # is computed from the gate player's natural travel time inside the loop
+    # below, not from the legacy ``step_clock_seconds`` timing contract.
+    num_steps = len(skeleton_steps)
     if num_steps == 0:
         return None
 
@@ -420,51 +690,213 @@ def build_skeleton_animation_steps(
         game_state.get("shot_clock_remaining", 0) or 0
     )
 
-    ball_walks = _walk_ball_owners(skeleton_steps)
+    # FCP-specific walker seed: carry the BIP-end BH into the first FCP
+    # skeleton step's `current_owner` so that early steps without an
+    # explicit `handle_ball`/`pass` action don't fall back to
+    # ``roles["ball_handler"]`` (which for FCP non-shot turns is the
+    # late-skeleton BH, often a different player than the BIP-end BH and
+    # causes a visible ball teleport at step 0 end). HCO uses its entry
+    # orchestrator for this seam and doesn't need the seed.
+    walker_seed_pos: Optional[str] = None
+    prior_turns_for_seed = getattr(game, "turns", None) or []
+    prior_turn_for_seed = prior_turns_for_seed[-1] if prior_turns_for_seed else None
+    if turn_type == "FCP" and isinstance(prior_turn_for_seed, dict):
+        prior_bh_id = prior_turn_for_seed.get("final_ball_handler_id")
+        if prior_bh_id:
+            walker_seed_pos = _position_of_player_id(off_lineup, str(prior_bh_id))
+
+    ball_walks = _walk_ball_owners(skeleton_steps, seed_owner_pos=walker_seed_pos)
 
     steps: List[AnimationStep] = []
     elapsed_so_far = 0.0
 
-    # Reset prepend: when this HCO turn carries hco_setup.inbound_pass (set by
-    # a source turn that ended with BH ≠ PG — e.g., FB hold-up, outlet
-    # denied), emit 1-2 Reset steps before the skeleton fires. Phase 1
-    # implementation: source turns still emit their own lead-in steps, so
-    # this layer renders Reset on top during verification. Phase 2 removes
-    # the source-turn duplicates.
-    hco_setup = turn_result.get("hco_setup")
-    inbound_pass = hco_setup.get("inbound_pass") if isinstance(hco_setup, dict) else None
-    is_hco_turn = turn_result.get("current_turn") == "HCO"
-    if is_hco_turn and isinstance(inbound_pass, dict):
-        from BackEnd.utils.reset_step_helper import build_reset_steps
+    # =========================================================================
+    # HCO Entry Orchestrator — dynamically determines whether to prepend
+    # Handoff, Kickout, and/or Walk Up steps before the HCO skeleton fires.
+    # Spec: _documentation_master/05_Animation_System/Step_By_Step_System.md
+    #
+    # Inputs read at HCO start:
+    #   current_bh_id    — from prior_turn.final_ball_handler_id (universal)
+    #   step0_bh_id      — from current turn's roles.ball_handler (playcall)
+    #   bh_start_coord   — from prior_turn.final_coords[current_bh_id]
+    #   in_back_court    — bh_start_coord.x < 71 (home) or > 29 (away)
+    #
+    # Decision tree (mutually exclusive per row, all evaluated):
+    #   bh ≠ step0_bh AND in_back_court  → Handoff fires
+    #   bh ≠ step0_bh AND NOT in_back   → Kickout fires
+    #   in_back_court                   → Walk Up fires (after Handoff if both)
+    #
+    # Handoff + Kickout are mutually exclusive (opposite x-coord conditions).
+    # =========================================================================
+    import logging as _hco_entry_log
+    prior_turns = getattr(game, "turns", None) or []
+    prior_turn = prior_turns[-1] if prior_turns else None
+    away_offense = bool(
+        getattr(off_team, "team_id", None) == getattr(getattr(game, "away_team", None), "team_id", None)
+    )
 
-        reset_bh_id = inbound_pass.get("from_player_id")
-        reset_start_coords = _coords_at_movement_index(animations, 0)
-        away_offense = bool(
-            getattr(off_team, "team_id", None) == getattr(getattr(game, "away_team", None), "team_id", None)
-        )
-        if reset_bh_id and reset_start_coords:
-            reset_steps = build_reset_steps(
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                start_coords=reset_start_coords,
-                is_away_offense=away_offense,
-                bh_id=str(reset_bh_id),
-                clock_remaining_at_start=clock_remaining_at_turn_start,
-                shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
-                start_index=0,
-                next_step_index_after_reset=0,  # fixed up below
+    # Run the HCO entry orchestrator universally for HCO turns. The decision
+    # tree (Handoff / Kickout / Walk Up) is self-deciding — if the BH is
+    # already at step 0 position and in front court, nothing prepends. The
+    # ``turn_type`` parameter scopes this to HCO; FCP turns skip the
+    # orchestrator (their entry seam is the BIP setup positions path).
+    is_hco_turn = (turn_type == "HCO") and isinstance(prior_turn, dict)
+    if is_hco_turn:
+        current_bh_id = prior_turn.get("final_ball_handler_id")
+        prior_final_coords = prior_turn.get("final_coords") or {}
+
+        # Step 0 skeleton BH — the player the HCO playcall expects to handle
+        # the ball at step 0. NOTE: ``roles.ball_handler`` resolves to the
+        # SHOOTER (final-step BH), not step 0's. Use the helper that walks
+        # the skeleton from step 0 specifically.
+        from BackEnd.engine.phase_resolution import get_ball_handler_from_skeleton
+        step0_bh_player = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=0)
+        step0_bh_id: Optional[str] = None
+        if step0_bh_player is not None:
+            pid = getattr(step0_bh_player, "player_id", None)
+            step0_bh_id = str(pid) if pid is not None else None
+
+        # HCO step 0 setup coords (where the playcall expects players to be
+        # at step 0 start). Resolved from animations[0].movement[0].
+        setup_coords = _coords_at_movement_index(animations, 0)
+
+        if not current_bh_id or not step0_bh_id or current_bh_id not in prior_final_coords:
+            _hco_entry_log.warning(
+                "🏠 [ENTRY] SKIP missing inputs: current_bh=%s step0_bh=%s "
+                "current_bh_in_final_coords=%s",
+                current_bh_id, step0_bh_id,
+                current_bh_id in prior_final_coords if current_bh_id else False,
             )
-            if reset_steps:
-                # Post-fix: last Reset step's next.index points to skeleton step 0,
-                # which lands at len(reset_steps) in the final steps array.
-                reset_steps[-1]["end"]["next"] = {
-                    "kind": "next_step",
-                    "index": len(reset_steps),
-                }
-                steps.extend(reset_steps)
-                elapsed_so_far = float(sum(s["end"]["time_elapsed"] for s in reset_steps))
+        else:
+            bh_start_coord = prior_final_coords[current_bh_id]
+            bh_x = float(bh_start_coord.get("x", 50.0))
+            in_back_court = (bh_x < 71.0) if not away_offense else (bh_x > 29.0)
+            bh_neq_step0 = (str(current_bh_id) != str(step0_bh_id))
+
+            _hco_entry_log.warning(
+                "🏠 [ENTRY] current_bh=%s step0_bh=%s bh_x=%.1f away=%s "
+                "in_back_court=%s bh_neq_step0=%s",
+                current_bh_id, step0_bh_id, bh_x, away_offense,
+                in_back_court, bh_neq_step0,
+            )
+
+            clock_r = clock_remaining_at_turn_start - elapsed_so_far
+            shot_r = shot_clock_remaining_at_turn_start - elapsed_so_far
+
+            # --- Handoff or Kickout (mutually exclusive) ---
+            if bh_neq_step0:
+                if in_back_court:
+                    from BackEnd.utils.transition_bridge import build_handoff_step
+                    off_strategy = getattr(off_team, "strategy_settings", {}) or {}
+                    tempo_value = off_strategy.get("tempo_override") or off_strategy.get("tempo")
+                    handoff_steps = build_handoff_step(
+                        off_lineup=off_lineup,
+                        def_lineup=def_lineup,
+                        start_coords=prior_final_coords,
+                        bh_id=str(current_bh_id),
+                        receiver_id=str(step0_bh_id),
+                        is_away_offense=away_offense,
+                        tempo=tempo_value,
+                        clock_remaining_at_start=clock_r,
+                        shot_clock_remaining_at_start=shot_r,
+                        next_step_index=len(steps),
+                        metadata_reason="hco_entry_handoff",
+                    )
+                    if handoff_steps:
+                        steps.extend(handoff_steps)
+                        tail_clock = handoff_steps[-1]["end"]["clock"]
+                        elapsed_so_far += sum(s["end"]["time_elapsed"] for s in handoff_steps)
+                        clock_r = tail_clock["clock_remaining"]
+                        shot_r = tail_clock["shot_clock_remaining"]
+                        _hco_entry_log.warning(
+                            "🏠 [ENTRY HANDOFF FIRED] steps=%d", len(handoff_steps),
+                        )
+                else:
+                    from BackEnd.utils.transition_bridge import build_kickout_step
+                    if setup_coords:
+                        kickout_steps = build_kickout_step(
+                            off_lineup=off_lineup,
+                            def_lineup=def_lineup,
+                            start_coords=prior_final_coords,
+                            bh_id=str(current_bh_id),
+                            receiver_id=str(step0_bh_id),
+                            setup_coords=setup_coords,
+                            is_away_offense=away_offense,
+                            clock_remaining_at_start=clock_r,
+                            shot_clock_remaining_at_start=shot_r,
+                            next_step_index=len(steps),
+                            metadata_reason="hco_entry_kickout",
+                        )
+                        if kickout_steps:
+                            steps.extend(kickout_steps)
+                            tail_clock = kickout_steps[-1]["end"]["clock"]
+                            elapsed_so_far += sum(s["end"]["time_elapsed"] for s in kickout_steps)
+                            clock_r = tail_clock["clock_remaining"]
+                            shot_r = tail_clock["shot_clock_remaining"]
+                            _hco_entry_log.warning(
+                                "🏠 [ENTRY KICKOUT FIRED] steps=%d", len(kickout_steps),
+                            )
+
+            # --- Walk Up (fires after Handoff, OR alone if BH = step0_bh in
+            # back court). Mutually exclusive with Kickout by x-coord rule. ---
+            if in_back_court and setup_coords:
+                from BackEnd.utils.transition_bridge import build_walk_up_step
+                # After Handoff, the receiver (step0_bh) has the ball.
+                # Without Handoff, current_bh is still the carrier.
+                handoff_fired = bool(steps)
+                walk_bh_id = str(step0_bh_id) if (bh_neq_step0 and handoff_fired) else str(current_bh_id)
+                walk_start_coords = (
+                    dict(steps[-1]["end"]["coords"]) if steps else prior_final_coords
+                )
+                walk_step = build_walk_up_step(
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    start_coords=walk_start_coords,
+                    end_coords=setup_coords,
+                    bh_id=walk_bh_id,
+                    clock_remaining_at_start=clock_r,
+                    shot_clock_remaining_at_start=shot_r,
+                    next_step_index=len(steps) + 1,
+                    bh_archetype="cruise",
+                    other_archetype="sprint",
+                    gate_player_ids=[walk_bh_id],
+                    metadata_reason="hco_entry_walkup",
+                )
+                steps.append(walk_step)
+                elapsed_so_far += walk_step["end"]["time_elapsed"]
+                _hco_entry_log.warning(
+                    "🏠 [ENTRY WALKUP FIRED] bh=%s", walk_bh_id,
+                )
+
+            # Fix up next-pointers across all prepended steps: linear chain
+            # where step[i].next.index = i + 1; final prepended step points
+            # to skeleton step 0 (= len(steps) in the final array).
+            for i, s in enumerate(steps[:-1]):
+                s["end"]["next"] = {"kind": "next_step", "index": i + 1}
+            if steps:
+                steps[-1]["end"]["next"] = {"kind": "next_step", "index": len(steps)}
 
     reset_count = len(steps)
+
+    # FCP turns enter with BIP-end coords randomized per
+    # `_build_fcp_setup_positions` — these don't match the skeleton's
+    # authored step-0 locations, so the first emitted step's start_coords
+    # must seed from `prior_turn.final_coords` (not the skeleton). Players
+    # animate from BIP-end toward step 0's authored destinations at their
+    # archetype rate; non-gate movers end at the interrupted coord per
+    # §9.5. Without this, the visual would teleport from BIP-end to step 0.
+    # HCO already handles the BIP→step-0 seam via the entry orchestrator
+    # (Handoff / Kickout / Walk Up); FCP has no walk-up so we patch step 0
+    # directly here.
+    fcp_seed_coords: Optional[Dict[str, GridCoord]] = None
+    if turn_type == "FCP" and isinstance(prior_turn, dict):
+        prior_fc = prior_turn.get("final_coords") or {}
+        if isinstance(prior_fc, dict) and prior_fc:
+            fcp_seed_coords = {
+                str(pid): {"x": float(c["x"]), "y": float(c["y"])}
+                for pid, c in prior_fc.items()
+                if isinstance(c, dict) and "x" in c and "y" in c
+            }
 
     for i in range(num_steps):
         # When Reset prepended, skeleton step 0's start coords = Reset's last
@@ -472,16 +904,42 @@ def build_skeleton_animation_steps(
         # holds across the seam).
         if i == 0 and reset_count > 0:
             start_coords = dict(steps[-1]["end"]["coords"])
+        elif i == 0 and fcp_seed_coords:
+            # FCP: step 0 starts from BIP-end (randomized setup). See
+            # comment above the loop. Falls back to the legacy animations
+            # source if final_coords is missing any player.
+            anim_step0 = _coords_at_movement_index(animations, i)
+            start_coords = dict(anim_step0)
+            for pid, coord in fcp_seed_coords.items():
+                start_coords[pid] = dict(coord)
         else:
             start_coords = _coords_at_movement_index(animations, i)
         end_coords = _coords_at_movement_index(animations, i + 1)
+        # Legacy animations[].movement is often 1 waypoint short of the
+        # schema's contract (N steps need N+1 waypoints, legacy provides N).
+        # On the final step, fall back to start_coords (stationary) when
+        # end_coords is empty — _apply_post_shot_overlay then overrides
+        # rebounder/getback positions for shot turns. Without this fallback,
+        # any prepended Reset steps would be nuked along with the rest.
+        if not end_coords and i == num_steps - 1:
+            end_coords = dict(start_coords)
         if not start_coords or not end_coords:
+            import logging as _emitter_bail_log
+            _emitter_bail_log.warning(
+                "🔍 [EMITTER BAIL] returning None at step i=%d num_steps=%d "
+                "start_coords_present=%s (n=%d) end_coords_present=%s (n=%d) "
+                "reset_count=%d steps_built=%d animations_len=%d",
+                i, num_steps,
+                bool(start_coords), len(start_coords or {}),
+                bool(end_coords), len(end_coords or {}),
+                reset_count, len(steps), len(animations),
+            )
             return None
 
         destinations, actions = _build_step_destinations_and_actions(
             skeleton_steps, i, off_lineup, def_lineup, end_coords, bh_def_pos,
         )
-        archetype = _build_archetype_map(off_lineup, def_lineup, actions)
+        archetype = _build_archetype_map(off_lineup, def_lineup, actions, turn_type)
 
         start_owner_pos, end_owner_pos = (
             ball_walks[i] if i < len(ball_walks) else (None, None)
@@ -505,7 +963,104 @@ def build_skeleton_animation_steps(
             else {"owner_player_id": bh_id_fallback}
         )
 
-        t = float(step_clock_seconds[i])
+        # Detect pass step (ball ownership transfer) early — used both by
+        # gate selection (FCP) and by the later ball_motion_style /
+        # ball_arrival_coord / SFX stamping block.
+        is_pass_step = (
+            start_owner_pos is not None
+            and end_owner_pos is not None
+            and start_owner_pos != end_owner_pos
+        )
+
+        # === Gate selection ====================================================
+        # HCO + FCP: shooter on the shot step; otherwise slowest offensive player
+        # (matches main-branch offense-gated step advance). FCP stopper-action
+        # steps gate on players involved in the stop event. Pass steps also
+        # factor ball pass time at PASS_GRID_SPOTS_PER_GAME_SECOND below.
+        gate_id: Optional[str] = None
+        gate_kind: str = "slowest"
+        is_fcp = (turn_type == "FCP")
+
+        # 1) Shot step — shooter is always the gate (HCO and FCP).
+        if i == num_steps - 1:
+            shooter_pos = _shooter_pos_in_step(skeleton_steps[i])
+            if shooter_pos:
+                gate_id = _player_id_at_pos(off_lineup, shooter_pos)
+                gate_kind = "shooter"
+
+        # 2) FCP stopper action step (truncated final skeleton step before
+        # the appended event marker). Gate on the players involved in the
+        # stop action.
+        fcp_stopper_ids: List[str] = []
+        if gate_id is None and is_fcp and _is_fcp_stopper_action_step(
+            skeleton_steps, i, num_steps,
+        ):
+            fcp_stopper_ids = _resolve_fcp_stopper_gate_ids(
+                skeleton_steps, i, turn_result, off_lineup, def_lineup, roles,
+            )
+            if fcp_stopper_ids:
+                gate_id = _slowest_among(start_coords, end_coords, fcp_stopper_ids)
+                gate_kind = "fcp_stopper"
+
+        # 3) HCO + FCP non-stopper steps: slowest offensive player (NOT slowest
+        # of all 10). Pass step also factors in ball pass time below.
+        if gate_id is None and (is_fcp or turn_type == "HCO"):
+            offense_ids = _offensive_player_ids(off_lineup)
+            gate_id = _slowest_among(start_coords, end_coords, offense_ids)
+            gate_kind = "fcp_offense_slowest" if is_fcp else "hco_offense_slowest"
+
+        # === Step T computation ================================================
+        # natural_t from the gate player's travel time at their archetype rate.
+        # FCP pass step also considers ball travel time at the canonical pass
+        # rate; whichever is longer determines step T.
+        gate_coord = end_coords.get(gate_id) if gate_id else None
+        natural_t = 0.0
+        if gate_id and gate_coord:
+            natural_t = _natural_t(
+                gate_id, start_coords, end_coords, archetype,
+                off_lineup, def_lineup,
+            )
+
+        # Pass step (HCO + FCP): also gate on the ball reaching the receiver.
+        # Step T = max(slowest_player_natural, ball_pass_time, floor) so the
+        # FE ball tween (PASS_GRID_SPOTS_PER_GAME_SECOND) completes within
+        # step T. Without this gate, short-distance pass steps end before the
+        # ball arrives, and the ball appears to animate after players finish.
+        ball_pass_t = 0.0
+        pass_target_coord: Optional[GridCoord] = None
+        if is_pass_step and owner_id_start and owner_id_end:
+            passer_start = start_coords.get(owner_id_start)
+            receiver_start = start_coords.get(owner_id_end)
+            receiver_end = end_coords.get(owner_id_end)
+            if passer_start and receiver_start and receiver_end:
+                receiver_player = _player_lookup_by_id(
+                    off_lineup, def_lineup, owner_id_end,
+                )
+                receiver_arch = archetype.get(owner_id_end, "cruise")
+                receiver_rate = _ag_grid_per_game_sec(receiver_player, receiver_arch)
+                pass_target_coord = _compute_pass_meet_point(
+                    passer_start, receiver_start, receiver_end, receiver_rate,
+                )
+                ball_pass_t = (
+                    _euclid(passer_start, pass_target_coord)
+                    / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
+                )
+
+        t = max(HCO_STEP_T_FLOOR_GAME_SECONDS, natural_t, ball_pass_t)
+
+        # UESS §9.5: only the gate player is guaranteed to reach skeleton
+        # destination; defenders and other non-gate movers freeze at
+        # interrupted coords when step T elapses before they arrive.
+        final_end_coords = _build_step_end_coords_with_interrupts(
+            start_coords,
+            destinations,
+            archetype,
+            t,
+            gate_id,
+            off_lineup,
+            def_lineup,
+        )
+
         clock_start: ClockState = {
             "clock_remaining": clock_remaining_at_turn_start - elapsed_so_far,
             "shot_clock_remaining": shot_clock_remaining_at_turn_start - elapsed_so_far,
@@ -515,18 +1070,25 @@ def build_skeleton_animation_steps(
             "shot_clock_remaining": shot_clock_remaining_at_turn_start - elapsed_so_far - t,
         }
 
-        # Per-step trigger: final step gates on the shooter (if any) so the
-        # shot motion is the canonical end-of-step event. Other steps and
-        # final steps without a shoot action gate on the slowest mover.
-        gate_id: Optional[str] = None
-        if i == num_steps - 1:
-            shooter_pos = _shooter_pos_in_step(skeleton_steps[i])
-            if shooter_pos:
-                gate_id = _player_id_at_pos(off_lineup, shooter_pos)
-        if gate_id is None:
-            gate_id = _slowest_mover_id(start_coords, end_coords)
-        gate_coord = end_coords.get(gate_id) if gate_id else None
-        if gate_id and gate_coord:
+        # AT condition: when this is a pass step and the ball is the longer
+        # gate, report ``ball_reaches_player`` so the FE-visible advance
+        # trigger reflects the actual gating event. Otherwise
+        # ``player_reaches_position``.
+        if (
+            is_pass_step and ball_pass_t > 0
+            and ball_pass_t >= natural_t
+            and pass_target_coord is not None
+            and owner_id_end
+        ):
+            advance_trigger: AdvanceTrigger = {
+                "condition": "ball_reaches_player",
+                "T_game_seconds": float(t),
+                "metadata": {
+                    "target_player_id": str(owner_id_end),
+                    "target_coords": dict(pass_target_coord),
+                },
+            }
+        elif gate_id and gate_coord:
             advance_trigger = _build_advance_trigger_player_reaches(gate_id, gate_coord, t)
         else:
             # No movement detected — fall back to ball-handler's end coord.
@@ -556,40 +1118,823 @@ def build_skeleton_animation_steps(
                 "advance_trigger": advance_trigger,
             },
             "end": {
-                "coords": end_coords,
+                "coords": final_end_coords,
                 "ball": ball_end,
                 "time_elapsed": t,
                 "clock": clock_end,
                 "next": next_step,
             },
         }
-        stamp_tween_durations(step["start"], end_coords, t, off_lineup, def_lineup)
+        # Mid-skeleton pass steps: stamp ``ball_motion_style="pass"`` so the
+        # ball tweens at the canonical half-court pass rate (30 grid/game-sec
+        # = PASS_GRID_SPOTS_PER_GAME_SECOND) independent of step T (which is
+        # gated by the slowest offensive player and would otherwise drag the ball
+        # below 30). Detected via ownership transfer on this step.
+        #
+        # Also stamp ``ball_arrival_coord`` — the meet-point where the ball
+        # intercepts the receiver (their interpolated position at ball
+        # arrival time, not their step-end coord). The FE tweens the ball
+        # to this point and attaches it to the receiver on tween completion;
+        # the ball then follows the receiver via parent transform for the
+        # remainder of step T. Critical when the receiver is still moving
+        # during the pass — otherwise the ball would land on the receiver's
+        # empty step-end position, then jump to the receiver's actual
+        # sprite on attach.
+        # (``is_pass_step`` was already computed above for gate selection.)
+        if is_pass_step:
+            step["start"]["ball_motion_style"] = "pass"
+            passer_id_mp = owner_id_start
+            receiver_id_mp = owner_id_end
+            if passer_id_mp and receiver_id_mp:
+                passer_start_coord = start_coords.get(passer_id_mp)
+                receiver_start_coord = start_coords.get(receiver_id_mp)
+                receiver_end_coord = end_coords.get(receiver_id_mp)
+                passer_player = _player_lookup_by_id(
+                    off_lineup, def_lineup, passer_id_mp,
+                )
+                receiver_player = _player_lookup_by_id(
+                    off_lineup, def_lineup, receiver_id_mp,
+                )
+                if (passer_start_coord and receiver_start_coord
+                    and receiver_end_coord):
+                    receiver_archetype = archetype.get(receiver_id_mp, "cruise")
+                    receiver_rate = _ag_grid_per_game_sec(
+                        receiver_player, receiver_archetype,
+                    )
+                    meet = _compute_pass_meet_point(
+                        passer_start_coord,
+                        receiver_start_coord,
+                        receiver_end_coord,
+                        receiver_rate,
+                    )
+                    step["start"]["ball_arrival_coord"] = meet
+
+                # Pass / Reception SFX (Sound_Design_Update.md).
+                # Backend resolves the tier from attributes; FE just plays.
+                step["start"]["sfx_on_ball_release"] = pass_release_sfx(passer_player)
+                step["start"]["sfx_on_ball_arrival"] = pass_arrival_sfx(receiver_player)
+        stamp_tween_durations(
+            step["start"], final_end_coords, t, off_lineup, def_lineup,
+        )
         steps.append(step)
         elapsed_so_far += t
 
-    # Movement #1 (post-shot positioning): on the final shot step, override
-    # `end.coords` for get-back / release / rebounder players using overlay
-    # maps produced by `shot_manager.resolve_shot`. This is how the schema
-    # tracks the players' actual post-shot positions (get-back players
-    # pulled back to defend, release players ahead toward outlet, rebound
-    # attemptors clustered near the rim) — without this, the legacy mid-turn
-    # `player.coords` writes (now removed) would leave the schema with stale
-    # end positions and the next turn would seed from wrong coords. See
-    # `_documentation_master/projects/Animation_System_Updated.md`.
+    # Post-shot positioning. For MAKE/MISS/BLOCK results, build schema-pure
+    # [ball_flight] (+ [bounce] for miss/block) sub-steps that follow the
+    # final [shoot] step. Overlay players (rebounder / get-back / release)
+    # move toward their overlay destination across all three sub-steps with
+    # proper interrupted coords + per-player tween durations per archetype.
+    # Shot clock pins on [ball_flight] + [bounce] (shot detached at start of
+    # [ball_flight]); game clock burns through all sub-steps.
+    #
+    # For non-shot result types (FOUL / STEAL / DEAD_BALL_TURNOVER / etc.)
+    # the sub-step builder is a no-op; we fall back to the legacy overlay
+    # apply (which is itself a no-op when overlay maps are empty — the
+    # common case for those result types).
     if steps:
-        _apply_post_shot_overlay(steps[-1], turn_result)
+        _build_post_shot_sub_steps(
+            steps, turn_result, off_lineup, def_lineup, away_offense,
+        )
+        result_type_final = (turn_result.get("result_type") or "").upper()
+        if result_type_final not in ("MAKE", "MISS", "BLOCK"):
+            _apply_post_shot_overlay(steps[-1], turn_result)
 
     return steps
 
 
-def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -> None:
-    """Override the final shot step's `end.coords` (and start action/archetype)
-    for players in shot_manager's post-shot overlay maps.
+def _compute_pass_meet_point(
+    passer_start: GridCoord,
+    receiver_start: GridCoord,
+    receiver_end: GridCoord,
+    receiver_rate: float,
+    ball_rate: float = float(PASS_GRID_SPOTS_PER_GAME_SECOND),
+) -> GridCoord:
+    """Compute where a ball moving at ``ball_rate`` grid/game-sec from
+    ``passer_start`` intercepts a receiver moving from ``receiver_start``
+    to ``receiver_end`` at ``receiver_rate`` grid/game-sec.
 
-    Overlay maps:
-    - `offense_getback_coords` — offensive players pulled back to defend
-    - `defense_release_coords` — defensive players released ahead for outlet
-    - `offense_rebounder_coords` — offensive non-get-back players at rebound spots
+    Returns the meet-point coord. The ball's natural arrival time is then
+    ``|passer_start - meet_point| / ball_rate``.
+
+    Case 1 — receiver already at destination by the time ball would arrive
+    at ``receiver_end`` (or receiver stationary): meet = ``receiver_end``.
+    Case 2 — receiver still moving when ball would arrive: solve quadratic
+    ``(ball_rate · t)² = |R0 - P + α · t|²`` where ``α`` is the receiver's
+    velocity vector. Expanding: ``a·t² + b·t + c = 0`` with
+    ``a = ball_rate² - |α|²``, ``b = -2 (R0 - P)·α``, ``c = -|R0 - P|²``.
+    With ``ball_rate > receiver_rate`` (all HCO archetypes are slower than
+    36) and ``c < 0``, the quadratic has exactly one positive root.
+
+    Used by HCO mid-skeleton pass steps so the ball lands on the
+    receiver's interpolated position rather than the receiver's step-end
+    coord (which the receiver may not have reached yet).
+    """
+    r_dist = _euclid(receiver_start, receiver_end)
+    t_to_end = _euclid(passer_start, receiver_end) / ball_rate
+
+    # Case 1: receiver stationary, or finishes before ball arrives at its
+    # step-end position.
+    if r_dist < 1e-6 or receiver_rate <= 0:
+        return dict(receiver_end)
+    receiver_t = r_dist / receiver_rate
+    if receiver_t <= t_to_end:
+        return dict(receiver_end)
+
+    # Case 2: receiver still moving. Solve quadratic for ball arrival time.
+    ax = (receiver_end["x"] - receiver_start["x"]) / receiver_t
+    ay = (receiver_end["y"] - receiver_start["y"]) / receiver_t
+    alpha_sq = ax * ax + ay * ay
+
+    dx0 = receiver_start["x"] - passer_start["x"]
+    dy0 = receiver_start["y"] - passer_start["y"]
+    a_q = ball_rate * ball_rate - alpha_sq
+    if a_q <= 0:
+        # Receiver as fast as / faster than ball — shouldn't happen for HCO
+        # (cruise=10, sprint=14, both < 36). Fall back to step-end coord.
+        return dict(receiver_end)
+    b_q = -2.0 * (dx0 * ax + dy0 * ay)
+    c_q = -(dx0 * dx0 + dy0 * dy0)
+    discriminant = b_q * b_q - 4.0 * a_q * c_q
+    if discriminant < 0:
+        return dict(receiver_end)
+    sqrt_disc = discriminant ** 0.5
+    # With a_q > 0 and c_q < 0: parabola opens up, roots have opposite
+    # signs. The positive root is `(-b_q + sqrt_disc) / (2 * a_q)`.
+    t = (-b_q + sqrt_disc) / (2.0 * a_q)
+    if t <= 0 or t >= receiver_t:
+        return dict(receiver_end)
+    meet_x = receiver_start["x"] + ax * t
+    meet_y = receiver_start["y"] + ay * t
+    return {"x": float(meet_x), "y": float(meet_y)}
+
+
+def _interpolate_step_end(
+    start_coord: GridCoord,
+    dest_coord: GridCoord,
+    rate: float,
+    step_t: float,
+) -> Tuple[GridCoord, float]:
+    """Compute the interrupted end coord + tween duration for a player moving
+    toward ``dest_coord`` at ``rate`` grid/game-sec over a step of duration
+    ``step_t`` game-sec.
+
+    Returns ``(end_coord, tween_duration_game_seconds)``.
+
+    - If ``natural_t = dist / rate <= step_t``: player reaches dest. Tween
+      duration = natural_t (player idles for the remainder of step_t at their
+      destination).
+    - If ``natural_t > step_t``: player is interrupted at
+      ``start + rate × step_t`` along start→dest. Tween duration = step_t.
+    - Degenerate inputs (dist ~ 0, rate ≤ 0, step_t ≤ 0): no tween, end = start.
+
+    Enforces UESS §9.5 — non-gate movers freeze at interrupted coord, never
+    snap to destination.
+    """
+    dist = _euclid(start_coord, dest_coord)
+    if dist < 1e-6 or rate <= 0 or step_t <= 0:
+        return dict(start_coord), 0.0
+    natural_t = dist / rate
+    if natural_t <= step_t:
+        return dict(dest_coord), float(natural_t)
+    frac = (rate * step_t) / dist
+    x = start_coord["x"] + (dest_coord["x"] - start_coord["x"]) * frac
+    y = start_coord["y"] + (dest_coord["y"] - start_coord["y"]) * frac
+    return {"x": float(x), "y": float(y)}, float(step_t)
+
+
+# Per-overlay-map archetype assignment. Rebounders move at cruise pace
+# (controlled positioning under the rim); release / get-back players sprint
+# (outlet / retreat urgency).
+_OVERLAY_ARCHETYPES: Tuple[Tuple[str, PlayerArchetype], ...] = (
+    ("offense_rebounder_coords", "cruise"),
+    ("defense_rebounder_coords", "cruise"),
+    ("offense_getback_coords",   "sprint"),
+    ("defense_release_coords",   "sprint"),
+)
+
+
+def _collect_overlay_players(
+    turn_result: Dict[str, Any],
+) -> Dict[str, Tuple[GridCoord, PlayerArchetype]]:
+    """Return ``{pid: (destination_coord, archetype)}`` aggregated from the
+    four overlay maps. Each player appears in at most one map by §9.1
+    invariant (enforced upstream by ``canonicalize_post_shot_overlays``);
+    iteration order matches that invariant's priority.
+    """
+    out: Dict[str, Tuple[GridCoord, PlayerArchetype]] = {}
+    for overlay_key, archetype in _OVERLAY_ARCHETYPES:
+        overlay = turn_result.get(overlay_key) or {}
+        if not isinstance(overlay, dict):
+            continue
+        for pid, coord in overlay.items():
+            if not isinstance(coord, dict):
+                continue
+            x = coord.get("x")
+            y = coord.get("y")
+            if x is None or y is None:
+                continue
+            out[str(pid)] = ({"x": float(x), "y": float(y)}, archetype)
+    return out
+
+
+def _apply_overlay_motion_to_shoot_step(
+    shoot_step: AnimationStep,
+    overlay_players: Dict[str, Tuple[GridCoord, PlayerArchetype]],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Rewrite the [shoot] step's overlay player fields in place. Replaces
+    the legacy ``_apply_post_shot_overlay`` snap-to-destination behavior with
+    interrupted-coord + per-player tween_duration motion.
+    """
+    end_coords = shoot_step["end"]["coords"]
+    start_coords = shoot_step["start"]["coords"]
+    destinations = shoot_step["start"]["destination"]
+    actions = shoot_step["start"]["action"]
+    archetype = shoot_step["start"]["archetype"]
+    tween_durations = dict(shoot_step["start"].get("tween_durations") or {})
+    step_t = float(shoot_step["end"]["time_elapsed"])
+
+    for pid, (dest_coord, arch) in overlay_players.items():
+        sc = start_coords.get(pid)
+        if sc is None:
+            continue
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        ec, dur = _interpolate_step_end(sc, dest_coord, rate, step_t)
+        end_coords[pid] = ec
+        destinations[pid] = dict(dest_coord)
+        actions[pid] = "cut"
+        archetype[pid] = arch
+        if dur > 0:
+            tween_durations[pid] = dur
+        elif pid in tween_durations:
+            del tween_durations[pid]
+
+    if tween_durations:
+        shoot_step["start"]["tween_durations"] = tween_durations
+
+
+def _build_ball_motion_sub_step(
+    *,
+    start_coords_seed: Dict[str, GridCoord],
+    overlay_players: Dict[str, Tuple[GridCoord, PlayerArchetype]],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_t: float,
+    ball_start_coord: GridCoord,
+    ball_end_coord: GridCoord,
+    clock_start: ClockState,
+    advance_trigger: AdvanceTrigger,
+    ball_motion_style: Optional[str],
+    next_step: NextStep,
+    sfx_on_ball_release: Optional[Dict[str, Any]] = None,
+    sfx_on_ball_arrival: Optional[Dict[str, Any]] = None,
+    timed_sfx: Optional[List[Dict[str, Any]]] = None,
+) -> AnimationStep:
+    """Build a [ball_flight] or [bounce] sub-step. Non-overlay players hold
+    position (stationary); overlay players continue toward their destination
+    at their archetype rate, interrupted at step_t.
+
+    Game clock burns ``step_t``; shot clock is pinned (no decrement) — both
+    sub-steps run after the shot has detached from the shooter.
+    """
+    end_coords: Dict[str, GridCoord] = {}
+    destinations: Dict[str, Optional[GridCoord]] = {}
+    actions: Dict[str, PlayerAction] = {}
+    archetype: Dict[str, PlayerArchetype] = {}
+    tween_durations: Dict[str, float] = {}
+
+    for pid, sc in start_coords_seed.items():
+        overlay_meta = overlay_players.get(pid)
+        if overlay_meta is None:
+            end_coords[pid] = dict(sc)
+            destinations[pid] = None
+            actions[pid] = "stationary"
+            archetype[pid] = "stationary"
+            continue
+        dest_coord, arch = overlay_meta
+        if _euclid(sc, dest_coord) < 1e-6:
+            end_coords[pid] = dict(sc)
+            destinations[pid] = None
+            actions[pid] = "stationary"
+            archetype[pid] = "stationary"
+            continue
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        ec, dur = _interpolate_step_end(sc, dest_coord, rate, step_t)
+        end_coords[pid] = ec
+        destinations[pid] = dict(dest_coord)
+        actions[pid] = "cut"
+        archetype[pid] = arch
+        if dur > 0:
+            tween_durations[pid] = dur
+
+    clock_end: ClockState = {
+        "clock_remaining": clock_start["clock_remaining"] - step_t,
+        # Shot clock pinned — detach happened at start of [ball_flight].
+        "shot_clock_remaining": clock_start["shot_clock_remaining"],
+    }
+
+    start: Dict[str, Any] = {
+        "coords": dict(start_coords_seed),
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": {"coords": dict(ball_start_coord)},
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    if ball_motion_style:
+        start["ball_motion_style"] = ball_motion_style
+    if tween_durations:
+        start["tween_durations"] = tween_durations
+    if sfx_on_ball_release:
+        start["sfx_on_ball_release"] = sfx_on_ball_release
+    if sfx_on_ball_arrival:
+        start["sfx_on_ball_arrival"] = sfx_on_ball_arrival
+    if timed_sfx:
+        start["timed_sfx"] = list(timed_sfx)
+
+    return {
+        "start": start,
+        "end": {
+            "coords": end_coords,
+            "ball": {"coords": dict(ball_end_coord)},
+            "time_elapsed": float(step_t),
+            "clock": clock_end,
+            "next": next_step,
+        },
+    }
+
+
+MAKE_HOLD_MS: float = 1000.0
+
+
+def _build_make_hold_sub_step(
+    *,
+    prev_end_coords: Dict[str, GridCoord],
+    prev_clock: ClockState,
+    ball_coord: GridCoord,
+    shooter_id: str,
+    away_offense: bool,
+    turn_result: Dict[str, Any],
+    next_step: NextStep,
+) -> AnimationStep:
+    """Build the [hold] sub-step that follows [ball_flight] on a MAKE.
+
+    Renders the post-make "ball settles at the rim + announcement"
+    beat. Mechanism:
+      - All players hold their post-[ball_flight] positions (frozen).
+      - Ball sits at the sweet spot.
+      - ``start.announcement`` fires "It's Good!" (or "It's Good! And 1!"
+        on and-one) — the FE's ``runStepAnnouncement`` pauses gameClock
+        + shotClock for ``hold_ms`` (1000ms wall-clock), then resumes.
+      - Step T = 0 game-sec → no additional wall-clock wait after the
+        announcement; ``snapBallToEndState`` then runs and we proceed to
+        the SHOT_ATTEMPT turn_stop.
+      - Clock fields pinned (no game/shot clock decrement during hold).
+
+    And-one detection mirrors the legacy ``ShotAnimationSystem``: when
+    ``next_play_type == "FREE_THROW"`` and a foul player is named on the
+    turn result, the announcement text is swapped.
+    """
+    is_and_one = (
+        str(turn_result.get("next_play_type") or "").upper() == "FREE_THROW"
+        and bool(
+            turn_result.get("foul_player_id")
+            or _safe_id(turn_result.get("foul_player"))
+        )
+    )
+    text = "It's Good! And 1!" if is_and_one else "It's Good!"
+    team = "away" if away_offense else "home"
+
+    coords = dict(prev_end_coords)
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in coords}
+    destinations: Dict[str, Optional[GridCoord]] = {pid: None for pid in coords}
+
+    announcement: Dict[str, Any] = {
+        "text": text,
+        "team": team,
+        "hold_ms": MAKE_HOLD_MS,
+        "style": "primary",
+        "player_data": {"playerId": str(shooter_id)},
+    }
+
+    trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": 0.0,
+        "metadata": {"kind": "make_hold"},
+    }
+
+    return {
+        "start": {
+            "coords": coords,
+            "destination": destinations,
+            "action": actions,
+            "archetype": archetype,
+            "ball": {"coords": dict(ball_coord)},
+            "clock": dict(prev_clock),
+            "advance_trigger": trigger,
+            "announcement": announcement,
+        },
+        "end": {
+            "coords": dict(coords),
+            "ball": {"coords": dict(ball_coord)},
+            "time_elapsed": 0.0,
+            "clock": dict(prev_clock),
+            "next": next_step,
+        },
+    }
+
+
+_RATTLE_VARIANTS = frozenset({"LITTLE_RATTLE", "NORMAL_RATTLE", "HEAVY_RATTLE"})
+_RATTLE_HOP_COUNTS: Dict[str, int] = {
+    "LITTLE_RATTLE": 2,
+    "NORMAL_RATTLE": 4,
+    "HEAVY_RATTLE": 8,
+}
+
+
+def _variant_flight_end(
+    shot_variant: Optional[str],
+    result_type: str,
+    away_offense: bool,
+    turn_result: Dict[str, Any],
+) -> GridCoord:
+    """Per-variant ball-flight terminal coord. Mirrors Sound_Design_Update.md
+    §Ball Resolve Animations. Falls back to make=MSSS / miss=rim for unknown
+    or missing variant (BLOCK; legacy emitters that haven't rolled a variant).
+    """
+    is_make = (result_type or "").upper() == "MAKE"
+    msss = (dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
+            else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM))
+    rim = (dict(AWAY_RIM_COORDS) if away_offense else dict(HOME_RIM_COORDS))
+    variant = (shot_variant or "").upper()
+
+    if variant == "SWISH":
+        return msss
+    if variant == "CLANK":
+        return rim
+    if variant == "BACK_OF_RIM":
+        return msss if is_make else rim
+    if variant in _RATTLE_VARIANTS:
+        start_mode = str(
+            turn_result.get("shot_variant_rattle_start") or "MSSS"
+        ).upper()
+        return msss if start_mode == "MSSS" else rim
+    if variant in ("BANK_MAKE", "BANK_MISS"):
+        # Bank point: x = MSSS_x + xSign·3 (toward backboard); y = MSSS_y +
+        # shooter-y-conditional offset (already rolled into the result by
+        # ``roll_shot_variant_extras``).
+        x_sign = -1.0 if away_offense else +1.0
+        y_off = float(turn_result.get("shot_variant_backboard_y_offset") or 0)
+        return {"x": float(msss["x"]) + x_sign * 3.0,
+                "y": float(msss["y"]) + y_off}
+    if variant == "AIRBALL":
+        # 2 grid units short of MSSS toward midcourt. Home (90,25) → (88,25);
+        # away (10,25) → (12,25).
+        x_sign = +1.0 if away_offense else -1.0
+        return {"x": float(msss["x"]) + x_sign * 2.0, "y": float(msss["y"])}
+    # Unknown / missing variant (BLOCK lands here) — legacy fallback.
+    return msss if is_make else rim
+
+
+def _rattle_hop_targets(
+    shot_variant: str,
+    away_offense: bool,
+    turn_result: Dict[str, Any],
+) -> List[GridCoord]:
+    """Build the ordered list of per-hop end coords for a RATTLE variant.
+
+    MSSS-start: y oscillation. Hops alternate between MSSS_y+1 and MSSS_y-1.
+    RIM-start:  x oscillation. Hops alternate between MSSS_x+1 and MSSS_x-1
+                (for the home rim that's 91 / 89 — the rim itself is one of
+                the two hop points).
+    Progression OPT_1: (+, -, +, -, ...). OPT_2: (-, +, -, +, ...).
+    Hop count: 2 / 4 / 8 for LITTLE / NORMAL / HEAVY.
+    """
+    msss = (dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
+            else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM))
+    start_mode = str(
+        turn_result.get("shot_variant_rattle_start") or "MSSS"
+    ).upper()
+    progression = str(
+        turn_result.get("shot_variant_rattle_progression") or "OPT_1"
+    ).upper()
+    hop_count = _RATTLE_HOP_COUNTS.get(shot_variant.upper(), 0)
+    if hop_count <= 0:
+        return []
+
+    if start_mode == "MSSS":
+        point_a = {"x": float(msss["x"]), "y": float(msss["y"]) + 1.0}
+        point_b = {"x": float(msss["x"]), "y": float(msss["y"]) - 1.0}
+    else:
+        point_a = {"x": float(msss["x"]) + 1.0, "y": float(msss["y"])}
+        point_b = {"x": float(msss["x"]) - 1.0, "y": float(msss["y"])}
+
+    first, second = (point_a, point_b) if progression == "OPT_1" else (point_b, point_a)
+    out: List[GridCoord] = []
+    pair_count = hop_count // 2
+    for _ in range(pair_count):
+        out.append(dict(first))
+        out.append(dict(second))
+    return out
+
+
+def _build_post_shot_sub_steps(
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    away_offense: bool,
+) -> None:
+    """Append schema-pure post-shot sub-steps for MAKE / MISS / BLOCK
+    results. The sequence is variant-aware (Sound_Design_Update.md §Ball
+    Resolve Animations + §SFX Bindings):
+
+      [shoot]       (already in steps[-1]) — shooter motion
+      [ball_flight] — shooter coord → variant flight target; stamps the
+                      launch SFX cue (``sfx_on_ball_release``) and the
+                      arrival SFX cue (``sfx_on_ball_arrival``, omitted for
+                      RATTLE which uses per-hop cues)
+      [variant sub-steps] — zero or more of:
+          - RATTLE hops    (N=2/4/8, per-hop ``rattle-leather.wav``)
+          - RATTLE settle  (make only, swish.wav arrival)
+          - BANK_MAKE settle (bank → MSSS, 250ms)
+          - BANK_MISS graze  (bank → rim-graze, 200ms)
+          - AIRBALL OOB continuation (2-short → OOB resting)
+      [hold]   — make only, 1000ms "It's Good!" announcement
+      [bounce] — miss/block with bounce_coords (skipped for AIRBALL)
+
+    All sub-steps share the same overlay-motion treatment: non-overlay
+    players hold position; overlay players continue toward their overlay
+    destination at archetype rate (interrupted coords per §9.5; never
+    snapped). Game clock burns; shot clock pinned (detach at start of
+    [ball_flight]).
+
+    No-op for result types outside MAKE/MISS/BLOCK.
+    """
+    if not steps:
+        return
+    result_type = (turn_result.get("result_type") or "").upper()
+    if result_type not in ("MAKE", "MISS", "BLOCK"):
+        return
+
+    shoot_step = steps[-1]
+    shooter_id = _safe_id(turn_result.get("shooter"))
+    shot_spot = shoot_step["end"]["coords"].get(shooter_id) if shooter_id else None
+    if not shooter_id or shot_spot is None:
+        return  # Can't build ball flight without shooter coord.
+
+    overlay_players = _collect_overlay_players(turn_result)
+    _apply_overlay_motion_to_shoot_step(
+        shoot_step, overlay_players, off_lineup, def_lineup,
+    )
+
+    def _shot_attempt_turn_stop() -> NextStep:
+        """Build the SHOT_ATTEMPT turn_stop, marking ``schema_rendered_arc`` so
+        the FE dispatcher's ``runShotAttempt`` skips its legacy arc/bounce
+        rendering (the schema sub-steps already rendered both)."""
+        ns = _resolve_final_step_next(turn_result)
+        if (isinstance(ns, dict)
+            and ns.get("kind") == "turn_stop"
+            and ns.get("event") == "SHOT_ATTEMPT"):
+            payload = dict(ns.get("payload") or {})
+            payload["schema_rendered_arc"] = True
+            ns["payload"] = payload
+        return ns
+
+    is_make = result_type == "MAKE"
+    shot_variant = turn_result.get("shot_variant")
+    variant_upper = (shot_variant or "").upper()
+    is_rattle = variant_upper in _RATTLE_VARIANTS
+    is_airball = variant_upper == "AIRBALL"
+
+    ball_flight_end = _variant_flight_end(
+        shot_variant, result_type, away_offense, turn_result,
+    )
+
+    flight_dist = _euclid(shot_spot, ball_flight_end)
+    flight_t = max(0.05, flight_dist / SHOT_BALL_GRID_PER_GAME_SECOND)
+    flight_trigger: AdvanceTrigger = {
+        "condition": "shot_resolved",
+        "T_game_seconds": float(flight_t),
+        "metadata": {
+            "target_coords": dict(ball_flight_end),
+            "result": result_type,
+            "shot_variant": shot_variant,
+        },
+    }
+
+    # Bounce step requires backend-stamped ball_bounce coords. AIRBALL takes
+    # the OOB continuation path instead (no rebound visual per spec).
+    bx = turn_result.get("ball_bounce_x")
+    by = turn_result.get("ball_bounce_y")
+    has_bounce_coords = (bx is not None) and (by is not None)
+    needs_bounce = (not is_make) and (not is_airball) and has_bounce_coords
+
+    # SFX cues for the [ball_flight] step. Launch cue fires at detach
+    # (= step start). Arrival cue fires at the ball's tween onComplete.
+    # RATTLE variants leave the arrival cue empty — per-hop SFX fires from
+    # the hop sub-steps below.
+    launch_sfx = shot_launch_sfx(turn_result.get("shot_score_pre_defense"))
+    arrival_sfx = shot_result_sfx(
+        shot_variant,
+        result_type,
+        bank_miss_sfx_file=turn_result.get("shot_variant_bank_miss_sfx_file"),
+    )
+    timed_sfx = shot_followup_timed_sfx(shot_variant, result_type)
+
+    flight_idx = len(steps)
+    # Flight's next pointer is filled in after we know how many variant
+    # sub-steps are coming (placeholder; rewired below).
+    flight_step = _build_ball_motion_sub_step(
+        start_coords_seed=dict(shoot_step["end"]["coords"]),
+        overlay_players=overlay_players,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        step_t=flight_t,
+        ball_start_coord=shot_spot,
+        ball_end_coord=ball_flight_end,
+        clock_start=dict(shoot_step["end"]["clock"]),
+        advance_trigger=flight_trigger,
+        ball_motion_style="shot",
+        next_step={"kind": "next_step", "index": flight_idx + 1},  # placeholder
+        sfx_on_ball_release=launch_sfx,
+        sfx_on_ball_arrival=arrival_sfx,
+        timed_sfx=timed_sfx,
+    )
+
+    # Rewire [shoot]: next → [ball_flight] (was turn_stop SHOT_ATTEMPT).
+    shoot_step["end"]["next"] = {"kind": "next_step", "index": flight_idx}
+    steps.append(flight_step)
+
+    # Cursor for the running ball position and step start state.
+    cursor_coords = dict(flight_step["end"]["coords"])
+    cursor_ball = dict(ball_flight_end)
+    cursor_clock = dict(flight_step["end"]["clock"])
+    last_appended = flight_step
+
+    def _append_motion(
+        *,
+        ball_end: GridCoord,
+        step_t: float,
+        trigger_kind: str,
+        sfx_release: Optional[Dict[str, Any]] = None,
+        sfx_arrival: Optional[Dict[str, Any]] = None,
+        ball_motion_style: Optional[str] = None,
+    ) -> None:
+        """Append a single ball-motion sub-step, wiring the previous step's
+        next pointer to it. Placeholder next pointer; finalized later."""
+        nonlocal cursor_coords, cursor_ball, cursor_clock, last_appended
+        trigger: AdvanceTrigger = {
+            "condition": "fixed_duration",
+            "T_game_seconds": float(step_t),
+            "metadata": {"target_coords": dict(ball_end), "kind": trigger_kind},
+        }
+        step = _build_ball_motion_sub_step(
+            start_coords_seed=dict(cursor_coords),
+            overlay_players=overlay_players,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_t=step_t,
+            ball_start_coord=dict(cursor_ball),
+            ball_end_coord=dict(ball_end),
+            clock_start=dict(cursor_clock),
+            advance_trigger=trigger,
+            ball_motion_style=ball_motion_style,
+            next_step={"kind": "next_step", "index": len(steps) + 1},  # placeholder
+            sfx_on_ball_release=sfx_release,
+            sfx_on_ball_arrival=sfx_arrival,
+        )
+        # Repoint the previous step's next pointer to THIS step's index.
+        last_appended["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+        steps.append(step)
+        cursor_coords = dict(step["end"]["coords"])
+        cursor_ball = dict(ball_end)
+        cursor_clock = dict(step["end"]["clock"])
+        last_appended = step
+
+    # --- Variant intermediate sub-steps ----------------------------------
+
+    if is_rattle:
+        # Per-hop sub-steps: 40 ms wall-clock each, with rattle-leather.wav
+        # firing at the start of every hop. Hop count = 2 / 4 / 8 for
+        # LITTLE / NORMAL / HEAVY.
+        hop_targets = _rattle_hop_targets(
+            variant_upper, away_offense, turn_result,
+        )
+        for hop_target in hop_targets:
+            _append_motion(
+                ball_end=hop_target,
+                step_t=float(RATTLE_HOP_GAME_SECONDS),
+                trigger_kind="rattle_hop",
+                sfx_release=rattle_hop_sfx(),
+            )
+        # RATTLE make: settle into MSSS with the terminal swish at arrival.
+        if is_make:
+            msss = (dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
+                    else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM))
+            _append_motion(
+                ball_end=msss,
+                step_t=float(RATTLE_MAKE_SETTLE_GAME_SECONDS),
+                trigger_kind="rattle_settle",
+                sfx_arrival=rattle_make_settle_sfx(),
+            )
+    elif variant_upper == "BANK_MAKE":
+        # Bank → MSSS settle. Arrival SFX is already handled by the
+        # [ball_flight] step's timed_sfx (bb-rim-swish + delayed swish).
+        msss = (dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
+                else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM))
+        _append_motion(
+            ball_end=msss,
+            step_t=float(BANK_MAKE_SETTLE_GAME_SECONDS),
+            trigger_kind="bank_settle",
+        )
+    elif variant_upper == "BANK_MISS":
+        # Bank → rim-graze. Graze point is MSSS + per-shot rolled offsets.
+        msss = (dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
+                else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM))
+        graze = {
+            "x": float(msss["x"]) + float(
+                turn_result.get("shot_variant_backboard_miss_rim_offset_x") or 0
+            ),
+            "y": float(msss["y"]) + float(
+                turn_result.get("shot_variant_backboard_miss_rim_offset_y") or 0
+            ),
+        }
+        _append_motion(
+            ball_end=graze,
+            step_t=float(BANK_MISS_GRAZE_GAME_SECONDS),
+            trigger_kind="bank_graze",
+        )
+    elif is_airball:
+        # AIRBALL: ball continues from 2-short past the rim to the OOB
+        # sideline. No rebound bounce.
+        oob_target = (dict(AIRBALL_OOB_AWAY_COORDS) if away_offense
+                      else dict(AIRBALL_OOB_HOME_COORDS))
+        _append_motion(
+            ball_end=oob_target,
+            step_t=float(AIRBALL_OOB_GAME_SECONDS),
+            trigger_kind="airball_oob",
+        )
+
+    # --- Terminal sub-step (hold / bounce / direct turn_stop) -----------
+
+    if is_make:
+        # MAKE: [hold] at the ball's final settle point (MSSS for all make
+        # variants; the bank/back-of-rim/rattle settle steps already moved
+        # the ball there).
+        hold_step = _build_make_hold_sub_step(
+            prev_end_coords=dict(cursor_coords),
+            prev_clock=dict(cursor_clock),
+            ball_coord=dict(cursor_ball),
+            shooter_id=str(shooter_id),
+            away_offense=away_offense,
+            turn_result=turn_result,
+            next_step=_shot_attempt_turn_stop(),
+        )
+        last_appended["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+        steps.append(hold_step)
+    elif needs_bounce:
+        bounce_target: GridCoord = {"x": float(bx), "y": float(by)}
+        bounce_trigger: AdvanceTrigger = {
+            "condition": "fixed_duration",
+            "T_game_seconds": float(BOUNCE_STEP_GAME_SECONDS),
+            "metadata": {
+                "target_coords": dict(bounce_target),
+                "kind": "bounce",
+            },
+        }
+        bounce_step = _build_ball_motion_sub_step(
+            start_coords_seed=dict(cursor_coords),
+            overlay_players=overlay_players,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_t=BOUNCE_STEP_GAME_SECONDS,
+            ball_start_coord=dict(cursor_ball),
+            ball_end_coord=bounce_target,
+            clock_start=dict(cursor_clock),
+            advance_trigger=bounce_trigger,
+            ball_motion_style=None,
+            next_step=_shot_attempt_turn_stop(),
+        )
+        last_appended["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+        steps.append(bounce_step)
+    else:
+        # No bounce (AIRBALL, or MISS/BLOCK with no bounce coords): the
+        # final variant sub-step (or [ball_flight] if no variant steps)
+        # leads directly to the SHOT_ATTEMPT turn_stop.
+        last_appended["end"]["next"] = _shot_attempt_turn_stop()
+
+
+def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -> None:
+    """Legacy overlay-snap behavior. Retained for non-MAKE/MISS/BLOCK result
+    types (shooting fouls / steals / dead-ball turnovers) until those paths
+    migrate to schema-pure sub-stepping. For MAKE/MISS/BLOCK, see
+    ``_build_post_shot_sub_steps`` instead.
     """
     end_coords = step.get("end", {}).get("coords")
     start_actions = step.get("start", {}).get("action")
@@ -597,9 +1942,6 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
     if not isinstance(end_coords, dict):
         return
 
-    # Order is load-bearing — see TURN_COORDS_OVERLAY_KEYS in shared.py.
-    # Rebounder overlays apply FIRST (default), then get-back / release
-    # override for designated non-rebounders.
     for overlay_key in (
         "offense_rebounder_coords",
         "defense_rebounder_coords",
